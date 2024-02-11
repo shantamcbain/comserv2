@@ -14,3 +14,4 @@ requires 'Starman'; # DBIx::Class
 requires 'Text::CSV'; # DBIx::Class
 requires 'Config::JSON';
 requires 'Catalyst::Plugin::Session';
+requires 'Catalyst::Plugin::Authorization::Roles';

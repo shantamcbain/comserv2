@@ -23,7 +23,17 @@
                 .subject %]</a>
         [% END %]
     </div>
-</div>            <div class="submenu-item">
+</div>
+
+            <div class="submenu-item">
+    <span class="submenu-header">User</span>
+    <div class="submenu">
+        <a href="/user/list_users">List User</a>
+        <a href="/todo/display_tables">ToDo Tables</a>
+    </div>
+</div>
+
+            <div class="submenu-item">
                 <span class="submenu-header">Setup</span>
                 <div class="submenu">
                     <a href="/setup">Site Setup</a>

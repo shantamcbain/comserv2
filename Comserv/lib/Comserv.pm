@@ -12,7 +12,9 @@ use Catalyst qw/
     Session
     Session::Store::File
     Session::State::Cookie
- /;
+    Authentication
+    Authorization::Roles
+/;
 # Set flags and add plugins for the application.
 #
 # Note that ORDERING IS IMPORTANT here as plugins are initialized in order,

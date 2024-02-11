@@ -19,7 +19,7 @@
             [% INCLUDE 'Navigation/TopDropListGlobal.tt' %]
             [% INCLUDE 'Navigation/TopDropListHosted.tt' %]
             [% INCLUDE 'Navigation/TopDropListMember.tt' %]
-        [% IF c.session.user_id == 1 %]
+        [% IF c.session.group == "admin" %]
             [% INCLUDE 'Navigation/admintopmenu.tt' %]
         [% END %]
 
