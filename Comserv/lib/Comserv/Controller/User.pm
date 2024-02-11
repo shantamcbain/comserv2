@@ -21,6 +21,7 @@ sub index :Path :Args(0) {
 
     # Display the user index page
     $c->stash(template => 'user/index.tt');
+    $c->forward($c->view('TT'));
 }
 sub login :Local {
     my ($self, $c) = @_;

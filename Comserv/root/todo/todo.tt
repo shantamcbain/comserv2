@@ -6,7 +6,7 @@
 [% END %]
 <h1>ToDo List</h1>
 <h2>[% date_today %]</h2>
-<h3><a href="/old_todo/ency/todo" >Old todo</a></h3>
+<h3><a href="/todo/addtodo" >Old todo</a></h3>
 <form action="/todo/add" method="post">
     <button type="submit">Add New Record</button>
 </form>
