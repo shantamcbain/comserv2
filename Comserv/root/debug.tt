@@ -1,0 +1,63 @@
+<h1>Stash Information</h1>
+<h2>Last Error</h2>
+<p>[% session.last_error OR 'No errors' %]</p>
+<h2>DBI Connection Status</h2>
+<p>[% session.dbi_connected ? 'Connected' : 'Not connected' %]</p><table>
+    <tr>
+        <th>Variable</th>
+        <th>Value</th>
+    </tr>
+    [% FOREACH key IN c.stash.keys.sort %]
+    <tr>
+        <td>[% key %]</td>
+        <td>[% c.stash.$key | html  %]</td>
+    </tr>
+    [% END %]
+</table>
+[% USE Dumper %]
+<h1>Session Information</h1>
+<table>
+    <tr>
+        <th>Variable</th>
+        <th>Value</th>
+    </tr>
+    [% FOREACH key IN c.session.keys.sort %]
+    <tr>
+        <td>[% key %]</td>
+        <td>
+            [%# Check if the session variable is an array reference %]
+ [% IF ref(c.session.$key) == 'ARRAY' %]
+    check array
+    [%# Iterate over the array and print each element %]
+    [% FOREACH element IN c.session.$key %]
+    [% END %]
+        [%# Check if the element is a hash reference %]
+        [% IF ref(element) == 'HASH' %]
+        [% ELSE %]
+        [% END %]
+            [% element | html %]<br>
+            [%# Iterate over the keys of the hash and print each key-value pair %]
+            [% FOREACH subkey IN element.keys.sort %]
+            [% END %]
+                [% subkey _ " => " _ element.$subkey | html %]<br>
+
+[% ELSE %]
+    [% c.session.$key | html %]
+[% END %]        </td>
+    </tr>
+    [% END %]
+</table>
+
+[% USE Dumper %]
+<h1>Debug Log Entries</h1>
+[% USE JSON %]
+[% FOREACH entry IN debug_log_entries %]
+    <p>
+        <span>[% entry %]</span>
+        [% IF entry.match('HASH') %]
+            <button onclick="alert('[% JSON.dump(entry) | html %]')">Show Hash</button>
+        [% END %]
+    </p>
+[% END %]
+
+</table>

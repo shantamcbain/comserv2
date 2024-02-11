@@ -1,0 +1,51 @@
+<head>
+    [% PageVersion = 'css_form.tt,v 0.01 2023/11/03 shanta Exp shanta ' %]
+    <meta charset="utf-8">
+    [% IF debug_mode == 1 %]
+        [% PageVersion %]
+        [% INCLUDE 'debug.tt' %]
+    [% END %]
+</head>
+<body>
+    <h1>Change Css data</h1>
+    <form action="/update_css" method="POST">
+        <label for="body-font-size-input">Body Font Size:</label>
+        <select id="body-font-size-input" name="body-font-size">
+            [% FOREACH size IN font_sizes %]
+                <option value="[% size %]" [% IF size == body_font_size %]selected[% END %]>[% size %]</option>
+            [% END %]
+        </select>
+        <label for="body-font-color-input">Body Font Color:</label>
+        <input type="color" id="body-font-color-input" name="body-font-color" value="[% body_font_color %]">
+        <label for="nav-background-color-input">Nav Background Color:</label>
+        <input type="color" id="nav-background-color-input" name="nav-background-color" value="[% nav_background_color %]">
+        <button type="submit">Update</button>
+    </form>
+
+    <form action="/backup_css" method="POST">
+        <button type="submit">Backup CSS</button>
+    </form>
+
+    <form action="/list_backup_files" method="POST">
+        <button type="submit">List Backup Files</button>
+    </form>
+
+    <h2>Backup Files:</h2>
+    backup file [% backup_file %]
+    <form action="/delete_backup_files" method="POST">
+
+    [% IF backup_files.size > 0 %]
+        <ul>
+        [% FOREACH backup_file IN backup_files %]
+            <li>
+                <input type="checkbox" name="selected_files" value="[% backup_file %]">
+                [% backup_file %]
+            </li>
+        [% END %]
+        </ul>
+        <button type="submit">Delete Selected Files</button>
+    [% ELSE %]
+        <p>No backup files found.</p>
+    [% END %]
+</form></body>
+</html>

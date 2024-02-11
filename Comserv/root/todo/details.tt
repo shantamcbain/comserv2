@@ -1,0 +1,20 @@
+[% PageVersion  = 'old_todo_add.tt,v 0.1 2023/12/07 Shanta Exp Shanta' %]
+[% IF debug_mode == 1 %]
+
+    <p>Error: [% error_msg %]</p>
+    [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [% INCLUDE 'debug.tt' %]
+[% END %]
+
+<h1>Record Details View.</h1>
+<form action="/modify/ShantaForager/CscTodoTb/[% record.id %]" method="post">
+    [% FOREACH column IN columns %]
+        <label for="[% column %]">[% column %]:</label>
+        <input type="text" id="[% column %]" name="[% column %]" value="[% record.$column %]"><br>
+    [% END %]
+
+    <button type="submit">Save Changes</button>
+    <button onclick="location.href='/todo/log?id=' _ record.id;">Log</button>
+    <button onclick="location.href='/todo/delete?id=' _ record.id;">Delete</button>
+</form>

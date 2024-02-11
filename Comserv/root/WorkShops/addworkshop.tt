@@ -1,0 +1,34 @@
+[% PageVersion = 'WorkShops/addworkshop.tt,v 0.01 2024/01/08 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+[% END %]
+ [% PageVersion %]
+
+<h1>Add Workshop</h1>
+
+<form method="POST" action="/workshops/add">
+    <label for="id">ID:</label>
+    <input type="text" id="id" name="id"><br>
+
+    <label for="siteName">Site Name:</label>
+    <input type="text" id="siteName" name="siteName"><br>
+
+    <label for="dateOfWorkshop">Date of Workshop:</label>
+    <input type="date" id="dateOfWorkshop" name="dateOfWorkshop"><br>
+
+    <label for="time">Time:</label>
+    <input type="time" id="time" name="time"><br>
+
+    <label for="location">Location:</label>
+    <input type="text" id="location" name="location"><br>
+
+    <label for="title">Title:</label>
+    <input type="text" id="title" name="title"><br>
+
+    <label for="details">Details:</label>
+    <input type="text" id="details" name="details"><br>
+
+    <label for="maxMinAttendees">Max/Min Attendees:</label>
+    <input type="text" id="maxMinAttendees" name="maxMinAttendees"><br>
+
+    <input type="submit" value="Add Workshop">
+</form>

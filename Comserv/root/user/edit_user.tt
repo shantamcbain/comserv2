@@ -1,0 +1,13 @@
+[% PageVersion = 'login.tt,v 0.01 2023/09/01 shanta Exp shanta ' %]
+[% META title = 'Edit User' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+    [% INCLUDE 'debug.tt' %]
+[% END %]
+<form method="POST" action="">
+    <label for="username">Username:</label><br>
+    <input type="text" id="username" name="username" value="[% user.username %]"><br>
+    <label for="roles">Roles:</label><br>
+    <input type="text" id="roles" name="roles" value="[% user.roles %]"><br>
+    <input type="submit" value="Submit">
+</form>

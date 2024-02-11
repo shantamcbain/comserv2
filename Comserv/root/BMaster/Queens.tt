@@ -1,0 +1,45 @@
+
+<head>
+    [% PageVersion = 'Queens.tt,v 0.01 2023/11/03 shanta Exp shanta ' %]
+    <meta charset="utf-8">
+    [% IF debug_mode == 1 %]
+        [% PageVersion %]
+        [% INCLUDE 'debug.tt' %]
+    [% END %]
+</head>
+<h1>Queen Breeding System</h1>
+
+<form action="/queens/add_graft" method="post">
+  <h2>Graft Calendar</h2>
+
+  <label for="first_graft_date">First Graft Date:</label>
+  <input type="date" id="first_graft_date" name="first_graft_date" required>
+
+  <label for="days_of_egg_laying">Days of Egg Laying:</label>
+  <input type="number" id="days_of_egg_laying" name="days_of_egg_laying" required>
+
+  <label for="number_of_grafts">Number of Grafts:</label>
+  <input type="number" id="number_of_grafts" name="number_of_grafts" required>
+
+  <input type="submit" value="Submit">
+</form>
+
+<script>
+  // Calculate the Queen Catch Date based on the number of days of egg laying desired
+  document.getElementById('days_of_egg_laying').addEventListener('change', function() {
+    var daysOfEggLaying = parseInt(this.value);
+    var number_of_grafts = parseInt(document.getElementById('number_of_grafts').value);
+    var queenCatchDateInput = document.getElementById('queen_catch_date');
+    if (!isNaN(daysOfEggLaying) && !isNaN(number_of_grafts)) {
+      var dateOfFirstGraft = new Date(document.getElementById('first_graft_date').value);
+      if (!isNaN(dateOfFirstGraft.getTime())) {
+        var totalGraftDays = number_of_grafts * daysOfEggLaying;
+        var queenCatchDate = new Date(dateOfFirstGraft.getTime() + (totalGraftDays * 24 * 60 * 60 * 1000));
+        var formattedDate = queenCatchDate.toISOString().split('T')[0];
+        queenCatchDateInput.value = formattedDate;
+      }
+    } else {
+      queenCatchDateInput.value = '';
+    }
+  });
+</script>

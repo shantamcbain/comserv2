@@ -1,0 +1,23 @@
+[% PageVersion	= 'USBM.tt,v 0.01 2023/08/30 shanta Exp shanta '	%]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+    [% INCLUDE 'debug.tt' %]
+[% END %]
+
+
+    <p>This is the home page for the USBM (Universal School of Biological Life).</p>
+    <p>We are dedicated to teaching users how to live in harmony and respect for each other and the planet we live on.</p>
+
+    <h2>Explore Our Programs</h2>
+    <ul>
+        <li><a href="/USBM/Introduction">Introduction to USBM</a></li>
+        <li><a href="/USBM/Courses">Courses Offered</a></li>
+        <li><a href="/USBM/Events">Upcoming Events</a></li>
+    </ul>
+
+    <h2>Get Involved</h2>
+    <p>If you're interested in joining our community and learning more about sustainable living and environmental harmony, please get in touch with us.</p>
+    <p>Contact us at: <a href="mailto:info@usbm.ca">info@usbm.ca</a></p>
+
+
+

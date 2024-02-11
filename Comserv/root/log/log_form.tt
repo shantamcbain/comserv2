@@ -1,0 +1,31 @@
+[%- USE date -%]
+
+
+    <h1>Log Form</h1>
+    <p>Date: [% date.format(date.now, '%Y-%m-%d') %]</p>
+    <form method="post" action="[% c.uri_for('/log/log_form') %]">
+        <label for="message">Message:</label><br>
+        <textarea id="message" name="message" rows="4" cols="50"></textarea><br>
+        <input type="submit" value="Submit">
+    </form>
+    [% IF c.stash.log_data %]
+        <h2>Log Data:</h2>
+        <table>
+    <thead>
+        <tr >
+            <th>Date</th>
+            <th>SiteName</th>
+            <th>Message</th>
+        </tr>
+    </thead>
+    <tbody>
+        [% FOREACH entry IN log_data %]
+            <tr class="log-row">
+                <td>[% entry.0 %]</td>
+                <td>[% entry.1 %]</td>
+                <td>[% entry.2 %]</td>
+            </tr>
+        [% END %]
+    </tbody>
+</table>
+    [% END %]

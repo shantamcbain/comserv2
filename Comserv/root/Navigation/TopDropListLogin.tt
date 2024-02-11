@@ -1,0 +1,31 @@
+[% PageVersion = 'Navigation/TopDropLisLogin.tt,v 0.01 2024/01/01hanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [%# PageVersion %]
+    [%# "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+       <li class="horizontal-dropdown">
+            <a href="#" class="dropbtn">Login</a>
+            <div class="dropdown-content">
+                <a href="/login">Login</a>
+                <a href="/logout">Logout</a>
+                <a href="/register">Register</a>
+ <!-- Add more login options if needed -->
+                [% IF c.session.login_links.size %]
+                    [% FOREACH link IN c.session.login_links %]
+                        <a href="[% link.url %]">[% link.name %]</a>
+                        [% IF c.session.group == 'admin' %]
+                            <a href="/edit_link?link_id=[% link.id %]">Edit/Delete</a>
+                        [% END %]
+                    [% END %]
+                [% END %]
+                [% IF c.session.group == 'admin' %]
+                    <a href="/add_link?menu=login">Add</a>
+                [% END %]
+ [% IF firstname %]
+     <A HREF ="http://webmail.[% HostName %]"target="_Blank"><font   class="LeftSideBarNavStyle">Mail</font></a>
+ [% ELSE %]
+	   <A  HREF ="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=MailView" ><font   class="LeftSideBarNavStyle">Mail</font></a>
+ [% END %]
+           </div>
+        </li>

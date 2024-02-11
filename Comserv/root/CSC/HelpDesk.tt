@@ -1,0 +1,33 @@
+[% PageVersion	= 'CSC/HelpDesk.tt,v 0.01 2024/01/27shanta Exp shanta '	%]
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+ <br>[%	PageVersion %] <br>
+    [%# "Debugging HostName: " _ HostName %]
+	[%# INCLUDE 'debug.tt' %]
+[% END %]
+[%# PROCESS 'setup/DefaultDBI.ttml' %]
+
+ <table><tr><td><!-- HelpDesk View -->
+
+	<!--	<p>Server name [% data.HostName %]</p>-->
+
+	[% IF c.session.username %]
+
+<h3> Hello  [% c.session.firstname%]&nbsp;  [% c.session.lastname%]! Welcome to  Our HelpDesk system!</h3>
+
+
+	[% ELSE %]
+
+	<h3>  Hello! Welcome to [% c.session.domain %] Our HelpDesk system!</h3>
+    [% END %]
+
+
+<A NAME="PageTop"></A>
+
+<p>
+<!--Embed page helpdeskContents-->
+[% INCLUDE 'CSC/HelpdeskContents.tt' %]
+<!--end Embed page helpdeskContents-->
+</td>
+</tr></table>
+<!-- End HelpDesk View -->

@@ -1,0 +1,65 @@
+<head>
+    [% PageVersion = 'yards.tt,v 0.01 2023/11/03 shanta Exp shanta ' %]
+    <meta charset="utf-8">
+    [% IF debug_mode == 1 %]
+        [% PageVersion %]
+        [% INCLUDE 'debug.tt' %]
+    [% END %]
+</head>
+
+<h2>Yards</h2>
+
+<p>Here is a list of yards in the operation:</p>
+<ul>
+    [% FOREACH yard IN yards %]
+    <li>
+        <a href="/yard/[% yard.yard_id %]">[% yard.yard_name %]</a>
+    </li>
+    [% END %]
+</ul>
+
+<h2>Yard Detail</h2>
+<p>Click on a yard to view its details.</p>
+<p>The yard detail view will include:</p>
+<ul>
+    <li>A picture of the yard showing each pallet in its position</li>
+    <li>A graph of the yard production based on the total number of frames</li>
+    <li>Number of queens in the yard</li>
+</ul>
+<p>Plan:</p>
+<ol>
+    <li>Retrieve yard details from the database using the yard ID</li>
+    <li>Display the yard's picture and position of each pallet</li>
+    <li>Calculate and display the yard's production graph based on frame count</li>
+    <li>Show the number of queens present in the yard</li>
+</ol>
+
+<h2>Pallet Detail</h2>
+<p>Click on a pallet in the yard to view its details.</p>
+<p>The pallet detail view will include:</p>
+<ul>
+    <li>A picture of the pallet showing each hive in its position</li>
+    <li>A graph of the pallet status based on the number of frames</li>
+</ul>
+<p>Plan:</p>
+<ol>
+    <li>Retrieve pallet details from the database using the pallet ID</li>
+    <li>Display the pallet's picture and position of each hive</li>
+    <li>Calculate and display the pallet's status graph based on frame count</li>
+</ol>
+
+<h2>Hive Detail</h2>
+<p>Click on a hive in the pallet to view its details.</p>
+<p>The hive detail view will include:</p>
+<ul>
+    <li>Information about the queen in the hive</li>
+    <li>A graph of the queen's status based on various metrics</li>
+    <li>A link to add frame types to the queen's frame type table</li>
+</ul>
+<p>Plan:</p>
+<ol>
+    <li>Retrieve hive details from the database using the hive ID</li>
+    <li>Display information about the queen in the hive</li>
+    <li>Calculate and display a graph of the queen's status based on metrics</li>
+    <li>Provide a link to add frame types to the queen's frame type table</li>
+</ol>

@@ -1,0 +1,57 @@
+[% META title = 'Add Project' %]
+
+<h1>Add Project</h1>
+
+<form method="POST" action="/create_project">
+    <form method="POST" action="/create_project">
+    <label for="sitename">Site Name:</label><br>
+    <select id="sitename" name="sitename" required>
+        <option value="home" [% IF session.sitename == 'home' %]selected[% END %]>home</option>
+        <option value="CSC" [% IF session.sitename == 'CSC' %]selected[% END %]>CSC</option>
+        <option value="USBM" [% IF session.sitename == 'USBM' %]selected[% END %]>USBM</option>
+        <option value="BMaster" [% IF session.sitename == 'BMaster' %]selected[% END %]>BMaster</option>
+    </select><br>
+    <button type="button" onclick="window.open('add_site', '_blank');">Add Site</button><br>
+    <!-- Rest of the form fields go here -->
+</form>
+    <label for="name">Project Name:</label><br>
+    <input type="text" id="name" name="name" required><br>
+
+    <label for="description">Description:</label><br>
+    <textarea id="description" name="description" required></textarea><br>
+
+    <label for="start_date">Start Date:</label><br>
+    <input type="date" id="start_date" name="start_date" required><br>
+
+    <label for="end_date">End Date:</label><br>
+    <input type="date" id="end_date" name="end_date" required><br>
+
+<label for="status">Status:</label><br>
+<select id="status" name="status" required>
+    <option value="Requested">Requested</option>
+    <option value="Public">Public</option>
+    <option value="In-Process">In-Process</option>
+    <option value="Testing">Testing</option>
+    <option value="Delivered">Delivered</option>
+</select><br>
+
+    <label for="project_code">Project Code:</label><br>
+    <input type="text" id="project_code" name="project_code" required><br>
+
+    <label for="project_size">Project Size:</label><br>
+    <input type="number" id="project_size" name="project_size" required><br>
+
+    <label for="estimated_man_hours">Estimated Man Hours:</label><br>
+    <input type="number" id="estimated_man_hours" name="estimated_man_hours" required><br>
+
+    <label for="developer_name">Developer Name:</label><br>
+    <input type="text" id="developer_name" name="developer_name" required><br>
+
+    <label for="client_name">Client Name:</label><br>
+    <input type="text" id="client_name" name="client_name" required><br>
+
+    <label for="comments">Comments:</label><br>
+    <textarea id="comments" name="comments" required></textarea><br>
+
+    <input type="submit" value="Add Project">
+</form>

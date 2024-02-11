@@ -1,0 +1,44 @@
+[% PageVersion = 'Navigation/TopDropListHosted.tt,v 0.01 2024/01/01hanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [%# PageVersion %]
+    [%# "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+        <!-- Hosted menu -->
+        <li class="horizontal-dropdown">
+            <a href="#" class="dropbtn">Hosted</a>
+            <div class="dropdown-content">
+                <a href="/apply">Apply for Hosted Account</a>
+                <a href="/accounts">Hosted Accounts</a>
+                <a href="https://shamanbotanicals.ca" target="_blank">shamanbotanicals.ca </a>
+                <a href="https://skyefarm.com" target="_blank">skyefarm.com </a>
+                <a href="https://ve7tit.com" target="_blank">ve7tit.com   </a>
+                <a href="https://altpowerstore.com" target="_blank">altpowerstore.com</a>
+[% FOREACH link = c.stash.dbi.query("SELECT * FROM internal_links_tb
+                                WHERE  category = 'Hosted_link' AND (username_of_poster = '$username' OR share = 'public')
+                                  AND (sitename =  '$SiteName')
+                                  ORDER BY link_order
+                                    ")%]
+
+
+       <a href="[% link.url %]" name="Contact" target="[%link.target %]"title="[% link.name %] "><font   class="LeftSideBarNavStyle">[% link.name %]</font></a>
+      [% IF c.session.group == 'admin' %]
+        <a href="/edit_link?link_id=[% link.id %]">Edit/Delete</a>
+        [% END %]
+
+
+  [% END %]
+                <!-- Add more hosted options -->
+                [% IF c.session.hosted_links.size %]
+                    [% FOREACH link IN c.session.hosted_links %]
+                        <a href="[% link.url %]">[% link.name %]</a>
+                        [% IF c.session.group == 'admin' %]
+                            <a href="/edit_link?link_id=[% link.id %]">Edit/Delete</a>
+                        [% END %]
+                    [% END %]
+                [% END %]
+                [% IF c.session.group == 'admin' %]
+                    <a href="/add_link?menu=hosted">Add</a>
+                [% END %]
+            </div>
+        </li>

@@ -1,0 +1,18 @@
+[% PageVersion	= 'CSCModulesView.tt,v 0.01 2023/08/30 shanta Exp shanta '	%]
+[% IF debug == 1 %]
+ [%	PageVersion %]
+[% END %]
+<p>Here is a list of current modules Available to all sites
+
+<ol>
+	<li><a href="http://demo.computersystemconsulting.ca/cgi-bin/WebCal/webcal.cgi?site=Demo&amp;">Calendar's</a> </li>
+	<li><a href="http://demo.computersystemconsulting.ca/cgi-bin/index.cgi?site=Demo&amp;view=ProductView&amp;">Products</a> </li>
+	<li><a href="http://demo.computersystemconsulting.ca/cgi-bin/index.cgi?site=Demo&amp;view=WorkShopsView&amp;">Workshops</a></li>
+	<li><a href="http://demo.computersystemconsulting.ca/cgi-bin/index.cgi?site=Demo&amp;view=BuySellHomeView&amp;">BuyAndSell</a></li>
+	<li><a href="http://demo.computersystemconsulting.ca/cgi-bin/index.cgi?site=Demo&amp;view=ToDoHomeView&amp;">ToDo management</a></li>
+	<li><a href="http://demo.computersystemconsulting.ca/cgi-bin/index.cgi?site=Demo&amp;view=LogHomeView&amp;">Logging Systems</a></li>
+	<li><a href="http://helpdesk.beemaster.ca/cgi-bin/CSC/helpdesk.cgi?site=Demo&amp;">HelpDesk</a></li>
+	<li><a href="http://demo.computersystemconsulting.ca/cgi-bin/BBS/bbs.cgi?site=Demo&amp;view=ProductView&amp;">Forums</a></li>
+	<li><a href="http://demo.computersystemconsulting.ca/cgi-bin/ToDo/project_tracker.cgi?site=Demo&amp;">Project Management</a></li>
+
+</ol>

@@ -1,0 +1,17 @@
+    <!DOCTYPE html>
+    <html>[% PageVersion	= 'layout.tt,v 0.01 2023/08/30 shanta Exp shanta '	%]
+    [% INCLUDE 'setup/DefaultDBI.tt' %]
+    [% INCLUDE 'setup/DefaultVariables.tt' %]
+
+    [% IF debug == 1 %]
+     [%	PageVersion %]
+    [% END %]
+        [% INCLUDE 'Header.tt' %]
+    <body>
+        [% INCLUDE 'pagetop.tt' %]
+    [%# INCLUDE 'home.tt' %]
+        [% content %]
+        [% INCLUDE 'AdminNotes.tt' %]
+        [% INCLUDE 'footer.tt' %]
+    </body>
+    </html>

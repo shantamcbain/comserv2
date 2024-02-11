@@ -1,0 +1,40 @@
+ [% PageVersion	= 'CSC/LiveEditAdmin.tt,v 0.01 2024/01/27shanta Exp shanta '	%]
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+<br> [%	PageVersion %]	</br>
+ [% END %]
+ 
+ <!-- call  LiveEditAdmin--> 
+   	 [% IF group    ==  'admin' OR
+	       group    ==  'AltPower_admin' OR
+	       group    ==  'Apis_admin' OR
+	       group    ==  'Brew_admin' OR
+	       group    ==  'CS_admin' OR
+	       group    ==  'CSC_admin' OR
+	       group    ==  'CSCDev_admin' OR
+	       group    ==  'ENCY_admin' OR
+	       group    ==  'Forager_admin' OR
+	       group    ==  'eXtropia_admin' OR
+	       group    ==  'GrindrodBC_admin' OR
+	       group    ==  'HE_admin' OR
+	       group    ==  'News_admin' OR
+	       group    ==  'OKB_admin'OR
+	       group    ==  'Organic_admin' OR
+	       group    ==  'Shanta_admin' OR
+	       group    ==  'SSeedSaver_admin' OR
+	       group    ==  'VitalVic_admin' OR
+	       group    ==  'WB_admin' OR
+	       group    ==  'WiseWoman_admin' OR
+	       username == 'Shanta' OR
+	       group    == 'Demo_admin'
+
+	 %]
+
+ <p><a href="/EditPage?site=[% SiteName %]&[% session_string %]&display_modification_form=on&record_id=[% Record_id %]"
+	   target="_blank">edit page</a>
+ <p><a href="/AddNewPage" target="_blank">Add page </a>
+You can modify anything from here to the last update. You may use Html code in this area.
+	   [% END %]
+
+
+	  <!-- end LiveEditAdmin--> 

@@ -1,0 +1,60 @@
+<head>
+    [% PageVersion = 'Header.tt,v 0.01 2023/08/30 shanta Exp shanta ' %]
+    <meta charset="utf-8">
+    [% IF debug == 1 %]
+        [% PageVersion %]
+    [% END %]
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="REVISIT-AFTER" content="7 days">
+    <meta name="ROBOTS" content="index all, follow all">
+    [%# HostName = 'https://computersystemconsulting.ca' %]
+    [% HostName = c.stash.HostName %] [%# HostName %]<!-- This is where you access the stashed HostName -->
+    [% SiteName = c.session.SiteName %] [%# SiteName %]<!-- This is where you access the stashed SiteName -->
+    [% favicon = c.stash.HostName _ "/images/favicon.ico" %]
+    [% page_title = "Default Home" %]
+    [% ScriptDisplayName = 'Catalyst' %]
+    [% css_view_url = "/static/css/default.css" %]
+    <meta charset="utf-8">
+    [% Catalyst.debug(obj) %]
+    [% PageSiteName = HostName _ 'Comserv home' %]
+    [% ScriptDisplayName = 'Comserv home' %]
+    <title>[% HostName _ ': ' _ ScriptDisplayName _ ': ' _ page_title %]</title>
+    [% HostName = "http://computersystemconsulting.ca" %]
+    [%# data.css_view_url ||%]
+    [%# css_view_url = HostName _ "/styles/usbmstyle.css"  %]
+    <link rel="stylesheet" type="text/css" href="[% css_view_url %]">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="REVISIT-AFTER" content="7 days">
+    <meta name="ROBOTS" content="index all, follow all">
+    [% IF keywords %]
+        <meta name="keywords" content="[% keywords %]">
+    [% ELSE %]
+        <meta name="keywords" content="[% data.http_header_keywords %]">
+    [% END %]
+    [% IF description %]
+        <meta name="description" content="[% description %]">
+    [% ELSE %]
+        <meta name="description" content="[% data.http_header_description %]">
+    [% END %]
+    <link rel="shortcut icon" href="[% favicon %]">
+    [% IF SiteName == "CSC" %]
+        [% embed('CSCWHMCSInterface') %]
+    [% END %]
+    <link rel="stylesheet" type="text/css" href="[% c.uri_for('/static/css/log.css') %]">
+    <link rel="stylesheet" type="text/css" href="[% c.uri_for('/static/css/menu.css') %]">
+
+    <script src="static/js/sub-menu.js"></script>
+    <script language="javascript" type="text/javascript">
+        function switchpage(select) {
+            var index;
+            for (index = 0; index < select.options.length; index++) {
+                if (select.options[index].selected) {
+                    if (select.options[index].value !== "") {
+                        window.location.href = select.options[index].value;
+                        break;
+                    }
+           }
+            }
+        }
+    </script>
+ </head>

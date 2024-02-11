@@ -1,0 +1,26 @@
+[% ViewVersion = 'v 0.01 2024/01/01 setup/DefalutDbi.ttml'  %]
+[% IF data.debug == 1 %]
+ <p>[%	ViewVersion %] </p>
+ Using DBI to connect to MySQL
+ [% END %]
+[% MYSQLPW        = data.mysqlpw  %]
+
+[%# IF $ENV{'SERVER_NAME'} == 'shanta.computersystemconsulting.ca' %]
+[%# USE DBI( data_source = 'dbi:mysql:forager',
+                username = 'shanta',
+                password =  'herbsrox2' )
+    %]
+[%# ELSE %]
+
+
+[% USE DBI( data_source = 'dbi:mysql:shanta_forager;host=localhost',
+            username    = 'shanta_forager',
+            password    = 'UA=nPF8*m+T#',
+            debug       = 2 )
+%]
+
+[% c.stash.dbi = DBI %]
+
+
+ [%# END %]
+ [%# PUvPVZFU0neoHD5x%]

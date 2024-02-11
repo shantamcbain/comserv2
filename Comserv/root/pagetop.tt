@@ -1,0 +1,35 @@
+[% PageVersion = 'pagetop.tt,v 0.021 2024/01/01 shanta Exp shanta ' %]
+[%# PageVersion = 'pagetop.tt,v 0.02 2023/08/30 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [%# PageVersion %]
+    [%# "Debugging HostName: " _ HostName %]
+    [% INCLUDE 'debug.tt' %]
+[% END %]
+<header>
+    <!-- Site Greeting -->
+    <h1>Welcome to [% welcome_message | html %]</h1>
+     <!-- Main Menu.pm -->
+    <nav>
+        <ul class="horizontal-menu">
+            <li class="horizontal-dropdown">
+                <a href="[% c.session.return_url %]"class="dropbtn">Back</a>
+            </li>
+            [% INCLUDE 'Navigation/TopDropListMain.tt' %]
+            [% INCLUDE 'Navigation/TopDropListLogin.tt' %]
+            [% INCLUDE 'Navigation/TopDropListGlobal.tt' %]
+            [% INCLUDE 'Navigation/TopDropListHosted.tt' %]
+            [% INCLUDE 'Navigation/TopDropListMember.tt' %]
+        [% IF c.session.user_id == 1 %]
+            [% INCLUDE 'Navigation/admintopmenu.tt' %]
+        [% END %]
+
+        [% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]
+        </ul>
+    </nav>
+</header>
+[% IF error_msg %]
+    <p>Error: [% error_msg %]</p>
+[% END %]
+[% IF success_msg %]
+    <p>Error: [% success_msg %]</p>
+[% END %]

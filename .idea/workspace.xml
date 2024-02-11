@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="08580b19-a3bf-4191-ae3a-4f8c1f4bd059" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/Changes" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/Makefile.PL" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/README" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/comserv.conf" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/comserv.psgi" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/cpanfile" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/lib/Comserv.pm" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/lib/Comserv/Controller/Root.pm" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/lib/Comserv/View/TT.pm" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/AdminNotes.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/BMaster/BMaster.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/BMaster/Queens.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/BMaster/graft_calendar.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/BMaster/yards.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/AdminTodoListLink.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/AppToolsView.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSC.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCAddListView.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCAdminBottomAdminLinks.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCAdminHeadLinks.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCAdminLinks.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCBottomAdminLinksView.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCCopyRight.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCDevHOMEPagesql.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCDevHome.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCDevLogHOMEPagesql.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCDevProjectPagesql.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCDevToDoHOMEPagesql.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCDevToDoSQL.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCHOMEPagesql.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCLeftLinksView.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCLeftPageView.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCLogHOMEPagesql.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCMemberLeftLinksView.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCMembersql.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCModulesView.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCNonMemberLeftLinksView.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCProListView.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCProcedures.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCProductView.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCProjectPagesql.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCProjects.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCRecyHomeView.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCRecyProductView.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCRightHead.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCSideBarScript.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCSiteChangeView.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCSiteNaveView.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCToDoHOMEPagesql.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCTopAdvertView.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCTopNavBarView.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCTotalView.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCWHMCSInterface.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSCWorkShops.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSC_SQL_Admin.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSC_SQL_Main.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSC_SQL_Members.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSFrameView.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSHomeView.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CSLeftLinksView.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/CityShopAdminView.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/HelpDesk.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/HelpDeskHomePagesql.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/HelpdeskContents.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/HostName.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/InheretedVariablesView.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/JobLinkView.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/LiveEditAdmin.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/LogList.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/PlanningLeftLinksView.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/ProgramingView.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/ProjectList.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/SBDataView.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/SLSearchView.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/SQL_Ledger_Support_View.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/ServicesView.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/SideBarHomeView.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/SunFireHome.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/WebAppView.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/WebSiteAdminView.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/debug.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/nPageTopView.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/pagefields.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/CSC/voip.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/Documentation/DBIDocument.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/Documentation/DocumentManagement.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/Documentation/Documentation.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/Documentation/Logging.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/Documentation/Login.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/Documentation/Overview.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/Documentation/Projects.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/Documentation/Sites.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/Documentation/Starman.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/Documentation/Todo.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/Forager/Forager.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/Header.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/Monashee/Monashee.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/Monashee/MonasheeCoopAdmin.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/Navigation/TopDropLisGlobal.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/Navigation/TopDropListGlobal.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/Navigation/TopDropListHelpDesk.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/Navigation/TopDropListHosted.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/Navigation/TopDropListLogin.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/Navigation/TopDropListMain.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/Navigation/TopDropListMember.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/Navigation/admintopmenu.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/Navigation/confirm_delete.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/Navigation/confirm_modification.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/Navigation/edit_link.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/Shanta/Shanta.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/Shanta/WB.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/Shanta/ve7tit.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/SiteAdminNotes.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/SunFire/SunFire.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/USBM/USBM.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/WorkShops/addworkshop.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/WorkShops/workshops.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/css.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/css_form.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/debug.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/details.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/dev/github_projects.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/dev/index.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/favicon.ico" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/footer.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/home.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/index.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/layout.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/log/log_form.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/log/logs.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/pagetop.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/setup.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/setup/DefaultDBI.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/setup/DefaultVariables.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/setup/display_schema.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/setup/display_tables.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/setup/multi_site.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/setup/table_structure.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/setup/tables.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/static/css/20231104_default.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/static/css/20231105_default.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/static/css/20231106_default.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/static/css/default.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/static/css/log.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/static/css/menu.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/static/images/btn_120x50_built.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/static/images/btn_120x50_built_shadow.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/static/images/btn_120x50_powered.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/static/images/btn_120x50_powered_shadow.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/static/images/btn_88x31_built.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/static/images/btn_88x31_built_shadow.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/static/images/btn_88x31_powered.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/static/images/btn_88x31_powered_shadow.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/static/images/catalyst_logo.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/static/images/favicon.ico" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/static/js/sub-menu.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/todo/add_project.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/todo/add_site.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/todo/addtodo.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/todo/details.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/todo/edit_admin_notes.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/todo/edit_link.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/todo/list_databases.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/todo/old_todo.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/todo/old_todo_add.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/todo/select_tables.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/todo/sync_options.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/todo/todo.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/user/edit_user.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/user/list_users.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/user/login.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/user/mail.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/root/user/register.tt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/script/comserv_cgi.pl" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/script/comserv_create.pl" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/script/comserv_fastcgi.pl" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/script/comserv_server.pl" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/script/comserv_test.pl" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/t/01app.t" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/t/02pod.t" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/t/03podcoverage.t" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv/t/view_TT.t" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Comserv2.iml" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 1
+}</component>
+  <component name="ProjectId" id="2cB6b9SfaV48tRMuOfBP0AppfjQ" />
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  },
+  &quot;keyToStringList&quot;: {
+    &quot;DatabaseDriversLRU&quot;: [
+      &quot;mariadb&quot;
+    ]
+  }
+}</component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="08580b19-a3bf-4191-ae3a-4f8c1f4bd059" name="Changes" comment="" />
+      <created>1707572786988</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1707572786988</updated>
+      <workItem from="1707572787086" duration="4546000" />
+      <workItem from="1707578005526" duration="2856000" />
+      <workItem from="1707581563662" duration="9706000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+</project>

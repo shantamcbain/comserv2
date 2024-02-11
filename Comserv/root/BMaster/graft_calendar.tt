@@ -1,0 +1,68 @@
+<head>
+    [% PageVersion = 'graft_calendar.tt,v 0.01 2023/11/03 shanta Exp shanta ' %]
+    <meta charset="utf-8">
+    [% IF debug_mode == 1 %]
+        [% PageVersion %]
+        [% INCLUDE 'debug.tt' %]
+    [% END %]
+</head>
+
+[%# Set the title for the Graft Calendar section %]
+<h1>Graft Calendar</h1>
+
+[%# Sort the events array by the graft date %]
+[% events.sort('date') %]
+
+<table class="center">
+    <tr>
+        <th>Date</th>
+        <th>Graft #</th>
+        <th>Description Event</th>
+    </tr>
+    [% FOREACH event IN events %]
+        <tr>
+            <td>Date: [% event.date %]</td>
+            <td>Graft: [% event.graft %]</td>
+            <td>[% event.event %]</td>
+        </tr>
+    [% END %]
+</table>
+
+[% SET mailing_list = [
+    { value => 'anu_user_list@anucollective.beemaster.ca', label => 'ANU User List' },
+    { value => 'anubeekeeping@anucollective.beemaster.ca', label => 'ANU BMaster' },
+    { value => 'apis_discussion_beemaster@beemaster.ca', label => 'APIS Discussion BeeMaster' },
+    { value => 'beemaster@beemaster.ca', label => 'BeeMaster' },
+    { value => 'beetalklive@beemaster.ca', label => 'BeeTalk Live' },
+    { value => 'breeder@beemaster.ca', label => 'Breeder' }
+]; %]
+<form action="/mail/send_email" method="post">
+    <!-- Calendar table and other content -->
+
+    <input type="hidden" name="calendar_data" value="[% calendar_data | uri %]">
+    <label for="from">From:</label>
+    <input type="text" id="to" name="from" placeholder="Enter Sender email addresses"><br>
+
+    <label for="to">To:</label>
+
+     <label for="mailing_list">Mailing List:</label><br>
+
+      <select id="mailing_list" name="mailing_list[]" multiple>
+        [% FOREACH item IN mailing_list %]
+            <option value="[% item.value %]">[% item.label %]</option>
+        [% END %]
+    </select><br>
+
+
+
+
+    <label for="custom_emails">Custom Emails (separated by commas):</label><br>
+    <textarea id="custom_emails" name="custom_emails"></textarea><br>
+    <label for="Subject">Subject:</label><br>
+    <textarea id="subject" name="subject"></textarea><br>
+    <input type="text" name="body" placeholder="enter body">
+
+
+    <input type="submit" value="Send Calendar Email">
+</form>
+

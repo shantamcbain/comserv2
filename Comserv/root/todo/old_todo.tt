@@ -1,0 +1,53 @@
+[% PageVersion  = 'old_todo.tt,v 0.01 2023/12/07 Shanta Exp Shanta' %]
+[% IF debug_mode == 1 %]
+
+    <p>Error: [% error_msg %]</p>
+    [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [% INCLUDE 'debug.tt' %]
+[% END %]
+<style>
+    /* CSS to wrap long text */
+    td {
+        white-space: pre-wrap;  /* CSS3 */
+        word-wrap: break-word;  /* Internet Explorer 5.5+ */
+    }
+    /* Set table layout to auto */
+    table {
+        table-layout: auto;
+        width: 100%;
+    }
+</style>
+<h1>Old Todo List</h1>
+
+<a href="/old_todo_add/ShantaForager/CscTodoTb">Add New Todo</a>
+<table>
+    [% counter = 0 %]
+    [% FOREACH todo IN todos %]
+        [% IF counter % 10 == 0 %]
+            <tr>
+                <th>SiteName</th>
+                <th>Priority</th>
+                <th>Subject</th>
+                <th>Description</th>
+                <th>Start Date</th>
+                <th>Due Date</th>
+                <th>Status</th>
+                <th>Details</th>
+                <th>Log</th>
+            </tr>
+        [% END %]
+        <tr>
+            <td>[% todo.sitename %]</td>
+            <td>[% priority.$todo.priority %]</td>
+            <td class="wrap-text">[% todo.subject %]</td>
+            <td class="wrap-text">[% todo.description %]</td>
+            <td>[% todo.start_date %]</td>
+            <td>[% todo.due_date %]</td>
+            <td>[% status.$todo.status %]</td>
+            <td><button onclick="location.href='/details/ShantaForager/CscTodoTb/' + [% todo.id %];">Details</button></td>
+            <td><button onclick="location.href='/log/ShantaForager/CscTodoTb/' + [% todo.id %];">Log</button></td>
+        </tr>
+        [% counter = counter + 1 %]
+    [% END %]
+</table>

@@ -1,0 +1,140 @@
+[%# INCLUDE 'layout.tt' %]
+[% PageVersion	= 'home.tt,v 0.01 2023/08/30 shanta Exp shanta '	%]
+[% IF c.session.debug_mode == 1 %]
+ [%	PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+<p>This is the landing page for the ComServ Application. </p>
+<p>Here is a list of the sites available for this application.</p>
+
+
+<h2> sites to be added to catalyst!</h2>
+<ul>
+   <li><a href="/Monashee">The new Monashee coop site
+              <ul>
+                <li>Create new branch in git.</li>
+                <li>Add site to Root.pm</li>
+                <li>Add route to index in Root.</li>
+                <li>Create site home page.</li>
+                <li>Create Controller for all further pages.</li>
+                <li>Need to add the ability to add a new user to the database.</li>
+                <li>Need to add the ability to add a new user to the database.</li>
+                <li>Need to add the ability to add a new user to the database.</li>
+                <li>Need to add the ability to add a new user to the database.</li>
+              </ul>
+
+
+       </a></li>
+
+    <li><a href="/Forager">The new forager.com site</a></li>
+    <li><a href="/helpfullearth">helpfullearth.com</a></li>
+    <li><a href="?site=SB">shamanbotanicals.ca"</a></li>
+    <li><a href="skyefarm.com">skyefarm.com</a></li>
+    <li><a href="grindrodbc.com">grindrodbc.com</a></li>
+   <li><a href="/Monashee">The new Monashee coop site</a></li>
+   <li><a href="/Monashee">The new Monashee coop site</a></li>
+
+</ul>
+<h2> What is currently under development.</h2>
+<ol>
+    <li>Migrate sites from old server.
+        <ol>
+            <li>ssl to add  skyfarm.com, mail.skyfarm.com, computersystemconsulting.ca,
+                beemaster.ca,
+                helpfulearth.com, mail.helpfulearth.com, shamambotanicals.ca, grindrodbc.com, countrystores.ca usbm
+                .ca</li>
+            <li><a href="https://computersystemconsulting.ca" target="_blank">computersystemconsulting.ca Works</a></li>
+            <li><a href="https://beemaster.ca" target="_blank">beemaster.ca default home</a></li>
+            <li><a href="https://helpfullearth.com" target="_blank">Helpfulearth.com default home</a></li>
+            <li><a href="https://shamanbotanicals.ca" target="_blank">shamanbotanicals.ca default home</a></li>
+            <li><a href="https://skyefarm.com" target="_blank">skyefarm.com default home</a></li>
+            <li><a href="https://usbm.ca" target="_blank">usbm.ca works</a></li>
+            <li><a href="https://forager.com" target="_blank"> Forager.com works.</a></li>
+            <li><a href="http://countrystores.ca/" target="_blank">countrystores.ca done</a></li>
+            <li><a href="https://grindrodbc.com" target="_blank">grindrodbc.com</a></li>
+            <li><a href="https://ve7tit.com" target="_blank">ve7tit.com working  </a></li>
+            <li><a href="https://weaverbeck.com" target="_blank">weaverbeck.com</a> done shanta@weaverbeck.com not working.
+                appears that mail users are asked to varify them selves.
+            </li>
+             <li><a href="https://altpowerstore.com" target="_blank">altpowerstore.com</a> works done</li>
+       </ol>
+    </li>
+    <li>We Need to work on getting the server restarted after a git pull, also we need to get the production server for
+        catalyst working.
+        This way we can separate the testing from production.
+
+        Currently, we need to go into processes in cpanel and kill the active 3000 server.
+        Then restart the server.
+    </li>
+    <li>Schema.
+    <ol>
+    <li>Schema ability of admin users to create and modify Database schema</li>
+        <li>Schema Management</li>
+        <li>Schema Management - Add Schema to database.</li>
+        <li>Schema Management - Edit Schema</li>
+        <li>Schema Management - Delete Schema</li>
+        <li>Schema Management - View Schema</li>
+    </ol></li>
+    <li>Site Page Management Via database.</li>
+   <li> <ol>
+        <li>Site Page Management - Add Page to site.</li>
+        <li>Site Page Management - Edit Page</li>
+        <li>Site Page Management - Delete Page</li>
+        <li>Site Page Management - View Page</li>
+    </ol></li>
+    <li>CSS system for site styling by user</li>
+    <li>Site Admin
+        <ol><li>User Management
+    <ol>
+        <li>User Management - Add User</li>
+        <li>User Management - Edit User</li>
+        <li>User Management - Delete User</li>
+        <li>User Management - View User</li>
+        <li>User Management - Add email address to session
+            <ol>
+                <li>Get 2096 working</li>
+                <li></li>
+            </ol>
+        </li>
+        <li>Registration</li>
+        <li>Forgot Password</li>
+        <li>Forgot Username</li>
+        <li>Change Password</li>
+    </ol></li>
+    <li>Site Admin - User Management</li>
+    <li>Site Admin - Site Management</li>
+    <li>Site Admin - Site Page Management</li>
+    <li>Site Admin - Site Page Content Management</li>
+    <li>Site Admin - Site Page Content Management - Add Content</li>
+    <li>Site Admin - Site Page Content Management - Edit Content</li>
+    <li>Site Admin - Site Page Content Management - Delete Content</li>
+    <li>Site Admin - Site Page Content Management - View Content</li>
+    </ol></li>
+    <li>ToDo system
+    <ol>
+        <li>ToDo Management</li>
+        <li>ToDo Management - Add ToDo</li>
+        <li>ToDo Management - Edit ToDo</li>
+        <li>ToDo Management - Delete ToDo</li>
+        <li>ToDo Management - View ToDo</li>
+        <li>loging </li>
+        <li>projects</li>
+    </ol></li>
+    <li>Blog system
+    <ol>
+        <li>Blog Management</li>
+        <li>Blog Management - Add Blog</li>
+        <li>Blog Management - Edit Blog</li>
+        <li>Blog Management - Delete Blog</li>
+        <li>Blog Management - View Blog</li>
+    </ol></li>
+    <li>System to collect all the Videos, books, etc. and put the files in a database.</li>
+    <li>Calendar system</li>
+    <li>Solar Management system.</li>
+    <li>Weather Management system.</li>
+    <li>Documentation and HelpDesk</li>
+
+</ol>
+
+

@@ -1,0 +1,52 @@
+[% PageVersion	= 'CSC/voip.tt,v 0.01 2023/08/30 shanta Exp shanta '	%]
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+ [%	PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+	[%# INCLUDE 'debug.tt' %]
+[% END %]
+
+
+<A NAME="PageTop"></A>
+
+<table>
+<tr>
+	<td>
+
+<h1>Join our VOIP Phone System</h1>
+<p>Save LOTS of money on your monthly phone bills.
+
+<ul>
+	<li><a createyouraccount='' href='http://www.voipinterface.net/interface/signup.php?UID=141935' onclick='window
+	.open(this.href, \"\", \"resizable=yes,status=no,location=no,toolbar=no,menubar=no,fullscreen=no,scrollbars=no,
+	dependent=no\" target=_blank); return false;'><h2>Create an account</h2></a>
+<p>Return here for the next step. You must access your account to attach a did (Phone number) to your account. Remember your email address and password you will need them to access your account in the next step</p>
+</li>
+
+<li>
+<a href='http://www.voipinterface.net/site/access/uid/141935' onclick='window.open(this.href, \"\", \"resizable=no,status=no,location=no,toolbar=no,menubar=no,fullscreen=no,scrollbars=no,dependent=no\"); return false;'><h2>Access your voip account.</h2></a>
+<p>Use the email address and password you gave in creating your account. Charge your account with some money. Paypal accepted by default. Look for the services link then Order did to order your did. </p>
+<p>
+Browse around the interface to see your available services and how to set them up and access them. Key ones are the user name and password you use to connect your client. Creating a voice mail account and activating it or two of the many features available with your account.
+</p></li>
+
+
+<li><a href='https://voip.computersystemconsulting.ca/cgi-bin/index.cgi' target='_blank'><h2>Application</h2></a></li>
+
+	<li><a href='https://helpdesk.computersystemconsulting.ca' onclick='window.open(this.href, \"HelpDesk\", \"resizable=yes,status=no,location=no,toolbar=no,menubar=no,fullscreen=no,scrollbars=no,dependent=no\"); return false;'><h2>HelpDesk</h2></a></li>
+
+<li><a href='/webphone/mobile.html' onclick='window.open(this.href, \"Mobile\", \"resizable=yes,status=no,location=no,toolbar=no,menubar=no,fullscreen=no,scrollbars=no,dependent=no,width=500,height=1000\"); return false;'>Mobile phone </a>Not working</li>
+	<li>
+	<h2>Voice Mail</h2>
+
+<p> All accounts come with voice mail services. Create your voice mail account by clicking Voice mail in the services menu. This page explains setup and how to access.</p>
+
+	</li>
+
+</ul>
+
+
+
+
+</td></tr>
+</table>

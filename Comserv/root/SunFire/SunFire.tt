@@ -1,0 +1,21 @@
+[%# INCLUDE 'layout.tt' %]
+[% PageVersion = 'index.tt,v 0.01 2023/12/01 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+
+<h1>Welcome to SunFire Systems</h1>
+<p>SunFire Systems is a business that specializes in selling wood stoves of all types and alternate power equipment. Our mission is to provide high-quality, sustainable solutions for heating and power.</p>
+
+<h2>Our Products</h2>
+<ul>
+    <li><a href="/wood_stoves">Wood Stoves</a> - Explore our wide range of wood stoves, perfect for heating any space.</li>
+    <li><a href="/power_equipment">Alternate Power Equipment</a> - Discover our selection of alternate power equipment, designed for efficiency and sustainability.</li>
+</ul>
+
+<img src="https://example.com/path/to/wood_stove_image.jpg" alt="Wood Stove">
+<img src="https://example.com/path/to/power_equipment_image.jpg" alt="Power Equipment">
+
+<p>We invite you to explore our site and learn more about our products. If you have any questions, please don't hesitate to <a href="/contact_us">contact us</a>.</p>

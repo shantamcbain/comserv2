@@ -1,0 +1,39 @@
+[% PageVersion	= 'WorkShops/workshops.tt,v 0.01 2024/01/08 shanta Exp shanta '	%]
+[% IF debug_mode == 1 %]
+ [%	PageVersion %]
+[% END %]
+
+<h1>Workshops</h1>
+<a href="/workshops/add">Add Workshop</a>
+<table>
+    <tr>
+
+        <th>SiteName</th>
+        <th>Date of Workshop</th>
+        <th>Time</th>
+        <th>Location</th>
+        <th>Title</th>
+        <th>Details</th>
+        <th>Max/Min Attendees</th>
+        <th>Actions</th>
+    </tr>
+    [% FOREACH workshop IN workshops %]
+    <tr>
+
+        <td>[% workshop.1 %]</td>
+        <td>[% workshop.2 %]</td>
+        <td>[% workshop.3 %]</td>
+        <td>[% workshop.4 %]</td>
+        <td>[% workshop.5 %]</td>
+        <td>[% workshop.6 %]</td>
+        <td>[% workshop.7 %]</td>
+        <td>
+            [% IF c.user_in_group('admin') %]
+            <a href="/workshops/edit/[% workshop.0 %]">Edit</a>
+            <a href="/workshops/delete/[% workshop.0 %]">Delete</a>
+            [% END %]
+        </td>
+    </tr>
+    [% END %]
+</table>
+

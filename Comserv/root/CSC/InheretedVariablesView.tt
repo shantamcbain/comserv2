@@ -1,0 +1,227 @@
+
+[% PageVersion	= 'InheretedVariablesView.tt,v 0.01 2023/08/30 shanta Exp shanta '	%]
+[% IF debug == 1 %]
+ [%	PageVersion %]
+[% END %]
+
+<!-- InharatedVariablesView.ttml -->
+<table cellspacing="2" align="center" rules="cols">
+ 
+</td><td></td></tr>
+<tr> 
+ <td	class="InharatedVariablesCell">SiteName  TTML =  </td>        
+ <td	class="InharatedVariablesCell"></td>
+</tr>
+
+<tr>     
+ <td	class="InharatedVariablesCell">SiteDisplayName = </td>  
+ <td	class="InharatedVariablesCell">.data</td>
+</tr>
+
+<tr>  
+  <td	class="InharatedVariablesCell">Domain Name  .data = </td>  
+  <td	class="InharatedVariablesCell"> </td> 
+</tr>
+
+<tr>  
+  <td	class="InharatedVariablesCell">Domain Name  TTML   = </td>  
+  <td	class="InharatedVariablesCell"></td>
+</tr>
+
+<tr>
+ <td	class="InharatedVariablesCell">vertual server  TTML  = </td>       
+ <td	class="InharatedVariablesCell"></td>
+</tr>
+
+<tr>
+ <td	class="InharatedVariablesCell">Virtual server name .data= </td>
+ <td	class="InharatedVariablesCell"> </td>
+</tr>
+
+ <tr>
+ <td	class="InharatedVariablesCell">First name  TTML </td>
+ <td>	class="InharatedVariablesCell"> </td>
+ </tr>
+
+<tr>
+<td	class="InharatedVariablesCell">Last name  TTML  </td>
+<td	class="InharatedVariablesCell"> </td>
+</tr>
+
+<tr>
+<td	class="InharatedVariablesCell">UserName   TTML   </td>
+<td	class="InharatedVariablesCell"> </td>
+</tr>
+
+<tr>
+<td	class="InharatedVariablesCell">UserName    .data     </td>
+<td	class="InharatedVariablesCell">  .data</td>
+</tr>
+
+<tr>
+<td	class="InharatedVariablesCell">Group  TTML  </td>
+<td	class="InharatedVariablesCell">   </td>
+</tr>
+
+<tr>
+<td	class="InharatedVariablesCell">Group  .data  </td>
+<td	class="InharatedVariablesCell">   </td>
+</tr>
+
+<tr>
+<td	class="InharatedVariablesCell">debug   .data     </td>
+<td	class="InharatedVariablesCell"> </td>
+</tr>
+
+<tr>
+<td	class="InharatedVariablesCell">brewname  </td>
+<td	class="InharatedVariablesCell">.data</td>
+</tr>
+
+<tr>
+<td	class="InharatedVariablesCell">Allow addition  .data </td>
+<td	class="InharatedVariablesCell">      .data</td>
+</tr>
+
+<tr>
+<td	class="InharatedVariablesCell">Allow Modification .data</td>
+<td	class="InharatedVariablesCell">   .data</td>
+</tr>
+
+
+<tr>
+<td	class="InharatedVariablesCell">Allow Deletions  </td>
+<td	class="InharatedVariablesCell">      .data</td>
+</tr>
+
+<tr>
+<td	class="InharatedVariablesCell">AUTH_FOR_SEARCHING_FLAG .data </td>
+<td	class="InharatedVariablesCell"> .data</td>
+</tr>
+
+<tr>
+<td	class="InharatedVariablesCell"> -CSS_VIEW_NAME .data</td>
+ <td	class="InharatedVariablesCell">          .data</td>
+ </tr>
+
+ <tr>
+ <td class="InharatedVariablesCell">-CSS_VIEW_URL  .data </td>
+ <td	class="InharatedVariablesCell">       .data</td>
+ </tr>
+
+ <tr>
+ <td	class="InharatedVariablesCell">Developer status TTML  </td>
+<td	class="InharatedVariablesCell">  </td>
+</tr>
+
+<tr> <td	class="InharatedVariablesCell">Favicon .data</td>
+<td	class="InharatedVariablesCell">          .data</td>
+</tr>
+
+<tr>
+<td	class="InharatedVariablesCell">image url  </td>
+<td	class="InharatedVariablesCell">             .data</td>
+</tr>
+
+<tr>
+<td>image_root_url </td>
+<td>
+</tr>
+
+<tr>
+<td	class="InharatedVariablesCell">Mobile  .data     </td>
+<td	class="InharatedVariablesCell">  </td>
+</tr>
+
+<tr>
+<td	class="InharatedVariablesCell">mysqlpw  .data  </td>
+<td	class="InharatedVariablesCell">   </td>
+</tr>
+
+<tr>
+<td	class="InharatedVariablesCell">Record id  </td>
+<td	class="InharatedVariablesCell">      </td>
+</tr>
+
+<tr>
+<td	class="InharatedVariablesCell"> ScriptDisplayName .data</td>
+<td	class="InharatedVariablesCell">  </td>
+</tr>
+
+<tr>
+<td	class="InharatedVariablesCell">Session   TTML  </td>
+<td	class="InharatedVariablesCell">         </td>
+</tr>
+
+<tr>
+<td	class="InharatedVariablesCell">session_id   TTML   </td>
+<td	class="InharatedVariablesCell">     </td>
+</tr>
+	
+<tr>  <td	class="InharatedVariablesCell">Site update  TTML   </td>
+<td	class="InharatedVariablesCell">     </td>
+</tr>
+
+<tr>
+<td	class="InharatedVariablesCell">Last update   TTML  </td>
+ <td	class="InharatedVariablesCell">     </td>
+</tr>	
+
+
+<tr>
+<td	class="InharatedVariablesCell">Logo  .data   </td>
+<td	class="InharatedVariablesCell">          .data</td>
+</tr>
+
+
+<tr>
+<td	class="InharatedVariablesCell" >Mail_to .data   </td>
+<td	class="InharatedVariablesCell">         </td>
+</tr>
+
+<tr>
+<td	class="InharatedVariablesCell">PageTopView  .data  </td>
+<td	class="InharatedVariablesCell">    </td>
+</tr>
+ 
+<tr>
+<td  class="InharatedVariablesCell">Page name .data   </td>
+<td	class="InharatedVariablesCell">          </td>
+</tr>
+ 
+<tr>
+<td	class="InharatedVariablesCell">Page name  TTML  </td>
+<td	class="InharatedVariablesCell">          </td>
+</tr>
+
+<tr>
+<td	class="InharatedVariablesCell"> PageSiteName  .data </td>
+<td	class="InharatedVariablesCell">          </td>
+</tr
+
+<tr>
+<td	class="InharatedVariablesCell" >Procedure Name .data   </td>
+<td	class="InharatedVariablesCell">          </td>
+</tr>
+
+<tr>
+<td	class="InharatedVariablesCell" Procedure Name .session   </td>
+<td	class="InharatedVariablesCell">     </td>
+</tr>
+ 
+<tr>
+<td	class="InharatedVariablesCell">SiteName  .data</td>
+<td	class="InharatedVariablesCell"> </td>
+</tr>
+
+<tr>
+<td	class="InharatedVariablesCell">View   TTML   </td>
+<td	class="InharatedVariablesCell">     </td>
+</tr>
+
+
+</table>
+
+
+<!-- InharatedVariablesView.ttml -->
+ 

@@ -1,0 +1,10 @@
+[% PageVersion = 'Documentation/DocumentManagement.tt,v 0.01 2024/01/28 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [%# "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+<h1>Document Management</h1>
+<p>
+    <!-- Add your content here -->
+</p>

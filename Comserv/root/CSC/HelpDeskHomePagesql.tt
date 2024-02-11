@@ -1,0 +1,20 @@
+[% PageVersion	= 'CSC/HelpDeskHomePagesql.tt,v 0.01 2024/01/27shanta Exp shanta '	%]
+[% debug %]
+<br>
+[% IF c.session.debug_mode == 1 %]
+ [%	PageVersion %]
+ [% END %]
+
+ [% FOREACH link =  c.stash.dbi.query("SELECT * FROM page_tb
+                                  WHERE  (status  = 2 AND
+                                         page_code = 'HelpDeskHomeView')
+                                  ORDER BY sitename
+                                  ")%]
+               [% site      = link.sitename        %]
+                 [% PageName  = link.view_name %]
+                 [% Record_id = link.record_id  %]
+                 [% body      = link.body %]
+                 [% status      = link.status %]
+                 [%  page_code     = link.page_code %]
+                 [% lastupdate = link.lastupdate %]
+       [% END %]

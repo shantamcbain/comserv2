@@ -1,0 +1,25 @@
+
+ 
+           <li class="horizontal-dropdown">
+                <a href="#" class="dropbtn" target=.blank'>HelpDesk</a>
+                <div class="dropdown-content">
+                    [% IF c.session.group == 'admin' %]
+                    <a href="/add_link?menu=HelpDesk">Add</a>
+                    [% END %]
+                    <a href="/HelpDesk"target=.blank'>HelpDesk</a>
+                    <a href="/faq" target="_blank" ><font   class="LeftSideBarNavStyle">Our FAQ</font></a>
+                    <a href="/KnowlegeBase" target="_blank" >Knowledge
+                            base</a>
+                    <a href="https://www.computersystemconsulting.ca/whmcs/submitticket.php?step=2&deptid=2"
+                   target='_blank' >Sumbmit a support ticket.</a>
+                [% FOREACH link IN member_links %]
+                    <a href="[% link.url %]">[% link.name %]</a>
+                    [% IF c.session.group == 'admin' %]
+                        <a href="/edit_link?link_id=[% link.id %]">Edit/Delete</a>
+                    [% END %]
+                [% END %]
+                    <!-- Add more hosted options -->
+                </div>
+            </li>
+
+

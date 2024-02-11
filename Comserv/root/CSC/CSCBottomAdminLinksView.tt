@@ -1,0 +1,51 @@
+
+
+
+
+
+
+
+
+<!-- This is CSC Admin Bottom links. -->
+
+
+
+	CSC admin  links	PageBottom
+
+                 &nbsp; |
+
+	<A HREF ="../ECF/ecfcal.cgi?&amp;view=MonthView&amp;submit_power_search=on&amp;simple_search_string=" Target ="mainCon"> 's ECF Cal</a>
+	&nbsp; |
+                   <A  HREF ="site_news_manager.cgi" target="_Blank">Site News </a>
+		   &nbsp; |
+                   <A  HREF ="http://computersystemconsulting.ca/cgi-bin/Extropia/extropia.cgi?" target="_Blank">Extropia HelpDesk </a>
+		   &nbsp; |
+
+				   <A  HREF ="http://computersystemconsulting.ca/cgi-bin/Extropia/extropia_methouds.cgi?view=BasicDataView&amp;" target="_Blank">Extropia methouds </a>
+		   &nbsp;|
+                   <A  HREF ="http://computersystemconsulting.ca/cgi-bin/CSC/methoud_tracker.cgi?view=BasicDataView&amp;" target="_Blank">CSC methouds </a>
+		   &nbsp;|
+                   <A  HREF ="http://forager.com/my">phpMyAdmin </a>
+		   &nbsp;|
+
+				   <A  HREF ="http://forager.com/phpPgAdmin/">phpPgAdmin </a>
+		   &nbsp;|
+ 				   <A  HREF ="http:///admin/phpPgAdmin/">phpPgAdmin local</a>
+		   &nbsp;|
+                   <A  HREF ="http://srv01.cybersoup.com/cgi-bin/qmailadmin/">Mail admin </a>
+		   &nbsp; |
+                   <A  HREF ="http://computersystemconsulting.ca/stats/">CSC Stats </a>
+		   &nbsp; |
+
+				   <A  HREF ="http://forager.com/stats/">forager Stats </a>
+                   <A  HREF ="http://organicfarming.ca/stats">Stats Organic</a>
+		   &nbsp; |
+		   &nbsp; |
+                   <A  HREF ="http://shanta.org/stats/">Shanta Stats </a>
+		   &nbsp; |
+                   <A  HREF ="http://webcthelpdesk.com/stats/">Stats WebCT</a>
+		   &nbsp; |
+                   <A  HREF ="http://24.71.38.219/weblizer/index.html">Stats ecf</a>
+		   &nbsp; |
+
+<!--This is the end of CSC BottomAdminLinks.ttml-->
