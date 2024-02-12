@@ -1,13 +1,67 @@
 [%- USE date -%]
 
 
-    <h1>Log Form</h1>
-    <p>Date: [% date.format(date.now, '%Y-%m-%d') %]</p>
-    <form method="post" action="[% c.uri_for('/log/log_form') %]">
-        <label for="message">Message:</label><br>
-        <textarea id="message" name="message" rows="4" cols="50"></textarea><br>
-        <input type="submit" value="Submit">
-    </form>
+[%- USE date -%]
+
+<h1>Log Form</h1>
+<p>Date: [% date.format(date.now, '%Y-%m-%d') %]</p>
+<form method="post" action="[% c.uri_for('/log/log_form') %]">
+    <label for="todo_record_id">Todo Record ID:</label><br>
+    <input type="text" id="todo_record_id" name="todo_record_id"value="[% record_id %]"><a href="[% c.uri_for('/todo/addtodo') %]"> Add Todo</a><!-- Add Todo Button --><br>
+
+    <label for="owner">Owner:</label><br>
+    <input type="text" id="owner" name="owner"><br>
+
+    <label for="sitename">Site Name:</label><br>
+    <input type="text" id="sitename" name="sitename" value="[% c.session.SiteName %]" readonly><br>
+
+    <label for="start_date">Start Date:</label><br>
+    <input type="date" id="start_date" name="start_date"><br>
+
+    <label for="project_code">Project Code:</label><br>
+    <input type="text" id="project_code" name="project_code"><br>
+
+    <label for="due_date">Due Date:</label><br>
+    <input type="date" id="due_date" name="due_date"><br>
+
+    <label for="abstract">Abstract:</label><br>
+    <textarea id="abstract" name="abstract" rows="4" cols="50"></textarea><br>
+
+    <label for="details">Details:</label><br>
+    <textarea id="details" name="details" rows="4" cols="50"></textarea><br>
+
+    <label for="start_time">Start Time:</label><br>
+    <input type="time" id="start_time" name="start_time"><br>
+
+    <label for="end_time">End Time:</label><br>
+    <input type="time" id="end_time" name="end_time"><br>
+
+    <label for="time">Time:</label><br>
+    <input type="time" id="time" name="time"><br>
+
+    <input type="text" id="group_of_poster" name="group_of_poster" value="[% c.session.roles %]" readonly><br>
+    <label for="status">Status:</label><br>
+    <input type="text" id="status" name="status"><br>
+
+<label for="priority">Priority:</label><br>
+<select id="priority" name="priority">
+    [% FOREACH key IN priority.keys.sort %]
+        <option value="[% key %]">[% priority.$key %]</option>
+    [% END %]
+</select><br>
+
+<label for="status">Status:</label><br>
+<select id="status" name="status">
+    [% FOREACH key IN status.keys.sort %]
+        <option value="[% key %]">[% status.$key %]</option>
+    [% END %]
+</select><br>
+
+    <label for="comments">Comments:</label><br>
+    <textarea id="comments" name="comments" rows="4" cols="50"></textarea><br>
+
+    <input type="submit" value="Submit">
+</form>
     [% IF c.stash.log_data %]
         <h2>Log Data:</h2>
         <table>

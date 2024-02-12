@@ -10,7 +10,7 @@
 
     <div>
         <label for="sitename">Site Name:</label>
-        <input type="text" id="sitename" name="sitename" value="[% todo.sitename OR '' %]">
+        <input type="text" id="sitename" name="sitename" value="[% sitename OR '' %]">
     </div>
 
     <div>
@@ -50,8 +50,17 @@
     </div>
 
     <div>
-        <label for="project_code">Project Code:</label>
-        <input type="text" id="project_code" name="project_code" value="[% todo.project_code OR '' %]">
+<!-- Existing form code... -->
+
+<label for="project_id">Project:</label>
+<select id="project_id" name="project_id">
+    [% FOREACH project IN active_projects %]
+        <option value="[% project.id %]">[% project.name %]</option>
+    [% END %]
+</select>
+<!-- Link to add a new project -->
+<a href="[% c.uri_for('/projects/addproject') %]">Add New Project</a>
+
     </div>
 
    <div>
@@ -74,8 +83,8 @@
     <div>
         <label for="share">Share:</label>
         <select id="share" name="share">
-            <option value="public" [% IF todo.share == 'public' %]selected[% END %]>Public</option>
-            <option value="private" [% IF todo.share == 'private' %]selected[% END %]>Private</option>
+            <option value="0" [% IF todo.share == 'public' %]selected[% END %]>Public</option>
+            <option value="1" [% IF todo.share == 'private' %]selected[% END %]>Private</option>
         </select>
     </div>
 

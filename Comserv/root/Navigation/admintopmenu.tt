@@ -11,7 +11,7 @@
 <div class="submenu-item">
     <span class="submenu-header">ToDo</span>
     <div class="submenu">
-        <a href="/todo/index">ToDo</a>
+        <a href="/todo">ToDo</a>
         <a href="/todo/display_tables">ToDo Tables</a>
         <a href="[% c.uri_for(c.controller('Log').action_for('log_form')) %]">Open Log</a>
         [% FOREACH todo = c.stash.dbi.query("SELECT * FROM csc_todo_tb

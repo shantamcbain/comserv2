@@ -31,25 +31,25 @@ __PACKAGE__->add_columns(
         data_type => 'integer',
     },
   "comments",
-  { data_type => "text", is_nullable => 0 },
+  { data_type => "text", is_nullable => 1 },
     accumulative_time => {
         data_type => 'integer',
     },
     "reporter",
-      { data_type => "varchar", default_value => "", is_nullable => 0, size => 50 },
+      { data_type => "varchar", default_value => "", is_nullable => 1, size => 50 },
     "company_code",
-      { data_type => "varchar", default_value => "", is_nullable => 0, size => 30 },
+      { data_type => "varchar", default_value => "", is_nullable => 1, size => 30 },
     "owner",
-     { data_type => "varchar", default_value => "", is_nullable => 0, size => 30 },
+     { data_type => "varchar", default_value => "", is_nullable => 1, size => 30 },
 
     project_code => {
         data_type => 'varchar',
         size => 255,
     },
   "developer",
-  { data_type => "varchar", default_value => "", is_nullable => 0, size => 50 },
+  { data_type => "varchar", default_value => "", is_nullable => 1, size => 50 },
   "username_of_poster",
-  { data_type => "varchar", default_value => "", is_nullable => 0, size => 30 },
+  { data_type => "varchar", default_value => "", is_nullable => 1, size => 30 },
     status => {
         data_type => 'varchar',
         size => 255,
@@ -78,7 +78,7 @@ __PACKAGE__->add_columns(
         data_type => 'integer',
     },
       "date_time_posted",
-  { data_type => "varchar", default_value => "", is_nullable => 0, size => 30 },
+  { data_type => "varchar", default_value => "", is_nullable => 1, size => 30 },
 
 );
 
