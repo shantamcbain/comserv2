@@ -1,11 +1,15 @@
 [% PageVersion	= 'add_site.tt,v 0.01 2023/11/28 shanta Exp shanta '	%]
 [% IF debug_mode == 1 %]
  [%	PageVersion %]
-    [% "Debugging HostName: " _ HostName %]
-    [% INCLUDE 'debug.tt' %]
 [% END %]
-<h1>Add Site</h1>
 
+<!-- Display the success message if it exists -->
+[% IF message %]
+    <p>[% message %]</p>
+[% END %]
+[% IF c.flash.message %]
+    <p>[% c.flash.message %]</p>
+[% END %]
 <h2>Existing Sites</h2>
 <ul>
 [% FOREACH site IN sites %]
@@ -14,7 +18,7 @@
 </ul>
 
 <h2>Add New Site</h2>
-<form method="POST" action="/create_site">
+<form method="POST" action="/site/add_site">
     <label for="name">Site Name:</label><br>
     <input type="text" id="name" name="name" required><br>
     <label for="description">Description:</label><br>

@@ -1,0 +1,18 @@
+[% PageVersion = 'todo/project_list.tt,v 0.01 2023/11/28 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+        [% PageVersion %]
+[% END %]
+<label for="project_id">Project:</label>
+<select id="project_id" name="project_id">Project List
+<!-- project_list.tt -->
+[%  FOREACH project IN projects %]
+    <option value="[% project.id %]">[% project.name %]</option>
+    [% IF project.sub_projects %]
+        [% FOREACH sub_project IN project.sub_projects %]
+            <option value="[% sub_project.id %]">---[% sub_project.name %]</option>
+        [% END %]
+    [% END %]
+[% END %]
+</select>
+    <!-- Link to add a new project -->
+    <a href="[% c.uri_for('/project/addproject') %]">Add New Project</a>

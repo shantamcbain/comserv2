@@ -1,0 +1,48 @@
+Yes, you can use the IntelliJ IDEA's database tool to make changes to the database schema. After making the changes, you can generate the SQL script for the changes and use it as the initial setup for your database. Here's how you can do it:
+
+1. Open the Database tool window (View | Tool Windows | Database).
+2. Right-click the table you want to change and select `Modify Table`.
+3. In the dialog that opens, add a new column `parent_id` with type `integer` and check the `is nullable` option.
+4. Click `Execute` (or `Ctrl+Enter`). IntelliJ IDEA generates the SQL script for modifying the table.
+5. Copy this SQL script.
+
+Now, you can use this SQL script as the initial setup for your database. Here's how you can do it:
+
+1. Create a new migration script in your `./migrations` directory. This script should use the SQL script to make the same changes to your DBIx::Class schema.
+2. In your `deploy_schema.pl` script, call `$migration->install_if_needed` to create the initial setup for your database.
+
+Here's an example of how you might create a new migration script:
+
+```perl5
+# ./migrations/_source/deploy/1/001-auto.sql
+BEGIN;
+
+-- Paste your SQL script here
+
+COMMIT;
+```
+
+And here's how you might modify your `deploy_schema.pl` script:
+
+```perl5
+# deploy_schema.pl
+use strict;
+use warnings;
+use lib './lib';
+use DBIx::Class::Migration;
+use Comserv::Model::Schema::Ency;  # use the name of your schema module
+
+my $schema = Comserv::Model::Schema::Ency->connect('dbi:mysql:dbname=ency', 'shanta_forager', 'UA=nPF8*m+T#');  # use your actual DSN, username, and password
+
+my $migration = DBIx::Class::Migration->new(
+schema     => $schema,
+directory  => './migrations',
+target_dir => './migrations', # specify the target_dir
+initial_version => 1,  # Update this to the version of your new migration script
+force_overwrite => 1,
+);
+$migration->install_if_needed;
+$migration->upgrade;
+```
+
+Remember to replace `1` with the version of your new migration script. This way, you can keep your schema changes in sync between your code and your database.

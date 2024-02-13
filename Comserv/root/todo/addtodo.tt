@@ -1,11 +1,10 @@
-[%# INCLUDE 'layout.tt' %]
 [% PageVersion	= 'addtodo.tt,v 0.01 2023/11/28shanta Exp shanta '	%]
 [% IF debug_mode == 1 %]
  [%	PageVersion %]
     [% "Debugging HostName: " _ HostName %]
     [% INCLUDE 'debug.tt' %]
 [% END %]
-
+Content of dumper [% Dumper(projects) %]
 <form action="/todo/create" method="post">
 
     <div>
@@ -52,14 +51,9 @@
     <div>
 <!-- Existing form code... -->
 
-<label for="project_id">Project:</label>
-<select id="project_id" name="project_id">
-    [% FOREACH project IN active_projects %]
-        <option value="[% project.id %]">[% project.name %]</option>
-    [% END %]
-</select>
-<!-- Link to add a new project -->
-<a href="[% c.uri_for('/projects/addproject') %]">Add New Project</a>
+
+    [% INCLUDE 'todo/project_list.tt' %]
+
 
     </div>
 
@@ -111,15 +105,6 @@
         </select>
     </div>
 
-    <div>
-        <label for="project_id">Project ID:</label>
-        <select id="project_id" name="project_id">
-            [% FOREACH project IN projects %]
-                <option value="[% project.id %]" [% IF project.id == todo.project_id %]selected[% END %]>[% project.name %]</option>
-            [% END %]
-        </select>
-        <button type="button" onclick="window.open('add_project', '_blank');">Add Project</button>
-    </div>
     <div>
         <input type="submit" value="Submit">
     </div>

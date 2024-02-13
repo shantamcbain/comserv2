@@ -1,0 +1,35 @@
+[% META title = 'Project Success' %]
+[% PageVersion = 'todo/project.tt,v 0.01 2023/11/28 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+        [% PageVersion %]
+[% END %]
+
+
+<h1>Projects</h1>
+
+<!-- Display the success message -->
+<p>[% message %]</p>
+[% IF message %]
+    <p>[% message %]</p>
+[% END %]
+<!-- Display the list of all existing projects -->
+<ul>
+    [% FOREACH project IN projects %]
+        <li>
+            [% project.name %] - [% project.description OR 'No description' %]
+            <button type="button" onclick="window.open('/project/details/[% project.id %]', '_blank');">Details</button>
+            <!-- Display the list of sub-projects -->
+            <ul>
+                [% FOREACH sub_project IN project.sub_projects %]
+                    <li>
+                        [% sub_project.name %] - [% sub_project.description OR 'No description' %]
+                        <button type="button" onclick="window.open('/project/details/[% sub_project.id %]', '_blank');">Details</button>
+                    </li>
+                [% END %]
+            </ul>
+        </li>
+    [% END %]
+</ul>
+
+<!-- Button to add a new project -->
+<button type="button" onclick="window.location.href='/project/add_project';">Add Project</button>

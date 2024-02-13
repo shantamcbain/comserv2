@@ -40,12 +40,13 @@
       <td>[% task.get_column('status') %]</td>
       <td>[% task.get_column('comments') %]</td>
       <td>
- <form action="/todo/details" method="POST">
+<form action="log/log_form" method="POST" target="_blank">
     <input type="hidden" name="record_id" value="[% task.get_column('record_id') %]">
-    <button type="submit">Show Details</button>
-</form>      <form action="log_form" method="POST">
-          <input type="hidden" name="record_id" value="[% task.get_column('record_id') %]">
-          <button type="submit">Add Log</button>
+    <button type="submit">Add Log</button>
+</form>
+         <form action="/todo/details" method="POST">
+             <input type="hidden" name="record_id" value="[% task.get_column('record_id') %]">
+          <button type="submit">Details</button>
         </form>
 
       </td>

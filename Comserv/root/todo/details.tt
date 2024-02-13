@@ -1,15 +1,15 @@
-[% PageVersion  = 'todo/details.tt,v 0.1 2023/12/07 Shanta Exp Shanta' %]
+[% PageVersion  = 'todo/details.tt,v 0.1 2023/12/07 Shanta Exp Shanta'; %]
 [% IF debug_mode == 1 %]
     <p>Error: [% error_msg %]</p>
     [% PageVersion %]
 [% END %]
 
 <h1>Record Details View.</h1>
-<form action="/todo/modify/[% record.get_column('record_id') %]" method="post">
     <div>
+    <form action="/todo/modify/[% record.get_column('record_id') %]" method="post">
         <label for="sitename">Site Name:</label>
         <input type="text" id="sitename" name="sitename" value="[% record.get_column('sitename') %]">
-    </div>
+   </div>
 
     <div>
         <label for="start_date">Start Date:</label>
@@ -43,7 +43,10 @@
 
     <div>
         <label for="status">Status:</label>
-        <input type="text" id="status" name="status" value="[% record.get_column('status') %]">
+         <select id="status" name="status">          <option value="1" [% IF todo.status == 'NEW' %]selected[% END %]>NEW</option>
+            <option value="2" [% IF todo.status == 'IN PROGRESS' %]selected[% END %]>IN PROGRESS</option>
+            <option value="3" [% IF todo.status == 'DONE' %]selected[% END %]>DONE</option>
+        </select>
     </div>
 
     <div>
@@ -80,6 +83,7 @@
         <input type="submit" value="Submit">
     </div>
 </form>
-<button type="submit">Save Changes</button>
-<button onclick="location.href='/log/log_form?id=' + [% record.get_column('record_id') %]">Log</button>
-<button onclick="location.href='/todo/delete?id=' _ record.get_column('record_id');">Delete</button>
+<p>Record ID: [% record.get_column('record_id') %]</p>
+<button onclick="location.href='/log/log_form?id=' [% record.get_column('record_id') %]">Log</button>
+<button onclick="location.href='/log/log_form?id=' [% record.get_column('record_id') %]">Log</button>
+<button onclick="location.href='/todo/delete?id=' [% record.get_column('record_id') %]">Delete</button>

@@ -5,9 +5,10 @@
 
 <h1>Log Form</h1>
 <p>Date: [% date.format(date.now, '%Y-%m-%d') %]</p>
-<form method="post" action="[% c.uri_for('/log/log_form') %]">
+<form action="/log/create_log" method="POST">
+<p>Record ID: [% record_id %]</p>
     <label for="todo_record_id">Todo Record ID:</label><br>
-    <input type="text" id="todo_record_id" name="todo_record_id"value="[% record_id %]"><a href="[% c.uri_for('/todo/addtodo') %]"> Add Todo</a><!-- Add Todo Button --><br>
+<input type="text" id="todo_record_id" name="todo_record_id"value="[% record_id %]">  <a href="[% c.uri_for('/todo/addtodo') %]"> Add Todo</a><!-- Add Todo Button --><br>
 
     <label for="owner">Owner:</label><br>
     <input type="text" id="owner" name="owner"><br>

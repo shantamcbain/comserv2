@@ -1,57 +1,70 @@
 [% META title = 'Add Project' %]
+[% PageVersion = 'todo/add_project.tt,v 0.01 2023/11/28 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+[% END %]
+ [% PageVersion %]
 
 <h1>Add Project</h1>
 
-<form method="POST" action="/create_project">
-    <form method="POST" action="/create_project">
-    <label for="sitename">Site Name:</label><br>
-    <select id="sitename" name="sitename" required>
-        <option value="home" [% IF session.sitename == 'home' %]selected[% END %]>home</option>
-        <option value="CSC" [% IF session.sitename == 'CSC' %]selected[% END %]>CSC</option>
-        <option value="USBM" [% IF session.sitename == 'USBM' %]selected[% END %]>USBM</option>
-        <option value="BMaster" [% IF session.sitename == 'BMaster' %]selected[% END %]>BMaster</option>
-    </select><br>
-    <button type="button" onclick="window.open('add_site', '_blank');">Add Site</button><br>
-    <!-- Rest of the form fields go here -->
-</form>
-    <label for="name">Project Name:</label><br>
-    <input type="text" id="name" name="name" required><br>
+<!-- Display the error message if there is one -->
+[% IF error_message %]
+    <p class="error">[% error_message %]</p>
+[% END %]
 
+<form method="POST" action="/project/create_project">
+    <label for="sitename">Site Name:</label><br>
+<select id="sitename" name="sitename" required>
+    [% FOREACH site IN sites %]
+
+        <option value="[% site.id %]" [% IF site.id == form_data.sitename OR site.id == session.sitename %]selected[% END %]>[% site.name %]</option>
+
+    [% END %]
+</select>    <button type="button" onclick="window.open('/site/add_site_form', '_blank');">Add Site</button><br>
+
+    <label for="name">Project Name:</label><br>
+    <input type="text" id="name" name="name" value="[% form_data.name %]" required><br>
+<label for="parent_id">Parent Project:</label><br>
+<select id="parent_id" name="parent_id">
+    <option value="">None</option>
+    [% FOREACH project IN projects %]
+        <option value="[% project.id %]">[% project.name %]</option>
+    [% END %]
+</select><br>
     <label for="description">Description:</label><br>
-    <textarea id="description" name="description" required></textarea><br>
+    <textarea id="description" name="description" required>[% form_data.description %]</textarea><br>
 
     <label for="start_date">Start Date:</label><br>
-    <input type="date" id="start_date" name="start_date" required><br>
+    <input type="date" id="start_date" name="start_date" value="[% form_data.start_date %]" required><br>
 
     <label for="end_date">End Date:</label><br>
-    <input type="date" id="end_date" name="end_date" required><br>
+    <input type="date" id="end_date" name="end_date" value="[% form_data.end_date %]" required><br>
 
-<label for="status">Status:</label><br>
-<select id="status" name="status" required>
-    <option value="Requested">Requested</option>
-    <option value="Public">Public</option>
-    <option value="In-Process">In-Process</option>
-    <option value="Testing">Testing</option>
-    <option value="Delivered">Delivered</option>
-</select><br>
+    <label for="status">Status:</label><br>
+    <select id="status" name="status" required>
+        <option value="Requested" [% IF form_data.status == 'Requested' %]selected[% END %]>Requested</option>
+        <option value="Public" [% IF form_data.status == 'Public' %]selected[% END %]>Public</option>
+        <option value="In-Process" [% IF form_data.status == 'In-Process' %]selected[% END %]>In-Process</option>
+        <option value="Testing" [% IF form_data.status == 'Testing' %]selected[% END %]>Testing</option>
+        <option value="Delivered" [% IF form_data.status == 'Delivered' %]selected[% END %]>Delivered</option>
+    </select><br>
 
     <label for="project_code">Project Code:</label><br>
-    <input type="text" id="project_code" name="project_code" required><br>
+    <input type="text" id="project_code" name="project_code" value="[% form_data.project_code %]" required><br>
 
     <label for="project_size">Project Size:</label><br>
-    <input type="number" id="project_size" name="project_size" required><br>
+    <input type="number" id="project_size" name="project_size" value="[% form_data.project_size %]" required><br>
 
     <label for="estimated_man_hours">Estimated Man Hours:</label><br>
-    <input type="number" id="estimated_man_hours" name="estimated_man_hours" required><br>
+    <input type="number" id="estimated_man_hours" name="estimated_man_hours" value="[% form_data.estimated_man_hours %]" required><br>
 
     <label for="developer_name">Developer Name:</label><br>
-    <input type="text" id="developer_name" name="developer_name" required><br>
+    <input type="text" id="developer_name" name="developer_name" value="[% form_data.developer_name %]" required><br>
 
     <label for="client_name">Client Name:</label><br>
-    <input type="text" id="client_name" name="client_name" required><br>
+    <input type="text" id="client_name" name="client_name" value="[% form_data.client_name %]" required><br>
 
     <label for="comments">Comments:</label><br>
-    <textarea id="comments" name="comments" required></textarea><br>
+    <textarea id="comments" name="comments" required>[% form_data.comments %]</textarea><br>
 
     <input type="submit" value="Add Project">
 </form>

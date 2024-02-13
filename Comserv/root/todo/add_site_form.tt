@@ -1,0 +1,13 @@
+[% META title = 'Add Site' %]
+
+<h1>Add Site</h1>
+
+<form method="POST" action="/site/add_site">
+    <label for="name">Site Name:</label><br>
+    <input type="text" id="name" name="name" required><br>
+
+    <label for="description">Description:</label><br>
+    <textarea id="description" name="description" required></textarea><br>
+
+    <input type="submit" value="Add Site">
+</form>
