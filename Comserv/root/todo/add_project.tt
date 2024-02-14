@@ -1,8 +1,9 @@
 [% META title = 'Add Project' %]
 [% PageVersion = 'todo/add_project.tt,v 0.01 2023/11/28 shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
+    [% PageVersion %]
 [% END %]
- [% PageVersion %]
+
 
 <h1>Add Project</h1>
 
@@ -25,7 +26,7 @@
     <input type="text" id="name" name="name" value="[% form_data.name %]" required><br>
 <label for="parent_id">Parent Project:</label><br>
 <select id="parent_id" name="parent_id">
-    <option value="">None</option>
+    <option value="">None</option> <!-- Change this line -->
     [% FOREACH project IN projects %]
         <option value="[% project.id %]">[% project.name %]</option>
     [% END %]

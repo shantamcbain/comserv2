@@ -4,7 +4,7 @@
     [% "Debugging HostName: " _ HostName %]
     [% INCLUDE 'debug.tt' %]
 [% END %]
-Content of dumper [% Dumper(projects) %]
+Content of dumper [%# Dumper(projects) %]
 <form action="/todo/create" method="post">
 
     <div>
@@ -15,6 +15,14 @@ Content of dumper [% Dumper(projects) %]
     <div>
         <label for="start_date">Start Date:</label>
         <input type="date" id="start_date" name="start_date" value="[% todo.start_date OR '' %]">
+    </div>
+    <div>
+        <!-- Existing form code... -->
+
+
+    [% INCLUDE 'todo/project_list.tt' %]
+
+
     </div>
 
     <div>
@@ -48,14 +56,6 @@ Content of dumper [% Dumper(projects) %]
         <input type="number" id="accumulative_time" name="accumulative_time" value="[% todo.accumulative_time OR '' %]">
     </div>
 
-    <div>
-<!-- Existing form code... -->
-
-
-    [% INCLUDE 'todo/project_list.tt' %]
-
-
-    </div>
 
    <div>
         <label for="status">Status:</label>

@@ -49,14 +49,16 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
     my $schema = $c->model('DBEncy');
 
     # Get active projects for the site
-    my $active_projects = $schema->get_active_projects($c->session->{SiteName});
+#    my $active_projects = $schema->get_active_projects($c->session->{SiteName});
+# Get the Project resultset
+    my $project_rs = $schema->resultset('Project');
 
     # Print the content of $active_projects
-    print "Before adding to stash: ", Dumper($active_projects);
+    print "Before adding to stash: ", Dumper($project_rs);
 
     # Add the active projects and SiteName to the stash
     $c->stash(
-        projects => $active_projects || [{ id => 0, name => 'No projects' }],
+        projects => $project_rs|| [{ id => 0, name => 'No projects' }],
         sitename => $c->session->{SiteName},
         template => 'todo/addtodo.tt',
         Dumper => \&Dumper,

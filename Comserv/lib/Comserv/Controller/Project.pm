@@ -84,6 +84,7 @@ my $username_of_poster = $c->session->{username};
 my $group_of_poster = $c->session->{roles};
 # Get the parent_id from the form data
 my $parent_id = $form_data->{parent_id};
+$parent_id = undef if $parent_id eq '';
 
     # Get the current date and time
     my $date_time_posted = DateTime->now;
@@ -124,7 +125,7 @@ my $project = eval {
         # If the project was created successfully, redirect to the project.tt template
         $c->stash(
             success_message => 'Project added successfully',
-            template => 'todo/project.tt'
+         $c->res->redirect($c->uri_for($self->action_for('project')))
         );
     }
 
