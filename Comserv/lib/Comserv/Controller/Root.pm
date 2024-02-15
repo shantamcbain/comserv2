@@ -8,7 +8,7 @@ __PACKAGE__->config(namespace => '');
 
 sub index :Path :Args(0){
     my ($self, $c) = @_;
-        my $site_name = $c->session->{SiteName};
+        my $SiteName = $c->session->{SiteName};
    # Define a hash to map site names to templates
     my %site_to_template = (
         'SunFire' => 'SunFire/SunFire.tt',
@@ -26,9 +26,9 @@ sub index :Path :Args(0){
     );
 
     # Check if the site name exists in the hash
-    if (exists $site_to_template{$site_name}) {
+    if (exists $site_to_template{$SiteName}) {
         # If it does, use the corresponding template
-        $c->stash(template => $site_to_template{$site_name});
+        $c->stash(template => $site_to_template{$SiteName});
     } else {
         # If it doesn't, default to 'index.tt'
         $c->stash(template => 'index.tt');
@@ -49,13 +49,13 @@ sub auto :Private {
         $c->session(group => 'normal');
     }
     # Get the site name from the URL
-    my $site_name = $c->req->param('site');
+    my $SiteName = $c->req->param('site');
         $c->stash(template => 'css_form.tt');
 
-    if (defined $site_name) {
+    if (defined $SiteName) {
         # If site name is defined in the URL, update the session and stash
-        $c->stash->{SiteName} = $site_name;
-        $c->session->{SiteName} = $site_name;
+        $c->stash->{SiteName} = $SiteName;
+        $c->session->{SiteName} = $SiteName;
     }
     elsif (defined $c->session->{SiteName}) {
         # If site name is not defined in the URL but is defined in the session, use the session value
@@ -156,9 +156,18 @@ sub auto :Private {
         # Store the session value in the stash
         $c->stash->{page} = $c->session->{page};
     }
+    # Fetch the list of todos from the database
 
     # Set the HostName in the stash
     $c->stash->{HostName} = $c->request->base;
+   # Fetch the top 10 todos from the Todo model
+    my @todos = $c->model('Todo')->get_top_todos($c, $SiteName);
+
+    # Fetch the todos from the session
+    my $todos = $c->session->{todos};
+
+    # Store the todos in the stash
+    $c->stash(todos => $todos);
 
     # Set the Domain in the session
     $c->session->{Domain} = $domain;

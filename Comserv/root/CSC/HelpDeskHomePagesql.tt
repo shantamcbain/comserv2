@@ -5,7 +5,7 @@
  [%	PageVersion %]
  [% END %]
 
- [% FOREACH link =  c.stash.dbi.query("SELECT * FROM page_tb
+ [% FOREACH link =  DBI1.do_sql("SELECT * FROM page_tb
                                   WHERE  (status  = 2 AND
                                          page_code = 'HelpDeskHomeView')
                                   ORDER BY sitename

@@ -5,7 +5,6 @@ use Config::JSON;
 
 use Catalyst::Runtime 5.80;
 use Catalyst qw/
-    -Debug
     ConfigLoader
     Static::Simple
     StackTrace
@@ -14,6 +13,7 @@ use Catalyst qw/
     Session::State::Cookie
     Authentication
     Authorization::Roles
+    Log::Dispatch
 /;
 # Set flags and add plugins for the application.
 #
@@ -46,13 +46,37 @@ my $connect_info_ency = $config->get('connect_info_ency');
 # details given here can function as a default configuration,
 # with an external configuration file acting as an override for
 # local deployment.
-
+# After the use statements and before the __PACKAGE__->config call
+__PACKAGE__->log(Catalyst::Log->new(output => sub {
+    my ($self, $level, $message) = @_;
+    $level = 'debug' unless defined $level;
+    $message = '' unless defined $message;
+    $self->dispatchers->[0]->log(level => $level, message => $message);
+}));
+# Continue with the existing code...
+__PACKAGE__->config(
+    # ...
+);
 __PACKAGE__->config(
     name => 'Comserv',
     # Disable deprecated behavior needed by old applications
     disable_component_resolution_regex_fallback => 1,
     enable_catalyst_header => 1, # Send X-Catalyst header
     encoding => 'UTF-8', # Setup request decoding and response encoding
+     # Configure the application's log
+    'Plugin::Log::Dispatch' => {
+        dispatchers => [
+            {
+                class => 'Log::Dispatch::File',
+                min_level => 'debug',
+                filename => 'logs/application.log',
+                mode => 'append',
+                newline => 1,
+            },
+        ],
+    },
+
+
 );
 
 # Start the application

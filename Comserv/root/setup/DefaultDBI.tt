@@ -6,21 +6,27 @@
 [% MYSQLPW        = data.mysqlpw  %]
 
 [%# IF $ENV{'SERVER_NAME'} == 'shanta.computersystemconsulting.ca' %]
-[%# USE DBI( data_source = 'dbi:mysql:forager',
+[%#$ USE DBI( data_source = 'dbi:mysql:forager',
                 username = 'shanta',
                 password =  'herbsrox2' )
     %]
 [%# ELSE %]
 
 
-[% USE DBI( data_source = 'dbi:mysql:shanta_forager;host=localhost',
+[% USE DBIE = DBI( data_source = 'dbi:mysql:ency;host=localhost',
             username    = 'shanta_forager',
             password    = 'UA=nPF8*m+T#',
             debug       = 2 )
 %]
 
-[% c.stash.dbi = DBI %]
+[% c.stash.dbi_ency = DBIE %]
+[% USE DBIF = DBI( data_source = 'dbi:mysql:shanta_forager;host=localhost',
+            username    = 'shanta_forager',
+            password    = 'UA=nPF8*m+T#',
+            debug       = 2 )
+%]
 
+[% c.stash.dbi_forager = DBIF %]
 
  [%# END %]
  [%# PUvPVZFU0neoHD5x%]

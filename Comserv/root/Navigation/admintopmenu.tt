@@ -14,11 +14,14 @@
         <a href="/todo">ToDo</a>
         <a href="/todo/display_tables">ToDo Tables</a>
         <a href="[% c.uri_for(c.controller('Log').action_for('log_form')) %]">Open Log</a>
-        [% FOREACH todo = c.stash.dbi.query("SELECT * FROM csc_todo_tb
-                                            WHERE sitename = '$SiteName'
-                                            ORDER BY priority,
-                                            due_date LIMIT 10") %]
-             <a href="/todo/details/ShantaForager/CscTodoTb/[% todo.record_id %]">Priority: [% todo.priority %],
+        via stash
+        [% FOREACH todo IN c.session.todos %]
+
+    <a href="/todo/details/[% todo.record_id %]">Priority: [% todo.priority %], Subject: [% todo.subject %]</a>
+[% END %]
+        Via DBI
+  [%  FOREACH todo = c.stash.dbi_ency.do_sql("SELECT * FROM todo WHERE sitename = ? ORDER BY priority, due_date LIMIT 10", c.session.SiteName) %]
+             <a href="/todo/details/Todo/[% todo.record_id %]">Priority: [% todo.priority %],
                  Subject: [% todo
                 .subject %]</a>
         [% END %]

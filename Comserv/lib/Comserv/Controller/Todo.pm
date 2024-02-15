@@ -9,7 +9,7 @@ sub index :Path(/todo) :Args(0) {
     my ( $self, $c ) = @_;
 
     # Retrieve all of the todo records as todo model objects and store in the stash
- #   $c->stash(todos => [$c->model('DB::Todo')->all]);
+    $c->stash(todos => [$c->model('DB::Todo')->all]);
 
     # Set the TT template to use.
     $c->stash(template => 'todo/todo.tt');
@@ -40,7 +40,6 @@ sub todo :Path('/todo') :Args(0) {
 
     $c->forward($c->view('TT')),
 }
-
 
 sub addtodo :Path('/todo/addtodo') :Args(0) {
     my ( $self, $c ) = @_;
