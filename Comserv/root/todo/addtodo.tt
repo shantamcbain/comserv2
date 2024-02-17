@@ -4,7 +4,7 @@
     [% "Debugging HostName: " _ HostName %]
     [% INCLUDE 'debug.tt' %]
 [% END %]
-Content of dumper [% Dumper(todos) %]
+Content of dumper [% Dumper(projets) %]
 <form action="/todo/create" method="post">
 
     <div>
