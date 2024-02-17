@@ -16,3 +16,4 @@ requires 'Config::JSON';
 requires 'Catalyst::Plugin::Session';
 requires 'Catalyst::Plugin::Authorization::Roles';
 requires 'DBIx::Class::Migration';
+requires 'DBIx::Class::TimeStamp';

@@ -13,7 +13,7 @@
                 <div class="dropdown-content">
                     <a href="[% c.uri_for('/' )%]" onclick="activateSite('Home')">Home</a>
                     <a href="[% c.session.return_url %]">Go Back</a>
-               <span><a href="[% c.uri_for('/workshops') %]" onclick="activateSite('Workshops')" target="_blenk">Workshops</a></span>
+               <span><a href="[% c.uri_for('/workshop') %]" onclick="activateSite('Workshops')" target="_blenk">Workshops</a></span>
 
       <ul>
       <!-- populate from Page_tb -->
