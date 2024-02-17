@@ -17,7 +17,7 @@
 <select id="sitename" name="sitename" required>
     [% FOREACH site IN sites %]
 
-        <option value="[% site.id %]" [% IF site.id == form_data.sitename OR site.id == session.sitename %]selected[% END %]>[% site.name %]</option>
+        <option value="[% site.name %]" [% IF site.id == form_data.sitename OR site.id == session.sitename %]selected[% END %]>[% site.name %]</option>
 
     [% END %]
 </select>    <button type="button" onclick="window.open('/site/add_site_form', '_blank');">Add Site</button><br>
@@ -31,6 +31,7 @@
         <option value="[% project.id %]">[% project.name %]</option>
     [% END %]
 </select><br>
+
     <label for="description">Description:</label><br>
     <textarea id="description" name="description" required>[% form_data.description %]</textarea><br>
 

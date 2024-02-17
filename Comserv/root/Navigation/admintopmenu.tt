@@ -14,6 +14,7 @@
         <a href="/todo">ToDo</a>
         <a href="/todo/display_tables">ToDo Tables</a>
         <a href="[% c.uri_for(c.controller('Log').action_for('log_form')) %]">Open Log</a>
+         <a href="[% c.uri_for(c.controller('project').action_for('project')) %]">Projects</a>
         via stash
         [% FOREACH todo IN c.session.todos %]
 

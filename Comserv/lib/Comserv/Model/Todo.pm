@@ -31,7 +31,7 @@ sub get_top_todos {
 
     # Log the actual data of the todos
     foreach my $todo (@todos) {
-        $c->log->debug("Todo: " . Dumper($todo));
+        #$c->log->debug("Todo: " . Dumper($todo));
     }
 
     $c->session(todos => \@todos);

@@ -1,9 +1,7 @@
-[% PageVersion	= 'addtodo.tt,v 0.01 2023/11/28shanta Exp shanta '	%]
+[% PageVersion	= 'addtodo.tt,v 0.02 2023/11/28shanta Exp shanta '	%]
 [% IF debug_mode == 1 %]
  [%	PageVersion %]
-    [% "Debugging HostName: " _ HostName %]
-    [% INCLUDE 'debug.tt' %]
-[% END %]
+ [% END %]
 Content of dumper [% Dumper(projets) %]
 <form action="/todo/create" method="post">
 
@@ -35,7 +33,8 @@ Content of dumper [% Dumper(projets) %]
 
     [% INCLUDE 'todo/project_list.tt' %]
 
-
+<label for="manual_project_id">Manual Project ID:</label>
+<input type="text" id="manual_project_id" name="manual_project_id">
     </div>
 
     <div>

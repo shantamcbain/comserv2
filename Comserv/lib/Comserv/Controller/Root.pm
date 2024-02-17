@@ -50,7 +50,7 @@ sub auto :Private {
     }
     # Get the site name from the URL
     my $SiteName = $c->req->param('site');
-        $c->stash(template => 'css_form.tt');
+        #$c->stash(template => 'css_form.tt');
 
     if (defined $SiteName) {
         # If site name is defined in the URL, update the session and stash

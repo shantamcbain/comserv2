@@ -176,10 +176,15 @@ sub create :Local {
     my $group_of_poster = $c->session->{roles};
     my $user_id = $c->request->params->{user_id};
     my $project_id = $c->request->params->{project_id};
+    my $manual_project_id = $c->request->params->{manual_project_id};
     my $date_time_posted = $c->request->params->{date_time_posted};
 
+    # If manual_project_id is not empty, use it as the project ID
+    # If manual_project_id is empty, use project_id as the project ID
+    my $selected_project_id = $manual_project_id ? $manual_project_id : $project_id;
+
     # Check if accumulative_time is a valid integer
-     $accumulative_time = $c->request->params->{accumulative_time};
+    $accumulative_time = $c->request->params->{accumulative_time};
     if (!defined $accumulative_time || $accumulative_time !~ /^\d+$/) {
         $accumulative_time = 0;  # default value
     }
@@ -188,7 +193,6 @@ sub create :Local {
 
     # Get the username from the session
     my $username = $c->session->{username};
-
 
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
@@ -222,7 +226,7 @@ sub create :Local {
         last_mod_date => $current_date,
         user_id => $user_id,
         group_of_poster => $group_of_poster,
-        project_id => $project_id,
+        project_id => $selected_project_id,
         date_time_posted => $date_time_posted,
     });
 

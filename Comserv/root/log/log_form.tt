@@ -41,8 +41,6 @@
     <input type="time" id="time" name="time"><br>
 
     <input type="text" id="group_of_poster" name="group_of_poster" value="[% c.session.roles %]" readonly><br>
-    <label for="status">Status:</label><br>
-    <input type="text" id="status" name="status"><br>
 
 <label for="priority">Priority:</label><br>
 <select id="priority" name="priority">
