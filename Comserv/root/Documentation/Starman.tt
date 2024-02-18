@@ -45,8 +45,8 @@
         After=network.target
 
         [Service]
-        ExecStart=/usr/local/bin/starman --listen :5000 /home/shantam/PycharmProjects/CatalystComser1/Comserv/starman.psgi
-        WorkingDirectory=/home/shantam/PycharmProjects/CatalystComser1/Comserv
+        ExecStart=/usr/local/bin/starman --listen :5000 /home/shantam/PycharmProjects/CatalystComserv1/Comserv/starman.psgi
+        WorkingDirectory=/home/shantam/PycharmProjects/CatalystComserv1/Comserv
         User=shantam
         Group=shantam
         Restart=always
@@ -55,7 +55,10 @@
         WantedBy=multi-user.target
         </pre>
     </li>
-    <li>After saving the file, reload the systemd manager configuration with: <code>sudo systemctl daemon-reload</code></li>
+    <li>After saving the file, reload the systemd manager configuration with: <code>
+
+        </code></li>
+    <li>Edit comserv.psgi<code> use lib "$FindBin::Bin/lib";</code> to find the Lib directory</li>
     <li>Enable the service to start on boot: <code>sudo systemctl enable starman</code></li>
     <li>You can start the service immediately with: <code>sudo systemctl start starman</code></li>
     <li>To check the status of the service, use: <code>sudo systemctl status starman</code></li>
