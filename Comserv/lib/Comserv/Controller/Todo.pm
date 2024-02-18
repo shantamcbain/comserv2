@@ -26,7 +26,7 @@ sub todo :Path('/todo') :Args(0) {
 
     # Fetch todos for the site, ordered by start_date
     my @todos = $rs->search(
-        { sitename => $c->session->{SiteName} },  # filter by site
+        { sitename => $c->session->{SiteName}, status => { '!=' => 3 }  },  # filter by site
         { order_by => 'start_date' }  # order by start_date
     );
 
