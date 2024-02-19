@@ -1,0 +1,21 @@
+[% PageVersion = 'Admin/index.tt,v 0.01 2023/08/30 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<h1>Admin Home Page</h1>
+
+<p>Welcome to the Admin Home Page. Here you can manage various aspects of the site.</p>
+
+<h2>Site Management</h2>
+
+<ul>
+    <li><a href="edit_documentation">Edit Documentation</a></li>
+    <li><a href="change_styles">Change Styles</a></li>
+    <li><a href="add_schema">Add Schema</a></li>
+    <li><a href="update_software">Update Software</a></li>
+    <li><a href="change_roles">Change User Roles</a></li>
+    <li><a href="access_logging">Access Logging</a></li>
+</ul>
+
+<p>For more information or assistance, please contact us.</p>

@@ -64,6 +64,9 @@ sub do_login :Local {
             $c->session->{last_name} = $user->last_name;
             $c->session->{email} = $user->email;
 
+# Store the user object in the session
+
+$c->set_authenticated(Comserv::Model::User->new(_user => $user));
             # Retrieve the referrer URL and form data from the session
             my $referer = $c->session->{referer};
             my $form_data = $c->session->{form_data};
@@ -81,7 +84,6 @@ sub do_login :Local {
         $c->forward($c->view('TT'));
     }
 }
-
 sub hash_password {
     my ($self, $password) = @_;
     return sha256_hex($password);
@@ -92,7 +94,6 @@ sub create_account :Local {
     # Display the account creation form
     $c->stash(template => 'user/create_account.tt');
 }
-
 sub do_create_account :Local {
     my ($self, $c) = @_;
 
@@ -160,8 +161,6 @@ sub edit_user :Local :Args(1) {
         $c->response->body('User not found');
     }
 }
-use Data::Dumper;
-
 sub do_edit_user :Local :Args(1) {
     my ($self, $c) = @_;
 

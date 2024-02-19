@@ -5,9 +5,30 @@
 [% END %]
 <ul class="horizontal-menu">
     <li class="horizontal-dropdown">
-        <a href="#" class="dropbtn">Admin</a>
+        <a href="/admin" class="dropbtn">Admin</a>
         <div class="dropdown-content">
             <a href="/add_link?menu=admin">Add New Link</a>
+    <div class="submenu-item">
+    <span class="submenu-header">admin</span>
+    <div class="submenu">
+        <a href="/todo">ToDo</a>
+        <a href="/todo/display_tables">ToDo Tables</a>
+        <a href="[% c.uri_for(c.controller('Log').action_for('log_form')) %]">Open Log</a>
+         <a href="[% c.uri_for(c.controller('project').action_for('project')) %]">Projects</a>
+        via stash
+        [% FOREACH todo IN c.session.todos %]
+
+    <a href="/todo/details/[% todo.record_id %]">Priority: [% todo.priority %], Subject: [% todo.subject %]</a>
+[% END %]
+        Via DBI
+  [%  FOREACH todo = c.stash.dbi_ency.do_sql("SELECT * FROM todo WHERE sitename = ? ORDER BY priority, due_date LIMIT 10", c.session.SiteName) %]
+             <a href="/todo/details/Todo/[% todo.record_id %]">Priority: [% todo.priority %],
+                 Subject: [% todo
+                .subject %]</a>
+        [% END %]
+    </div>
+</div>
+
 <div class="submenu-item">
     <span class="submenu-header">ToDo</span>
     <div class="submenu">
