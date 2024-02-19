@@ -9,7 +9,7 @@
 
  <!-- Start /HTMLTemplates/Default/TopDropListMain.tt-->
          <li class="horizontal-dropdown">
-                <a href="#" class="dropbtn">Main</a>
+                <a href="/" class="dropbtn">Main</a>
                 <div class="dropdown-content">
                     <a href="[% c.uri_for('/' )%]" onclick="activateSite('Home')">Home</a>
                     <a href="[% c.session.return_url %]">Go Back</a>

@@ -6,7 +6,7 @@
 [% END %]
        <!-- Member menu -->
         <li class="horizontal-dropdown">
-            <a href="#" class="dropbtn">Member</a>
+            <a href="/membership" class="dropbtn">Member</a>
             <div class="dropdown-content">
                 <a href="/membership">Membership Information</a>
                 <a href="/applymembership">Apply for Membership</a>

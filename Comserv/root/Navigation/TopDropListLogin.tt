@@ -5,7 +5,7 @@
     [%# INCLUDE 'debug.tt' %]
 [% END %]
        <li class="horizontal-dropdown">
-            <a href="#" class="dropbtn">Login</a>
+            <a href="/user/login" class="dropbtn">Login</a>
             <div class="dropdown-content">
                 <a href="/user/login">Login</a>
                 <a href="/user/logout">Logout</a>

@@ -1,0 +1,24 @@
+[% PageVersion = 'admin/edit_documentation.tt,v 0.01 2023/08/30 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<h1>Edit documentation</h1>
+
+<p>This is the start of the system to document the application for the application</p>
+<ol>
+    <li>First round of in the documentation is store in tt files in the Documentation directory</li>
+    <ol>
+        <li>forms to list all the files </li>
+        <li>forms to edit the files</li>
+    </ol>
+    <li>Documentation will be stored in the database</li>
+    <ol>
+        <li>create schema to store document</li>
+        <li>forms to list the records </li>
+        <li>forms to create the records</li>
+        <li>forms to edit the records</li>
+    </ol>
+    <li>System to store reference document. </li>
+
+</ol>

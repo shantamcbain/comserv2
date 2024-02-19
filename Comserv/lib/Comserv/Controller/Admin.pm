@@ -45,6 +45,10 @@ sub index :Path :Args(0) {
     # Forward to the view
     $c->forward($c->view('TT'));
 }
+sub edit_documentation :Path('/edit_documentation') :Args(0) {
+    my ( $self, $c ) = @_;
+    $c->stash(template => 'admin/edit_documentation.tt');
+}
 
 __PACKAGE__->meta->make_immutable;
 

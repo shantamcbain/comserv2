@@ -6,7 +6,7 @@
 [% END %]
         <!-- Hosted menu -->
         <li class="horizontal-dropdown">
-            <a href="#" class="dropbtn">Hosted</a>
+            <a href="/hosted" class="dropbtn">Hosted</a>
             <div class="dropdown-content">
                 <a href="/apply">Apply for Hosted Account</a>
                 <a href="/accounts">Hosted Accounts</a>

@@ -1,7 +1,7 @@
 
  
            <li class="horizontal-dropdown">
-                <a href="#" class="dropbtn" target=.blank'>HelpDesk</a>
+                <a href="HelpDesk" class="dropbtn" target=.blank'>HelpDesk</a>
                 <div class="dropdown-content">
                     [% IF c.session.group == 'admin' %]
                     <a href="/add_link?menu=HelpDesk">Add</a>
