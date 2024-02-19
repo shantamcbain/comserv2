@@ -6,5 +6,9 @@
 [% END %]
 <h1>Sites</h1>
 <p>
-    <!-- Add your content here -->
+   We will be hosting a number of sites on our server.  We will be hosting sites for our clients, and we will also be hosting sites for our own use.
+    Sodo code for this might look like this:
+    1. get the domain store it in the session.
+    2. check the param('site') for an admin change in the SiteName.
+    3. based on the SiteName set the site controller to define site specific routs. souch as the home page in the index . to return that page to the user. for example beemaster.ca/ would return the home page for beemaster.ca as defined in the BMaster controller.
 </p>

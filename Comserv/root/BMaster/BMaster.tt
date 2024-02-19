@@ -7,13 +7,13 @@
 <p>Welcome to the BMaster Module of our application!</p>
 <p>Explore the different sections:</p>
 <ul>
-    <li><a href="/apiary">APIary Management System</a></li>
-    <li><a href="/Queens">Queen Rearing System</a></li>
-    <li><a href="/hive">Hive Management</a></li>
-    <li><a href="/honey">Honey Production</a></li>
-    <li><a href="/beehealth">Bee Health</a></li>
-    <li><a href="/environment">Environmental Considerations</a></li>
-    <li><a href="/education">Education and Collaboration</a></li>
+    <li><a href="/BMaster/apiary">Apiary Management System </a> Help you run your beekeeping operations.</li>
+    <li><a href="/BMaster/Queens">Queen Rearing System</a>Learn to raise queens with our system.</li>
+    <li><a href="/BMaster/hive">Hive Management</a>Part of our Apriary system Track the life of your hives. Use the information to see what to do next</li>
+    <li><a href="/BMaster/honey">Honey Production</a></li>
+    <li><a href="/BMaster/beehealth">Bee Health</a></li>
+    <li><a href="/BMaster/environment">Environmental Considerations</a></li>
+    <li><a href="/BMaster/education">Education and Collaboration</a>Our online, In yard and workshop training system. Learn to keep your bees with us.</li>
 </ul>
 <p>Here are some key features and practices for each section:</p>
 <h2>Hive Management</h2>

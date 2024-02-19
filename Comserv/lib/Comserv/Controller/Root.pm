@@ -8,11 +8,30 @@ __PACKAGE__->config(namespace => '');
 
 sub index :Path :Args(0){
     my ($self, $c) = @_;
-        my $SiteName = $c->session->{SiteName};
-   # Define a hash to map site names to templates
+    $c->log->debug('Entered index action in Root.pm');
+    my $SiteName = $c->session->{SiteName};
+    print "SiteName in root index: = $SiteName\n";
+    $c->log->debug('SiteName in root index: = $SiteName\n');
+    # Define a hash to map site names to controllers
+    my %site_to_controller = (
+        # ...
+        'BMaster' => 'BMaster',
+        # ...
+    );
+
+    # Check if the site name exists in the hash
+    if (exists $site_to_controller{$SiteName}) {
+        # Set the site controller to define site specific routes
+        my $controller = $site_to_controller{$SiteName};
+$c->detach($site_to_controller{$SiteName}, 'index');
+    } else {
+        # Handle the case when the site name doesn't exist in the hash
+        #$c->detach('Default::index');
+    }
+
+    # Define a hash to map site names to templates
     my %site_to_template = (
         'SunFire' => 'SunFire/SunFire.tt',
-        'BMaster' => 'BMaster/BMaster.tt',
         'Brew'    => 'Brew/Brew.tt',
         'CSC' => 'CSC/CSC.tt',
         'Dev' => 'dev/index.tt',
@@ -38,6 +57,7 @@ sub index :Path :Args(0){
 }
 sub auto :Private {
     my ( $self, $c ) = @_;
+   $c->log->debug('Entered auto action in Root.pm');
     # Get the domain name
     my $domain = $c->req->uri->host;
 
@@ -68,8 +88,7 @@ sub auto :Private {
             $c->stash->{SiteName} = 'SunFire';
             $c->session->{SiteName} = 'SunFire';
         }
-        elsif ($domain =~ /beemaster.ca\.ca$/
-            || $domain =~ /BMaster$/) {
+        elsif ($domain =~ /beemaster.ca\.ca$/ || $domain =~ /BMaster$/ || $domain =~ /beemaster\.computersystemconsulting\.ca$/) {
             $c->stash->{SiteName} = 'BMaster';
             $c->session->{SiteName} = 'BMaster';
         }
@@ -188,6 +207,7 @@ sub auto :Private {
             member_links => \@member_links,
         );
     }
+   $c->log->debug('Finished auto action in Root.pm');
 
     # Continue processing the rest of the request
     return 1;

@@ -1,0 +1,41 @@
+[% PageVersion	= 'Bmaster/apiary.tt,v 0.01 2023/08/30 shanta Exp shanta '	%]
+[% IF debug_mode == 1 %]
+ [%	PageVersion %]
+[% END %]
+<h1>Apiary Management System</h1>
+
+<p>Welcome to our Apiary Management System. This system is designed to help you track and manage your apiary effectively.</p>
+
+<h2>Hive Tracking</h2>
+
+<p>Our system allows you to track various aspects of your hives, including:</p>
+
+<ul>
+    <li>Hive condition</li>
+    <li>Number of bees</li>
+    <li>Frames of brood, honey, foundation, comb, and empty</li>
+    <li>Weight</li>
+    <li>Disease</li>
+    <li>Internal temperature</li>
+    <li>Temperament</li>
+</ul>
+
+<h2>Inventory Management</h2>
+
+<p>Keep track of your apiary equipment inventory, including:</p>
+
+<ul>
+    <li>Tops</li>
+    <li>Brood boxes</li>
+    <li>Entrance reducers</li>
+    <li>Frames</li>
+    <li>Bottom boards</li>
+    <li>Inner covers</li>
+    <li>Frame feeders</li>
+</ul>
+
+<p>This information will help you plan what is needed for your next visit to the yard.</p>
+
+<h2>Seasonal Calendar</h2>
+
+<p>Plan your activities for the season with our integrated calendar.</p>
