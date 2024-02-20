@@ -6,5 +6,22 @@
 [% END %]
 <h1>Overview</h1>
 <p>
-    <!-- Add your content here -->
-</p>
+    This Catalyst application is replacing our old eXtropia site which was written in Perl 4. The old site was a collection of CGI scripts and HTML pages.  The new site is written in Perl 5 using the Catalyst framework.  The new site is designed to be more modular and easier to maintain.  The new site is also designed to be more user-friendly and to provide more information to the user.</p>
+    <h2>These are the main features of the new site:</h2>
+<ol>
+    <li><h3>AI integration with the site:</h3>  </li>
+    <li><h3>Modular design:</h3>  </li>
+    <li><h3>ToDo, Project management, logs:</h3>  </li>
+    <li><h3>Admin functions:</h3>  edit files, control css, </li>
+    <li><h3>Security:</h3>  </li>
+    <li><h3>Documentation:</h3>  </li>
+    <li><h3>Search:</h3>  Using ai to build a comprehensive information base.</li>
+    <li><h3>Reference system of documents:</h3>  </li>
+    <li><h3>Power monitoring system:</h3>  </li>
+    <li><h3>Web based email:</h3>  </li>
+    <li><h3>Web based calendar:</h3>  </li>
+    <li><h3>Web based address book:</h3>  </li>
+    <li><h3>Web based file manager:</h3>  </li>
+    <li><h3>Web based photo album:</h3>  </li>
+    <li><h3>Web based music player:</h3>  </li>
+
