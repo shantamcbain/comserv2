@@ -6,5 +6,7 @@
 [% END %]
 <h1>Todo</h1>
 <p>
+    Sudo Code for add log
+    1. click button it will pass the todo record id sitename startdate project code the subject, priority and details     will go into details subject will go into abstract. start time will be filled with the current time. on success it will     return to the page the add log was clicked from.
     <!-- Add your content here -->
 </p>

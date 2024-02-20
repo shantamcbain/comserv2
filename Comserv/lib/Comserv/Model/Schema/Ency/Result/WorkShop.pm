@@ -5,14 +5,10 @@ __PACKAGE__->load_components("TimeStamp");
 __PACKAGE__->table('workshop');
 # Add your columns and relationships here
 
-Add__PACKAGE__->add_columns(
+__PACKAGE__->add_columns(
     id => {
         data_type => 'integer',
         is_auto_increment => 1,
-    },
-
-    site_id => {
-        data_type => 'integer',
     },
     site_id => {
         data_type => 'integer',
@@ -34,9 +30,6 @@ Add__PACKAGE__->add_columns(
     instructor => {
         data_type => 'varchar',
         size => 255,
-    },
-    max_participants => {
-        data_type => 'integer',
     },
     max_participants => {
         data_type => 'integer',
