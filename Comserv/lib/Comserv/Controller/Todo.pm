@@ -26,19 +26,21 @@ sub todo :Path('/todo') :Args(0) {
 
     # Fetch todos for the site, ordered by start_date
     my @todos = $rs->search(
-        { sitename => $c->session->{SiteName} },  # filter by site
+        {
+            sitename => $c->session->{SiteName},  # filter by site
+            status => { '!=' => 3 }  # status not equal to 3
+        },
         { order_by => 'start_date' }  # order by start_date
     );
 
     # Add the todos to the stash
-   $c->stash(
+    $c->stash(
         todos => \@todos,
         sitename => $c->session->{SiteName},
         template => 'todo/todo.tt',
-
     );
 
-    $c->forward($c->view('TT')),
+    $c->forward($c->view('TT'));
 }
 
 sub addtodo :Path('/todo/addtodo') :Args(0) {
@@ -83,8 +85,27 @@ sub details :Path('/todo/details') :Args(0) {
     # Fetch the todo with the given record_id
     my $todo = $rs->find($record_id);
 
-    # Add the todo to the stash
-    $c->stash(record => $todo);
+    # Retrieve accumulative_time from the database
+    my $accumulative_time_in_seconds = $todo->accumulative_time;
+
+    # Convert accumulative_time from seconds to hours and minutes
+    my $hours = int($accumulative_time_in_seconds / 3600);
+    my $minutes = int(($accumulative_time_in_seconds % 3600) / 60);
+
+    # Round minutes to the nearest minute
+    $minutes = int($minutes + 0.5);
+
+    # If minutes is 60, increment hours by 1 and set minutes to 0
+    if ($minutes == 60) {
+        $hours += 1;
+        $minutes = 0;
+    }
+
+    # Format the total time as 'HH:MM'
+    my $accumulative_time = sprintf("%02d:%02d", $hours, $minutes);
+
+    # Add the todo and accumulative_time to the stash
+    $c->stash(record => $todo, accumulative_time => $accumulative_time);
 
     # Set the template to 'todo/details.tt'
     $c->stash(template => 'todo/details.tt');
@@ -113,6 +134,33 @@ sub modify :Local :Args(1) {
 
         # Get the username from the session
         my $username = $c->session->{username};
+     # Add up the 'time' field
+        # Get a DBIx::Class::ResultSet object for 'Log'
+        my $log_rs = $schema->resultset('Log');
+
+        # Search the 'log' table for all completed logs for the current 'todo' entry
+        my @logs = $log_rs->search({ todo_record_id => $todo_id, status => 3 });
+# Add up the 'time' field
+# Initialize total_time to 0
+my $total_time_in_seconds = 0;
+
+# Loop over each log record
+foreach my $log (@logs) {
+    # Split the time field into hours, minutes, and seconds
+    my ($hours, $minutes, $seconds) = split(':', $log->time);
+
+    # Convert the hours, minutes, and seconds into seconds and add it to total_time
+    $total_time_in_seconds += $hours * 3600 + $minutes * 60 + $seconds;
+}
+
+# Now, total_time_in_seconds holds the total accumulated time in seconds
+# Convert total_time_in_seconds into hours, minutes, and seconds
+my $hours = int($total_time_in_seconds / 3600);
+my $minutes = int(($total_time_in_seconds % 3600) / 60);
+my $seconds = $total_time_in_seconds % 60;
+
+# Format the total time as 'HH:MM:SS'
+my $accumulative_time = sprintf("%02d:%02d:%02d", $hours, $minutes, $seconds);
 
         # Update the todo record with the new data
         $todo->update({
@@ -124,7 +172,7 @@ sub modify :Local :Args(1) {
             description => $form_data->{description},
             estimated_man_hours => $form_data->{estimated_man_hours},
             comments => $form_data->{comments},
-            accumulative_time => $form_data->{accumulative_time},
+            accumulative_time  => $total_time_in_seconds,
             reporter => $form_data->{reporter},
             company_code => $form_data->{company_code},
             owner => $form_data->{owner},
