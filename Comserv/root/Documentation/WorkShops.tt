@@ -1,0 +1,25 @@
+[% PageVersion = 'WorkShops/workshops.tt,v 0.01 2024/01/08 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+ [%	PageVersion %]
+[% END %]
+
+<h1>Workshop Application Creation Process</h1>
+
+<p>To create the Workshop application, we are following a structured approach that involves several steps:</p>
+
+<ol>
+    <li>Define the Data Models: We have defined several data models to represent the core entities in our application. These include WorkShop, Participant, and SiteWorkshop. Each model corresponds to a table in the database and defines the fields (columns) in that table.</li>
+    <li>Establish Relationships Between Models: We have established relationships between our models to reflect the associations between our entities. For example, we have a belongs_to relationship from WorkShop to Site, indicating that each workshop belongs to a site.</li>
+    <li>Create the Views: We have created a Template Toolkit file workshops.tt that defines the user interface for displaying and interacting with workshops. This file includes HTML and Template Toolkit directives to display a list of workshops and provide links for adding, editing, and deleting workshops.</li>
+</ol>
+
+<h2>Next steps:</h2>
+
+<ol>
+    <li>Implement the Controllers: We will implement controllers that handle user interactions with our application. These controllers will use the models to interact with the database and the views to generate the user interface.</li>
+    <li>Implement the Service Layer: We will implement a service layer that encapsulates the business logic of our application. This will include functions for checking if a user is allowed to create a workshop, if a workshop is full, or if a workshop can be scheduled at a certain time.</li>
+    <li>Test the Application: We will thoroughly test our application to ensure that it works as expected. This will include unit tests for our models, controllers, and service layer, as well as integration tests for the application as a whole.</li>
+    <li>Deploy the Application: Once we are confident that our application is working correctly, we will deploy it to a production environment.</li>
+</ol>
+
+<p>Remember, this is a high-level overview and the actual implementation might involve additional steps depending on the specific requirements of your application.</p>

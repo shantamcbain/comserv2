@@ -17,6 +17,7 @@
     <a href="#logging">Logging</a> |
     <a href="#document-management">Document Management</a> |
     <a href="#starman-setup">Starman Setup</a>
+   <a href="#workshop-management">Workshop Management</a> |
 </nav>
 
 <h3 id="overview"><a href="#top">Back to top</a> </h3>
@@ -45,3 +46,5 @@
 
 <h3 id="starman-setup"><a href="#top">Back to top</a> </h3>
 [% INCLUDE 'Documentation/Starman.tt' %]
+<h3 id="orkshop-management"><a href="#top">Back to top</a> </h3>
+[% INCLUDE 'Documentation/WorkShops.tt' %]
