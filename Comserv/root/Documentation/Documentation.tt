@@ -10,13 +10,14 @@
 <nav>
     <a href="#overview">Overview</a> |
     <a href="#dbi">DBI</a> |
-    <a href="#login">Login</a> |
-    <a href="#sites">Sites</a> |
-    <a href="#todo">Todo</a> |
-    <a href="#projects">Projects</a> |
-    <a href="#logging">Logging</a> |
     <a href="#document-management">Document Management</a> |
+    <a href="#Installation">Installation</a> |
+    <a href="#login">Login</a> |
+    <a href="#logging">Logging</a> |
+    <a href="#projects">Projects</a> |
+    <a href="#sites">Sites</a> |
     <a href="#starman-setup">Starman Setup</a> |
+    <a href="#todo">Todo</a> |
    <a href="#workshop-management">Workshop Management</a> |
 </nav>
 
@@ -25,6 +26,8 @@
 
 <h3 id="dbi"><a href="#top">Back to top</a> </h3>
 [% INCLUDE 'Documentation/DBIDocument.tt' %]
+<h3 id="Installation"><a href="#top">Back to top</a> </h3>
+[% INCLUDE 'Documentation/Instalation.tt' %]
 
 <h3 id="login"><a href="#top">Back to top</a> </h3>
 [% INCLUDE 'Documentation/Login.tt' %]

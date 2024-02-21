@@ -1,0 +1,44 @@
+[% PageVersion = 'Documentation/Instalation.tt,v 0.01 2024/01/28 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+[% END %]
+
+
+<h2>Detailed steps for the process of installing the software:</h2>
+<ol>
+    <li>
+1. **Create a GitHub repository**
+        <ul>
+ <li>- Sign in to your GitHub account.   </li>
+ <li>- Click on the '+' icon at the top right corner and select   'New repository'.   </li>
+ <li>- Name your repository and provide a description.   </li>
+ <li>- Choose whether the repository should be public or private.   </li>
+ <li>- Initialize the repository with a README file, if necessary.   </li>
+ <li>- Click on 'Create repository'.
+        </ul>
+    </li>
+<li>2. **Create a strata to replace the old catalyst repository with the new one**
+    <ul>
+<li>- Clone the new repository to your local machine using the command `git clone  &lt;repository_url &lt;`.</li>
+ <li>   - Navigate to the cloned repository's directory.
+    <li>- Create a new branch for the strata using the command `git checkout -b  &lt;branch_name &lt;`.</li>
+    <li>    - Make the necessary changes to replace the old catalyst repository.</li>
+    <li>    - Stage the changes using the command `git add .`.</li>
+    <li>    - Commit the changes using the command `git commit -m " &lt;commit_message &lt;"`.</li>
+            <li> - Push the changes to the remote repository using the command `git push origin  &lt;branch_name &lt;`.</li>
+                           </ul>
+</li>
+              <li>  3. **Update the repository on the production server**
+                         <ul>
+                <li>- SSH into the production server.</li>
+               <li> - Navigate to the directory where the repository is located.</li>
+                <li>- Pull the latest changes from the remote repository using the command `git pull origin master`.</li>
+  </ul>  </li>
+ <li>               4. **Update the database for the new version**
+                            <ul>
+                <li>- Backup the current database.</li>
+               <li> - Run the necessary SQL scripts to update the database schema.
+                <li>- Test the new version of the application with the updated database.</li>
+               <li> - If everything works as expected, commit the database changes.</li>  </ul>
+                                </li>
+</ol>
+               <p>Remember to always test each step in a safe environment before applying them to the production server.</p>
