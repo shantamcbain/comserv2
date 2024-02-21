@@ -62,7 +62,8 @@
                 <span class="submenu-header">Setup</span>
                 <div class="submenu">
                     <a href="/setup">Site Setup</a>
-                    <a href="/admin/documentation">Documentation</a>
+                    <a href="edit_documentation">Documentation editing</a>
+                    <a href="documentation">Documentation</a>
                     <a href="/css_form">CSS Settings</a>
                     <a href="/admin/users">Users</a>
                     <a href="/display_schema">Schema</a>
