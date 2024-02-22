@@ -34,10 +34,10 @@ use Catalyst qw/
 extends 'Catalyst';
 
 our $VERSION = '0.01';
-my $config = Config::JSON->new('db_config.json');
-
-my $connect_info = $config->get('connect_info');
-my $connect_info_ency = $config->get('connect_info_ency');
+#my $config = Config::JSON->new('db_config.json');
+#my $config = Config::JSON->new("$Bin/../db_config.json");
+#my $connect_info = $config->get('connect_info');
+#my $connect_info_ency = $config->get('connect_info_ency');
 
 # Now you can use $connect_info and $connect_info_ency to connect to your databases with DBIx
 # Configure the application.
