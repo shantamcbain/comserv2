@@ -2,6 +2,7 @@ package Comserv;
 use Moose;
 use namespace::autoclean;
 use Config::JSON;
+use FindBin '$Bin';
 
 use Catalyst::Runtime 5.80;
 use Catalyst qw/
