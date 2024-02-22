@@ -12,7 +12,7 @@ __PACKAGE__->config(
     schema_class => 'Comserv::Model::Schema::Ency',
 
     connect_info => {
-        dsn => $is_dev ? 'dbi:mysql:dbname=ency' : 'dbi:mysql:dbname=shanta_ency;host=remote_server_ip',
+        dsn => $is_dev ? 'dbi:mysql:dbname=ency' : 'dbi:mysql:dbname=shanta_ency;host=209.121.123.102',
         user => $is_dev ? 'shanta_forager' : 'remote_username',
         password => $is_dev ? 'UA=nPF8*m+T#' : 'remote_password',
     }
