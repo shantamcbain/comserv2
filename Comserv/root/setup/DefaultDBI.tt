@@ -13,7 +13,7 @@
 [%# ELSE %]
 
 
-[% USE DBIE = DBI( data_source = 'dbi:mysql:ency;host=localhost',
+[% USE DBIE = DBI( data_source = 'dbi:mysql:shanta_ency;host=localhost',
             username    = 'shanta_forager',
             password    = 'UA=nPF8*m+T#',
             debug       = 2 )
