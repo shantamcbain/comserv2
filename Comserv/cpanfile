@@ -17,3 +17,6 @@ requires 'Catalyst::Plugin::Session';
 requires 'Catalyst::Plugin::Authorization::Roles';
 requires 'DBIx::Class::Migration';
 requires 'DBIx::Class::TimeStamp';
+requires  'Catalyst::Plugin::Log::Dispatch';
+requires 'Catalyst::Plugin::Session::Store::DBI';
+requires 'Catalyst::Plugin::Session::Store::File';

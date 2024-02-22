@@ -2,14 +2,19 @@ package Comserv::Model::DBEncy;
 
 use strict;
 use base 'Catalyst::Model::DBIC::Schema';
+use Sys::Hostname;
+use Socket;
+
+my $hostname = hostname;
+my $is_dev = $hostname eq '0.0.0.0' || inet_aton($hostname) ? 1 : 0;
 
 __PACKAGE__->config(
     schema_class => 'Comserv::Model::Schema::Ency',
-    
+
     connect_info => {
-        dsn => 'dbi:mysql:dbname=ency',
-        user => 'shanta_forager',
-        password => 'UA=nPF8*m+T#',
+        dsn => $is_dev ? 'dbi:mysql:dbname=ency' : 'dbi:mysql:dbname=shanta_ency;host=remote_server_ip',
+        user => $is_dev ? 'shanta_forager' : 'remote_username',
+        password => $is_dev ? 'UA=nPF8*m+T#' : 'remote_password',
     }
 );
 
