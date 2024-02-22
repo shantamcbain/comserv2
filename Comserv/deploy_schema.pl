@@ -5,7 +5,7 @@ use lib './lib';
 use DBIx::Class::Migration;
 use Comserv::Model::Schema::Ency;  # use the name of your schema module
 
-my $schema = Comserv::Model::Schema::Ency->connect('dbi:mysql:dbname=shanta_ency', 'shanta_forager', 'UA=nPF8*m+T#');  # use your actual DSN, username, and password
+my $schema = Comserv::Model::Schema::Ency->connect('dbi:mysql:dbname=ency', 'shanta_forager', 'UA=nPF8*m+T#');  # use your actual DSN, username, and password
 
 my $migration = DBIx::Class::Migration->new(
   schema     => $schema,
