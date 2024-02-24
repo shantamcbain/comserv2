@@ -8,12 +8,12 @@
     <meta name="REVISIT-AFTER" content="7 days">
     <meta name="ROBOTS" content="index all, follow all">
     [%# HostName = 'https://computersystemconsulting.ca' %]
-    [% HostName = c.stash.HostName %] [%# HostName %]<!-- This is where you access the stashed HostName -->
+    [% HostName = c.stash.HostName %] [% HostName %]<!-- This is where you access the stashed HostName -->
     [% SiteName = c.session.SiteName %] [%# SiteName %]<!-- This is where you access the stashed SiteName -->
     [% favicon = c.stash.HostName _ "/images/favicon.ico" %]
     [% page_title = "Default Home" %]
     [% ScriptDisplayName = 'Catalyst' %]
-    [% css_view_url = "/static/css/default.css" %]
+[% css_view_name = c.stash.css_view_name %][% css_view_name%] [% c.stash.css_view_name %]
     <meta charset="utf-8">
     [% Catalyst.debug(obj) %]
     [% PageSiteName = HostName _ 'Comserv home' %]
@@ -22,7 +22,7 @@
     [% HostName = "http://computersystemconsulting.ca" %]
     [%# data.css_view_url ||%]
     [%# css_view_url = HostName _ "/styles/usbmstyle.css"  %]
-    <link rel="stylesheet" type="text/css" href="[% css_view_url %]">
+    <link rel="stylesheet" type="text/css" href="[%c.stash.css_view_name %]">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="REVISIT-AFTER" content="7 days">
     <meta name="ROBOTS" content="index all, follow all">
@@ -40,6 +40,7 @@
     [% IF SiteName == "CSC" %]
         [% embed('CSCWHMCSInterface') %]
     [% END %]
+        <link rel="stylesheet" type="text/css" href="[% c.uri_for('/static/css/default.css') %]">
     <link rel="stylesheet" type="text/css" href="[% c.uri_for('/static/css/log.css') %]">
     <link rel="stylesheet" type="text/css" href="[% c.uri_for('/static/css/menu.css') %]">
 

@@ -123,7 +123,7 @@ sub create_project :Path('create_project') :Args(0) {
         # If the project was created successfully, redirect to the project.tt template
         $c->stash(
             success_message => 'Project added successfully',
-Attem         );
+        );
         $c->res->redirect($c->uri_for($self->action_for('project')));
 
         $c->forward($c->view('TT'));

@@ -55,25 +55,20 @@ $c->detach($site_to_controller{$SiteName}, 'index');
 
     $c->forward($c->view('TT'));
 }
+
 sub auto :Private {
     my ( $self, $c ) = @_;
-   $c->log->debug('Entered auto action in Root.pm');
-    # Get the domain name
-    my $domain = $c->req->uri->host;
+    $c->log->debug('Entered auto action in Root.pm');
+    # Get a DBIx::Class::Schema object
+    my $schema = $c->model('DBEncy');
 
-    # Store domain in stash
-    $c->stash->{domain} = $domain;
-  # Store domain in session
-    $c->session->{domain} = $domain;
-    unless ($c->session->{group}) {
-        $c->session(group => 'normal');
-    }
     # Get the site name from the URL
     my $SiteName = $c->req->param('site');
-        #$c->stash(template => 'css_form.tt');
+# Get the domain name
+my $domain = $c->req->uri->host; # Add 'my' here
 
+    # If site name is defined in the URL, update the session and stash
     if (defined $SiteName) {
-        # If site name is defined in the URL, update the session and stash
         $c->stash->{SiteName} = $SiteName;
         $c->session->{SiteName} = $SiteName;
     }
@@ -81,68 +76,53 @@ sub auto :Private {
         # If site name is not defined in the URL but is defined in the session, use the session value
         $c->stash->{SiteName} = $c->session->{SiteName};
     }
-    else {
-        # If site name is not defined in the URL or the session, check the domain and set the site accordingly
-        if ($domain =~ /sunfire\.computersystemconsulting\.ca$/
-            || $domain =~ /sunfiresystems\.ca$/) {
-            $c->stash->{SiteName} = 'SunFire';
-            $c->session->{SiteName} = 'SunFire';
-        }
-        elsif ($domain =~ /beemaster.ca\.ca$/ || $domain =~ /BMaster$/ || $domain =~ /beemaster\.computersystemconsulting\.ca$/) {
-            $c->stash->{SiteName} = 'BMaster';
-            $c->session->{SiteName} = 'BMaster';
-        }
-        elsif ($domain =~ /computersystemconsulting\.ca$/
-            || $domain =~ /CSC$/) {
-            $c->stash->{SiteName} = 'CSC';
-            $c->session->{SiteName} = 'CSC';
-        }
-        elsif ($domain =~ /shanta\.computersystemconsulting\.ca$/
-            || $domain =~ /shanta\.weaverbeck\.com$/ || $domain =~ /Shanta$/) {
-            $c->stash->{SiteName} = 'Shanta';
-            $c->session->{SiteName} = 'Shanta';
-        }
-        elsif ($domain =~ /dev\.computersystemconsulting\.ca$/ || $domain =~ /Dev$/) {
-            $c->stash->{SiteName} = 'CSCDev';
-            $c->session->{SiteName} = 'CSCDev';
-        }
-        elsif ($domain =~ /forager\.com$/ || $domain =~ /Forager$/) {
-            $c->stash->{SiteName} = 'Forager';
-            $c->session->{SiteName} = 'Forager';
-        }
-        elsif ($domain =~ /monashee\.computersystemconsulting\.ca$/
-            || $domain =~ /Monashee$/) {
-            $c->stash->{SiteName} = 'Monashee';
-            $c->session->{SiteName} = 'Monashee';
-        }
-        elsif ($domain =~ /brew\.computersystemconsulting\.ca$/
-            || $domain =~ /brew\.weaverbeck\.com$/ || $domain =~ /Brew$/) {
-            $c->stash->{SiteName} = 'Brew';
-            $c->session->{SiteName} = 'Brew';
-        }
-        elsif ($domain =~ /usbm\.computersystemconsulting\.ca$/
-            || $domain =~ /usbm\.ca$/ || $domain =~ /USBM$/) {
-            $c->stash->{SiteName} = 'USBM';
-            $c->session->{SiteName} = 'USBM';
-        }
-        elsif ($domain =~ /weaverbeck\.computersystemconsulting\.ca$/
-            || $domain =~ /weaverbeck\.com$/ || $domain =~ /WB$/) {
-            $c->stash->{SiteName} = 'WB';
-            $c->session->{SiteName} = 'WB';
-        }
-        elsif ($domain =~ /ve7tit\.weaverbeck\.com$/ || $domain =~ /ve7tit\.com$/ || $domain =~ /ve7tit$/) {
-            $c->stash->{SiteName} = 've7tit';
-            $c->session->{SiteName} = 've7tit';
-        }
-        elsif ($domain =~ /home$/ || $domain =~ /home/) {
-            $c->stash->{SiteName} = 'home';
-            $c->session->{SiteName} = 'home';
+
+    # If SiteName is defined, fetch the site details from the Site model using the SiteName
+    if (defined $c->stash->{SiteName}) {
+        my $site = $schema->resultset('Site')->find({ name => $c->stash->{SiteName} });
+        if ($site) {
+            # If the site exists in the database, fetch the associated site
+            # Set the SiteName in the stash and the session to the site name from the database
+            $c->stash->{SiteName} = $site->name;
+            $c->session->{SiteName} = $site->name;
         }
         else {
-            # If the domain does not match any condition, set SiteName to 'none'
+            # If the site does not exist in the database, set SiteName to 'none'
             $c->stash->{SiteName} = 'none';
             $c->session->{SiteName} = 'none';
         }
+    }
+    else {
+        # Get the domain name
+        my $domain = $c->req->uri->host; # Add 'my' here
+
+        # Store domain in stash
+        $c->stash->{domain} = $domain;
+
+        # Store domain in session
+        $c->session->{domain} = $domain;
+
+        # Fetch the site details from the SiteDomain model using the domain name
+        my $site_domain = $schema->resultset('SiteDomain')->find({ domain => $domain });
+
+        if ($site_domain) {
+            # If the site domain exists in the database, fetch the associated site
+            # Fetch the site record
+            my $site = $schema->resultset('Site')->find($site_domain->site_id); # Remove 'my' here
+
+            # Set the SiteName in the stash and the session to the site name from the database
+            $c->stash->{SiteName} = $site->name;
+            $c->session->{SiteName} = $site->name;
+        }
+        else {
+            # If the site domain does not exist in the database, set SiteName to 'none'
+            $c->stash->{SiteName} = 'none';
+            $c->session->{SiteName} = 'none';
+        }
+    }
+
+    unless ($c->session->{group}) {
+        $c->session(group => 'normal');
     }
 
     # Get the debug parameter from the URL
