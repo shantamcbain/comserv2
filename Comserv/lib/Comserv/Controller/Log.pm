@@ -5,6 +5,21 @@ use DateTime;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
+has 'record_id' => (is => 'rw', isa => 'Str');
+has 'priority' => (is => 'rw', isa => 'HashRef');
+has 'status' => (is => 'rw', isa => 'HashRef');
+
+sub BUILD {
+    my $self = shift;
+    $self->priority({ map { $_ => $_ } (1..10) });
+    $self->status({
+        1 => 'NEW',
+        2 => 'IN PROGRESS',
+        3 => 'DONE',
+    });
+}
+
+# Rest of your controller code
 sub index :Path :Args(0) {
     my ( $self, $c ) = @_;
 
@@ -16,28 +31,33 @@ sub index :Path :Args(0) {
 # This method will only display the form
 sub log_form :Path('/log/log_form'):Args() {
     my ( $self, $c) = @_;
+        my $schema = $c->model('DBEncy');
+
     my $record_id = $c->request->body_parameters->{record_id};
-    $c->stash(record_id => $record_id);
-    my %priority = map { $_ => $_ } (1..10);
 
-    my %status =
-    (
-      1 => 'NEW',
-      2 => 'IN PROGRESS',
-      3 => 'DONE',
-    );
-
+    my $log = Comserv::Model::Log->new(record_id => $record_id);
+my $todo = Comserv::Model::Todo->new();
+my $todo_record = $todo->fetch_todo_record($c, $record_id);
     # Add the priority, status, and record_id to the stash
     $c->stash(
-        priority => \%priority,
-        status   => \%status,
-        record_id => $record_id,
+            build_priority => $self->priority,
+            build_status   => $self->status,
+        priority => $todo_record->priority,
+        status   => $todo_record->status,
+        record_id => $todo_record->record_id,
+        todo_record => $todo_record->record_id,
+        start_date  => $todo_record->start_date,
+        site_name   => $todo_record->sitename,
+        due_date    => $todo_record->due_date,
+        abstract    => $todo_record->subject,
+        details     => $todo_record->description,
+        comments    => $todo_record->comments,
     );
 
     # Check if record_id is provided
-    if (defined $record_id) {
-        $c->stash(record_id => $record_id);
-        $c->stash(todo_record_id => $record_id);  # Add this line
+    if (defined $log->record_id) {
+        $c->stash(record_id => $log->record_id);
+        $c->stash(todo_record_id => $log->record_id);  # Add this line
     }
 
     # Render the form
@@ -53,6 +73,8 @@ sub create_log :Path('/log/create_log'):Args() {
 
     # Retrieve start_date from form data
     my $start_date = $c->request->body_parameters->{start_date};
+    # Set owner to 'none' if it's not provided
+    my $owner = $c->request->body_parameters->{owner} || 'none';
 
     # Check if start_date is empty
     if ($start_date eq '') {
@@ -70,7 +92,7 @@ sub create_log :Path('/log/create_log'):Args() {
         # Stash the form data
         $c->stash(
             todo_record_id => $c->request->body_parameters->{todo_record_id},
-            owner => $c->request->body_parameters->{owner},
+            owner => $c->request->body_parameters->{owner}||'none',
             sitename => $c->session->{SiteName},
             start_date => $start_date,
             project_code => $c->request->body_parameters->{project_code},
@@ -107,7 +129,7 @@ my $time_diff = sprintf("%02d:%02d:%02d", $hours, $minutes, $seconds);
     my $current_date = DateTime->now->ymd;
     my $logEntry = $rs->create({
         todo_record_id => $c->request->body_parameters->{todo_record_id},
-        owner => $c->request->body_parameters->{owner},
+        owner => $owner,
         sitename => $c->session->{SiteName},
         start_date => $start_date||$current_date,
         project_code => $c->request->body_parameters->{project_code},

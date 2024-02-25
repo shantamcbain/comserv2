@@ -41,6 +41,18 @@ sub get_top_todos {
 
     return \@todos;
 }
+sub fetch_todo_record {
+    my ($self, $c, $record_id) = @_;
+    # Get a DBIx::Class::Schema object
+    my $schema = $c->model('DBEncy');
+
+    # Get a DBIx::Class::ResultSet object for the 'Todo' table
+    my $rs = $schema->resultset('Todo');
+
+    # Fetch the todo record based on $record_id
+    my $todo_record = $rs->find($record_id);
+    return $todo_record;
+}
 __PACKAGE__->meta->make_immutable;
 
 1;

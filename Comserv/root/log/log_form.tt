@@ -15,85 +15,52 @@ window.onload = function() {
     document.getElementById('start_time').value = hours + ":" + minutes;
 };
 </script>
-<h1>Log Form</h1>
-<p>Date: [% date.format(date.now, '%Y-%m-%d') %]</p>
 <form action="/log/create_log" method="POST">
-<p>Record ID: [% record_id %]</p>
-    <label for="todo_record_id">Todo Record ID:</label><br>
-    <!-- Use the record_id from the stash -->
+    <p>Record ID: [% record_id %]</p>
+    <label for="record_id">Todo Record ID:</label><br>
     <input type="text" id="todo_record_id" name="todo_record_id" value="[% record_id %]">  <a href="[% c.uri_for('/todo/addtodo') %]"> Add Todo</a><br>
 
-    <label for="owner">Owner:</label><br>
-    <input type="text" id="owner" name="owner"><br>
-
     <label for="sitename">Site Name:</label><br>
-    <!-- Use the sitename from the stash -->
-    <input type="text" id="sitename" name="sitename" value="[% sitename %]" readonly><br>
+    <input type="text" id="sitename" name="sitename" value="[% site_name %]" readonly><br>
 
     <label for="start_date">Start Date:</label><br>
-    <!-- Use the start_date from the stash -->
     <input type="date" id="start_date" name="start_date" value="[% start_date %]"><br>
 
     <label for="project_code">Project Code:</label><br>
-    <!-- Use the project_code from the stash -->
     <input type="text" id="project_code" name="project_code" value="[% project_code %]"><br>
 
     <label for="due_date">Due Date:</label><br>
-    <input type="date" id="due_date" name="due_date"><br>
+    <input type="date" id="due_date" name="due_date" value="[% due_date %]"><br>
 
     <label for="abstract">Abstract:</label><br>
-    <!-- Use the subject from the stash as the abstract -->
-    <textarea id="abstract" name="abstract" required rows="4" cols="50">[% subject %]</textarea><br>
+    <textarea id="abstract" name="abstract" required rows="4" cols="50">[% abstract %]</textarea><br>
 
     <label for="details">Details:</label><br>
-    <!-- Use the details from the stash -->
     <textarea id="details" name="details" required rows="4" cols="50">[% details %]</textarea><br>
 
     <label for="start_time">Start Time:</label><br>
-    <input type="time" id="start_time" name="start_time"><br>
+    <input type="time" id="start_time" name="start_time" value=""><br>
 
     <label for="end_time">End Time:</label><br>
-    <input type="time" id="end_time" name="end_time"><br>
+    <input type="time" id="end_time" name="end_time" value=""><br>
 
-     <input type="text" id="group_of_poster" name="group_of_poster" value="[% c.session.roles %]" readonly><br>
+    <input type="text" id="group_of_poster" name="group_of_poster" value="[% c.session.roles %]" readonly><br>
 
-    <label for="priority">Priority:</label><br>
-    <select id="priority" name="priority">
-        [% FOREACH key IN priority.keys.sort %]
-            <option value="[% key %]">[% priority.$key %]</option>
-        [% END %]
-    </select><br>
+ <label for="priority">Priority:</label><br>
+<select id="priority" name="priority">
+    [% FOREACH key IN build_priority.keys.sort %]
+        <option value="[% key %]" [% 'selected' IF key == priority %]>[% build_priority.$key %]</option>
+    [% END %]
+</select><br>
 
-    <label for="status">Status:</label><br>
-    <select id="status" name="status">
-        [% FOREACH key IN status.keys.sort %]
-            <option value="[% key %]">[% status.$key %]</option>
-        [% END %]
-    </select><br>
-
+<label for="status">Status:</label><br>
+<select id="status" name="status">
+    [% FOREACH key IN build_status.keys.sort %]
+        <option value="[% key %]" [% 'selected' IF key == status %]>[% build_status.$key %]</option>
+    [% END %]
+</select><br>
     <label for="comments">Comments:</label><br>
-    <textarea id="comments" name="comments" rows="4" cols="50"></textarea><br>
+    <textarea id="comments" name="comments" rows="4" cols="50">[% comments %]</textarea><br>
 
     <input type="submit" value="Submit">
 </form>
-    [% IF c.stash.log_data %]
-        <h2>Log Data:</h2>
-        <table>
-    <thead>
-        <tr >
-            <th>Date</th>
-            <th>SiteName</th>
-            <th>Message</th>
-        </tr>
-    </thead>
-    <tbody>
-        [% FOREACH entry IN log_data %]
-            <tr class="log-row">
-                <td>[% entry.0 %]</td>
-                <td>[% entry.1 %]</td>
-                <td>[% entry.2 %]</td>
-            </tr>
-        [% END %]
-    </tbody>
-</table>
-    [% END %]

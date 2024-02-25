@@ -4,9 +4,20 @@
     [%# "Debugging HostName: " _ HostName %]
     [%# INCLUDE 'debug.tt' %]
 [% END %]
-<h1>Todo</h1>
+<h1>Todo System</h1>
 <p>
     Sudo Code for add log
-    1. click button it will pass the todo record id sitename startdate project code the subject, priority and details     will go into details subject will go into abstract. start time will be filled with the current time. on success it will     return to the page the add log was clicked from.
-    <!-- Add your content here -->
-</p>
+    1. click button it will pass the todo record id sitename to the log_form.
+    2. log_form will use to the record id to find the table fill in the fallowing:
+    3. The todo record id will go into todo_record id. working,
+    4. sitename will go into sitename. not working,
+    5. subject will go into abstract. not working,
+    6. description will go into details will go into details. not working,
+    7. start_date will go into start_date. not working.
+    8. due_date will go into due_date. Not working.
+    9. start_time puts the time the form is open into the start time field it is working.
+    10. end_time is selected by user. working.
+    11. admin is filled in from session role of the user. working.
+    12. priority is pulled from the todo record. working.
+    12. status is selected in with value todo record the word open. not working.
+    </p>
