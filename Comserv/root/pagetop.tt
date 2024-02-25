@@ -7,9 +7,8 @@
 [% END %]
 <header>
     <!-- Site Greeting -->
-    <h1>Welcome to [% welcome_message | html %]</h1>
-     <!-- Main Menu.pm -->
-    <nav>
+<h1>Welcome to [% c.stash.site_display_name  %]</h1>
+<!-- Main Menu.pm -->    <nav>
         <ul class="horizontal-menu">
             <li class="horizontal-dropdown">
                 <a href="[% c.session.return_url %]"class="dropbtn">Back</a>

@@ -56,11 +56,14 @@ $c->detach($site_to_controller{$SiteName}, 'index');
     $c->forward($c->view('TT'));
 }
 
+
+
 sub auto :Private {
-    my ( $self, $c ) = @_;
+    my ($self, $c) = @_;
     $c->log->debug('Entered auto action in Root.pm');
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
+    # Set up universal variables
 
     # Get the site name from the URL
     my $SiteName = $c->req->param('site');
@@ -140,8 +143,31 @@ my $domain = $c->req->uri->host; # Add 'my' here
         # Store the session value in the stash
         $c->stash->{debug_mode} = $c->session->{debug_mode};
     }
+   my $site = $c->model('DBEncy::Site')->find({ name => $SiteName });
+my $css_view_name;
+if (defined $site) {
+    $css_view_name = $site->css_view_name;
+} else {
+    # Handle the case when the site is not found
+    # For example, you can set a default value or throw an error
+    $css_view_name = '/static/css/default.css';m, ,
+}
+my $SiteName = $c->stash->{SiteName} || $c->session->{SiteName};
+my $css_view_name = $c->model('DBEncy::Site')->find({ name => $SiteName })->css_view_name;
+    my $site_display_name = $c->model('DBEncy::Site')->find({ name => $SiteName })->site_display_name;
+    $c->stash->{site_display_name} = $site_display_name;
+$c->stash->{css_view_name} = $css_view_name;
+my $page = $c->req->param('page');
 
-    my $page = $c->req->param('page');
+   $c->stash(
+       #site_display_name=> $c->uri_for($c->stash->{site_display_name} || 'none'),
+        default_css => $c->uri_for($c->stash->{css_view_name} || '/static/css/default.css'),
+        #log_css => $c->uri_for('/static/css/log.css'),
+        menu_css => $c->uri_for('/static/css/menu.css'),
+       log_css => $c->req->base->rel($c->uri_for('/static/css/log.css')),
+    #menu_css => $c->req->base->rel($c->uri_for('/static/css/menu.css')),
+ );
+
     # If the debug parameter is defined
     if (defined $page) {
         # If the debug parameter is different from the session value
@@ -187,11 +213,14 @@ my $domain = $c->req->uri->host; # Add 'my' here
             member_links => \@member_links,
         );
     }
+
+
    $c->log->debug('Finished auto action in Root.pm');
 
     # Continue processing the rest of the request
     return 1;
 }
+
 sub debug :Path('/debug') {
     my ($self, $c) = @_;
     my $site_name = $c->stash->{SiteName};

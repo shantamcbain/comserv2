@@ -1,3 +1,6 @@
+
+}
+/* Main Menu */
 nav {
     background-color: #ccffff;
 }
@@ -43,37 +46,27 @@ nav {
     display: block;
 }
 
-/* Styles for menu.tt */
-.horizontal-menu {
-    display: flex;
-    list-style-type: none;
-    margin: 0;
-    padding: 0;
-}
-
-.horizontal-dropdown {
+/* Submenu Styles */
+.submenu-item {
     position: relative;
-    display: inline-block;
 }
 
-.dropbtn {
-    display: inline-block;
-    color: black;
-    text-align: center;
-    padding: 14px 16px;
-    text-decoration: none;
+.submenu-header {
+    font-weight: bold;
 }
 
-.dropdown-content {
+.submenu {
     display: none;
     position: absolute;
-    background-color: #f9f9f9;
+    top: 0;
+    left: 100%;
     min-width: 160px;
+    background-color: #f9f9f9;
     box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
     z-index: 1;
 }
 
-.dropdown-content a {
+.submenu a {
     color: black;
     padding: 12px 16px;
     text-decoration: none;
@@ -81,14 +74,6 @@ nav {
     text-align: left;
 }
 
-.horizontal-dropdown:hover .dropdown-content {
+.submenu-item:hover .submenu {
     display: block;
-}
-/* Add a new class for the workshops link */
-.menu-link {
-    color: black;
-    padding: 12px 16px;
-    text-decoration: none;
-    display: block;
-    text-align: left;
 }
