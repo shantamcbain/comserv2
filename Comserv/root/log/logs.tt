@@ -1,3 +1,126 @@
+2024-02-26 05:30:00;
+Worked on getting starman to load. erros in auto preventing loageind of starman.  need to clean up the logic in auto
+to make the code more readabel and easier to debug.  Also need to add some logging to the code to help with debugging.
+sudo code for the auto code is as follows:
+We have done the following:
+
+``` load the SiteName from url
+    Test if it is in the stash or session.
+    If it is not in the stash or session then load it into both.
+    If yes then use it to retrieve the SiteName record from site table for the site. Using the sitename.
+    If not then use the domain name to retrieve the SiteDomain Schema  to find the sitename for the domain.
+    If the SiteName is not SiteName found then set the default to none.
+    If we know site id load site record from the site table using the id. putting key values into stash or session.
+    If not load the site record from the siteconfig table using the SiteName. getting the SiteName  from the name.
+    load the model for the site.
+    check the url for the debug_mode and store in session.
+    set the roles unless ($c->session->{roles}) {
+        $c->session(roles => 'normal');
+    From the values in the site record for the site name we want to put into stash or session. the following values
+    my $site_display_name = $c->model('DBEncy::Site')->find({ name => $SiteName })->site_display_name;
+    $c->stash->{site_display_name} = $site_display_name;
+$c->stash->{css_view_name} = $css_view_name;
+my $page = $c->req->param('page');
+
+   $c->stash(
+       #site_display_name=> $c->uri_for($c->stash->{site_display_name} || 'none'),
+        default_css => $c->uri_for($c->stash->{css_view_name} || '/static/css/default.css'),
+        #log_css => $c->uri_for('/static/css/log.css'), not in site record
+        menu_css => $c->uri_for('/static/css/menu.css'), not in site record
+       log_css => $c->req->base->rel($c->uri_for('/static/css/log.css')), not in site record
+    #menu_css => $c->req->base->rel($c->uri_for('/static/css/menu.css')), not in site record
+ );
+
+
+
+We may want to move as many of the functions to the models that are appropriate ie site setup value may be better in
+the site model.
+```
+   my $site = $c->model('DBEncy::Site')->find({ name => $SiteName });
+my $css_view_name;
+if (defined $site) {
+    $css_view_name = $site->css_view_name;
+} else {
+    # Handle the case when the site is not found
+    # For example, you can set a default value or throw an error
+    $css_view_name = '/static/css/default.css';m, ,
+}
+#my $SiteName = $c->stash->{SiteName} || $c->session->{SiteName};
+#my $css_view_name = $c->model('DBEncy::Site')->find({ name => $SiteName })->css_view_name;
+    my $site_display_name = $c->model('DBEncy::Site')->find({ name => $SiteName })->site_display_name;
+    $c->stash->{site_display_name} = $site_display_name;
+$c->stash->{css_view_name} = $css_view_name;
+my $page = $c->req->param('page');
+
+   $c->stash(
+       #site_display_name=> $c->uri_for($c->stash->{site_display_name} || 'none'),
+        default_css => $c->uri_for($c->stash->{css_view_name} || '/static/css/default.css'),
+        #log_css => $c->uri_for('/static/css/log.css'),
+        menu_css => $c->uri_for('/static/css/menu.css'),
+       log_css => $c->req->base->rel($c->uri_for('/static/css/log.css')),
+    #menu_css => $c->req->base->rel($c->uri_for('/static/css/menu.css')),
+ );
+
+
+    # Get the site name from the URL
+    my $SiteName = $c->req->param('site');
+# Get the domain name
+my $domain = $c->req->uri->host; # Add 'my' here
+
+    # If site name is defined in the URL, update the session and stash
+    if (defined $SiteName) {
+        $c->stash->{SiteName} = $SiteName;
+        $c->session->{SiteName} = $SiteName;
+    }
+    elsif (defined $c->session->{SiteName}) {
+        # If site name is not defined in the URL but is defined in the session, use the session value
+        $c->stash->{SiteName} = $c->session->{SiteName};
+    }
+
+    # If SiteName is defined, fetch the site details from the Site model using the SiteName
+    if (defined $c->stash->{SiteName}) {
+        my $site = $schema->resultset('Site')->find({ name => $c->stash->{SiteName} });
+        if ($site) {
+            # If the site exists in the database, fetch the associated site
+            # Set the SiteName in the stash and the session to the site name from the database
+            $c->stash->{SiteName} = $site->name;
+            $c->session->{SiteName} = $site->name;
+        }
+        else {
+            # If the site does not exist in the database, set SiteName to 'none'
+            $c->stash->{SiteName} = 'none';
+            $c->session->{SiteName} = 'none';
+        }
+    }
+    else {
+        # Get the domain name
+        my $domain = $c->req->uri->host; # Add 'my' here
+
+        # Store domain in stash
+        $c->stash->{domain} = $domain;
+
+        # Store domain in session
+        $c->session->{domain} = $domain;
+
+        # Fetch the site details from the SiteDomain model using the domain name
+        my $site_domain = $schema->resultset('SiteDomain')->find({ domain => $domain });
+
+        if ($site_domain) {
+            # If the site domain exists in the database, fetch the associated site
+            # Fetch the site record
+            my $site = $schema->resultset('Site')->find($site_domain->site_id); # Remove 'my' here
+
+            # Set the SiteName in the stash and the session to the site name from the database
+            $c->stash->{SiteName} = $site->name;
+            $c->session->{SiteName} = $site->name;
+        }
+        else {
+            # If the site domain does not exist in the database, set SiteName to 'none'
+            $c->stash->{SiteName} = 'none';
+            $c->session->{SiteName} = 'none';
+        }
+    }
+
 Yes, you can use the IntelliJ IDEA's database tool to make changes to the database schema. After making the changes, you can generate the SQL script for the changes and use it as the initial setup for your database. Here's how you can do it:
 
 1. Open the Database tool window (View | Tool Windows | Database).

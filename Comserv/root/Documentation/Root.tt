@@ -1,0 +1,42 @@
+[% PageVersion = 'Documentation/ComservDocumentation.tt,v 0.01 2024/01/28 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+<h1 id="top">Comserv App Documentation</h1>
+    # Get a DBIx::Class::Schema object
+    my $schema = $c->model('DBEncy');
+    # Get the site name from the URL
+    my $SiteName = $self->fetch_and_set($c, $schema, 'site');
+
+sub fetch_and_set {
+my ($self, $c, $schema, $param) = @_;
+my $value = $c->req->param($param);
+
+# If value is defined in the URL, update the session and stash
+if (defined $value) {
+$c->stash->{$param} = $value;
+$c->session->{$param} = $value;
+}
+elsif (defined $c->session->{$param}) {
+# If value is not defined in the URL but is defined in the session, use the session value
+$c->stash->{$param} = $c->session->{$param};
+}
+
+# If value is defined, fetch the site details from the Site model using the value
+if (defined $c->stash->{$param}) {
+my $site = $schema->resultset('Site')->find({ name => $c->stash->{$param} });
+if ($site) {
+# If the site exists in the database, fetch the associated site
+# Set the value in the stash and the session to the site name from the database
+$c->stash->{$param} = $site->name;
+$c->session->{$param} = $site->name;
+}
+else {
+# If the site does not exist in the database, set value to 'none'
+$c->stash->{$param} = 'none';
+$c->session->{$param} = 'none';
+}
+}
+
+return $value;
+}
