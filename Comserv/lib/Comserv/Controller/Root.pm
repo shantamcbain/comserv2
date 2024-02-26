@@ -58,31 +58,92 @@ $c->detach($site_to_controller{$SiteName}, 'index');
 
 
 
-sub fetch_and_set {
-    my ($self, $c, $schema, $param) = @_;
-    my $value = $c->req->query_parameters->{$param};
+sub auto :Private {
+    my ($self, $c) = @_;
+    $c->log->debug('Entered auto action in Root.pm');
+    # Get a DBIx::Class::Schema object
+    my $schema = $c->model('DBEncy');
+    # Set up universal variables
 
-    # If value is defined in the URL, update the session and stash
-    if (defined $value) {
-        $c->stash->{SiteName} = $value;
-        $c->session->{SiteName} = $value;
+    # Get the site name from the URL
+    my $SiteName = $self->fetch_and_set($c, $schema, 'site');
+    # Get the domain name
+    my $domain = $self->fetch_and_set($c, $schema, 'domain');
+     $self->site_setup($c, $SiteName);
+
+    unless ($c->session->{group}) {
+        $c->session(group => 'normal');
     }
-    elsif (defined $c->session->{SiteName}) {
-        # If value is not defined in the URL but is defined in the session, use the session value
-        $c->stash->{SiteName} = $c->session->{SiteName};
-    }
-    else {
-        # If value is not defined in the URL or session, use the domain name to fetch the site name from the Site model
-        my $domain = $c->req->base->host;
-        my $site = $schema->resultset('Site')->find({ domain => $domain });
-        if ($site) {
-            $value = $site->name;
-            $c->stash->{SiteName} = $value;
-            $c->session->{SiteName} = $value;
+
+    # Get the debug parameter from the URL
+    my $debug_param = $c->req->param('debug');
+    # If the debug parameter is defined
+    if (defined $debug_param) {
+        # If the debug parameter is different from the session value
+        if ($c->session->{debug_mode} ne $debug_param) {
+            # Store the new debug parameter in the session and stash
+            $c->session->{debug_mode} = $debug_param;
+            $c->stash->{debug_mode} = $debug_param;
         }
+    } elsif (defined $c->session->{debug_mode}) {
+        # If the debug parameter is not defined but there is a value in the session
+        # Store the session value in the stash
+        $c->stash->{debug_mode} = $c->session->{debug_mode};
     }
 
-    return $value;
+# Declare the variable $page before using it
+my $page = $c->req->param('page');
+    # If the debug parameter is defined
+    if (defined $page) {
+        # If the debug parameter is different from the session value
+        if ($c->session->{page} ne $page) {
+            # Store the new debug parameter in the session and stash
+            $c->session->{page} = $page;
+            $c->stash->{page} = $page;
+        }
+    } elsif (defined $c->session->{page}) {
+        # If the debug parameter is not defined but there is a value in the session
+        # Store the session value in the stash
+        $c->stash->{page} = $c->session->{page};
+    }
+    # Fetch the list of todos from the database
+
+    # Set the HostName in the stash
+    $c->stash->{HostName} = $c->request->base;
+   # Fetch the top 10 todos from the Todo model
+    my @todos = $c->model('Todo')->get_top_todos($c, $SiteName);
+
+    # Fetch the todos from the session
+    my $todos = $c->session->{todos};
+
+    # Store the todos in the stash
+    $c->stash(todos => $todos);
+
+    # Set the Domain in the session
+    $c->session->{Domain} = $domain;
+
+    # In your Comserv::Controller::Root controller
+    if (ref($c) eq 'Catalyst::Context') {
+        my @main_links = $c->model('DB')->get_links($c, 'Main');
+        my @login_links = $c->model('DB')->get_links($c, 'Login');
+        my @global_links = $c->model('DB')->get_links($c, 'Global');
+        my @hosted_links = $c->model('DB')->get_links($c, 'Hosted');
+        my @member_links = $c->model('DB')->get_links($c, 'Member');
+
+        $c->session(
+            main_links => \@main_links,
+            login_links => \@login_links,
+            global_links => \@global_links,
+            hosted_links => \@hosted_links,
+            member_links => \@member_links,
+        );
+    }
+
+
+   $c->log->debug('Finished auto action in Root.pm');
+
+    # Continue processing the rest of the request
+    return 1;
 }
 sub fetch_and_set {
     my ($self, $c, $schema, $param) = @_;
@@ -110,8 +171,38 @@ sub fetch_and_set {
 
     return $value;
 }
+sub fetch_and_set2 {
+    my ($self, $c, $schema, $param) = @_;
+    my $value = $c->req->query_parameters->{$param};
+
+    # If value is defined in the URL, update the session and stash
+    if (defined $value) {
+        $c->stash->{SiteName} = $value;
+        $c->session->{SiteName} = $value;
+    }
+    elsif (defined $c->session->{SiteName}) {
+        # If value is not defined in the URL but is defined in the session, use the session value
+        $c->stash->{SiteName} = $c->session->{SiteName};
+    }
+    else {
+        # If value is not defined in the URL or session, use the domain name to fetch the site name from the Site model
+        my $domain = $c->req->base->host;
+        my $site = $schema->resultset('Site')->find({ domain => $domain });
+        if ($site) {
+            $value = $site->name;
+            $c->stash->{SiteName} = $value;
+            $c->session->{SiteName} = $value;
+        }
+    }
+
+    return $value;
+}
+
 sub site_setup {
     my ($self, $c, $SiteName) = @_;
+       $SiteName = $c->session->{SiteName};
+    # Log the SiteName
+    $c->log->debug("SiteName: $SiteName");
 
     # Fetch the site details from the Site model using the SiteName
     my $site = $c->model('DBEncy::Site')->find({ name => $SiteName });

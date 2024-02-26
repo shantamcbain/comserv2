@@ -1,6 +1,11 @@
+2024-02-26 09:20:00;
+added
+
+       $SiteName = $c->session->{SiteName}; to the sub site_setup {code to get the site name from the session if it is not in the stash.
+
 2024-02-26 05:30:00;
-Worked on getting starman to load. erros in auto preventing loageind of starman.  need to clean up the logic in auto
-to make the code more readabel and easier to debug.  Also need to add some logging to the code to help with debugging.
+Worked on getting starman to load. errors in auto preventing loadings of starman.  need to clean up the logic in auto
+to make the code more read abel and easier to debug.  Also need to add some logging to the code to help with debugging.
 sudo code for the auto code is as follows:
 We have done the following:
 
