@@ -161,7 +161,7 @@ sub fetch_and_set {
     else {
         # If value is not defined in the URL or session, use the domain name to fetch the site name from the Site model
         my $domain = $c->req->base->host;
-        my $site = $schema->resultset('Site')->find({ domain => $domain });
+        my $site = $schema->resultset('Site')->find({ name => $domain });
         if ($site) {
             $value = $site->name;
             $c->stash->{SiteName} = $value;
