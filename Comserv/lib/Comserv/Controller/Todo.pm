@@ -30,7 +30,7 @@ sub todo :Path('/todo') :Args(0) {
             sitename => $c->session->{SiteName},  # filter by site
             status => { '!=' => 3 }  # status not equal to 3
         },
-        { order_by => [ 'priority','start_date']}  # order by start_date
+{ order_by => { -asc => ['priority', 'start_date'] } } # order by start_date
     );
 
     # Add the todos to the stash
