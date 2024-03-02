@@ -1,4 +1,11 @@
-2024-02-26 09:20:00;
+
+2024-03-01 10:10:00;
+
+2024-02-26 16:10:00;
+Working on Workshop model
+Documantation for the Workshop model
+```
+2024-02-26 10:10:00;
 added
 
        $SiteName = $c->session->{SiteName}; to the sub site_setup {code to get the site name from the session if it is not in the stash.

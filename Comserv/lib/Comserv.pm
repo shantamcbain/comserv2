@@ -26,7 +26,7 @@ use Catalyst qw/
 #         -Debug: activates the debug mode for very useful log messages
 #   ConfigLoader: will load the configuration from a Config::General file in the
 #                 application's home directory
-# Static::Simple: will serve static files from the application's root
+# Static::Simple: will serve static file from the application's root
 #                 directory
 
 

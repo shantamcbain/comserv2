@@ -10,8 +10,8 @@ __PACKAGE__->add_columns(
         data_type => 'integer',
         is_auto_increment => 1,
     },
-    site_id => {
-        data_type => 'integer',
+    sitename => {
+        data_type => 'varchar',
     },
     title => {
         data_type => 'varchar',
@@ -23,6 +23,12 @@ __PACKAGE__->add_columns(
     date => {
         data_type => 'datetime',
     },
+    end_time => {
+        data_type => 'time',
+    },
+    time => {
+        data_type => 'time',
+    },
     location => {
         data_type => 'varchar',
         size => 255,
@@ -31,14 +37,24 @@ __PACKAGE__->add_columns(
         data_type => 'varchar',
         size => 255,
     },
+    share => {
+    data_type => 'enum',
+    default_value => 'private',
+    extra => {
+        list => ['public', 'private']
+    },
+},
     max_participants => {
         data_type => 'integer',
     },
 );
-
+__PACKAGE__->set_primary_key('id');
 __PACKAGE__->belongs_to(
     site => 'Comserv::Model::Schema::Ency::Result::Site',
     { 'foreign.id' => 'self.site_id' },
 );
-
+__PACKAGE__->has_many(
+    'file' => 'Comserv::Model::Schema::Ency::Result::File',
+    'workshop_id'
+);
 1;

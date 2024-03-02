@@ -1,0 +1,17 @@
+[% PageVersion = 'files.filemanagement.tt,v 0.02 2024/03/01 shanta Exp shanta ' %]
+<meta charset="utf-8">
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+</head>
+
+<h2>Current Directory: [% current_directory %]</h2>
+
+<ul id="directoryList">
+    [% FOREACH directory IN directories %]
+        <li><a href="file[% current_directory | url %]/[% directory | url %]">[% directory %]</a></li>
+    [% END %]
+    [% FOREACH file IN files %]
+        <li>[% file.name %] - [% file.type %] - [% file.size %] - [% file.date %] - [% file.description %]</li>
+    [% END %]
+</ul>

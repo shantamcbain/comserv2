@@ -15,6 +15,7 @@ sub get_top_todos {
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
 
+
     # Get a DBIx::Class::ResultSet object for the 'Todo' table
     my $rs = $schema->resultset('Todo');
 

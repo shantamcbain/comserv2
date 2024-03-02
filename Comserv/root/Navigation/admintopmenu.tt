@@ -9,11 +9,11 @@
         <div class="dropdown-content">
             <a href="/add_link?menu=admin">Add New Link</a>
     <div class="submenu-item">
-    <span class="submenu-header">admin</span>
+    <span class="submenu-header"><a href="/admin" class="dropbtn">admin</a></span>
     <div class="submenu">
         <a href="/todo">ToDo</a>
         <a href="/todo/display_tables">ToDo Tables</a>
-        <a href="[% c.uri_for(c.controller('Log').action_for('log_form')) %]">Open Log</a>
+        <a href="[% c.uri_for(c.controller('Log').action_for('log')) %]">Open Log</a>
          <a href="[% c.uri_for(c.controller('project').action_for('project')) %]">Projects</a>
         via stash
         [% FOREACH todo IN c.session.todos %]
@@ -50,7 +50,49 @@
     </div>
 </div>
 
-            <div class="submenu-item">
+<div class="submenu-item">
+    <span class="submenu-header"><a href="/file">File Management</a></span>
+    <div class="submenu">
+        <a href="/file">File</a>
+    </div>
+
+    <div class="submenu">
+  <form action="file/search_and_insert" method="get">
+    <label for="fileType">Select file type:</label>
+    <select id="fileType">
+        <option value="txt">Text</option>
+        <option value="doc">Word Document</option>
+        <option value="pdf">PDF</option>
+        <option value="odt">Open Document</option>
+        <option value="epub">eBook</option>
+        <option value="jpg">JPEG Image</option>
+        <option value="png">PNG Image</option>
+        <option value="gif">GIF Image</option>
+        <option value="mp4">MP4 Video</option>
+        <option value="mp3">MP3 Audio</option>
+        <option value="epub">EPUB eBook</option>
+        <option value="mobi">MOBI eBook</option>
+        <option value="azw">AZW eBook</option>
+        <option value="fb2">FB2 eBook</option>
+        <option value="ibooks">iBooks eBook</option>
+        <option value="xls">Excel Spreadsheet</option>
+        <option value="xlsx">Excel 2007+ Spreadsheet</option>
+        <option value="ods">OpenDocument Spreadsheet</option>
+        <option value="csv">CSV File</option>
+        <option value="zip">zip File</option>
+    </select>
+       <input type="submit" value="Start Search">
+</form>
+    </div>
+</div>
+
+  <div class="submenu-item">
+    <span class="submenu-header"><a href="/log">Loging</a></span>
+    <div class="submenu">
+        <a href="log">Loging system</a>
+    </div>
+</div>
+          <div class="submenu-item">
     <span class="submenu-header">User</span>
     <div class="submenu">
         <a href="/user/list_users">List User</a>

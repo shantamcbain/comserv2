@@ -5,8 +5,9 @@
 [% END %]
 
 <h1>Record Details View.</h1>
+    <p>Record ID: [% record.get_column('record_id') %]</p>
+<form action="/todo/modify/[% record.get_column('record_id') %]" method="post">
     <div>
-    <form action="/todo/modify/[% record.get_column('record_id') %]" method="post">
         <label for="sitename">Site Name:</label>
         <input type="text" id="sitename" name="sitename" value="[% record.get_column('sitename') %]">
     </div>
@@ -36,20 +37,21 @@
         <input type="number" id="estimated_man_hours" name="estimated_man_hours" value="[% record.get_column('estimated_man_hours') %]">
     </div>
 
-<div>
-    <label for="accumulative_time">Accumulative Time:</label>
-    <input type="text" id="accumulative_time" name="accumulative_time" value="[% accumulative_time %]">
-</div>
+    <div>
+        <label for="accumulative_time">Accumulative Time:</label>
+        <input type="text" id="accumulative_time" name="accumulative_time" value="[% accumulative_time %]">
+    </div>
 
-<div>
-    <label for="status">Status:</label>
-    <select id="status" name="status">
-        <option value="1" [% IF record.get_column('status') == status.1 %]selected[% END %]>NEW</option>
-        <option value="2" [% IF record.get_column('status') == status.2 %]selected[% END %]>IN PROGRESS</option>
-        <option value="3" [% IF record.get_column('status') == status.3 %]selected[% END %]>DONE</option>
-    </select>
-</div>
-<div>
+    <div>
+        <label for="status">Status:</label>
+        <select id="status" name="status">
+            <option value="1" [% IF record.get_column('status') == status.1 %]selected[% END %]>NEW</option>
+            <option value="2" [% IF record.get_column('status') == status.2 %]selected[% END %]>IN PROGRESS</option>
+            <option value="3" [% IF record.get_column('status') == status.3 %]selected[% END %]>DONE</option>
+        </select>
+    </div>
+
+    <div>
         <label for="priority">Priority:</label>
         <input type="number" id="priority" name="priority" value="[% record.get_column('priority') %]">
     </div>
@@ -83,7 +85,9 @@
         <input type="submit" value="Submit">
     </div>
 </form>
-<p>Record ID: [% record.get_column('record_id') %]</p>
-<button onclick="location.href='/log/log_form?id=' [% record.get_column('record_id') %]">Log</button>
-<button onclick="location.href='/log/log_form?id=' [% record.get_column('record_id') %]">Log</button>
-<button onclick="location.href='/todo/delete?id=' [% record.get_column('record_id') %]">Delete</button>
+
+<div>
+
+      <button onclick="location.href='/log/log_form?id=' [% record.get_column('record_id') %]">Log</button>
+    <button onclick="location.href='/todo/delete?id=' [% record.get_column('record_id') %]">Delete</button>
+</div>

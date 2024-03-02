@@ -2,7 +2,7 @@ package Comserv::Controller::Log;
 use Moose;
 use namespace::autoclean;
 use DateTime;
-
+use DateTime::Format::Strptime;
 BEGIN { extends 'Catalyst::Controller'; }
 
 has 'record_id' => (is => 'rw', isa => 'Str');
@@ -17,16 +17,134 @@ sub BUILD {
         2 => 'IN PROGRESS',
         3 => 'DONE',
     });
+
 }
 
 # Rest of your controller code
-sub index :Path :Args(0) {
-    my ( $self, $c ) = @_;
+sub index :Path('/log') :Args {
+    my ( $self, $c, $status ) = @_;
 
-    $c->response->body('Matched Comserv::Controller::Log in Log.');
+    # Default status to not 3 if not provided
+    $status //= { '!=' => 3 };
+
+    # Create a new instance of the Log model
+    my $log_model = Comserv::Model::Log->new();
+
+    # Fetch all open logs that match the status
+    my $rs = $log_model->get_logs($c, $status);
+
+    # Debug: Print all logs
+    while (my $log = $rs->next) {
+        $c->log->debug("Record ID: " . $log->record_id);
+    }
+
+    # Pass the logs to the template
+    $c->stash(logs => [$rs->all]);
+
+    # Set the template
+    $c->stash->{template} = 'log/index.tt';
 }
 
 
+sub edit :Path('/log/details'):Args(0) {
+    my ( $self, $c, $record_id ) = @_;
+    $record_id = $c->request->body_parameters->{record_id};
+    # Fetch the log entry
+    my $schema = $c->model('DBEncy');
+    my $log = $schema->resultset('Log')->find($record_id);
+
+    # Check if the log entry exists
+    if (!$log) {
+        $c->response->body('Log entry not found.');
+        return;
+    }
+    # Print the status value to the debug log
+    warn "Status: " . $log->status;
+
+    # Pass the log entry and the priority, status to the template
+    $c->stash(
+    build_priority => $self->priority,
+    build_status   => $self->status,
+    priority => $log->priority,
+    status => $log->status,
+    log => $log
+);
+
+    # Set the template
+    $c->stash->{template} = 'log/details.tt';
+}
+
+
+sub update :Path('/log/update') :Args(0) {
+    my ( $self, $c ) = @_;
+
+    # Get the record_id from the form data
+    my $record_id = $c->request->body_parameters->{record_id};
+
+    # Fetch the log record
+    my $schema = $c->model('DBEncy');
+    my $log = $schema->resultset('Log')->find($record_id);
+
+    # Check if the log entry exists
+    if (!$log) {
+        $c->response->body('Log entry not found.');
+        return;
+    }
+
+    # Get the start_time and end_time from the form data
+    my $start_time_str = $c->request->body_parameters->{start_time};
+    my $end_time_str = $c->request->body_parameters->{end_time};
+
+    # Create a DateTime::Format::Strptime object for parsing the time strings
+    my $strp = DateTime::Format::Strptime->new(
+        pattern   => '%H:%M',
+        time_zone => 'local',
+    );
+
+    # Convert the start_time and end_time strings to DateTime objects
+    my $start_time = $strp->parse_datetime($start_time_str);
+    my $end_time = $strp->parse_datetime($end_time_str);
+
+    # Calculate the difference between the end time and the start time
+    my $duration = $end_time->subtract_datetime($start_time);
+
+    # Convert the duration to the format 'HH:MM'
+    my $time = sprintf("%02d:%02d", $duration->hours, $duration->minutes);
+
+    # Get the new values from the form data
+    my $new_values = {
+        sitename => $c->request->body_parameters->{sitename},
+        start_date => $c->request->body_parameters->{start_date},
+        project_code => $c->request->body_parameters->{project_code},
+        due_date => $c->request->body_parameters->{due_date},
+        abstract => $c->request->body_parameters->{abstract},
+        details => $c->request->body_parameters->{details},
+        start_time => $start_time_str,
+        end_time => $end_time_str,
+        time => $time,
+        group_of_poster => $c->session->{roles},
+        status => $c->request->body_parameters->{status},
+        priority => $c->request->body_parameters->{priority},
+        comments => $c->request->body_parameters->{comments},
+    };
+
+    # Validate the new values
+    # This is a placeholder for your validation logic
+    # You should replace this with your actual validation logic
+    if (0) { # replace with your validation condition
+        $c->response->body('Invalid data.');
+        return;
+    }
+
+    # Create a new instance of the Log model
+    my $log_model = Comserv::Model::Log->new();
+
+    # Call the modify method on the Log model instance
+    $log_model->modify($log, $new_values);
+
+    # Redirect to the log details page
+    $c->response->redirect($c->uri_for("/log", { record_id => $record_id }));
+}
 
 # This method will only display the form
 sub log_form :Path('/log/log_form'):Args() {

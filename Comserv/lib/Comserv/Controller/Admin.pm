@@ -49,7 +49,54 @@ sub edit_documentation :Path('/edit_documentation') :Args(0) {
     my ( $self, $c ) = @_;
     $c->stash(template => 'admin/edit_documentation.tt');
 }
+sub add_schema :Path('/add_schema') :Args(0) {
+    my ( $self, $c ) = @_;
 
+    if ($c->request->method eq 'POST') {
+        # Get the schema name and description from the form
+        my $schema_name = $c->request->params->{schema_name};
+        my $schema_description = $c->request->params->{schema_description};
+
+        # Run the create_migration_script.pl script
+        my $output = `create_migration_script.pl $schema_name $schema_description`;
+
+        # Check if the script ran successfully
+        if ($? == 0) {
+            $c->stash(message => 'Migration script created successfully.');
+        } else {
+            $c->stash(message => 'Failed to create migration script.');
+        }
+
+        # Add the output to the stash so it can be displayed in the template
+        $c->stash(output => $output);
+    }
+
+    $c->stash(template => 'admin/add_schema.tt');
+}
+sub migrate_schema :Path('/migrate_schema') :Args(0) {
+    my ( $self, $c ) = @_;
+
+    if ($c->request->method eq 'POST') {
+        # Run the migration script
+        my $output = `perl Comserv/script/migrate_schema.pl`;
+
+        # Add the output to the stash so it can be displayed in the template
+        $c->stash(output => $output);
+    }
+{
+        # Run the migration script
+        my $output = `perl Comserv/script/migrate_schema.pl`;
+
+        # Check if the script ran successfully
+        if ($? == 0) {
+            $c->stash(message => 'Schema migrated successfully.');
+        } else {
+            $c->stash(message => 'Failed to migrate schema.');
+        }
+    }
+
+    $c->stash(template => 'admin/add_schema.tt');
+}
 __PACKAGE__->meta->make_immutable;
 
 1;

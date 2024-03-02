@@ -7,10 +7,10 @@
 
 <p>This is the start of the system to document the application for the application</p>
 <ol>
-    <li>First round of in the documentation is store in tt files in the Documentation directory</li>
+    <li>First round of in the documentation is store in tt file in the Documentation directory</li>
     <ol>
-        <li>forms to list all the files </li>
-        <li>forms to edit the files</li>
+        <li>forms to list all the file </li>
+        <li>forms to edit the file</li>
     </ol>
     <li>Documentation will be stored in the database</li>
     <ol>

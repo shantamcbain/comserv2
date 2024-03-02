@@ -30,7 +30,7 @@ sub todo :Path('/todo') :Args(0) {
             sitename => $c->session->{SiteName},  # filter by site
             status => { '!=' => 3 }  # status not equal to 3
         },
-        { order_by => 'start_date' }  # order by start_date
+        { order_by => [ 'priority','start_date']}  # order by start_date
     );
 
     # Add the todos to the stash
@@ -43,7 +43,46 @@ sub todo :Path('/todo') :Args(0) {
 
     $c->forward($c->view('TT')),
 }
+sub details :Path('/todo/details') :Args(0) {
+    my ( $self, $c ) = @_;
 
+    # Get the record_id from the request parameters
+    my $record_id = $c->request->parameters->{record_id};
+
+    # Get a DBIx::Class::Schema object
+    my $schema = $c->model('DBEncy');
+
+    # Get a DBIx::Class::ResultSet object
+    my $rs = $schema->resultset('Todo');
+
+    # Fetch the todo with the given record_id
+    my $todo = $rs->find($record_id);
+
+    # Retrieve accumulative_time from the database
+    my $accumulative_time_in_seconds = $todo->accumulative_time;
+
+    # Convert accumulative_time from seconds to hours and minutes
+    my $hours = int($accumulative_time_in_seconds / 3600);
+    my $minutes = int(($accumulative_time_in_seconds % 3600) / 60);
+
+    # Round minutes to the nearest minute
+    $minutes = int($minutes + 0.5);
+
+    # If minutes is 60, increment hours by 1 and set minutes to 0
+    if ($minutes == 60) {
+        $hours += 1;
+        $minutes = 0;
+    }
+
+    # Format the total time as 'HH:MM'
+    my $accumulative_time = sprintf("%02d:%02d", $hours, $minutes);
+
+    # Add the todo and accumulative_time to the stash
+    $c->stash(record => $todo, accumulative_time => $accumulative_time);
+
+    # Set the template to 'todo/details.tt'
+    $c->stash(template => 'todo/details.tt');
+}
 sub addtodo :Path('/todo/addtodo') :Args(0) {
     my ( $self, $c ) = @_;
 
@@ -71,27 +110,6 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
 
     $c->forward($c->view('TT'));
 }
-sub details :Path('/todo/details') :Args(0) {
-    my ( $self, $c ) = @_;
-
-    # Get the record_id from the request parameters
-    my $record_id = $c->request->parameters->{record_id};
-
-    # Get a DBIx::Class::Schema object
-    my $schema = $c->model('DBEncy');
-
-    # Get a DBIx::Class::ResultSet object
-    my $rs = $schema->resultset('Todo');
-
-    # Fetch the todo with the given record_id
-    my $todo = $rs->find($record_id);
-
-    # Add the todo to the stash
-    $c->stash(record => $todo);
-
-    # Set the template to 'todo/details.tt'
-    $c->stash(template => 'todo/details.tt');
-}
 sub modify :Local :Args(1) {
     my ($self, $c) = @_;
 
@@ -101,15 +119,27 @@ sub modify :Local :Args(1) {
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
 
-    # Get a DBIx::Class::ResultSet object
-    my $rs = $schema->resultset('Todo');
+    # Get a DBIx::Class::ResultSet object for the 'Todo' table
+    my $todo_rs = $schema->resultset('Todo');
 
     # Find the todo in the database
-    my $todo = $rs->find($todo_id);
+    my $todo = $todo_rs->find($todo_id);
 
     if ($todo) {
         # The todo was found, so retrieve the form data
         my $form_data = $c->request->body_parameters;
+
+        # Get a DBIx::Class::ResultSet object for the 'Log' table
+        my $log_rs = $schema->resultset('Log');
+
+        # Fetch the logs for the todo
+        my @logs = $log_rs->search({ todo_record_id => $todo_id });
+
+        # Calculate the total time from the logs
+        my $total_time = 0;
+        foreach my $log (@logs) {
+            $total_time += $log->time;
+        }
 
         # Get the current date
         my $current_date = DateTime->now->ymd;
@@ -127,11 +157,11 @@ sub modify :Local :Args(1) {
             description => $form_data->{description},
             estimated_man_hours => $form_data->{estimated_man_hours},
             comments => $form_data->{comments},
-            accumulative_time => $form_data->{accumulative_time},
+            accumulative_time => $total_time,
             reporter => $form_data->{reporter},
             company_code => $form_data->{company_code},
             owner => $form_data->{owner},
-            project_code => $form_data->{project_code},
+            project_id => $form_data->{project_id},
             developer => $form_data->{developer},
             username_of_poster => $username,
             status => $form_data->{status},
@@ -150,7 +180,7 @@ sub modify :Local :Args(1) {
         # The todo was not found, so display an error message
         $c->response->body('Todo not found');
     }
-}
+} # Add this line
 sub create :Local {
     my ( $self, $c ) = @_;
 
@@ -160,7 +190,7 @@ sub create :Local {
     my $start_date = $c->request->params->{start_date};
     my $parent_todo = $c->request->params->{parent_todo};
     my $due_date = $c->request->params->{due_date};
-    my $subject = $c->request->params->{subject};
+    my $subject = $c->request->params->{subject}; my $schema = $c->model('DBEncy');
     my $description = $c->request->params->{description};
     my $estimated_man_hours = $c->request->params->{estimated_man_hours};
     my $comments = $c->request->params->{comments};
@@ -198,7 +228,7 @@ sub create :Local {
     my $username = $c->session->{username};
 
     # Get a DBIx::Class::Schema object
-    my $schema = $c->model('DBEncy');
+    $schema = $c->model('DBEncy');
 
     # Get a DBIx::Class::ResultSet object
     my $rs = $schema->resultset('Todo');

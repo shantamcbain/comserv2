@@ -5,18 +5,19 @@
 
 <h1>Add Workshop</h1>
 
-<form method="POST" action="/workshops/add">
-    <label for="id">ID:</label>
-    <input type="text" id="id" name="id"><br>
+<form method="POST" action="/workshop/addworkshop">
 
     <label for="siteName">Site Name:</label>
-    <input type="text" id="siteName" name="siteName"><br>
+    <input type="text" id="sitename" name="sitename" value="[% SiteName OR '' %]"> <br>
 
     <label for="dateOfWorkshop">Date of Workshop:</label>
     <input type="date" id="dateOfWorkshop" name="dateOfWorkshop"><br>
 
     <label for="time">Time:</label>
     <input type="time" id="time" name="time"><br>
+
+    <label for="time">End Time:</label>
+    <input type="time" id="end_time" name="time"><br>
 
     <label for="location">Location:</label>
     <input type="text" id="location" name="location"><br>
@@ -25,10 +26,15 @@
     <input type="text" id="title" name="title"><br>
 
     <label for="details">Details:</label>
-    <input type="text" id="details" name="details"><br>
+    <input type="text" id="description" name="details"><br>
 
     <label for="maxMinAttendees">Max/Min Attendees:</label>
     <input type="text" id="maxMinAttendees" name="maxMinAttendees"><br>
-
+   <label for="share">Share: Private will share only on your site. </label>
+    <select id="share" name="share">
+        <option value="public" [% IF record.share == 'public' %]selected[% END %]>Public</option>
+        <option value="private" [% IF record.share == 'private' %]selected[% END %]>Private</option>
+        <option value="member" [% IF record.share == 'member' %]selected[% END %]>Member</option>
+    </select>
     <input type="submit" value="Add Workshop">
 </form>

@@ -30,7 +30,7 @@ Our applications incorporate the fallowing basic fundamentals.
  <li>User maintainable Content.</li>
  <li>Users require minimal web related skills.</li>
  <li>Site is built to HTML 4 standards.</li>
- <li>All data is stored in files or MySQL.</li>
+ <li>All data is stored in file or MySQL.</li>
  <li>All software is platform independent. You can run a local copy.</li>
  <li>We provide several support packages to help all site users.</li>
  <li><ul>

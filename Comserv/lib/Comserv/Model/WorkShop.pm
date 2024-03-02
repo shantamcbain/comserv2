@@ -4,28 +4,34 @@ use namespace::autoclean;
 
 extends 'Catalyst::Model';
 
-=head1 NAME
+# In Model/WorkShop.pm
+sub get_active_workshops {
+    my ($self, $c) = @_;
 
-Comserv::Model::WorkShop - Catalyst Model
+    # Get a DBIx::Class::Schema object
+    my $schema = $c->model('DBEncy');
 
-=head1 DESCRIPTION
+    # Get a DBIx::Class::ResultSet object for the 'WorkShop' table
+    my $rs = $schema->resultset('WorkShop');
 
-Catalyst Model.
+    my @workshops;
+    my $error;
+    eval {
+        # Fetch the active workshops from today's date and are not private
+        @workshops = $rs->search(
+            {
+                date => { '>=' => DateTime->today->ymd },
+                share => 0
+            },
+            { order_by => { -asc => 'date' } }
+        );
+    };
+    if ($@) {
+        $error = "Error fetching active workshops: $@";
+    }
 
-
-=encoding utf8
-
-=head1 AUTHOR
-
-Shanta McBain
-
-=head1 LICENSE
-
-This library is free software. You can redistribute it and/or modify
-it under the same terms as Perl itself.
-
-=cut
-
+    return (\@workshops, $error);
+}
 __PACKAGE__->meta->make_immutable;
 
 1;

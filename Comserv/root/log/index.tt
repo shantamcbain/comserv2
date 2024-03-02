@@ -1,0 +1,32 @@
+[% PageVersion = 'log/index.tt,v 0.02 2024/01/28 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+<h2>Our open logs</h2>
+
+
+<form id="statusForm">
+    <select id="statusSelect" name="status">
+        <option value="all">All</option>
+        <option value="1">Status 1</option>
+        <option value="2">Status 2</option>
+        <option value="3">Status 3</option>
+    </select>
+    <input type="submit" value="Filter">
+</form>
+
+<script>
+document.getElementById('statusForm').addEventListener('submit', function(event) {
+    event.preventDefault();
+    var status = document.getElementById('statusSelect').value;
+    window.location.href = '/log/' + status;
+});
+</script>
+[% FOREACH log IN logs %]
+    <div>
+        <form method="post" action="/log/details">
+            <input type="hidden" name="record_id" value="[% log.record_id %]">
+            <button type="submit">[% log.abstract %]</button>
+        </form>
+    </div>
+[% END %]

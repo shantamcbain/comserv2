@@ -12,6 +12,7 @@
     <a href="#overview">Overview</a> |
     <a href="#dbi">DBI</a> |
     <a href="#document-management">Document Management</a> |
+    <a href="#files">Files</a> |
     <a href="#Installation">Installation</a> |
     <a href="#login">Login</a> |
     <a href="#logging">Logging</a> |
@@ -30,6 +31,8 @@
 [% INCLUDE 'Documentation/DBIDocument.tt' %]
 <h3 id="document-management"><a href="#top">Back to top</a> </h3>
 [% INCLUDE 'Documentation/DocumentManagement.tt' %]
+<h3 id="files"><a href="#top">Back to top</a> </h3>
+[% INCLUDE 'Documentation/files.tt' %]
 <h3 id="Installation"><a href="#top">Back to top</a> </h3>
 [% INCLUDE 'Documentation/Instalation.tt' %]
 

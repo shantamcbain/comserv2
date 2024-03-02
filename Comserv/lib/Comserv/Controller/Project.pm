@@ -124,7 +124,7 @@ sub create_project :Path('create_project') :Args(0) {
         $c->stash(
             success_message => 'Project added successfully',
         );
-        $c->res->redirect($c->uri_for($self->action_for('project')));
+$c->go('project');
 
         $c->forward($c->view('TT'));
     }

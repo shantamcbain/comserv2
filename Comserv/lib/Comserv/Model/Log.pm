@@ -14,6 +14,36 @@ sub BUILD {
         3 => 'DONE',
     });
 }
+sub get_logs {
+    my ($self,  $c, $status) = @_;
+    my $schema = $c->model('DBEncy');
 
+    # Define search criteria
+    my $search_criteria = { SiteName => $c->session->{SiteName} };
+
+    # Add status to search criteria if not 'all'
+    if ($status ne 'all') {
+        $search_criteria->{status} = $status;
+    }
+
+    # Retrieve all log records
+    my $logs = $schema->resultset('Log')->search($search_criteria, { order_by => 'start_date' });
+
+    return $logs;
+}
+sub modify {
+    my ($self, $log, $new_values) = @_;
+
+    # Iterate over each key-value pair in the new values hash
+    while (my ($key, $value) = each %$new_values) {
+        # Update the corresponding field in the log record
+        $log->$key($value);
+    }
+
+    # Save the updated log record
+    $log->update;
+
+    return $log;
+}
 
 1;

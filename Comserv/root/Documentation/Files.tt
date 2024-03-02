@@ -1,0 +1,7 @@
+[% PageVersion = 'Documentation/file.tt,v 0.01 2024/01/28 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<h2>Files</h2>
+
