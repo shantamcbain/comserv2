@@ -21,12 +21,12 @@
     [% FOREACH workshop IN workshops %]
     <tr>
 
-        <td>[% workshop.1 %]</td>
-        <td>[% workshop.2 %]</td>
-        <td>[% workshop.3 %]</td>
-        <td>[% workshop.4 %]</td>
-        <td>[% workshop.11 %]</td>
-        <td>[% workshop.5 %]</td>
+        <td>[% workshop.sitename %]</td>
+        <td>[% workshop.date %]</td>
+        <td>[% workshop.time %]</td>
+        <td>[% workshop.location %]</td>
+        <td>[% workshop.title %]</td>
+        <td>[% workshop.discription %]</td>
         <td>[% workshop.6 %]</td>
         <td>[% workshop.7 %]</td>
         <td>

@@ -21,7 +21,7 @@ sub get_active_workshops {
         @workshops = $rs->search(
             {
                 date => { '>=' => DateTime->today->ymd },
-                share => 0
+                share => 'public'
             },
             { order_by => { -asc => 'date' } }
         );

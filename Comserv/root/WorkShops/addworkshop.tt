@@ -10,8 +10,9 @@
     <label for="siteName">Site Name:</label>
     <input type="text" id="sitename" name="sitename" value="[% SiteName OR '' %]"> <br>
 
+
     <label for="dateOfWorkshop">Date of Workshop:</label>
-    <input type="date" id="dateOfWorkshop" name="dateOfWorkshop"><br>
+    <input type="date" id="dateOfWorkshop" name="dateOfWorkshop" value="[% todo.start_date OR '' %]"><br>
 
     <label for="time">Time:</label>
     <input type="time" id="time" name="time"><br>

@@ -8,30 +8,37 @@ BEGIN { extends 'Catalyst::Controller'; }
 sub index :Path :Args(0) {
     my ( $self, $c ) = @_;
 
-    # Get the active workshops and any error message
-    my ($workshops, $error) = $c->model('WorkShop')->get_active_workshops($c);
+  # Try to get the active workshops and catch any exceptions
+my ($workshops, $error);
 
-      # Get the file for each workshop
+    ($workshops, $error) = $c->model('WorkShop')->get_active_workshops($c);
+
+
+
+# Continue with the rest of your code...
+    # Get the file for each workshop and convert each workshop to a hash
+    my @workshops_hash;
     for my $workshop (@$workshops) {
         my @file = $c->model('DBEncy::File')->search({ workshop_id => $workshop->id });
-        $workshop->{file} = \@file;
+
+        # Convert the workshop object to a hash
+        my %workshop_hash = $workshop->get_columns;
+        $workshop_hash{file} = \@file;
+
+        push @workshops_hash, \%workshop_hash;
     }
 
     # Pass the workshops and the error message to the view
     $c->stash(
-        workshops => $workshops,
+        workshops => \@workshops_hash,
         error => $error,
         sitename => $c->session->{SiteName},
         template => 'WorkShops/workshops.tt',
-    );# Pass the workshops and the error message to the view
-
-$c->stash(
-        workshops => $workshops, error => $error,
-        sitename => $c->session->{SiteName},
-        template => 'WorkShops/workshops.tt',
-
     );
- }
+    if ($@) {
+    $c->stash(error => "Error fetching active workshops: $@");
+}
+}
 sub add :Local {
     my ( $self, $c ) = @_;
 
@@ -58,6 +65,18 @@ sub addworkshop :Local {
     # Get a DBIx::Class::ResultSet object
     my $rs = $schema->resultset('WorkShop');
 
+    # Get the start_time from the form data
+    my $start_time_str = $c->request->body_parameters->{time};
+
+    # Create a DateTime::Format::Strptime object for parsing the time strings
+    my $strp = DateTime::Format::Strptime->new(
+        pattern   => '%H:%M',
+        time_zone => 'local',
+    );
+
+    # Convert the start_time string to a DateTime object
+    my $time = $strp->parse_datetime($start_time_str);
+
     # Try to create a new workshop record
     my $workshop;
     eval {
@@ -71,7 +90,7 @@ sub addworkshop :Local {
             max_participants => $params->{maxMinAttendees},
             share => $params->{share},
             end_time => $params->{end_time},
-            time => $params->{time},
+            time => $time,
         });
     };
     if ($@) {
@@ -81,12 +100,9 @@ sub addworkshop :Local {
         return;
     }
 
-
-
     # Redirect the user to the index action
     $c->response->redirect($c->uri_for($self->action_for('index')));
 }
-
 sub validate_form_data {
     my ($params) = @_;
 
