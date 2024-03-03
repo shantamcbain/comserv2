@@ -3,8 +3,11 @@
 
 2024-02-26 16:10:00;
 Working on Workshop model
-Documantation for the Workshop model
-```
+Documentation for the Workshop model
+
+2024-03-03 12:00:00;
+site setup goal get the server to allow each site to edit their site record.  This will allow the site to change the css and other values for their site.
+changed the setup link to open the site route.
 2024-02-26 10:10:00;
 added
 
