@@ -4,19 +4,30 @@ use strict;
 use base 'Catalyst::Model::DBIC::Schema';
 use Sys::Hostname;
 use Socket;
+use JSON;
 
 my $hostname = hostname;
 my $is_dev = $hostname eq '0.0.0.0' || inet_aton($hostname) ? 1 : 0;
+my $json_text;
+{
+    local $/; # Enable 'slurp' mode
+open my $fh, "<", "db_config.json" or die "Could not open db_config.json: $!";
+    $json_text = <$fh>;
+    close $fh;
+}
+my $config = decode_json($json_text);
 
 __PACKAGE__->config(
     schema_class => 'Comserv::Model::Schema::Ency',
 
-    connect_info => {
-        dsn => $is_dev ? 'dbi:mysql:dbname=ency' : 'dbi:mysql:dbname=shanta_ency;host=209.121.123.102',
-        user => $is_dev ? 'shanta_forager' : 'remote_username',
-        password => $is_dev ? 'UA=nPF8*m+T#' : 'remote_password',
-    }
-);
+          connect_info => {
+            dsn => "dbi:mysql:dbname=$config->{shanta_ency}->{database};host=$config->{shanta_ency}->{host};port=$config->{shanta_ency}->{port}",
+            user => $config->{shanta_ency}->{username},
+            password => $config->{shanta_ency}->{password},
+        }
+    );
+
+
 
 # In your DBEncy.pm file
 
