@@ -62,4 +62,5 @@
     <li>Enable the service to start on boot: <code>sudo systemctl enable starman</code></li>
     <li>You can start the service immediately with: <code>sudo systemctl start starman</code></li>
     <li>To check the status of the service, use: <code>sudo systemctl status starman</code></li>
+    <li>After testing you site with the development server restart starman  with <code>sudo systemctl restart starman</code></li>
 </ol>
