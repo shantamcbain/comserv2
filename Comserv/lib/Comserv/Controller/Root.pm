@@ -63,6 +63,8 @@ sub auto :Private {
     $c->log->debug('Entered auto action in Root.pm');
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
+    print Dumper($config);
+
     # Set up universal variables
 
     # Get the site name from the URL
