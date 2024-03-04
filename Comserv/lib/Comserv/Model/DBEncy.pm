@@ -28,7 +28,9 @@ __PACKAGE__->config(
         password => $config->{shanta_ency}->{password},
     }
 );
-
+sub get_config {
+    return $config;
+}
 sub get_active_projects {
     my ($self, $site_name) = @_;
 
