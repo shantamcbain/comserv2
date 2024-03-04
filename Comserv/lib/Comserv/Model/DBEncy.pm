@@ -16,6 +16,9 @@ my $json_text;
 }
 my $config = decode_json($json_text);
 
+# Print the contents of the $config variable
+print Dumper($config);
+
 # Set the schema_class and connect_info attributes
 __PACKAGE__->config(
     schema_class => 'Comserv::Model::Schema::Ency',
