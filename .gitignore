@@ -6,3 +6,4 @@ workspace.xml
 Comserv/comserv.psgi
 .idea/workspace.xml
 .idea.*
+/Comserv/lib/Comserv/Model/DBEncy.pm
