@@ -104,6 +104,7 @@
                 <span class="submenu-header">Setup</span>
                 <div class="submenu">
                     <a href="/site">Site Setup</a>
+                     <a href="/site/add_site_form">Add Site</a>
                     <a href="edit_documentation">Documentation editing</a>
                     <a href="documentation">Documentation</a>
                     <a href="/css_form">CSS Settings</a>

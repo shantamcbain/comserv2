@@ -3,7 +3,7 @@
  [%	PageVersion %]
 [% END %]
 <h1>Our  Sites </h1>
-
+<button type="button" onclick="window.open('/site/add_site_form', '_blank');">Add Site</button><br>
 [% FOREACH site IN sites %]
     <div>
         <a href="/site/details?id=[% site.id %]">[% site.id %]  [% site.name %]</a>
