@@ -235,14 +235,37 @@ sub edit_domain :Local :Args(1) {
     # Find the domain
     my $domain = $domain_rs->find($domain_id);
 
- # Get all the sites and sort them by name
-my @sites = sort { $a->name cmp $b->name } $schema->resultset('Site')->all;
-    # Pass the domain and sites to the template
-    $c->stash->{domain} = $domain;
-    $c->stash->{sites} = \@sites;
+    # If the domain is not found, return an error message
+    unless ($domain) {
+        $c->res->body('Domain not found');
+        return;
+    }
 
-    # Set the template to site/edit_domain.tt
-    $c->stash(template => 'site/edit_domain.tt');
+    # If the form is submitted (POST request)
+    if ($c->request->method eq 'POST') {
+        # Get the new site_id and domain from the request parameters
+        my $new_site_id = $c->request->parameters->{site_id};
+        my $new_domain = $c->request->parameters->{domain};
+
+        # Update the domain with the new site_id and domain
+        $domain->update({
+            site_id => $new_site_id,
+            domain => $new_domain,
+        });
+
+        # Redirect back to the referring page
+        $c->res->redirect($c->req->referer || $c->uri_for('/'));
+    } else {
+        # Get all the sites and sort them by name
+        my @sites = sort { $a->name cmp $b->name } $schema->resultset('Site')->all;
+
+        # Pass the domain and sites to the template
+        $c->stash->{domain} = $domain;
+        $c->stash->{sites} = \@sites;
+
+        # Set the template to site/edit_domain.tt
+        $c->stash(template => 'site/edit_domain.tt');
+    }
 }
 sub list_domains :Local {
     my ($self, $c) = @_;

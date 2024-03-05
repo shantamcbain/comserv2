@@ -2,8 +2,12 @@
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
-
 <h1>Edit Domain</h1>
+
+<!-- Debugging code -->
+<p>Domain Site ID: [% domain.site_id %]</p>
+<p>Sites: [% sites.map(site => site.name).join(', ') %]</p>
+
 <form action="/site/update_domain" method="post">
     <input type="hidden" name="domain_id" value="[% domain.id %]">
     <label for="site_id">Site ID:</label><br>
