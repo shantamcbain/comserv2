@@ -12,6 +12,7 @@
     <p class="error">[% error_message %]</p>
 [% END %]
 
+
 <form method="POST" action="/project/create_project">
     <label for="sitename">Site Name:</label><br>
 <select id="sitename" name="sitename" required>
@@ -20,7 +21,8 @@
         <option value="[% site.name %]" [% IF site.id == form_data.sitename OR site.id == session.sitename %]selected[% END %]>[% site.name %]</option>
 
     [% END %]
-</select>    <button type="button" onclick="window.open('/site/add_site_form', '_blank');">Add Site</button><br>
+</select>
+<button type="button" onclick="openAddSiteForm()">Add Site</button><br>
 
     <label for="name">Project Name:</label><br>
     <input type="text" id="name" name="name" value="[% form_data.name %]" required><br>
@@ -70,3 +72,10 @@
 
     <input type="submit" value="Add Project">
 </form>
+<script>
+function openAddSiteForm() {
+    var url = window.location.origin + '/site/add_site_form';
+    console.log("Opening URL: " + url);
+    window.open(url, '_blank');
+}
+</script>
