@@ -164,11 +164,20 @@ sub fetch_and_set {
     else {
         # If value is not defined in the URL or session, use the domain name to fetch the site name from the Site model
         my $domain = $c->req->base->host;
-        my $site = $schema->resultset('Site')->find({ name => $domain });
-        if ($site) {
-            $value = $site->name;
-            $c->stash->{SiteName} = $value;
-            $c->session->{SiteName} = $value;
+        $domain =~ s/:.*//; # Remove the port number from the domain
+
+        # Fetch the site_id from the sitedomain table
+        my $site_domain = $schema->resultset('SiteDomain')->find({ domain => $domain });
+        if ($site_domain) {
+            my $site_id = $site_domain->site_id;
+
+            # Fetch the site details from the sites table
+            my $site = $schema->resultset('Site')->find({ id => $site_id });
+            if ($site) {
+                $value = $site->name;
+                $c->stash->{SiteName} = $value;
+                $c->session->{SiteName} = $value;
+            }
         }
     }
 

@@ -2,7 +2,7 @@
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
- [% PageVersion %]
+
 <h1>Site Details</h1>
 
 <div>

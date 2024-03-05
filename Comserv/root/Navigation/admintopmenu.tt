@@ -121,7 +121,7 @@
                     <a href="?site=None" class="site-dropdown-item" onclick="activateSite('None')">None</a>
                     <a href="?site=Forager" class="site-dropdown-item" onclick="activateSite('Forager')">Forager</a>
                     <a href="?site=Shanta" class="site-dropdown-item" onclick="activateSite('Shanta')">Shanta</a>
-
+                   <a href="http://shanta.local:3000" class="site-dropdown-item" onclick="activateSite('Shanta')">Shanta.local</a>
                     <a href="?site=SunFire" class="site-dropdown-item" onclick="activateSite('SunFire')
 ">SunFire</a>
            <a href="/USBM?site=USBM" class="site-dropdown-item" onclick="activateSite('USBM')">USBM</a>
