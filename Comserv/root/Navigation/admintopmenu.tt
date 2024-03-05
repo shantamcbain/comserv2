@@ -104,7 +104,8 @@
                 <span class="submenu-header">Setup</span>
                 <div class="submenu">
                     <a href="/site">Site Setup</a>
-                     <a href="/site/add_site_form">Add Site</a>
+                    <a href="/site/add_site_form">Add Site</a>
+                    <a href="/site/list_domains">All Sites</a>
                     <a href="edit_documentation">Documentation editing</a>
                     <a href="documentation">Documentation</a>
                     <a href="/css_form">CSS Settings</a>
@@ -127,7 +128,8 @@
 ">SunFire</a>
            <a href="/USBM?site=USBM" class="site-dropdown-item" onclick="activateSite('USBM')">USBM</a>
            <a href="?site=WB" class="site-dropdown-item" onclick="activateSite('wb')">WeaverBeck.com</a>
-           <a href="/?site=home" class="site-dropdown-item" onclick="activateSite('home')
+                   <a href="http://ve7tit.local:3000" class="site-dropdown-item" target="_blank" onclick="activateSite('ve7tit')">ve7tit.local</a>
+          <a href="/?site=home" class="site-dropdown-item" onclick="activateSite('home')
 ">Default home</a>               </div>
             </div>
             <div class="submenu-item">

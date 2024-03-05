@@ -223,6 +223,45 @@ sub add_domain :Local :Args(0) {
     # Redirect back to the details page
     $c->res->redirect($c->uri_for($self->action_for('details'), [$site_id]));
 }
+sub edit_domain :Local :Args(1) {
+    my ($self, $c, $domain_id) = @_;
+
+    # Get a DBIx::Class::Schema object
+    my $schema = $c->model('DBEncy');
+
+    # Get the SiteDomain resultset
+    my $domain_rs = $schema->resultset('SiteDomain');
+
+    # Find the domain
+    my $domain = $domain_rs->find($domain_id);
+
+ # Get all the sites and sort them by name
+my @sites = sort { $a->name cmp $b->name } $schema->resultset('Site')->all;
+    # Pass the domain and sites to the template
+    $c->stash->{domain} = $domain;
+    $c->stash->{sites} = \@sites;
+
+    # Set the template to site/edit_domain.tt
+    $c->stash(template => 'site/edit_domain.tt');
+}
+sub list_domains :Local {
+    my ($self, $c) = @_;
+
+    # Get a DBIx::Class::Schema object
+    my $schema = $c->model('DBEncy');
+
+    # Get the SiteDomain resultset
+    my $domain_rs = $schema->resultset('SiteDomain');
+
+    # Get all domains
+    my @domains = $domain_rs->all;
+
+    # Pass the domains to the template
+    $c->stash->{domains} = \@domains;
+
+    # Set the template to site/list_domains.tt
+    $c->stash(template => 'site/list_domains.tt');
+}
 __PACKAGE__->meta->make_immutable;
 
 1;

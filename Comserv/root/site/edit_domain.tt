@@ -1,0 +1,17 @@
+[% PageVersion = 'site/edit_domain.tt,v 0.01 2023/11/28 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<h1>Edit Domain</h1>
+<form action="/site/update_domain" method="post">
+    <input type="hidden" name="domain_id" value="[% domain.id %]">
+    <label for="site_id">Site ID:</label><br>
+    <select id="site_id" name="site_id">
+    [% FOREACH site IN sites %]
+       <option value="[% site.id %]" [% IF site.id == domain.site_id %]selected[% END %]>[% site.name %]</option>
+    [% END %]
+    </select><br>    <label for="domain">Domain:</label><br>
+       <input type="text" id="domain" name="domain" value="[% domain.domain %]"><br>
+       <input type="submit" value="Submit">
+</form>

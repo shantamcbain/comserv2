@@ -12,11 +12,10 @@
  [% FOREACH site_domain IN domains %]
     <li>
         [% site_domain.domain %]
-        <form action="/edit_domain" method="post">
-            <input type="hidden" name="site_id" value="[% site_domain.site_id %]">
-            <input type="hidden" name="domain_id" value="[% site_domain.id %]">
-            <input type="submit" value="Edit">
-        </form>
+  <form action="/site/edit_domain/[% site_domain.id %]" method="post">
+    <input type="hidden" name="site_id" value="[% site_domain.site_id %]">
+    <input type="submit" value="Edit">
+</form
     </li>
 [% END %]
     </ul>
