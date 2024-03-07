@@ -23,7 +23,7 @@ sub get_top_todos {
     # Add a condition to only fetch todos where status is not 3
     my @todos = $rs->search(
         { sitename => $SiteName, status => { '!=' => 3 } },
-        { order_by => { -desc => ['priority', 'due_date'] }, rows => 10 }
+        { order_by => { -asc => ['priority', 'due_date'] }, rows => 10 }
     );
 
     $c->log->debug('Visited the todo page');

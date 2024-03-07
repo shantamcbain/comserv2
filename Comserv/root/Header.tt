@@ -11,9 +11,7 @@
     <meta charset="utf-8">
     <title>[% HostName _ ': ' _ ScriptDisplayName _ ': ' _ page_title %]</title>
     [% HostName = "http://computersystemconsulting.ca" %]
-    [%# data.css_view_url ||%]
-    [%# css_view_url = HostName _ "/styles/usbmstyle.css"  %]
-     <meta name="viewport" content="width=device-width, initial-scale=1">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="REVISIT-AFTER" content="7 days">
     <meta name="ROBOTS" content="index all, follow all">
     [% IF keywords %]
