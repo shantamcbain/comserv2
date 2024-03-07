@@ -1,7 +1,7 @@
 [% PageVersion = 'pagetop.tt,v 0.021 2024/01/01 shanta Exp shanta ' %]
 [%# PageVersion = 'pagetop.tt,v 0.02 2023/08/30 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
-    [%# PageVersion %]
+    [% PageVersion %]
     [%# "Debugging HostName: " _ HostName %]
     [% INCLUDE 'debug.tt' %]
 [% END %]

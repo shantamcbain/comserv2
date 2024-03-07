@@ -1,7 +1,7 @@
 <head>
     [% PageVersion = 'Header.tt,v 0.01 2023/08/30 shanta Exp shanta ' %]
     <meta charset="utf-8">
-    [% IF debug == 1 %]
+    [% IF c.session.debug_mode == 1 %]
         [% PageVersion %]
     [% END %]
     <meta name="viewport" content="width=device-width, initial-scale=1">

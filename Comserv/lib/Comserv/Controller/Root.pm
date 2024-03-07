@@ -11,46 +11,25 @@ sub index :Path :Args(0){
     my ($self, $c) = @_;
     $c->log->debug('Entered index action in Root.pm');
     my $SiteName = $c->session->{SiteName};
-    print "SiteName in root index: = $SiteName\n";
-    $c->log->debug('SiteName in root index: = $SiteName\n');
-    # Define a hash to map site names to controllers
-    my %site_to_controller = (
-        # ...
-        'BMaster' => 'BMaster',
-        # ...
-    );
+    my $ControllerName = $c->session->{ControllerName};
+    print "ControllerName in index: = $ControllerName\n";
+    $c->log->debug("ControllerName in index: = $ControllerName\n");
+    print "print SiteName in root index: = $SiteName\n";
+    $c->log->debug('deboug SiteName in root index: = $SiteName\n');
 
-    # Check if the site name exists in the hash
-    if (exists $site_to_controller{$SiteName}) {
-        # Set the site controller to define site specific routes
-        my $controller = $site_to_controller{$SiteName};
-$c->detach($site_to_controller{$SiteName}, 'index');
+    # Check if the controller name exists
+    if ($ControllerName) {
+        # Check if the ControllerName is a controller or a template
+        if ($ControllerName =~ /\.tt$/) {
+            # If it's a template, set the template
+            $ControllerName =~ s{^/}{};
+            $c->stash(template => $ControllerName);
+        } else {
+            # If it's a controller, detach to the controller
+            $c->detach($ControllerName, 'index');
+        }
     } else {
-        # Handle the case when the site name doesn't exist in the hash
-        #$c->detach('Default::index');
-    }
-
-    # Define a hash to map site names to templates
-    my %site_to_template = (
-        'SunFire' => 'SunFire/SunFire.tt',
-        'Brew'    => 'Brew/Brew.tt',
-        'CSC' => 'CSC/CSC.tt',
-        'Dev' => 'dev/index.tt',
-        'Forager' => 'Forager/Forager.tt',
-        'Monashee' => 'Monashee/Monashee.tt',
-        'Shanta' => 'Shanta/Shanta.tt',
-        'WB' => 'Shanta/WB.tt',
-        'USBM' => 'USBM/USBM.tt',
-        've7tit' => 'Shanta/ve7tit.tt',
-        'home' => 'home.tt',
-    );
-
-    # Check if the site name exists in the hash
-    if (exists $site_to_template{$SiteName}) {
-        # If it does, use the corresponding template
-        $c->stash(template => $site_to_template{$SiteName});
-    } else {
-        # If it doesn't, default to 'index.tt'
+        # Handle the case when the controller name doesn't exist
         $c->stash(template => 'index.tt');
     }
 
@@ -177,33 +156,16 @@ sub fetch_and_set {
                 $value = $site->name;
                 $c->stash->{SiteName} = $value;
                 $c->session->{SiteName} = $value;
+                print "SiteName in fetch_and_set: = $value\n";
+                 $c->session->{ScriptDisplayName} =$site->site_display_name;
+                # Fetch the home_view from the Site table
+                my $home_view = $site->home_view;
+                $c->stash->{ControllerName} = $site->name || 'Default';
+                print "ControllerName in fetch_and_set: = $home_view\n";
+                $c->log->debug("home_view: $home_view");
+                $c->session->{ControllerName} = $home_view;
+                $c->log->debug("home_view: $home_view");
             }
-        }
-    }
-
-    return $value;
-}
-sub fetch_and_set2 {
-    my ($self, $c, $schema, $param) = @_;
-    my $value = $c->req->query_parameters->{$param};
-
-    # If value is defined in the URL, update the session and stash
-    if (defined $value) {
-        $c->stash->{SiteName} = $value;
-        $c->session->{SiteName} = $value;
-    }
-    elsif (defined $c->session->{SiteName}) {
-        # If value is not defined in the URL but is defined in the session, use the session value
-        $c->stash->{SiteName} = $c->session->{SiteName};
-    }
-    else {
-        # If value is not defined in the URL or session, use the domain name to fetch the site name from the Site model
-        my $domain = $c->req->base->host;
-        my $site = $schema->resultset('Site')->find({ domain => $domain });
-        if ($site) {
-            $value = $site->name;
-            $c->stash->{SiteName} = $value;
-            $c->session->{SiteName} = $value;
         }
     }
 

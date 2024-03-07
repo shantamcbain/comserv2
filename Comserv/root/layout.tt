@@ -3,7 +3,7 @@
     [% INCLUDE 'setup/DefaultDBI.tt' %]
     [% INCLUDE 'setup/DefaultVariables.tt' %]
 
-    [% IF debug == 1 %]
+    [% IF c.session.debug_mode == 1 %]
      [%	PageVersion %]
     [% END %]
         [% INCLUDE 'Header.tt' %]

@@ -11,21 +11,9 @@
     <div class="submenu-item">
     <span class="submenu-header"><a href="/admin" class="dropbtn">admin</a></span>
     <div class="submenu">
-        <a href="/todo">ToDo</a>
-        <a href="/todo/display_tables">ToDo Tables</a>
-        <a href="[% c.uri_for(c.controller('Log').action_for('log')) %]">Open Log</a>
+           <a href="[% c.uri_for(c.controller('Log').action_for('log')) %]">Open Log</a>
          <a href="[% c.uri_for(c.controller('project').action_for('project')) %]">Projects</a>
-        via stash
-        [% FOREACH todo IN c.session.todos %]
 
-    <a href="/todo/details/[% todo.record_id %]">Priority: [% todo.priority %], Subject: [% todo.subject %]</a>
-[% END %]
-        Via DBI
-  [%  FOREACH todo = c.stash.dbi_ency.do_sql("SELECT * FROM todo WHERE sitename = ? ORDER BY priority, due_date LIMIT 10", c.session.SiteName) %]
-             <a href="/todo/details/Todo/[% todo.record_id %]">Priority: [% todo.priority %],
-                 Subject: [% todo
-                .subject %]</a>
-        [% END %]
     </div>
 </div>
 
@@ -34,19 +22,12 @@
     <div class="submenu">
         <a href="/todo">ToDo</a>
         <a href="/todo/display_tables">ToDo Tables</a>
-        <a href="[% c.uri_for(c.controller('Log').action_for('log_form')) %]">Open Log</a>
-         <a href="[% c.uri_for(c.controller('project').action_for('project')) %]">Projects</a>
-        via stash
+
         [% FOREACH todo IN c.session.todos %]
 
     <a href="/todo/details/[% todo.record_id %]">Priority: [% todo.priority %], Subject: [% todo.subject %]</a>
 [% END %]
-        Via DBI
-  [%  FOREACH todo = c.stash.dbi_ency.do_sql("SELECT * FROM todo WHERE sitename = ? ORDER BY priority, due_date LIMIT 10", c.session.SiteName) %]
-             <a href="/todo/details/Todo/[% todo.record_id %]">Priority: [% todo.priority %],
-                 Subject: [% todo
-                .subject %]</a>
-        [% END %]
+
     </div>
 </div>
 
@@ -117,7 +98,9 @@
                 <span class="submenu-header">Select Domain</span>
                 <div class="submenu">
                     <a href="?site=BMaster" class="site-dropdown-item" onclick="activateSite('BMaster')">BMaster</a>
-                    <a href="?site=CSC" class="site-dropdown-item" onclick="activateSite('CSC')">CSC</a>
+                     <a href="http://bmaster.local:3000" class="site-dropdown-item" onclick="activateSite('BMaster')">BMaster.local</a>
+                   <a href="?site=CSC" class="site-dropdown-item" onclick="activateSite('CSC')">CSC</a>
+                   <a href="http://comserv.local:3000" class="site-dropdown-item" onclick="activateSite('CSC')">CSC local</a>
                     <a href="?site=Dev" class="site-dropdown-item" onclick="activateSite('Dev')">Dev</a>
                     <a href="?site=Monashee" class="site-dropdown-item" onclick="activateSite('Monashee')">Monashee</a>
                     <a href="?site=None" class="site-dropdown-item" onclick="activateSite('None')">None</a>

@@ -25,3 +25,4 @@ For example beemaster.ca/ would return the home page for beemaster.ca as defined
 The site table record contains key information about the site.  The site table record will contain the following
 fields:  the first two we want to put will be the css_view_name site_display_name these values need to be placed in
 the session to set the DefaultVariables.tt for use by all other tt. in the application.
+we need to set the home page of the application based on the value in home_view in the site table. This value will set the default home page for the site. for the most part it will be a controller of the same name.  The home page will be set in the site controller.
