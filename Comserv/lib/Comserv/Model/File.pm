@@ -111,6 +111,62 @@ sub fetch_file_record {
     my $file_record = $rs->find($record_id);
     return $file_record;
 }
+sub upload_file {
+    my ($self, $c) = @_;
+
+    # Get the upload from the request
+    my $upload = $c->request->upload('file');
+
+    # Determine the directory to store the file in based on the user's permissions
+    my $directory;
+    if ($c->user_exists && $c->check_user_roles('admin')) {
+        # If the user is an admin, they can upload to any directory
+        $directory = $c->request->param('directory');
+    } else {
+        # Otherwise, restrict the directory to a specific location
+        $directory = 'uploads';
+    }
+
+    # Use the model to handle the file upload
+    my $result = $c->model('File')->handle_upload($upload, $directory);
+
+    if ($result) {
+        $c->response->body('File uploaded successfully.');
+    } else {
+        $c->response->body('Failed to upload file.');
+    }
+}
+
+sub handle_upload {
+    my ($self, $upload, $directory) = @_;
+
+    # Extract the file's name and size
+    my $filename = $upload->filename;
+    my $filesize = $upload->size;
+
+    # Define the allowed file types and maximum file size
+    my @allowed_types = ('.jpg', '.png', '.pdf'); # adjust as needed
+    my $max_size = 10 * 1024 * 1024; # 10 MB
+
+    # Check the file type
+    my ($file_type) = $filename =~ /(\.[^.]+)$/;
+    unless (grep { $_ eq $file_type } @allowed_types) {
+        return "Invalid file type. Allowed types are: " . join(", ", @allowed_types);
+    }
+
+    # Check the file size
+    if ($filesize > $max_size) {
+        return "File is too large. Maximum size is $max_size bytes.";
+    }
+
+    # Create the full path for the new file
+    my $filepath = "$directory/$filename";
+
+    # Save the uploaded file
+    my $result = $upload->copy_to($filepath);
+
+    return $result ? "File uploaded successfully." : "Failed to upload file.";
+}
 __PACKAGE__->meta->make_immutable;
 
 1;

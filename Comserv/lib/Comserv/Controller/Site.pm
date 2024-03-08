@@ -3,20 +3,23 @@ use Moose;
 use namespace::autoclean;
 
 BEGIN { extends 'Catalyst::Controller'; }
+# In your controller or script file
+use Comserv::Model::Site;
+
+
+
 sub index :Path :Args(0) {
     my ( $self, $c ) = @_;
+# Get a DBIx::Class::Schema object
+my $schema = $c->model('DBEncy');
 
-    # Get a DBIx::Class::Schema object
-    my $schema = $c->model('DBEncy');
-
-    # Get the Site resultset
-    my $site_rs = $schema->resultset('Site');
-
-    # Get all sites
-    my @sites = $site_rs->all;
+# Create a new Comserv::Model::Site object
+my $site_model = Comserv::Model::Site->new(schema => $schema);
+   # Get all sites
+    my $sites = $c->model('Site')->get_all_sites();
 
     # Pass the sites to the template
-    $c->stash->{sites} = \@sites;
+    $c->stash->{sites} = $sites;
 
     # Set the template to site/index.tt
     $c->stash(template => 'site/index.tt');
@@ -27,54 +30,8 @@ sub add_site :Local {
     # Get the site details from the request
     my $site = $c->request->body_parameters;
 
-    # Declare new_site_details
-    my $new_site_details = $site;
-
-    # Get a DBIx::Class::Schema object
-    my $schema = $c->model('DBEncy');
-
-    # Get the Site resultset
-    my $site_rs = $schema->resultset('Site');
-# Check for empty strings in integer fields and set them to 0
-for my $field (qw(affiliate pid app_logo_width app_logo_height)) {
-    if (exists $new_site_details->{$field} && $new_site_details->{$field} eq '') {
-        $new_site_details->{$field} = 0;
-    }
-}
     # Add the site to the database
-    $site_rs->create({
-        name => $site->{name},
-        description => $site->{description},
-        affiliate => $site->{affiliate},
-        pid => $site->{pid},
-        auth_table => $site->{auth_table},
-        home_view => $site->{home_view},
-        app_logo => $site->{app_logo},
-        app_logo_alt => $site->{app_logo_alt},
-        app_logo_width => $site->{app_logo_width},
-        app_logo_height => $site->{app_logo_height},
-        css_view_name => $site->{css_view_name},
-        mail_from => $site->{mail_from},
-        mail_to => $site->{mail_to},
-        mail_to_discussion => $site->{mail_to_discussion},
-        mail_to_admin => $site->{mail_to_admin},
-        mail_to_user => $site->{mail_to_user},
-        mail_to_client => $site->{mail_to_client},
-        mail_replyto => $site->{mail_replyto},
-        site_display_name => $site->{site_display_name},
-        document_root_url => $site->{document_root_url},
-        link_target => $site->{link_target},
-        http_header_params => $site->{http_header_params},
-        image_root_url => $site->{image_root_url},
-        global_datafiles_directory => $site->{global_datafiles_directory},
-        templates_cache_directory => $site->{templates_cache_directory},
-        app_datafiles_directory => $site->{app_datafiles_directory},
-        datasource_type => $site->{datasource_type},
-        cal_table => $site->{cal_table},
-        http_header_description => $site->{http_header_description},
-        http_header_keywords => $site->{http_header_keywords},
-        # Add more fields as needed
-    });
+    my $new_site = $c->model('Site')->add_site($site);
 
     # Pass a success message to the template
     $c->flash->{message} = 'Site added successfully';
@@ -82,6 +39,7 @@ for my $field (qw(affiliate pid app_logo_width app_logo_height)) {
     # Redirect to the add_site_form action
     $c->res->redirect($c->uri_for($self->action_for('add_site_form')));
 }
+
 
 sub add_site_form :Local {
     my ($self, $c) = @_;

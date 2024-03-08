@@ -148,7 +148,31 @@ sub extract_file_data {
 
     return ($name, $size, $creation_date, $file_path);
 }
+sub upload_file :Local {
+    my ($self, $c) = @_;
 
+    # Get the upload from the request
+    my $upload = $c->request->upload('file');
+
+    # Determine the directory to store the file in based on the user's permissions
+    my $directory;
+    if ($c->user_exists && $c->check_user_roles('admin')) {
+        # If the user is an admin, they can upload to any directory
+        $directory = $c->request->param('directory');
+    } else {
+        # Otherwise, restrict the directory to a specific location
+        $directory = '/path/to/restricted/directory';
+    }
+
+    # Use the model to handle the file upload
+    my $result = $c->model('File')->handle_upload($upload, $directory);
+
+    if ($result) {
+        $c->response->body('File uploaded successfully.');
+    } else {
+        $c->response->body('Failed to upload file.');
+    }
+}
 
 __PACKAGE__->meta->make_immutable;
 
