@@ -88,5 +88,15 @@ sub details :Local {
     # Set the template to site/details.tt
     $c->stash(template => 'site/details.tt');
 }
+sub get_site_domain {
+    my ($self, $domain) = @_;
+    return $self->resultset('SiteDomain')->find({ domain => $domain });
+}
+
+sub get_site_details {
+    my ($self, $site_id) = @_;
+    return $self->resultset('Site')->find({ id => $site_id });
+}
+
 
 1;

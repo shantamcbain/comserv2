@@ -79,6 +79,11 @@ sub delete_site {
 
     return $site;
 }
+sub get_site_details_by_name {
+    my ($self, $site_name) = @_;
+    my $site_rs = $self->schema->resultset('Site');
+    return $site_rs->find({ name => $site_name });
+}
 
 __PACKAGE__->meta->make_immutable;
 

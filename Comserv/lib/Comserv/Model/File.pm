@@ -42,7 +42,7 @@ sub get_files_info {
 sub get_top_files {
     my ($self, $c, $SiteName) = @_;
     $SiteName = $c -> session -> {'SiteName'};
-    $c->log->debug("Site name: $SiteName");
+    $c->log->debug("Get_top_files Site name: $SiteName");
 
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');

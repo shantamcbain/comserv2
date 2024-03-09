@@ -26,3 +26,5 @@ The site table record contains key information about the site.  The site table r
 fields:  the first two we want to put will be the css_view_name site_display_name these values need to be placed in
 the session to set the DefaultVariables.tt for use by all other tt. in the application.
 we need to set the home page of the application based on the value in home_view in the site table. This value will set the default home page for the site. for the most part it will be a controller of the same name.  The home page will be set in the site controller.
+
+root auto will use the site model to check if the domain i in the sitedomain table. If it is it will set the SiteName in the session.  It will then use the SiteName to set the site controller.  The site controller will then be used to set the site specific routes.  The site specific routes will be used to return the site specific pages to the user.  For example beemaster.ca/ would return the home page for beemaster.ca as defined in the BMaster controller.

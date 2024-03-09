@@ -47,11 +47,10 @@ sub auto :Private {
 
     # Set up universal variables
 
-    # Get the site name from the URL
+    # Call fetch_and_set method
     my $SiteName = $self->fetch_and_set($c, $schema, 'site');
-    # Get the domain name
-    my $domain = $self->fetch_and_set($c, $schema, 'domain');
-     $self->site_setup($c, $SiteName);
+    $c->log->debug("SiteName in auto: = $SiteName\n");
+    $self->site_setup($c, $SiteName);
 
     unless ($c->session->{group}) {
         $c->session(group => 'normal');
@@ -73,8 +72,8 @@ sub auto :Private {
         $c->stash->{debug_mode} = $c->session->{debug_mode};
     }
 
-# Declare the variable $page before using it
-my $page = $c->req->param('page');
+    # Declare the variable $page before using it
+    my $page = $c->req->param('page');
     # If the debug parameter is defined
     if (defined $page) {
         # If the debug parameter is different from the session value
@@ -92,7 +91,7 @@ my $page = $c->req->param('page');
 
     # Set the HostName in the stash
     $c->stash->{HostName} = $c->request->base;
-   # Fetch the top 10 todos from the Todo model
+    # Fetch the top 10 todos from the Todo model
     my @todos = $c->model('Todo')->get_top_todos($c, $SiteName);
 
     # Fetch the todos from the session
@@ -100,9 +99,6 @@ my $page = $c->req->param('page');
 
     # Store the todos in the stash
     $c->stash(todos => $todos);
-
-    # Set the Domain in the session
-    $c->session->{Domain} = $domain;
 
     # In your Comserv::Controller::Root controller
     if (ref($c) eq 'Catalyst::Context') {
@@ -121,16 +117,15 @@ my $page = $c->req->param('page');
         );
     }
 
-
-   $c->log->debug('Finished auto action in Root.pm');
+    $c->log->debug('Finished auto action in Root.pm');
 
     # Continue processing the rest of the request
     return 1;
 }
 sub fetch_and_set {
-    my ($self, $c, $schema, $param) = @_;
+    my ($self, $c, $param) = @_;
     my $value = $c->req->query_parameters->{$param};
-
+    $c->log->debug("fetch_and_set: $value");
     # If value is defined in the URL, update the session and stash
     if (defined $value) {
         $c->stash->{SiteName} = $value;
@@ -146,18 +141,19 @@ sub fetch_and_set {
         $domain =~ s/:.*//; # Remove the port number from the domain
 
         # Fetch the site_id from the sitedomain table
-        my $site_domain = $schema->resultset('SiteDomain')->find({ domain => $domain });
+        my $site_domain = $c->model('DBEncy::Site')->get_site_domain($domain);
+        $c->log->debug("fetch_and_set site_domain: $site_domain");
         if ($site_domain) {
             my $site_id = $site_domain->site_id;
 
             # Fetch the site details from the sites table
-            my $site = $schema->resultset('Site')->find({ id => $site_id });
+            my $site = $c->model('DBEncy::Site')->get_site_details($site_id);
             if ($site) {
                 $value = $site->name;
                 $c->stash->{SiteName} = $value;
                 $c->session->{SiteName} = $value;
                 print "SiteName in fetch_and_set: = $value\n";
-                 $c->session->{ScriptDisplayName} =$site->site_display_name;
+                $c->session->{ScriptDisplayName} =$site->site_display_name;
                 # Fetch the home_view from the Site table
                 my $home_view = $site->home_view;
                 $c->stash->{ControllerName} = $site->name || 'Default';
@@ -174,12 +170,13 @@ sub fetch_and_set {
 
 sub site_setup {
     my ($self, $c, $SiteName) = @_;
-       $SiteName = $c->session->{SiteName};
+    $SiteName = $c->session->{SiteName};
     # Log the SiteName
     $c->log->debug("SiteName: $SiteName");
+    $c->log->debug("s Site model loaded: " . ($c->model('Site') ? "Yes" : "No")). "\n";
 
     # Fetch the site details from the Site model using the SiteName
-    my $site = $c->model('DBEncy::Site')->find({ name => $SiteName });
+    my $site = $c->model('Site')->get_site_details_by_name($SiteName);
 
     my $css_view_name;
     if (defined $site) {
