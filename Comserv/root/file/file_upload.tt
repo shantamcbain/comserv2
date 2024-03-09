@@ -4,9 +4,12 @@
 [% END %]
 <h1>Upload a File</h1>
 <form action="/upload" method="post" enctype="multipart/form-data">
-    <label for="site_id">Site ID:</label>
-    <input type="number" id="site_id" name="site_id" required><br>
-
+<label for="site_id">Site:</label>
+<select id="site_id" name="site_id">
+    [% FOREACH site IN sites %]
+        <option value="[% site.id %]" [% IF site.name == stash.SiteName %]selected[% END %]>[% site.name %]</option>
+    [% END %]
+</select><br>
     <label for="reference_id">Reference ID:</label>
     <input type="number" id="reference_id" name="reference_id" required><br>
 

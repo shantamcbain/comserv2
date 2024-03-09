@@ -23,11 +23,12 @@
         <a href="/todo">ToDo</a>
         <a href="/todo/display_tables">ToDo Tables</a>
 
-        [% FOREACH todo IN c.session.todos %]
-
-    <a href="/todo/details/[% todo.record_id %]">Priority: [% todo.priority %], Subject: [% todo.subject %]</a>
+  [% FOREACH todo IN c.session.todos %]
+    <form action="/todo/details" method="POST">
+        <input type="hidden" name="record_id" value="[% todo.record_id %]">
+        <button type="submit" style="background:none!important; border:none; padding:0!important; color:#069; text-decoration:underline; cursor:pointer;">Priority: [% todo.priority %], Subject: [% todo.subject %]</button>
+    </form>
 [% END %]
-
     </div>
 </div>
 

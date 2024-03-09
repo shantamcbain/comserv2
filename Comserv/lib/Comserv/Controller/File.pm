@@ -150,9 +150,20 @@ sub extract_file_data {
 }
 sub upload_file :Local {
     my ($self, $c) = @_;
+# Get all sites
+my $sites = $c->model('Site')->get_all_sites();
 
+# Pass the sites to the template
+$c->stash->{sites} = $sites;
     # Get the upload from the request
     my $upload = $c->request->upload('file');
+
+    # If no file has been uploaded, display the file_upload.tt template
+    if (!defined $upload) {
+        $c->stash(template => 'file/file_upload.tt');
+        $c->forward('View::TT');
+        return;
+    }
 
     # Determine the directory to store the file in based on the user's permissions
     my $directory;
