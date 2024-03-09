@@ -84,7 +84,18 @@ sub get_site_details_by_name {
     my $site_rs = $self->schema->resultset('Site');
     return $site_rs->find({ name => $site_name });
 }
-
+sub get_site_domain {
+    my ($self, $domain_name) = @_;
+    my $site_domain_rs = $self->schema->resultset('SiteDomain');
+    my $site_domain = $site_domain_rs->find({ domain => $domain_name });
+    return $site_domain;
+}
+sub get_site_details {
+    my ($self, $site_id) = @_;
+    my $site_rs = $self->schema->resultset('Site');
+    my $site = $site_rs->find({ id => $site_id });
+    return $site;
+}
 __PACKAGE__->meta->make_immutable;
 
 1;

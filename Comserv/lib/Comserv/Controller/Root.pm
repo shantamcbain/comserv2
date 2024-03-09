@@ -141,19 +141,19 @@ sub fetch_and_set {
         $domain =~ s/:.*//; # Remove the port number from the domain
 
         # Fetch the site_id from the sitedomain table
-        my $site_domain = $c->model('DBEncy::Site')->get_site_domain($domain);
+        my $site_domain = $c->model('Site')->get_site_domain($domain);
         $c->log->debug("fetch_and_set site_domain: $site_domain");
         if ($site_domain) {
             my $site_id = $site_domain->site_id;
 
             # Fetch the site details from the sites table
-            my $site = $c->model('DBEncy::Site')->get_site_details($site_id);
+            my $site = $c->model('Site')->get_site_details($site_id);
             if ($site) {
                 $value = $site->name;
                 $c->stash->{SiteName} = $value;
                 $c->session->{SiteName} = $value;
                 print "SiteName in fetch_and_set: = $value\n";
-                $c->session->{ScriptDisplayName} =$site->site_display_name;
+                $c->session->{SiteDisplayName} =$site->site_display_name;
                 # Fetch the home_view from the Site table
                 my $home_view = $site->home_view;
                 $c->stash->{ControllerName} = $site->name || 'Default';
@@ -189,7 +189,7 @@ sub site_setup {
 
     my $site_display_name = $site ? $site->site_display_name : 'none';
 
-    $c->stash->{site_display_name} = $site_display_name;
+    $c->stash->{ScriptDisplayName} = $site_display_name;
     $c->stash->{css_view_name} = $css_view_name;
 
     my $page = $c->req->param('page');
