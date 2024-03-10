@@ -52,6 +52,14 @@ sub add_site :Local {
     # Redirect to the add_site_form action
     $c->res->redirect($c->uri_for($self->action_for('add_site_form')));
 }
+sub add_site_form :Local {
+    my ($self, $c) = @_;
+
+    # Your code here...
+
+    # Set the template to site/add_site_form.tt
+    $c->stash(template => 'site/add_site_form.tt');
+}
 sub details :Local {
     my ($self, $c) = @_;
 

@@ -159,10 +159,10 @@ my $todo_record = $todo->fetch_todo_record($c, $record_id);
     # Add the priority, status, and record_id to the stash
     $c->stash(
             build_priority => $self->priority,
-            build_status   => $self->status,
+        build_status   => $self->status,
         priority => $todo_record->priority,
         status   => $todo_record->status,
-        record_id => $todo_record->record_id,
+        project_code   => $todo_record->project_id,
         todo_record => $todo_record->record_id,
         start_date  => $todo_record->start_date,
         site_name   => $todo_record->sitename,
