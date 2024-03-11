@@ -7,6 +7,7 @@ extends 'Catalyst::Model';
 
 # In your Todo.pm file
 # In your Todo.pm file
+# In your Todo.pm file
 sub get_top_todos {
     my ($self, $c, $SiteName) = @_;
     $SiteName = $c -> session -> {'SiteName'};
@@ -15,15 +16,15 @@ sub get_top_todos {
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
 
-
     # Get a DBIx::Class::ResultSet object for the 'Todo' table
     my $rs = $schema->resultset('Todo');
 
     # Fetch the top 10 todos for the given site, ordered by priority and due_date
     # Add a condition to only fetch todos where status is not 3
+    # Order by priority and start_date
     my @todos = $rs->search(
         { sitename => $SiteName, status => { '!=' => 3 } },
-        { order_by => { -asc => ['priority', 'due_date'] }, rows => 10 }
+        { order_by => { -asc => ['priority', 'start_date'] }, rows => 10 }
     );
 
     $c->log->debug('Visited the todo page');

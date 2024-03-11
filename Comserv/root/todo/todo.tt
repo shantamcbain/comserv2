@@ -6,6 +6,21 @@
 [% END %]
 <h1>ToDo List</h1>
 <h2>[% date_today %]</h2>
+<style>
+    /* Basic table styling */
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    /* Responsive table */
+    @media screen and (max-width: 600px) {
+        table {
+            overflow-x: auto;
+            display: block;
+        }
+    }
+</style>
 
 <form action="/todo/addtodo" method="post">
     <button type="submit">Add New Record</button>
@@ -42,7 +57,7 @@
       <td>[% task.get_column('comments') %]</td>
        <td>[% task.get_column('accumulative_time') %]</td>
      <td>
-<form action="log/log_form" method="POST" target="_blank">
+<form action="/log/log_form" method="POST" target="_blank">
     <input type="hidden" name="record_id" value="[% task.get_column('record_id') %]">
     <button type="submit">Add Log</button>
 </form>

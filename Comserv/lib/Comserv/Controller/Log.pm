@@ -158,7 +158,7 @@ my $todo = Comserv::Model::Todo->new();
 my $todo_record = $todo->fetch_todo_record($c, $record_id);
     # Add the priority, status, and record_id to the stash
     $c->stash(
-            build_priority => $self->priority,
+        build_priority => $self->priority,
         build_status   => $self->status,
         priority => $todo_record->priority,
         status   => $todo_record->status,

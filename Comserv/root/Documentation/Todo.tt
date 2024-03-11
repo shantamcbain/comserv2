@@ -6,18 +6,42 @@
 [% END %]
 <h1>Todo System</h1>
 <p>
-    Sudo Code for add log
-    1. click button it will pass the todo record id sitename to the log_form.
-    2. log_form will use to the record id to find the table fill in the fallowing:
-    3. The todo record id will go into todo_record id. working,
-    4. sitename will go into sitename. not working,
-    5. subject will go into abstract. not working,
-    6. description will go into details will go into details. not working,
-    7. start_date will go into start_date. not working.
-    8. due_date will go into due_date. Not working.
-    9. start_time puts the time the form is open into the start time field it is working.
-    10. end_time is selected by user. working.
-    11. admin is filled in from session role of the user. working.
-    12. priority is pulled from the todo record. working.
-    12. status is selected in with value todo record the word open. not working.
-    </p>
+    The Todo System uses two different date management systems:
+    <ul>
+        <li><strong>DateTime::Format::ISO8601:</strong> This is used for handling dates in the ISO 8601 format, which is an international standard for date and time representations. We use this for the day and future calendar functionalities.</li>
+        <li><strong>DateTime::Format::Strptime:</strong> This provides more flexibility in terms of the date and time formats it can handle. We use this for calculating the time spent on projects in the logs.</li>
+    </ul>
+</p>
+<h2>Calendar Functionality</h2>
+<p>
+    The Calendar functionality provides a visual representation of the tasks in the Todo System. It includes three views: day, week, and month. Each view displays the tasks scheduled for the respective time period.
+</p>
+<h3>Day View</h3>
+<p>
+    The day view shows all tasks scheduled for a specific day. Each task is represented as an event on the calendar. The start and end times of the task correspond to the start and end times of the event on the calendar.
+</p>
+<h3>Week and Month Views</h3>
+<p>
+    The week and month views show an overview of the tasks scheduled for the respective time period. Each day in these views contains a summary of the tasks scheduled for that day.
+</p>
+<h3>Adapting the Day View</h3>
+<p>
+    The day view is adapted to work in the week and month views by summarizing the tasks for each day. Instead of showing each task as an individual event, the day view in the week and month views shows a summary of the tasks for that day. This summary includes the number of tasks and the total time scheduled for those tasks.
+</p>
+<h2>Adding a Log: Step-by-Step</h2>
+<ol>
+    <li>Click button. It will pass the todo record id and sitename to the log_form.</li>
+    <li>log_form will use the record id to find the table and fill in the following:</li>
+    <li>The todo record id will go into todo_record id.</li>
+    <li>sitename will go into sitename.</li>
+    <li>subject will go into abstract.</li>
+    <li>description will go into details.</li>
+    <li>start_date will go into start_date.</li>
+    <li>due_date will go into due_date.</li>
+    <li>start_time puts the time the form is open into the start time field.</li>
+    <li>end_time is selected by user.</li>
+    <li>admin is filled in from session role of the user.</li>
+    <li>priority is pulled from the todo record.</li>
+    <li>status is selected in with value todo record the word open.</li>
+</ol>
+</p>

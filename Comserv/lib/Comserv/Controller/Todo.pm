@@ -1,7 +1,7 @@
 package Comserv::Controller::Todo;
 use Moose;
 use namespace::autoclean;
-
+use DateTime::Format::ISO8601;
 use Data::Dumper;
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -265,6 +265,44 @@ sub create :Local {
 
     # Redirect the user to the index action
     $c->response->redirect($c->uri_for($self->action_for('index')));
+}
+sub day :Path('/todo/day') :Args {
+    my ( $self, $c, $date_arg ) = @_;
+
+    # Validate the date_arg if it's defined
+    my $date;
+    if (defined $date_arg) {
+        my $iso8601 = DateTime::Format::ISO8601->new;
+        eval { $date = $iso8601->parse_datetime($date_arg) };
+        $date = DateTime->now->ymd unless $date;  # Use today's date if $date_arg is not valid
+    } else {
+        $date = DateTime->now->ymd;  # Use today's date if $date_arg is not defined
+    }
+# Calculate the previous and next dates
+my $dt = DateTime::Format::ISO8601->parse_datetime($date);
+my $previous_date = $dt->clone->subtract(days => 1)->strftime('%Y-%m-%d');
+my $next_date = $dt->clone->add(days => 1)->strftime('%Y-%m-%d');
+
+    # Get the Todo model
+    my $todo_model = $c->model('Todo');
+
+    # Fetch todos for the site, ordered by start_date
+    my $todos = $todo_model->get_top_todos($c, $c->session->{SiteName});
+
+    # Filter todos for the given day and status not equal to 3
+    my @filtered_todos = grep { $_->start_date le $date && $_->status ne '3' } @$todos;
+
+    # Add the todos to the stash
+    $c->stash(
+        todos => \@filtered_todos,
+        sitename => $c->session->{SiteName},
+        date => $date,
+        previous_date => $previous_date,
+        next_date => $next_date,
+        template => 'todo/day.tt',
+    );
+
+    $c->forward($c->view('TT')),
 }
 __PACKAGE__->meta->make_immutable;
 

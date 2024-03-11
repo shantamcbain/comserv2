@@ -1,0 +1,52 @@
+
+[% PageVersion = 'todo/day.tt,v 0.01 2024/03/10 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]   <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed; /* Add this line */
+         }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            word-wrap: break-word;
+        }
+        th {
+            background-color: #4CAF50;
+            color: white;
+        }
+    </style>
+<body>
+    <h1>[% sitename %] Todos for [% date %]</h1>
+    <a href="/todo/day/[% previous_date.format('yyyy-MM-dd') %]">Previous Day</a>
+    <a href="/todo/day/[% next_date.format('yyyy-MM-dd') %]">Next Day</a>
+
+    <table>
+        <tr>
+           <th>Subject</th>
+            <th>Start Date</th>
+            <th>Status</th>
+            <th>Priority</th>
+             <th>Action</th>
+        </tr>
+        [% FOREACH todo IN todos %]
+        <tr>
+             <td>[% todo.subject %]</td>
+            <td>[% todo.start_date %]</td>
+             <td>[% todo.status %]</td>
+            <td>[% todo.priority %]</td>
+    <td>
+<form action="/log/log_form" method="POST" target="_blank">
+    <input type="hidden" name="record_id" value="[% todo.record_id %]">
+    <button type="submit">Add Log</button>
+</form>
+         <form action="/todo/details" method="POST">
+             <input type="hidden" name="record_id" value="[% todo.record_id %]">
+          <button type="submit">Details</button>
+        </form>
+      </td>
+         </tr>
+        [% END %]
+    </table>
