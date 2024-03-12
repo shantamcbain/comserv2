@@ -188,9 +188,13 @@ sub site_setup {
     }
 
     my $site_display_name = $site ? $site->site_display_name : 'none';
+    my $mail_to_admin = $site ? $site->mail_to_admin : 'none';  # Fetch mail_to_admin from the Site model
 
     $c->stash->{ScriptDisplayName} = $site_display_name;
     $c->stash->{css_view_name} = $css_view_name;
+    $c->stash->{mail_to_admin} = $mail_to_admin;
+    $c->stash->{mail_replyto} = $site->mail_replyto||'helpdesk.computersystemconsulting.ca';  # Fetch and store the mail_replyto value
+ the stash
 
     my $page = $c->req->param('page');
 

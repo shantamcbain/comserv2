@@ -22,7 +22,7 @@
 </form>
 
 <!-- Add a Register button that links to the register page -->
-<a href="/register" class="register-button">Register</a>
+<a href="/user/register" class="register-button">Register</a>
 
 <!-- Add a Change Password button that links to the change_password page -->
 <a href="/change_password" class="change-password-button">Change Password</a>

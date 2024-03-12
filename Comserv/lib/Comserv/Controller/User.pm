@@ -3,7 +3,9 @@ use Moose;
 use namespace::autoclean;
 use Digest::SHA qw(sha256_hex);  # For hashing passwords
 use Data::Dumper;
-
+use Email::Sender::Simple qw(sendmail);
+use Email::Simple;
+use Email::Simple::Creator;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -92,7 +94,7 @@ sub create_account :Local {
     my ($self, $c) = @_;
 
     # Display the account creation form
-    $c->stash(template => 'user/create_account.tt');
+    $c->stash(template => '/user/create_account.tt');
 }
 sub do_create_account :Local {
     my ($self, $c) = @_;
@@ -100,9 +102,17 @@ sub do_create_account :Local {
     # Retrieve the form data
     my $username = $c->request->params->{username};
     my $password = $c->request->params->{password};
+    my $password_confirm = $c->request->params->{password_confirm};  # Retrieve the confirmation password
     my $first_name = $c->request->params->{first_name};
     my $last_name = $c->request->params->{last_name};
     my $email = $c->request->params->{email};
+
+    # Check if the password and confirmation password match
+    if ($password ne $password_confirm) {
+        $c->stash(template => 'user/register.tt', error => 'Passwords do not match');
+        $c->forward($c->view('TT'));
+        return;
+    }
 
     # Hash the password
     my $hashed_password = $self->hash_password($password);
@@ -121,7 +131,35 @@ sub do_create_account :Local {
         last_name => $last_name,
         email => $email,
     });
+     # If there was an error, catch it and report it to the browser
+    if ($@) {
+        $c->stash(template => 'user/register.tt', error => "An error occurred: $@");
+        $c->forward($c->view('TT'));
+        return;
+    }
 
+# After the user is created, send an email to the support address
+my $support_address = $c->stash->{mail_to_admin};
+
+
+    my $email = Email::Simple->create(
+        header => [
+            To      => $support_address,
+            From    => $c->stash->{mail_replyto},
+            Subject => 'New user registration',
+        ],
+        body => "A new user has registered. Username: $username, Email: $email, First Name: $first_name , Last name: $last_name",
+    );
+
+eval {
+    sendmail($email);
+};
+
+if ($@) {
+    $c->stash(template => 'user/register.tt', error => "An error occurred while sending the email: $@");
+    $c->forward($c->view('TT'));
+    return;
+}
     # Redirect to the login page
     $c->res->redirect($c->uri_for('/user/login'));
 }
@@ -198,6 +236,12 @@ sub do_edit_user :Local :Args(1) {
         # The user was not found, so display an error message
         $c->response->body('User not found');
     }
+}
+sub register :Local {
+    my ($self, $c) = @_;
+
+    # Display the registration form
+    $c->stash(template => 'user/register.tt');
 }
 __PACKAGE__->meta->make_immutable;
 
