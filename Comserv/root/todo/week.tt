@@ -19,7 +19,10 @@
         [% FOREACH day IN week_days %]
             <th>
                 <a href="/todo/day/[% day.date %]">[% day.day_name %] [% day.date %]</a>
-            </th>
+ <form action="/todo/addtodo" method="post">
+    <input type="hidden" name="date" value="[% day.date %]">
+    <button type="submit">Add New Record</button>
+</form>           </th>
         [% END %]
     </tr>
     <!-- Display the todos for each day -->

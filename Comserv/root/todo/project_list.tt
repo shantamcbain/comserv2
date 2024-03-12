@@ -2,7 +2,7 @@
 [% IF debug_mode == 1 %]
         [% PageVersion %]
 [% END %]
-Content of dumper [%# Dumper(projects) %]
+
 <label for="project_id">Project:</label>
 <select id="project_id" name="project_id">Project List
 <!-- project_list.tt -->

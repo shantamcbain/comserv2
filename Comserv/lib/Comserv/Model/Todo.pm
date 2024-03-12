@@ -45,6 +45,8 @@ sub get_top_todos {
 }
 sub get_todos_for_date {
     my ($self, $c, $date) = @_;
+   # Get the SiteName from the session
+    my $SiteName = $c->session->{SiteName};
 
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
@@ -55,7 +57,7 @@ sub get_todos_for_date {
     # Fetch todos whose start date is on or before the given date and status is not 3
     # Order by priority and start_date
     my @todos = $rs->search(
-        { start_date => { '<=' => $date }, status => { '!=' => 3 } },
+        { start_date => { '<=' => $date }, status => { '!=' => 3 }, sitename => $SiteName },
         { order_by => { -asc => ['priority', 'start_date'] } }
     );
 

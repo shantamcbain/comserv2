@@ -86,21 +86,27 @@ sub details :Path('/todo/details') :Args {
 sub addtodo :Path('/todo/addtodo') :Args(0) {
     my ( $self, $c ) = @_;
 
+    # Get the date from the POST parameters
+    my $date = $c->request->body_parameters->{date};
+
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
+    # Get the SiteName from the session
+    my $SiteName = $c->session->{SiteName};
 
-    # Get active projects for the site
-#    my $active_projects = $schema->get_active_projects($c->session->{SiteName});
-# Get the Project resultset
-    my $project_rs = $schema->resultset('Project');
+ # Get the Project resultset
+my $project_rs = $schema->resultset('Project')->search({sitename => $SiteName});
+# Convert the resultset to an array of hashrefs for use in the template
+my @projects = map { { id => $_->id, name => $_->name } } $project_rs->all;
 
-    # Print the content of $active_projects
+    # Print the content of $project_rs
     print "Before adding to stash: ", Dumper($project_rs);
 
-    # Add the active projects and SiteName to the stash
+    # Add the active projects, SiteName, and date to the stash
     $c->stash(
-        projects => $project_rs|| [{ id => 0, name => 'No projects' }],
+        projects => \@projects || [{ id => 0, name => 'No projects' }],
         sitename => $c->session->{SiteName},
+        start_date => $date,  # Add the date to the stash
         template => 'todo/addtodo.tt',
         Dumper => \&Dumper,
     );
