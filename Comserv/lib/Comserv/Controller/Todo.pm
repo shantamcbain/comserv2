@@ -43,7 +43,7 @@ sub todo :Path('/todo') :Args(0) {
 
     $c->forward($c->view('TT')),
 }
-sub details :Path('/todo/details') :Args(0) {
+sub details :Path('/todo/details') :Args {
     my ( $self, $c ) = @_;
 
     # Get the record_id from the request parameters
@@ -109,6 +109,21 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
     print "After adding to stash: ", Dumper($c->stash->{projects});
 
     $c->forward($c->view('TT'));
+}
+sub debug :Local {
+    my ($self, $c) = @_;
+
+    # Print the @INC path
+    $c->log->debug("INC: " . join(", ", @INC));
+
+    # Check if the DateTime plugin is installed
+    my $is_installed = eval {
+        require Template::Plugin::DateTime;
+        1;
+    };
+    $c->log->debug("DateTime plugin is " . ($is_installed ? "" : "not ") . "installed");
+
+    $c->response->body("Debugging information has been logged");
 }
 sub modify :Local :Args(1) {
     my ($self, $c) = @_;
@@ -303,6 +318,69 @@ my $next_date = $dt->clone->add(days => 1)->strftime('%Y-%m-%d');
     );
 
     $c->forward($c->view('TT')),
+}
+sub week :Path('/todo/week') :Args {
+    my ($self, $c, $date) = @_;
+
+    # Get the Todo model
+    my $todo_model = $c->model('Todo');
+
+    # If no date is provided, use the current date
+    if (!defined $date) {
+        my $dt = DateTime->now(time_zone => 'local');
+        $date = $dt->ymd;
+    }
+
+    # Convert the date string to a DateTime object
+    my $dt = DateTime::Format::ISO8601->parse_datetime($date);
+
+    # Calculate the start and end dates of the week
+    my $start_date = $dt->clone->subtract(days => $dt->day_of_week % 7);
+    my $end_date = $start_date->clone->add(days => 6);
+
+    # Calculate the dates for the previous and next weeks
+    my $prev_week_date = $start_date->clone->subtract(days => 7)->ymd;
+    my $next_week_date = $start_date->clone->add(days => 7)->ymd;
+
+# Calculate the dates and day names for each day of the week
+my @week_days;
+for my $day (0..6) {
+    my $current_date = $start_date->clone->add(days => $day);
+    my $all_todos = $todo_model->get_todos_for_date($c, $current_date->ymd);
+
+    # Filter todos based on the day
+    my @day_todos = grep {
+        if ($day == 0) {
+            # If it's the first day of the week, include todos that have gone beyond their due date
+                   # If it's the first day of the week, include todos that have gone beyond their due date and are not closed
+            $_->due_date le $current_date->ymd && $_->status ne 'closed'
+
+        } else {
+            # For the rest of the days, only include todos that start on or before the current date and the due date is on or after the current date
+            $_->start_date le $current_date->ymd && $_->due_date ge $current_date->ymd
+        }
+    } @$all_todos;
+
+    push @week_days, {
+        date => $current_date->ymd,
+        day_name => $current_date->day_name,
+        todos => \@day_todos,
+    };
+}    # Format the dates to 'yyyy-mm-dd' before adding them to the stash
+    $c->stash(
+        date => $dt->ymd,
+        week_days => \@week_days,
+        start_date => $start_date->ymd,
+        end_date => $end_date->ymd,
+        prev_week_date => $prev_week_date,
+        next_week_date => $next_week_date,
+    );
+
+    # Render the week.tt template
+    $c->stash->{template} = 'todo/week.tt';
+
+    # Forward to the 'TT' view
+    $c->forward($c->view('TT'));
 }
 __PACKAGE__->meta->make_immutable;
 

@@ -1,0 +1,46 @@
+<!-- Include the new CSS file -->
+<link rel="stylesheet" type="text/css" href="/static/css/week_view.css">
+
+<!-- Template Toolkit -->
+[% PageVersion  = '/todo/week.tt,v 0.1 2024/03/11 Shanta Exp Shanta' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+
+<h1>Week View: [% start_date %] - [% end_date %]</h1>
+<div style="display: flex; justify-content: space-between;">
+   <a href="/todo/week/[% prev_week_date %]">Previous Week</a>
+    <a href="/todo/week/[% next_week_date %]">Next Week</a>
+ </div>
+<table class="week-view-table">
+    <!-- Display the days -->
+    <tr>
+        [% FOREACH day IN week_days %]
+            <th>
+                <a href="/todo/day/[% day.date %]">[% day.day_name %] [% day.date %]</a>
+            </th>
+        [% END %]
+    </tr>
+    <!-- Display the todos for each day -->
+    [% max_todos = week_days.0.todos.size; # Assuming all days have the same number of todos %]
+    [% FOREACH i IN [0..max_todos] %]
+        <tr>
+            [% FOREACH day IN week_days %]
+                [% IF day.todos.$i %]
+                    <td>
+  <!-- Debug output -->
+[%# "Due date: " _ day.todos.$i.due_date _ ", Formatted due date: " _ date.format(day.todos.$i.due_date) _ ", Now: " _ date.format('day.todos.$i.day') %]
+                      <!-- Display the todo -->
+<form action="/todo/details" method="POST">
+    <input type="hidden" name="record_id" value="[% day.todos.$i.id %]">
+  <button type="submit" class="[% IF day.todos.$i.due_date < day.date %]overdue[% ELSE %]todo-button[% END %]" title="[% day.todos.$i.description %]">[% day.todos.$i.subject %]</button>
+</form>
+</td>
+              [% ELSE %]
+                    <td></td>
+                [% END %]
+            [% END %]
+        </tr>
+    [% END %]
+</table>

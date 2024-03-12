@@ -43,6 +43,24 @@ sub get_top_todos {
 
     return \@todos;
 }
+sub get_todos_for_date {
+    my ($self, $c, $date) = @_;
+
+    # Get a DBIx::Class::Schema object
+    my $schema = $c->model('DBEncy');
+
+    # Get a DBIx::Class::ResultSet object for the 'Todo' table
+    my $rs = $schema->resultset('Todo');
+
+    # Fetch todos whose start date is on or before the given date and status is not 3
+    # Order by priority and start_date
+    my @todos = $rs->search(
+        { start_date => { '<=' => $date }, status => { '!=' => 3 } },
+        { order_by => { -asc => ['priority', 'start_date'] } }
+    );
+
+    return \@todos;
+}
 sub fetch_todo_record {
     my ($self, $c, $record_id) = @_;
     # Get a DBIx::Class::Schema object

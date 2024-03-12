@@ -22,7 +22,8 @@
     <div class="submenu">
         <a href="/todo">ToDo</a>
         <a href="/todo/display_tables">ToDo Tables</a>
-        <a href="/todo/day">ToDo day</a>
+        <a href="/todo/day">ToDo Day</a>
+        <a href="/todo/week">ToDo Week</a>
   [% FOREACH todo IN c.session.todos %]
     <form action="/todo/details" method="POST">
         <input type="hidden" name="record_id" value="[% todo.record_id %]">

@@ -1,0 +1,18 @@
+/* week_view.css */
+.week-view-table th, .week-view-table td {
+    border: 1px solid black;
+    padding: 10px;
+}
+.week-view-table th {
+    background-color: #ccffff; /* Change this to the color you want for the day headers */
+}
+.week-view-table td {
+    background-color: #ccffff; /* Change this to the color you want for the todos */
+.todo-button {
+    color: white;
+    background-color: blue;
+}
+.overdue {
+    background-color: red;
+}
+}

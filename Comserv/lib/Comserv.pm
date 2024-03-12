@@ -55,10 +55,7 @@ __PACKAGE__->log(Catalyst::Log->new(output => sub {
     $message = '' unless defined $message;
     $self->dispatchers->[0]->log(level => $level, message => $message);
 }));
-# Continue with the existing code...
-__PACKAGE__->config(
-    # ...
-);
+
 __PACKAGE__->config(
     name => 'Comserv',
     # Disable deprecated behavior needed by old applications
@@ -80,8 +77,6 @@ __PACKAGE__->config(
 
 
 );
-
-
 
 # Start the application
 __PACKAGE__->setup();
