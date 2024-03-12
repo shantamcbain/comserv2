@@ -194,7 +194,7 @@ sub site_setup {
     $c->stash->{css_view_name} = $css_view_name;
     $c->stash->{mail_to_admin} = $mail_to_admin;
     $c->stash->{mail_replyto} = $site->mail_replyto||'helpdesk.computersystemconsulting.ca';  # Fetch and store the mail_replyto value
- the stash
+
 
     my $page = $c->req->param('page');
 
