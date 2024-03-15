@@ -67,7 +67,8 @@ __PACKAGE__->add_columns(
     date_time_posted => {
         data_type => 'datetime',
     },
-);
+    );
+
 __PACKAGE__->set_primary_key('id');
 # Add a new relationship for the parent project
 __PACKAGE__->belongs_to(parent => 'Comserv::Model::Schema::Ency::Result::Project', 'parent_id');

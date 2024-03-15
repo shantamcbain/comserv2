@@ -1,0 +1,37 @@
+[% META title = 'Project Success' %]
+[% PageVersion = 'todo/projectdetails.tt,v 0.01 2024/03/15 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+        [% PageVersion %]
+[% END %]
+
+<h1>Project Details</h1>
+
+<!-- Display the project details -->
+<ul>
+    <li>Name: [% project.name %]</li>
+    <li>Description: [% project.description OR 'No description' %]</li>
+    <li>Start Date: [% project.start_date %]</li>
+    <li>End Date: [% project.end_date %]</li>
+    <li>Status: [% project.status %]</li>
+    <li>Record ID: [% project.record_id %]</li>
+    <li>Project Code: [% project.project_code %]</li>
+    <li>Project Size: [% project.project_size %]</li>
+    <li>Estimated Man Hours: [% project.estimated_man_hours %]</li>
+    <li>Developer Name: [% project.developer_name %]</li>
+    <li>Client Name: [% project.client_name %]</li>
+    <li>Site Name: [% project.sitename %]</li>
+    <li>Comments: [% project.comments %]</li>
+    <li>Username of Poster: [% project.username_of_poster %]</li>
+    <li>Parent ID: [% project.parent_id %]</li>
+    <li>Group of Poster: [% project.group_of_poster %]</li>
+    <li>Date Time Posted: [% project.date_time_posted %]</li>
+</ul>
+
+<!-- Button to go back to the project list -->
+<button type="button" onclick="window.location.href='/project';">Back to Projects</button>
+
+<!-- Form to edit the current project -->
+<form action="/project/editproject" method="POST">
+    <input type="hidden" name="project_id" value="[% project.id %]">
+    <button type="submit">Edit Project [% project.id %]</button>
+</form>
