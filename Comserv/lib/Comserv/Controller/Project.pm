@@ -15,26 +15,24 @@ sub add_project :Path('addproject') :Args(0) {
     my ( $self, $c ) = @_;
     print("__PACKAGE__ add_project\n");
     print "SiteName: in ", $c->session->{SiteName}, "\n";
-   # Get a Comserv::Model::Project object
+
+    # Get a Comserv::Model::Project object
     my $project_model = $c->model('Project');
 
     # Get all projects
     my $projects = $project_model->get_projects($c->model('DBEncy'));
 
-
-  # Print the SiteName
-
     # Pass the projects to the template
     $c->stash->{projects} = $projects;
 
-    # Get the Site resultset
-    my $site_rs = $c->model('DBEncy')->resultset('Site');
+    # Get a Comserv::Model::Site object
+    my $site_model = $c->model('Site');
 
-    # Get all sites in ascending order by name
-    my @sites = $site_rs->search({}, { order_by => 'name' });
+    # Get all sites
+    my $sites = $site_model->get_all_sites();
 
     # Pass the sites to the template
-    $c->stash->{sites} = \@sites;
+    $c->stash->{sites} = $sites;
 
     $c->stash(
         sitename => $c->session->{SiteName},
@@ -42,6 +40,71 @@ sub add_project :Path('addproject') :Args(0) {
     );
 
     $c->forward($c->view('TT'));
+}
+sub create_project :Path('create_project') :Args(0) {
+    my ( $self, $c ) = @_;
+    print Dumper($c->session);
+    # Get the form data from the request
+    my $form_data = $c->request->body_parameters;
+
+    # Get the username_of_poster from the session
+    my $username_of_poster = $c->session->{username};
+
+    # Get a DBIx::Class::Schema object
+    my $schema = $c->model('DBEncy');
+
+    # Get the Project resultset
+    my $project_rs = $schema->resultset('Project');
+
+    # Get the group name of poster from the session
+    my $group_of_poster = $c->session->{roles};
+    # Get the parent_id from the form data
+    my $parent_id = $form_data->{parent_id};
+    $parent_id = undef if $parent_id eq '';
+
+    # Get the current date and time
+    my $date_time_posted = DateTime->now;
+    # Get the record_id from the form data
+    my $record_id = $form_data->{record_id}||0;
+
+    # Try to create a new project in the database
+    my $project = eval {
+        $project_rs->create({
+            record_id => $record_id,
+            sitename => $form_data->{sitename},
+            name => $form_data->{name},
+            description => $form_data->{description},
+            start_date => $form_data->{start_date},
+            end_date => $form_data->{end_date},
+            status => $form_data->{status},
+            project_code => $form_data->{project_code},
+            project_size => $form_data->{project_size},
+            estimated_man_hours => $form_data->{estimated_man_hours},
+            developer_name => $form_data->{developer_name},
+            client_name => $form_data->{client_name},
+            comments => $form_data->{comments},
+            username_of_poster => $username_of_poster,
+            parent_id => $parent_id,
+            group_of_poster => $group_of_poster, # Added this line
+            date_time_posted => $date_time_posted->ymd . ' ' . $date_time_posted->hms, # Added this line
+        });
+    };
+    if ($@) {
+        # If there was an error creating the project, return to the add_project.tt template
+        $c->stash(
+            form_data => $form_data,
+            error_message => 'There was an error creating the project: ' . $@,
+            template => 'todo/add_project.tt'
+        );
+    } else {
+        # If the project was created successfully, redirect to the project.tt template
+        $c->stash(
+            success_message => 'Project added successfully',
+        );
+        $c->res->redirect($c->uri_for($self->action_for('project')));
+
+        $c->forward($c->view('TT'));
+    }
 }
 
 sub project :Path('project') :Args(0) {
@@ -101,6 +164,14 @@ sub editproject :Path('editproject') :Args(0) {
     my $project_model = $c->model('Project');
     # Get the project
     my $project = $project_model->get_project($schema, $project_id);
+ # Get a Comserv::Model::Site object
+    my $site_model = $c->model('Site');
+
+    # Get all sites
+    my $sites = $site_model->get_all_sites();
+
+    # Pass the sites to the template
+    $c->stash->{sites} = $sites;
 
 # Get all projects
 my $projects = $project_model->get_projects($c->model('DBEncy'), $c->session->{SiteName});
@@ -116,6 +187,48 @@ my $projects = $project_model->get_projects($c->model('DBEncy'), $c->session->{S
 
     $c->forward($c->view('TT'));
 }
+sub update_project :Local :Args(0)  {
+    my ( $self, $c ) = @_;
+    # Get the form data from the request
+    my $form_data = $c->request->body_parameters;
 
+    # Get the project id from the form data
+    my $project_id = $form_data->{project_id};
+
+    # Get a DBIx::Class::Schema object
+    my $schema = $c->model('DBEncy');
+
+    # Get the Project resultset
+    my $project_rs = $schema->resultset('Project');
+
+    # Find the project in the database
+    my $project = $project_rs->find($project_id);
+
+    if ($project) {
+        # Update the project's fields with the new data
+        $project->update({
+            sitename => $form_data->{sitename},
+            name => $form_data->{name},
+            description => $form_data->{description},
+            start_date => $form_data->{start_date},
+            end_date => $form_data->{end_date},
+            status => $form_data->{status},
+            project_code => $form_data->{project_code},
+            project_size => $form_data->{project_size},
+            estimated_man_hours => $form_data->{estimated_man_hours},
+            developer_name => $form_data->{developer_name},
+            client_name => $form_data->{client_name},
+            comments => $form_data->{comments},
+            # Add any other fields that need to be updated
+        });
+
+        # Redirect to the project home page
+        $c->res->redirect($c->uri_for($self->action_for('project')));
+    } else {
+        # Return an error response if the project was not found
+        $c->response->status(404);
+        $c->response->body('Project not found');
+    }
+}
 __PACKAGE__->meta->make_immutable;
 1;

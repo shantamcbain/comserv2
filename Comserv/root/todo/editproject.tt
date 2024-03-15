@@ -13,7 +13,8 @@
 [% END %]
 
 
-<form method="POST" action="/project/create_project">
+<form method="POST" action="/project/update_project">
+    <input type="hidden" id="project_id" name="project_id" value="[% project.id %]">
     <label for="sitename">Site Name:</label><br>
 <select id="sitename" name="sitename" required>
     [% FOREACH site IN sites %]
@@ -70,7 +71,7 @@
     <label for="comments">Comments:</label><br>
     <textarea id="comments" name="comments" required>[% project.comments %]</textarea><br>
 
-    <input type="submit" value="Add Project">
+    <input type="submit" value="Update Project [% project.name %]">
 </form>
 <script>
 function openAddSiteForm() {
