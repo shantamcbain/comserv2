@@ -13,7 +13,7 @@
     <li>Start Date: [% project.start_date %]</li>
     <li>End Date: [% project.end_date %]</li>
     <li>Status: [% project.status %]</li>
-    <li>Record ID: [% project.record_id %]</li>
+    <li>Parent ID: [% project.parent_id %]</li>
     <li>Project Code: [% project.project_code %]</li>
     <li>Project Size: [% project.project_size %]</li>
     <li>Estimated Man Hours: [% project.estimated_man_hours %]</li>
