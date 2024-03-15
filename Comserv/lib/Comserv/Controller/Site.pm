@@ -105,6 +105,43 @@ sub get_site_details {
     my ($self, $site_id) = @_;
     return $self->resultset('Site')->find({ id => $site_id });
 }
+sub modify :Local {
+    my ($self, $c) = @_;
 
+    # Get the site id from the query parameters
+    my $site_id = $c->request->query_parameters->{id};
+
+    # Get the new site details from the request body
+    my $new_site_details = $c->request->body_parameters;
+  # Check for empty strings in integer fields and set them to 0
+    for my $field (qw(affiliate pid app_logo_width app_logo_height)) {
+        if (exists $new_site_details->{$field} && $new_site_details->{$field} eq '') {
+            $new_site_details->{$field} = 0;
+        }
+    }
+
+    # Get a DBIx::Class::Schema object
+    my $schema = $c->model('DBEncy');
+
+    # Get the Site resultset
+    my $site_rs = $schema->resultset('Site');
+
+    # Find the site
+    my $site = $site_rs->find($site_id);
+
+    # Check if the site exists
+    if ($site) {
+        # Update the site
+        $site->update($new_site_details);
+
+        # Redirect to the details page for the site
+           $c->flash->{error} = 'You made the change.';
+    $c->res->redirect($c->uri_for($self->action_for('index')));
+    } else {
+        # Redirect to the details page with an error message
+        $c->flash->{error} = 'Site not found';
+        $c->res->redirect($c->uri_for($self->action_for('details'), [$site_id]));
+    }
+}
 
 1;
