@@ -26,9 +26,11 @@
         [% IF project.parent_id == '' %] <!-- Check if the project has no parent -->
             <li>
                 [% project.name %] - [% project.description OR 'No description' %]
-                 <form action="/project/details" method="POST">
+                 <form action="/project/details"  method="POST">
                     <input type="hidden" name="project_id" value="[% project.id %]">
-                    <button type="submit">Details</button>
+                    <button type="submit">Details</button> [%# project.id %]
+                </form>
+                    <input type="hidden" name="project_id" value="[% project.id %]">
                 </form>
                 <!-- Display the list of sub-projects -->
                 <ul>
@@ -36,8 +38,8 @@
                         <li>
                             [% sub_project.name %] - [% sub_project.description OR 'No description' %]
                              <form action="/project/details" method="POST">
-                    <input type="hidden" name="project_id" value="[% project.id %]">
-                    <button type="submit">Details</button>
+                    <input type="hidden" name="project_id" value="[% sub_project.id %]">
+                    <button type="submit">Details</button> [%# sub_project.id %]
                 </form>
                         </li>
                     [% END %]
