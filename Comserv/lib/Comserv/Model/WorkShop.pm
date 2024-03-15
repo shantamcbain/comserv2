@@ -32,6 +32,26 @@ sub get_active_workshops {
 
     return (\@workshops, $error);
 }
+sub get_workshop_by_id {
+    my ($self, $c, $id) = @_;
+
+    # Get a DBIx::Class::Schema object
+    my $schema = $c->model('DBEncy');
+
+    # Get a DBIx::Class::ResultSet object for the 'WorkShop' table
+    my $rs = $schema->resultset('WorkShop');
+
+    # Try to find the workshop by its ID
+    my $workshop;
+    eval {
+        $workshop = $rs->find($id);
+    };
+    if ($@) {
+        return (undef, "Error fetching workshop: $@");
+    }
+
+    return ($workshop, undef);
+}
 __PACKAGE__->meta->make_immutable;
 
 1;

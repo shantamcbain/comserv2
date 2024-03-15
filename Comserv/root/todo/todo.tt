@@ -4,28 +4,17 @@
     [% "Debugging HostName: " _ HostName %]
     [%# INCLUDE 'debug.tt' %]
 [% END %]
+<!-- Include the new CSS file -->
+<link rel="stylesheet" type="text/css" href="/static/css/week_view.css">
+
 <h1>ToDo List</h1>
 <h2>[% date_today %]</h2>
-<style>
-    /* Basic table styling */
-    table {
-        width: 100%;
-        border-collapse: collapse;
-    }
 
-    /* Responsive table */
-    @media screen and (max-width: 600px) {
-        table {
-            overflow-x: auto;
-            display: block;
-        }
-    }
-</style>
 
 <form action="/todo/addtodo" method="post">
     <button type="submit">Add New Record</button>
 </form>
-<table>
+<table class="week-view-table">
   <tr>
     <th>Sitename</th>
     <th>Project</th>
@@ -62,7 +51,7 @@
     <button type="submit">Add Log</button>
 </form>
          <form action="/todo/details" method="POST">
-             <input type="hidden" name="record_id" value="[% task.get_column('record_id') %]">
+             <input type="hidden" name="record_id" class="[% IF day.todos.$i.due_date < day.date %]overdue[% ELSE %]todo-button[% END %]" value="[% task.get_column('record_id') %]">
           <button type="submit">Details</button>
         </form>
 

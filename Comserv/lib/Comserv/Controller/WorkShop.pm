@@ -1,7 +1,7 @@
 package Comserv::Controller::WorkShop;
 use Moose;
 use namespace::autoclean;
-
+use Data::FormValidator;
 BEGIN { extends 'Catalyst::Controller'; }
 
 # In Workshop Controller
@@ -102,6 +102,94 @@ sub addworkshop :Local {
 
     # Redirect the user to the index action
     $c->response->redirect($c->uri_for($self->action_for('index')));
+}
+sub details :Local {
+    my ( $self, $c ) = @_;
+
+    # Get the ID from the POST parameters
+    my $id = $c->request->body_parameters->{id};
+
+    # Get a DBIx::Class::Schema object
+    my $schema = $c->model('DBEncy');
+
+    # Get a DBIx::Class::ResultSet object for the 'WorkShop' table
+    my $rs = $schema->resultset('WorkShop');
+
+    # Try to find the workshop by its ID
+    my $workshop;
+    eval {
+        $workshop = $rs->find($id);
+    };
+    # Assuming $workshop->date is a DateTime object
+my $formatted_date = $workshop->date->strftime('%Y-%m-%d');
+    if ($@) {
+        $c->stash->{error_msg} = 'Failed to find workshop: ' . $@;
+        $c->stash->{template} = 'WorkShops/details.tt';
+
+        return;
+    }
+
+    # Pass the workshop to the view
+    $c->stash(
+        workshop => $workshop,
+        formatted_date => $formatted_date,
+        template => 'WorkShops/details.tt',
+    );
+}
+use DateTime::Format::Strptime;
+
+sub edit :Local :Args(1) {
+    my ($self, $c, $id) = @_;
+
+    # Define the input validation rules
+    my $validator = Data::FormValidator->check(
+        $c->request->body_parameters,
+        {
+            required => [qw(date)],
+            optional => [qw(other_form_fields)],
+            filters  => ['trim'],
+            constraint_methods => {
+                date => qr/^\d{4}-\d{2}-\d{2}$/,
+            },
+        }
+    );
+
+    # Find the workshop in the database
+    my $workshop = $c->model('DBEncy::Workshop')->find($id);
+
+    if ($c->request->method eq 'POST') {
+        # Check if the input is valid
+        if ($validator->has_invalid || $validator->has_missing) {
+            # Invalid or missing input
+            $c->stash->{error_msg} = 'Invalid input: ' . join(', ', $validator->invalid, $validator->missing);
+            $c->stash->{form_data} = $c->request->body_parameters;  # Add the form data to the stash
+            $c->stash->{template} = 'WorkShops/edit.tt';
+            return;
+        }
+
+        # Try to update the workshop record with the form data
+        eval {
+            $workshop->update($c->request->body_parameters);
+        };
+
+        if ($@) {
+            # An error occurred during the update
+            $c->stash->{error_msg} = 'Failed to update workshop: ' . $@;
+            $c->stash(workshop => $workshop);
+            $c->stash->{form_data} = $c->request->body_parameters;  # Add the form data to the stash
+            $c->stash->{template} = 'WorkShops/edit.tt';
+            return;
+        }
+
+        # Redirect to the workshop details page
+        $c->res->redirect($c->uri_for($self->action_for('details'), [$id]));
+    } else {
+        # Pass the workshop data to the template
+        $c->stash(workshop => $workshop);
+
+        # Specify the template to use
+        $c->stash->{template} = 'WorkShops/edit.tt';
+    }
 }
 sub validate_form_data {
     my ($params) = @_;

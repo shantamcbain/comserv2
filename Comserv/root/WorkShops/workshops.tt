@@ -29,13 +29,18 @@
         <td>[% workshop.discription %]</td>
         <td>[% workshop.6 %]</td>
         <td>[% workshop.7 %]</td>
-        <td>
-            [% IF c.user_in_group('admin') %]
-            <a href="/workshops/edit/[% workshop.0 %]">Edit</a>
-            <a href="/workshops/delete/[% workshop.0 %]">Delete</a>
-            [% END %]
-        </td>
-    </tr>
+ <td>
+   [% IF c.session.roles == 'admin' %]
+    <form action="/workshop/details" method="POST">
+        <input type="hidden" name="id" value="[% workshop.id %]">
+        <input type="submit" value="Edit">
+    </form>
+    <form action="/workshop/delete" method="POST">
+        <input type="hidden" name="id" value="[% workshop.id %]">
+        <input type="submit" value="Delete">
+    </form>
+[% END %]
+</td>   </tr>
     [% END %]
 </table>
 [% IF error %]

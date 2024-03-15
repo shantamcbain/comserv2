@@ -142,7 +142,7 @@ sub do_create_account :Local {
 my $support_address = $c->stash->{mail_to_admin};
 
 
-    my $email = Email::Simple->create(
+     $email = Email::Simple->create(
         header => [
             To      => $support_address,
             From    => $c->stash->{mail_replyto},

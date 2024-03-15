@@ -14,7 +14,7 @@
 
     <div>
         <label for="start_date">Start Date:</label>
-        <input type="date" id="start_date" name="start_date" value="[% record.get_column('start_date') %]">
+        <input type="date" id="start_date" name="start_date" value="[% record.get_column('start_date') %]">[% record.get_column('start_date') %]
     </div>
 
     <div>
@@ -88,6 +88,11 @@
 
 <div>
 
-      <button onclick="location.href='/log/log_form?id=' [% record.get_column('record_id') %]">Log</button>
-    <button onclick="location.href='/todo/delete?id=' [% record.get_column('record_id') %]">Delete</button>
-</div>
+<form action="/log/log_form" method="POST" target="_blank">
+    <input type="hidden" name="record_id" value="[% record.get_column('record_id') %]">
+    <button type="submit">Add Log</button>
+</form>
+         <form action="/todo/details" method="POST">
+             <input type="hidden" name="record_id" value="[% record.get_column('record_id') %]">
+          <button type="submit">Details</button>
+        </form></div>
