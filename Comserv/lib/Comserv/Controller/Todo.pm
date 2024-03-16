@@ -195,8 +195,9 @@ sub modify :Local :Args(1) {
             date_time_posted => $form_data->{date_time_posted},
         });
 
-        # Redirect the user back to the list of todos
-        $c->response->redirect($c->uri_for($self->action_for('list_todos')));
+        # Redirect the user back to the page they came from
+        my $referer = $c->request->referer || $c->uri_for($self->action_for('list_todos'));
+        $c->response->redirect($referer);
     } else {
         # The todo was not found, so display an error message
         $c->response->body('Todo not found');

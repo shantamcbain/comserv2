@@ -91,8 +91,8 @@
                     <a href="/site">Site Setup</a>
                     <a href="/site/add_site_form">Add Site</a>
                     <a href="/site/list_domains">All Sites</a>
-                    <a href="edit_documentation">Documentation editing</a>
-                    <a href="documentation">Documentation</a>
+                    <a href="/admin/edit_documentation">Documentation editing</a>
+                    <a href="/documentation">/Documentation</a>
                     <a href="/css_form">CSS Settings</a>
                     <a href="/admin/users">Users</a>
                     <a href="/display_schema">Schema</a>

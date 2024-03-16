@@ -5,6 +5,8 @@
 [% END %]
 
 <h1>Record Details View.</h1>
+<!-- Button to return to the previous page -->
+<button type="button" onclick="window.history.back();">Return</button>
     <p>Record ID: [% record.get_column('record_id') %]</p>
 <form action="/todo/modify/[% record.get_column('record_id') %]" method="post">
     <div>
@@ -96,3 +98,5 @@
              <input type="hidden" name="record_id" value="[% record.get_column('record_id') %]">
           <button type="submit">Details</button>
         </form></div>
+<!-- Button to return to the previous page -->
+<button type="button" onclick="window.history.back();">Return</button>

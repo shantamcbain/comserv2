@@ -48,12 +48,10 @@
 
 <h3 id="logging"><a href="#top">Back to top</a> </h3>
 [% INCLUDE 'Documentation/Logging.tt' %]
-h3 id="root"><a href="#top">Back to top</a> </h3>
+<h3 id="root"><a href="#top">Back to top</a> </h3>
 [% INCLUDE 'Documentation/Root.tt' %]
 <h3 id="sites"><a href="#top">Back to top</a> </h3>
 [% INCLUDE 'Documentation/Sites.tt' %]
-
-
 <h3 id="starman-setup"><a href="#top">Back to top</a> </h3>
 [% INCLUDE 'Documentation/Starman.tt' %]
 <h3 id="todo"><a href="#top">Back to top</a> </h3>

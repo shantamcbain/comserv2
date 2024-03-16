@@ -173,7 +173,6 @@ sub site_setup {
     $SiteName = $c->session->{SiteName};
     # Log the SiteName
     $c->log->debug("SiteName: $SiteName");
-    $c->log->debug("s Site model loaded: " . ($c->model('Site') ? "Yes" : "No")). "\n";
 
     # Fetch the site details from the Site model using the SiteName
     my $site = $c->model('Site')->get_site_details_by_name($SiteName);
