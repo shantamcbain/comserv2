@@ -26,3 +26,5 @@ requires 'DateTime::Format::ISO8601';
 requires 'JSON';
 requires  'Template::Plugin::DateTime';
 requires 'Email::Sender::Simple';
+requires 'Catalyst::Plugin::Authorization::Roles';
+requires 'Catalyst::Plugin::Authorization::ACL';

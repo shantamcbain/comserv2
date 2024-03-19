@@ -13,7 +13,7 @@ sub index :Path(/todo) :Args(0) {
 
     # Set the TT template to use.
     $c->stash(template => 'todo/todo.tt');
-   $c->forward($c->view('TT'));
+    $c->forward($c->view('TT'));
 }
 sub todo :Path('/todo') :Args(0) {
     my ( $self, $c ) = @_;
@@ -41,7 +41,7 @@ sub todo :Path('/todo') :Args(0) {
 
     );
 
-    $c->forward($c->view('TT')),
+    $c->forward($c->view('TT'));
 }
 sub details :Path('/todo/details') :Args {
     my ( $self, $c ) = @_;
