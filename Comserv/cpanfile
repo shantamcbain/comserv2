@@ -27,3 +27,5 @@ requires 'JSON';
 requires  'Template::Plugin::DateTime';
 requires 'Email::Sender::Simple';
 requires 'Data::FormValidator';
+requires 'Catalyst::Plugin::Authorization::Roles';
+requires 'Catalyst::Plugin::Authorization::ACL';

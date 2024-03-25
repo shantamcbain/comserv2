@@ -13,7 +13,7 @@ sub index :Path(/todo) :Args(0) {
 
     # Set the TT template to use.
     $c->stash(template => 'todo/todo.tt');
-   $c->forward($c->view('TT'));
+    $c->forward($c->view('TT'));
 }
 sub todo :Path('/todo') :Args(0) {
     my ( $self, $c ) = @_;
@@ -41,7 +41,7 @@ sub todo :Path('/todo') :Args(0) {
 
     );
 
-    $c->forward($c->view('TT')),
+    $c->forward($c->view('TT'));
 }
 sub details :Path('/todo/details') :Args {
     my ( $self, $c ) = @_;
@@ -202,7 +202,7 @@ sub modify :Local :Args(1) {
         # The todo was not found, so display an error message
         $c->response->body('Todo not found');
     }
-} # Add this line
+}
 sub create :Local {
     my ( $self, $c ) = @_;
 
@@ -324,7 +324,7 @@ my $next_date = $dt->clone->add(days => 1)->strftime('%Y-%m-%d');
         template => 'todo/day.tt',
     );
 
-    $c->forward($c->view('TT')),
+    $c->forward($c->view('TT'));
 }
 sub week :Path('/todo/week') :Args {
     my ($self, $c, $date) = @_;
