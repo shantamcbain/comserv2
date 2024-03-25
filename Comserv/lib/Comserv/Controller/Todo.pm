@@ -201,7 +201,7 @@ sub modify :Local :Args(1) {
         # The todo was not found, so display an error message
         $c->response->body('Todo not found');
     }
-} # Add this line
+}
 sub create :Local {
     my ( $self, $c ) = @_;
 
@@ -323,7 +323,7 @@ my $next_date = $dt->clone->add(days => 1)->strftime('%Y-%m-%d');
         template => 'todo/day.tt',
     );
 
-    $c->forward($c->view('TT')),
+    $c->forward($c->view('TT'));
 }
 sub week :Path('/todo/week') :Args {
     my ($self, $c, $date) = @_;
