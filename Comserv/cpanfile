@@ -29,3 +29,5 @@ requires 'Email::Sender::Simple';
 requires 'Data::FormValidator';
 requires 'Catalyst::Plugin::Authorization::Roles';
 requires 'Catalyst::Plugin::Authorization::ACL';
+requires 'script::runner';
+requires 'Catalyst::ScriptRunner';

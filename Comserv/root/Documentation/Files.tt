@@ -5,14 +5,46 @@
 
 <h2>Files</h2>
 
-To handle file uploads from multiple users and ensure that each user can only access their own uploaded files, you can follow these steps:
+<h2>To handle file uploads from multiple users and ensure that each user can only access their own uploaded files, you can follow these steps:
+</h2>
+<ol>
+<li>When a user uploads a file, save the file in a user-specific directory. The directory can be named after the user's unique ID or username to ensure it's unique for each user.</li>
+<li>When serving files, check if the requested file is in the directory corresponding to the currently logged-in user. If it is, serve the file. If not, return an error or redirect the user.</li>
+    <li>setfacl -m u:starman_user:rwx /path/to/user/directory/starman
+        Yes, you can automate the process of creating the directory and setting its permissions when a new user is created in Virtualmin. You can do this by adding a script to the "Post-creation script" field in the Server Templates settings.
 
-1. When a user uploads a file, save the file in a user-specific directory. The directory can be named after the user's unique ID or username to ensure it's unique for each user.
+Here's a basic example of what the script could look like:
 
-2. When serving files, check if the requested file is in the directory corresponding to the currently logged-in user. If it is, serve the file. If not, return an error or redirect the user.
+```bash
+#!/bin/bash
+# Create the directory
+mkdir -p /home/${USER}/public_html/starman
 
+# Set the permissions
+setfacl -m u:starman_user:rwx /home/${USER}/public_html/starman
+```
+
+This script will create a 'starman' directory in the 'public_html' directory of the new user's home directory and then set the necessary permissions for the 'starman_user'.
+
+Please replace 'starman_user' with the actual username of the user under which the Starman server is running.
+
+To add this script to the Server Template:
+
+1. Go to Virtualmin > System Settings > Server Templates.
+2. Select the template you want to modify.
+3. In the Edit Server Template page, find the "Post-creation script" field under the "Actions upon server and user creation" section.
+4. Enter the full path to your script in this field.
+
+Now, whenever a new virtual server is created using this template, the script will be executed.
+
+Remember to make your script executable by running `chmod +x /path/to/your/script.sh`.
+
+Please note that this is a basic example and you might need to adjust it according to your specific needs and environment.
+    </li>
+
+<li>
 Here's how you can modify the `handle_upload` method in the `Comserv::Model::File` model to implement this:
-
+<code>
 ```perl5
 sub handle_upload {
     my ($self, $c, $upload) = @_;
@@ -54,12 +86,13 @@ sub handle_upload {
     return $result ? "File uploaded successfully." : "Failed to upload file.";
 }
 ```
-
+</code>
 This code will save each user's uploaded files in a separate directory. When serving files, you would use a similar approach to check if the requested file is in the directory corresponding to the currently logged-in user.
 To implement access control in a Catalyst application, you can create a method in your controller that checks if the requested file is in the directory corresponding to the currently logged-in user. If it is, serve the file. If not, return an error or redirect the user.
-
+</li>
+<li>
 Here's a basic example of how you might implement this in your `Comserv::Controller::File` controller:
-
+<code>
 ```perl5
 sub serve_file :Local {
     my ($self, $c, $filename) = @_;
@@ -82,7 +115,9 @@ sub serve_file :Local {
     }
 }
 ```
-
+</code>
 In this example, the `serve_file` method is a new action in your `Comserv::Controller::File` controller. It gets the requested filename from the URL, constructs the full path to the file based on the currently logged-in user's ID, and checks if the file exists and is readable. If it is, it serves the file to the user. If not, it returns a 403 Forbidden error.
 
 This is a very basic example and doesn't include any error handling or security measures. In a real application, you would want to add checks to ensure the filename is safe to use in a file path, the user is authenticated, and the user has permission to access the file.
+</li>
+</ol>
