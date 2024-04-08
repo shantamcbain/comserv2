@@ -97,6 +97,19 @@ sub migrate_schema :Path('/migrate_schema') :Args(0) {
 
     $c->stash(template => 'admin/add_schema.tt');
 }
+sub toggle_debug :Path('/toggle_debug') :Args(0) {
+    my ( $self, $c ) = @_;
+
+    # Toggle the CATAYST_DEBUG environment variable
+    if ($ENV{CATALYST_DEBUG} // 0) {
+        $ENV{CATALYST_DEBUG} = 0;
+    } else {
+        $ENV{CATALYST_DEBUG} = 1;
+    }
+
+    # Redirect to the admin index page
+    $c->response->redirect($c->uri_for('/admin'));
+}
 __PACKAGE__->meta->make_immutable;
 
 1;
