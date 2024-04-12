@@ -13,14 +13,17 @@ sub index :Path :Args(0) {
 
 sub add_project :Path('addproject') :Args(0) {
     my ( $self, $c ) = @_;
-    print("__PACKAGE__ add_project\n");
-    print "SiteName: in ", $c->session->{SiteName}, "\n";
+    # Store the referrer URL in the session
+    $c->session->{previous_url} = $c->req->referer;
 
     # Get a Comserv::Model::Project object
     my $project_model = $c->model('Project');
 
     # Get all projects
-    my $projects = $project_model->get_projects($c->model('DBEncy'));
+    my $projects = $project_model->get_projects($c->model('DBEncy'), $c->session->{SiteName});
+
+    # Debug: print the projects to the console
+    print Dumper($projects);
 
     # Pass the projects to the template
     $c->stash->{projects} = $projects;
@@ -35,12 +38,12 @@ sub add_project :Path('addproject') :Args(0) {
     $c->stash->{sites} = $sites;
 
     $c->stash(
-        sitename => $c->session->{SiteName},
         template => 'todo/add_project.tt'
     );
 
     $c->forward($c->view('TT'));
 }
+
 sub create_project :Path('create_project') :Args(0) {
     my ( $self, $c ) = @_;
     print Dumper($c->session);
@@ -101,7 +104,7 @@ sub create_project :Path('create_project') :Args(0) {
         $c->stash(
             success_message => 'Project added successfully',
         );
-        $c->res->redirect($c->uri_for($self->action_for('project')));
+              $c->res->redirect($c->session->{previous_url});
 
         $c->forward($c->view('TT'));
     }
@@ -151,30 +154,22 @@ sub details :Path('details') :Args(0) {
 }
 # Route to display the edit project form
 # Route to display the edit project form
+
 sub editproject :Path('editproject') :Args(0) {
     my ( $self, $c ) = @_;
-
-    # Get a DBIx::Class::Schema object
-    my $schema = $c->model('DBEncy');
 
     # Get the project id from the form data
     my $project_id = $c->request->body_parameters->{project_id};
 
     # Get a Comserv::Model::Project object
     my $project_model = $c->model('Project');
+
     # Get the project
-    my $project = $project_model->get_project($schema, $project_id);
- # Get a Comserv::Model::Site object
-    my $site_model = $c->model('Site');
+    my $project = $project_model->get_project($c->model('DBEncy'), $project_id);
 
-    # Get all sites
-    my $sites = $site_model->get_all_sites();
+    # Get all projects
+    my $projects = $project_model->get_projects($c->model('DBEncy'), $c->session->{SiteName});
 
-    # Pass the sites to the template
-    $c->stash->{sites} = $sites;
-
-# Get all projects
-my $projects = $project_model->get_projects($c->model('DBEncy'), $c->session->{SiteName});
     # Pass the projects to the template
     $c->stash->{projects} = $projects;
 

@@ -100,7 +100,7 @@ sub auto :Private {
     # Store the todos in the stash
     $c->stash(todos => $todos);
 
-    # In your Comserv::Controller::Root controller
+      # In your Comserv::Controller::Root controller
     if (ref($c) eq 'Catalyst::Context') {
         my @main_links = $c->model('DB')->get_links($c, 'Main');
         my @login_links = $c->model('DB')->get_links($c, 'Login');
@@ -117,7 +117,6 @@ sub auto :Private {
         );
     }
 
-    $c->log->debug('Finished auto action in Root.pm');
 
     # Continue processing the rest of the request
     return 1;
@@ -197,11 +196,12 @@ sub site_setup {
 
     my $page = $c->req->param('page');
 
-    $c->stash(
-        default_css => $c->uri_for($c->stash->{css_view_name} || '/static/css/default.css'),
-        menu_css => $c->uri_for('/static/css/menu.css'),
-        log_css => $c->req->base->rel($c->uri_for('/static/css/log.css')),
-    );
+$c->stash(
+    default_css => $c->uri_for($c->stash->{css_view_name} || '/static/css/default.css'),
+    menu_css => $c->uri_for('/static/css/menu.css'),
+    log_css => $c->uri_for('/static/css/log.css'),
+    todo_css => $c->uri_for('/static/css/todo.css'),
+);
 }
 sub debug :Path('/debug') {
     my ($self, $c) = @_;

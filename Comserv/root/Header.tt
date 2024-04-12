@@ -35,6 +35,7 @@
 <link rel="stylesheet" type="text/css" href="[% c.stash.default_css %]">
 <link rel="stylesheet" type="text/css" href="[% c.stash.log_css %]">
 <link rel="stylesheet" type="text/css" href="[% c.stash.menu_css %]">
+ <link rel="stylesheet" type="text/css" href="[% c.stash.todo_css %]">
     <script src="static/js/sub-menu.js"></script>
     <script language="javascript" type="text/javascript">
         function switchpage(select) {
