@@ -1,4 +1,4 @@
-package Comserv::Controller::File;
+   package Comserv::Controller::File;
 use Moose;
 use namespace::autoclean;
 use File::Find;
@@ -7,22 +7,38 @@ use URI::Escape;
 BEGIN { extends 'Catalyst::Controller'; }
 
 
+sub index :PathPart('file') :Chained('/') :Args(0) {
+    my ( $self, $c ) = @_;
+    my $dir_path = $c->request->param('dir_path') // '';
+    my $show_hidden = $c->request->param('show_hidden') // 0;
 
-sub index :PathPart('file') :Chained('/') :Args {
-    my ( $self, $c, $dir_path ) = @_;
-    $dir_path = defined $dir_path ? (substr($dir_path, 0, 1) eq '/' ? $dir_path : $ENV{'HOME'} . $dir_path) : $ENV{'HOME'};
-     #$dir_path = defined $dir_path ? (substr($dir_path, 0, 1) eq '/' ? $dir_path : $ENV{'HOME'} . $dir_path) : $ENV{'HOME'};
-   my ($directories, $files) = $c->model('File')->get_files_info($c, $dir_path);
+    # If the path is not absolute, prepend the home directory
+    if (substr($dir_path, 0, 1) ne '/') {
+        $dir_path = $ENV{'HOME'} . '/' . $dir_path;
+    }
 
-    my @sorted_directories = sort @$directories;
-    my @sorted_files = sort @$files;
-    $c->stash(directories => \@sorted_directories);
-    $c->stash(files => \@sorted_files);
-    $c->stash(current_directory => $dir_path);
+    # Check if the directory exists
+    if (-d $dir_path) {
+        my ($directories, $files) = $c->model('File')->get_files_info($c, $dir_path, $show_hidden);
+# Print the file names
+print "Files: " . join(", ", @$files) . "\n";       # Debugging: print out the file names
+        $c->log->debug("Files: " . join(", ", @$files));
 
-    $c->stash(template => 'file/filemanagement.tt');
-    $c->stash->{last_directory} = $dir_path;
-    $c->forward('View::TT');
+        my @sorted_directories = sort @$directories;
+        my @sorted_files = sort @$files;
+        $c->stash(directories => \@sorted_directories);
+        $c->stash(files => \@sorted_files);
+        $c->stash(current_directory => $dir_path);
+
+        $c->stash(template => 'file/filemanagement.tt');
+        $c->stash->{last_directory} = $dir_path;
+        $c->forward('View::TT');
+    } else {
+        # Handle the error
+        $c->stash(error_message => "The directory $dir_path does not exist.");
+        $c->stash(template => 'error.tt');
+        $c->forward('View::TT');
+    }
 }
 sub list_files :Local {
     my ($self, $c, $dir_path) = @_;
