@@ -27,11 +27,39 @@
     <th>Priority</th>
     <th>Status</th>
     <th>Code needed for</th>
-<th>Accumulated time</th>
+    <th>Accumulated time</th>
     <th>Action</th>
   </tr>
-
+[% counter = 0 %]
 [% FOREACH task IN todos %]
+    [% IF counter % 5 == 0 AND counter != 0 %]
+        <tr>
+        <td colspan="13">
+            <div class="top-controls">
+                <button type="button" onclick="window.scrollTo(0, 0);">Return to top</button>
+                <!-- Add the form next to the "Return to top" button -->
+                <form action="/todo/addtodo" method="post">
+                    <button type="submit">Add New Record</button>
+                </form>
+            </div>
+        </td>
+        </tr>
+        <tr>
+            <th>Sitename</th>
+            <th>Project</th>
+            <th>Parent todo</th>
+            <th>Start Date</th>
+            <th>Due Date</th>
+            <th>What needs to be done</th>
+            <th>Details </th>
+            <th>Who is responsible</th>
+            <th>Priority</th>
+            <th>Status</th>
+            <th>Code needed for</th>
+            <th>Accumulated time</th>
+            <th>Action</th>
+        </tr>
+    [% END %]
     <tr>
       <td>[% task.get_column('sitename') %]</td>
       <td>[% task.get_column('project_id') %]</td>
@@ -44,19 +72,23 @@
       <td>[% task.get_column('priority') %]</td>
       <td>[% task.get_column('status') %]</td>
       <td>[% task.get_column('comments') %]</td>
-       <td>[% task.get_column('accumulative_time') %]</td>
-     <td>
-<form action="/log/log_form" method="POST" target="_blank">
-    <input type="hidden" name="record_id" value="[% task.get_column('record_id') %]">
-    <button type="submit">Add Log</button>
-</form>
-         <form action="/todo/details" method="POST">
-             <input type="hidden" name="record_id" class="[% IF day.todos.$i.due_date < day.date %]overdue[% ELSE %]todo-button[% END %]" value="[% task.get_column('record_id') %]">
+      <td>[% task.get_column('accumulative_time') %]</td>
+      <td>
+        <form action="/log/log_form" method="POST" target="_blank">
+          <input type="hidden" name="record_id" value="[% task.get_column('record_id') %]">
+          <button type="submit">Add Log</button>
+        </form>
+        <form action="/todo/details" method="POST">
+          <input type="hidden" name="record_id" class="[% IF day.todos.$i.due_date < day.date %]overdue[% ELSE %]todo-button[% END %]" value="[% task.get_column('record_id') %]">
           <button type="submit">Details</button>
         </form>
-
       </td>
     </tr>
+    [% counter = counter + 1 %]
 [% END %]
-
 </table>
+<script>document.querySelectorAll('.week-view-table tbody tr').forEach(row => {
+    row.addEventListener('click', () => {
+        row.classList.toggle('highlight');
+    });
+});</script>

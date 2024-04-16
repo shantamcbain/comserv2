@@ -40,6 +40,7 @@
     </div>
 <div class="submenu">
         <a href="/file/upload_file">Upload a file.</a>
+       <a href="/file/files">files in db.</a>
     </div>
     <div class="submenu">
   <form action="file/search_and_insert" method="get">

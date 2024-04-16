@@ -6,7 +6,18 @@ extends 'Catalyst::Model';
 
 # Set the schema_class attribute
 
+sub get_files {
+    my ($self, $c) = @_;
+    my $schema = $c->model('DBEncy');
 
+    # Get a DBIx::Class::ResultSet object for the 'File' table
+    my $rs = $schema->resultset('File');
+
+    # Fetch all files
+    my @files = $rs->all();
+
+    return \@files;
+}
 sub get_files_info {
     my ($self, $c, $dir_path, $show_hidden) = @_;
 

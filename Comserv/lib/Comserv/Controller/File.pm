@@ -73,7 +73,17 @@ sub list_files :Local {
     $c->stash->{files} = \@file_info;
     $c->forward('View::JSON');
 }
+sub files :Local {
+    my ($self, $c) = @_;
 
+    # Fetch the files from the 'ency' database
+    my $files = $c->model('File')->get_files($c);
+
+    # Pass the files to the template
+    $c->stash->{files} = $files;
+    $c->stash(template => 'file/files.tt');
+    $c->forward('View::TT');
+}
 sub search_and_insert :Local {
     my ( $self, $c ) = @_;
 
