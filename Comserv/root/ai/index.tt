@@ -1,0 +1,49 @@
+[% PageVersion = 'Documentation/ComservDocumentation.tt,v 0.01 2024/01/28 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+<form id="questionForm" action="/ai" method="POST">
+    <label for="question">Question:</label><br>
+    <input type="text" id="question" name="question"><br>
+    <input type="submit" value="Submit">
+</form>
+<h2>AI Answer:</h2>
+<p id="aiAnswer">[% answer %]</p>
+
+<script>
+ window.onload = function() {
+    document.getElementById('questionForm').addEventListener('submit', function(event) {
+        // Prevent the form from being submitted the default way
+        event.preventDefault();
+
+        // Get the question from the form
+        var question = document.getElementById('question').value;
+
+        // Display a loading message
+        document.getElementById('aiAnswer').textContent = 'Connecting to AI...';
+
+        // Send the question to the server
+        fetch('/ai', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ question: question })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Update the AI Answer section with the actual answer
+            document.getElementById('aiAnswer').textContent = 'Waiting for answer...';
+        })
+        .catch(error => {
+            console.error('There has been a problem with your fetch operation:', error);
+            document.getElementById('aiAnswer').textContent = 'Failed to connect to AI.';
+        });
+    });
+}
+</script>
