@@ -10,13 +10,18 @@
 <h2>Yards</h2>
 
 <p>Here is a list of yards in the operation:</p>
-<ul>
-    [% FOREACH yard IN yards %]
-    <li>
-        <a href="/yard/[% yard.yard_id %]">[% yard.yard_name %]</a>
-    </li>
-    [% END %]
-</ul>
+
+
+<li>
+    <a href="/yard/[% yard.record_id %]">[% yard.sitename %]</a>
+    <p>Status: [% yard.status %]</p>
+    <p>Yard Code: [% yard.yard_code %]</p>
+    <p>Yard Name: [% yard.yard_name %]</p>
+    <p>Yard Size: [% yard.yard_size %]</p>
+    <p>Current: [% yard.current %]</p>
+    <p>Total Yard Size: [% yard.total_yard_size %]</p>
+    <p>Date: [% yard.date %]</p>
+</li>
 
 <h2>Yard Detail</h2>
 <p>Click on a yard to view its details.</p>

@@ -14,14 +14,40 @@ sub index :Path :Args(0) {
     $c->stash(template => 'BMaster/BMaster.tt');
     $c->forward($c->view('TT'));
 }
+sub frames :Chained('base') :PathPart('frames') :Args(1) {
+    my ( $self, $c, $queen_tag_number ) = @_;
 
+    # Get the frames for the given queen
+    my $frames = $c->model('BMaster')->get_frames_for_queen($queen_tag_number);
 
+    # Set the TT template to use
+    $c->stash->{template} = 'BMaster/frames.tt';
+    $c->stash->{frames} = $frames;
+}
+sub api_frames :Chained('base') :PathPart('api/frames') :Args(0) {
+    my ( $self, $c ) = @_;
+
+    # Fetch the data for the frames
+    my $data = $c->model('BMaster')->get_frames_data();
+
+    # Set the response body to the JSON representation of the data
+    $c->response->body( $c->stash->{json}->($data) );
+}
 sub products :Chained('base') :PathPath('products') :Args(0) {
     my ( $self, $c ) = @_;
     $c->stash(template => 'BMaster/products.tt');
 }
 
+sub yards :Chained('base') :PathPart('yards') :Args(0) {
+    my ( $self, $c ) = @_;
 
+    # Get the yards
+    my $yards = $c->model('BMaster')->get_yards();
+
+    # Set the TT template to use
+    $c->stash->{template} = 'BMaster/yards.tt';
+    $c->stash->{yards} = $yards;
+}
 # Define an action for each link in BMaster.tt
 
 sub apiary :Chained('base') :PathPart('apiary') :Args(0){
