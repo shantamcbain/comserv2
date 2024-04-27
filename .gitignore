@@ -7,3 +7,10 @@ Comserv/comserv.psgi
 .idea/workspace.xml
 .idea.*
 /Comserv/lib/Comserv/Model/DBEncy.pm
+/.idea/dbnavigator.xml
+/.idea/ComServ2.iml
+/.idea/git_toolbox_prj.xml
+/.idea/misc.xml
+/.idea/modules.xml
+/.idea/inspectionProfiles/profiles_settings.xml
+/.idea/vcs.xml
