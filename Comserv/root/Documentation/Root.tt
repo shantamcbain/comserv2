@@ -1,42 +1,46 @@
-[% PageVersion = 'Documentation/ComservDocumentation.tt,v 0.01 2024/01/28 Shanta Exp shanta ' %]
+[% PageVersion = 'Documentation/ComservDocumentation.tt,v 0.011 2024/01/28 Shanta Exp shanta ' %]
+[%# PageVersion = 'Documentation/ComservDocumentation.tt,v 0.01 2024/01/28 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 <h1 id="top">Comserv App Documentation</h1>
-    # Get a DBIx::Class::Schema object
-    my $schema = $c->model('DBEncy');
-    # Get the site name from the URL
-    my $SiteName = $self->fetch_and_set($c, $schema, 'site');
 
-sub fetch_and_set {
-my ($self, $c, $schema, $param) = @_;
-my $value = $c->req->param($param);
+<p>The Root controller in the Comserv application is responsible for handling the initial request and setting up the necessary variables for the application. It does this through several methods:</p>
 
-# If value is defined in the URL, update the session and stash
-if (defined $value) {
-$c->stash->{$param} = $value;
-$c->session->{$param} = $value;
-}
-elsif (defined $c->session->{$param}) {
-# If value is not defined in the URL but is defined in the session, use the session value
-$c->stash->{$param} = $c->session->{$param};
-}
+<h2>auto</h2>
+<p>The 'auto' method is called before every action in the application. It's responsible for setting up the necessary variables for the application. It does this by:</p>
+<ul>
+    <li>Extracting the domain name from the request</li>
+    <li>Calling the 'forward_to_controller_based_on_domain' method to determine the controller based on the domain</li>
+    <li>Setting up universal variables</li>
+    <li>Fetching and setting the site name</li>
+    <li>Setting up the session and stash with necessary parameters</li>
+</ul>
 
-# If value is defined, fetch the site details from the Site model using the value
-if (defined $c->stash->{$param}) {
-my $site = $schema->resultset('Site')->find({ name => $c->stash->{$param} });
-if ($site) {
-# If the site exists in the database, fetch the associated site
-# Set the value in the stash and the session to the site name from the database
-$c->stash->{$param} = $site->name;
-$c->session->{$param} = $site->name;
-}
-else {
-# If the site does not exist in the database, set value to 'none'
-$c->stash->{$param} = 'none';
-$c->session->{$param} = 'none';
-}
-}
+<h2>forward_to_controller_based_on_domain</h2>
+<p>The 'forward_to_controller_based_on_domain' method is used to determine the controller based on the domain name. It does this by:</p>
+<ul>
+    <li>Fetching the site domain record from the Site model using the domain name</li>
+    <li>If a site domain record is found, it gets the site_id from the site domain record and fetches the site details from the Site model using the site_id</li>
+    <li>If a site is found, it gets the controller name from the site details and forwards the request to the appropriate controller</li>
+    <li>If no site domain record is found, it forwards the request to a default controller</li>
+</ul>
 
-return $value;
-}
+<h2>fetch_and_set</h2>
+<p>The 'fetch_and_set' method is used to fetch a parameter from the URL, session, or database and set it in the session and stash. It does this by:</p>
+<ul>
+    <li>Checking if the parameter is defined in the URL. If it is, it updates the session and stash with this value</li>
+    <li>If it's not defined in the URL but is defined in the session, it uses the session value</li>
+    <li>If it's not defined in either the URL or session, it uses the domain name to fetch the site name from the Site model and sets it in the session and stash</li>
+</ul>
+
+<h2>index</h2>
+<p>The 'index' method is used to handle the default request. It does this by:</p>
+<ul>
+    <li>Getting the controller name from the stash</li>
+    <li>If the controller name exists, it checks if it's a controller or a template and sets the template or detaches to the controller accordingly</li>
+    <li>If the controller name doesn't exist, it sets a default template</li>
+</ul>
+
+<h2>end</h2>
+<p>The 'end' method is called at the end of every request to render the view.</p>

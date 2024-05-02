@@ -14,16 +14,7 @@ sub index :Path :Args(0) {
     $c->stash(template => 'BMaster/BMaster.tt');
     $c->forward($c->view('TT'));
 }
-sub frames :Chained('base') :PathPart('frames') :Args(1) {
-    my ( $self, $c, $queen_tag_number ) = @_;
 
-    # Get the frames for the given queen
-    my $frames = $c->model('BMaster')->get_frames_for_queen($queen_tag_number);
-
-    # Set the TT template to use
-    $c->stash->{template} = 'BMaster/frames.tt';
-    $c->stash->{frames} = $frames;
-}
 sub api_frames :Chained('base') :PathPart('api/frames') :Args(0) {
     my ( $self, $c ) = @_;
 
@@ -38,16 +29,25 @@ sub products :Chained('base') :PathPath('products') :Args(0) {
     $c->stash(template => 'BMaster/products.tt');
 }
 
+sub frames :Chained('base') :PathPart('frames') :Args(1) {
+    my ( $self, $c, $queen_tag_number ) = @_;
+
+    # Call an existing method in the BMaster model
+    my $frames = $c->model('BMaster')->existing_method($queen_tag_number);
+
+    # Rest of the method...
+}
+
 sub yards :Chained('base') :PathPart('yards') :Args(0) {
     my ( $self, $c ) = @_;
 
-    # Get the yards
-    my $yards = $c->model('BMaster')->get_yards();
+    # Call an existing method in the BMaster model
+    my $yards = $c->model('BMaster')->existing_method();
 
-    # Set the TT template to use
-    $c->stash->{template} = 'BMaster/yards.tt';
-    $c->stash->{yards} = $yards;
+    # Rest of the method...
 }
+
+
 # Define an action for each link in BMaster.tt
 
 sub apiary :Chained('base') :PathPart('apiary') :Args(0){
