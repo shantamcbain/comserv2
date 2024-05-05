@@ -6,38 +6,40 @@ extends 'Catalyst::Model';
 
 # Set the schema_class attribute
 
+sub get_files {
+    my ($self, $c) = @_;
+    my $schema = $c->model('DBEncy');
 
-use File::Find;
-use File::Basename;
+    # Get a DBIx::Class::ResultSet object for the 'File' table
+    my $rs = $schema->resultset('File');
 
-use Try::Tiny;
+    # Fetch all files
+    my @files = $rs->all();
 
+    return \@files;
+}
 sub get_files_info {
-    my ($self, $c, $dir_path) = @_;
-    my @directories;
-    my @files;
+    my ($self, $c, $dir_path, $show_hidden) = @_;
 
-    try {
-        opendir my $dir, $dir_path or die "Cannot open directory '$dir_path': $!";
-        my @items = readdir $dir;
-        closedir $dir;
-
-        foreach my $item (@items) {
-            next if $item =~ /^\.\.?$/;  # Skip . and ..
-
-            my $item_location = "$dir_path/$item";
-            if (-d $item_location) {
-                push @directories, $item;
-            } else {
-                push @files, $item;
-            }
-        }
-    } catch {
-        $c->log->error("Failed to open directory '$dir_path': $_");
+    opendir my $dir, $dir_path or do {
+        $c->log->error("Failed to open directory $dir_path: $!");
+        return ([], []);
     };
+
+    my @entries = readdir $dir;
+    closedir $dir;
+
+    unless ($show_hidden) {
+        @entries = grep { !/^\./ } @entries;  # Exclude hidden files and directories
+    }
+
+    my @directories = grep {-d "$dir_path/$_" && ! /^\.{1,2}$/} @entries;
+    my @files = grep {-f "$dir_path/$_"} @entries;
 
     return (\@directories, \@files);
 }
+
+
 
 sub get_top_files {
     my ($self, $c, $SiteName) = @_;

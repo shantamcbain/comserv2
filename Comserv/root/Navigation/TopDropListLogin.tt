@@ -22,10 +22,6 @@
                 [% IF c.session.group == 'admin' %]
                     <a href="/add_link?menu=login">Add</a>
                 [% END %]
- [% IF firstname %]
-     <A HREF ="http://webmail.[% HostName %]"target="_Blank"><font   class="LeftSideBarNavStyle">Mail</font></a>
- [% ELSE %]
-	   <A  HREF ="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;view=MailView" ><font   class="LeftSideBarNavStyle">Mail</font></a>
- [% END %]
+
            </div>
         </li>

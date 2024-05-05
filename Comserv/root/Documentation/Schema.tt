@@ -1,0 +1,34 @@
+[% PageVersion  = 'documents/schema.tt,v 0.1 2024/04/04 Shanta Exp Shanta'; %]
+[% IF debug_mode == 1 %]
+    <p>Error: [% error_msg %]</p>
+    [% PageVersion %]
+[% END %]
+
+<h1 id="top">Database Schema Installation</h1>
+
+<nav>
+    <a href="#prerequisites">Prerequisites</a> |
+    <a href="#installation">Installation</a> |
+</nav>
+
+
+
+<h3 id="prerequisites"><a href="#top">Back to top</a> </h3>
+<p>Before you begin, make sure you have the following:</p>
+<ul>
+    <li>MySQL Server installed on your server</li>
+    <li>Access to the command line on your server</li>
+    <li>The `ency.sql` backup file</li>
+</ul>
+
+<h3 id="installation"><a href="#top">Back to top</a> </h3>
+<p>Follow these steps to install the MySQL backup on your server:</p>
+<ol>
+    <li>Open the command line on your server.</li>
+    <li>Navigate to the directory where the `ency.sql` file is located.</li>
+    <li>Log in to the MySQL server with the following command: `mysql -u username -p`. Replace `username` with your MySQL username. You will be prompted to enter your password.</li>
+    <li>Create a new database with the following command: `CREATE DATABASE new_database;`. Replace `new_database` with the name of your new database.</li>
+    <li>Select the new database with the following command: `USE new_database;`.</li>
+    <li>Import the `ency.sql` file with the following command: `source ency.sql;`.</li>
+</ol>
+<p>Your MySQL database should now be installed on your server.</p>

@@ -19,6 +19,7 @@
     <a href="#logging">Logging</a> |
     <a href="#projects">Projects</a> |
     <a href="#root">root</a> |
+    <a href="#schema">Schema</a> |
     <a href="#sites">Sites</a> |
     <a href="#starman-setup">Starman Setup</a> |
     <a href="#todo">Todo</a> |
@@ -48,14 +49,13 @@
 
 <h3 id="logging"><a href="#top">Back to top</a> </h3>
 [% INCLUDE 'Documentation/Logging.tt' %]
-h3 id="root"><a href="#top">Back to top</a> </h3>
+<h3 id="root"><a href="#top">Back to top</a> </h3>
 [% INCLUDE 'Documentation/Root.tt' %]
+<h3 id="schema"><a href="#top">Back to top</a> </h3>
+[% INCLUDE 'Documentation/Schema.tt' %]
 <h3 id="sites"><a href="#top">Back to top</a> </h3>
 [% INCLUDE 'Documentation/Sites.tt' %]
-
-
-<h3 id="starman-setup"><a href="#top">Back to top</a> </h3>
-[% INCLUDE 'Documentation/Starman.tt' %]
+<h3 id="starman-setup"><a href="#top">Back to top</a> </h3>[% INCLUDE 'Documentation/Starman.tt' %]
 <h3 id="todo"><a href="#top">Back to top</a> </h3>
 [% INCLUDE 'Documentation/Todo.tt' %]
 <h3 id="workshop-management"><a href="#top">Back to top</a> </h3>

@@ -1,4 +1,6 @@
-#!/usr/bin/env perl
+qqa  ;ljhz
+
+
 
 use Catalyst::ScriptRunner;
 Catalyst::ScriptRunner->run('Comserv', 'CGI');

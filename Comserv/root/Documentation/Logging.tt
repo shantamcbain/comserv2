@@ -5,8 +5,10 @@
     [%# INCLUDE 'debug.tt' %]
 [% END %]
 <h1>Logging</h1>
+<h2>We currently to separate Logging system</h2>
 <p>
-  logging is currently based on the ToDo we log actions for each todo logs are linked to a todo which are linked to a project. In a log we track what is done by whom time started and ended. the time started and ended for each log session. on save or modification we recorded in  the time value.  The ToDo search the logs for the time spent on the todo.
-
-    <!-- Add your content here -->
+  <ul>
+    <li>ToDo Logging: This system is the daily loging of time spent on todo's etc.  logging is currently based on the ToDo we log actions for each todo logs are linked to a todo which are linked to a project. In a log we track what is done by whom time started and ended. the time started and ended for each log session. on save or modification we recorded in  the time value.  The ToDo search the logs for the time spent on the todo.</li>
+    <li>Debug Logging: For the purpose of debugging we $c->log->debug("At " . __PACKAGE__ . " in " . __FILE__ . " line " . __LINE__ . ": Site model loaded: " . ($c->model('Site') ? "Yes" : "No")); </li>
+    </ul>
 </p>

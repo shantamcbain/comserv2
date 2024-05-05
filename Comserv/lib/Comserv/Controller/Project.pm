@@ -13,40 +13,8 @@ sub index :Path :Args(0) {
 
 sub add_project :Path('addproject') :Args(0) {
     my ( $self, $c ) = @_;
-    print("__PACKAGE__ add_project\n");
-    print "SiteName: in ", $c->session->{SiteName}, "\n";
-
-    # Get a Comserv::Model::Project object
-    my $project_model = $c->model('Project');
-    print " project $project_model \n";
-    # Get all projects
-     my $projects = $project_model->get_projects($c->model('DBEncy'), $c->session->{SiteName});
-        use Data::Dumper;
-    print "projects: ", Dumper($projects), "\n";
-  # Print the SiteName
-
-    # Pass the projects to the template
-    $c->stash->{projects} = $projects;
-
-    # Get the Site resultset
-    my $site_rs = $c->model('DBEncy')->resultset('Site');
-
-    # Get all sites in ascending order by name
-    my @sites = $site_rs->search({}, { order_by => 'name' });
-
-    # Pass the sites to the template
-    $c->stash->{sites} = \@sites;
-
-    $c->stash(
-        sitename => $c->session->{SiteName},
-        template => 'todo/add_project.tt'
-    );
-
-    $c->forward($c->view('TT'));
-}
-
-sub project :Path('project') :Args(0) {
-    my ( $self, $c ) = @_;
+    # Store the referrer URL in the session
+    $c->session->{previous_url} = $c->req->referer;
 
     # Get a Comserv::Model::Project object
     my $project_model = $c->model('Project');
@@ -54,11 +22,23 @@ sub project :Path('project') :Args(0) {
     # Get all projects
     my $projects = $project_model->get_projects($c->model('DBEncy'), $c->session->{SiteName});
 
+    # Debug: print the projects to the console
+    print Dumper($projects);
+
     # Pass the projects to the template
     $c->stash->{projects} = $projects;
 
+    # Get a Comserv::Model::Site object
+    my $site_model = $c->model('Site');
+
+    # Get all sites
+    my $sites = $site_model->get_all_sites();
+
+    # Pass the sites to the template
+    $c->stash->{sites} = $sites;
+
     $c->stash(
-        template => 'todo/project.tt'
+        template => 'todo/add_project.tt'
     );
 
     $c->forward($c->view('TT'));
@@ -124,11 +104,126 @@ sub create_project :Path('create_project') :Args(0) {
         $c->stash(
             success_message => 'Project added successfully',
         );
-$c->go('project');
+              $c->res->redirect($c->session->{previous_url});
 
         $c->forward($c->view('TT'));
     }
 }
 
+sub project :Path('project') :Args(0) {
+    my ( $self, $c ) = @_;
+
+    # Get a Comserv::Model::Project object
+    my $project_model = $c->model('Project');
+
+    # Get all projects
+    my $projects = $project_model->get_projects($c->model('DBEncy'), $c->session->{SiteName});
+
+    # Pass the projects to the template
+    $c->stash->{projects} = $projects;
+
+    $c->stash(
+        template => 'todo/project.tt'
+    );
+
+    $c->forward($c->view('TT'));
+}
+
+sub details :Path('details') :Args(0) {
+    my ( $self, $c ) = @_;
+   # Get a DBIx::Class::Schema object
+    my $schema = $c->model('DBEncy');
+
+    # Get the project id from the form data
+    my $project_id = $c->request->body_parameters->{project_id};
+
+    # Get a Comserv::Model::Project object
+    my $project_model = $c->model('Project');
+
+    # Get the project
+    my $project = $project_model->get_project($schema, $project_id);
+
+    # Pass the project to the template
+    $c->stash->{project} = $project;
+
+    $c->stash(
+        template => 'todo/projectdetails.tt'
+    );
+
+    $c->forward($c->view('TT'));
+}
+# Route to display the edit project form
+# Route to display the edit project form
+
+sub editproject :Path('editproject') :Args(0) {
+    my ( $self, $c ) = @_;
+
+    # Get the project id from the form data
+    my $project_id = $c->request->body_parameters->{project_id};
+
+    # Get a Comserv::Model::Project object
+    my $project_model = $c->model('Project');
+
+    # Get the project
+    my $project = $project_model->get_project($c->model('DBEncy'), $project_id);
+
+    # Get all projects
+    my $projects = $project_model->get_projects($c->model('DBEncy'), $c->session->{SiteName});
+
+    # Pass the projects to the template
+    $c->stash->{projects} = $projects;
+
+    # Pass the project to the template
+    $c->stash->{project} = $project;
+
+    $c->stash(
+        template => 'todo/editproject.tt'
+    );
+
+    $c->forward($c->view('TT'));
+}
+sub update_project :Local :Args(0)  {
+    my ( $self, $c ) = @_;
+    # Get the form data from the request
+    my $form_data = $c->request->body_parameters;
+
+    # Get the project id from the form data
+    my $project_id = $form_data->{project_id};
+
+    # Get a DBIx::Class::Schema object
+    my $schema = $c->model('DBEncy');
+
+    # Get the Project resultset
+    my $project_rs = $schema->resultset('Project');
+
+    # Find the project in the database
+    my $project = $project_rs->find($project_id);
+
+    if ($project) {
+        # Update the project's fields with the new data
+        $project->update({
+            sitename => $form_data->{sitename},
+            name => $form_data->{name},
+            description => $form_data->{description},
+            start_date => $form_data->{start_date},
+            end_date => $form_data->{end_date},
+            status => $form_data->{status},
+            project_code => $form_data->{project_code},
+            project_size => $form_data->{project_size},
+            estimated_man_hours => $form_data->{estimated_man_hours},
+            developer_name => $form_data->{developer_name},
+            client_name => $form_data->{client_name},
+            comments => $form_data->{comments},
+            # Add any other fields that need to be updated
+        });
+
+        # Redirect to the project home page
+        $c->res->redirect($c->uri_for($self->action_for('project')));
+    } else {
+        # Return an error response if the project was not found
+        $c->response->status(404);
+        $c->response->body('Project not found');
+    }
+}
 __PACKAGE__->meta->make_immutable;
 1;
