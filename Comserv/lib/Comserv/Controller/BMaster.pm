@@ -10,9 +10,9 @@ sub base :Chained('/') :PathPart('BMaster') :CaptureArgs(0) {
 
 
 sub index :Path :Args(0) {
-    my ( $self, $c ) = @_;
+    my ($self, $c) = @_;
+    # Set the template for the default case
     $c->stash(template => 'BMaster/BMaster.tt');
-    $c->forward($c->view('TT'));
 }
 
 sub api_frames :Chained('base') :PathPart('api/frames') :Args(0) {

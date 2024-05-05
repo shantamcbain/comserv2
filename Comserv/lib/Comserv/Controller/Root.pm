@@ -60,14 +60,10 @@ sub auto :Private {
         my $site = $c->model('Site')->get_site_details($site_id);
 
         # If a site was found
-        if ($site) {
-            # Get the controller name from the site details
-            my $controller_name = $site->name;
-
-            # Forward the request to the appropriate controller
-            $c->detach($controller_name, 'index');
-        }
-    }
+if ($site) {
+    my $controller_name = $site->name;
+    $c->forward($controller_name, 'index');
+}    }
     else {
         # Default case when no matching domain is found
         $c->detach('default');
