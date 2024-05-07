@@ -1,0 +1,30 @@
+[% PageVersion = 'Documentation/BMaster.tt,v 0.01 2024/05/06 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+<nav>
+
+    <a href="#Controller">Controller</a> |
+    <a href="#Model">Model</a> |
+    <a href="#queens">Queen Management</a> |
+    <a href="#files"></a> |
+    <a href="#git"></a> |
+    <a href="#Installation"></a> |
+    <a href="#login"></a> |
+    <a href="#logging"></a> |
+    <a href="#projects"></a> |
+    <a href="#root"></a> |
+    <a href="#schema"></a> |
+    <a href="#sites"></a> |
+    <a href="#starman-setup"></a> |
+    <a href="#todo"></a> |
+   <a href="#workshop-management"></a> |
+</nav>
+<h1 id="top">Beemaster Application.</h1>
+
+<h3 id="Controller"><a href="#top">Back to top</a> </h3>
+[% INCLUDE 'Documentation/BMasterController.tt' %]
+<h3 id="Model"><a href="#top">Back to top</a> </h3>
+[% INCLUDE 'Documentation/BMaserModel.tt' %]
+<h3 id="Model"><a href="#top">Back to top</a> </h3>
+[% INCLUDE 'Documentation/Queens.tt' %]

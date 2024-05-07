@@ -1,0 +1,7 @@
+<h1 id="top">BMaster Model Documentation</h1>
+
+<h2 id="get_frames_for_queen">get_frames_for_queen</h2>
+<p>This function fetches the frames for a given queen based on the queen's tag number. It returns a reference to an array of frames.</p>
+
+<h2 id="get_yards_for_site">get_yards_for_site</h2>
+<p>This function fetches all yards for a given site based on the site's name. It returns a reference to an array of yards.</p>

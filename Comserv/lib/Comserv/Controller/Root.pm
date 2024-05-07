@@ -45,30 +45,6 @@ sub auto :Private {
     my $schema = $c->model('DBEncy');
     print "Schema: $schema\n";
 
-    # Extract the domain name from the request
-    my $domain = $c->req->uri->host;
-
-    # Call the new subroutine to determine the controller based on the domain
-     my $site_domain = $self->forward_to_controller_based_on_domain($c, $domain);
-
-    # If a site domain record was found
-    if ($site_domain) {
-        # Get the site_id from the site domain record
-        my $site_id = $site_domain->site_id;
-
-        # Get the site details
-        my $site = $c->model('Site')->get_site_details($site_id);
-
-        # If a site was found
-if ($site) {
-    my $controller_name = $site->name;
-    $c->forward($controller_name, 'index');
-}    }
-    else {
-        # Default case when no matching domain is found
-        $c->detach('default');
-    }
-
     # Set up universal variables
 
     # Call fetch_and_set method
@@ -144,36 +120,6 @@ if ($site) {
 
     # Continue processing the rest of the request
     return 1;
-}
-sub forward_to_controller_based_on_domain {
-    my ($self, $c, $domain) = @_;
-
-    # Get the site domain record
-    my $site_domain = $c->model('Site')->get_site_domain($domain);
-
-    # If a site domain record was found
-    if ($site_domain) {
-        # Get the site_id from the site domain record
-        my $site_id = $site_domain->site_id;
-
-        # Get the site details
-        my $site = $c->model('Site')->get_site_details($site_id);
-
-        # If a site was found
-        if ($site) {
-            # Get the controller name from the site details
-            my $controller_name = $site->name;
-
-            # Forward the request to the appropriate controller
-            $c->detach($controller_name, 'index');
-        }
-    }
-    else {
-        # Default case when no matching domain is found
-        $c->detach('default');
-    }
-
-    return $site_domain;
 }
 sub fetch_and_set {
     my ($self, $c, $param) = @_;

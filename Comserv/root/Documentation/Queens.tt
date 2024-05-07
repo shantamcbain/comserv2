@@ -1,0 +1,41 @@
+[% PageVersion = 'Documentation/queens.tt,v 0.01 2024/05/06 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<h1 id="top">Queen Management System</h1>
+
+<p>Our queen management system is designed to manage the lifecycle of the queen bees in our apiary. Here are the key activities and their timelines:</p>
+
+<table>
+    <tr>
+        <th>Date</th>
+        <th>Activity</th>
+    </tr>
+    <tr>
+        <td>Graft date</td>
+        <td>The date when the grafting process starts.</td>
+    </tr>
+    <tr>
+        <td>3 days after graft date</td>
+        <td>Move the brood back from the incubator and count the number of cells that have been started.</td>
+    </tr>
+    <tr>
+        <td>10 days after graft date</td>
+        <td>Move the cells to the mating nucs.</td>
+    </tr>
+    <tr>
+        <td>20 days after graft date</td>
+        <td>The queen will have been mated and start laying.</td>
+    </tr>
+    <tr>
+        <td>Queen pull</td>
+        <td>The number of days entered in the form egg laying day.</td>
+    </tr>
+    <tr>
+        <td>Second graft</td>
+        <td>Done 10 days before the queen pull.</td>
+    </tr>
+</table>
+
+<p>We store the graft date and the number of days of egg laying in the database. This helps us to track and manage the lifecycle of each queen bee.</p>

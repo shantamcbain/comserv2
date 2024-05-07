@@ -11,6 +11,7 @@
 <nav>
     <a href="#overview">Overview</a> |
     <a href="#dbi">DBI</a> |
+    <a href="#bmaster">BMaster</a> |
     <a href="#document-management">Document Management</a> |
     <a href="#files">Files</a> |
     <a href="#git">Git</a> |
@@ -31,6 +32,8 @@
 
 <h3 id="dbi"><a href="#top">Back to top</a> </h3>
 [% INCLUDE 'Documentation/DBIDocument.tt' %]
+<h3 id="bmaster"><a href="#top">Back to top</a> </h3>
+[% INCLUDE 'Documentation/BMaster.tt' %]
 <h3 id="document-management"><a href="#top">Back to top</a> </h3>
 [% INCLUDE 'Documentation/DocumentManagement.tt' %]
 <h3 id="git"><a href="#top">Back to top</a> </h3>

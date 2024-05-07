@@ -1,9 +1,10 @@
-[% PageVersion = 'Documentation/ComservDocumentation.tt,v 0.011 2024/01/28 Shanta Exp shanta ' %]
-[%# PageVersion = 'Documentation/ComservDocumentation.tt,v 0.01 2024/01/28 Shanta Exp shanta ' %]
+[% PageVersion = 'Documentation/Root.tt,v 0.012 2024/05/28 Shanta Exp shanta ' %]
+[%# PageVersion = 'Documentation/Root.tt,v 0.011 2024/01/28 Shanta Exp shanta ' %]
+[%# PageVersion = 'Documentation/Root.tt,v 0.01 2024/01/28 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
-<h1 id="top">Comserv App Documentation</h1>
+<h1 id="top">Comserv App Documentation Root.pm </h1>
 
 <p>The Root controller in the Comserv application is responsible for handling the initial request and setting up the necessary variables for the application. It does this through several methods:</p>
 
@@ -41,6 +42,18 @@
     <li>If the controller name exists, it checks if it's a controller or a template and sets the template or detaches to the controller accordingly</li>
     <li>If the controller name doesn't exist, it sets a default template</li>
 </ul>
+<h2>site_setup</h2>
+<p>The 'site_setup' method is used to fetch the site details from the Site model using the SiteName. It sets up the stash with necessary parameters such as css_view_name, mail_to_admin, and mail_replyto. It also sets up the default CSS paths for the application.</p>
+
+<h2>debug</h2>
+<p>The 'debug' method is used to forward the request to the 'TT' view with the 'debug.tt' template. This is used for debugging purposes.</p>
+
+<h2>default</h2>
+<p>The 'default' method is used to handle the default request when a page is not found. It sets the response body to 'Page not found' and the response status to 404.</p>
+
+<h2>documentation</h2>
+<p>The 'documentation' method is used to set the template to 'Documentation/Documentation.tt'. This is used to display the documentation page.</p>
 
 <h2>end</h2>
 <p>The 'end' method is called at the end of every request to render the view.</p>
+<p>These methods work together to handle the initial request, set up the necessary variables, and render the appropriate view based on the request.</p>

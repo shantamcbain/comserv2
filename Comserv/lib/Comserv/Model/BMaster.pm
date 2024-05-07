@@ -2,6 +2,7 @@ package Comserv::Model::BMaster;
 use Moose;
 use namespace::autoclean;
 
+
 extends 'Catalyst::Model';
 
 sub get_frames_for_queen {

@@ -1,0 +1,40 @@
+<h1 id="top">BMaster Controller Documentation</h1>
+
+<h2 id="base">base</h2>
+<p>This function captures /BMaster in the URL.</p>
+
+<h2 id="index">index</h2>
+<p>This function sets the template to 'BMaster/BMaster.tt' and forwards to the TT view.</p>
+
+<h2 id="frames">frames</h2>
+<p>This function gets the frames for the given queen and sets the template to 'BMaster/frames.tt'.</p>
+
+<h2 id="api_frames">api_frames</h2>
+<p>This function fetches the data for the frames and sets the response body to the JSON representation of the data.</p>
+
+<h2 id="products">products</h2>
+<p>This function sets the template to 'BMaster/products.tt'.</p>
+
+<h2 id="yards">yards</h2>
+<p>This function gets the yards and sets the template to 'BMaster/yards.tt'.</p>
+
+<h2 id="apiary">apiary</h2>
+<p>This function sets the template to 'BMaster/apiary.tt'.</p>
+
+<h2 id="queens">queens</h2>
+<p>This function sets the template to 'BMaster/Queens.tt'.</p>
+
+<h2 id="hive">hive</h2>
+<p>This function sets the template to 'BMaster/hive.tt'.</p>
+
+<h2 id="honey">honey</h2>
+<p>This function sets the template to 'BMaster/honey.tt'.</p>
+
+<h2 id="beehealth">beehealth</h2>
+<p>This function sets the template to 'BMaster/beehealth.tt'.</p>
+
+<h2 id="environment">environment</h2>
+<p>This function sets the template to 'BMaster/environment.tt'.</p>
+
+<h2 id="education">education</h2>
+<p>This function sets the template to 'BMaster/education.tt'.</p>
