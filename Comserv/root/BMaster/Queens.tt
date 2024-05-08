@@ -21,8 +21,6 @@
   <input type="submit" value="Submit">
 </form>
 
-<h1>[% today.strftime('%B %Y') %]</h1> <!-- Display the current month and year -->
-
 <table>
   <tr>
     <th>Sun</th>
@@ -36,14 +34,13 @@
   [% SET day_of_week = dates.0.day_of_week %] <!-- Set day_of_week to the day of the week of the first day of the month -->
   [% FOREACH date IN dates %]
     [% IF day_of_week == 0 %]<tr>[% END %]
-    <td [% IF date.day == today.day AND date.month == today.month AND date.year == today.year %]style="background-color: yellow;"[% END %]>
+    <td class="calendar-date" [% IF date.day == today.day AND date.month == today.month AND date.year == today.year %]style="background-color: yellow;"[% END %]>
       [% date.day %]
-      [% FOREACH graft IN graft_dates %]
-        [% IF date.ymd == graft.graft_date.ymd %] <!-- Compare the dates as strings in the format 'yyyy-mm-dd' -->
-          <br>[% graft.event_name %] <!-- Display the event name -->
-        [% END %]
-      [% END %]
-    </td>
+[% FOREACH graft IN graft_dates %]
+  [% IF date.ymd == graft.graft_date.ymd %] <!-- Compare the dates as strings in the format 'yyyy-mm-dd' -->
+    <div class="event-box">[% graft.event_name %]</div> <!-- Display the event name -->
+  [% END %]
+[% END %]    </td>
     [% SET day_of_week = (day_of_week + 1) % 7 %]
     [% IF day_of_week == 0 OR loop.last %]</tr>[% END %]
   [% END %]

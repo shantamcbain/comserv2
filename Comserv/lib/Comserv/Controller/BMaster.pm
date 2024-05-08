@@ -17,7 +17,7 @@ sub index :Path :Args(0) {
 }
 
 sub generate_month_dates {
-    my ($year, $month) = @_;
+    my ($year, $month, $number_of_grafts) = @_;
 
     my $dt = DateTime->new(
         year  => $year,
@@ -33,8 +33,14 @@ sub generate_month_dates {
 
     my @dates;
 
+    # Calculate the total number of days required for all grafts
+    my $total_days = $number_of_grafts * 21;
+
+    # Calculate the number of weeks required to cover all these days
+    my $total_weeks = int(($total_days + 6) / 7);  # Add 6 before dividing to round up
+
     # Generate the dates for the current month's view
-    for (1..42) { # 42 days = 6 weeks
+    for (1..($total_weeks * 7)) {  # Multiply by 7 to get the total number of days
         push @dates, $dt->clone;
         $dt->add(days => 1);
     }
@@ -59,28 +65,29 @@ sub add_graft :Chained('base') :PathPart('add_graft') :Args(0) {
 
         # Calculate the dates for each graft and store them in an array
         my @graft_dates;
-for my $i (0..$number_of_grafts-1) {
-    my $graft_date_clone = $graft_date->clone->add(days => $i * 10);  # Each graft is 10 days apart
+        for my $i (0..$number_of_grafts-1) {
+            my $graft_date_clone = $graft_date->clone;  # The first graft is on the date submitted, subsequent grafts are 10 days before the queen pull date
 
-    my $move_brood_back_date = $graft_date_clone->clone->add(days => 3);
-    my $move_cells_to_nucs_date = $graft_date_clone->clone->add(days => 10);
-    my $queen_mated_and_start_laying_date = $graft_date_clone->clone->add(days => 20);
-    my $queen_pull_date = $queen_mated_and_start_laying_date->clone->add(days => $days_of_egg_laying);  # Queen pull date is days_of_egg_laying days after the queen starts laying
-    my $second_graft_date = $queen_pull_date->clone->subtract(days => 10);  # Second graft date is 10 days before the queen pull date
+            my $return_brood_date = $graft_date_clone->clone->add(days => 3);  # Return brood event is 3 days after each graft day
+            my $queen_mated_and_start_laying_date = $graft_date_clone->clone->add(days => 20);  # Queen Mated and Start Laying event is 20 days after each graft day
+            my $queen_pull_date = $queen_mated_and_start_laying_date->clone->add(days => $days_of_egg_laying);  # Queen pull date is days_of_egg_laying days after the queen starts laying
+            my $cell_up_date = $graft_date_clone->clone->add(days => 10);  # Cell Up event is 10 days after the graft date
 
-    push @graft_dates, { graft_date => $graft_date_clone, event_name => "First Graft" };
-    push @graft_dates, { graft_date => $move_brood_back_date, event_name => "Return Brood" };
-    push @graft_dates, { graft_date => $move_cells_to_nucs_date, event_name => "Cell Up Nucs" };
-    push @graft_dates, { graft_date => $queen_mated_and_start_laying_date, event_name => "Queen Mated and Start Laying" };
-    push @graft_dates, { graft_date => $queen_pull_date, event_name => "Queen Pull" };
-    push @graft_dates, { graft_date => $second_graft_date, event_name => "Second Graft" };
-}
+            push @graft_dates, { graft_date => $graft_date_clone, event_name => "Graft " . ($i + 1), graft_number => $i + 1 };  # Append the graft number to the event name
+            push @graft_dates, { graft_date => $return_brood_date, event_name => "Return Brood " . ($i + 1), graft_number => $i + 1 };  # Append the graft number to the event name
+            push @graft_dates, { graft_date => $cell_up_date, event_name => "Cell Up " . ($i + 1), graft_number => $i + 1 };  # Append the graft number to the event name
+            push @graft_dates, { graft_date => $queen_mated_and_start_laying_date, event_name => "Queen Mated and Start Laying " . ($i + 1), graft_number => $i + 1 };  # Append the graft number to the event name
+            push @graft_dates, { graft_date => $queen_pull_date, event_name => "Queen Pull " . ($i + 1), graft_number => $i + 1 };  # Append the graft number to the event name
+
+            # Update the graft date for the next iteration
+            $graft_date = $queen_pull_date->clone->subtract(days => 10);
+        }
+
         # Store the graft dates in the session
         $c->session->{graft_dates} = \@graft_dates;
         $c->session->{first_graft_date} = $first_graft_date;
         $c->session->{days_of_egg_laying} = $days_of_egg_laying;
         $c->session->{number_of_grafts} = $number_of_grafts;
-
         # Redirect to the queens page
         $c->response->redirect($c->uri_for($self->action_for('queens')));
     } else {
@@ -138,14 +145,14 @@ sub queens :Chained('base') :PathPart('Queens') :Args(0) {
     my $month = $dt->month; # current month
     my $year = $dt->year; # current year
 
-    # Get all the dates for the current month's view
-    my $dates = generate_month_dates($year, $month);
-
     # Retrieve the form data and graft dates from the session
     my $first_graft_date = $c->session->{first_graft_date};
     my $days_of_egg_laying = $c->session->{days_of_egg_laying};
     my $number_of_grafts = $c->session->{number_of_grafts};
     my $graft_dates_hashes = $c->session->{graft_dates};
+
+    # Get all the dates for the current month's view
+    my $dates = generate_month_dates($year, $month, $number_of_grafts);
 
     # Flatten the graft_dates array into a single array of hash references
     my @graft_dates = map { { graft_date => $_->{graft_date}, event_name => $_->{event_name} } } @$graft_dates_hashes;

@@ -95,3 +95,16 @@ nav {
 .submenu-item:hover .submenu {
     display: block;
 }
+.calendar-date {
+    border: 1px solid black;
+    padding: 5px;
+    text-align: center;
+    width: 14.28%; /* 100% divided by 7 (number of days in a week) */
+
+}
+.event-box {
+    border: 1px solid black;
+    padding: 5px;
+    margin: 5px 0;
+    text-align: center;
+}
