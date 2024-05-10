@@ -24,7 +24,7 @@
     <a href="#sites">Sites</a> |
     <a href="#starman-setup">Starman Setup</a> |
     <a href="#todo">Todo</a> |
-   <a href="#workshop-management">Workshop Management</a> |
+   <a href="#workshop-management">Workshop Management</a> |<a href="#ve7tit">Ve7tit application</a> |
 </nav>
 
 <h3 id="overview"><a href="#top">Back to top</a> </h3>
@@ -63,3 +63,5 @@
 [% INCLUDE 'Documentation/Todo.tt' %]
 <h3 id="workshop-management"><a href="#top">Back to top</a> </h3>
 [% INCLUDE 'Documentation/WorkShops.tt' %]
+<h3 id="ve7tit"><a href="#top">Back to top</a> </h3>
+[% INCLUDE 'Documentation/Ve7tit.tt' %]

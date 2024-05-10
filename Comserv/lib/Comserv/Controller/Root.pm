@@ -161,6 +161,10 @@ sub fetch_and_set {
                 $c->session->{ControllerName} = $home_view;
                 $c->log->debug("home_view: $home_view");
             }
+        } else {
+            # If the site is not found in the Site model, set a default value in the session
+            $c->session->{SiteName} = 'DefaultSite';
+            $c->stash->{SiteName} = 'DefaultSite';
         }
     }
 

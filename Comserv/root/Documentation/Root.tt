@@ -34,7 +34,16 @@
     <li>If it's not defined in the URL but is defined in the session, it uses the session value</li>
     <li>If it's not defined in either the URL or session, it uses the domain name to fetch the site name from the Site model and sets it in the session and stash</li>
 </ul>
-
+<h2>Returning the Controller for a Given Site</h2>
+<p>The controller for a given site is determined in the 'forward_to_controller_based_on_domain' method in the Root controller. Here's how it works:</p>
+<ul>
+    <li>The method first fetches the site domain record from the Site model using the domain name extracted from the request.</li>
+    <li>If a site domain record is found, it retrieves the site_id from the site domain record and fetches the site details from the Site model using this site_id.</li>
+    <li>If a site is found, it retrieves the controller name from the site details. This controller name is the name of the controller that will handle the request for this site.</li>
+    <li>The method then forwards the request to the appropriate controller based on the controller name. This is done using the 'forward' method of the Catalyst context object.</li>
+    <li>If no site domain record is found, the method forwards the request to a default controller. This ensures that the application can handle requests for unknown or unconfigured domains.</li>
+</ul>
+<p>This process ensures that each site can have its own controller, allowing for site-specific behavior in the application.</p>
 <h2>index</h2>
 <p>The 'index' method is used to handle the default request. It does this by:</p>
 <ul>

@@ -1,0 +1,123 @@
+[% PageVersion = 've7tit/index.tt,v 0.01 2024/05/10 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<h3 > Hello  [% firstname%]  [% lastname%]! Welcome to VE7TIT  Shack!</h3>
+
+
+
+
+
+
+
+
+<p>We are proud to sponsor <a href="http://usbm.ca" target="_blank" name="Universal School of Biological Life" title="Click here to see details.">The Universal School of Biological Life Site</a>.</p>
+<br>
+<br>
+
+
+
+
+<h3>Our Current list of equipment.</h3>
+<h4>Radio Equipment:</h4>
+<ul>
+ <li><a href="/FT-897"
+ >Yaesu HT/VHF/UHF all mode
+ transceiver FT-897</a>
+ </li>
+ <li><a href="/FT-891"
+ >Yaesu HT/50MHz transceiver FT-891</a>
+ </li>
+ <li><a href="/Baofeg"
+ >Baofeng</a> only used for back-country work as they transmit too widely and will interfere with other radio on
+ nearby frequency's.
+ </li>
+  <li><a href="/IC-2at"
+ >ICOM IC-2AT </a>
+ </li>
+ <li><a href="/IC-H10"
+ >ICOM IC-h10</a>
+ </li>
+ <li><a href="/IC-F3-2"
+ >ICOM IC-F3-2 </a>
+  <li><a href="/TaitTP8110B-B100"
+ >Tait TP8110B-B100</a>
+ </li>
+
+ </ul>
+<h4>Antenna Equipment:</h4>
+<ul>
+<li><a href="/Z-100Plus"
+ >Z-100Plus Autotuner </a>
+ </li>
+
+ <li><a href="/WolfriverCoil"
+ >Wolfriver Coil Antenna</a>
+ </li>
+</ul>
+<h4>Test Equipment:</h4>
+<ul>
+<li><a href="NanoVNA"
+ >NanoVNS -H Network Analyzer</a>
+ </li>
+<li><a href="HeathkitIM-2410"
+ >Heathkit Digital frequency counter IM-2410</a>
+ </li> <li><a href="Textronixtype422"
+ >Textronix type 422 Oscilloscope</a>
+ </li>
+<li><a href="BKModle2050"
+ >B&K Model 2050 RF Generator.</a>
+</ul>
+
+
+<h4>Modes of operation:</h4>
+<ul>
+ <li><a href="CW">CW</a></li>
+ <li><a href="DigitalModes">Digital Modes</a></li>
+
+   <li><a href="SignalinkUSB"
+ >SignaLink USB Integrated USB Sound Card</a>
+ </li>
+  </ul>
+ <li><a href="Voice">Voice communications</a></li>
+</ul>
+
+<h4>Electronics:</h4>
+
+<ul>
+ <li><a href="Electronics">Electronics
+ .</a></li>
+</ul>
+<h4>Programing:</h4>
+
+<ul>
+ <li><a href="NodeRedHam">Nodered</a></li>
+ <li><a href="Perl">Perl</a></li>
+ <li><a href="Python">Python</a></li>
+</ul>
+
+<h4>Programs:</h4>
+<ul>
+  <li><a href="WSJTXFieldDays">WSJTX</a></li>
+</ul>
+<h4>Activities:</h4>
+<ul>
+  <li><a href="FieldDays">Field Days</a></li>
+<h4>Power:</h4>
+<ul/>
+<li><a href="/Power">Every thing needs Power</a></li>
+</ul>
+<h4>Restoration projects:</h4>
+<ul>
+<li><a href="Hallicrafters-S-40A">Hallicrafters
+ S-40A</a></li>
+ <li><a href="HeathkitVTVMIM-11">Heathkit VTVM IM-11</a></li>
+ S-40A</a></li>
+</ul>
+<br>
+<br>
+<p>
+<a href="http://computersystemconsulting.ca:5000/HelpDesk" target="_Blank" > HelpDesk</a>
+
+<p>Last Updated: [% data.site_last_update %]
