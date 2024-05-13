@@ -13,7 +13,7 @@ sub base :Chained('/') :PathPart('BMaster') :CaptureArgs(0) {
 sub index :Path :Args(0) {
     my ( $self, $c ) = @_;
     $c->stash(template => 'BMaster/BMaster.tt');
-    $c->forward($c->view('TT'));
+    #$c->forward($c->view('TT'));
 }
 
 sub generate_month_dates {
