@@ -1,3 +1,5 @@
+[% PageVersion = 'Documentation/BMasterController.tt,v 0.01 2024/01/28 Shanta Exp shanta ' %]
+
 <h1 id="top">BMaster Controller Documentation</h1>
 
 <h2 id="base">base</h2>

@@ -1,23 +1,28 @@
 package Comserv::Controller::Root;
+
 use Moose;
 use namespace::autoclean;
 use Template;
 use Data::Dumper;
+
 BEGIN { extends 'Catalyst::Controller' }
 
 __PACKAGE__->config(namespace => '');
 
-sub index :Path :Args(0){
+sub index :Path :Args(0) {
     my ($self, $c) = @_;
+
     $c->log->debug('Entered index action in Root.pm');
+
     my $SiteName = $c->session->{SiteName};
     my $ControllerName = $c->session->{ControllerName};
+
     print "ControllerName in index: = $ControllerName\n";
     $c->log->debug("ControllerName in index: = $ControllerName\n");
-    print "print SiteName in root index: = $SiteName\n";
-    $c->log->debug('deboug SiteName in root index: = $SiteName\n');
 
-    # Check if the controller name exists
+    print "print SiteName in root index: = $SiteName\n";
+    $c->log->debug('debug SiteName in root index: = $SiteName\n');
+
     if ($ControllerName) {
         # Check if the ControllerName is a controller or a template
         if ($ControllerName =~ /\.tt$/) {
@@ -36,12 +41,32 @@ sub index :Path :Args(0){
     $c->forward($c->view('TT'));
 }
 
-
-
 sub auto :Private {
     my ($self, $c) = @_;
+
+    my $domain = $c->req->base->host;
+    $domain =~ s/:.*//;
+
+    my $site_domain = $c->model('Site')->get_site_domain($domain);
+
+    if ($site_domain) {
+        # If a SiteName is found, store it in the session and stash
+        my $site_id = $site_domain->site_id;
+        my $site = $c->model('Site')->get_site_details($site_id);
+
+        if ($site) {
+            my $SiteName = $site->name;
+            $c->stash->{SiteName} = $SiteName;
+            $c->session->{SiteName} = $SiteName;
+        }
+    } else {
+        # If no SiteName is found, set a default SiteName in the session and stash
+        $c->stash->{SiteName} = 'none';
+        $c->session->{SiteName} = 'none';
+    }
+
     $c->log->debug('Entered auto action in Root.pm');
-    # Get a DBIx::Class::Schema object
+
     my $schema = $c->model('DBEncy');
     print "Schema: $schema\n";
 
@@ -53,7 +78,7 @@ sub auto :Private {
     $self->site_setup($c, $SiteName);
 
     unless ($c->session->{group}) {
-        $c->session(group => 'normal');
+        $c->session->{group} = 'normal';
     }
 
     # Get the debug parameter from the URL
@@ -121,8 +146,10 @@ sub auto :Private {
     # Continue processing the rest of the request
     return 1;
 }
+
 sub fetch_and_set {
     my ($self, $c, $param) = @_;
+
     my $value = $c->req->query_parameters->{$param};
     $c->log->debug("fetch_and_set: $value");
     # If value is defined in the URL, update the session and stash
@@ -142,11 +169,13 @@ sub fetch_and_set {
         # Fetch the site_id from the sitedomain table
         my $site_domain = $c->model('Site')->get_site_domain($domain);
         $c->log->debug("fetch_and_set site_domain: $site_domain");
+
         if ($site_domain) {
             my $site_id = $site_domain->site_id;
 
             # Fetch the site details from the sites table
             my $site = $c->model('Site')->get_site_details($site_id);
+
             if ($site) {
                 $value = $site->name;
                 $c->stash->{SiteName} = $value;
@@ -163,8 +192,8 @@ sub fetch_and_set {
             }
         } else {
             # If the site is not found in the Site model, set a default value in the session
-            $c->session->{SiteName} = 'DefaultSite';
-            $c->stash->{SiteName} = 'DefaultSite';
+            $c->session->{SiteName} = 'none';
+            $c->stash->{SiteName} = 'none';
         }
     }
 
@@ -173,6 +202,7 @@ sub fetch_and_set {
 
 sub site_setup {
     my ($self, $c, $SiteName) = @_;
+
     $SiteName = $c->session->{SiteName};
     # Log the SiteName
     $c->log->debug("SiteName: $SiteName");
@@ -181,6 +211,7 @@ sub site_setup {
     my $site = $c->model('Site')->get_site_details_by_name($SiteName);
 
     my $css_view_name;
+
     if (defined $site) {
         $css_view_name = $site->css_view_name;
     } else {
@@ -190,39 +221,42 @@ sub site_setup {
     }
 
     my $site_display_name = $site ? $site->site_display_name : 'none';
-    my $mail_to_admin = $site ? $site->mail_to_admin : 'none';  # Fetch mail_to_admin from the Site model
+    my $mail_to_admin = $site ? $site->mail_to_admin : 'none';
 
     $c->stash->{ScriptDisplayName} = $site_display_name;
     $c->stash->{css_view_name} = $css_view_name;
     $c->stash->{mail_to_admin} = $mail_to_admin;
-    $c->stash->{mail_replyto} = $site->mail_replyto||'helpdesk.computersystemconsulting.ca';  # Fetch and store the mail_replyto value
-
+    $c->stash->{mail_replyto} = $site->mail_replyto || 'helpdesk.computersystemconsulting.ca';
 
     my $page = $c->req->param('page');
 
-$c->stash(
-    default_css => $c->uri_for($c->stash->{css_view_name} || '/static/css/default.css'),
-    menu_css => $c->uri_for('/static/css/menu.css'),
-    log_css => $c->uri_for('/static/css/log.css'),
-    todo_css => $c->uri_for('/static/css/todo.css'),
-);
+    $c->stash(
+        default_css => $c->uri_for($c->stash->{css_view_name} || '/static/css/default.css'),
+        menu_css => $c->uri_for('/static/css/menu.css'),
+        log_css => $c->uri_for('/static/css/log.css'),
+        todo_css => $c->uri_for('/static/css/todo.css'),
+    );
 }
+
 sub debug :Path('/debug') {
     my ($self, $c) = @_;
+
     my $site_name = $c->stash->{SiteName};
     $c->stash(template => 'debug.tt');
     $c->forward($c->view('TT'));
-
 }
+
 sub default :Path {
     my ( $self, $c ) = @_;
     $c->response->body( 'Page not found' );
     $c->response->status(404);
 }
+
 sub documentation :Path('documentation') :Args(0) {
     my ( $self, $c ) = @_;
     $c->stash(template => 'Documentation/Documentation.tt');
 }
+
 sub end : ActionClass('RenderView') {}
 
 __PACKAGE__->meta->make_immutable;
