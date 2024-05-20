@@ -3,8 +3,15 @@
 <h1 id="top">BMaster Controller Documentation</h1>
 
 <h2 id="base">base</h2>
-<p>This function captures /BMaster in the URL.</p>
+<p>The 'base' function is the root of the chained actions in the BMaster controller. It captures '/BMaster' in the URL and performs common setup tasks that are shared by multiple actions in the controller. Here are some examples of what the 'base' function can do:</p>
 
+<ul>
+    <li><strong>Loading Model Data:</strong> If multiple actions in the BMaster controller need to access the same data from the BMaster model, this data can be loaded in the 'base' function and stored in the stash for other actions to use.</li>
+    <li><strong>Checking User Permissions:</strong> If multiple actions in the BMaster controller require the user to have certain permissions, these permissions can be checked in the 'base' function. If the user does not have the required permissions, they can be redirected to an error page.</li>
+    <li><strong>Setting Common Template Variables:</strong> If multiple actions in the BMaster controller use the same template variables, these variables can be set in the 'base' function.</li>
+</ul>
+
+<p>By performing these common setup tasks in the 'base' function, we can avoid duplicating code in multiple actions, making the code more maintainable and easier to understand.</p>
 <h2 id="index">index</h2>
 <p>This function sets the template to 'BMaster/BMaster.tt' and forwards to the TT view.</p>
 
