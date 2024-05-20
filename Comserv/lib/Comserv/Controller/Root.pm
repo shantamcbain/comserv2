@@ -15,7 +15,7 @@ sub index :Path :Args(0) {
     $c->log->debug('Entered index action in Root.pm');
 
     my $SiteName = $c->session->{SiteName};
-    my $ControllerName = $c->session->{ControllerName};
+    my $ControllerName = $c->session->{SiteName};
 
     print "ControllerName in index: = $ControllerName\n";
     $c->log->debug("ControllerName in index: = $ControllerName\n");
@@ -48,7 +48,7 @@ sub auto :Private {
     $domain =~ s/:.*//;
 
     my $site_domain = $c->model('Site')->get_site_domain($domain);
-
+$c->log->debug(__PACKAGE__ . " . (split '::', __SUB__)[-1] . \" line \" . __LINE__ . \": site_domain in auto = $site_domain");
     if ($site_domain) {
         # If a SiteName is found, store it in the session and stash
         my $site_id = $site_domain->site_id;
@@ -60,10 +60,12 @@ sub auto :Private {
             $c->session->{SiteName} = $SiteName;
         }
     } else {
-        # If no SiteName is found, set a default SiteName in the session and stash
-        $c->stash->{SiteName} = 'none';
-        $c->session->{SiteName} = 'none';
+        # If no SiteName is found, call fetch_and_set method to handle this
+        my $SiteName = $self->fetch_and_set($c, 'site');
+        $c->log->debug(__PACKAGE__ . " . (split '::', __SUB__)[-1] . \" line \" . __LINE__ . \": SiteName in auto = $SiteName");
+        $self->site_setup($c, $SiteName);
     }
+
 
     $c->log->debug('Entered auto action in Root.pm');
 
@@ -74,8 +76,8 @@ sub auto :Private {
 
     # Call fetch_and_set method
     my $SiteName = $self->fetch_and_set($c, $schema, 'site');
-    $c->log->debug("SiteName in auto: = $SiteName\n");
-    $self->site_setup($c, $SiteName);
+ #   $c->log->debug("SiteName in auto: = $SiteName\n");
+
 
     unless ($c->session->{group}) {
         $c->session->{group} = 'normal';
@@ -151,7 +153,9 @@ sub fetch_and_set {
     my ($self, $c, $param) = @_;
 
     my $value = $c->req->query_parameters->{$param};
-    $c->log->debug("fetch_and_set: $value");
+
+    $c->log->debug(__PACKAGE__ . " . (split '::', __SUB__)[-1] . \" line \" . __LINE__ . \":  in fetch_and_set: $value");
+
     # If value is defined in the URL, update the session and stash
     if (defined $value) {
         $c->stash->{SiteName} = $value;

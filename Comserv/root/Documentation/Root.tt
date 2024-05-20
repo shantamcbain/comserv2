@@ -5,35 +5,85 @@
     [% PageVersion %]
 [% END %]
 <h1 id="top">Comserv App Documentation Root.pm </h1>
+<nav>
+    <a id="roottop"></a>
+       <a href="#index">index Action</a>|
+        <a href="#auto"> Action</a>|
+        <a href="#fetch_and_set">fetch_and_set Method</a>|
+        <a href="#controller">Returning the Controller for a Given Site</a>|
+        <a href="#site_setup">site_setup Method</a>|
+        <a href="#debug">debug</a>|
+        <a href="#default">default</a>|
+        <a href="#documentation">documentation</a>|
+        <a href="#end">end</a>
 
+</nav>
 <p>The Root controller in the Comserv application is responsible for handling the initial request and setting up the necessary variables for the application. It does this through several methods:</p>
+<a id="index"></a><a href="#roottop">back to top</a>
+<h2>index Action</h2>
+<p>The <code>index</code> action is a method in the <code>Comserv::Controller::Root</code> package. It is mapped to the root URL ("/") of the application. This action is typically the first one that is executed when a user visits the root URL of the application.</p>
 
-<h2>auto</h2>
-<p>The 'auto' method is called before every action in the application. It's responsible for setting up the necessary variables for the application. It does this by:</p>
-<ul>
-    <li>Extracting the domain name from the request</li>
-    <li>Calling the 'forward_to_controller_based_on_domain' method to determine the controller based on the domain</li>
-    <li>Setting up universal variables</li>
-    <li>Fetching and setting the site name</li>
-    <li>Setting up the session and stash with necessary parameters</li>
-</ul>
+<h3>Functionality</h3>
+<p>The <code>index</code> action performs the following steps:</p>
+<ol>
+    <li>It logs a debug message indicating that the index action in Root.pm has been entered.</li>
+    <li>It retrieves the <code>SiteName</code> and <code>ControllerName</code> from the user's session.</li>
+    <li>It checks if a <code>ControllerName</code> is set in the session. If it is, it does one of two things:
+        <ul>
+            <li>If the <code>ControllerName</code> ends with <code>.tt</code>, it assumes that the <code>ControllerName</code> is a template. It removes any leading slash from the <code>ControllerName</code> and sets the template to that name.</li>
+            <li>If the <code>ControllerName</code> does not end with <code>.tt</code>, it assumes that the <code>ControllerName</code> is a controller. It detaches to that controller's index action.</li>
+        </ul>
+    </li>
+    <li>If no <code>ControllerName</code> is set in the session, it defaults to the <code>index.tt</code> template.</li>
+    <li>Finally, it forwards to the Template Toolkit view to render the template.</li>
+</ol>
 
-<h2>forward_to_controller_based_on_domain</h2>
-<p>The 'forward_to_controller_based_on_domain' method is used to determine the controller based on the domain name. It does this by:</p>
-<ul>
-    <li>Fetching the site domain record from the Site model using the domain name</li>
-    <li>If a site domain record is found, it gets the site_id from the site domain record and fetches the site details from the Site model using the site_id</li>
-    <li>If a site is found, it gets the controller name from the site details and forwards the request to the appropriate controller</li>
-    <li>If no site domain record is found, it forwards the request to a default controller</li>
-</ul>
+<h3>Implications</h3>
+<p>The <code>index</code> action is crucial for routing in the application. It determines which template or controller to use based on the <code>ControllerName</code> stored in the session. This allows for dynamic routing based on session data.</p>
+<a id="auto"></a><a href="#roottop">back to top</a>
+<h2>auto Action</h2>
+<p>The <code>auto</code> action is a method in the <code>Comserv::Controller::Root</code> package. It is a special type of action in Catalyst that is automatically called before any other actions. This makes it a good place to put any setup code that needs to be run for every request.</p>
 
-<h2>fetch_and_set</h2>
-<p>The 'fetch_and_set' method is used to fetch a parameter from the URL, session, or database and set it in the session and stash. It does this by:</p>
-<ul>
-    <li>Checking if the parameter is defined in the URL. If it is, it updates the session and stash with this value</li>
-    <li>If it's not defined in the URL but is defined in the session, it uses the session value</li>
-    <li>If it's not defined in either the URL or session, it uses the domain name to fetch the site name from the Site model and sets it in the session and stash</li>
-</ul>
+<h3>Functionality</h3>
+<p>The <code>auto</code> action performs the following steps:</p>
+<ol>
+    <li>It retrieves the domain from the request and removes any port number.</li>
+    <li>It fetches the site domain from the database using the <code>Site</code> model.</li>
+    <li>If a site domain is found, it fetches the corresponding site details and stores the site name in the session and stash.</li>
+    <li>If no site domain is found, it sets a default site name in the session and stash.</li>
+    <li>It logs a debug message indicating that the auto action in Root.pm has been entered.</li>
+    <li>It retrieves the database schema from the <code>DBEncy</code> model.</li>
+    <li>It calls the <code>fetch_and_set</code> method to fetch the site name from the request or session and set it in the session and stash.</li>
+    <li>It calls the <code>site_setup</code> method to set up various stash variables based on the site name.</li>
+    <li>It sets a default group in the session if none is set.</li>
+    <li>It retrieves the debug parameter from the request and updates the session and stash with it if it is different from the session value.</li>
+    <li>It retrieves the page parameter from the request and updates the session and stash with it if it is different from the session value.</li>
+    <li>It sets the host name in the stash.</li>
+    <li>It fetches the top 10 todos from the <code>Todo</code> model and stores them in the stash.</li>
+    <li>It fetches the todos from the session and stores them in the stash.</li>
+    <li>If the context is a <code>Catalyst::Context</code>, it fetches various links from the <code>DB</code> model and stores them in the session.</li>
+    <li>Finally, it returns 1 to continue processing the rest of the request.</li>
+</ol>
+
+<h3>Implications</h3>
+<p>The <code>auto</code> action is crucial for setting up the request. It determines the site name based on the domain, sets up various session and stash variables, and fetches data from the database. This allows for dynamic content and routing based on the request and session data.</p>
+<a id="fetch_and_set"></a><a href="#roottop">back to top</a>
+<h2>fetch_and_set Method</h2>
+<p>The <code>fetch_and_set</code> method is a helper method in the <code>Comserv::Controller::Root</code> package. It is used to fetch a parameter from the URL, session, or database and set it in the session and stash.</p>
+
+<h3>Functionality</h3>
+<p>The <code>fetch_and_set</code> method performs the following steps:</p>
+<ol>
+    <li>It checks if the parameter is defined in the URL. If it is, it updates the session and stash with this value.</li>
+    <li>If the parameter is not defined in the URL but is defined in the session, it uses the session value and updates the stash with it.</li>
+    <li>If the parameter is not defined in either the URL or session, it uses the domain name to fetch the site name from the Site model. It then sets the site name in the session and stash.</li>
+    <li>If the site is not found in the Site model, it sets a default value in the session and stash.</li>
+    <li>Finally, it returns the value of the parameter.</li>
+</ol>
+
+<h3>Implications</h3>
+<p>The <code>fetch_and_set</code> method is crucial for fetching and setting parameters in the application. It allows for dynamic content and routing based on the parameter value. This method is used in the <code>auto</code> action to fetch and set the site name.</p>
+<a id="controller"></a><a href="#roottop">back to top</a>
 <h2>Returning the Controller for a Given Site</h2>
 <p>The controller for a given site is determined in the 'forward_to_controller_based_on_domain' method in the Root controller. Here's how it works:</p>
 <ul>
@@ -44,25 +94,35 @@
     <li>If no site domain record is found, the method forwards the request to a default controller. This ensures that the application can handle requests for unknown or unconfigured domains.</li>
 </ul>
 <p>This process ensures that each site can have its own controller, allowing for site-specific behavior in the application.</p>
-<h2>index</h2>
-<p>The 'index' method is used to handle the default request. It does this by:</p>
-<ul>
-    <li>Getting the controller name from the stash</li>
-    <li>If the controller name exists, it checks if it's a controller or a template and sets the template or detaches to the controller accordingly</li>
-    <li>If the controller name doesn't exist, it sets a default template</li>
-</ul>
-<h2>site_setup</h2>
-<p>The 'site_setup' method is used to fetch the site details from the Site model using the SiteName. It sets up the stash with necessary parameters such as css_view_name, mail_to_admin, and mail_replyto. It also sets up the default CSS paths for the application.</p>
+<a id="site_setup"></a><a href="#roottop">back to top</a>
+<h2>site_setup Method</h2>
+<p>The <code>site_setup</code> method is a helper method in the <code>Comserv::Controller::Root</code> package. It is used to fetch site details from the Site model and set up various stash variables based on the site name.</p>
 
+<h3>Functionality</h3>
+<p>The <code>site_setup</code> method performs the following steps:</p>
+<ol>
+    <li>It retrieves the site name from the session.</li>
+    <li>It fetches the site details from the Site model using the site name. The site details include various fields such as <code>css_view_name</code>, <code>site_display_name</code>, <code>mail_to_admin</code>, and <code>mail_replyto</code>.</li>
+    <li>If a site is found, it retrieves the <code>css_view_name</code> from the site details. If no site is found, it sets a default CSS view name.</li>
+    <li>It retrieves the <code>site_display_name</code> and <code>mail_to_admin</code> from the site details. If no site is found, it sets default values for these fields.</li>
+    <li>It retrieves the <code>mail_replyto</code> from the site details. If this field is not set, it sets a default value.</li>
+    <li>It sets these values in the stash.</li>
+    <li>It retrieves the page parameter from the request.</li>
+    <li>It sets up various CSS paths in the stash. These paths are used to include the appropriate CSS files in the views.</li>
+</ol>
+
+<h3>Implications</h3>
+<p>The <code>site_setup</code> method is crucial for setting up the stash with site-specific variables. These variables are used in the views to customize the appearance and behavior of the application based on the site. This method is used in the <code>auto</code> action after the site name has been fetched and set.</p>
+<a id="debug"></a><a href="#roottop">back to top</a>
 <h2>debug</h2>
 <p>The 'debug' method is used to forward the request to the 'TT' view with the 'debug.tt' template. This is used for debugging purposes.</p>
 
 <h2>default</h2>
 <p>The 'default' method is used to handle the default request when a page is not found. It sets the response body to 'Page not found' and the response status to 404.</p>
-
+<a id="documentation"></a><a href="#roottop">back to top</a>
 <h2>documentation</h2>
 <p>The 'documentation' method is used to set the template to 'Documentation/Documentation.tt'. This is used to display the documentation page.</p>
-
+<a id="end"></a><a href="#roottop">back to top</a>
 <h2>end</h2>
 <p>The 'end' method is called at the end of every request to render the view.</p>
 <p>These methods work together to handle the initial request, set up the necessary variables, and render the appropriate view based on the request.</p>

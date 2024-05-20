@@ -11,8 +11,9 @@
     <div class="submenu-item">
     <span class="submenu-header"><a href="/admin" class="dropbtn">admin</a></span>
     <div class="submenu">
-           <a href="[% c.uri_for(c.controller('Log').action_for('log')) %]">Open Log</a>
-         <a href="[% c.uri_for(c.controller('project').action_for('project')) %]">Projects</a>
+        <a href="/documentation">Documentation</a>
+        <a href="[% c.uri_for(c.controller('Log').action_for('log')) %]">Open Log</a>
+        <a href="[% c.uri_for(c.controller('project').action_for('project')) %]">Projects</a>
 
     </div>
 </div>
