@@ -1,0 +1,35 @@
+[% PageVersion = 'Documentation/ENCYModel.tt,v 0.01 2024/05/20 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]<h1 id="encymtop">ENCY Model</h1>
+
+<nav>
+  <a href="#get_reference_by_id">get_reference_by_id</a> |
+  <a href="#create_reference">create_reference</a> |
+  <a href="#get_category_by_id">get_category_by_id</a> |
+  <a href="#create_category">create_category</a>
+</nav>
+
+<h2 id="ency">ENCY Model</h2>
+<p>The ENCY model is responsible for handling data related to the ENCY controller. It includes several methods, each of which performs a specific task.</p>
+<p><a href="#encymtop">Return to top</a></p>
+
+
+<h3 id="get_reference_by_id">get_reference_by_id</h3>
+<p>The 'get_reference_by_id' method is responsible for fetching a reference by its id. It takes an id as an argument, fetches the corresponding reference from the database, and returns the reference.</p>
+<p><a href="#encymtop">Return to top</a></p>
+
+<h3 id="create_reference">create_reference</h3>
+<p>The 'create_reference' method is responsible for creating a new reference. It takes the necessary data as arguments, creates a new reference in the database, and returns the new reference.</p>
+<p><a href="#encymtop">Return to top</a></p>
+
+<h3 id="get_category_by_id">get_category_by_id</h3>
+<p>The 'get_category_by_id' method is responsible for fetching a category by its id. It takes an id as an argument, fetches the corresponding category from the database, and returns the category.</p>
+<p><a href="#encymtop">Return to top</a></p>
+
+<h3 id="create_category">create_category</h3>
+<p>The 'create_category' method is responsible for creating a new category. It takes the necessary data as arguments, creates a new category in the database, and returns the new category.</p>
+<p><a href="#encymtop">Return to top</a></p>
+
+<p>Each of these methods is used by the ENCY controller to perform its tasks. The ENCY model is defined in the 'Comserv::Model::ENCY' package, which is located in the 'lib/Comserv/Model' directory.</p>
+<p><a href="#encymtop">Return to top</a></p>

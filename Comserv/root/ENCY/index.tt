@@ -1,40 +1,32 @@
-<div ALIGN="center">
-	[% IF username %]
-
-<h3 > Hello  [% firstname%]  [% lastname%]! Welcome to The Encyclopaedia of Biological life!</h3>
-
-
-	[% ELSE %]
-
-	<h3>  Hello! Welcome to The Encyclopaedia of Biological life!</h3
-
-	[% END %]
-
+[% PageVersion = 'ENCY/index.tt,v 0.02 2024/05/22 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+<div align="center">
+    [% IF username %]
+        <h3>Hello [% firstname %] [% lastname %]! Welcome to The Encyclopedia of Biological Life!</h3>
+    [% ELSE %]
+        <h3>Hello! Welcome to The Encyclopedia of Biological Life!</h3>
+    [% END %]
 </div>
-<div ALIGN="center">
-<A NAME="PageTop"></A>
+<div align="center">
+    <a name="PageTop"></a>
 </div>
 
+<h2>Your Dynamic Link to Alternative Health Information</h2>
 
+<p>ENCY provides a comprehensive reference to natural health that evolves with your needs. We continuously update the information in this reference, drawing from herbals, medical texts and journals, growers, foragers, herbalists, and even our users. We strive to verify all information to the best of our ability.</p>
 
+<p>
+    <a href="/ENCY/BotanicalNameView">Botanical Name View</a>
+</p>
 
-        <h2>Your dynamic link to alternate health information.</h2>
+<p>All references to uses are for informational purposes only. You should consult your healthcare practitioner team before using any products for your health. This applies to all treatments and therapies that you may be considering in your personal health program.</p>
 
-      <p>ENCY brings you the a compressive reference to natural health that evolves
-        to your needs. We are constantly updating the information in this reference.
-        Information comes from herbals, Medical text and journals, growers, foragers,
-        herbalist, even our users. We try to verify all information the best we
-        can.
-      <p>All references of uses are for information only. You should consult your
-        practitioner team before using any products for your health. This applies
-        to all treatments and therapies that you may be considering in your personal
-        health program.
-      <p>Our practitioner profiles will help you to know what to expect from each
-        practitioner type and how they can help you in your health care program.
- <div ALIGN="center">
-<a href="../CSC/helpdesk.cgi?[% session_string %]" target="_Blank" > HelpDesk</a>
-<p>Last Updated: [% SiteLastUpdate  %]
+<div align="center">
+    <a href="../CSC/helpdesk.cgi?[% session_string %]" target="_blank">HelpDesk</a>
+    <p>Last Updated: [% SiteLastUpdate %]</p>
+</div>
 
 [% embed('CSCCopyRight') %]
 [% embed(data.page_bottom_view) %]
-

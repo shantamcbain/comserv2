@@ -1,29 +1,58 @@
-[% PageVersion = 'Documentation/Overview.tt,v 0.01 2024/01/28 Shanta Exp shanta ' %]
+[% PageVersion = 'Documentation/Overview.tt,v 0.02 2024/05/22 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
     [%# "Debugging HostName: " _ HostName %]
     [%# INCLUDE 'debug.tt' %]
 [% END %]
+
 <h1>Overview</h1>
 <p>
-    This Catalyst application is replacing our old eXtropia site which was written in Perl 4. The old site was a collection of CGI scripts and HTML pages.  The new site is written in Perl 5 using the Catalyst framework.  The new site is designed to be more modular and easier to maintain.  The new site is also designed to be more user-friendly and to provide more information to the user.</p>
-    <h2>These are the main features of the new site:</h2>
+    This Catalyst application is replacing our old eXtropia site, which was written in Perl 4. The old site consisted of a collection of CGI scripts and HTML pages. The new site is written in Perl 5 using the Catalyst framework. This new implementation is designed to be more modular, easier to maintain, and more user-friendly, providing enhanced information to the user.
+</p>
+
+<h2>Main Features of the New Site:</h2>
 <ol>
-    <li><h3>AI integration with the site:</h3>  Integrate the ability to search internal resources, external resources and add information to the local system.</li>
-    <li><h3>Modular design:</h3>  </li>
-    <li><h3>ToDo, Project management, logs:</h3>  </li>
-    <li><h3>Admin functions:</h3>  edit file, control css, update application, Schema management.</li>
-    <li><h3>Security:</h3>  </li>
-    <li><h3>Documentation:</h3>  </li>
-    <li><h3>Search:</h3>  Using ai to build a comprehensive information base.</li>
-    <li><h3>Reference system of documents:</h3>  </li>
-    <li><h3>Power monitoring system:</h3>  </li>
-    <li><h3>Web based email:</h3>  </li>
-    <li><h3>Web based calendar:</h3>  </li>
-    <li><h3>Web based address book:</h3>  </li>
-    <li><h3>Web based file manager:</h3>  </li>
-    <li><h3>Web based photo album:</h3>  </li>
-    <li><h3>Web based music player:</h3>  </li>
-    <li><h3>The ability to host multiple sites with the same software:</h3>  </li>
-    <li><h3>Extensive herbal and health information:</h3>  </li>
+    <li><h3>AI Integration with the Site:</h3> Integrates the ability to search internal resources, external resources, and add information to the local system.</li>
+    <li><h3>Modular Design:</h3> Ensures the site is built in a modular fashion for ease of maintenance and scalability.</li>
+    <li><h3>ToDo, Project Management, Logs:</h3> Incorporates tools for managing tasks, projects, and maintaining logs for better tracking and management.</li>
+    <li><h3>Admin Functions:</h3> Provides capabilities to edit files, control CSS, update the application, and manage the schema.</li>
+    <li><h3>Security:</h3> Implements robust security measures to protect data and user information.</li>
+    <li><h3>Documentation:</h3> Maintains comprehensive documentation to assist developers and users.</li>
+    <li><h3>Search:</h3> Uses AI to build a comprehensive information base, improving search accuracy and relevance.</li>
+    <li><h3>Reference System of Documents:</h3> Offers a well-organized system for managing and referencing documents.</li>
+    <li><h3>Power Monitoring System:</h3> Includes a system for monitoring power usage and efficiency.</li>
+    <li><h3>Web-Based Email:</h3> Provides a web-based email client for managing emails.</li>
+    <li><h3>Web-Based Calendar:</h3> Offers a web-based calendar for scheduling and event management.</li>
+    <li><h3>Web-Based Address Book:</h3> Maintains a web-based address book for contact management.</li>
+    <li><h3>Web-Based File Manager:</h3> Includes a web-based file manager for file storage and organization.</li>
+    <li><h3>Web-Based Photo Album:</h3> Provides a web-based photo album for managing and sharing photos.</li>
+    <li><h3>Web-Based Music Player:</h3> Includes a web-based music player for playing and managing music files.</li>
+    <li><h3>Hosting Multiple Sites:</h3> Supports the ability to host multiple sites using the same software.</li>
+    <li><h3>Extensive Herbal and Health Information:</h3> Provides detailed information on herbs and health-related topics.</li>
 </ol>
+
+<h2>Suggestions for Improvement and Expansion</h2>
+<p>As we continue to develop and enhance this application, consider the following suggestions:</p>
+<ul>
+    <li><strong>AI Integration Planning:</strong> Create a detailed plan for integrating AI into various modules of the application. This should include specific tasks, goals, and technologies to be used. Consider adding an AI.tt documentation file to outline this plan.</li>
+    <li><strong>User Feedback Mechanism:</strong> Implement a system for collecting user feedback to continuously improve the user experience and functionality of the site.</li>
+    <li><strong>Enhanced Security Measures:</strong> Regularly review and update security protocols to address new vulnerabilities and threats.</li>
+    <li><strong>Performance Optimization:</strong> Optimize the application's performance to handle increasing amounts of data and user activity efficiently.</li>
+    <li><strong>Accessibility Improvements:</strong> Ensure the site meets accessibility standards to provide an inclusive experience for all users.</li>
+    <li><strong>Regular Updates and Maintenance:</strong> Establish a schedule for regular updates and maintenance to keep the site current and secure.</li>
+    <li><strong>Training and Support Resources:</strong> Develop training materials and support resources for users and administrators to maximize the application's potential.</li>
+</ul>
+
+<h2>Instructions for Developers</h2>
+<p>To ensure the continuous improvement and consistency of this project, please adhere to the following guidelines:</p>
+<ul>
+    <li><strong>Naming Conventions:</strong> Follow the existing naming conventions strictly. If you find inconsistencies, normalize them to maintain uniformity.</li>
+    <li><strong>Code Quality:</strong> Write clear, well-documented code. Use meaningful variable and function names to enhance readability and maintainability.</li>
+    <li><strong>Error Handling:</strong> Implement robust error handling to ensure the application behaves predictably under unexpected conditions.</li>
+    <li><strong>Contributing to the Todo List:</strong> If you identify any issues or potential improvements, add them to the 'Todo' section of the documentation.</li>
+    <li><strong>Code Reviews:</strong> Submit your code for peer review to catch potential issues early and ensure adherence to best practices.</li>
+</ul>
+
+<p>We are committed to evolving the Comserv application to meet the needs of our users. Your contributions and adherence to these guidelines are crucial for our continued success.</p>
+
+<p><a href="#top">Back to top</a></p>

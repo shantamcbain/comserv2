@@ -1,0 +1,121 @@
+[% PageVersion = 'Documentation/ENCYController.tt,v 0.02 2024/05/22 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<h1 id="encyctop">ENCY Controller</h1>
+
+<h2 id="ency">ENCY Controller</h2>
+<p>The ENCY controller is responsible for handling requests related to the ENCY model. It includes several subroutines, each of which performs a specific task.</p>
+<p><a href="#encyctop">Return to top</a></p>
+<nav>
+  <a href="#indexencyc">index</a> |
+  <a href="#botanical_name_view">botanical_name_view</a> |
+  <a href="#herb_detail">herb_detail</a> |
+  <a href="#get_reference_by_id">get_reference_by_id</a> |
+  <a href="#create_reference">create_reference</a> |
+  <a href="#get_category_by_id">get_category_by_id</a> |
+  <a href="#create_category">create_category</a>
+</nav>
+
+<h3 id="indexencyc">index</h3>
+<p>The <code>index</code> subroutine handles requests to the root of the ENCY controller's URL. It sets the template to 'ENCY/index.tt', which is used to render the response.</p>
+<pre><code>
+sub index :Path('/ENCY') :Args(0) {
+    my ( $self, $c ) = @_;
+    # The index action will display the 'index.tt' template
+    $c->stash(template => 'ENCY/index.tt');
+}
+</code></pre>
+<p><a href="#encyctop">Return to top</a></p>
+
+<h3 id="botanical_name_view">botanical_name_view</h3>
+<p>The <code>botanical_name_view</code> subroutine handles requests to display the Botanical Name View page. It fetches herbal data from the 'DBForager' model and passes this data to the template.</p>
+<pre><code>
+sub botanical_name_view :Path('/ENCY/BotanicalNameView') :Args(0) {
+    my ( $self, $c ) = @_;
+
+    # Fetch the herbal data
+    my $forager_data = $c->model('DBForager')->get_herbal_data();
+
+    # Pass the data to the template
+    my $herbal_data = $forager_data;
+    $c->stash(herbal_data => $herbal_data, template => 'ENCY/BotanicalNameView.tt');
+}
+</code></pre>
+<p><a href="#encyctop">Return to top</a></p>
+
+<h3 id="herb_detail">herb_detail</h3>
+<p>The <code>herb_detail</code> subroutine handles requests to display detailed information about a specific herb. It takes an <code>id</code> as an argument, fetches the corresponding herb from the 'DBForager' model, and sets the herb and the template 'ENCY/HerbDetailView.tt' in the stash.</p>
+<pre><code>
+sub herb_detail :Path('/ENCY/herb_detail') :Args(1) {
+    my ( $self, $c, $id ) = @_;
+    my $herb = $c->model('DBForager')->get_herb_by_id($id);
+    $c->stash(herb => $herb, template => 'ENCY/HerbDetailView.tt');
+}
+</code></pre>
+<p><a href="#encyctop">Return to top</a></p>
+
+<h3 id="get_reference_by_id">get_reference_by_id</h3>
+<p>The <code>get_reference_by_id</code> subroutine handles requests to get a reference by its id. It takes an <code>id</code> as an argument, fetches the corresponding reference from the 'ENCY' model, and sets the reference and the template 'ency/get_reference_form.tt' in the stash.</p>
+<pre><code>
+sub get_reference_by_id :Local {
+    my ( $self, $c, $id ) = @_;
+    # Fetch the reference using the ENCY model
+    my $reference = $c->model('ENCY')->get_reference_by_id($id);
+    $c->stash(reference => $reference);
+    $c->stash(template => 'ency/get_reference_form.tt');
+}
+</code></pre>
+<p><a href="#encyctop">Return to top</a></p>
+
+<h3 id="create_reference">create_reference</h3>
+<p>The <code>create_reference</code> subroutine handles requests to display the form for creating a new reference. It sets the template 'ency/create_reference_form.tt' in the stash.</p>
+<pre><code>
+sub create_reference :Local {
+    my ( $self, $c ) = @_;
+    # Display the form for creating a new reference
+    $c->stash(template => 'ency/create_reference_form.tt');
+}
+</code></pre>
+<p><a href="#encyctop">Return to top</a></p>
+
+<h3 id="get_category_by_id">get_category_by_id</h3>
+<p>The <code>get_category_by_id</code> subroutine handles requests to get a category by its id. It takes an <code>id</code> as an argument, fetches the corresponding category from the 'ENCY' model, and sets the category and the template 'ency/get_category_form.tt' in the stash.</p>
+<pre><code>
+sub get_category_by_id :Local {
+    my ( $self, $c, $id ) = @_;
+    # Fetch the category using the ENCY model
+    my $category = $c->model('ENCY')->get_category_by_id($id);
+    $c->stash(category => $category);
+    $c->stash(template => 'ency/get_category_form.tt');
+}
+</code></pre>
+<p><a href="#encyctop">Return to top</a></p>
+<p>For more information on how AI can enhance the functionalities of the ENCY module, refer to the <a href="#AI">AI Integration Plan</a>.</p>
+
+<h3 id="create_category">create_category</h3>
+<p>The <code>create_category</code> subroutine handles requests to display the form for creating a new category. It sets the template 'ency/create_category_form.tt' in the stash.</p>
+<pre><code>
+sub create_category :Local {
+    my ( $self, $c ) = @_;
+    # Display the form for creating a new category
+    $c->stash(template => 'ency/create_category_form.tt');
+}
+</code></pre>
+<p><a href="#encyctop">Return to top</a></p>
+
+<p>Each of these subroutines relies on the ENCY model to perform its tasks. The ENCY model is loaded in the ENCY controller with the <code>use Comserv::Model::ENCY;</code> statement. The ENCY model is defined in the 'Comserv::Model::ENCY' package, which is located in the 'lib/Comserv/Model' directory.</p>
+<p><a href="#encyctop">Return to top</a></p>
+
+<h2>Future Development</h2>
+<p>To evolve the ENCY application, consider the following enhancements:</p>
+<ul>
+    <li><strong>Improved Data Validation:</strong> Implement stricter data validation and error handling in all subroutines to ensure data integrity and provide better user feedback.</li>
+    <li><strong>Enhanced User Interface:</strong> Develop more interactive and user-friendly templates, possibly integrating JavaScript frameworks for a better user experience.</li>
+    <li><strong>API Integration:</strong> Create RESTful API endpoints to allow external applications to interact with the ENCY data, enabling wider access and integration.</li>
+    <li><strong>Search and Filtering:</strong> Add advanced search and filtering capabilities to allow users to find specific information more efficiently.</li>
+    <li><strong>Automated Data Updates:</strong> Implement automation for data updates from trusted sources to keep the information current and accurate.</li>
+    <li><strong>User Contributions:</strong> Develop features that allow users to contribute data and corrections, with moderation workflows to ensure quality.</li>
+</ul>
+<p><a href="#encyctop">Return to top</a></p>

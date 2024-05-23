@@ -1,67 +1,103 @@
-[% PageVersion = 'Documentation/ComservDocumentation.tt,v 0.01 2024/01/28 Shanta Exp shanta ' %]
+[% PageVersion = 'Documentation/ComservDocumentation.tt,v 0.02 2024/05/22 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
-    [%# "Debugging HostName: " _ HostName %]
-    [%# INCLUDE 'debug.tt' %]
+[%# "Debugging HostName: " _ HostName %]
+[%# INCLUDE 'debug.tt' %]
 
-<h1 id="top">Comserv App Documentation</h1>
+<h1 id="top">Comserv Application Documentation</h1>
 
 <nav>
     <a href="#overview">Overview</a> |
     <a href="#dbi">DBI</a> |
     <a href="#bmaster">BMaster</a> |
     <a href="#document-management">Document Management</a> |
+    <a href="#ENCY">The Encyclopedia of Biological Life</a> |
     <a href="#files">Files</a> |
     <a href="#git">Git</a> |
-    <a href="#Installation">Installation</a> |
+    <a href="#installation">Installation</a> |
     <a href="#login">Login</a> |
     <a href="#logging">Logging</a> |
     <a href="#projects">Projects</a> |
-    <a href="#root">root</a> |
+    <a href="#root">Root</a> |
     <a href="#schema">Schema</a> |
     <a href="#sites">Sites</a> |
     <a href="#starman-setup">Starman Setup</a> |
     <a href="#todo">Todo</a> |
-   <a href="#workshop-management">Workshop Management</a> |<a href="#ve7tit">Ve7tit application</a> |
+    <a href="#workshop-management">Workshop Management</a> |
+    <a href="#ve7tit">Ve7tit Application</a>
+      <a href="#AI">AI Integration Plan</a>
+
 </nav>
 
-<h3 id="overview"><a href="#top">Back to top</a> </h3>
+<h3 id="overview"><a href="#top">Back to top</a></h3>
 [% INCLUDE 'Documentation/Overview.tt' %]
+<h3 id=AI"><a href="#top">Back to top</a></h3>
+[% INCLUDE 'Documentation/AI.tt' %]
 
-<h3 id="dbi"><a href="#top">Back to top</a> </h3>
+<h3 id="dbi"><a href="#top">Back to top</a></h3>
 [% INCLUDE 'Documentation/DBIDocument.tt' %]
-<h3 id="bmaster"><a href="#top">Back to top</a> </h3>
-[% INCLUDE 'Documentation/BMaster.tt' %]
-<h3 id="document-management"><a href="#top">Back to top</a> </h3>
-[% INCLUDE 'Documentation/DocumentManagement.tt' %]
-<h3 id="git"><a href="#top">Back to top</a> </h3>
-[% INCLUDE 'Documentation/Git.tt' %]
-<h3 id="files"><a href="#top">Back to top</a> </h3>
-[% INCLUDE 'Documentation/Files.tt' %]<h3 id="Installation"><a href="#top">Back to top</a> </h3>
-[% INCLUDE 'Documentation/Instalation.tt' %]
 
-<h3 id="login"><a href="#top">Back to top</a> </h3>
+<h3 id="bmaster"><a href="#top">Back to top</a></h3>
+[% INCLUDE 'Documentation/BMaster.tt' %]
+
+<h3 id="document-management"><a href="#top">Back to top</a></h3>
+[% INCLUDE 'Documentation/DocumentManagement.tt' %]
+
+<h3 id="ENCY"><a href="#top">Back to top</a></h3>
+[% INCLUDE 'Documentation/ENCYController.tt' %]
+[% INCLUDE 'Documentation/ENCYModel.tt' %]
+
+<h3 id="files"><a href="#top">Back to top</a></h3>
+[% INCLUDE 'Documentation/Files.tt' %]
+
+<h3 id="git"><a href="#top">Back to top</a></h3>
+[% INCLUDE 'Documentation/Git.tt' %]
+
+<h3 id="installation"><a href="#top">Back to top</a></h3>
+[% INCLUDE 'Documentation/Installation.tt' %]
+
+<h3 id="login"><a href="#top">Back to top</a></h3>
 [% INCLUDE 'Documentation/Login.tt' %]
 
-
-
-<h3 id="projects"><a href="#top">Back to top</a> </h3>
+<h3 id="projects"><a href="#top">Back to top</a></h3>
 [% INCLUDE 'Documentation/Projects.tt' %]
 
-<h3 id="logging"><a href="#top">Back to top</a> </h3>
+<h3 id="logging"><a href="#top">Back to top</a></h3>
 [% INCLUDE 'Documentation/Logging.tt' %]
-<h3 id="root"><a href="#top">Back to top</a> </h3>
+
+<h3 id="root"><a href="#top">Back to top</a></h3>
 [% INCLUDE 'Documentation/Root.tt' %]
-<h3 id="schema"><a href="#top">Back to top</a> </h3>
+
+<h3 id="schema"><a href="#top">Back to top</a></h3>
 [% INCLUDE 'Documentation/Schema.tt' %]
-<h3 id="sites"><a href="#top">Back to top</a> </h3>
+
+<h3 id="sites"><a href="#top">Back to top</a></h3>
 [% INCLUDE 'Documentation/Sites.tt' %]
-<h3 id="starman-setup"><a href="#top">Back to top</a> </h3>[% INCLUDE 'Documentation/Starman.tt' %]
-<h3 id="todo"><a href="#top">Back to top</a> </h3>
+
+<h3 id="starman-setup"><a href="#top">Back to top</a></h3>
+[% INCLUDE 'Documentation/Starman.tt' %]
+
+<h3 id="todo"><a href="#top">Back to top</a></h3>
 [% INCLUDE 'Documentation/Todo.tt' %]
-<h3 id="workshop-management"><a href="#top">Back to top</a> </h3>
+
+<h3 id="workshop-management"><a href="#top">Back to top</a></h3>
 [% INCLUDE 'Documentation/WorkShops.tt' %]
-<h3 id="ve7tit"><a href="#top">Back to top</a> </h3>
+
+<h3 id="ve7tit"><a href="#top">Back to top</a></h3>
 [% INCLUDE 'Documentation/Ve7tit.tt' %]
+
+<h2>Instructions for Developers</h2>
+<p>Welcome to the Comserv Application Documentation. Here are some guidelines and best practices to keep in mind while working with this project:</p>
+<ul>
+    <li><strong>Naming Conventions:</strong> Follow the existing naming conventions for consistency. If you encounter any deviations, normalize them to maintain uniformity.</li>
+    <li><strong>Code Quality:</strong> Ensure that all code is well-documented and adheres to the project's coding standards. Use meaningful variable and function names to enhance readability and maintainability.</li>
+    <li><strong>Error Handling:</strong> Implement robust error handling in all subroutines to ensure the application behaves predictably under unexpected conditions.</li>
+    <li><strong>To-Do List:</strong> If you identify any issues or potential improvements in the code, add them to the 'Todo' section of this documentation.</li>
+    <li><strong>Code Reviews:</strong> Submit your code for review by peers to catch potential issues early and ensure adherence to best practices.</li>
+</ul>
+
+<p>We are committed to evolving the Comserv application to meet the needs of our users. Please contribute by keeping this documentation up to date and following the guidelines provided.</p>
+
+<p><a href="#top">Back to top</a></p>

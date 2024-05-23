@@ -11,6 +11,7 @@ sub base :Chained('/') :PathPart('BMaster') :CaptureArgs(0) {
     # You can put common setup code here if needed
 }
 sub index :Path('/BMaster') :Args(0) {
+
     my ( $self, $c ) = @_;
     $c->stash(template => 'BMaster/BMaster.tt');
     #$c->forward($c->view('TT'));

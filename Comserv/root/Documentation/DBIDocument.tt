@@ -1,108 +1,26 @@
-[% PageVersion = 'Documentation/DBIDocument.tt,v 0.01 2024/01/28 Shanta Exp shanta ' %]
+[% PageVersion = 'Documentation/DBIDocument.tt,v 0.02 2024/05/22 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
     [%# "Debugging HostName: " _ HostName %]
     [%# INCLUDE 'debug.tt' %]
 [% END %]
 
-    <h1>DBI and DBIx::Class Setup</h1>
-    <h2>DBI Setup</h2>
-    <p>
-        DBI (Database Independent Interface) is a database access module for the Perl programming language. It defines a set of methods, variables, and conventions that provide a consistent database interface, independent of the actual database being used.
-    </p>
-<p>In the `Comserv::Controller::Admin` module, DBI is used to execute SQL queries directly. The DBI handle is retrieved from the model and used to prepare and execute SQL statements.</p>
-
-<p>In your code, DBI is used in the _build_dbh method to establish a database connection. The method takes a Catalyst context object and a database name as arguments. It retrieves the database connection information from the dbi_info attribute, which is a hash reference containing the connection details for each database. The method then uses DBI->connect to establish a connection to the specified database.
-</p>
-    <h2>DBIx::Class Setup</h2>
-    <p>
-        DBIx::Class (often referred to as DBIC) is an Object-Relational Mapping (ORM) module for Perl. It provides an intuitive and flexible API for database-related operations.
-    </p>
-<p>In your code, DBIx::Class is used to define a Catalyst model that interacts with the database. The model extends Catalyst::Model::DBIC::Schema, which integrates DBIx::Class with Catalyst.</p>
-<p>The schema_class configuration option is used to specify the DBIx::Class schema class for each database. The connect_info configuration option is a subroutine that returns the connection information for the corresponding database from the dbi_info attribute.</p>
+<h1>DBI Setup</h1>
+<p>DBI (Database Independent Interface) is a database access module for the Perl programming language. It defines a set of methods, variables, and conventions that provide a consistent database interface, independent of the actual database being used.</p>
+<p>In the `Comserv::Model::DBEncy` and `Comserv::Model::DBForager` modules, DBI is used to establish connections to the respective MySQL databases ('Ency' and 'Forager').</p>
+<p>The database connection information for each module is retrieved from a JSON file named 'db_config.json', which contains details such as the database name, host, port, username, and password.</p>
+<p>The `_build_dbh` method in each module is responsible for establishing the database connection using the DBI->connect method.</p>
 
 <h2>Database Operations</h2>
-    <p>
-        The module provides several methods for performing database operations, such as get_tables, get_fields, get_record_by_id, delete_record_by_id, modify_record_by_id, get_filtered_schema_info, get_database_contents, get_databases, get_table_structure, get_user_by_username, hash_password, check_password, change_password, create_or_update_schema, shanta_forager_schema, and get_links.
-    </p>
-<p>
-    The `Comserv::Controller::Admin` module provides several methods for performing database operations. These methods use either DBI or DBIx::Class to interact with the database, depending on the specific operation.
-</p>
-<p> These methods use either DBI or DBIx::Class to interact with the database, depending on the specific operation. For example, get_tables and get_fields use DBI to execute raw SQL queries, while get_record_by_id and change_password use DBIx::Class to interact with the database in a more abstract and Perl-friendly way.
-</p>
-    <h2>Debugging</h2>
-    <p>
-        The code includes extensive debugging output, with print statements showing the progress of the execution and the values of important variables. This can be very helpful for troubleshooting problems with the database operations.
-    </p>
-    <h2>Security</h2>
-    <p>
-        The code uses the Digest::SHA module to hash passwords, providing a basic level of security for password storage. The hash_password and check_password methods are used for this purpose.
-    </p>
-    <h2>Configuration</h2>
-    <p>
-        The database connection information is stored in a JSON file, which is read by the dbi_info attribute's default subroutine. This allows the database configuration to be changed without modifying the code.
-    </p>
-    <h2>Catalyst Integration</h2>
-    <p>
-        The module is designed to be used as a model in a Catalyst application. It uses the Catalyst context object ($c) to access session data and other Catalyst features.
-    </p>
+<p>The `DBEncy` and `DBForager` modules provide methods for performing various database operations specific to their respective MySQL databases.</p>
 
-<h2>Comserv.pm</h2>
-<p>
-    `Comserv.pm` is the main module of your Catalyst application. It's where you configure the application and set up things like the model, view, and controller components. It also includes a debug log method for logging debug messages, and a setup method for setting up the application.
-</p>
+<h2>Debugging</h2>
+<p>The code includes extensive debugging output, with print statements showing the progress of execution and the values of important variables. This can be very helpful for troubleshooting problems with database operations.</p>
 
-<h2>Schema Files</h2>
-<p>
-  <h1>Subroutines using DBI or DBIx::Class</h1>
+<h2>Security</h2>
+<p>The code employs security measures such as hashing passwords using the Digest::SHA module to ensure secure password storage.</p>
 
-<h2>In Comserv::Controller::Admin.pm</h2>
-<ul>
-    <li>index</li>
-    <li>aauto</li>
-    <li>add</li>
-    <li>create</li>
-    <li>insert_into_project_table</li>
-    <li>select_tables</li>
-    <li>old_todo_add</li>
-    <li>list_databases</li>
-    <li>old_todo</li>
-    <li>details</li>
-    <li>modify</li>
-</ul>
+<h2>Catalyst Integration</h2>
+<p>The `DBEncy` and `DBForager` modules are designed to be used as models in a Catalyst application. They utilize the Catalyst context object ($c) to access session data and other Catalyst features.</p>
 
-<h2>In Comserv::Model::DB.pm</h2>
-<ul>
-    <li>_build_dbh</li>
-</ul>
-  <h2>In Comserv::Model::ToDo.pm</h2>
-<ul>
-    <li>get_sorted_tasks</li>
-    <li>get_task_details</li>
-    <li>save_task_details</li>
-    <li>get_relevant_tables</li>
-    <li>generate_record_id</li>
-</ul>
-    <h1>Subroutines in Comserv::Controller::Root.pm</h1>
-    <ul>
-        <li>stash_dump</li>
-        <li>index</li>
-        <li>auto</li>
-        <li>css_form</li>
-        <li>debug</li>
-        <li>display_schema</li>
-        <li>get_tables</li>
-        <li>multi_site</li>
-        <li>show_tables_post</li>
-        <li>search_schema</li>
-        <li>display_sorted_tables</li>
-        <li>generate_new_key</li>
-        <li>default</li>
-        <li>setup</li>
-    </ul>
-
-    <h1>Subroutines in Comserv::Controller::Project.pm</h1>
-    <ul>
-        <li>aauto</li>
-        <li>add</li>
-    </ul>
+<p>For more information on how AI can enhance the functionalities of the DBI module, refer to the <a href="#AI">AI Integration Plan</a>.</p>

@@ -210,18 +210,20 @@ sub site_setup {
     $SiteName = $c->session->{SiteName};
     # Log the SiteName
     $c->log->debug("SiteName: $SiteName");
-
+    $c->log->debug("SiteName: $SiteName");  # Add this line
     # Fetch the site details from the Site model using the SiteName
     my $site = $c->model('Site')->get_site_details_by_name($SiteName);
-
+    $c->log->debug(__PACKAGE__ . " . (split '::', __SUB__)[-1] . \" line \" . __LINE__ . \": SiteName in site_setup: = $SiteName\n");
     my $css_view_name;
 
     if (defined $site) {
         $css_view_name = $site->css_view_name;
+
     } else {
         # Handle the case when the site is not found
         # For example, you can set a default value or throw an error
-        $css_view_name = '/static/css/default.css';
+        $css_view_name = '/static/css/default.css'
+
     }
 
     my $site_display_name = $site ? $site->site_display_name : 'none';
