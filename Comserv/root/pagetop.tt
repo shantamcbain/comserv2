@@ -7,7 +7,7 @@
 [% END %]
 <header>
     <!-- Site Greeting -->
-<h1>Welcome to [% c.stash.site_display_name  %]</h1>
+<h1>Welcome to [% c.stash.ScriptDisplayName  %]</h1>
 <!-- Main Menu.pm -->    <nav>
         <ul class="horizontal-menu">
             <li class="horizontal-dropdown">

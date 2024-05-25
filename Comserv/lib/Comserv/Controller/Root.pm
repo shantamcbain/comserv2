@@ -13,9 +13,12 @@ sub index :Path :Args(0) {
     my ($self, $c) = @_;
 
     $c->log->debug('Entered index action in Root.pm');
-
+    $c->log->debug('About to fetch SiteName from session');
     my $SiteName = $c->session->{SiteName};
     my $ControllerName = $c->session->{SiteName};
+    # Add a logging statement here
+    $c->log->debug("Fetched SiteName from session: $SiteName");
+    $c->log->debug("Fetched ControllerName from session: $ControllerName");
 
     print "ControllerName in index: = $ControllerName\n";
     $c->log->debug("ControllerName in index: = $ControllerName\n");
@@ -44,11 +47,13 @@ sub index :Path :Args(0) {
 sub auto :Private {
     my ($self, $c) = @_;
 
+    # Keep the code to remove the port from the domain
     my $domain = $c->req->base->host;
     $domain =~ s/:.*//;
 
     my $site_domain = $c->model('Site')->get_site_domain($domain);
-$c->log->debug(__PACKAGE__ . " . (split '::', __SUB__)[-1] . \" line \" . __LINE__ . \": site_domain in auto = $site_domain");
+    $c->log->debug(__PACKAGE__ . " . (split '::', __SUB__)[-1] . \" line \" . __LINE__ . \": site_domain in auto = $site_domain");
+
     if ($site_domain) {
         # If a SiteName is found, store it in the session and stash
         my $site_id = $site_domain->site_id;
@@ -63,10 +68,19 @@ $c->log->debug(__PACKAGE__ . " . (split '::', __SUB__)[-1] . \" line \" . __LINE
         # If no SiteName is found, call fetch_and_set method to handle this
         my $SiteName = $self->fetch_and_set($c, 'site');
         $c->log->debug(__PACKAGE__ . " . (split '::', __SUB__)[-1] . \" line \" . __LINE__ . \": SiteName in auto = $SiteName");
-        $self->site_setup($c, $SiteName);
+
+        # If the domain is not in the table, use the default home page of index.tt
+        if (!defined $SiteName) {
+            $c->stash(template => 'index.tt');
+            $c->forward($c->view('TT'));
+            return 0; # Stop further processing of this request
+        }
     }
 
+    # Call site_setup regardless of whether SiteName is found or not
+    $self->site_setup($c, $c->session->{SiteName});
 
+    # Continue with the rest of the auto method as before
     $c->log->debug('Entered auto action in Root.pm');
 
     my $schema = $c->model('DBEncy');
@@ -76,8 +90,6 @@ $c->log->debug(__PACKAGE__ . " . (split '::', __SUB__)[-1] . \" line \" . __LINE
 
     # Call fetch_and_set method
     my $SiteName = $self->fetch_and_set($c, $schema, 'site');
- #   $c->log->debug("SiteName in auto: = $SiteName\n");
-
 
     unless ($c->session->{group}) {
         $c->session->{group} = 'normal';
@@ -114,6 +126,7 @@ $c->log->debug(__PACKAGE__ . " . (split '::', __SUB__)[-1] . \" line \" . __LINE
         # Store the session value in the stash
         $c->stash->{page} = $c->session->{page};
     }
+
     # Fetch the list of todos from the database
 
     # Set the HostName in the stash
@@ -127,7 +140,7 @@ $c->log->debug(__PACKAGE__ . " . (split '::', __SUB__)[-1] . \" line \" . __LINE
     # Store the todos in the stash
     $c->stash(todos => $todos);
 
-      # In your Comserv::Controller::Root controller
+    # In your Comserv::Controller::Root controller
     if (ref($c) eq 'Catalyst::Context') {
         my @main_links = $c->model('DB')->get_links($c, 'Main');
         my @login_links = $c->model('DB')->get_links($c, 'Login');
@@ -143,7 +156,6 @@ $c->log->debug(__PACKAGE__ . " . (split '::', __SUB__)[-1] . \" line \" . __LINE
             member_links => \@member_links,
         );
     }
-
 
     # Continue processing the rest of the request
     return 1;
@@ -203,38 +215,36 @@ sub fetch_and_set {
 
     return $value;
 }
-
 sub site_setup {
-    my ($self, $c, $SiteName) = @_;
+    my ($self, $c) = @_;
+    my $SiteName = $c->session->{SiteName};
 
-    $SiteName = $c->session->{SiteName};
-    # Log the SiteName
-    $c->log->debug("SiteName: $SiteName");
-    $c->log->debug("SiteName: $SiteName");  # Add this line
-    # Fetch the site details from the Site model using the SiteName
-    my $site = $c->model('Site')->get_site_details_by_name($SiteName);
-    $c->log->debug(__PACKAGE__ . " . (split '::', __SUB__)[-1] . \" line \" . __LINE__ . \": SiteName in site_setup: = $SiteName\n");
-    my $css_view_name;
-
-    if (defined $site) {
-        $css_view_name = $site->css_view_name;
-
-    } else {
-        # Handle the case when the site is not found
-        # For example, you can set a default value or throw an error
-        $css_view_name = '/static/css/default.css'
-
+    unless (defined $SiteName) {
+        $c->log->debug("SiteName is not defined in the session");
+        return;
     }
 
-    my $site_display_name = $site ? $site->site_display_name : 'none';
-    my $mail_to_admin = $site ? $site->mail_to_admin : 'none';
+    $c->log->debug("SiteName: $SiteName");
+
+    my $site = $c->model('Site')->get_site_details_by_name($SiteName);
+
+    unless (defined $site) {
+        $c->log->debug("No site found for SiteName: $SiteName");
+        return;
+    }
+
+    # Add debug logging for the site object
+    $c->log->debug("Found site: " . Dumper($site));
+
+    my $css_view_name = $site->css_view_name || '/static/css/default.css';
+    my $site_display_name = $site->site_display_name || 'none';
+    my $mail_to_admin = $site->mail_to_admin || 'none';
+    my $mail_replyto = $site->mail_replyto || 'helpdesk.computersystemconsulting.ca';
 
     $c->stash->{ScriptDisplayName} = $site_display_name;
     $c->stash->{css_view_name} = $css_view_name;
     $c->stash->{mail_to_admin} = $mail_to_admin;
-    $c->stash->{mail_replyto} = $site->mail_replyto || 'helpdesk.computersystemconsulting.ca';
-
-    my $page = $c->req->param('page');
+    $c->stash->{mail_replyto} = $mail_replyto;
 
     $c->stash(
         default_css => $c->uri_for($c->stash->{css_view_name} || '/static/css/default.css'),

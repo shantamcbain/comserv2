@@ -1,30 +1,193 @@
-[% PageVersion = 'Documentation/Sites.tt,v 0.01 2024/01/28 Shanta Exp shanta ' %]
+[% PageVersion = 'Documentation/Sites.tt,v 0.02 2024/05/23 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
     [%# "Debugging HostName: " _ HostName %]
     [%# INCLUDE 'debug.tt' %]
 [% END %]
-<h1>Sites</h1>
-<p>
-   We will be hosting a number of sites on our server.  We will be hosting sites for our clients, and we will also be hosting sites for our own use.
-    Sodo code for this might look like this:
-    1. get the domain store it in the session HostName it is stored in the http://shanta.local:3000/ formate.
-    2. The HostName will be used to set the SiteName.
-    3. The table that maps the HostName to the SiteName is in the sitedomain table. DomainName is the domain field and the SiteName is the site_id field. The domain is stored in the shanta.local formate.
-    4. the site_id field is used to set find the site int the sites table.
-    5. THe site table contains the site setup details. which we use to set the site parameters such as the site controller. css view name and site display name, email address etc.
-    6. The site controller is used to set the site specific routes.
 
+
+<h1 id="site-top">Sites</h1>
+<nav>
+    <ul>
+        <li><a href="#site-overview">Overview</a></li>
+        <li><a href="#site-route-auto-setup">Route Auto Setup</a></li>
+        <li><a href="#site-fetch-and-set">Fetching and Setting Site Configuration</a></li>
+        <li><a href="#site-setup">Site Setup</a></li>
+        <li><a href="#site-improvements">Suggestions for Improvement</a></li>
+        <li><a href="#top">Back to top</a></li>
+    </ul>
+</nav>
+
+
+
+<p>
+    This document provides a detailed explanation of how we manage hosting multiple sites on our server. We will be hosting sites for our clients as well as for our own use. The following steps outline the process of mapping domain names to site configurations and setting up site-specific routes.
+</p>
+<<h2 id="site-overview"><a href="#site-top">Overview of the Process</a></h2>
+<p>
+
+</p>p>
+    **Overview of the Process:**
+    1. **Retrieve Domain Name:** Extract the domain name from the request and store it in the session as `HostName`. The domain name is typically in the format `http://shanta.local:3000/`.
+    2. **Set Site Name:** Use the `HostName` to determine the `SiteName`.
+    3. **Domain-Site Mapping:** The mapping between `HostName` and `SiteName` is stored in the `sitedomain` table. The `DomainName` field stores the domain, and the `SiteName` field stores the corresponding site ID.
+    4. **Site Details Retrieval:** Use the `site_id` from the `sitedomain` table to fetch site setup details from the `sites` table. This includes parameters such as the site controller, CSS view name, site display name, email address, etc.
+    5. **Site Controller Setup:** The site controller is responsible for setting site-specific routes.
 </p>
 
-In route auto we will use the acquired SiteName to search the site table for the record that matches the SiteName.
-We will then use the SiteName to set the site controller.
-The site controller will then be used to set the site specific routes.
-The site specific routes will be used to return the site specific pages to the user.
-For example beemaster.ca/ would return the home page for beemaster.ca as defined in the BMaster controller.
-The site table record contains key information about the site.  The site table record will contain the following
-fields:  the first two we want to put will be the css_view_name site_display_name these values need to be placed in
-the session to set the DefaultVariables.tt for use by all other tt. in the application.
-we need to set the home page of the application based on the value in home_view in the site table. This value will set the default home page for the site. for the most part it will be a controller of the same name.  The home page will be set in the site controller.
+<p>
+    **Detailed Explanation:**
+    The following sections explain the code used to implement the above steps, highlighting the purpose of each part and suggesting improvements.
+</p>
 
-root auto will use the site model to check if the domain i in the sitedomain table. If it is it will set the SiteName in the session.  It will then use the SiteName to set the site controller.  The site controller will then be used to set the site specific routes.  The site specific routes will be used to return the site specific pages to the user.  For example beemaster.ca/ would return the home page for beemaster.ca as defined in the BMaster controller.
+
+
+<h2 id="site-route-auto-setup"><a href="#site-top">Route Auto Setup</a></h2>
+
+<p>
+    In the `auto` subroutine of the `Root` controller, the following operations are performed to set up the site-specific configurations.
+</p>
+
+```perl
+sub auto :Private {
+    my ($self, $c) = @_;
+
+    # Extract the domain name from the request and remove the port number
+    my $domain = $c->req->base->host;
+    $domain =~ s/:.*//;
+
+    # Retrieve the site domain record from the 'Site' model
+    my $site_domain = $c->model('Site')->get_site_domain($domain);
+    $c->log->debug("site_domain in auto: $site_domain");
+
+    if ($site_domain) {
+        # If a SiteName is found, store it in the session and stash
+        my $site_id = $site_domain->site_id;
+        my $site = $c->model('Site')->get_site_details($site_id);
+
+        if ($site) {
+            my $SiteName = $site->name;
+            $c->stash->{SiteName} = $SiteName;
+            $c->session->{SiteName} = $SiteName;
+        }
+    } else {
+        # Handle cases where no SiteName is found
+        my $SiteName = $self->fetch_and_set($c, 'site');
+        $self->site_setup($c, $SiteName);
+    }
+
+    # Set up universal variables
+    # Example: setting the 'group' session variable if not already set
+    unless ($c->session->{group}) {
+        $c->session->{group} = 'normal';
+    }
+
+    # Handle the 'debug' parameter for debugging purposes
+    my $debug_param = $c->req->param('debug');
+    if (defined $debug_param) {
+        if ($c->session->{debug_mode} ne $debug_param) {
+            $c->session->{debug_mode} = $debug_param;
+            $c->stash->{debug_mode} = $debug_param;
+        }
+    } elsif (defined $c->session->{debug_mode}) {
+        $c->stash->{debug_mode} = $c->session->{debug_mode};
+    }
+
+    # Handle the 'page' parameter
+    my $page = $c->req->param('page');
+    if (defined $page) {
+        if ($c->session->{page} ne $page) {
+            $c->session->{page} = $page;
+            $c->stash->{page} = $page;
+        }
+    } elsif (defined $c->session->{page}) {
+        $c->stash->{page} = $c->session->{page};
+    }
+
+    # Set the HostName in the stash
+    $c->stash->{HostName} = $c->request->base;
+
+    # Continue processing the rest of the request
+    return 1;
+}
+<h2 id="site-fetch-and-set"><a href="#site-top">Fetching and Setting Site Configuration</a></h2>
+
+<p>
+    The `fetch_and_set` subroutine is used to handle cases where the SiteName is not directly found. This subroutine checks various sources to determine the SiteName and sets session and stash variables accordingly.
+</p>
+sub fetch_and_set {
+    my ($self, $c, $param) = @_;
+
+    my $value = $c->req->query_parameters->{$param};
+
+    $c->log->debug("in fetch_and_set: $value");
+
+    if (defined $value) {
+        $c->stash->{SiteName} = $value;
+        $c->session->{SiteName} = $value;
+    } elsif (defined $c->session->{SiteName}) {
+        $c->stash->{SiteName} = $c->session->{SiteName};
+    } else {
+        my $domain = $c->req->base->host;
+        $domain =~ s/:.*//;
+
+        my $site_domain = $c->model('Site')->get_site_domain($domain);
+        $c->log->debug("fetch_and_set site_domain: $site_domain");
+
+        if ($site_domain) {
+            my $site_id = $site_domain->site_id;
+            my $site = $c->model('Site')->get_site_details($site_id);
+
+            if ($site) {
+                $value = $site->name;
+                $c->stash->{SiteName} = $value;
+                $c->session->{SiteName} = $value;
+                $c->session->{SiteDisplayName} = $site->site_display_name;
+                $c->session->{ControllerName} = $site->home_view;
+            }
+        } else {
+            $c->session->{SiteName} = 'none';
+            $c->stash->{SiteName} = 'none';
+        }
+    }
+
+    return $value;
+}
+<h2 id="site-setup"><a href="#site-top">Site Setup</a></h2>
+<p>
+    The `site_setup` subroutine configures the site-specific settings using the `SiteName`. This involves setting up various view parameters and default values.
+</p>
+sub site_setup {
+    my ($self, $c, $SiteName) = @_;
+
+    $SiteName = $c->session->{SiteName};
+    $c->log->debug("SiteName in site_setup: $SiteName");
+
+    my $site = $c->model('Site')->get_site_details_by_name($SiteName);
+    $c->log->debug("SiteName in site_setup: $SiteName");
+
+    my $css_view_name = $site ? $site->css_view_name : '/static/css/default.css';
+    my $site_display_name = $site ? $site->site_display_name : 'none';
+    my $mail_to_admin = $site ? $site->mail_to_admin : 'none';
+
+    $c->stash->{ScriptDisplayName} = $site_display_name;
+    $c->stash->{css_view_name} = $css_view_name;
+    $c->stash->{mail_to_admin} = $mail_to_admin;
+    $c->stash->{mail_replyto} = $site->mail_replyto || 'helpdesk.computersystemconsulting.ca';
+
+    $c->stash(
+        default_css => $c->uri_for($c->stash->{css_view_name} || '/static/css/default.css'),
+        menu_css => $c->uri_for('/static/css/menu.css'),
+        log_css => $c->uri_for('/static/css/log.css'),
+        todo_css => $c->uri_for('/static/css/todo.css'),
+    );
+}
+<h2 id="site-improvements"><a href="#site-top">Suggestions for Improvement</a></h2>
+<ul>
+    <li>**Error Handling:** Ensure robust error handling throughout the process, particularly in the subroutines fetching data from the database.</li>
+    <li>**Code Modularity:** Consider breaking down larger subroutines into smaller, more manageable functions to improve readability and maintainability.</li>
+    <li>**Session Management:** Ensure that session variables are consistently and correctly set and cleared as needed to prevent stale or incorrect data from affecting the user experience.</li>
+    <li>**Logging:** Enhance logging to provide more detailed and context-specific information for debugging and monitoring purposes.</li>
+    <li>**Documentation:** Keep the documentation up-to-date with code changes and provide clear instructions for new developers to understand the setup process quickly.</li>
+</ul>
+<p>We are committed to continuously improving our site setup process. Please contribute by following the guidelines provided and suggesting further enhancements.</p>

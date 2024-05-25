@@ -6,6 +6,10 @@
 [%# "Debugging HostName: " _ HostName %]
 [%# INCLUDE 'debug.tt' %]
 
+<!--
+Please ensure that all navigation links within each sub-document are unique. This includes the "Back to top" links, as well as any other navigation links present. Each link should be specific to the content within that particular sub-document to enhance clarity and organization within the documentation.
+-->
+
 <h1 id="top">Comserv Application Documentation</h1>
 
 <nav>
@@ -26,66 +30,66 @@
     <a href="#starman-setup">Starman Setup</a> |
     <a href="#todo">Todo</a> |
     <a href="#workshop-management">Workshop Management</a> |
-    <a href="#ve7tit">Ve7tit Application</a>
-      <a href="#AI">AI Integration Plan</a>
-
+    <a href="#ve7tit">Ve7tit Application</a> |
+    <a href="#AI">AI Integration Plan</a>
 </nav>
 
-<h3 id="overview"><a href="#top">Back to top</a></h3>
+<h3 id="overview"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Overview.tt' %]
-<h3 id=AI"><a href="#top">Back to top</a></h3>
+
+<h3 id="AI"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/AI.tt' %]
 
-<h3 id="dbi"><a href="#top">Back to top</a></h3>
+<h3 id="dbi"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/DBIDocument.tt' %]
 
-<h3 id="bmaster"><a href="#top">Back to top</a></h3>
+<h3 id="bmaster"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/BMaster.tt' %]
 
-<h3 id="document-management"><a href="#top">Back to top</a></h3>
+<h3 id="document-management"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/DocumentManagement.tt' %]
 
-<h3 id="ENCY"><a href="#top">Back to top</a></h3>
+<h3 id="ENCY"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/ENCYController.tt' %]
 [% INCLUDE 'Documentation/ENCYModel.tt' %]
 
-<h3 id="files"><a href="#top">Back to top</a></h3>
+<h3 id="files"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Files.tt' %]
 
-<h3 id="git"><a href="#top">Back to top</a></h3>
+<h3 id="git"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Git.tt' %]
 
-<h3 id="installation"><a href="#top">Back to top</a></h3>
+<h3 id="installation"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Installation.tt' %]
 
-<h3 id="login"><a href="#top">Back to top</a></h3>
+<h3 id="login"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Login.tt' %]
 
-<h3 id="projects"><a href="#top">Back to top</a></h3>
+<h3 id="projects"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Projects.tt' %]
 
-<h3 id="logging"><a href="#top">Back to top</a></h3>
+<h3 id="logging"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Logging.tt' %]
 
-<h3 id="root"><a href="#top">Back to top</a></h3>
+<h3 id="root"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Root.tt' %]
 
-<h3 id="schema"><a href="#top">Back to top</a></h3>
+<h3 id="schema"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Schema.tt' %]
 
-<h3 id="sites"><a href="#top">Back to top</a></h3>
+<h3 id="sites"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Sites.tt' %]
 
-<h3 id="starman-setup"><a href="#top">Back to top</a></h3>
+<h3 id="starman-setup"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Starman.tt' %]
 
-<h3 id="todo"><a href="#top">Back to top</a></h3>
+<h3 id="todo"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Todo.tt' %]
 
-<h3 id="workshop-management"><a href="#top">Back to top</a></h3>
+<h3 id="workshop-management"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/WorkShops.tt' %]
 
-<h3 id="ve7tit"><a href="#top">Back to top</a></h3>
+<h3 id="ve7tit"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Ve7tit.tt' %]
 
 <h2>Instructions for Developers</h2>
@@ -100,4 +104,4 @@
 
 <p>We are committed to evolving the Comserv application to meet the needs of our users. Please contribute by keeping this documentation up to date and following the guidelines provided.</p>
 
-<p><a href="#top">Back to top</a></p>
+<p><a href="#top">Back to top of Documentation</a></p>

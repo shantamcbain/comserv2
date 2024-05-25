@@ -3,18 +3,18 @@ use Moose;
 use namespace::autoclean;
 use DateTime;
 use DateTime::Event::Recurrence;
-use Comserv::Model::BMaster;
+use Comserv::Model::BMasterModel;
 BEGIN { extends 'Catalyst::Controller'; }
 sub base :Chained('/') :PathPart('BMaster') :CaptureArgs(0) {
     my ($self, $c) = @_;
     # This will be the root of the chained actions
     # You can put common setup code here if needed
 }
-sub index :Path('/BMaster') :Args(0) {
+sub index :Chained('base') :Path('') :Args(0) {
 
     my ( $self, $c ) = @_;
     $c->stash(template => 'BMaster/BMaster.tt');
-    #$c->forward($c->view('TT'));
+    $c->forward($c->view('TT'));
 }
 
 sub generate_month_dates {
