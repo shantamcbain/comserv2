@@ -1,0 +1,55 @@
+
+
+
+
+
+</div>
+<div ALIGN="center">
+<A NAME="PageTop"></A>
+</div>
+
+<p>We are looking for volunteers to help ups develop this database. Your help is greatly needed and appreciated. We are looking to add pictures of pollen to the system so one can get a picture of what plants the bees are collecting from the environment. This will help users to find out what plants are in the are of the hive. How many. This data is vary useful in planing plantings to provide forager over the course of the year. Of course this is limited to plants bees use for pollen not necessary for honey production.
+
+<p>We are also looking to add data on the effects of pollen's on the bees health. A spin off of this is the medicinal use for human and other animals.
+     
+        <h2>Bee forage plants by Botanical name.</h2>
+      
+      
+      <form action="/cgi-bin/ENCY/herbs.cgi?site=[% SiteName %]&[% session_string %]" METHOD =" POST"> 
+<font FACE =" " SIZE =" 2"> 
+Search our herbal Database 
+        <input TYPE="TEXT"   NAME="simple_search_string"
+               VALUE=""> 
+<input TYPE="HIDDEN" NAME="display_simple_search_results"
+               VALUE =" on"> 
+<input TYPE="SUBMIT" NAME="display_simple_search_results"
+               VALUE ="       Go        "> 
+</font> 
+
+ 
+</form> 
+
+ <p>Diverse Bee pasture is the key to healthy bees
+
+[% FOREACH link IN herbal_data %]
+    <tr>
+        <td>
+            <i>[% link.botanical_name %]</i><br>
+            Common Name: [% link.common_names %]<br>
+            Forage: [% link.apis %]<br>
+            Nectar: [% link.nectar %]<br>
+            Pollen: [% link.pollen %]<br>
+           <a href="/ENCY/herb_detail/[% link.record_id %]" name="Contact" title="details "><font class="LeftSideBarNavStyle">Details</font></a>
+            [% IF group == "Apis_admin" %] <a href="/cgi-bin/ENCY/herbs_admin.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;&display_details_view.x&record_id=[% link.record_id %]" name="Contact" target="[% link.target %]" title="details "><font class="LeftSideBarNavStyle">Admin</font></a> [% END %]
+        </td>
+        <td>
+            <img src="[% link.image %]" WIDTH="300" HEIGHT="325" />
+        </td>
+    </tr>
+[% END %]
+      
+ <a href="http://helpdesk.computersystemconsulting.ca/cgi-bin/index.cgi?site=[% SiteName %]" target="_Blank" > HelpDesk</a>
+
+[%# embed('CSCCopyRight') %]
+[% embed(data.page_bottom_view) %]
+

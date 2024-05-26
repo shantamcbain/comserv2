@@ -1,0 +1,111 @@
+[% ViewVersion = 'v 1.21 2022/08/28 /cgi-bin/HTMLTemplates/ENCY/BotanicalNameView.ttml,'%]
+[%
+
+# the ENCY template
+#	$Id: BotanicalNameView.ttml,v 1.2 2011/09/21 19:25:15 shanta Exp $	
+#file location/cgi-bin/HTMLTemplates/ENCY
+%]
+
+
+
+
+
+[% IF data.debug == 1 %]
+ [%	ViewVersion %]
+  [% embed  ('InheretedVariablesView') %]
+[% END %]
+
+
+	[% IF username %]
+
+<h3 > Hello  [% firstname%]  [% lastname%]! Welcome to The Encyclopaedia of Biological life!</h3>
+	  
+
+	[% ELSE %]
+
+	<h3>  Hello! Welcome to The Encyclopaedia of Biological life!</h3>
+
+	[% END %]
+
+
+<div ALIGN="center">
+<A NAME="PageTop"></A>
+</div>
+     
+        <h2>Herbs by Botanical name.</h2>
+    
+      
+      <form action="/cgi-bin/ENCY/herbs.cgi?site=[% SiteName%]&[% session_string %]" METHOD =" POST"> 
+<font FACE =" " SIZE =" 2"> 
+Search our herbal Database 
+        <input TYPE="TEXT"   NAME="simple_search_string"
+               VALUE=""> 
+<input TYPE="HIDDEN" NAME="display_simple_search_results"
+               VALUE =" on"> 
+<input TYPE="SUBMIT" NAME="display_simple_search_results"
+               VALUE ="       Go        "> 
+</font> 
+
+ 
+</form> 
+
+<p>     <a href="/cgi-bin/index.cgi?site=[% SiteName %]&[% session_string %]&view=ForumulaView"> Formulas.</a> 
+ 
+ <p> These Herbs are in the data base. [% IF group    ==  'Alegro_admin' OR
+			       group    ==  'Apis_Admin' OR
+		          group    == 'BHN_Admin' OR
+			       group    ==  'AltPower_admin' OR
+		  	       group    ==  'Apis_Admin' OR
+			       group    ==  'AnuCollective_admin' OR
+			       group    ==  'Brew_admin' OR
+			       group    ==  'CS_admin' OR
+			       group    ==  'CSC_admin' OR
+			       group    ==  'CSPS_admin' OR
+			       group    ==  'ENCY_admin' OR
+			       group    ==  'Forager_admin' OR
+			       group    ==  'eXtropia_admin' OR
+			       group    ==  'GPMarket_admin' OR
+			       group    ==  'HE_admin' OR
+			       group    ==  'NOWD_admin' OR
+			       group    ==  'News_admin' OR
+			       group    ==  'OKB_admin'OR
+			       group    ==  'Organic_admin' OR
+			       group    ==  'Shanta_admin' OR
+			       group    ==  'VitalVic_admin' OR
+			       group    ==  'rv_admin' OR
+			       group    == 'MJB_Admin' OR
+			       group    ==  'ULC_admin' OR
+			       group    ==  'USBM_admin' OR
+			       group    ==  'WB_admin' OR
+			       group    ==  'WW_admin' OR
+			       username == 'Shanta' OR
+			      group    == 'Demo_admin'
+			 %] 
+			 <a href="/cgi-bin/ENCY/herbs_admin.cgi?site=[% SiteName %]&[% session_string %]&display_add_form=on" target="_blank" target="_blank">Add new Herb</a>
+			[% END %]
+
+<table>
+
+ [% FOREACH link IN herbal_data %]
+    <tr>
+        <td>
+            <i>[% link.botanical_name %]</i><br>
+            Common Name: [% link.common_names %]<br>
+            Forage: [% link.apis %]<br>
+            Nectar: [% link.nectar %]<br>
+            Pollen: [% link.pollen %]<br>
+           <a href="/ENCY/herb_detail/[% link.record_id %]" name="Contact" title="details "><font class="LeftSideBarNavStyle">Details</font></a>
+            [% IF group == "Apis_admin" %] <a href="/cgi-bin/ENCY/herbs_admin.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;&display_details_view.x&record_id=[% link.record_id %]" name="Contact" target="[% link.target %]" title="details "><font class="LeftSideBarNavStyle">Admin</font></a> [% END %]
+        </td>
+        <td>
+            <img src="[% link.image %]" WIDTH="300" HEIGHT="325" />
+        </td>
+    </tr>
+[% END %]
+</table>
+      
+ <a href="http://helpdesk.computersystemconsulting.ca" target="_Blank" > HelpDesk</a>
+
+[%# embed('CSCCopyRight') %]
+[% embed(data.page_bottom_view) %]
+
