@@ -39,7 +39,25 @@ sub create_reference :Local {
     # Implement the logic to display the form for creating a new reference
     $c->stash(template => 'ency/create_reference_form.tt');
 }
+sub search :Path('/ENCY/search') :Args(0) {
+    my ($self, $c) = @_;
 
+    my $search_string = $c->request->parameters->{search_string};
+
+    # Call the searchHerbs method in the DBForager model
+    my $results = $c->model('DBForager')->searchHerbs($c, $search_string);
+
+    # Stash the results for the view
+    $c->stash(herbal_data => $results);  # Changed from 'results' to 'herbal_data'
+
+    # Get the referer from the request headers
+    my $referer = $c->req->headers->referer;
+
+    # Extract the template name from the referer
+
+        $c->stash(template => 'ENCY/BotanicalNameView.tt');
+
+}
 sub get_category_by_id :Local {
     my ( $self, $c, $id ) = @_;
     # Implement the logic to display the form for getting a category by its id

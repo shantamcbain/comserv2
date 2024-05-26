@@ -54,3 +54,84 @@ sub get_herb_by_id {
     }
     return $herb;
 }
+sub searchHerbs {
+    my ($self, $c, $search_string) = @_;
+
+    # Remove leading and trailing whitespaces
+    $search_string =~ s/^\s+|\s+$//g;
+
+    # Convert to lowercase
+    $search_string = lc($search_string);
+
+    # Initialize an array to hold the debug messages
+    my @debug_messages;
+
+    # Log the search string and add it to the debug messages
+    push @debug_messages, __PACKAGE__ . " " . __LINE__ . ": Search string: $search_string";
+
+    # Get a ResultSet object for the 'Herb' table
+    my $rs = $self->schema->resultset('Herb');
+
+    # Split the search string into individual words
+    my @search_words = split(' ', $search_string);
+
+    # Initialize an array to hold the search conditions
+    my @search_conditions;
+
+    # For each search word, add a condition for each field
+    foreach my $word (@search_words) {
+        push @search_conditions, (
+            botanical_name  => { 'like', "%" . $word . "%" },
+            common_names    => { 'like', "%" . $word . "%" },
+            apis            => { 'like', "%" . $word . "%" },
+            nectar          => { 'like', "%" . $word . "%" },
+            pollen          => { 'like', "%" . $word . "%" },
+            key_name        => { 'like', "%" . $word . "%" },
+            ident_character => { 'like', "%" . $word . "%" },
+            stem            => { 'like', "%" . $word . "%" },
+            leaves          => { 'like', "%" . $word . "%" },
+            flowers         => { 'like', "%" . $word . "%" },
+            fruit           => { 'like', "%" . $word . "%" },
+            taste           => { 'like', "%" . $word . "%" },
+            odour           => { 'like', "%" . $word . "%" },
+            root            => { 'like', "%" . $word . "%" },
+            distribution    => { 'like', "%" . $word . "%" },
+            constituents    => { 'like', "%" . $word . "%" },
+            solvents        => { 'like', "%" . $word . "%" },
+            dosage          => { 'like', "%" . $word . "%" },
+            administration  => { 'like', "%" . $word . "%" },
+            formulas        => { 'like', "%" . $word . "%" },
+            contra_indications => { 'like', "%" . $word . "%" },
+            chinese         => { 'like', "%" . $word . "%" },
+            non_med         => { 'like', "%" . $word . "%" },
+            harvest         => { 'like', "%" . $word . "%" },
+            reference       => { 'like', "%" . $word . "%" },
+        );
+    }
+
+    # Perform the search in the database
+    my @results;
+    eval {
+        @results = $rs->search({ -or => \@search_conditions });
+    };
+    if ($@) {
+        my $error = $@;
+        push @debug_messages, __PACKAGE__ . " " . __LINE__ . ": Error searching herbs: $error";
+        $c->stash(error_msg => "Error searching herbs: $error");
+        return;
+    }
+
+    # Log the number of results and add it to the debug messages
+    push @debug_messages, __PACKAGE__ . " " . __LINE__ . ": Number of results: " . scalar @results;
+
+    # Add the debug messages to the stash
+    $c->stash(debug_msg => \@debug_messages);
+
+    return \@results;
+}
+
+sub trim {
+    my $s = shift;
+    $s =~ s/^\s+|\s+$//g;
+    return $s;
+}

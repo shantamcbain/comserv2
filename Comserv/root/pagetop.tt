@@ -4,6 +4,12 @@
     [% PageVersion %]
     [%# "Debugging HostName: " _ HostName %]
     [% INCLUDE 'debug.tt' %]
+[% IF c.stash.debug_msg %]
+    [% FOREACH msg IN c.stash.debug_msg %]
+        <p class="debug">Debug: [% msg %]</p>
+    [% END %]
+[% END %]
+
 [% END %]
 <header>
     <!-- Site Greeting -->

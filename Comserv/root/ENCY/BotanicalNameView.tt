@@ -34,22 +34,13 @@
      
         <h2>Herbs by Botanical name.</h2>
     
-      
-      <form action="/cgi-bin/ENCY/herbs.cgi?site=[% SiteName%]&[% session_string %]" METHOD =" POST"> 
-<font FACE =" " SIZE =" 2"> 
-Search our herbal Database 
-        <input TYPE="TEXT"   NAME="simple_search_string"
-               VALUE=""> 
-<input TYPE="HIDDEN" NAME="display_simple_search_results"
-               VALUE =" on"> 
-<input TYPE="SUBMIT" NAME="display_simple_search_results"
-               VALUE ="       Go        "> 
-</font> 
+<form action="search" method="POST">
+    <label for="search">Search our herbal Database:</label>
+    <input type="text" id="search" name="search_string" value="">
+    <input type="submit" value="Go">
+</form>
 
- 
-</form> 
-
-<p>     <a href="/cgi-bin/index.cgi?site=[% SiteName %]&[% session_string %]&view=ForumulaView"> Formulas.</a> 
+<p>     <a href="ForumulaView"> Formulas.</a>
  
  <p> These Herbs are in the data base. [% IF group    ==  'Alegro_admin' OR
 			       group    ==  'Apis_Admin' OR

@@ -14,20 +14,13 @@
      
         <h2>Bee forage plants by Botanical name.</h2>
       
-      
-      <form action="/cgi-bin/ENCY/herbs.cgi?site=[% SiteName %]&[% session_string %]" METHOD =" POST"> 
-<font FACE =" " SIZE =" 2"> 
-Search our herbal Database 
-        <input TYPE="TEXT"   NAME="simple_search_string"
-               VALUE=""> 
-<input TYPE="HIDDEN" NAME="display_simple_search_results"
-               VALUE =" on"> 
-<input TYPE="SUBMIT" NAME="display_simple_search_results"
-               VALUE ="       Go        "> 
-</font> 
+ <form action="/ENCY/search" method="POST">
+    <label for="search">Search our herbal Database:</label>
+    <input type="text" id="search" name="search_string" value="">
+    <input type="submit" value="Go">
+</form>
 
- 
-</form> 
+
 
  <p>Diverse Bee pasture is the key to healthy bees
 

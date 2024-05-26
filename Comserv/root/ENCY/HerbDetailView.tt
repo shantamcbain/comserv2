@@ -7,7 +7,7 @@
 <p>key name [% herb.key_name %] </p>
 <p>Idententifing Character [% herb.ident_character %] </p>
 <p>Stem[% herb.stem %]</p>
-<p>Leaves[% herb.leaves %] </p>
+    <p>Leaves[% herb.leaves %] </p>
 <p>Flowers [% herb.flowers %]</p>
 <p>Fruit [% herb.fruit %] </p>
 <p>Taste [% herb.taste %] </p>
