@@ -4,4 +4,29 @@
 <p>Nectar: [% herb.nectar %]</p>
 <p>Pollen: [% herb.pollen %]</p>
 <img src="[% herb.image %]" WIDTH="300" HEIGHT="325" />
-<!-- Add more fields as needed -->
+<p>Pollinator Forage [% herb.apis %]
+<p>Nectar [% herb.nectar %]</p>
+<p>Pollen [% herb.pollen %]</p>
+<p>key name [% herb.key_name %] </p>
+<p>Idententifing Character [% herb.ident_character %] </p>
+<p>Stem[% herb.stem %]</p>
+<p>Leaves[% herb.leaves %] </p>
+<p>Flowers [% herb.flowers %]</p>
+<p>Fruit [% herb.fruit %] </p>
+<p>Taste [% herb.taste %] </p>
+<p>Odour [% herb.odour %] </p>
+<p>Root [% herb.root %] </p>
+<p>Distribution [% herb.distribution %] </p>
+<p>Constituents [% herb.constituents %] </p>
+<p>Solvents [% herb.solvents %] </p>
+<p>Dosage [% herb.dosage %]  </p>
+<p>administration [% herb.administration %]  </p>
+<p>Formulas [% herb.formulas %]  </p>
+<p>Contra Indications [% herb.contra_indications %]  </p>
+<p>Chinese [% herb.chinese %]  </p>
+<p>Veterinary [% herb.vetrinary %]  </p>
+<p> [% herb.cultivation %]  </p>
+<p>Harvest [% herb.harvest %] </p>
+<p>Non Med [% herb.non_med %]</p>
+<p>History [% herb.history %] </p>
+<p>Reference [% herb.reference %]</p>

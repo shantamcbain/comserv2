@@ -32,7 +32,7 @@
 
 
 
-<link rel="stylesheet" type="text/css" href="[% c.stash.default_css %]">
+<link rel="stylesheet" type="text/css" href="[% c.stash.css_view_name %]">
 <link rel="stylesheet" type="text/css" href="[% c.stash.log_css %]">
 <link rel="stylesheet" type="text/css" href="[% c.stash.menu_css %]">
  <link rel="stylesheet" type="text/css" href="[% c.stash.todo_css %]">
