@@ -1,8 +1,5 @@
 <h1>[% herb.botanical_name %]</h1>
 <p>Common Names: [% herb.common_names %]</p>
-<p>Forage: [% herb.apis %]</p>
-<p>Nectar: [% herb.nectar %]</p>
-<p>Pollen: [% herb.pollen %]</p>
 <img src="[% herb.image %]" WIDTH="300" HEIGHT="325" />
 <p>Pollinator Forage [% herb.apis %]
 <p>Nectar [% herb.nectar %]</p>

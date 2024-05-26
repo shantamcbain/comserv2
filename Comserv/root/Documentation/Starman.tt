@@ -1,4 +1,4 @@
-[% PageVersion = 'Documentation/Starman.tt,v 0.01 2024/01/28 Shanta Exp shanta ' %]
+[% PageVersion = 'Documentation/Starman.tt,v 0.02 2024/05/26 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
     [%# "Debugging HostName: " _ HostName %]
@@ -32,12 +32,12 @@
 <h2>Configuring Starman to Run Your Application</h2>
 <ol>
     <li>Use the command: <code>starman --listen :5000 comserv.psgi</code> to run your application.</li>
-    <li>If you want Starman to keep running even after logging out, use the command: <code>nohup starman --listen :5000 starman.psgi &</code></li>
+    <li>If you want Starman to keep running even after logging out, use the command: <code>nohup starman --listen :5000 comserv.psgi &</code></li>
 </ol>
 
 <h2>Setting Up Starman to Run on Boot</h2>
 <ol>
-    <li>Create a systemd service file for Starman. Open a new file in <code>/etc/systemd/system/</code> directory. You can name it <code>starman.service</code>.</li>
+    <li>Create a systemd service file for Starman. Open a new file in the <code>/etc/systemd/system/</code> directory. You can name it <code>starman.service</code>.</li>
     <li>Add the following content to the file:
         <pre>
         [Unit]
@@ -45,7 +45,7 @@
         After=network.target
 
         [Service]
-        ExecStart=/usr/local/bin/starman --listen :5000 /home/shantam/PycharmProjects/CatalystComserv1/Comserv/starman.psgi
+        ExecStart=/usr/local/bin/starman --listen :5000 /home/shantam/PycharmProjects/CatalystComserv1/Comserv/comserv.psgi
         WorkingDirectory=/home/shantam/PycharmProjects/CatalystComserv1/Comserv
         User=shantam
         Group=shantam
@@ -55,12 +55,23 @@
         WantedBy=multi-user.target
         </pre>
     </li>
-    <li>After saving the file, reload the systemd manager configuration with: <code>
-
-        </code></li>
-    <li>Edit comserv.psgi<code> use lib "$FindBin::Bin/lib";</code> to find the Lib directory</li>
+    <li>After saving the file, reload the systemd manager configuration with: <code>sudo systemctl daemon-reload</code></li>
     <li>Enable the service to start on boot: <code>sudo systemctl enable starman</code></li>
     <li>You can start the service immediately with: <code>sudo systemctl start starman</code></li>
     <li>To check the status of the service, use: <code>sudo systemctl status starman</code></li>
-    <li>After testing you site with the development server restart starman  with <code>sudo systemctl restart starman</code></li>
+    <li>If you need to restart the service after making changes, use: <code>sudo systemctl restart starman</code></li>
+</ol>
+
+<h2>Running Starman as a User</h2>
+<ol>
+    <li>To run Starman in the background, use the command:
+        <pre><code>nohup starman --listen :5000 comserv.psgi &</code></pre>
+        The <code>nohup</code> command allows the process to continue running after you log out, and the <code>&</code> puts the process in the background.
+    </li>
+    <li>To stop Starman when it is running in the background, use the <code>ps</code> command to find its process ID (PID):
+        <pre><code>ps aux | grep starman</code></pre>
+        Find the PID of the Starman process in the output, then use the <code>kill</code> command to stop it:
+        <pre><code>kill [PID]</code></pre>
+        Replace <code>[PID]</code> with the actual process ID of the Starman process.
+    </li>
 </ol>

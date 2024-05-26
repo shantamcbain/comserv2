@@ -7,8 +7,8 @@
 <p>Welcome to the BMaster Module of our application!</p>
 <p>Explore the different sections:</p>
 <ul>
-    <li><a href="/BMaster/apiary">Apiary Management System </a> Help you run your beekeeping operations.</li>
-    <li><a href="/BMaster/Queens">Queen Rearing System</a>Learn to raise queens with our system.</li>
+    <li><a href="/BMaster/bee_pasture">Bee pasture. </a> Learn about plants that are used by pollinators for pasture.</li>
+    <li><a href="/BMaster/apiary">Apiary Management System </a> Help you run your beekeeping operations.</li>    <li><a href="/BMaster/Queens">Queen Rearing System</a>Learn to raise queens with our system.</li>
     <li><a href="/BMaster/hive">Hive Management</a>Part of our Apriary system Track the life of your hives. Use the information to see what to do next</li>
     <li><a href="/BMaster/honey">Honey Production</a></li>
     <li><a href="/BMaster/beehealth">Bee Health</a></li>

@@ -4,6 +4,7 @@ use namespace::autoclean;
 use DateTime;
 use DateTime::Event::Recurrence;
 use Comserv::Model::BMasterModel;
+use Comserv::Model::DBForager;
 BEGIN { extends 'Catalyst::Controller'; }
 sub base :Chained('/') :PathPart('BMaster') :CaptureArgs(0) {
     my ($self, $c) = @_;
@@ -17,6 +18,19 @@ sub index :Chained('base') :Path('') :Args(0) {
     $c->forward($c->view('TT'));
 }
 
+# In the BMaster controller
+sub bee_pasture :Chained('base') :PathPart('bee_pasture') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Use the DBForager model to fetch all the records from the herb table where the apis field has a value
+    my @plants = @{$c->model('DBForager')->get_herbs_with_apis};
+
+    # Pass the fetched records to the view
+    $c->stash->{herbal_data} = \@plants;
+
+    # Set the template
+    $c->stash->{template} = 'ENCY/BeePastureView.tt';
+}
 sub generate_month_dates {
     my ($year, $month, $number_of_grafts) = @_;
 
