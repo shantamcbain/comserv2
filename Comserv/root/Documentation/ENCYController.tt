@@ -1,11 +1,11 @@
-[% PageVersion = 'Documentation/ENCYController.tt,v 0.02 2024/05/22 Shanta Exp shanta ' %]
+[% PageVersion = 'Documentation/ENCY.tt,v 0.02 2024/05/22 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
-<h1 id="encyctop">ENCY Controller</h1>
+<h1 id="encyctop"><a href="#ency_top"</a>ENCY Controller</h1>
 
-<h2 id="ency">ENCY Controller</h2>
+
 <p>The ENCY controller is responsible for handling requests related to the ENCY model. It includes several subroutines, each of which performs a specific task.</p>
 <p><a href="#encyctop">Return to top</a></p>
 <nav>
@@ -118,4 +118,4 @@ sub create_category :Local {
     <li><strong>Automated Data Updates:</strong> Implement automation for data updates from trusted sources to keep the information current and accurate.</li>
     <li><strong>User Contributions:</strong> Develop features that allow users to contribute data and corrections, with moderation workflows to ensure quality.</li>
 </ul>
-<p><a href="#encyctop">Return to top</a></p>
+

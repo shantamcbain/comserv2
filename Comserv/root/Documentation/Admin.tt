@@ -1,0 +1,60 @@
+[% PageVersion = 'Documentation/admin.tt,v 0.01 2024/05/27 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<h2 id="admin_module"><a href="#documentation_top">Admin Module</a></h2>
+
+<h3>Table of Contents</h3>
+<ul>
+    <li><a href="#site_management">Site Management</a></li>
+    <li><a href="#database_schema_management">Database Schema Management</a></li>
+</ul>
+
+<p>The Admin module provides a suite of tools for managing various aspects of the site, with a current focus on handling schema changes within the application.</p>
+
+<h3 id="site_management"><a href="#admin_module">Site Management</a></h3>
+
+<p>The Site Management section includes the following features:</p>
+
+<ul>
+    <li><strong><a href="#edit_documentation">Edit Documentation</a></strong></li>
+    <li><strong><a href="#change_styles">Change Styles</a></strong></li>
+    <li><strong><a href="#update_software">Update Software</a></strong></li>
+    <li><strong><a href="#change_user_roles">Change User Roles</a></strong></li>
+    <li><strong><a href="#access_logging">Access Logging</a></strong></li>
+</ul>
+
+<h3 id="database_schema_management"><a href="#admin_module">Database Schema Management</a></h3>
+
+<p>The Database Schema Management section focuses on managing database schema changes from within the application. It includes the following features:</p>
+
+<ul>
+    <li><strong>Admin Controller:</strong> The Admin Controller handles various administrative tasks. Here are the routes defined in the controller and their functionalities:
+    <ol>
+        <li><strong>begin:</strong> Checks if the user is logged in and if they have the 'admin' role. If not, redirects to an error page.</li>
+        <li><strong>index:</strong> Sets the Template Toolkit template to 'admin/index.tt' and forwards the request to the view.</li>
+        <li><strong>edit_documentation:</strong> Sets the Template Toolkit template to 'admin/edit_documentation.tt'.</li>
+        <li><strong>add_schema:</strong> Handles the addition of new schemas. If the request method is 'POST', retrieves the schema name and description from the form, runs the 'create_migration_script.pl' script, and checks if the script ran successfully.</li>
+        <li><strong>migrate_schema:</strong> Handles the migration of schemas. If the request method is 'POST', runs the 'migrate_schema.pl' script.</li>
+        <li><strong>toggle_debug:</strong> Toggles the 'CATALYST_DEBUG' environment variable and redirects to the admin index page.</li>
+        <li><strong>get_table_info:</strong> Retrieves information about a specific table from the 'DBEncy' model. If the table exists, displays its schema. If the table does not exist, displays an error message.</li>
+    </ol>
+    </li>
+    <li><strong>Add New Schema:</strong> This feature allows you to add new schemas to the database. It works as follows:
+    <ol>
+        <li>When you click on the "Add New Schema" link, it will open a new window or tab and take you to a specific route in the Catalyst application.</li>
+        <li>This route points to a method in the Admin controller. This method handles the logic for adding a new schema.</li>
+        <li>The method first retrieves the current schemas from the database and the application schema.</li>
+        <li>It then compares the two sets of schemas. If there are any schemas present in the application schema that are not in the database, these are the new schemas that need to be added.</li>
+        <li>For each new schema, it is added to the database.</li>
+        <li>If there are any schemas in the application that are also in the database but have differences, these are the schemas that need to be modified. These schemas are updated in the database.</li>
+        <li>Finally, a success message is returned if the operation was successful, or an error message if there were any issues.</li>
+    </ol>
+    <p>To use this feature, click on the link below:</p>
+    <a href="/add_schema" target="_blank">Add New Schema</a>
+    </li>
+    <li><strong><a href="#get_table_information">Get Table Information</a></strong> Retrieves information about a specific table from the 'DBEncy' model. If the table exists, displays its schema. If the table does not exist, displays an error message.</li>
+</ul>
+
+<p>For more information on how to use these features, please refer to the specific documentation for each feature.</p>

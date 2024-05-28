@@ -42,5 +42,24 @@ sub get_active_projects {
 
     return \@projects;
 }
+sub get_table_info {
+    my ($self, $table_name) = @_;
+
+    # Get the DBIx::Class::Schema object
+    my $schema = $self->schema;
+
+    # Check if the table exists
+    if ($schema->source($table_name)) {
+        # The table exists, get its schema
+        my $source = $schema->source($table_name);
+        my $columns_info = $source->columns_info;
+
+        # Return the schema
+        return $columns_info;
+    } else {
+        # The table does not exist
+        return;
+    }
+}
 
 1;

@@ -1,38 +1,58 @@
-[% PageVersion = 'Documentation/Overview.tt,v 0.02 2024/05/22 Shanta Exp shanta ' %]
+[% PageVersion = 'Documentation/Overview.tt,v 0.03 2024/05/27 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
-    [%# "Debugging HostName: " _ HostName %]
-    [%# INCLUDE 'debug.tt' %]
 [% END %]
+<h1 id="overview_top"><a href="#top">Overview</a></h1>
+<nav>
 
-<h1>Overview</h1>
-<p>
-    This Catalyst application is replacing our old eXtropia site, which was written in Perl 4. The old site consisted of a collection of CGI scripts and HTML pages. The new site is written in Perl 5 using the Catalyst framework. This new implementation is designed to be more modular, easier to maintain, and more user-friendly, providing enhanced information to the user.
-</p>
+<a href="#main_features">Main Features</a> |
+<a href="#suggestions">Suggestions for Improvement and Expansion</a> |
+<a href="#instructions">Instructions for Developers</a>
+</nav>
 
-<h2>Main Features of the New Site:</h2>
+<h2 id="main_features">Main Features of the New Site:</h2>
+<nav>
+<a href="#AI_integration">AI Integration with the Site</a> |
+<a href="#modular_design">Modular Design</a> |
+<a href="#todo_project_management_logs">ToDo, Project Management, Logs</a> |
+<a href="#admin_functions">Admin Functions</a> |
+<a href="#security">Security</a> |
+<a href="#documentation">Documentation</a> |
+<a href="#search">Search</a> |
+<a href="#reference_system">Reference System of Documents</a> |
+<a href="#power_monitoring">Power Monitoring System</a> |
+<a href="#web_based_email">Web-Based Email</a> |
+<a href="#web_based_calendar">Web-Based Calendar</a> |
+<a href="#web_based_address_book">Web-Based Address Book</a> |
+<a href="#web_based_file_manager">Web-Based File Manager</a> |
+<a href="#web_based_photo_album">Web-Based Photo Album</a> |
+<a href="#web_based_music_player">Web-Based Music Player</a> |
+<a href="#hosting_multiple_sites">Hosting Multiple Sites</a> |
+<a href="#extensive_herbal_health_info">Extensive Herbal and Health Information</a>
+</nav>
+
 <ol>
-    <li><h3>AI Integration with the Site:</h3> Integrates the ability to search internal resources, external resources, and add information to the local system.</li>
-    <li><h3>Modular Design:</h3> Ensures the site is built in a modular fashion for ease of maintenance and scalability.</li>
-    <li><h3>ToDo, Project Management, Logs:</h3> Incorporates tools for managing tasks, projects, and maintaining logs for better tracking and management.</li>
-    <li><h3>Admin Functions:</h3> Provides capabilities to edit files, control CSS, update the application, and manage the schema.</li>
-    <li><h3>Security:</h3> Implements robust security measures to protect data and user information.</li>
-    <li><h3>Documentation:</h3> Maintains comprehensive documentation to assist developers and users.</li>
-    <li><h3>Search:</h3> Uses AI to build a comprehensive information base, improving search accuracy and relevance.</li>
-    <li><h3>Reference System of Documents:</h3> Offers a well-organized system for managing and referencing documents.</li>
-    <li><h3>Power Monitoring System:</h3> Includes a system for monitoring power usage and efficiency.</li>
-    <li><h3>Web-Based Email:</h3> Provides a web-based email client for managing emails.</li>
-    <li><h3>Web-Based Calendar:</h3> Offers a web-based calendar for scheduling and event management.</li>
-    <li><h3>Web-Based Address Book:</h3> Maintains a web-based address book for contact management.</li>
-    <li><h3>Web-Based File Manager:</h3> Includes a web-based file manager for file storage and organization.</li>
-    <li><h3>Web-Based Photo Album:</h3> Provides a web-based photo album for managing and sharing photos.</li>
-    <li><h3>Web-Based Music Player:</h3> Includes a web-based music player for playing and managing music files.</li>
-    <li><h3>Hosting Multiple Sites:</h3> Supports the ability to host multiple sites using the same software.</li>
-    <li><h3>Extensive Herbal and Health Information:</h3> Provides detailed information on herbs and health-related topics.</li>
+    <li><h3 id="AI_integration"><a href="#main_features">AI Integration with the Site:</a></h3> Integrates the ability to search internal resources, external resources, and add information to the local system.</li>
+    <li><h3 id="modular_design"><a href="#main_features">Modular Design:</a></h3> Ensures the site is built in a modular fashion for ease of maintenance and scalability.</li>
+    <li><h3 id="todo_project_management_logs"><a href="#main_features">ToDo, Project Management, Logs:</a></h3> Incorporates tools for managing tasks, projects, and maintaining logs for better tracking and management.</li>
+    <li><h3 id="admin_functions"><a href="#main_features">Admin Functions:</a></h3> Provides capabilities to edit files, control CSS, update the application, and manage the schema.</li>
+    <li><h3 id="security"><a href="#main_features">Security:</a></h3> Implements robust security measures to protect data and user information.</li>
+    <li><h3 id="documentation"><a href="#main_features">Documentation:</a></h3> Maintains comprehensive documentation to assist developers and users.</li>
+    <li><h3 id="search"><a href="#main_features">Search:</a></h3> Uses AI to build a comprehensive information base, improving search accuracy and relevance.</li>
+    <li><h3 id="reference_system"><a href="#main_features">Reference System of Documents:</a></h3> Offers a well-organized system for managing and referencing documents.</li>
+    <li><h3 id="power_monitoring"><a href="#main_features">Power Monitoring System:</a></h3> Includes a system for monitoring power usage and efficiency.</li>
+    <li><h3 id="web_based_email"><a href="#main_features">Web-Based Email:</a></h3> Provides a web-based email client for managing emails.</li>
+    <li><h3 id="web_based_calendar"><a href="#main_features">Web-Based Calendar:</a></h3> The application now includes a web-based calendar module. This module can be used by all other modules in the application for scheduling and event management. It provides features such as creating, viewing, and editing events, setting reminders, and sharing events with other users. The calendar module is designed to be flexible and adaptable, allowing it to be integrated with other modules in various ways. For example, the project management module could use the calendar to schedule project deadlines and milestones, while the education module could use it to schedule classes and exams.</li>
+    <li><h3 id="web_based_address_book"><a href="#main_features">Web-Based Address Book:</a></h3> Maintains a web-based address book for contact management.</li>
+    <li><h3 id="web_based_file_manager"><a href="#main_features">Web-Based File Manager:</a></h3> Includes a web-based file manager for file storage and organization.</li>
+    <li><h3 id="web_based_photo_album"><a href="#main_features">Web-Based Photo Album:</a></h3> Provides a web-based photo album for managing and sharing photos.</li>
+    <li><h3 id="web_based_music_player"><a href="#main_features">Web-Based Music Player:</a></h3> Includes a web-based music player for playing and managing music files.</li>
+    <li><h3 id="hosting_multiple_sites"><a href="#main_features">Hosting Multiple Sites:</a></h3> Supports the ability to host multiple sites using the same software.</li>
+    <li><h3 id="extensive_herbal_health_info"><a href="#main_features">Extensive Herbal and Health Information:</a></h3> Provides detailed information on herbs and health-related topics.</li>
 </ol>
 
-<h2>Suggestions for Improvement and Expansion</h2>
-<p>As we continue to develop and enhance this application, consider the following suggestions:</p>
+<p><a href="#main_features">Back to top of Main Features</a></p>
+<h2 id="suggestions"><a href="#overview_top">Suggestions for Improvement and Expansion</a></h2>
 <ul>
     <li><strong>AI Integration Planning:</strong> Create a detailed plan for integrating AI into various modules of the application. This should include specific tasks, goals, and technologies to be used. Consider adding an AI.tt documentation file to outline this plan.</li>
     <li><strong>User Feedback Mechanism:</strong> Implement a system for collecting user feedback to continuously improve the user experience and functionality of the site.</li>
@@ -41,9 +61,10 @@
     <li><strong>Accessibility Improvements:</strong> Ensure the site meets accessibility standards to provide an inclusive experience for all users.</li>
     <li><strong>Regular Updates and Maintenance:</strong> Establish a schedule for regular updates and maintenance to keep the site current and secure.</li>
     <li><strong>Training and Support Resources:</strong> Develop training materials and support resources for users and administrators to maximize the application's potential.</li>
+    <li><strong>Calendar Module Enhancements:</strong> Continue to enhance the functionality of the calendar module. Consider adding features such as recurring events, event categories, and integration with external calendar services. Also, explore ways to further integrate the calendar with other modules in the application.</li>
 </ul>
 
-<h2>Instructions for Developers</h2>
+<h2 id="instructions"><a href="#overview_top">Instructions for Developers</a></h2>
 <p>To ensure the continuous improvement and consistency of this project, please adhere to the following guidelines:</p>
 <ul>
     <li><strong>Naming Conventions:</strong> Follow the existing naming conventions strictly. If you find inconsistencies, normalize them to maintain uniformity.</li>
@@ -55,4 +76,5 @@
 
 <p>We are committed to evolving the Comserv application to meet the needs of our users. Your contributions and adherence to these guidelines are crucial for our continued success.</p>
 
-<p><a href="#top">Back to top</a></p>
+<p><a href="#overview_top">Back to top</a></p>
+<p><a href="#top">Back to top of Documentation</a></p>

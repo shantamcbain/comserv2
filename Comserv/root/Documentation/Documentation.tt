@@ -3,8 +3,6 @@
     [% PageVersion %]
 [% END %]
 
-[%# "Debugging HostName: " _ HostName %]
-[%# INCLUDE 'debug.tt' %]
 
 <!--
 Please ensure that all navigation links within each sub-document are unique. This includes the "Back to top" links, as well as any other navigation links present. Each link should be specific to the content within that particular sub-document to enhance clarity and organization within the documentation.
@@ -14,6 +12,7 @@ Please ensure that all navigation links within each sub-document are unique. Thi
 
 <nav>
     <a href="#overview">Overview</a> |
+    <a href="#admin_module">Admin Module</a> |
     <a href="#dbi">DBI</a> |
     <a href="#bmaster">BMaster</a> |
     <a href="#document-management">Document Management</a> |
@@ -21,6 +20,7 @@ Please ensure that all navigation links within each sub-document are unique. Thi
     <a href="#files">Files</a> |
     <a href="#git">Git</a> |
     <a href="#installation">Installation</a> |
+    <a href="#calendar">Calendar</a> |
     <a href="#login">Login</a> |
     <a href="#logging">Logging</a> |
     <a href="#projects">Projects</a> |
@@ -34,12 +34,11 @@ Please ensure that all navigation links within each sub-document are unique. Thi
     <a href="#AI">AI Integration Plan</a>
 </nav>
 
-<h3 id="overview"><a href="#top">Back to top of Documentation</a></h3>
+<h3 id="overview"></h3>
 [% INCLUDE 'Documentation/Overview.tt' %]
-
-<h3 id="AI"><a href="#top">Back to top of Documentation</a></h3>
+[% INCLUDE 'Documentation/Admin.tt' %]
 [% INCLUDE 'Documentation/AI.tt' %]
-
+[% INCLUDE 'Documentation/Calendar.tt' %]
 <h3 id="dbi"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/DBIDocument.tt' %]
 
@@ -50,8 +49,8 @@ Please ensure that all navigation links within each sub-document are unique. Thi
 [% INCLUDE 'Documentation/DocumentManagement.tt' %]
 
 <h3 id="ENCY"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/ENCYController.tt' %]
-[% INCLUDE 'Documentation/ENCYModel.tt' %]
+[% INCLUDE 'Documentation/ENCY.tt' %]
+
 
 <h3 id="files"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Files.tt' %]

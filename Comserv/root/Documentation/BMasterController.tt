@@ -1,6 +1,7 @@
-[% PageVersion = 'Documentation/BMasterController.tt,v 0.01 2024/01/28 Shanta Exp shanta ' %]
 
-<h1 id="top">BMaster Controller Documentation</h1>
+[% PageVersion = 'Documentation/BMasterController.tt,v 0.02 2024/05/07 Shanta Exp shanta ' %]
+
+<h1 id="BMaster_top"><a href="#BMaster_top">BMaster Controller Documentation</a></h1>
 
 <h2 id="base">base</h2>
 <p>The 'base' function is the root of the chained actions in the BMaster controller. It captures '/BMaster' in the URL and performs common setup tasks that are shared by multiple actions in the controller. Here are some examples of what the 'base' function can do:</p>

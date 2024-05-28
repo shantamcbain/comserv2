@@ -1,11 +1,11 @@
-[% PageVersion = 'Admin/index.tt,v 0.01 2023/08/30 shanta Exp shanta ' %]
+[% PageVersion = 'Admin/index.tt,v 0.02 2024/05/30 shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
 <h1>Admin Home Page</h1>
 
-<p>Welcome to the Admin Home Page. Here you can manage various aspects of the site.</p>
+<p>Welcome to the Admin Home Page. Here you can manage various aspects of the site, with a current focus on handling schema changes within the application.</p>
 
 <h2>Site Management</h2>
 
@@ -13,9 +13,21 @@
     <li><a href="edit_documentation">Edit Documentation</a></li>
     <li><a href="change_styles">Change Styles</a></li>
     <li><a href="add_schema">Add Schema</a></li>
+    <li><a href="get_table_info">Get Table Information</a></li>
     <li><a href="update_software">Update Software</a></li>
     <li><a href="change_roles">Change User Roles</a></li>
     <li><a href="access_logging">Access Logging</a></li>
 </ul>
+
+<h2>Database Schema Management</h2>
+
+<p>Our current focus is on managing database schema changes from within the application. You can add new schemas, get information about existing tables, and update the database as needed.</p>
+
+<ul>
+    <li><a href="add_schema">Add New Schema</a></li>
+    <li><a href="get_table_info">Get Table Information</a></li>
+</ul>
+
+<p>For more information on how to use these features, please refer to our <a href="[% c.uri_for('/Documentation/Admin') %]">Admin Module Documentation</a>.</p>
 
 <p>For more information or assistance, please contact us.</p>

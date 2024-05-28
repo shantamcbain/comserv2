@@ -1,0 +1,12 @@
+[% PageVersion = 'Documentation/ENCY.tt,v 0.01 2024/05/0Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+<h1 id="ency_top"><a href="#top">ENCY Module</a></h1>
+<nav>
+<a href="#encyctop">ENCY Controller</a> |
+<a href="#encymtop">ENCY Model</a>
+</nav>
+
+[% INCLUDE 'Documentation/ENCYController.tt' %]
+[% INCLUDE 'Documentation/ENCYModel.tt' %]   <a href="#Controller">Controller</a> |

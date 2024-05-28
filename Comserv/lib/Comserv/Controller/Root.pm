@@ -47,33 +47,44 @@ sub index :Path :Args(0) {
 sub auto :Private {
     my ($self, $c) = @_;
 
-    # Keep the code to remove the port from the domain
-    my $domain = $c->req->base->host;
-    $domain =~ s/:.*//;
+    # Check the session for SiteName
+    my $SiteName = $c->session->{SiteName};
 
-    my $site_domain = $c->model('Site')->get_site_domain($domain);
-    $c->log->debug(__PACKAGE__ . " . (split '::', __SUB__)[-1] . \" line \" . __LINE__ . \": site_domain in auto = $site_domain");
-
-    if ($site_domain) {
-        # If a SiteName is found, store it in the session and stash
-        my $site_id = $site_domain->site_id;
-        my $site = $c->model('Site')->get_site_details($site_id);
-
-        if ($site) {
-            my $SiteName = $site->name;
-            $c->stash->{SiteName} = $SiteName;
-            $c->session->{SiteName} = $SiteName;
-        }
+    if (defined $SiteName) {
+        # If SiteName is found in the session, skip the domain extraction and site domain retrieval
+        $c->log->debug("SiteName found in session: $SiteName");
     } else {
-        # If no SiteName is found, call fetch_and_set method to handle this
-        my $SiteName = $self->fetch_and_set($c, 'site');
-        $c->log->debug(__PACKAGE__ . " . (split '::', __SUB__)[-1] . \" line \" . __LINE__ . \": SiteName in auto = $SiteName");
+        # If SiteName is not found in the session, proceed with domain extraction and site domain retrieval
+        $c->log->debug("SiteName not found in session, proceeding with domain extraction and site domain retrieval");
 
-        # If the domain is not in the table, use the default home page of index.tt
-        if (!defined $SiteName) {
-            $c->stash(template => 'index.tt');
-            $c->forward($c->view('TT'));
-            return 0; # Stop further processing of this request
+        # Keep the code to remove the port from the domain
+        my $domain = $c->req->base->host;
+        $domain =~ s/:.*//;
+
+        my $site_domain = $c->model('Site')->get_site_domain($domain);
+        $c->log->debug(__PACKAGE__ . " . (split '::', __SUB__)[-1] . \" line \" . __LINE__ . \": site_domain in auto = $site_domain");
+
+        if ($site_domain) {
+            # If a SiteName is found, store it in the session and stash
+            my $site_id = $site_domain->site_id;
+            my $site = $c->model('Site')->get_site_details($site_id);
+
+            if ($site) {
+                $SiteName = $site->name;
+                $c->stash->{SiteName} = $SiteName;
+                $c->session->{SiteName} = $SiteName;
+            }
+        } else {
+            # If no SiteName is found, call fetch_and_set method to handle this
+            $SiteName = $self->fetch_and_set($c, 'site');
+            $c->log->debug(__PACKAGE__ . " . (split '::', __SUB__)[-1] . \" line \" . __LINE__ . \": SiteName in auto = $SiteName");
+
+            # If the domain is not in the table, use the default home page of index.tt
+            if (!defined $SiteName) {
+                $c->stash(template => 'index.tt');
+                $c->forward($c->view('TT'));
+                return 0; # Stop further processing of this request
+            }
         }
     }
 
@@ -89,7 +100,7 @@ sub auto :Private {
     # Set up universal variables
 
     # Call fetch_and_set method
-    my $SiteName = $self->fetch_and_set($c, $schema, 'site');
+    $SiteName = $self->fetch_and_set($c, $schema, 'site');
 
     unless ($c->session->{group}) {
         $c->session->{group} = 'normal';
@@ -160,7 +171,6 @@ sub auto :Private {
     # Continue processing the rest of the request
     return 1;
 }
-
 sub fetch_and_set {
     my ($self, $c, $param) = @_;
 

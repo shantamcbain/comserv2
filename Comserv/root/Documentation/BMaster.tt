@@ -1,11 +1,11 @@
-[% PageVersion = 'Documentation/BMaster.tt,v 0.01 2024/05/06 Shanta Exp shanta ' %]
+[% PageVersion = 'Documentation/BMaster.tt,v 0.02 2024/05/0Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 <nav>
 
     <a href="#Controller">Controller</a> |
-    <a href="#Model">Model</a> |
+    <a href="#bmasteModel">Model</a> |
     <a href="#queens">Queen Management</a> |
     <a href="#files"></a> |
     <a href="#git"></a> |
@@ -20,7 +20,15 @@
     <a href="#todo"></a> |
    <a href="#workshop-management"></a> |
 </nav>
-<h1 id="top">Beemaster Application.</h1>
+<h1 id="BMaster_top">Beemaster Application.</h1>
+<p>This application is intended to both educate and provide a platform for beekeepers to manage their hives and apiaries</p>
+<p> We have added several links to the main page of the application most are described in the controller. The latest addition to the application is the return of access to the old database table for herbs that from the point of view of BMaster is the Bee pasture view.
+The BeePastureView give a current list of all the plants that are used by pollinators as pasture. </p>
+<h3 id="searchHerbs">searchHerbs</h3><p> The search field now works if the search string appears in the record it is returned. to the browser in a list. The details link pulls all the data in the table.</p>
+<p> Please look to the ency module for details on how this works.</p>
+
+
+<p>The 'searchHerbs' function in the 'Comserv/lib/Comserv/Model/DBForager.pm' file has been updated to improve the search functionality in the BMaster system. The function now uses normalized field names that match the field names in the database and the view. It also stores all debug messages in an array and puts that array into the stash, allowing all debug messages to be passed to the template and displayed in the browser. In the case where no records are returned from the search, a specific debug message stating "No results found" is added to the debug messages array.</p>
 
 <h3 id="Controller"><a href="#top">Back to top</a> </h3>
 [% INCLUDE 'Documentation/BMasterController.tt' %]

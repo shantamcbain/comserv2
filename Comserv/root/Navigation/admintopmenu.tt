@@ -115,7 +115,7 @@
                    <a href="http://shanta.local:3000" class="site-dropdown-item" onclick="activateSite('Shanta')">Shanta.local</a>
                     <a href="?site=SunFire" class="site-dropdown-item" onclick="activateSite('SunFire')
 ">SunFire</a>
-           <a href="/USBM?site=USBM" class="site-dropdown-item" onclick="activateSite('USBM')">USBM</a>
+           <a href="http://usbm.ca:5000" class="site-dropdown-item" onclick="activateSite('USBM')">USBM</a>
            <a href="?site=WB" class="site-dropdown-item" onclick="activateSite('wb')">WeaverBeck.com</a>
                    <a href="http://ve7tit.local:3000" class="site-dropdown-item" target="_blank" onclick="activateSite('ve7tit')">ve7tit.local</a>
           <a href="/?site=home" class="site-dropdown-item" onclick="activateSite('home')
