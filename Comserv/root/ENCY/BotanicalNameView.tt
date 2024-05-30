@@ -41,7 +41,7 @@
 </form>
 
 <p>     <a href="ForumulaView"> Formulas.</a>
- 
+
  <p> These Herbs are in the data base. [% IF group    ==  'Alegro_admin' OR
 			       group    ==  'Apis_Admin' OR
 		          group    == 'BHN_Admin' OR
@@ -76,15 +76,19 @@
 			[% END %]
 
 <table>
+   <tr>
+        <th width="50%">Plant</th>
+        <th width="50%">Image</th>
+    </tr>
 
  [% FOREACH link IN herbal_data %]
     <tr>
         <td>
-            <i>[% link.botanical_name %]</i><br>
-            Common Name: [% link.common_names %]<br>
-            Forage: [% link.apis %]<br>
-            Nectar: [% link.nectar %]<br>
-            Pollen: [% link.pollen %]<br>
+            <span style="font-size: 30px;"> Botanical Name:</span> [% link.botanical_name %]<br>
+             <span style="font-size: 30px;">Common Name:</span> [% link.common_names %]<br>
+             <span style="font-size: 30px;">Idententifing Character:</span> [% link.ident_character %]<br>
+            <span style="font-size: 30px;"> Distribution:</span> [% link.distribution %]<br>
+            <span style="font-size: 30px;" >Medical Uses:</span> [% link.medical_uses %]<br>
            <a href="/ENCY/herb_detail/[% link.record_id %]" name="Contact" title="details "><font class="LeftSideBarNavStyle">Details</font></a>
             [% IF group == "Apis_admin" %] <a href="/cgi-bin/ENCY/herbs_admin.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;&display_details_view.x&record_id=[% link.record_id %]" name="Contact" target="[% link.target %]" title="details "><font class="LeftSideBarNavStyle">Admin</font></a> [% END %]
         </td>

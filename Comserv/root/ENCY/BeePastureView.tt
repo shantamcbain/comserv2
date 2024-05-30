@@ -8,7 +8,7 @@
 <A NAME="PageTop"></A>
 </div>
 
-<p>We are looking for volunteers to help ups develop this database. Your help is greatly needed and appreciated. We are looking to add pictures of pollen to the system so one can get a picture of what plants the bees are collecting from the environment. This will help users to find out what plants are in the are of the hive. How many. This data is vary useful in planing plantings to provide forager over the course of the year. Of course this is limited to plants bees use for pollen not necessary for honey production.
+<p>We are looking for volunteers to help us develop this database. Your help is greatly needed and appreciated. We are looking to add pictures of pollen to the system so one can get a picture of what plants the bees are collecting from the environment. This will help users to find out what plants are in the area of the hive. How many. This data is vary useful in planning plantings to provide forage over the course of the year.
 
 <p>We are also looking to add data on the effects of pollen's on the bees health. A spin off of this is the medicinal use for human and other animals.
      
@@ -22,27 +22,27 @@
 
 
 
- <p>Diverse Bee pasture is the key to healthy bees
-
+ <p>Diverse Bee pasture is the key to healthy bees</p>
+<table>
+    <tr>
+        <th width="50%">Plant</th>
+        <th width="50%">Image</th>
+    </tr>
 [% FOREACH link IN herbal_data %]
     <tr>
-        <td>
-            <i>[% link.botanical_name %]</i><br>
-            Common Name: [% link.common_names %]<br>
-            Forage: [% link.apis %]<br>
-            Nectar: [% link.nectar %]<br>
-            Pollen: [% link.pollen %]<br>
-           <a href="/ENCY/herb_detail/[% link.record_id %]" name="Contact" title="details "><font class="LeftSideBarNavStyle">Details</font></a>
-            [% IF group == "Apis_admin" %] <a href="/cgi-bin/ENCY/herbs_admin.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;&display_details_view.x&record_id=[% link.record_id %]" name="Contact" target="[% link.target %]" title="details "><font class="LeftSideBarNavStyle">Admin</font></a> [% END %]
+        <td width="50%" style="font-size: 18px; font-weight: bold;">
+            <span style="font-size: 30px;"> Botanical Name:</span> [% link.botanical_name %]<br>
+             <span style="font-size: 30px;">Common Name:</span> [% link.common_names %]<br>
+             <span style="font-size: 30px;">Forage: </span> [% link.apis %]<br>
+             <span style="font-size: 30px;">Nectar: </span>[% link.nectar %]<br>
+             <span style="font-size: 30px;">Pollen:</span> [% link.pollen %]<br>
+           <a href="/ENCY/herb_detail/[% link.record_id %]" name="Contact" title="details ">Details</a>
         </td>
-        <td>
-            <img src="[% link.image %]" WIDTH="300" HEIGHT="325" />
+        <td width="50% ">
+            [% IF group == "Apis_admin" %] <a href="/cgi-bin/ENCY/herbs_admin.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;&display_details_view.x&record_id=[% link.record_id %]" name="Contact" target="[% link.target %]" title="details "><font class="LeftSideBarNavStyle">Admin</font></a> [% END %]<br>
+            <img src="[% link.image %]" WIDTH="300" HEIGHT="325" /><br>
         </td>
     </tr>
 [% END %]
-      
- <a href="http://helpdesk.computersystemconsulting.ca/cgi-bin/index.cgi?site=[% SiteName %]" target="_Blank" > HelpDesk</a>
-
-[%# embed('CSCCopyRight') %]
-[% embed(data.page_bottom_view) %]
+</table>
 

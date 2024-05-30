@@ -14,6 +14,7 @@
 <p>Odour [% herb.odour %] </p>
 <p>Root [% herb.root %] </p>
 <p>Distribution [% herb.distribution %] </p>
+<p>Medical Uses [% herb.medical_uses%] </p>
 <p>Constituents [% herb.constituents %] </p>
 <p>Solvents [% herb.solvents %] </p>
 <p>Dosage [% herb.dosage %]  </p>
