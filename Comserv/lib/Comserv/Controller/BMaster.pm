@@ -3,9 +3,12 @@ use Moose;
 use namespace::autoclean;
 use DateTime;
 use DateTime::Event::Recurrence;
-use Comserv::Model::BMasterModel;
+use Comserv::Model::BMaster;
 use Comserv::Model::DBForager;
-BEGIN { extends 'Catalyst::Controller'; }
+use Sub::Util 'subname';
+use Data::Dumper;
+BEGIN { extends 'Comserv::Controller::Base'; }
+
 sub base :Chained('/') :PathPart('BMaster') :CaptureArgs(0) {
     my ($self, $c) = @_;
     # This will be the root of the chained actions
@@ -136,20 +139,89 @@ sub products :Chained('base') :PathPath('products') :Args(0) {
 sub yards :Chained('base') :PathPart('yards') :Args(0) {
     my ( $self, $c ) = @_;
 
-    # Get the yards
-    my $yards = $c->model('BMaster')->get_yards();
+    # Get the site name from the session
+    my $site_name = $c->session->{SiteName};
+
+    # Get the yards for the site
+    my $yards = $c->model('BMaster')->get_yards_for_site($site_name);
+
+    # For each yard, get the pallets and for each pallet, get the hives
+    foreach my $yard (@$yards) {
+        my $pallets = $c->model('BMaster')->get_pallets_for_yard($yard->{id});
+        $yard->{pallets} = $pallets;
+        foreach my $pallet (@$pallets) {
+            my $hives = $c->model('BMaster')->get_hives_for_pallet($pallet->{id});
+            $pallet->{hives} = $hives;
+        }
+    }
 
     # Set the TT template to use
     $c->stash->{template} = 'BMaster/yards.tt';
     $c->stash->{yards} = $yards;
 }
-# Define an action for each link in BMaster.tt
+sub add_yard :Chained('base') :PathPart('add_yard') :Args(0) {
+    my ( $self, $c ) = @_;
+
+    # If the form has been submitted
+    if ($c->request->method eq 'POST') {
+        # Get the yard data from the form
+        my $yard_code = $c->request->parameters->{yard_code};
+        my $yard_name = $c->request->parameters->{yard_name};
+        my $sitename = $c->request->parameters->{sitename};
+        my $total_yard_size = $c->request->parameters->{total_yard_size};
+        my $date_established = $c->request->parameters->{date_established};
+        my $notes = $c->request->parameters->{notes};
+        my $yard_image = $c->request->upload('image');  # Assuming the image is uploaded as a file
+
+        # Check if the 'Yard' table exists and create it if it doesn't
+        my $table_check_result = $c->model('DBEncy')->create_table_from_result('Yard', $c->model('DBEncy')->schema, $c);
+
+        # Use the stash_message subroutine to stash the message
+        $self->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": create_table_from_result returned: $table_check_result");
+
+        # Add the new yard to the database
+        my $result = $c->model('BMaster')->add_yard($yard_code, $yard_name, $sitename, $total_yard_size, $date_established, $notes, $yard_image);
+
+        # If the add_yard method returned undef (indicating an error), add an error message
+        unless ($result) {
+            # Use the stash_message subroutine to stash the message
+            $self->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": An error occurred while adding the yard.");
+        }
+
+        # If there are any error messages, render the form with the error messages
+        if ($c->stash->{error_messages}) {
+            # Set the TT template to use
+            $c->stash->{template} = 'BMaster/add_yard.tt';
+            return;
+        }
+
+        # If the add_yard method returned a truthy value, redirect to the yards page
+        $c->response->redirect($c->uri_for($self->action_for('yards')));
+        return;
+    }
+
+    # Set the TT template to use
+    $c->stash->{template} = 'BMaster/add_yard.tt';
+}
 
 sub apiary :Chained('base') :PathPart('apiary') :Args(0){
     my ( $self, $c ) = @_;
     $c->log->debug('Entered apiary');
-    # Set the TT template to use
-    $c->stash->{template} = 'BMaster/apiary.tt';
+
+    # Fetch the total number of queens, frames of bees, brood, foundation, comb, and honey
+    my $total_queens = $c->model('BMaster')->count_queens();
+    my $total_frames = $c->model('BMaster')->count_frames();
+    # If no values are returned, set no_data to true
+    my $no_data = !$total_queens && !$total_frames;
+
+    # Pass the data to the template
+    $c->stash(
+        no_data => $no_data,
+        total_queens => $total_queens,
+        total_frames => $total_frames,
+        template => 'BMaster/apiary.tt',
+    );
+
     $c->forward($c->view('TT'));
 }
 
@@ -208,7 +280,6 @@ sub education :Chained('base') :PathPart('education') :Args(0){
     my ( $self, $c ) = @_;
     $c->stash->{template} = 'BMaster/education.tt';
 }
-
 
 __PACKAGE__->meta->make_immutable;
 
