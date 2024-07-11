@@ -47,4 +47,4 @@ requires 'Catalyst::View::TT';
 requires 'DateTime::Format::ISO8601';
 requires 'Data::FormValidator';
 requires 'Catalyst::Action::RenderView';
-
+requires 'Catalyst::ScriptRunner';
