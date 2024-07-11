@@ -1,50 +1,45 @@
 requires 'Moose';
 requires 'namespace::autoclean';
-requires 'JSON::MaybeXS';
-requires 'Catalyst::Model';
-requires 'DBI';
-requires 'Paws'; # AWS SDK for Perl
 requires 'Catalyst'; # Catalyst framework
-requires 'Catalyst::Runtime'; # Catalyst framework
-requires 'Catalyst::Plugin::ConfigLoader'; # Catalyst framework
-requires 'Term::ReadPassword'; # Catalyst framework
-requires 'Template::Plugin::JSON'; # Template Toolkit JSON plugin
-requires 'DBIx::Class::Schema::Loader'; # DBIx::Class
-requires 'Starman'; # DBIx::Class
-requires 'Text::CSV'; # DBIx::Class
-requires 'Config::JSON';
-requires 'Catalyst::Plugin::Session';
-requires 'Catalyst::Plugin::Authorization::Roles';
-requires 'DBIx::Class::Migration';
-requires 'DBIx::Class::TimeStamp';
-requires  'Catalyst::Plugin::Log::Dispatch';
-requires 'Catalyst::Plugin::Session::Store::DBI';
-requires 'Catalyst::Plugin::Session::Store::File';
-requires 'Log::Dispatch::Config';
-requires 'DateTime';
-requires 'DateTime::Event::Recurrence';
-requires 'DateTime::Format::Strptime';
-requires 'DateTime::Format::ISO8601';
-requires 'JSON';
-requires  'Template::Plugin::DateTime';
-requires 'Email::Sender::Simple';
-requires 'Data::FormValidator';
+requires 'Catalyst::Action::RenderView';
+requires 'Catalyst::Authentication::Store::DBIx::Class';
+requires 'Catalyst::Model';
+requires 'Catalyst::Plugin::Authentication';
 requires 'Catalyst::Plugin::Authorization::Roles';
 requires 'Catalyst::Plugin::Authorization::ACL';
-requires 'script::runner';
-requires 'Template::Plugin::DBI';
-requires 'Catalyst::ScriptRunner';
+requires 'Catalyst::Plugin::ConfigLoader'; # Catalyst framework
 requires 'Catalyst::Plugin::Log::Dispatch';
+requires 'Catalyst::Plugin::Session';
+requires 'Catalyst::Plugin::Session::Store::DBI';
+requires 'Catalyst::Plugin::Session::Store::File';
 requires 'Catalyst::Plugin::Session::State::Cookie';
 requires 'Catalyst::Plugin::Session::Store::File';
 requires 'Catalyst::Plugin::StackTrace';
 requires 'Catalyst::Plugin::Static::Simple';
-requires 'Catalyst::Plugin::ConfigLoader';
-requires 'Catalyst::Plugin::Authentication';
-requires 'Catalyst::Authentication::Store::DBIx::Class';
-requires 'DBIx::Class::TimeStamp';
-requires 'Catalyst::View::TT';
-requires 'DateTime::Format::ISO8601';
-requires 'Data::FormValidator';
-requires 'Catalyst::Action::RenderView';
+requires 'Catalyst::Runtime'; # Catalyst framework
 requires 'Catalyst::ScriptRunner';
+requires 'Catalyst::View::TT';
+requires 'Config::JSON';
+requires 'DBD::mysql'; # DBIx::Class
+requires 'DBIx::Class::Migration';
+requires 'DBIx::Class::TimeStamp';
+requires 'DBIx::Class::Schema::Loader'; # DBIx::Class
+requires 'sudo cpanm DBD::mysql';
+requires 'Data::FormValidator';
+requires 'DateTime';
+requires 'DateTime::Event::Recurrence';
+requires 'DateTime::Format::Strptime';
+requires 'DateTime::Format::ISO8601';
+requires 'Email::Sender::Simple';
+requires 'JSON::MaybeXS';
+requires 'JSON';
+requires 'Log::Dispatch::Config';
+requires 'Paws'; # AWS SDK for Perl
+requires 'script::runner';
+requires 'Starman'; # DBIx::Class
+requires 'Template::Plugin::DBI';
+requires 'Template::Plugin::DateTime';
+requires 'Template::Plugin::DBI';
+requires 'Term::ReadPassword'; # Catalyst framework
+requires 'Template::Plugin::JSON'; # Template Toolkit JSON plugin
+requires 'Text::CSV'; # DBIx::Class
