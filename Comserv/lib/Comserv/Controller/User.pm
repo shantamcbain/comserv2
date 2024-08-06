@@ -8,6 +8,7 @@ use Email::Simple;
 use Email::Simple::Creator;
 
 BEGIN { extends 'Catalyst::Controller'; }
+
 sub base :Chained('/') :PathPart('user') :CaptureArgs(0) {
     my ( $self, $c ) = @_;
     # This will capture /user in the URL
@@ -22,6 +23,7 @@ sub login :Chained('base') :PathPart('login') :Args(0) {
     # Set the template for the login page
     $c->stash(template => 'User/login.tt');
 }
+
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
 
@@ -38,17 +40,7 @@ sub index :Path :Args(0) {
     $c->stash(template => 'user/index.tt');
     $c->forward($c->view('TT'));
 }
-sub login :Local {
-    my ($self, $c) = @_;
-   # Store the referrer URL and form data in the session
-    $c->session->{referer} = $c->req->header('referer');
-    $c->session->{form_data} = $c->req->body_params;
 
-    # Display the login form
-    $c->stash(template => 'user/login.tt');
-    $c->forward($c->view('TT'));
-
-}
 sub do_login :Local {
     my ($self, $c) = @_;
 
@@ -79,9 +71,9 @@ sub do_login :Local {
             $c->session->{last_name} = $user->last_name;
             $c->session->{email} = $user->email;
 
-# Store the user object in the session
+            # Store the user object in the session
+            $c->set_authenticated(Comserv::Model::User->new(_user => $user));
 
-$c->set_authenticated(Comserv::Model::User->new(_user => $user));
             # Retrieve the referrer URL and form data from the session
             my $referer = $c->session->{referer};
             my $form_data = $c->session->{form_data};
@@ -99,16 +91,19 @@ $c->set_authenticated(Comserv::Model::User->new(_user => $user));
         $c->forward($c->view('TT'));
     }
 }
+
 sub hash_password {
     my ($self, $password) = @_;
     return sha256_hex($password);
 }
+
 sub create_account :Local {
     my ($self, $c) = @_;
 
     # Display the account creation form
     $c->stash(template => '/user/create_account.tt');
 }
+
 sub do_create_account :Local {
     my ($self, $c) = @_;
 
@@ -144,18 +139,18 @@ sub do_create_account :Local {
         last_name => $last_name,
         email => $email,
     });
-     # If there was an error, catch it and report it to the browser
+
+    # If there was an error, catch it and report it to the browser
     if ($@) {
         $c->stash(template => 'user/register.tt', error => "An error occurred: $@");
         $c->forward($c->view('TT'));
         return;
     }
 
-# After the user is created, send an email to the support address
-my $support_address = $c->stash->{mail_to_admin};
+    # After the user is created, send an email to the support address
+    my $support_address = $c->stash->{mail_to_admin};
 
-
-     $email = Email::Simple->create(
+    $email = Email::Simple->create(
         header => [
             To      => $support_address,
             From    => $c->stash->{mail_replyto},
@@ -164,18 +159,20 @@ my $support_address = $c->stash->{mail_to_admin};
         body => "A new user has registered. Username: $username, Email: $email, First Name: $first_name , Last name: $last_name",
     );
 
-eval {
-    sendmail($email);
-};
+    eval {
+        sendmail($email);
+    };
 
-if ($@) {
-    $c->stash(template => 'user/register.tt', error => "An error occurred while sending the email: $@");
-    $c->forward($c->view('TT'));
-    return;
-}
+    if ($@) {
+        $c->stash(template => 'user/register.tt', error => "An error occurred while sending the email: $@");
+        $c->forward($c->view('TT'));
+        return;
+    }
+
     # Redirect to the login page
     $c->res->redirect($c->uri_for('/user/login'));
 }
+
 sub list_users :Local :Args(0) {
     my ($self, $c) = @_;
 
@@ -186,6 +183,7 @@ sub list_users :Local :Args(0) {
     # Display the list of users
     $c->stash(template => 'user/list_users.tt');
 }
+
 sub edit_user :Local :Args(1) {
     my ($self, $c) = @_;
 
@@ -212,6 +210,7 @@ sub edit_user :Local :Args(1) {
         $c->response->body('User not found');
     }
 }
+
 sub do_edit_user :Local :Args(1) {
     my ($self, $c) = @_;
 
@@ -250,12 +249,14 @@ sub do_edit_user :Local :Args(1) {
         $c->response->body('User not found');
     }
 }
+
 sub register :Local {
     my ($self, $c) = @_;
 
     # Display the registration form
     $c->stash(template => 'user/register.tt');
 }
+
 __PACKAGE__->meta->make_immutable;
 
 1;

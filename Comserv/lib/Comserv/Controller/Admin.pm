@@ -2,6 +2,8 @@ package Comserv::Controller::Admin;
 use Moose;
 use namespace::autoclean;
 use Data::Dumper;
+use Comserv::Model::DBSchemaManager;
+
 BEGIN { extends 'Catalyst::Controller'; }
 
 sub begin : Private {
@@ -77,27 +79,37 @@ sub add_schema :Path('/add_schema') :Args(0) {
     $c->stash(template => 'admin/add_schema.tt');
 }
 
-sub migrate_schema :Path('/migrate_schema') :Args(0) {
-    my ( $self, $c ) = @_;
+sub check_and_update_schema {
+    my ($self) = @_;
 
-    if ($c->request->method eq 'POST') {
-        # Run the migration script
-        my $output = `perl Comserv/script/migrate_schema.pl`;
+    try {
+        my $schema = Comserv::Model::DBEncy->new->schema;
+        my $dbh = $schema->storage->dbh;
 
-        # Check if the script ran successfully
-        if ($? == 0) {
-            $c->stash(message => 'Schema migrated successfully.');
+        # Check if the schema is up-to-date
+        my $tables_exist = $dbh->selectrow_array("SHOW TABLES LIKE 'sitedomain'");
+
+        if ($tables_exist) {
+            my $differences = $self->compare_schemas();
+            if (@$differences) {
+                $self->{schema_needs_update} = 1;
+            } else {
+                $self->{schema_needs_update} = 0;
+            }
         } else {
-            $c->stash(message => 'Failed to migrate schema.');
+            $self->deploy_schema();
+            $self->{schema_needs_update} = 0;
         }
-
-        # Add the output to the stash so it can be displayed in the template
-        $c->stash(output => $output);
-    }
-
-    $c->stash(template => 'admin/add_schema.tt');
+    } catch {
+        ERROR("Error in check_and_update_schema: $_");
+        $self->{schema_needs_update} = 1;
+    };
 }
 
+sub schema_needs_update {
+    my ($self) = @_;
+    return $self->{schema_needs_update};
+}
 sub toggle_debug :Path('/toggle_debug') :Args(0) {
     my ( $self, $c ) = @_;
 
@@ -127,6 +139,32 @@ sub get_table_info :Path('/get_table_info') :Args(1) {
     }
 
     $c->stash(template => 'admin/get_table_info.tt');
+}
+sub schema_update :Local {
+    my ($self, $c) = @_;
+
+    my $db_schema_manager = Comserv::Model::DBSchemaManager->new();
+    my $differences = $db_schema_manager->compare_schemas();
+
+    $c->stash(
+        differences => $differences,
+        template    => 'admin/schema_update.tt2'
+    );
+}
+
+sub apply_schema_update :Local {
+    my ($self, $c) = @_;
+
+    my $action = $c->req->params->{action};
+    my $db_schema_manager = Comserv::Model::DBSchemaManager->new();
+
+    if ($action eq 'deploy') {
+        $db_schema_manager->deploy_schema();
+    } elsif ($action eq 'update') {
+        $db_schema_manager->update_schema();
+    }
+
+    $c->response->redirect($c->uri_for('/admin/schema_update'));
 }
 
 __PACKAGE__->meta->make_immutable;
