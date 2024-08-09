@@ -33,8 +33,19 @@
     </nav>
 </header>
 [% IF error_msg %]
-    <p>Error: [% error_msg %]</p>
+    <div class="error-message">
+        [% error_msg %]
+    </div>
 [% END %]
-[% IF success_msg %]
-    <p>Error: [% success_msg %]</p>
+[% IF success_msg %][% IF c.session.success_msg %]
+    <p>[% c.session.success_msg %]</p>
+[% END %]
+<!-- Display error message if it exists -->
+[% IF c.stash.error_msg %]
+    <p class="error">[% c.stash.error_msg %]</p>
+[% END %]
+
+    <div class="success-message">
+        [% success_msg %]
+    </div>
 [% END %]

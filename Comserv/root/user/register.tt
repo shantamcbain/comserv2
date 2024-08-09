@@ -1,32 +1,29 @@
 [% PageVersion = 'register.tt,v 0.01 2023/11/25 shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
   [% PageVersion %]
-
 [% END %]
 
-<!-- root/src/register.tt2 -->
 <form method="post" action="/user/do_create_account">
     <label for="username">Username</label>
     <input type="text" id="username" name="username" value="[% username | html %]"><br>
 
     <label for="password">Password</label>
-    <input type="password" id="password" name="password">
-<br>
+    <input type="password" id="password" name="password"><br>
+
     <label for="password_confirm">Confirm Password</label>
-    <input type="password" id="password_confirm" name="password_confirm">
-<br>
+    <input type="password" id="password_confirm" name="password_confirm"><br>
+
     <label for="email">Email</label>
-    <input type="email" id="email" name="email" value="[% email | html %]">
-<br>
- <br>
+    <input type="email" id="email" name="email" value="[% email | html %]"><br>
+
     <label for="first_name">First Name</label>
-    <input type="test" id="first_name" name="firstname" value="[% firatename | html %]">
-    <br>
+    <input type="text" id="first_name" name="first_name" value="[% first_name | html %]"><br>
+
     <label for="last_name">Last Name</label>
-    <input type="last_name" id="last_name" name="last_name" value="[% last_name | html %]">
-<br>
-<br>   <input type="submit" value="Register">
-   </form>
+    <input type="text" id="last_name" name="last_name" value="[% last_name | html %]"><br>
+
+    <input type="submit" value="Register">
+</form>
 
 <!-- Display the error message if it exists -->
 [% IF error_msg %]
