@@ -5,6 +5,7 @@ use namespace::autoclean;
 use Template;
 use Data::Dumper;
 use Comserv::Model::DBSchemaManager;
+use Try::Tiny;
 
 BEGIN { extends 'Catalyst::Controller' }
 
@@ -13,20 +14,20 @@ __PACKAGE__->config(namespace => '');
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
 
-    $c->log->debug("Entered index action in Root.pm");
-    $c->log->debug("About to fetch SiteName from session");
+    # Logging to stash
+    push @{$c->stash->{error_msg}}, "Entered index action in Root.pm";
+    push @{$c->stash->{error_msg}}, "About to fetch SiteName from session";
 
     my $site_name = $c->session->{SiteName} // 'none';
-    my $controller_name = $c->session->{ControllerName} // 'Root';
 
-    $c->log->debug("Fetched SiteName from session: $site_name");
-    $c->log->debug("Fetched ControllerName from session: $controller_name");
+    # Logging to stash
+    push @{$c->stash->{error_msg}}, "Fetched SiteName from session: $site_name";
 
-    if ($controller_name ne 'Root') {
-        $c->log->debug("Redirecting to controller: $controller_name");
-        $c->detach($controller_name, 'index');
+    if ($site_name ne 'Root') {
+        push @{$c->stash->{error_msg}}, "Redirecting to controller: $site_name";
+        $c->detach($site_name, 'index');
     } else {
-        $c->log->debug("Rendering Root index");
+        push @{$c->stash->{error_msg}}, "Rendering Root index";
         $c->stash(template => 'index.tt');
     }
 }
@@ -34,61 +35,40 @@ sub index :Path :Args(0) {
 sub auto :Private {
     my ($self, $c) = @_;
 
-    # Check the session for SiteName
-   my $SiteName = $c->session->{SiteName};
+    my $SiteName = $c->session->{SiteName};
 
-if (defined $SiteName) {
-    $c->log->debug("SiteName found in session: $SiteName");
-} else {
-    $c->log->debug("SiteName not found in session, proceeding with domain extraction and site domain retrieval");
+    if (defined $SiteName && $SiteName ne 'none') {
+        push @{$c->stash->{error_msg}}, "SiteName found in session: $SiteName";
+    } else {
+        push @{$c->stash->{error_msg}}, "SiteName not found in session or is 'none', proceeding with domain extraction and site domain retrieval";
 
-    my $domain = $c->req->base->host;
-    $domain =~ s/:.*//;
+        my $domain = $c->req->base->host;
+        push @{$c->stash->{error_msg}}, "Extracted domain: $domain";  # Log the extracted domain
+        $domain =~ s/:.*//;
 
-    try {
-        my $site_domain = $c->model('Site')->get_site_domain($domain);
-        $c->log->debug(__PACKAGE__ . " . (split '::', __SUB__)[-1] . \" line \" . __LINE__ . \": site_domain in auto = $site_domain");
+        try {
+            my $site_domain = $c->model('Site')->get_site_domain($domain);
+            push @{$c->stash->{error_msg}}, "Retrieved site domain: " . Dumper($site_domain);
 
-        if ($site_domain) {
-            my $site_id = $site_domain->site_id;
-            my $site = $c->model('Site')->get_site_details($site_id);
-
-            if ($site) {
-                $SiteName = $site->name;
-                $c->stash->{SiteName} = $SiteName;
-                $c->session->{SiteName} = $SiteName;
+            if ($site_domain && $site_domain->site_id) {
+                $SiteName = $self->fetch_and_set($c, $site_domain->site_id, 'site');
+            } else {
+                $c->session->{SiteName} = 'none';
+                $c->stash->{SiteName} = 'none';
             }
-        } else {
-            $SiteName = $self->fetch_and_set($c, 'site');
-            $c->log->debug(__PACKAGE__ . " . (split '::', __SUB__)[-1] . \" line \" . __LINE__ . \": SiteName in auto = $SiteName");
-
-            if (!defined $SiteName) {
-                $c->stash(template => 'index.tt');
-                $c->forward($c->view('TT'));
-                return 0;
-            }
-        }
-    } catch {
-        if ($_ =~ /Schema update required/) {
-            $c->response->redirect($c->uri_for('/admin/schema_update'));
-            return 0;
-        } else {
-            $c->log->error("Caught exception in auto: $_");
-            $c->response->body("Internal Server Error");
-            $c->response->status(500);
-            return 0;
-        }
-    };
-}
+        } catch {
+            push @{$c->stash->{error_msg}}, "Error retrieving site domain: $_";
+            $c->session->{SiteName} = 'none';
+            $c->stash->{SiteName} = 'none';
+        };
+    }
 
     $self->site_setup($c, $c->session->{SiteName});
 
-    $c->log->debug('Entered auto action in Root.pm');
+    push @{$c->stash->{error_msg}}, 'Entered auto action in Root.pm';
 
     my $schema = $c->model('DBEncy');
     print "Schema: $schema\n";
-
-    $SiteName = $self->fetch_and_set($c, $schema, 'site');
 
     unless ($c->session->{group}) {
         $c->session->{group} = 'normal';
@@ -141,45 +121,19 @@ if (defined $SiteName) {
 }
 
 sub fetch_and_set {
-    my ($self, $c, $param) = @_;
+    my ($self, $c, $site_id, $param) = @_;
 
-    my $value = $c->req->query_parameters->{$param};
+    my $site = $c->model('Site')->get_site_details($site_id);
 
-    $c->log->debug(__PACKAGE__ . " . (split '::', __SUB__)[-1] . \" line \" . __LINE__ . \":  in fetch_and_set: $value");
-
-    if (defined $value) {
-        $c->stash->{SiteName} = $value;
-        $c->session->{SiteName} = $value;
-    }
-    elsif (defined $c->session->{SiteName}) {
-        $c->stash->{SiteName} = $c->session->{SiteName};
-    }
-    else {
-        my $domain = $c->req->base->host;
-        $domain =~ s/:.*//;
-
-        my $site_domain = $c->model('Site')->get_site_domain($domain);
-        $c->log->debug("fetch_and_set site_domain: $site_domain");
-
-        if ($site_domain) {
-            my $site_id = $site_domain->site_id;
-
-            my $site = $c->model('Site')->get_site_details($site_id);
-
-            if ($site) {
-                $value = $site->name;
-                $c->stash->{SiteName} = $value;
-                $c->session->{SiteName} = $value;
-                $c->session->{ControllerName} = $site->home_view;
-            }
-        } else {
-            $c->session->{SiteName} = 'none';
-            $c->stash->{SiteName} = 'none';
-            $c->session->{ControllerName} = 'Root';
-        }
+    if ($site) {
+        $c->stash->{SiteName} = $site->name;
+        $c->session->{SiteName} = $site->name;
+    } else {
+        $c->stash->{SiteName} = 'none';
+        $c->session->{SiteName} = 'none';
     }
 
-    return $value;
+    return $c->stash->{SiteName};
 }
 
 sub site_setup {
@@ -187,20 +141,20 @@ sub site_setup {
     my $SiteName = $c->session->{SiteName};
 
     unless (defined $SiteName) {
-        $c->log->debug("SiteName is not defined in the session");
+        push @{$c->stash->{error_msg}}, "SiteName is not defined in the session";
         return;
     }
 
-    $c->log->debug("SiteName: $SiteName");
+    push @{$c->stash->{error_msg}}, "SiteName: $SiteName";
 
     my $site = $c->model('Site')->get_site_details_by_name($SiteName);
 
     unless (defined $site) {
-        $c->log->debug("No site found for SiteName: $SiteName");
+        push @{$c->stash->{error_msg}}, "No site found for SiteName: $SiteName";
         return;
     }
 
-    $c->log->debug("Found site: " . Dumper($site));
+    push @{$c->stash->{error_msg}}, "Found site: " . Dumper($site);
 
     my $css_view_name = $site->css_view_name || '/static/css/default.css';
     my $site_display_name = $site->site_display_name || 'none';
