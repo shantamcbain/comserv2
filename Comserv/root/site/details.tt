@@ -20,12 +20,14 @@
 [% END %]
     </ul>
 
-    <form action="/site/add_domain" method="post">
-        <input type="hidden" name="site_id" value="[% site.id %]">
-        <input type="text" name="new_domain" placeholder="Add new domain">
-        <input type="submit" value="Add">
-    </form>
-    <form method="POST" action="/site/modify?id=[% site.id %]"><br>
+<form method="POST" action="[% c.uri_for('/site/add_domain_post') %]">
+    <input type="hidden" name="site_id" value="[% site.id %]">
+    <label for="domain">Domain:</label>
+    <input type="text" id="domain" name="domain" required><br>
+    <input type="submit" value="Add Domain">
+</form>
+
+<form method="POST" action="/site/modify?id=[% site.id %]"><br>
         <label for="name">Name:</label>
         <input type="text" id="name" name="name" value="[% site.name %]"><br>
         <label for="description">Description:</label>
