@@ -27,30 +27,6 @@
 <p>The `auto` action is a unique feature of the Catalyst framework that is automatically invoked before any other actions in the request-response cycle. Its primary role in the `Comserv::Controller::Root` package is to prepare the request by identifying the site name from the domain, initializing various session and stash variables, and retrieving necessary data from the database. This setup process enables dynamic content generation and routing based on the specifics of the request and session data.</p>
 
 <h3>Functionality</h3>
-<p>The `auto` action performs the following steps:</p>
-<ol>
-    <li><strong>Domain Extraction:</strong> It extracts the domain from the incoming request and removes any port number, if present.</li>
-    <li><strong>Site Identification:</strong> Using the extracted domain, it identifies the site by querying the `Site` model. This step is crucial for multi-tenant applications where the content and routing may vary based on the site.</li>
-    <li><strong>Session and Stash Setup:</strong> Depending on the site identified, it sets up various session and stash variables. These variables can be used later in the request-response cycle to customize the response.</li>
-    <li><strong>Data Fetching:</strong> It fetches necessary data from the database that might be required for processing the request. This could include site-specific configurations, user data, etc.</li>
-</ol>
-
-<h3>Implications</h3>
-<p>The `auto` action plays a crucial role in the request-response cycle. It sets the stage for all subsequent actions by setting up necessary variables and fetching required data. Any issues in this action can potentially impact the entire request processing, so it's important to handle errors and edge cases properly in this action.</p>
-
-<h3>Suggestions for Improvement</h3>
-<p>While the `auto` action is already doing a great job, there are a few areas where it can be improved:</p>
-<ol>
-    <li><strong>Error Handling:</strong> Robust error handling can be added to handle scenarios where the database is down or the `Site` model returns an error.</li>
-    <li><strong>Logging:</strong> Adding more detailed logging can help in debugging issues. For instance, logging the extracted domain, identified site, and fetched data can provide valuable insights during debugging.</li>
-    <li><strong>Code Comments:</strong> While the code is quite readable, adding comments explaining the purpose of each step can make it easier for new developers to understand the code.</li>
-</ol>
-
-<a id="fetch_and_set"></a><a href="#roottop">back to top</a>
-<h2>fetch_and_set Method</h2>
-<p>The `fetch_and_set` method is a helper method in the `Comserv::Controller::Root` package. It is used to fetch a parameter from the URL, session, or database and set it in the session and stash. This allows for dynamic content and routing based on the parameter value. This method is used in the `auto` action to fetch and set the site name.</p>
-
-<h3>Functionality</h3>
 <p>The `fetch_and_set` method performs the following steps:</p>
 <ol>
     <li><strong>Fetch the parameter from the URL query string:</strong> The method takes a Catalyst context object (`$c`) and a parameter name (`$param`) as arguments. It uses the `query_parameters` method of the request object to fetch the value of the parameter from the URL query string.</li>
@@ -62,6 +38,7 @@
 
 <h3>Implications</h3>
 <p>The `fetch_and_set` method is crucial for fetching and setting parameters in the application. It allows for dynamic content and routing based on the parameter value. This method is used in the `auto` action to fetch and set the site name.</p>
+
 <a id="controller"></a><a href="#roottop">back to top</a>
 <h2>Returning the Controller for a Given Site</h2>
 <p>The controller for a given site is determined in the `forward_to_controller_based_on_domain` method. This method fetches the site domain record from the Site model using the domain name extracted from the request, retrieves the site details using the `site_id` from the site domain record, and then forwards the request to the appropriate controller based on the controller name retrieved from the site details.</p>
@@ -85,5 +62,13 @@
 <a id="end"></a><a href="#roottop">back to top</a>
 <h2>end</h2>
 <p>The `end` method is called at the end of every request to render the view. This is the final step in the request lifecycle, where the response is prepared and sent back to the client.</p>
+
+<a id="index"></a><a href="#roottop">back to top</a>
+<h2>index</h2>
+<p>The `index` method handles the main entry point of the application. It checks the `SiteName` in the session and either redirects to the appropriate site or renders the root index page.</p>
+
+<a id="auto"></a><a href="#roottop">back to top</a>
+<h2>auto</h2>
+<p>The `auto` method manages session setup, including setting the `SiteName`, and handles domain extraction and site domain retrieval. This method is crucial for initializing the session and ensuring the correct site context is used throughout the application.</p>
 
 <p>These methods work together to handle the initial request, set up the necessary variables, and render the appropriate view based on the request. This allows for dynamic content and routing based on session data and request parameters.</p>

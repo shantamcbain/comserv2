@@ -182,7 +182,7 @@ sub site_setup {
         return;
     }
 
-co    #push @{$c->stash->{error_msg}}, "Found site: " . Dumper($site);
+   #push @{$c->stash->{error_msg}}, "Found site: " . Dumper($site);
 
     my $css_view_name = $site->css_view_name || '/static/css/default.css';
     my $site_display_name = $site->site_display_name || 'none';
