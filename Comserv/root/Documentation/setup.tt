@@ -1,0 +1,20 @@
+[% PageVersion = 'Documentation/setup.tt,v 0.02 2024/10/00 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+[% END %]
+    [% PageVersion %]
+
+<h1 id="setup_top"><a href="#top">Setup Module</a></h1>
+<p>The Setup module is responsible for guiding the user through the initial setup process of the application. This includes setting up the necessary databases and ensuring that the application is ready for use. The module is divided into three parts: the Controller, the Model, and the View. The Controller handles user input and requests, the Model manages the data and business logic, and the View displays the setup process to the user. The module is built using the Catalyst framework and the Template Toolkit.</p>
+
+<h2 id="setup_controller"><a href="#setup_controller">Setup Controller</a></h2>
+[% INCLUDE 'Documentation/SetupController.tt' %]
+
+<h2 id="setup_model"><a href="#setup_model">Setup Model</a></h2>
+[% INCLUDE 'Documentation/SetupModel.tt' %]
+
+<h2 id="setup_view"><a href="#setup_view">Setup View</a></h2>
+<p>The Setup View is responsible for displaying the setup process to the user. It includes templates that guide the user through the setup steps and provide feedback on the success or failure of the setup process.</p>
+
+<p>We are committed to ensuring that the setup process is smooth and user-friendly. Please refer to the relevant sections for more details on the Setup module.</p>
+
+<p><a href="#setup_top">Back to top of Setup Documentation</a></p>

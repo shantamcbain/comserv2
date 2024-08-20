@@ -3,7 +3,8 @@
     [% PageVersion %]
 [% END %]
 <h1 id="ency_top"><a href="#top">ENCY Module</a></h1>
-<nav>
+<p>The Encyclopedia of Biological Life is a module that allows users to get information on various species of plants and animals. The module is divided into three parts: the Controller, the Model, and the View. The Controller is responsible for handling user input and requests, the Model is responsible for handling the data and business logic, and the View is responsible for displaying the data to the user. The module is built using the Catalyst framework and the Template Toolkit.
+
 <a href="#encyctop">ENCY Controller</a> |
 <a href="#encymtop">ENCY Model</a>
 </nav>

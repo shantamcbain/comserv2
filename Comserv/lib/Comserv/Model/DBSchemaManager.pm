@@ -117,21 +117,43 @@ sub restore_backup {
 
 
 
-sub get_redirect_info {
+sub is_schema_deployed {
+    my ($self, $schema_name) = @_;
+    my $schema = "Comserv::Model::$schema_name"->new->schema;
+    my $dbh = $schema->storage->dbh;
+
+    # Check if a specific table exists to determine if the schema is deployed
+    my $tables_exist = $dbh->selectrow_array("SHOW TABLES LIKE 'sitedomain'");
+    return $tables_exist ? 1 : 0;
+}
+
+sub are_schemas_deployed {
     my ($self) = @_;
-    return ($self->{redirect_to}, $self->{error_msg});
+    return $self->is_schema_deployed('DBEncy') && $self->is_schema_deployed('DBForager');
 }
 
 sub deploy_schema {
-    my ($self) = @_;
+    my ($self, $schema_name) = @_;
+    my $schema = "Comserv::Model::$schema_name"->new->schema;
+    $schema->deploy();
+}
 
-    try {
-        my $schema = Comserv::Model::DBEncy->new->schema;
-        $schema->deploy;
-        DEBUG("Schema deployed successfully.");
-    } catch {
-        ERROR("Error in deploy_schema: $_");
-    };
+sub is_database_exist {
+    my ($self, $database_name) = @_;
+    my $dsn = "DBI:mysql:;host=$config->{shanta_forager}->{host};port=$config->{shanta_forager}->{port}";
+    my $username = $config->{shanta_forager}->{username};
+    my $password = $config->{shanta_forager}->{password};
+
+    my $dbh = DBI->connect($dsn, $username, $password, { RaiseError => 1, PrintError => 0 });
+    my $database_exists = $dbh->selectrow_array("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?", undef, $database_name);
+    $dbh->disconnect;
+
+    return $database_exists ? 1 : 0;
+}
+
+sub are_databases_exist {
+    my ($self) = @_;
+    return $self->is_database_exist('shanta_forager') && $self->is_database_exist('ency');
 }
 
 

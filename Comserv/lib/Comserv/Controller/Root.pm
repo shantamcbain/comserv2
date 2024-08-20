@@ -35,6 +35,19 @@ sub index :Path :Args(0) {
 sub auto :Private {
     my ($self, $c) = @_;
 
+    # Check if the databases exist
+    my $db_schema_manager = Comserv::Model::DBSchemaManager->new();
+    unless ($db_schema_manager->are_databases_exist) {
+        if ($ENV{CATALYST_DEBUG}) {
+            # Redirect to the setup page if in debug mode and databases do not exist
+            $c->response->redirect($c->uri_for('/setup'));
+        } else {
+            # Redirect to the default site name if databases do not exist
+            $c->response->redirect($c->uri_for('/none'));
+        }
+        return 0;
+    }
+
     my $SiteName = $c->session->{SiteName};
 
     if (defined $SiteName && $SiteName ne 'none') {

@@ -1,8 +1,7 @@
-[% PageVersion = 'Documentation/ComservDocumentation.tt,v 0.02 2024/05/22 Shanta Exp shanta ' %]
+[% PageVersion = 'Documentation/ComservDocumentation.tt,v 0.03 2024/10/20 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
-
 
 <!--
 Please ensure that all navigation links within each sub-document are unique. This includes the "Back to top" links, as well as any other navigation links present. Each link should be specific to the content within that particular sub-document to enhance clarity and organization within the documentation.
@@ -27,6 +26,7 @@ Please ensure that all navigation links within each sub-document are unique. Thi
     <a href="#root">Root</a> |
     <a href="#schema">Schema</a> |
     <a href="#sites">Sites</a> |
+    <a href="#setup">Setup</a> |
     <a href="#starman-setup">Starman Setup</a> |
     <a href="#todo">Todo</a> |
     <a href="#workshop-management">Workshop Management</a> |
@@ -34,11 +34,12 @@ Please ensure that all navigation links within each sub-document are unique. Thi
     <a href="#AI">AI Integration Plan</a>
 </nav>
 
-<h3 id="overview"></h3>
+<h3 id="overview"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Overview.tt' %]
 [% INCLUDE 'Documentation/Admin.tt' %]
 [% INCLUDE 'Documentation/AI.tt' %]
 [% INCLUDE 'Documentation/Calendar.tt' %]
+
 <h3 id="dbi"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/DBIDocument.tt' %]
 
@@ -50,7 +51,6 @@ Please ensure that all navigation links within each sub-document are unique. Thi
 
 <h3 id="ENCY"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/ENCY.tt' %]
-
 
 <h3 id="files"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Files.tt' %]
@@ -78,6 +78,9 @@ Please ensure that all navigation links within each sub-document are unique. Thi
 
 <h3 id="sites"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Sites.tt' %]
+
+<h3 id="setup"><a href="#top">Back to top of Documentation</a></h3>
+[% INCLUDE 'Documentation/Setup.tt' %]
 
 <h3 id="starman-setup"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Starman.tt' %]
