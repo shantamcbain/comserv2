@@ -38,14 +38,14 @@ sub auto :Private {
     # Check if the databases exist
     my $db_schema_manager = Comserv::Model::DBSchemaManager->new();
     unless ($db_schema_manager->are_databases_exist) {
-        if ($ENV{CATALYST_DEBUG}) {
-            # Redirect to the setup page if in debug mode and databases do not exist
-            $c->response->redirect($c->uri_for('/setup'));
-        } else {
-            # Redirect to the default site name if databases do not exist
-            $c->response->redirect($c->uri_for('/none'));
-        }
-        return 0;
+        push @{$c->stash->{error_msg}}, "Databases 'shanta_forager' and/or 'ency' do not exist.";
+        $c->stash(template => 'admin/index.tt');
+        return 1;
+    }
+
+    if ($ENV{CATALYST_DEBUG}) {
+        $c->stash(template => 'admin/index.tt');
+        return 1;
     }
 
     my $SiteName = $c->session->{SiteName};
@@ -129,6 +129,9 @@ sub auto :Private {
             member_links => \@member_links,
         );
     }
+
+    # Set the template to admin/index.tt
+    $c->stash(template => 'admin/index.tt');
 
     return 1;
 }

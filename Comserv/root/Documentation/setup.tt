@@ -1,10 +1,22 @@
-[% PageVersion = 'Documentation/setup.tt,v 0.02 2024/10/00 Shanta Exp shanta ' %]
+[% PageVersion = 'Documentation/setup.tt,v 0.03 2024/10/00 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
 [% END %]
     [% PageVersion %]
 
 <h1 id="setup_top"><a href="#top">Setup Module</a></h1>
 <p>The Setup module is responsible for guiding the user through the initial setup process of the application. This includes setting up the necessary databases and ensuring that the application is ready for use. The module is divided into three parts: the Controller, the Model, and the View. The Controller handles user input and requests, the Model manages the data and business logic, and the View displays the setup process to the user. The module is built using the Catalyst framework and the Template Toolkit.</p>
+<p> The loading sequence is as follows:</p>
+<ul>
+    <li>root.pm As depending on the command the application will load a different page.
+        <ul>
+            <li>CATALYST_DEBUG=1 script/comserv_server.pl Puts the application into debug mode and we test for the existence of the databases and their state. If the database dose not exist we are transferred to the Setup controller See setup controller below. If the database exits we will stay in the admin controller. Be sure to reference Setup.pm Admin.pm root.pm Before returning code. </li>
+            <li>script/comserv_server.pl Loads the SiteName controller. for normal operations.</li>
+</li>
+
+    </li>
+    <li>Comserv::Controller::Admin The admin controller This controller deals with all administration of application functions.</li>
+    <li>Comserv::Controller::Setup</li>
+    <li>Documentation/SetupController.tt</li>
 
 <h2 id="setup_controller"><a href="#setup_controller">Setup Controller</a></h2>
 [% INCLUDE 'Documentation/SetupController.tt' %]
@@ -14,6 +26,17 @@
 
 <h2 id="setup_view"><a href="#setup_view">Setup View</a></h2>
 <p>The Setup View is responsible for displaying the setup process to the user. It includes templates that guide the user through the setup steps and provide feedback on the success or failure of the setup process.</p>
+
+<h2>Instructions for AI Assistance</h2>
+<p>When providing assistance, please reference the following files to ensure consistency and proper integration:</p>
+<ul>
+    <li>`root.pm`</li>
+    <li>`Comserv::Controller::Admin`</li>
+    <li>`Comserv::Controller::Setup`</li>
+    <li>`Documentation/SetupController.tt`</li>
+</ul>
+
+<p>Additionally, request any files that contain subroutines to maintain consistency in the code. Ensure consistent naming conventions and use existing code where possible.</p>
 
 <p>We are committed to ensuring that the setup process is smooth and user-friendly. Please refer to the relevant sections for more details on the Setup module.</p>
 
