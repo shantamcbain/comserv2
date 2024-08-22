@@ -1,7 +1,9 @@
+<!-- File: Comserv/root/Documentation/Root.tt -->
+
 [% PageVersion = 'Documentation/Root.tt,v 0.012 2024/05/28 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
-    [% PageVersion %]
 [% END %]
+    [% PageVersion %]
 <h1 id="top">Comserv App Documentation: Root.pm </h1>
 <nav>
     <a id="roottop"></a>
@@ -85,5 +87,31 @@
 <a id="end"></a><a href="#roottop">back to top</a>
 <h2>end</h2>
 <p>The `end` method is called at the end of every request to render the view. This is the final step in the request lifecycle, where the response is prepared and sent back to the client.</p>
+
+<h2>Current Issue: Error Handling and Logging</h2>
+<p>We have been working on improving the error handling and logging in the `Root.pm` controller. The main issues were:</p>
+<ul>
+    <li>Insufficient detail in error messages.</li>
+    <li>Difficulty in tracing errors due to lack of line numbers and subroutine names.</li>
+</ul>
+
+<h3>Successes</h3>
+<ul>
+    <li>Added line numbers and subroutine names to error messages.</li>
+    <li>Improved the `error.tt` template to display detailed error messages and stack traces.</li>
+</ul>
+
+<h3>Failures</h3>
+<ul>
+    <li>Some error messages are still not detailed enough.</li>
+    <li>Need to ensure all error messages include the file name, line number, and subroutine name.</li>
+</ul>
+
+<h3>To-Do</h3>
+<ul>
+    <li>Review all error messages in `Root.pm` to ensure they include the file name, line number, and subroutine name.</li>
+    <li>Test the application to ensure the new error handling and logging are working as expected.</li>
+    <li>Update the documentation to reflect any further changes made.</li>
+</ul>
 
 <p>These methods work together to handle the initial request, set up the necessary variables, and render the appropriate view based on the request. This allows for dynamic content and routing based on session data and request parameters.</p>

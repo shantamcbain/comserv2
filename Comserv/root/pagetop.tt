@@ -32,19 +32,41 @@
         </ul>
     </nav>
 </header>
-[% IF error_msg %]
-    <div class="error-message">
-        [% error_msg %]
-    </div>
-[% END %]
-[% IF success_msg %][% IF c.session.success_msg %]
-    <p>[% c.session.success_msg %]</p>
-[% END %]
-<!-- Display error message if it exists -->
-[% IF c.stash.error_msg %]
-    <p class="error">[% c.stash.error_msg %]</p>
+
+
+
+<!-- File: Comserv/root/pagetop.tt -->
+
+[% IF c.session.debug_mode == 1 %]
+    [% IF c.stash.debug_msg %]
+    first debug message set to 1
+        [% FOREACH msg IN c.stash.debug_msg %]
+            <p class="debug">Debug: [% msg %]</p>
+        [% END %]
+    [% END %]
+    [% PageVersion %]
+    [% INCLUDE 'debug.tt' %]
 [% END %]
 
+<header>
+    <h1>Welcome to [% c.stash.ScriptDisplayName %]</h1>
+    <nav>
+        <ul class="horizontal-menu">
+            <!-- Menu items here -->
+        </ul>
+    </nav>
+</header>
+
+[% IF error_msg %]
+    <div class="error-message">
+    4 error message set
+        [% FOREACH msg IN error_msg %]
+            <p class="error">[% msg %]</p>
+        [% END %]
+    </div>
+[% END %]
+
+[% IF success_msg %]
     <div class="success-message">
         [% success_msg %]
     </div>
