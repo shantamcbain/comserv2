@@ -1,8 +1,9 @@
 <!-- File: Comserv/root/Documentation/Documentation.tt -->
 
-<a href="#workshop-management">Workshop Management</a> |
-<a href="#ve7tit">Ve7tit Application</a> |
-<a href="#AI">AI Integration Plan</a>
+<nav>
+    <a href="#workshop-management">Workshop Management</a> |
+    <a href="#ve7tit">Ve7tit Application</a> |
+    <a href="#AI">AI Integration Plan</a>
 </nav>
 
 <h3 id="overview"><a href="#top">Back to top of Documentation</a></h3>
