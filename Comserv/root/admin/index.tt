@@ -1,9 +1,9 @@
-[% PageVersion = 'Admin/index.tt,v 0.02 2024/05/30 shanta Exp shanta ' %]
+In root we are checking fo[% PageVersion = 'Admin/index.tt,v 0.02 2024/05/30 shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
-<h1>Admin Home Page</h1>
+<h1>Admin Dashboard</h1>
 
 <p>Welcome to the Admin Home Page. Here you can manage various aspects of the site, with a current focus on handling schema changes within the application.</p>
 

@@ -51,6 +51,9 @@ sub auto :Private {
 
     push @{$c->stash->{error_msg}}, 'Completed auto action in Root.pm at line ' . __LINE__ . " in sub " . (caller(0))[3];
 
+    # Set the template to admin/index.tt
+    $c->stash(template => 'admin/index.tt');
+
     return 1;
 }
 
@@ -94,16 +97,16 @@ sub site_setup {
     my $SiteName = $c->session->{SiteName};
 
     unless (defined $SiteName) {
-        push @{$c->stash->{error_msg}}, "SiteName is not defined in the session at line " . __LINE__ . " in sub " . (caller(0))[3];
+        push @{$c->stash->{error_msg}}, "SiteName is not defined in the session";
         return;
     }
 
-    push @{$c->stash->{error_msg}}, "SiteName: $SiteName at line " . __LINE__ . " in sub " . (caller(0))[3];
+    push @{$c->stash->{error_msg}}, "SiteName: $SiteName";
 
     my $site = $c->model('Site')->get_site_details_by_name($SiteName);
 
     unless (defined $site) {
-        push @{$c->stash->{error_msg}}, "No site found for SiteName: $SiteName at line " . __LINE__ . " in sub " . (caller(0))[3];
+        push @{$c->stash->{error_msg}}, "No site found for SiteName: $SiteName";
         return;
     }
 
@@ -141,11 +144,9 @@ sub default :Path {
     $c->response->status(404);
 }
 
-sub documentation :Path('/documentation') :Args(0) {
+sub documentation :Path('documentation') :Args(0) {
     my ( $self, $c ) = @_;
-    push @{$c->stash->{error_msg}}, "Entered documentation action in Root.pm at line " . __LINE__ . " in sub " . (caller(0))[3];
     $c->stash(template => 'Documentation/Documentation.tt');
-    $c->forward($c->view('TT'));
 }
 
 sub end : ActionClass('RenderView') {

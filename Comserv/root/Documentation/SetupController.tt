@@ -19,6 +19,7 @@
 <h2>To-Do List for the Next Session</h2>
 <p>In the next session, the following tasks need to be addressed:</p>
 <ul>
+    <li>Change the load order if debug is set to 1. The application will load the admin/index.tt</li>
     <li>Implement redirection to `setup/index.tt` to show errors and what needs to be done if the setup process is not completed.</li>
     <li>Implement error handling for database connection issues.</li>
     <li>Add validation for user inputs in the setup form.</li>

@@ -37,16 +37,24 @@ sub begin : Private {
 }
 
 sub index :Path :Args(0) {
-    my ( $self, $c ) = @_;
+    my ($self, $c) = @_;
 
-    # Log the application's configured template path
-    $c->log->debug("Template path: " . $c->path_to('root'));
+    # Check database connection
+    my $schema = $c->model('DB');
+    eval {
+        $schema->storage->ensure_connected;
+    };
+    if ($@) {
+        push @{$c->stash->{error_msg}}, "DBI error - DBI connect failed: $@";
+    }
 
     # Set the TT template to use.
     $c->stash(template => 'admin/index.tt');
 
     # Forward to the view
-    $c->forward($c->view('TT'));
+    #$c->forward($c->view('TT'));
+    $c->forward('View::TT');
+
 }
 
 sub edit_documentation :Path('/edit_documentation') :Args(0) {

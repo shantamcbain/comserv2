@@ -9,6 +9,7 @@
 <ul>
     <li><a href="#site_management">Site Management</a></li>
     <li><a href="#database_schema_management">Database Schema Management</a></li>
+    <li><a href="#current_problems">Current Problems</a></li>
 </ul>
 
 <p>The Admin module provides a suite of tools for managing various aspects of the site, with a current focus on handling schema changes within the application.</p>
@@ -56,5 +57,19 @@
     </li>
     <li><strong><a href="#get_table_information">Get Table Information</a></strong> Retrieves information about a specific table from the 'DBEncy' model. If the table exists, displays its schema. If the table does not exist, displays an error message.</li>
 </ul>
+
+<h3 id="current_problems"><a href="#admin_module">Current Problems</a></h3>
+
+<p>We are currently experiencing issues with getting the `index.tt` page to load. This problem applies to all routes, such as `/documentation`. The error message encountered is:</p>
+<pre>
+Couldn't detach to command "none": Invalid action or component.
+Couldn't render template "admin/index.tt: DBI error - DBI connect failed: Unknown database 'shanta_forager'"
+</pre>
+<p>Steps to reproduce:</p>
+<ol>
+    <li>Navigate to any route, such as `/documentation`.</li>
+    <li>Observe the error message indicating a failure to load the `index.tt` page.</li>
+</ol>
+<p>We are working on resolving this issue and will update the documentation once a solution is found.</p>
 
 <p>For more information on how to use these features, please refer to the specific documentation for each feature.</p>
