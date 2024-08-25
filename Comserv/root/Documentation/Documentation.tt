@@ -1,44 +1,17 @@
-[% PageVersion = 'Documentation/ComservDocumentation.tt,v 0.02 2024/05/22 Shanta Exp shanta ' %]
-[% IF c.session.debug_mode == 1 %]
-    [% PageVersion %]
-[% END %]
-
-
-<!--
-Please ensure that all navigation links within each sub-document are unique. This includes the "Back to top" links, as well as any other navigation links present. Each link should be specific to the content within that particular sub-document to enhance clarity and organization within the documentation.
--->
-
-<h1 id="top">Comserv Application Documentation</h1>
+<!-- File: Comserv/root/Documentation/Documentation.tt -->
 
 <nav>
-    <a href="#overview">Overview</a> |
-    <a href="#admin_module">Admin Module</a> |
-    <a href="#dbi">DBI</a> |
-    <a href="#bmaster">BMaster</a> |
-    <a href="#document-management">Document Management</a> |
-    <a href="#ENCY">The Encyclopedia of Biological Life</a> |
-    <a href="#files">Files</a> |
-    <a href="#git">Git</a> |
-    <a href="#installation">Installation</a> |
-    <a href="#calendar">Calendar</a> |
-    <a href="#login">Login</a> |
-    <a href="#logging">Logging</a> |
-    <a href="#projects">Projects</a> |
-    <a href="#root">Root</a> |
-    <a href="#schema">Schema</a> |
-    <a href="#sites">Sites</a> |
-    <a href="#starman-setup">Starman Setup</a> |
-    <a href="#todo">Todo</a> |
     <a href="#workshop-management">Workshop Management</a> |
     <a href="#ve7tit">Ve7tit Application</a> |
     <a href="#AI">AI Integration Plan</a>
 </nav>
 
-<h3 id="overview"></h3>
+<h3 id="overview"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Overview.tt' %]
 [% INCLUDE 'Documentation/Admin.tt' %]
 [% INCLUDE 'Documentation/AI.tt' %]
 [% INCLUDE 'Documentation/Calendar.tt' %]
+
 <h3 id="dbi"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/DBIDocument.tt' %]
 
@@ -50,7 +23,6 @@ Please ensure that all navigation links within each sub-document are unique. Thi
 
 <h3 id="ENCY"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/ENCY.tt' %]
-
 
 <h3 id="files"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Files.tt' %]
@@ -79,6 +51,9 @@ Please ensure that all navigation links within each sub-document are unique. Thi
 <h3 id="sites"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Sites.tt' %]
 
+<h3 id="setup"><a href="#top">Back to top of Documentation</a></h3>
+[% INCLUDE 'Documentation/Setup.tt' %]
+
 <h3 id="starman-setup"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Starman.tt' %]
 
@@ -99,6 +74,32 @@ Please ensure that all navigation links within each sub-document are unique. Thi
     <li><strong>Error Handling:</strong> Implement robust error handling in all subroutines to ensure the application behaves predictably under unexpected conditions.</li>
     <li><strong>To-Do List:</strong> If you identify any issues or potential improvements in the code, add them to the 'Todo' section of this documentation.</li>
     <li><strong>Code Reviews:</strong> Submit your code for review by peers to catch potential issues early and ensure adherence to best practices.</li>
+</ul>
+
+<h2>Current Issue: Error Handling and Logging</h2>
+<p>We have been working on improving the error handling and logging in the `Root.pm` controller. The main issues were:</p>
+<ul>
+    <li>Insufficient detail in error messages.</li>
+    <li>Difficulty in tracing errors due to lack of line numbers and subroutine names.</li>
+</ul>
+
+<h3>Successes</h3>
+<ul>
+    <li>Added line numbers and subroutine names to error messages.</li>
+    <li>Improved the `error.tt` template to display detailed error messages and stack traces.</li>
+</ul>
+
+<h3>Failures</h3>
+<ul>
+    <li>Some error messages are still not detailed enough.</li>
+    <li>Need to ensure all error messages include the file name, line number, and subroutine name.</li>
+</ul>
+
+<h3>To-Do</h3>
+<ul>
+    <li>Review all error messages in `Root.pm` to ensure they include the file name, line number, and subroutine name.</li>
+    <li>Test the application to ensure the new error handling and logging are working as expected.</li>
+    <li>Update the documentation to reflect any further changes made.</li>
 </ul>
 
 <p>We are committed to evolving the Comserv application to meet the needs of our users. Please contribute by keeping this documentation up to date and following the guidelines provided.</p>
