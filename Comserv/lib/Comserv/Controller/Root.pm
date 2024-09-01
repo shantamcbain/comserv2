@@ -16,7 +16,7 @@ sub index :Path :Args(0) {
 
     # Logging to stash
     push @{$c->stash->{error_msg}}, "Entered index action in Root.pm";
-    push @{$c->stash->{error_msg}}, "About to fetch SiteName from session";
+    push @{$c->stash->{error_msg}}, "Abzut to fetch SiteName from session";
 
     my $site_name = $c->session->{SiteName} // 'none';
 
@@ -218,8 +218,27 @@ sub default :Path {
 
 sub documentation :Path('documentation') :Args(0) {
     my ( $self, $c ) = @_;
-    $c->stash(template => 'Documentation/Documentation.tt');
+
+    # Logging to stash
+    push @{$c->stash->{error_msg}}, "Entered documentation action in Root.pm";
+
+    # Ensure the template path is correct
+    my $template_path = 'Documentation/Documentation.tt';
+    if (!-e $c->path_to('root', $template_path)) {
+        push @{$c->stash->{error_msg}}, "Template file not found: $template_path";
+        $c->response->body('Template file not found');
+        $c->response->status(500);
+        return;
+    }
+
+    $c->stash(template => $template_path);
+
+    # Logging to stash
+    push @{$c->stash->{error_msg}}, "Template set to $template_path";
+
+    $c->forward($c->view('TT'));
 }
+
 
 sub end : ActionClass('RenderView') {}
 

@@ -2,7 +2,7 @@
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
-<h1 id="top">Comserv App Documentation: Root.pm </h1>
+<h1 id="-roottop">Comserv App Documentation: Root.pm </h1>
 <nav>
     <a id="roottop"></a>
     <a href="#index">index Action</a>|

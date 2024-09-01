@@ -78,7 +78,7 @@ $c->stash(template => 'admin/index.tt');
     <li>The domain extraction process is not finding a matching site domain record in the database.</li>
     <li>As a result, the `SiteName` is set to 'none'.</li>
     <li>The application then attempts to dispatch to a controller or action named 'none', which does not exist.</li>
-    <li>This leads to the error message being displayed instead of the intended `admin/index.tt` template.</li>
+    <li>This leads to the error message being displayed instead o f the intended `admin/index.tt` template.</li>
 </ul>
 
 <p>To resolve this issue, ensure that the domain extraction process correctly identifies the site domain and that the appropriate controller and action are dispatched based on the `SiteName`.</p>

@@ -1,107 +1,185 @@
 <!-- File: Comserv/root/Documentation/Documentation.tt -->
 
+[% PageVersion = 'Documentation/ComservDocumentation.tt,v 0.03 2024/10/20 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<!--
+Please ensure that all navigation links within each sub-document are unique. This includes the "Back to top" links, as well as any other navigation links present. Each link should be specific to the content within that particular sub-document to enhance clarity and organization within the documentation.
+-->
 <nav>
+    <a href="#overview">Overview</a> |
+    <a href="#admin_module">Admin Module</a> |
+    <a href="#dbi">DBI</a> |
+    <a href="#bmaster">BMaster</a> |
+    <a href="#document-management">Document Management</a> |
+    <a href="#ENCY">The Encyclopedia of Biological Life</a> |
+    <a href="#files">Files</a> |
+    <a href="#git">Git</a> |
+    <a href="#installation">Installation</a> |
+    <a href="#calendar">Calendar</a> |
+    <a href="#login">Login</a> |
+    <a href="#logging">Logging</a> |
+    <a href="#projects">Projects</a> |
+    <a href="#root">Root</a> |
+    <a href="#schema">Schema</a> |
+    <a href="#sites">Sites</a> |
+    <a href="#setup">Setup</a> |
+    <a href="#starman-setup">Starman Setup</a> |
+    <a href="#todo">Todo</a> |
     <a href="#workshop-management">Workshop Management</a> |
     <a href="#ve7tit">Ve7tit Application</a> |
     <a href="#AI">AI Integration Plan</a>
 </nav>
 
 <h3 id="overview"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/Overview.tt' %]
-[% INCLUDE 'Documentation/Admin.tt' %]
-[% INCLUDE 'Documentation/AI.tt' %]
-[% INCLUDE 'Documentation/Calendar.tt' %]
+[% TRY %]
+    [% INCLUDE 'Documentation/Overview.tt' %]
+[% CATCH %]
+    <p>Error including Overview.tt: [% error %]</p>
+[% END %]
+
+<h3 id="admin_module"><a href="#top">Back to top of Documentation</a></h3>
+[% TRY %]
+    [% INCLUDE 'Documentation/Admin.tt' %]
+[% CATCH %]
+    <p>Error including Admin.tt: [% error %]</p>
+[% END %]
+
+<h3 id="AI"><a href="#top">Back to top of Documentation</a></h3>
+[% TRY %]
+    [% INCLUDE 'Documentation/AI.tt' %]
+[% CATCH %]
+    <p>Error including AI.tt: [% error %]</p>
+[% END %]
+
+<h3 id="calendar"><a href="#top">Back to top of Documentation</a></h3>
+[% TRY %]
+    [% INCLUDE 'Documentation/Calendar.tt' %]
+[% CATCH %]
+    <p>Error including Calendar.tt: [% error %]</p>
+[% END %]
 
 <h3 id="dbi"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/DBIDocument.tt' %]
+[% TRY %]
+    [% INCLUDE 'Documentation/DBIDocument.tt' %]
+[% CATCH %]
+    <p>Error including DBIDocument.tt: [% error %]</p>
+[% END %]
 
 <h3 id="bmaster"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/BMaster.tt' %]
+[% TRY %]
+    [% INCLUDE 'Documentation/BMaster.tt' %]
+[% CATCH %]
+    <p>Error including BMaster.tt: [% error %]</p>
+[% END %]
 
 <h3 id="document-management"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/DocumentManagement.tt' %]
+[% TRY %]
+    [% INCLUDE 'Documentation/DocumentManagement.tt' %]
+[% CATCH %]
+    <p>Error including DocumentManagement.tt: [% error %]</p>
+[% END %]
 
 <h3 id="ENCY"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/ENCY.tt' %]
+[% TRY %]
+    [% INCLUDE 'Documentation/ENCY.tt' %]
+[% CATCH %]
+    <p>Error including ENCY.tt: [% error %]</p>
+[% END %]
 
 <h3 id="files"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/Files.tt' %]
+[% TRY %]
+    [% INCLUDE 'Documentation/Files.tt' %]
+[% CATCH %]
+    <p>Error including Files.tt: [% error %]</p>
+[% END %]
 
 <h3 id="git"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/Git.tt' %]
+[% TRY %]
+    [% INCLUDE 'Documentation/Git.tt' %]
+[% CATCH %]
+    <p>Error including Git.tt: [% error %]</p>
+[% END %]
 
 <h3 id="installation"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/Installation.tt' %]
+[% TRY %]
+    [% INCLUDE 'Documentation/Installation.tt' %]
+[% CATCH %]
+    <p>Error including Installation.tt: [% error %]</p>
+[% END %]
 
 <h3 id="login"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/Login.tt' %]
+[% TRY %]
+    [% INCLUDE 'Documentation/Login.tt' %]
+[% CATCH %]
+    <p>Error including Login.tt: [% error %]</p>
+[% END %]
 
 <h3 id="projects"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/Projects.tt' %]
+[% TRY %]
+    [% INCLUDE 'Documentation/Projects.tt' %]
+[% CATCH %]
+    <p>Error including Projects.tt: [% error %]</p>
+[% END %]
 
 <h3 id="logging"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/Logging.tt' %]
+[% TRY %]
+    [% INCLUDE 'Documentation/Logging.tt' %]
+[% CATCH %]
+    <p>Error including Logging.tt: [% error %]</p>
+[% END %]
 
 <h3 id="root"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/Root.tt' %]
-
-<h3 id="schema"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/Schema.tt' %]
-
-<h3 id="sites"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/Sites.tt' %]
+[% TRY %]
+    [% INCLUDE 'Documentation/Root.tt' %]
+[% CATCH %]
+    <p>Error including Root.tt: [% error %]</p>
+[% END %]
 
 <h3 id="setup"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/Setup.tt' %]
+[% TRY %]
+    [% INCLUDE 'Documentation/setup.tt' %]
+[% CATCH %]
+    <p>Error including setup.tt: [% error %]</p>
+[% END %]
 
+<h3 id="schema"><a href="#top">Back to top of Documentation</a></h3>
+[% TRY %]
+    [% INCLUDE 'Documentation/Schema.tt' %]
+[% CATCH %]
+    <p>Error including Schema.tt: [% error %]</p>
+[% END %]
 <h3 id="starman-setup"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/Starman.tt' %]
+[% TRY %]
+    [% INCLUDE 'Documentation/Starman.tt' %]
+[% CATCH %]
+    <p>Error including Starman.tt: [% error %]</p>
+[% END %]
+<h3 id="sites"><a href="#top">Back to top of Documentation</a></h3>
+[% TRY %]
+    [% INCLUDE 'Documentation/Sites.tt' %]
+[% CATCH %]
+    <p>Error including Sites.tt: [% error %]</p>
+[% END %]
 
 <h3 id="todo"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/Todo.tt' %]
+[% TRY %]
+    [% INCLUDE 'Documentation/Todo.tt' %]
+[% CATCH %]
+    <p>Error including Todo.tt: [% error %]</p>
+[% END %]
 
-<h3 id="workshop-management"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/WorkShops.tt' %]
-
+    <h3 id="workshop-management"><a href="#top">Back to top of Documentation</a></h3>
+[% TRY %]
+    [% INCLUDE 'Documentation/WorkShops.tt' %]
+[% CATCH %]
+    <p>Error including WorkShops.tt: [% error %]</p>
+[% END %]
 <h3 id="ve7tit"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/Ve7tit.tt' %]
-
-<h2>Instructions for Developers</h2>
-<p>Welcome to the Comserv Application Documentation. Here are some guidelines and best practices to keep in mind while working with this project:</p>
-<ul>
-    <li><strong>Naming Conventions:</strong> Follow the existing naming conventions for consistency. If you encounter any deviations, normalize them to maintain uniformity.</li>
-    <li><strong>Code Quality:</strong> Ensure that all code is well-documented and adheres to the project's coding standards. Use meaningful variable and function names to enhance readability and maintainability.</li>
-    <li><strong>Error Handling:</strong> Implement robust error handling in all subroutines to ensure the application behaves predictably under unexpected conditions.</li>
-    <li><strong>To-Do List:</strong> If you identify any issues or potential improvements in the code, add them to the 'Todo' section of this documentation.</li>
-    <li><strong>Code Reviews:</strong> Submit your code for review by peers to catch potential issues early and ensure adherence to best practices.</li>
-</ul>
-
-<h2>Current Issue: Error Handling and Logging</h2>
-<p>We have been working on improving the error handling and logging in the `Root.pm` controller. The main issues were:</p>
-<ul>
-    <li>Insufficient detail in error messages.</li>
-    <li>Difficulty in tracing errors due to lack of line numbers and subroutine names.</li>
-</ul>
-
-<h3>Successes</h3>
-<ul>
-    <li>Added line numbers and subroutine names to error messages.</li>
-    <li>Improved the `error.tt` template to display detailed error messages and stack traces.</li>
-</ul>
-
-<h3>Failures</h3>
-<ul>
-    <li>Some error messages are still not detailed enough.</li>
-    <li>Need to ensure all error messages include the file name, line number, and subroutine name.</li>
-</ul>
-
-<h3>To-Do</h3>
-<ul>
-    <li>Review all error messages in `Root.pm` to ensure they include the file name, line number, and subroutine name.</li>
-    <li>Test the application to ensure the new error handling and logging are working as expected.</li>
-    <li>Update the documentation to reflect any further changes made.</li>
-</ul>
-
-<p>We are committed to evolving the Comserv application to meet the needs of our users. Please contribute by keeping this documentation up to date and following the guidelines provided.</p>
-
-<p><a href="#top">Back to top of Documentation</a></p>
+[% TRY %]
+    [% INCLUDE 'Documentation/Ve7tit.tt' %]
+[% CATCH %]
+    <p>Error including Ve7tit.tt: [% error %]</p>
+[% END %]

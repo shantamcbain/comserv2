@@ -1,0 +1,32 @@
+<!-- File: root/error.tt -->
+
+<h1>An error occurred</h1>
+<div class="error-section">
+    <h2>Error Message</h2>
+    <pre>[% FOREACH msg IN error_msg %]
+[% msg %]
+[% END %]</pre>
+</div>
+<div class="error-section">
+    <h2>Stack Trace</h2>
+    <pre>[% c.error.stack_trace.join("\n") | html %]</pre>
+</div>
+<div class="error-section">
+    <h2>Request Details</h2>
+    <pre>
+Method: [% c.request.method %]
+Path: [% c.request.path %]
+Address: [% c.request.address %]
+User Agent: [% c.request.user_agent %]
+Parameters: [% c.request.parameters | html %]
+    </pre>
+</div>
+<div class="error-section">
+    <h2>Response Details</h2>
+    <pre>
+Status: [% c.response.status %]
+Content Type: [% c.response.content_type %]
+    </pre>
+</div>
+
+[% INCLUDE 'debug.tt' %]
