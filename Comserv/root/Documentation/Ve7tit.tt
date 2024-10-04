@@ -1,9 +1,9 @@
-[% PageVersion = 'Documentation/Ve7tit.tt,v 0.01 2024/05/10 Shanta Exp shanta ' %]
+[% PageVersion = 'Documentation/Ve7tit.tt,v 0.02 2024/08/31 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
-<h1 id="top">The 'Ve7tit' Documentation</h1>
+<h1 id="Ve7tittop">The 'Ve7tit' Documentation</h1>
 
 <p>This is my documentation for the 've7tit' application. All the information you need to know about the application is here.</p>
 
