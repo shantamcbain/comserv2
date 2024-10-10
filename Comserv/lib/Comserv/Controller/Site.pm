@@ -25,6 +25,37 @@ my $site_model = Comserv::Model::Site->new(schema => $schema);
     # Set the template to site/index.tt
     $c->stash(template => 'site/index.tt');
 }
+# Subroutine to setup site details from session
+sub site_setup {
+    my ($self, $c) = @_;
+    my $SiteName = $c->session->{SiteName};
+
+    unless (defined $SiteName) {
+        push @{$c->stash->{error_msg}}, "SiteName is not defined in the session";
+        return;
+    }
+
+    # Fetch site details by name
+    my $site = $c->model('Site')->get_site_details_by_name($SiteName);
+
+    unless ($site) {
+        push @{$c->stash->{error_msg}}, "No site found for SiteName: $SiteName";
+        return;
+    }
+
+    # Stash site details
+    $c->stash(
+        ScriptDisplayName => $site->site_display_name || 'none',
+        css_view_name     => $site->css_view_name || '/static/css/default.css',
+        mail_to_admin     => $site->mail_to_admin || 'none',
+        mail_replyto      => $site->mail_replyto || 'helpdesk.computersystemconsulting.ca',
+        template          => 'site/setup.tt',
+    );
+}
+
+# Subroutine to handle domain editing
+
+
 sub add_site :Local {
     my ($self, $c) = @_;
 
@@ -98,13 +129,14 @@ sub details :Local {
     $c->stash(template => 'site/details.tt');
 }
 sub get_site_domain {
-    my ($self, $domain) = @_;
-    return $self->resultset('SiteDomain')->find({ domain => $domain });
+    my ($self, $c, $domain) = @_;
+    return $c->model('DBEncy::SiteDomain')->find({ domain => $domain });
 }
 
+
 sub get_site_details {
-    my ($self, $site_id) = @_;
-    return $self->resultset('Site')->find({ id => $site_id });
+    my ($self, $c, $site_id) = @_;
+    return $c->model('DBEncy::SiteDomain')->find({ id => $site_id });
 }
 sub modify :Local {
     my ($self, $c) = @_;
@@ -144,10 +176,87 @@ sub modify :Local {
         $c->res->redirect($c->uri_for($self->action_for('details'), [$site_id]));
     }
 }
+sub edit_domain :Local :Args(1) {
+    my ($self, $c, $id) = @_;
+
+    # Get the schema
+    my $schema = $c->model('DBEncy');
+
+    # Fetch site details directly from the Site resultset
+    my $site = $schema->resultset('Site')->find($id);
+
+    if ($site) {
+        # Fetch domains for this site
+        my @site_domains = $schema->resultset('SiteDomain')->search({ site_id => $id });
+
+        # Pass the site and domains to the template
+        $c->stash->{site} = $site;
+        $c->stash->{domains} = \@site_domains;
+
+        # If there's a POST request to modify a domain
+        if ($c->request->method eq 'POST') {
+            my $domain_id = $c->request->parameters->{domain_id};
+            my $new_domain = $c->request->parameters->{new_domain};
+
+            # Update domain logic here
+            my $domain = $schema->resultset('SiteDomain')->find($domain_id);
+            if ($domain) {
+                $domain->update({ domain => $new_domain });
+                $c->flash->{message} = 'Domain updated successfully';
+            } else {
+                $c->flash->{error} = 'Domain not found';
+            }
+            $c->res->redirect($c->uri_for($self->action_for('details'), [$id]));
+            return;
+        }
+
+        # Set the template to edit_domain.tt instead of site/index.tt
+        $c->stash(template => 'site/edit_domain.tt');
+    } else {
+        $c->flash->{error} = 'Site not found';
+        $c->res->redirect($c->uri_for($self->action_for('index')));
+    }
+}
+
+sub edit_domain_post :Local {
+    my ($self, $c) = @_;
+
+    # Get the site_id and domain from the form parameters
+    my $site_id = $c->request->parameters->{site_id};
+    my $new_domain = $c->request->parameters->{domain};
+
+    # Validate inputs
+    my @errors;
+    push @errors, 'Site ID is required.' unless $site_id;
+    push @errors, 'Domain is required.' unless $new_domain;
+
+    if (@errors) {
+        # Pass the errors to the template and redisplay the form
+        $c->stash->{error_msgs} = \@errors;
+        $c->forward('edit_domain', [$site_id]);
+        return;
+    }
+
+    # Update the domain in the SiteDomain table
+    my $site_domain = $c->model('DBEncy::SiteDomain')->find({ site_id => $site_id });
+    if ($site_domain) {
+        try {
+            $site_domain->update({ domain => $new_domain });
+            $c->flash->{success_msg} = 'Domain updated successfully';
+            $c->res->redirect($c->uri_for('/site/details', { id => $site_id }));
+        } catch {
+            push @errors, "Failed to update domain: $_";
+            $c->stash->{error_msgs} = \@errors;
+            $c->forward('edit_domain', [$site_id]);
+        };
+    } else {
+        $c->flash->{error} = 'Domain not found';
+        $c->res->redirect($c->uri_for('/site'));
+    }
+}
 
 
 
-# Add the following subroutine to `Comserv/lib/Comserv/Controller/Site.pm`
 sub add_domain :Local {
     my ($self, $c) = @_;
 
