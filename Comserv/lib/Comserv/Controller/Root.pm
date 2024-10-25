@@ -37,8 +37,11 @@ sub auto :Private {
 
     my $SiteName = $c->session->{SiteName};
 
-    if (defined $SiteName && $SiteName ne 'none') {
-        push @{$c->stash->{error_msg}}, "SiteName found in session: $SiteName";
+    if ($c->session->{SiteName} && $c->session->{SiteName} ne 'none') {
+        # SiteName is already present in the session, no need to proceed with domain extraction and site domain retrieval
+        # Use the SiteName to select the correct controller
+        my $controller = $c->session->{SiteName};
+        $c->detach($controller, 'index');
     } else {
         push @{$c->stash->{error_msg}}, "SiteName not found in session or is 'none', proceeding with domain extraction and site domain retrieval";
 
@@ -55,6 +58,9 @@ sub auto :Private {
                 if ($site_details && $site_details->name) {
                     $c->session->{SiteName} = $site_details->name;
                     $c->stash->{SiteName} = $site_details->name;
+                    # Use the SiteName to select the correct controller
+                    my $controller = $site_details->name;
+                    $c->detach($controller, 'index');
                 } else {
                     $c->session->{SiteName} = 'none';
                     $c->stash->{SiteName} = 'none';
@@ -83,52 +89,16 @@ sub auto :Private {
         $c->session->{group} = 'normal';
     }
 
-    my $debug_param = $c->req->param('debug');
-    if (defined $debug_param) {
-        if ($c->session->{debug_mode} ne $debug_param) {
-            $c->session->{debug_mode} = $debug_param;
-            $c->stash->{debug_mode} = $debug_param;
-        }
-    } elsif (defined $c->session->{debug_mode}) {
-        $c->stash->{debug_mode} = $c->session->{debug_mode};
+
+my $debug_param = $c->req->param('debug');
+if (defined $debug_param) {
+    if ($debug_param eq '1') {
+        $c->session->{debug_mode} = 1;
+    } elsif ($debug_param eq '0') {
+        $c->session->{debug_mode} = 0;
     }
-
-    my $page = $c->req->param('page');
-    if (defined $page) {
-        if ($c->session->{page} ne $page) {
-            $c->session->{page} = $page;
-            $c->stash->{page} = $page;
-        }
-    } elsif (defined $c->session->{page}) {
-        $c->stash->{page} = $c->session->{page};
-    }
-
-    $c->stash->{HostName} = $c->request->base;
-    my @todos = $c->model('Todo')->get_top_todos($c, $SiteName);
-
-    my $todos = $c->session->{todos};
-
-    $c->stash(todos => $todos);
-
-    if (ref($c) eq 'Catalyst::Context') {
-        my @main_links = $c->model('DB')->get_links($c, 'Main');
-        my @login_links = $c->model('DB')->get_links($c, 'Login');
-        my @global_links = $c->model('DB')->get_links($c, 'Global');
-        my @hosted_links = $c->model('DB')->get_links($c, 'Hosted');
-        my @member_links = $c->model('DB')->get_links($c, 'Member');
-
-        $c->session(
-            main_links => \@main_links,
-            login_links => \@login_links,
-            global_links => \@global_links,
-            hosted_links => \@hosted_links,
-            member_links => \@member_links,
-        );
-    }
-
-    return 1;
 }
-
+}
 sub fetch_and_set {
     my ($self, $c, $param) = @_;
 
