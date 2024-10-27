@@ -17,7 +17,7 @@ use Catalyst qw/
     Log::Dispatch
     Authorization::ACL
 /;
-
+use Comserv::Util::Debug;
 extends 'Catalyst';
 
 our $VERSION = '0.01';

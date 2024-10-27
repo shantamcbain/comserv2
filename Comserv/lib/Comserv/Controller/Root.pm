@@ -10,38 +10,56 @@ use Try::Tiny;
 BEGIN { extends 'Catalyst::Controller' }
 
 __PACKAGE__->config(namespace => '');
+sub log_with_details {
+    my ($class, $message) = @_;
+    my ($package, $filename, $line) = caller(1);
+    my $caller = caller(0);
 
+    # Instead of directly using $c, we'll assume it's passed as an argument
+    my $c = shift if scalar @_ > 1;  # If there's more than one argument, the first is $c
+
+    if ($c) {
+        push @{$c->stash->{error_msg}}, "Entered log_with_details method in $caller";
+
+        $c->log->debug(sprintf("[%s:%d] %s", $filename, $line, $message));
+        push @{$c->stash->{error_msg}}, sprintf("[%s:%d] %s", $filename, $line, $message);
+    }
+    print STDERR sprintf("[%s:%d] %s\n", $filename, $line, $message);
+}
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
 
-    # Logging to stash
     push @{$c->stash->{error_msg}}, "Entered index action in Root.pm";
-    push @{$c->stash->{error_msg}}, "Abzut to fetch SiteName from session";
+
+    $self->log_with_details($c, "Entered index action in Root.pm");
+    $self->log_with_details($c, "About to fetch SiteName from session");
 
     my $site_name = $c->session->{SiteName} // 'none';
 
-    # Logging to stash
-    push @{$c->stash->{error_msg}}, "Fetched SiteName from session: $site_name";
+    $self->log_with_details($c, "Fetched SiteName from session: $site_name");
 
     if ($site_name ne 'Root') {
-        push @{$c->stash->{error_msg}}, "Redirecting to controller: $site_name";
+        $self->log_with_details($c, "Redirecting to controller: $site_name");
         $c->detach($site_name, 'index');
     } else {
-        push @{$c->stash->{error_msg}}, "Rendering Root index";
+        $self->log_with_details($c, "Rendering Root index");
         $c->stash(template => 'index.tt');
     }
 }
-
 sub auto :Private {
     my ($self, $c) = @_;
+# Logging to stash
+    push @{$c->stash->{error_msg}}, "Entering auto method";
 
     my $SiteName = $c->session->{SiteName};
 
     if ($c->session->{SiteName} && $c->session->{SiteName} ne 'none') {
+        $c->session->{SiteName} = $SiteName;
+        push @{$c->stash->{error_msg}}, "SiteName found in session: $SiteName";
         # SiteName is already present in the session, no need to proceed with domain extraction and site domain retrieval
         # Use the SiteName to select the correct controller
         my $controller = $c->session->{SiteName};
-        $c->detach($controller, 'index');
+       # $c->detach($controller, 'index');
     } else {
         push @{$c->stash->{error_msg}}, "SiteName not found in session or is 'none', proceeding with domain extraction and site domain retrieval";
 
@@ -60,7 +78,7 @@ sub auto :Private {
                     $c->stash->{SiteName} = $site_details->name;
                     # Use the SiteName to select the correct controller
                     my $controller = $site_details->name;
-                    $c->detach($controller, 'index');
+                    #$c->detach($controller, 'index');
                 } else {
                     $c->session->{SiteName} = 'none';
                     $c->stash->{SiteName} = 'none';
@@ -78,7 +96,7 @@ sub auto :Private {
 
     $self->site_setup($c, $c->session->{SiteName});
 
-    push @{$c->stash->{error_msg}}, 'Entered auto action in Root.pm';
+    push @{$c->stash->{error_msg}}, 'Should be returing form site_setup';
 
     my $schema = $c->model('DBEncy');
     print "Schema: $schema\n";

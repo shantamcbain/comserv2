@@ -1,30 +1,29 @@
 requires 'Moose';
 requires 'namespace::autoclean';
-requires 'Catalyst'; # Catalyst framework
+requires 'Catalyst';
 requires 'Catalyst::Action::RenderView';
 requires 'Catalyst::Authentication::Store::DBIx::Class';
 requires 'Catalyst::Model';
 requires 'Catalyst::Plugin::Authentication';
 requires 'Catalyst::Plugin::Authorization::Roles';
 requires 'Catalyst::Plugin::Authorization::ACL';
-requires 'Catalyst::Plugin::ConfigLoader'; # Catalyst framework
+requires 'Catalyst::Plugin::ConfigLoader';
 requires 'Catalyst::Plugin::Log::Dispatch';
 requires 'Catalyst::Plugin::Session';
 requires 'Catalyst::Plugin::Session::Store::DBI';
 requires 'Catalyst::Plugin::Session::Store::File';
 requires 'Catalyst::Plugin::Session::State::Cookie';
-requires 'Catalyst::Plugin::Session::Store::File';
 requires 'Catalyst::Plugin::StackTrace';
 requires 'Catalyst::Plugin::Static::Simple';
-requires 'Catalyst::Runtime'; # Catalyst framework
+requires 'Catalyst::Runtime';
 requires 'Catalyst::ScriptRunner';
 requires 'Catalyst::View::TT';
 requires 'Config::JSON';
-requires 'DBD::mysql'; # DBIx::Class
+requires 'Data::Dumper';
+requires 'DBD::mysql';
 requires 'DBIx::Class::Migration';
 requires 'DBIx::Class::TimeStamp';
-requires 'DBIx::Class::Schema::Loader'; # DBIx::Class
-requires 'sudo cpanm DBD::mysql';
+requires 'DBIx::Class::Schema::Loader';
 requires 'Data::FormValidator';
 requires 'DateTime';
 requires 'DateTime::Event::Recurrence';
@@ -34,12 +33,9 @@ requires 'Email::Sender::Simple';
 requires 'JSON::MaybeXS';
 requires 'JSON';
 requires 'Log::Dispatch::Config';
-requires 'Paws'; # AWS SDK for Perl
-requires 'script::runner';
-requires 'Starman'; # DBIx::Class
+requires 'Paws';
+requires 'Starman';
 requires 'Template::Plugin::DBI';
 requires 'Template::Plugin::DateTime';
-requires 'Template::Plugin::DBI';
-requires 'Term::ReadPassword'; # Catalyst framework
-requires 'Template::Plugin::JSON'; # Template Toolkit JSON plugin
-requires 'Text::CSV'; # DBIx::Class
+requires 'Template::Plugin::JSON';
+requires 'Text::CSV';

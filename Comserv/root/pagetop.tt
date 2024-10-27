@@ -22,9 +22,10 @@
             [% INCLUDE 'Navigation/TopDropListGlobal.tt' %]
             [% INCLUDE 'Navigation/TopDropListHosted.tt' %]
             [% INCLUDE 'Navigation/TopDropListMember.tt' %]
-        [% IF c.session.roles == "admin" %]
-        [% END %]
-            [% INCLUDE 'Navigation/admintopmenu.tt' %]
+            [% IF c.session.roles == "admin" %]
+                [% INCLUDE 'Navigation/admintopmenu.tt' %]
+            [% END %]
+
 
         [% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]
         </ul>
