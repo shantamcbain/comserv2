@@ -6,189 +6,86 @@ use Template;
 use Data::Dumper;
 use Comserv::Model::DBSchemaManager;
 use Try::Tiny;
-
+use Comserv::Util::Logger;
 BEGIN { extends 'Catalyst::Controller' }
 
 __PACKAGE__->config(namespace => '');
-sub log_with_details {
-    my ($class, $message) = @_;
-    my ($package, $filename, $line) = caller(1);
-    my $caller = caller(0);
 
-    # Instead of directly using $c, we'll assume it's passed as an argument
-    my $c = shift if scalar @_ > 1;  # If there's more than one argument, the first is $c
-
-    if ($c) {
-        push @{$c->stash->{error_msg}}, "Entered log_with_details method in $caller";
-
-        $c->log->debug(sprintf("[%s:%d] %s", $filename, $line, $message));
-        push @{$c->stash->{error_msg}}, sprintf("[%s:%d] %s", $filename, $line, $message);
-    }
-    print STDERR sprintf("[%s:%d] %s\n", $filename, $line, $message);
-}
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
 
-    push @{$c->stash->{error_msg}}, "Entered index action in Root.pm";
+    Comserv::Util::Logging->log_with_details($c, "Entered index action in Root.pm");
 
-    $self->log_with_details($c, "Entered index action in Root.pm");
-    $self->log_with_details($c, "About to fetch SiteName from session");
+    Comserv::Util::Logging->log_with_details($c, "Entered index action in Root.pm");
+    Comserv::Util::Logging->log_with_details($c, "About to fetch SiteName from session");
 
     my $site_name = $c->session->{SiteName} // 'none';
 
-    $self->log_with_details($c, "Fetched SiteName from session: $site_name");
+    Comserv::Util::Logging->log_with_details($c, "Fetched SiteName from session: $site_name");
 
     if ($site_name ne 'Root') {
-        $self->log_with_details($c, "Redirecting to controller: $site_name");
+        Comserv::Util::Logging->log_with_details($c, "Redirecting to controller: $site_name");
         $c->detach($site_name, 'index');
     } else {
-        $self->log_with_details($c, "Rendering Root index");
+        Comserv::Util::Logging->log_with_details($c, "Rendering Root index");
         $c->stash(template => 'index.tt');
     }
 }
 sub auto :Private {
     my ($self, $c) = @_;
-# Logging to stash
-    push @{$c->stash->{error_msg}}, "Entering auto method";
 
-    my $SiteName = $c->session->{SiteName};
+    # Log entry into the auto action
+    Comserv::Util::Logging->instance->log_with_details($c, "Entered auto action in Root.pm");
 
-    if ($c->session->{SiteName} && $c->session->{SiteName} ne 'none') {
-        $c->session->{SiteName} = $SiteName;
-        push @{$c->stash->{error_msg}}, "SiteName found in session: $SiteName";
-        # SiteName is already present in the session, no need to proceed with domain extraction and site domain retrieval
-        # Use the SiteName to select the correct controller
-        my $controller = $c->session->{SiteName};
-       # $c->detach($controller, 'index');
-    } else {
-        push @{$c->stash->{error_msg}}, "SiteName not found in session or is 'none', proceeding with domain extraction and site domain retrieval";
+    # Domain setup
+    my $domain = $c->req->base->host;
+    $domain =~ s/:.*//;
 
-        my $domain = $c->req->base->host;
-        push @{$c->stash->{error_msg}}, "Extracted domain: $domain";  # Log the extracted domain
-        $domain =~ s/:.*//;
+    my $site_model = $c->model('Site');
+    my $SiteName = $c->session->{SiteName} || $domain;
+    Comserv::Util::Logging->instance->log_with_details($c, "Fetched SiteName from session: $SiteName");
 
-        try {
-            my $site_domain = $c->model('Site')->get_site_domain($domain);
-            #push @{$c->stash->{error_msg}}, "Retrieved site domain: " . Dumper($site_domain);
-
-            if ($site_domain && $site_domain->site_id) {
-                my $site_details = $c->model('Site')->get_site_details($site_domain->site_id);
-                if ($site_details && $site_details->name) {
-                    $c->session->{SiteName} = $site_details->name;
-                    $c->stash->{SiteName} = $site_details->name;
-                    # Use the SiteName to select the correct controller
-                    my $controller = $site_details->name;
-                    #$c->detach($controller, 'index');
-                } else {
-                    $c->session->{SiteName} = 'none';
-                    $c->stash->{SiteName} = 'none';
-                }
+    try {
+        if ($SiteName ne 'none' && $c->session->{SiteName}) {
+            $c->stash(site_name => $SiteName);
+        } else {
+            my $domain_setup = $site_model->site_setup($SiteName);
+            if ($domain_setup && $domain_setup->{site_name}) {
+                $c->stash(%$domain_setup);
+                $c->session->{SiteName} = $domain_setup->{site_name};
+                Comserv::Util::Logging->instance->log_with_details($c, "Site setup successful for $SiteName");
             } else {
-                $c->session->{SiteName} = 'none';
-                $c->stash->{SiteName} = 'none';
+                Comserv::Util::Logging->instance->log_with_details($c, "Failed to setup site for domain: $domain");
             }
-        } catch {
-            push @{$c->stash->{error_msg}}, "Error retrieving site domain: $_";
-            $c->session->{SiteName} = 'none';
-            $c->stash->{SiteName} = 'none';
-        };
-    }
+        }
+        $self->site_setup($c, $c->stash->{site_name});
+    } catch {
+        Comserv::Util::Logging->instance->log_with_details($c, "Error setting up site: $_");
+    };
 
-    $self->site_setup($c, $c->session->{SiteName});
-
-    push @{$c->stash->{error_msg}}, 'Should be returing form site_setup';
-
+    # Existing logic for schema, group, and debug mode
     my $schema = $c->model('DBEncy');
     print "Schema: $schema\n";
 
-    $SiteName = $self->fetch_and_set($c, $schema, 'site');
+    # Update the call to fetch_and_set to use the Site model
+    $SiteName = $site_model->fetch_and_set($c, $schema, 'site');
 
     unless ($c->session->{group}) {
         $c->session->{group} = 'normal';
     }
 
-
-my $debug_param = $c->req->param('debug');
-if (defined $debug_param) {
-    if ($debug_param eq '1') {
-        $c->session->{debug_mode} = 1;
-    } elsif ($debug_param eq '0') {
-        $c->session->{debug_mode} = 0;
-    }
-}
-}
-sub fetch_and_set {
-    my ($self, $c, $param) = @_;
-
-    my $value = $c->req->query_parameters->{$param};
-
-    # Logging to stash
-    push @{$c->stash->{error_msg}}, __PACKAGE__ . " . (split '::', __SUB__)[-1] . \" line \" . __LINE__ . \":  in fetch_and_set: $value";
-
-    if (defined $value) {
-        $c->stash->{SiteName} = $value;
-        $c->session->{SiteName} = $value;
-    }
-    elsif (defined $c->session->{SiteName}) {
-        $c->stash->{SiteName} = $c->session->{SiteName};
-        $c->session->{SiteName} = $value;
-   }
-    else {
-        my $domain = $c->req->base->host;
-        $domain =~ s/:.*//;
-
-        my $site_domain = $c->model('Site')->get_site_domain($domain);
-        push @{$c->stash->{error_msg}}, "fetch_and_set site_domain: $site_domain";
-
-        if ($site_domain) {
-            $c->stash->{SiteName} = $site_domain;
-            $c->session->{SiteName} = $site_domain;
-        } else {
-            $c->stash->{SiteName} = 'none';
-            $c->session->{SiteName} = 'none';
+    # Debug mode toggle
+    my $debug_param = $c->req->param('debug');
+    if (defined $debug_param) {
+        if ($debug_param eq '1') {
+            $c->session->{debug_mode} = 1;
+        } elsif ($debug_param eq '0') {
+            $c->session->{debug_mode} = 0;
         }
     }
-
-    return $value;
 }
 
-sub site_setup {
-    my ($self, $c) = @_;
-    my $SiteName = $c->session->{SiteName};
 
-    unless (defined $SiteName) {
-        push @{$c->stash->{error_msg}}, "SiteName is not defined in the session";
-        return;
-    }
-
-    push @{$c->stash->{error_msg}}, "SiteName: $SiteName";
-
-    my $site = $c->model('Site')->get_site_details_by_name($SiteName);
-
-    unless (defined $site) {
-        push @{$c->stash->{error_msg}}, "No site found for SiteName: $SiteName";
-        return;
-    }
-
-   #push @{$c->stash->{error_msg}}, "Found site: " . Dumper($site);
-
-    my $css_view_name = $site->css_view_name || '/static/css/default.css';
-    my $site_display_name = $site->site_display_name || 'none';
-    my $mail_to_admin = $site->mail_to_admin || 'none';
-    my $mail_replyto = $site->mail_replyto || 'helpdesk.computersystemconsulting.ca';
-
-    $c->stash->{ScriptDisplayName} = $site_display_name;
-    $c->stash->{css_view_name} = $css_view_name;
-    $c->stash->{mail_to_admin} = $mail_to_admin;
-    $c->stash->{mail_replyto} = $mail_replyto;
-
-    $c->stash(
-        default_css => $c->uri_for($c->stash->{css_view_name} || '/static/css/default.css'),
-        menu_css => $c->uri_for('/static/css/menu.css'),
-        log_css => $c->uri_for('/static/css/log.css'),
-        todo_css => $c->uri_for('/static/css/todo.css'),
-    );
-}
 
 sub debug :Path('/debug') {
     my ($self, $c) = @_;
@@ -208,12 +105,12 @@ sub documentation :Path('documentation') :Args(0) {
     my ( $self, $c ) = @_;
 
     # Logging to stash
-    push @{$c->stash->{error_msg}}, "Entered documentation action in Root.pm";
+    Comserv::Util::Logging->log_with_details($c, "Entered documentation action in Root.pm");
 
     # Ensure the template path is correct
     my $template_path = 'Documentation/Documentation.tt';
     if (!-e $c->path_to('root', $template_path)) {
-        push @{$c->stash->{error_msg}}, "Template file not found: $template_path";
+        Comserv::Util::Logging->log_with_details($c, "Template file not found: $template_path");
         $c->response->body('Template file not found');
         $c->response->status(500);
         return;
@@ -222,7 +119,7 @@ sub documentation :Path('documentation') :Args(0) {
     $c->stash(template => $template_path);
 
     # Logging to stash
-    push @{$c->stash->{error_msg}}, "Template set to $template_path";
+    Comserv::Util::Logging->log_with_details($c, "Template set to $template_path");
 
     $c->forward($c->view('TT'));
 }

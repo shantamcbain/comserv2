@@ -17,10 +17,11 @@ use Catalyst qw/
     Log::Dispatch
     Authorization::ACL
 /;
-use Comserv::Util::Debug;
+use Comserv::Util::Logging;
 extends 'Catalyst';
 
 our $VERSION = '0.01';
+our $logging = Comserv::Util::Logging->instance;
 
 __PACKAGE__->log(Catalyst::Log->new(output => sub {
     my ($self, $level, $message) = @_;
