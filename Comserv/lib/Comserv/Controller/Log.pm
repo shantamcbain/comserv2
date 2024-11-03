@@ -17,16 +17,15 @@ sub BUILD {
         2 => 'IN PROGRESS',
         3 => 'DONE',
     });
-
 }
 
-# Rest of your controller code
 sub index :Path('/log') :Args {
     my ( $self, $c, $status ) = @_;
 
     # Default status to not 3 if not provided
     $status //= { '!=' => 3 };
 
+    $self->logging->log_with_details($c, __FILE__, __LINE__, "Fetching logs with status: $status");
     # Create a new instance of the Log model
     my $log_model = Comserv::Model::Log->new();
 
@@ -35,7 +34,7 @@ sub index :Path('/log') :Args {
 
     # Debug: Print all logs
     while (my $log = $rs->next) {
-        $c->log->debug("Record ID: " . $log->record_id);
+        $self->logging->log_with_details($c, __FILE__, __LINE__, "Record ID: " . $log->record_id);
     }
 
     # Pass the logs to the template
@@ -59,7 +58,7 @@ sub edit :Path('/log/details'):Args(0) {
         return;
     }
     # Print the status value to the debug log
-    warn "Status: " . $log->status;
+    $self->logging->log_with_details($c, __FILE__, __LINE__, "Status: " . $log->status);
 
     # Pass the log entry and the priority, status to the template
     $c->stash(
@@ -146,7 +145,6 @@ sub update :Path('/log/update') :Args(0) {
     $c->response->redirect($c->uri_for("/log", { record_id => $record_id }));
 }
 
-# This method will only display the form
 sub log_form :Path('/log/log_form'):Args() {
     my ( $self, $c) = @_;
         my $schema = $c->model('DBEncy');

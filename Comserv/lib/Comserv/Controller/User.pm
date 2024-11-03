@@ -9,6 +9,8 @@ use Email::Simple;
 use Email::Simple::Creator;
 use Email::Sender::Transport::SMTP qw();
 
+use Comserv::Model::DBEncy;  # Ensure the correct path to the module
+
 BEGIN { extends 'Catalyst::Controller'; }
 
 sub base :Chained('/') :PathPart('user') :CaptureArgs(0) {
@@ -24,6 +26,7 @@ sub login :Chained('base') :PathPart('login') :Args(0) {
 
     # Set the template for the login page
     $c->stash(template => 'user/login.tt');
+    $c->forward($c->view('TT'));
 }
 
 sub index :Path :Args(0) {
@@ -31,9 +34,11 @@ sub index :Path :Args(0) {
 
     # Access the User model
     my $user_model = $c->model('DBEncy::Ency::User');
+    die "User model not found" unless $user_model;
 
     # Use the User model to retrieve user data
     my $user_data = $user_model->search({});
+    die "User data not found" unless $user_data;
 
     # Store the user data in the stash
     $c->stash(users => $user_data);
@@ -45,10 +50,12 @@ sub index :Path :Args(0) {
 
 sub do_login :Local {
     my ($self, $c) = @_;
-
+    
     # Retrieve the username and password from the form data
     my $username = $c->request->params->{username};
     my $password = $c->request->params->{password};
+
+    $c->log->debug("Attempting to log in user: $username");
 
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
@@ -72,7 +79,7 @@ sub do_login :Local {
             $c->session->{first_name} = $user->first_name;
             $c->session->{last_name} = $user->last_name;
             $c->session->{email} = $user->email;
-
+            
             # Store the user object in the session
             $c->set_authenticated(Comserv::Model::User->new(_user => $user));
 
@@ -157,7 +164,7 @@ sub do_create_account :Local {
     );
 
         # Send email to admin
-        my $email = Email::Simple->create(
+        $email = Email::Simple->create(
             header => [
                 To      => 'shanta@computersystemconsulting.ca',
                 From    => 'noreply@computersystemconsulting.ca',
@@ -256,6 +263,7 @@ sub do_edit_user :Local :Args(1) {
         # Check if the password field is provided and not empty
         if ($form_data->{password}) {
             # Hash the new password before storing it
+            $c->log->debug("Updating password for user: $user_id");
             $update_data{password} = sha256_hex($form_data->{password});
         }
 

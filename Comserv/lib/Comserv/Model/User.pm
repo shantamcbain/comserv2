@@ -1,17 +1,15 @@
 package Comserv::Model::User;
 use Moose;
 use namespace::autoclean;
-use namespace::autoclean;
 use Email::Sender::Simple qw(sendmail);
 use Email::Sender::Transport::SMTP qw();
 use Email::Simple;
 use Email::Simple::Creator;
 
+use Comserv::Model::DBEncy;  # Ensure the correct path to the module
+
 extends 'Catalyst::Model';
 extends 'Catalyst::Authentication::User';
-
-# Ensure the correct path to the module
-use Comserv::Model::DBEncy;
 
 has '_user' => (
     is => 'ro',
@@ -49,7 +47,6 @@ sub roles {
 }
 
 
-# Ensured correct database connection and user creation
 # Ensured correct database connection and user creation
 sub create_user {
     my ($self, $user_data) = @_;

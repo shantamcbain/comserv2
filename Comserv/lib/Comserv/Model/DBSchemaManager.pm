@@ -12,7 +12,7 @@ use Log::Log4perl qw(:easy);
 use Comserv::Model::DBEncy;
 use Data::Dumper;
 print Dumper(\@INC);
-# Initialize logger
+# Initialize logging
 Log::Log4perl->easy_init($DEBUG);
 
 # Load the database configuration from db_config.json

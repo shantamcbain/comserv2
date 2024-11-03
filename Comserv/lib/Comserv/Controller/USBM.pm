@@ -8,6 +8,7 @@ sub index :Path('/') :Args(0) {
     my ( $self, $c ) = @_;
 
      $c->stash(template => 'USBM/USBM.tt');
+     $c->forward('View::TT');
 }
 
 

@@ -358,8 +358,7 @@ for my $day (0..6) {
     # Filter todos based on the day
     my @day_todos = grep {
         if ($day == 0) {
-            # If it's the first day of the week, include todos that have gone beyond their due date
-                   # If it's the first day of the week, include todos that have gone beyond their due date and are not closed
+            # If it's the first day of the week, include todos that have gone beyond their due date and are not closed
             $_->due_date le $current_date->ymd && $_->status ne 'closed'
 
         } else {

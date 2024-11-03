@@ -10,6 +10,7 @@ sub begin : Private {
     my ( $self, $c ) = @_;
 
     # Check if the user is logged in
+    $self->logging->log_with_details($c, __FILE__, __LINE__, "Checking if user is logged in");
     if (!$c->user_exists) {
         # If the user isn't logged in, call the index method
         $self->index($c);
@@ -18,10 +19,11 @@ sub begin : Private {
     # Fetch the roles from the session
     my $roles = $c->session->{roles};
     # Log the roles
-    $c->log->info("admin begin Roles: " . Dumper($roles));  # Change this line
+    $self->logging->log_with_details($c, __FILE__, __LINE__, "admin begin Roles: " . Dumper($roles));
     # Check if roles is defined and is an array reference
     if (defined $roles && ref $roles eq 'ARRAY') {
         # Check if the user has the 'admin' role
+        $self->logging->log_with_details($c, __FILE__, __LINE__, "User roles: " . Dumper($roles));
         if (grep { $_ eq 'admin' } @$roles) {
             # User is an admin, proceed with the request
         } else {
@@ -101,7 +103,7 @@ sub check_and_update_schema {
             $self->{schema_needs_update} = 0;
         }
     } catch {
-        ERROR("Error in check_and_update_schema: $_");
+        $self->logging->log_with_details($self, __FILE__, __LINE__, "Error in check_and_update_schema: $_");
         $self->{schema_needs_update} = 1;
     };
 }

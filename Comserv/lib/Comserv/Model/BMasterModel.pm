@@ -7,7 +7,7 @@ use Log::Log4perl qw(:easy);
 
 extends 'Catalyst::Model';
 
-# Initialize logger
+# Initialize logging
 Log::Log4perl->easy_init($DEBUG);
 
 sub get_frames_for_queen {

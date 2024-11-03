@@ -1,22 +1,14 @@
 package Comserv::Controller::Site;
 use Moose;
 use namespace::autoclean;
+use Try::Tiny;
 
 BEGIN { extends 'Catalyst::Controller'; }
-# In your controller or script file
-use Try::Tiny;
-use Comserv::Model::Site;
-
-
 
 sub index :Path :Args(0) {
     my ( $self, $c ) = @_;
-# Get a DBIx::Class::Schema object
-my $schema = $c->model('DBEncy');
 
-# Create a new Comserv::Model::Site object
-my $site_model = Comserv::Model::Site->new(schema => $schema);
-   # Get all sites
+    # Get all sites
     my $sites = $c->model('Site')->get_all_sites();
 
     # Pass the sites to the template
@@ -25,6 +17,7 @@ my $site_model = Comserv::Model::Site->new(schema => $schema);
     # Set the template to site/index.tt
     $c->stash(template => 'site/index.tt');
 }
+
 sub add_site :Local {
     my ($self, $c) = @_;
 
@@ -53,6 +46,7 @@ sub add_site :Local {
     # Redirect to the add_site_form action
     $c->res->redirect($c->uri_for($self->action_for('add_site_form')));
 }
+
 sub add_site_form :Local {
     my ($self, $c) = @_;
 
@@ -61,6 +55,7 @@ sub add_site_form :Local {
     # Set the template to site/add_site_form.tt
     $c->stash(template => 'site/add_site_form.tt');
 }
+
 sub details :Local {
     my ($self, $c) = @_;
 
@@ -97,6 +92,7 @@ sub details :Local {
     # Set the template to site/details.tt
     $c->stash(template => 'site/details.tt');
 }
+
 sub get_site_domain {
     my ($self, $domain) = @_;
     return $self->resultset('SiteDomain')->find({ domain => $domain });
@@ -106,6 +102,7 @@ sub get_site_details {
     my ($self, $site_id) = @_;
     return $self->resultset('Site')->find({ id => $site_id });
 }
+
 sub modify :Local {
     my ($self, $c) = @_;
 
@@ -114,7 +111,7 @@ sub modify :Local {
 
     # Get the new site details from the request body
     my $new_site_details = $c->request->body_parameters;
-  # Check for empty strings in integer fields and set them to 0
+    # Check for empty strings in integer fields and set them to 0
     for my $field (qw(affiliate pid app_logo_width app_logo_height)) {
         if (exists $new_site_details->{$field} && $new_site_details->{$field} eq '') {
             $new_site_details->{$field} = 0;
@@ -136,8 +133,8 @@ sub modify :Local {
         $site->update($new_site_details);
 
         # Redirect to the details page for the site
-           $c->flash->{error} = 'You made the change.';
-    $c->res->redirect($c->uri_for($self->action_for('index')));
+        $c->flash->{error} = 'You made the change.';
+        $c->res->redirect($c->uri_for($self->action_for('index')));
     } else {
         # Redirect to the details page with an error message
         $c->flash->{error} = 'Site not found';
@@ -145,9 +142,6 @@ sub modify :Local {
     }
 }
 
-
-
-# Add the following subroutine to `Comserv/lib/Comserv/Controller/Site.pm`
 sub add_domain :Local {
     my ($self, $c) = @_;
 

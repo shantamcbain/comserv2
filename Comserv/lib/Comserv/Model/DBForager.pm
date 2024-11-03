@@ -2,7 +2,7 @@ package Comserv::Model::DBForager;
 
 use strict;
 
-use JSON;  # Add this line-*`
+use JSON;
 use base 'Catalyst::Model::DBIC::Schema';
 
 # Load the database configuration from db_config.json
