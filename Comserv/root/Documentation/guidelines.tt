@@ -1,0 +1,141 @@
+[% PageVersion = 'Documentation/guidelines.tt,v 0.01 2024/05/28 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+[% PageVersion -%]
+[% END %]
+
+<h1 id="guidelines-top">Comserv Development Guidelines</h1>
+
+<nav>
+    <a href="#patch-format">Patch Format</a> |
+    <a href="#catalyst-coding-standards">Catalyst Coding Standards</a> |
+    <a href="#documentation">Documentation Standards</a> |
+    <a href="#testing">Testing Guidelines</a> |
+    <a href="#git-workflow">Git Workflow</a> |
+    <a href="#security">Security Guidelines</a> |
+    <a href="#completed-items">Completed Items</a> |
+    <a href="#session-planning">Session Planning</a> |
+    <a href="#placeholders">Placeholders in Code Returns</a>
+</nav>
+
+<h2 id="patch-format">Patch Format</h2>
+<p>When providing code returns, always use the `+-` patch format to prevent overwriting existing functions. This ensures that changes are clear and maintainable.</p>
+
+<h2 id="placeholders">Placeholders in Code Returns</h2>
+<p>Placeholders should never be used in code returns. Always provide complete code snippets without placeholders to ensure clarity and accuracy in code sharing.</p>
+
+<h2 id="catalyst-coding-standards">Catalyst Coding Standards</h2>
+<p>Follow these standards when coding in Catalyst:</p>
+<ul>
+    <li>Use Moose for object-oriented programming.</li>
+    <li>Keep controllers slim by moving business logic to models.</li>
+    <li>Use clear and descriptive names for actions and methods.</li>
+    <li>Implement error handling gracefully.</li>
+</ul>
+
+<h2 id="testing">Testing Guidelines</h2>
+<p>Ensure that your code is thoroughly tested, including testing for both .tt templates and the underlying code. Some key points to consider:</p>
+<ul>
+    <li>Review .tt templates for proper syntax and ensure all necessary variables are passed correctly.</li>
+    <li>Write unit tests to validate the behavior of individual functions and methods.</li>
+    <li>Run integration tests to ensure the application components work together as expected.</li>
+    <li>Implement automated testing frameworks to catch regressions early in the development process.</li>
+</ul>
+<p><a href="#guidelines-top">Back to top</a></p>
+
+<h2 id="documentation">Documentation Standards</h2>
+<p>Keep the documentation up-to-date and comprehensive. Ensure that all changes to the codebase are reflected in the corresponding documentation sections.</p>
+<p><a href="#guidelines-top">Back to top</a></p>
+
+<h2 id="git-workflow">Git Workflow</h2>
+<p>A Git workflow refers to the agreed-upon process for how developers should use Git to manage code changes, collaborate on features, and maintain the codebase. The key elements of the recommended Git workflow for this project are:</p>
+
+<ul>
+    <li>Establish a clear branching strategy:
+<ul>
+    <li>Guidelines for when to create new feature branches:
+        <ul>
+            <li>Create a new feature branch for each new feature or bug fix. This helps in isolating changes and makes it easier to manage and review code.</li>
+            <li>Start a feature branch from the latest version of the main development branch to ensure you have the most recent updates.</li>
+            <li>Use feature branches for experimental work that might not be ready for production.</li>
+        </ul>
+    </li>
+    <li>How to name branches:
+        <ul>
+            <li>Use descriptive names that reflect the purpose of the branch, such as `feature/login-page` or `bugfix/user-authentication`.</li>
+            <li>Include identifiers like ticket numbers or issue IDs if applicable, e.g., `feature/1234-login-page`.</li>
+            <li>Maintain consistency in naming conventions across the team to avoid confusion.</li>
+        </ul>
+    </li>
+    <li>Managing merging back into the main development branch:
+        <ul>
+            <li>Before merging, ensure your feature branch is up-to-date with the main development branch by regularly pulling the latest changes.</li>
+            <li>Resolve any conflicts that arise during the merge process to ensure a smooth integration.</li>
+            <li>Conduct code reviews and obtain necessary approvals before merging to maintain code quality and consistency.</li>
+            <li>Use pull requests to facilitate discussion and review of the changes before they are merged into the main branch.</li>
+<li>Guidelines for deleting or keeping a branch after merging:
+        <ul>
+            <li>Delete a branch after merging if:
+                <ul>
+                    <li>The feature or bug fix is complete and no further changes are expected.</li>
+                    <li>Keeping the branch would clutter the repository with obsolete branches.</li>
+                </ul>
+            </li>
+            <li>Keep a branch after merging if:
+                <ul>
+                    <li>Further development or bug fixes are anticipated on the same feature.</li>
+                    <li>The branch serves as a reference for ongoing or related work.</li>
+                </ul>
+            </li>
+        </ul>
+        </ul>
+    </li>
+</ul>
+    </li>
+    <li>Provide guidance on writing clear and informative commit messages:
+        <ul>
+            <li>Explain the purpose and scope of each change.</li>
+        </ul>
+    </li>
+    <li>Document the process for submitting changes for review:
+        <ul>
+            <li>Creating pull requests.</li>
+            <li>Getting approvals from other team members.</li>
+        </ul>
+    </li>
+    <li>Describe the steps for merging approved changes into the main branch:
+        <ul>
+            <li>Include any necessary testing or deployment procedures.</li>
+        </ul>
+    </li>
+    <li>Emphasize the importance of keeping the codebase clean and well-organized:
+        <ul>
+            <li>Regularly remove obsolete branches and commits.</li>
+        </ul>
+
+</ul>
+<p>Follow the established Git workflow for the project, including regular commits with meaningful messages and the use of feature branches for new developments.</p>
+<p><a href="#guidelines-top">Back to top</a></p>
+
+<p><a href="#guidelines-top">Back to top</a></p>
+
+
+<h2 id="security">Security Guidelines</h2>
+<!-- Add security guidelines content -->
+<p><a href="#guidelines-top">Back to top</a></p>
+
+<h2 id="completed-items">Completed Items</h2>
+<ul>
+    <li>Created the Git Workflow guidelines section</li>
+    <li>Added the Testing Guidelines section</li>
+</ul>
+
+<h2 id="session-planning">Session Planning</h2>
+<p>When planning your sessions, please follow these guidelines:</p>
+<ol>
+    <li>Please read <code>sessionplan.tt</code>.</li>
+    <li>Compare the current prompt and the plan you would create for it with the session plan.</li>
+    <li>Modify the current session plan to incorporate the plan you just created.</li>
+</ol>
+
+<h2 id="example-prompt">Example Prompt</h2>
+<p>When reminding the assistant, you can say: "Please follow the guidelines outlined in guidelines.tt, especially regarding the `+-` patch format for code returns and the prohibition on using placeholders in code returns."</p>

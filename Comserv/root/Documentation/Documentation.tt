@@ -1,6 +1,6 @@
 [% PageVersion = 'Documentation/ComservDocumentation.tt,v 0.02 2024/05/22 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
-    [% PageVersion %]
+[% PageVersion -%]
 [% END %]
 
 
@@ -15,7 +15,7 @@ Please ensure that all navigation links within each sub-document are unique. Thi
     <a href="#admin_module">Admin Module</a> |
     <a href="#dbi">DBI</a> |
     <a href="#bmaster">BMaster</a> |
-    <a href="#document-management">Document Management</a> |
+    <a href="#document-management">Document Management</a>  |
     <a href="#ENCY">The Encyclopedia of Biological Life</a> |
     <a href="#files">Files</a> |
     <a href="#git">Git</a> |
@@ -24,22 +24,25 @@ Please ensure that all navigation links within each sub-document are unique. Thi
     <a href="#login">Login</a> |
     <a href="#logging">Logging</a> |
     <a href="#projects">Projects</a> |
+    <a href="#guidelines">Guidelines</a>    |
     <a href="#root">Root</a> |
     <a href="#schema">Schema</a> |
     <a href="#sites">Sites</a> |
     <a href="#starman-setup">Starman Setup</a> |
     <a href="#todo">Todo</a> |
-    <a href="#workshop-management">Workshop Management</a> |
+    <a href="#workshop-management">Workshop Management</a>  |
     <a href="#ve7tit">Ve7tit Application</a> |
-    <a href="#AI">AI Integration Plan</a>
+    <a href="#AI">AI Integration Plan</a> 
+    <a href="#session-plan">Session Plan</a>
 </nav>
 
-<h3 id="overview"></h3>
+<h3 id="overview"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Overview.tt' %]
 [% INCLUDE 'Documentation/Admin.tt' %]
-[% INCLUDE 'Documentation/AI.tt' %]
+[% INCLUDE 'Documentation/AI.tt' %] 
 [% INCLUDE 'Documentation/Calendar.tt' %]
 <h3 id="dbi"><a href="#top">Back to top of Documentation</a></h3>
+
 [% INCLUDE 'Documentation/DBIDocument.tt' %]
 
 <h3 id="bmaster"><a href="#top">Back to top of Documentation</a></h3>
@@ -48,14 +51,16 @@ Please ensure that all navigation links within each sub-document are unique. Thi
 <h3 id="document-management"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/DocumentManagement.tt' %]
 
-<h3 id="ENCY"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/ENCY.tt' %]
+[% INCLUDE 'Documentation/ENCY.tt' %] 
 
 
 <h3 id="files"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Files.tt' %]
 
 <h3 id="git"><a href="#top">Back to top of Documentation</a></h3>
+
+<h3 id="guidelines"><a href="#top">Back to top of Documentation</a></h3>
+[% INCLUDE 'Documentation/guidelines.tt' %]
 [% INCLUDE 'Documentation/Git.tt' %]
 
 <h3 id="installation"><a href="#top">Back to top of Documentation</a></h3>
@@ -64,20 +69,23 @@ Please ensure that all navigation links within each sub-document are unique. Thi
 <h3 id="login"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Login.tt' %]
 
-<h3 id="projects"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/Projects.tt' %]
-
 <h3 id="logging"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Logging.tt' %]
+
+<h3 id="projects"><a href="#top">Back to top of Documentation</a></h3>
+[% INCLUDE 'Documentation/Projects.tt' %]
 
 <h3 id="root"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Root.tt' %]
 
 <h3 id="schema"><a href="#top">Back to top of Documentation</a></h3>
+
+<h3 id="session-plan"><a href="#top">Back to top of Session Plan</a></h3>
+[% INCLUDE 'Documentation/sessionplan.tt' %]
 [% INCLUDE 'Documentation/Schema.tt' %]
 
 <h3 id="sites"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/Sites.tt' %]
+[% INCLUDE 'Documentation/Sites.tt' %] 
 
 <h3 id="starman-setup"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Starman.tt' %]
@@ -85,11 +93,8 @@ Please ensure that all navigation links within each sub-document are unique. Thi
 <h3 id="todo"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Todo.tt' %]
 
-<h3 id="workshop-management"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/WorkShops.tt' %]
-
-<h3 id="ve7tit"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/Ve7tit.tt' %]
+<h3 id="guidelines"><a href="#top">Back to top of Documentation</a></h3>
+[% INCLUDE 'Documentation/guidelines.tt' %]
 
 <h2>Instructions for Developers</h2>
 <p>Welcome to the Comserv Application Documentation. Here are some guidelines and best practices to keep in mind while working with this project:</p>

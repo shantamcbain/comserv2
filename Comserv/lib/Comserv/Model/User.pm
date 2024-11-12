@@ -1,6 +1,11 @@
 package Comserv::Model::User;
 use Moose;
 use namespace::autoclean;
+use namespace::autoclean;
+use Email::Sender::Simple qw(sendmail);
+use Email::Sender::Transport::SMTP qw();
+use Email::Simple;
+use Email::Simple::Creator;
 
 extends 'Catalyst::Model';
 extends  'Catalyst::Authentication::User';
@@ -38,6 +43,31 @@ sub roles {
     my $self = shift;
     return [ map $_->role, $self->_user->roles->all ];
 }
+
+
+# Ensured correct database connection and user creation
+# Ensured correct database connection and user creation
+sub create_user {
+    my ($self, $user_data) = @_;
+
+    # Use the existing database connection from Comserv::Model::DBEncy
+    my $schema = Comserv::Model::DBEncy->new->schema;
+
+    # Check if the username already exists
+    my $existing_user = $schema->resultset('User')->find({ username => $user_data->{username} });
+    if ($existing_user) {
+        return "Username already exists";
+    }
+
+    # Create a new user, ensuring 'roles' field is provided
+    my $new_user = $schema->resultset('User')->create({
+        %$user_data,
+        roles => $user_data->{roles} // 'default_role',  # Provide a default role if not specified
+    });
+
+    return $new_user;
+}
+
 
 
 __PACKAGE__->meta->make_immutable;
