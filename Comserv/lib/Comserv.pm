@@ -76,14 +76,14 @@ sub psgi_app {
 __PACKAGE__->setup();
 
 # Call the initialize_db.pl script during application startup
-BEGIN {
-    my $script_path = "$FindBin::Bin/../script/initialize_db.pl";
-    unless (-x $script_path) {
-        die "Failed to initialize database: $script_path is not executable";
-    }
-    system($script_path) == 0
-        or die "Failed to initialize database: $!";
-}
+#BEGIN {
+#    my $script_path = "$FindBin::Bin/../script/initialize_db.pl";
+#    unless (-x $script_path) {
+#        die "Failed to initialize database: $script_path is not executable";
+#    }
+#    system($script_path) == 0
+#        or die "Failed to initialize database: $!";
+#}
 
 =encoding utf8
 
