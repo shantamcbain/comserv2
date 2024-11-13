@@ -1,0 +1,24 @@
+[% PageVersion = 'Documentation/User.tt,v 0.01 2024/10/04' %]
+
+<h1 id="user-management">User Management Documentation</h1>
+
+<h2 id="user-controller">User Controller</h2>
+<p>The User Controller handles all user-related actions and functionalities:</p>
+<ul>
+    <li><strong>Add New Users</strong>: Provides functionality to register new users.</li>
+    <li><strong>Change Password</strong>: Allows users to change their passwords securely.</li>
+    <li><strong>Login</strong>: Facilitates user login, validating credentials and starting a session.</li>
+    <li><strong>Logout</strong>: Ends the user session, securely logging them out.</li>
+    <li><strong>Edit User Profile</strong>: Enables users to update their personal information.</li>
+</ul>
+
+<h2 id="user-model">User Model</h2>
+<p>The User Model represents the user data and business logic:</p>
+<ul>
+    <li><strong>User Account Creation</strong>: Manages the creation and validation of new user accounts.</li>
+    <li><strong>Password Hashing</strong>: Ensures that user passwords are securely hashed before storage.</li>
+    <li><strong>User Data Retrieval</strong>: Provides methods to retrieve user data from the database.</li>
+    <li><strong>User Data Update</strong>: Handles updates to existing user information.</li>
+</ul>
+
+<p><a href="#user-management">Back to top</a></p>

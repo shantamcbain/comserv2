@@ -35,10 +35,10 @@
     <li><h3 id="AI_integration"><a href="#main_features">AI Integration with the Site:</a></h3> Integrates the ability to search internal resources, external resources, and add information to the local system.</li>
     <li><h3 id="modular_design"><a href="#main_features">Modular Design:</a></h3> Ensures the site is built in a modular fashion for ease of maintenance and scalability.</li>
     <li><h3 id="todo_project_management_logs"><a href="#main_features">ToDo, Project Management, Logs:</a></h3> Incorporates tools for managing tasks, projects, and maintaining logs for better tracking and management.</li>
-    <li><h3 id="admin_functions"><a href="#main_features">Admin Functions:</a></h3> Provides capabilities to edit files, control CSS, update the application, and manage the schema.</li>
+    <li><h3 id="admin_functions"><a href="#main_features">Admin Functions:</a></h3> Provides capabilities to edit files, control Cascading Style Sheets, update the application, and manage the schema.</li>
     <li><h3 id="security"><a href="#main_features">Security:</a></h3> Implements robust security measures to protect data and user information.</li>
     <li><h3 id="documentation"><a href="#main_features">Documentation:</a></h3> Maintains comprehensive documentation to assist developers and users.</li>
-    <li><h3 id="search"><a href="#main_features">Search:</a></h3> Uses AI to build a comprehensive information base, improving search accuracy and relevance.</li>
+    <li><h3 id="search"><a href="#main_features">Search:</a></h3> Uses Artificial Intelligence to build a comprehensive information base, improving search accuracy and relevance.</li>
     <li><h3 id="reference_system"><a href="#main_features">Reference System of Documents:</a></h3> Offers a well-organized system for managing and referencing documents.</li>
     <li><h3 id="power_monitoring"><a href="#main_features">Power Monitoring System:</a></h3> Includes a system for monitoring power usage and efficiency.</li>
     <li><h3 id="web_based_email"><a href="#main_features">Web-Based Email:</a></h3> Provides a web-based email client for managing emails.</li>
@@ -54,7 +54,7 @@
 <p><a href="#main_features">Back to top of Main Features</a></p>
 <h2 id="suggestions"><a href="#overview_top">Suggestions for Improvement and Expansion</a></h2>
 <ul>
-    <li><strong>AI Integration Planning:</strong> Create a detailed plan for integrating AI into various modules of the application. This should include specific tasks, goals, and technologies to be used. Consider adding an AI.tt documentation file to outline this plan.</li>
+    <li><strong>AI Integration Planning:</strong> Create a detailed plan for integrating Artificial Intelligence into various modules of the application. This should include specific tasks, goals, and technologies to be used. Consider adding an AI.tt documentation file to outline this plan.</li>
     <li><strong>User Feedback Mechanism:</strong> Implement a system for collecting user feedback to continuously improve the user experience and functionality of the site.</li>
     <li><strong>Enhanced Security Measures:</strong> Regularly review and update security protocols to address new vulnerabilities and threats.</li>
     <li><strong>Performance Optimization:</strong> Optimize the application's performance to handle increasing amounts of data and user activity efficiently.</li>
@@ -76,5 +76,5 @@
 
 <p>We are committed to evolving the Comserv application to meet the needs of our users. Your contributions and adherence to these guidelines are crucial for our continued success.</p>
 
-<p><a href="#overview_top">Back to top</a></p>
-<p><a href="#top">Back to top of Documentation</a></p>
+<h2><a href="#overview_top">Back to top of Overview</a></h2>
+

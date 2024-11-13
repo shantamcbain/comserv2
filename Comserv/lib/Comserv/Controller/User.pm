@@ -13,14 +13,16 @@ sub base :Chained('/') :PathPart('user') :CaptureArgs(0) {
     # This will capture /user in the URL
 }
 
-sub login :Chained('base') :PathPart('login') :Args(0) {
+sub login :Local {
     my ($self, $c) = @_;
+   # Store the referrer URL and form data in the session
+    $c->session->{referer} = $c->req->header('referer');
+    $c->session->{form_data} = $c->req->body_params;
 
-    # Handle the login functionality here
-    # For example, you can check the user's credentials and start a session
+    # Display the login form
+    $c->stash(template => 'user/login.tt');
+    $c->forward($c->view('TT'));
 
-    # Set the template for the login page
-    $c->stash(template => 'User/login.tt');
 }
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
@@ -38,17 +40,7 @@ sub index :Path :Args(0) {
     $c->stash(template => 'user/index.tt');
     $c->forward($c->view('TT'));
 }
-sub login :Local {
-    my ($self, $c) = @_;
-   # Store the referrer URL and form data in the session
-    $c->session->{referer} = $c->req->header('referer');
-    $c->session->{form_data} = $c->req->body_params;
 
-    # Display the login form
-    $c->stash(template => 'user/login.tt');
-    $c->forward($c->view('TT'));
-
-}
 sub do_login :Local {
     my ($self, $c) = @_;
 

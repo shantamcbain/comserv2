@@ -1,12 +1,7 @@
-[% PageVersion = 'Documentation/ComservDocumentation.tt,v 0.02 2024/05/22 Shanta Exp shanta ' %]
+[% PageVersion = 'Documentation/ComservDocumentation.tt,v 0.03 2024/05/22 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
 [% PageVersion -%]
 [% END %]
-
-
-<!--
-Please ensure that all navigation links within each sub-document are unique. This includes the "Back to top" links, as well as any other navigation links present. Each link should be specific to the content within that particular sub-document to enhance clarity and organization within the documentation.
--->
 
 <h1 id="top">Comserv Application Documentation</h1>
 
@@ -37,94 +32,97 @@ Please ensure that all navigation links within each sub-document are unique. Thi
     <a href="#user-management">User Management</a>
 </nav>
 
-<h3 id="overview"><a href="#top">Back to top of Documentation</a></h3>
 
 [% INCLUDE 'Documentation/Overview.tt' %]
-<h3 id="admin"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/Admin.tt' %]
-<h3 id="ai"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/AI.tt' %] 
+<p><a href="#top">Return to top of Documentation</a></p>
 
+<h3 id="admin_module"><a href="#top">Back to top of Documentation</a></h3>
+[% INCLUDE 'Documentation/Admin.tt' %]
+<p><a href="#top">Return to top of Documentation</a></p>
+
+<h3 id="AI"><a href="#top">Back to top of Documentation</a></h3>
+[% INCLUDE 'Documentation/AI.tt' %]
+<p><a href="#top">Return to top of Documentation</a></p>
 
 <h3 id="dbi"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/DBIDocument.tt' %]
+<p><a href="#top">Return to top of Documentation</a></p>
 
-<h3 id="bmaster">
-<h3><a href="#top">Back to top of Documentation</a></h3>
+<h3 id="bmaster"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/BMaster.tt' %]
+<p><a href="#top">Return to top of Documentation</a></p>
 
-<h3 id="calendar"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/Calendar.tt' %]
 <h3 id="document-management"><a href="#top">Back to top of Documentation</a></h3>
-
 [% INCLUDE 'Documentation/DocumentManagement.tt' %]
+<p><a href="#top">Return to top of Documentation</a></p>
 
 <h3 id="ENCY"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/ENCY.tt' %] 
+[% INCLUDE 'Documentation/ENCY.tt' %]
+<p><a href="#top">Return to top of Documentation</a></p>
 
 <h3 id="files"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Files.tt' %]
+<p><a href="#top">Return to top of Documentation</a></p>
 
-
-
-
-<h3 id="guidelines"><a href="#top">Back to top of Documentation</a></h3>
-
-[% INCLUDE 'Documentation/guidelines.tt' %]
 <h3 id="git"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Git.tt' %]
+<p><a href="#top">Return to top of Documentation</a></p>
+
+<h3 id="guidelines"><a href="#top">Back to top of Documentation</a></h3>
+[% INCLUDE 'Documentation/guidelines.tt' %]
+<p><a href="#top">Return to top of Documentation</a></p>
 
 <h3 id="installation"><a href="#top">Back to top of Documentation</a></h3>
-
 [% INCLUDE 'Documentation/Installation.tt' %]
+<p><a href="#top">Return to top of Documentation</a></p>
 
 <h3 id="login"><a href="#top">Back to top of Documentation</a></h3>
-<h3><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Login.tt' %]
+<p><a href="#top">Return to top of Documentation</a></p>
 
 <h3 id="logging"><a href="#top">Back to top of Documentation</a></h3>
-
 [% INCLUDE 'Documentation/Logging.tt' %]
+<p><a href="#top">Return to top of Documentation</a></p>
 
 <h3 id="projects"><a href="#top">Back to top of Documentation</a></h3>
-
 [% INCLUDE 'Documentation/Projects.tt' %]
+<p><a href="#top">Return to top of Documentation</a></p>
 
 <h3 id="root"><a href="#top">Back to top of Documentation</a></h3>
-
 [% INCLUDE 'Documentation/Root.tt' %]
+<p><a href="#top">Return to top of Documentation</a></p>
 
-<h3 id="session-plan"><a href="#top">Back to top of Documentation</a></h3>
-
-
-
-[% INCLUDE 'Documentation/sessionplan.tt' %]
 <h3 id="schema"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Schema.tt' %]
+<p><a href="#top">Return to top of Documentation</a></p>
 
-<h3 id="user-management"><a href="#top">Back to top of Documentation</a></h3>
-
-[% INCLUDE 'Documentation/User.tt' %]
+<h3 id="session-plan"><a href="#top">Back to top of Documentation</a></h3>
+[% INCLUDE 'Documentation/sessionplan.tt' %]
+<p><a href="#top">Return to top of Documentation</a></p>
 
 <h3 id="sites"><a href="#top">Back to top of Documentation</a></h3>
-
-[% INCLUDE 'Documentation/Sites.tt' %] 
+[% INCLUDE 'Documentation/Sites.tt' %]
+<p><a href="#top">Return to top of Documentation</a></p>
 
 <h3 id="starman-setup"><a href="#top">Back to top of Documentation</a></h3>
-
 [% INCLUDE 'Documentation/Starman.tt' %]
+<p><a href="#top">Return to top of Documentation</a></p>
 
 <h3 id="todo"><a href="#top">Back to top of Documentation</a></h3>
-
 [% INCLUDE 'Documentation/Todo.tt' %]
+<p><a href="#top">Return to top of Documentation</a></p>
 
-<h3 id="workshop-management"><a href="#top">Back to top of Documentation</a></h3>
+<h3 id="user-management"><a href="#top">Back to top of Documentation</a></h3>
+[% INCLUDE 'Documentation/User.tt' %]
+<p><a href="#top">Return to top of Documentation</a></p>
 
-[% INCLUDE 'Documentation/WorkShops.tt' %]
 <h3 id="ve7tit"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Ve7tit.tt' %]
-<h3 id="AI"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/AI.tt' %]
+<p><a href="#top">Return to top of Documentation</a></p>
+
+<h3 id="workshop-management"><a href="#top">Back to top of Documentation</a></h3>
+[% INCLUDE 'Documentation/WorkShops.tt' %]
+<p><a href="#top">Return to top of Documentation</a></p>
 
 <h2>Instructions for Developers</h2>
 <p>Welcome to the Comserv Application Documentation. Here are some guidelines and best practices to keep in mind while working with this project:</p>

@@ -1,18 +1,15 @@
 package Comserv::Model::User;
 use Moose;
 use namespace::autoclean;
-use namespace::autoclean;
 use Email::Sender::Simple qw(sendmail);
 use Email::Sender::Transport::SMTP qw();
 use Email::Simple;
 use Email::Simple::Creator;
 
-extends 'Catalyst::Model';
-extends  'Catalyst::Authentication::User';
+extends 'Catalyst::Model', 'Catalyst::Authentication::User';
 
 has '_user' => (
     is => 'ro',
-     is => 'ro',
     lazy => 1,
     default => sub {
         die "_user attribute must be set before it's used";
@@ -45,7 +42,6 @@ sub roles {
 }
 
 
-# Ensured correct database connection and user creation
 # Ensured correct database connection and user creation
 sub create_user {
     my ($self, $user_data) = @_;
