@@ -1,6 +1,12 @@
 requires 'Moose';
 requires 'namespace::autoclean';
 requires 'JSON::MaybeXS';
+
+# System modules
+requires 'Socket';
+requires 'Sys::Hostname';
+requires 'MooseX::MarkAsMethods';
+requires 'DBD::mysql';
 requires 'Catalyst::Runtime' => '5.90130';
 requires 'Catalyst::Model';
 requires 'DBI';
