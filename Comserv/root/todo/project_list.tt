@@ -1,20 +1,11 @@
-[% PageVersion = 'todo/project_list.tt,v 0.01 2023/11/28 shanta Exp shanta ' %]
-[% IF debug_mode == 1 %]
-        [% PageVersion %]
-[% END %]
-
-<label for="project_id">Project:</label>
-<select id="project_id" name="project_id">Project List
-<!-- project_list.tt -->
-[% FOREACH project IN projects %]
-    [% IF project.parent_id == '' %] <!-- Check if the project has no parent -->
-        <option value="[% project.id %]">[% project.name %]</option>
-        <!-- List the sub-projects -->
-        [% FOREACH sub_project IN project.projects %]
-            <option value="[% project.id %]">---[% project.name %]</option>
+<select id="project_id" name="project_id">
+    <option value="">Select a project</option>
+    [% FOREACH project IN projects.sort('name') %] <!-- Sort projects by name -->
+        <option value="[% project.id %]" [% IF project.id == selected_project_id %]selected[% END %]>[% project.name %]</option>
+        [% IF project.sub_projects.size %]
+            [% FOREACH sub_project IN project.sub_projects.sort('name') %] <!-- Sort sub-projects by name -->
+                <option value="[% sub_project.id %]" [% IF sub_project.id == selected_project_id %]selected[% END %]>--- [% sub_project.name %]</option>
+            [% END %]
         [% END %]
     [% END %]
-[% END %]
 </select>
-    <!-- Link to add a new project -->
-    <a href="[% c.uri_for('/project/addproject') %]">Add New Project</a>

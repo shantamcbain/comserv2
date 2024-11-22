@@ -64,16 +64,17 @@ sub do_login :Local {
         # Compare the hashed password with the one stored in the database
         if ($hashed_password eq $user->password) {
             # The passwords match, so the login is successful
-            # Store the user's roles in the session
+            # Store the user's roles and other details in the session
             $c->session->{roles} = $user->roles;
             $c->session->{username} = $user->username;
             $c->session->{first_name} = $user->first_name;
             $c->session->{last_name} = $user->last_name;
             $c->session->{email} = $user->email;
+            $c->session->{user_id} = $user->id;  # Store user_id in the session
 
-# Store the user object in the session
+            # Store the user object in the session
+            $c->set_authenticated(Comserv::Model::User->new(_user => $user));
 
-$c->set_authenticated(Comserv::Model::User->new(_user => $user));
             # Retrieve the referrer URL and form data from the session
             my $referer = $c->session->{referer};
             my $form_data = $c->session->{form_data};
@@ -91,6 +92,7 @@ $c->set_authenticated(Comserv::Model::User->new(_user => $user));
         $c->forward($c->view('TT'));
     }
 }
+
 sub hash_password {
     my ($self, $password) = @_;
     return sha256_hex($password);

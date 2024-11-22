@@ -2,12 +2,24 @@ package Comserv::Controller::Log;
 use Moose;
 use namespace::autoclean;
 use DateTime;
+use DateTime::TimeZone;
 use DateTime::Format::Strptime;
+use Data::Dumper;
+use Comserv::Util::Logging;
+#use Comserv::Util::Logging; # Import the logging utility
 BEGIN { extends 'Catalyst::Controller'; }
 
 has 'record_id' => (is => 'rw', isa => 'Str');
 has 'priority' => (is => 'rw', isa => 'HashRef');
 has 'status' => (is => 'rw', isa => 'HashRef');
+has 'logging' => (is => 'ro', isa => 'Comserv::Util::Logging', lazy => 1, builder => '_build_logging');
+has 'logging' => (
+    is => 'ro',
+    default => sub { Comserv::Util::Logging->instance }
+);
+sub _build_logging {
+    return Comserv::Util::Logging->instance;
+}
 
 sub BUILD {
     my $self = shift;
@@ -17,10 +29,8 @@ sub BUILD {
         2 => 'IN PROGRESS',
         3 => 'DONE',
     });
-
 }
 
-# Rest of your controller code
 sub index :Path('/log') :Args {
     my ( $self, $c, $status ) = @_;
 
@@ -34,9 +44,7 @@ sub index :Path('/log') :Args {
     my $rs = $log_model->get_logs($c, $status);
 
     # Debug: Print all logs
-    while (my $log = $rs->next) {
-        $c->log->debug("Record ID: " . $log->record_id);
-    }
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'index', "Fetched logs: " . Dumper($rs));
 
     # Pass the logs to the template
     $c->stash(logs => [$rs->all]);
@@ -49,6 +57,7 @@ sub index :Path('/log') :Args {
 sub edit :Path('/log/details'):Args(0) {
     my ( $self, $c, $record_id ) = @_;
     $record_id = $c->request->body_parameters->{record_id};
+
     # Fetch the log entry
     my $schema = $c->model('DBEncy');
     my $log = $schema->resultset('Log')->find($record_id);
@@ -58,21 +67,29 @@ sub edit :Path('/log/details'):Args(0) {
         $c->response->body('Log entry not found.');
         return;
     }
+
+    # Set the end_time to the current time
+    my $current_time = DateTime->now(time_zone => DateTime::TimeZone->new(name => 'local'))->hms;
+$log->end_time($current_time);
+    $log->end_time($current_time);
+
     # Print the status value to the debug log
-    warn "Status: " . $log->status;
+    $self->logging->log_with_details($c, __FILE__, __LINE__, "Status: " . $log->status);
 
     # Pass the log entry and the priority, status to the template
     $c->stash(
-    build_priority => $self->priority,
-    build_status   => $self->status,
-    priority => $log->priority,
-    status => $log->status,
-    log => $log
-);
+        build_priority => $self->priority,
+        build_status   => $self->status,
+        priority => $log->priority,
+        status => $log->status,
+        log => $log
+    );
 
     # Set the template
     $c->stash->{template} = 'log/details.tt';
 }
+
+
 
 
 sub update :Path('/log/update') :Args(0) {
@@ -216,13 +233,7 @@ sub create_log :Path('/log/create_log'):Args() {
             project_code => $c->request->body_parameters->{project_code},
             due_date => $c->request->body_parameters->{due_date},
             abstract => $subject,
-            details => $c->request->body_parameters->{details},
-            start_time => $c->request->body_parameters->{start_time},
-            end_time => $c->request->body_parameters->{end_time},
-            group_of_poster => $c->session->{roles},
-            status => $c->request->body_parameters->{status},
-            priority => $c->request->body_parameters->{priority},
-            comments => $c->request->body_parameters->{comments}
+            # Add other necessary fields here
         );
 
         # Render the form again
@@ -234,28 +245,32 @@ sub create_log :Path('/log/create_log'):Args() {
     my $start_time = $c->request->body_parameters->{start_time};
     my $end_time = $c->request->body_parameters->{end_time};
 
- # Calculate time difference
-my ($start_hour, $start_min) = split(':', $start_time);
-my ($end_hour, $end_min) = split(':', $end_time);
-my $time_diff_in_minutes = ($end_hour - $start_hour) * 60 + ($end_min - $start_min);
+    # Set end_time to a default value if it's an empty string or undefined
+    $end_time = '00:00:00' if !defined $end_time || $end_time eq '';
 
-# Convert time difference in minutes to 'HH:MM:SS' format
-my $hours = int($time_diff_in_minutes / 60);
-my $minutes = $time_diff_in_minutes % 60;
-my $seconds = 0;  # Assuming there are no seconds in the time difference
-my $time_diff = sprintf("%02d:%02d:%02d", $hours, $minutes, $seconds);
+    # Calculate time difference
+    my ($start_hour, $start_min) = split(':', $start_time);
+    my ($end_hour, $end_min) = defined $end_time ? split(':', $end_time) : (0, 0);
+    my $time_diff_in_minutes = ($end_hour - $start_hour) * 60 + ($end_min - $start_min);
+
+    # Convert time difference in minutes to 'HH:MM:SS' format
+    my $hours = int($time_diff_in_minutes / 60);
+    my $minutes = $time_diff_in_minutes % 60;
+    my $seconds = 0;  # Assuming there are no seconds in the time difference
+    my $time_diff = sprintf("%02d:%02d:%02d", $hours, $minutes, $seconds);
+
     my $current_date = DateTime->now->ymd;
     my $logEntry = $rs->create({
         todo_record_id => $c->request->body_parameters->{todo_record_id},
         owner => $owner,
         sitename => $c->session->{SiteName},
-        start_date => $start_date||$current_date,
+        start_date => $start_date || $current_date,
         project_code => $c->request->body_parameters->{project_code},
         due_date => $c->request->body_parameters->{due_date},
         abstract => $subject,
         details => $c->request->body_parameters->{details},
-        start_time => $c->request->body_parameters->{start_time},
-        end_time => $c->request->body_parameters->{end_time},
+        start_time => $start_time,
+        end_time => $end_time,  # Use default value if not provided
         time => $time_diff,
         group_of_poster => $c->session->{roles},
         status => $c->request->body_parameters->{status},
@@ -266,11 +281,13 @@ my $time_diff = sprintf("%02d:%02d:%02d", $hours, $minutes, $seconds);
     });
 
     if ($logEntry) {
+        $self->logging->log_with_details($c, __FILE__, __LINE__, 'create_log', "Created new log entry: " . Dumper($logEntry));
         $c->response->redirect($c->uri_for('/'));
     } else {
         $c->response->body('Error creating log entry.');
     }
 }
+
 __PACKAGE__->meta->make_immutable;
 
 1;

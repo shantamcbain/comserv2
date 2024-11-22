@@ -2,31 +2,41 @@
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
-<h2>Our open logs</h2>
-
+<h2>Our Logs</h2>
 
 <form id="statusForm">
-    <select id="statusSelect" name="status">
-        <option value="all">All</option>
+    <select id="statusSelect" name="status" onchange="filterLogs()">
+        <option value="all">All Logs</option>
+        <option value="open">Open Logs</option>
         <option value="1">Status 1</option>
         <option value="2">Status 2</option>
         <option value="3">Status 3</option>
     </select>
-    <input type="submit" value="Filter">
 </form>
 
+<div id="logContainer">
+    [% FOREACH log IN logs %]
+        <div class="log-entry" data-status="[% log.status %]">
+            <form method="post" action="/log/details">
+                <input type="hidden" name="record_id" value="[% log.record_id %]">
+                <button type="submit">[% log.abstract %]</button>
+            </form>
+        </div>
+    [% END %]
+</div>
+
 <script>
-document.getElementById('statusForm').addEventListener('submit', function(event) {
-    event.preventDefault();
-    var status = document.getElementById('statusSelect').value;
-    window.location.href = '/log/' + status;
-});
+    function filterLogs() {
+        var status = document.getElementById('statusSelect').value;
+        var logEntries = document.querySelectorAll('.log-entry');
+
+        logEntries.forEach(function(entry) {
+            var entryStatus = entry.getAttribute('data-status');
+            if (status === 'all' || (status === 'open' && entryStatus != '3') || entryStatus === status) {
+                entry.style.display = 'block';
+            } else {
+                entry.style.display = 'none';
+            }
+        });
+    }
 </script>
-[% FOREACH log IN logs %]
-    <div>
-        <form method="post" action="/log/details">
-            <input type="hidden" name="record_id" value="[% log.record_id %]">
-            <button type="submit">[% log.abstract %]</button>
-        </form>
-    </div>
-[% END %]

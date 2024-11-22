@@ -1,17 +1,17 @@
 package Comserv::Model::Todo;
 use Moose;
 use namespace::autoclean;
-use Data::Dumper;  # Add this line
+use Data::Dumper;
+
 extends 'Catalyst::Model';
-
-
-# In your Todo.pm file
-# In your Todo.pm file
-# In your Todo.pm file
+has 'logging' => (
+    is => 'ro',
+    default => sub { Comserv::Util::Logging->instance }
+);
 sub get_top_todos {
     my ($self, $c, $SiteName) = @_;
-    $SiteName = $c -> session -> {'SiteName'};
-    $c->log->debug("Site name: $SiteName");
+    $SiteName = $c->session->{'SiteName'};
+    $self->logging->log_with_details($c, __FILE__, __LINE__, "Site name: $SiteName");
 
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
@@ -27,9 +27,9 @@ sub get_top_todos {
         { order_by => { -asc => ['priority', 'start_date'] }, rows => 10 }
     );
 
-    $c->log->debug('Visited the todo page');
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'Visited the todo page');
     # Log the number of todos fetched
-    $c->log->debug("Number of todos fetched: " . scalar(@todos));
+    $self->logging->log_with_details($c, __FILE__, __LINE__, "Number of todos fetched: " . scalar(@todos));
 
     # Log the actual data of the todos
     foreach my $todo (@todos) {
@@ -43,6 +43,7 @@ sub get_top_todos {
 
     return \@todos;
 }
+
 sub get_todos_for_date {
     my ($self, $c, $date) = @_;
    # Get the SiteName from the session
@@ -63,6 +64,7 @@ sub get_todos_for_date {
 
     return \@todos;
 }
+
 sub fetch_todo_record {
     my ($self, $c, $record_id) = @_;
     # Get a DBIx::Class::Schema object
@@ -73,8 +75,10 @@ sub fetch_todo_record {
 
     # Fetch the todo record based on $record_id
     my $todo_record = $rs->find($record_id);
+    $self->logging->log_with_details($c, __FILE__, __LINE__, "Fetched todo record");
     return $todo_record;
 }
+
 __PACKAGE__->meta->make_immutable;
 
 1;

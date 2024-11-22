@@ -2,20 +2,19 @@ package Comserv::Model::Project;
 use Moose;
 use namespace::autoclean;
 
-extends 'Catalyst::Model';
-
-
+use Comserv::Util::Logging;
 use strict;
 use warnings;
 use Data::Dumper;
-
+has 'logging' => (
+    is => 'ro',
+    default => sub { Comserv::Util::Logging->instance }
+);
 sub get_projects {
     my ($self, $schema, $sitename) = @_;
-   # Get a DBIx::Class::Schema object
-
+    # Get a DBIx::Class::Schema object
 
     # Get the Project resultset
-
     my $project_rs = $schema->resultset('Project');
 
     # Prepare the DBIx::Class query
@@ -26,10 +25,11 @@ sub get_projects {
         }
     )->all;
 
-print "Projects: ", Dumper(@projects);
+    Comserv::Util::Logging->instance->log_with_details($self, __FILE__, __LINE__, 'get_projects', Dumper(@projects));
 
     return \@projects;
 }
+
 sub get_project {
     my ($self, $schema, $project_id) = @_;
 
@@ -41,6 +41,7 @@ sub get_project {
 
     return $project;
 }
+
 __PACKAGE__->meta->make_immutable;
 
 1;
