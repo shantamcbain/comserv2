@@ -34,8 +34,8 @@ sub BUILD {
 sub index :Path('/log') :Args(0) {
     my ( $self, $c ) = @_;
 
-    # Retrieve the status from the query parameters
-    my $status = $c->request->params->{status} // 'all';
+    # Retrieve the status from the query parameters, default to 'open'
+    my $status = $c->request->params->{status} // 'open';
 
     # Create a new instance of the Log model
     my $log_model = Comserv::Model::Log->new();
@@ -53,13 +53,39 @@ sub index :Path('/log') :Args(0) {
     # Debug: Print all logs
     $self->logging->log_with_details($c, __FILE__, __LINE__, 'index', "Fetched logs: " . Dumper([$rs->all]));
 
-    # Pass the logs to the template
-    $c->stash(logs => [$rs->all]);
-
-    # Set the template
-    $c->stash->{template} = 'log/index.tt';
+    # Pass the logs and status to the template
+    $c->stash(
+        logs => [$rs->all],
+        status => $status,  # Pass the current status to the template
+        template => 'log/index.tt'
+    );
 }
 
+sub details :Path('/log/details') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Retrieve the record_id from the request parameters
+    my $record_id = $c->request->body_parameters->{record_id};
+
+    # Fetch the log entry from the database
+    my $log = $c->model('DBEncy')->resultset('Log')->find($record_id);
+
+    if ($log) {
+        # Get the current local time
+        my $current_time = DateTime->now(time_zone => 'local')->strftime('%H:%M');
+
+        # Pass the log entry and dropdown data to the template
+        $c->stash(
+            log => $log,
+            build_priority => $self->priority,
+            build_status   => $self->status,
+            end_time       => $current_time,  # Set end_time to current local time
+            template       => 'log/details.tt'
+        );
+    } else {
+        $c->response->body('Log entry not found.');
+    }
+}
 
 
 sub update :Path('/log/update') :Args(0) {
@@ -136,13 +162,17 @@ sub update :Path('/log/update') :Args(0) {
 # This method will only display the form
 sub log_form :Path('/log/log_form'):Args() {
     my ( $self, $c) = @_;
-        my $schema = $c->model('DBEncy');
+    my $schema = $c->model('DBEncy');
 
     my $record_id = $c->request->body_parameters->{record_id};
 
     my $log = Comserv::Model::Log->new(record_id => $record_id);
-my $todo = Comserv::Model::Todo->new();
-my $todo_record = $todo->fetch_todo_record($c, $record_id);
+    my $todo = Comserv::Model::Todo->new();
+    my $todo_record = $todo->fetch_todo_record($c, $record_id);
+
+    # Get the current time
+    my $current_time = DateTime->now->strftime('%H:%M:%S');
+
     # Add the priority, status, and record_id to the stash
     $c->stash(
         build_priority => $self->priority,
@@ -157,6 +187,7 @@ my $todo_record = $todo->fetch_todo_record($c, $record_id);
         abstract    => $todo_record->subject,
         details     => $todo_record->description,
         comments    => $todo_record->comments,
+        end_time    => $current_time,  # Set end_time to current time
     );
 
     # Check if record_id is provided
@@ -168,6 +199,7 @@ my $todo_record = $todo->fetch_todo_record($c, $record_id);
     # Render the form
     $c->stash->{template} = 'log/log_form.tt';
 }
+
 
 sub create_log :Path('/log/create_log'):Args() {
     my ( $self, $c) = @_;
