@@ -31,20 +31,27 @@ sub BUILD {
     });
 }
 
-sub index :Path('/log') :Args {
-    my ( $self, $c, $status ) = @_;
+sub index :Path('/log') :Args(0) {
+    my ( $self, $c ) = @_;
 
-    # Default status to not 3 if not provided
-    $status //= { '!=' => 3 };
+    # Retrieve the status from the query parameters
+    my $status = $c->request->params->{status} // 'all';
 
     # Create a new instance of the Log model
     my $log_model = Comserv::Model::Log->new();
 
-    # Fetch all open logs that match the status
-    my $rs = $log_model->get_logs($c, $status);
+    # Fetch logs based on the status
+    my $rs;
+    if ($status eq 'all') {
+        $rs = $log_model->get_logs($c, 'all');  # Fetch all logs without status filter
+    } elsif ($status eq 'open') {
+        $rs = $log_model->get_logs($c, 'open');  # Fetch open logs (status not equal to 3)
+    } else {
+        $rs = $log_model->get_logs($c, $status);  # Fetch logs with specific status
+    }
 
     # Debug: Print all logs
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'index', "Fetched logs: " . Dumper($rs));
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'index', "Fetched logs: " . Dumper([$rs->all]));
 
     # Pass the logs to the template
     $c->stash(logs => [$rs->all]);
@@ -52,43 +59,6 @@ sub index :Path('/log') :Args {
     # Set the template
     $c->stash->{template} = 'log/index.tt';
 }
-
-
-sub edit :Path('/log/details'):Args(0) {
-    my ( $self, $c, $record_id ) = @_;
-    $record_id = $c->request->body_parameters->{record_id};
-
-    # Fetch the log entry
-    my $schema = $c->model('DBEncy');
-    my $log = $schema->resultset('Log')->find($record_id);
-
-    # Check if the log entry exists
-    if (!$log) {
-        $c->response->body('Log entry not found.');
-        return;
-    }
-
-    # Set the end_time to the current time
-    my $current_time = DateTime->now(time_zone => DateTime::TimeZone->new(name => 'local'))->hms;
-$log->end_time($current_time);
-    $log->end_time($current_time);
-
-    # Print the status value to the debug log
-    $self->logging->log_with_details($c, __FILE__, __LINE__, "Status: " . $log->status);
-
-    # Pass the log entry and the priority, status to the template
-    $c->stash(
-        build_priority => $self->priority,
-        build_status   => $self->status,
-        priority => $log->priority,
-        status => $log->status,
-        log => $log
-    );
-
-    # Set the template
-    $c->stash->{template} = 'log/details.tt';
-}
-
 
 
 

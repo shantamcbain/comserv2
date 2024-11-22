@@ -1,42 +1,43 @@
-[% PageVersion = 'log/index.tt,v 0.02 2024/01/28 Shanta Exp shanta ' %]
+[% PageVersion = 'log/index.tt,v 0.02 2024/11/22 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
-    [% PageVersion %]
+[% PageVersion %]
 [% END %]
-<h2>Our Logs</h2>
 
-<form id="statusForm">
-    <select id="statusSelect" name="status" onchange="filterLogs()">
-        <option value="all">All Logs</option>
-        <option value="open">Open Logs</option>
-        <option value="1">Status 1</option>
-        <option value="2">Status 2</option>
-        <option value="3">Status 3</option>
-    </select>
-</form>
+<!-- Ensure the style is correctly applied -->
+<style>
+    .filter-button {
+        margin: 5px;
+        padding: 10px;
+        border: none;
+        background-color: #f0f0f0;
+        cursor: pointer;
+    }
+    .filter-button.active {
+        background-color: #007bff;
+        color: white;
+    }
+</style>
+
+<h2>Our Logs</h2>
+<div id="statusButtons">
+    <button class="filter-button [% IF status == 'all' %]active[% END %]" onclick="window.location.href='/log?status=all'">All Logs</button>
+    <button class="filter-button [% IF status == 'open' %]active[% END %]" onclick="window.location.href='/log?status=open'">Open Logs</button>
+    <button class="filter-button [% IF status == '1' %]active[% END %]" onclick="window.location.href='/log?status=1'">Status 1</button>
+    <button class="filter-button [% IF status == '2' %]active[% END %]" onclick="window.location.href='/log?status=2'">Status 2</button>
+    <button class="filter-button [% IF status == '3' %]active[% END %]" onclick="window.location.href='/log?status=3'">Status 3</button>
+</div>
 
 <div id="logContainer">
-    [% FOREACH log IN logs %]
+    [% IF logs.size == 0 %]
+        <p>No logs available.</p>
+    [% ELSE %]
+        [% FOREACH log IN logs %]
         <div class="log-entry" data-status="[% log.status %]">
             <form method="post" action="/log/details">
                 <input type="hidden" name="record_id" value="[% log.record_id %]">
                 <button type="submit">[% log.abstract %]</button>
             </form>
         </div>
+        [% END %]
     [% END %]
 </div>
-
-<script>
-    function filterLogs() {
-        var status = document.getElementById('statusSelect').value;
-        var logEntries = document.querySelectorAll('.log-entry');
-
-        logEntries.forEach(function(entry) {
-            var entryStatus = entry.getAttribute('data-status');
-            if (status === 'all' || (status === 'open' && entryStatus != '3') || entryStatus === status) {
-                entry.style.display = 'block';
-            } else {
-                entry.style.display = 'none';
-            }
-        });
-    }
-</script>

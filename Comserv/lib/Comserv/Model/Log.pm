@@ -23,16 +23,17 @@ sub get_logs {
 
     # Add status to search criteria if not 'all'
     if ($status eq 'open') {
-        $search_criteria->{status} = { '!=' => 3 };  # Exclude DONE logs
+        $search_criteria->{status} = { '!=' => 3 }; # Exclude DONE logs
     } elsif ($status ne 'all') {
-        $search_criteria->{status} = $status;  # Specific status
+        $search_criteria->{status} = $status; # Specific status
     }
 
     # Retrieve all log records
     my $logs = $schema->resultset('Log')->search($search_criteria, { order_by => 'start_date' });
-
     return $logs;
 }
+
+
 
 sub modify {
     my ($self, $log, $new_values) = @_;

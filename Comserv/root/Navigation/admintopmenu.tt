@@ -12,10 +12,10 @@
     <span class="submenu-header"><a href="/admin" class="dropbtn">admin</a></span>
     <div class="submenu">
         <a href="/documentation">Documentation</a>
-<a href="[% c.uri_for(c.controller('Log').action_for('log')) %]">Open Log</a>
-<!-- Manually constructing the URL as a temporary workaround
-<a href="/log">Open Log</a> -->
+<!--<a href="[% c.uri_for(c.controller('Log').action_for('log')) %]">Open Log</a>-->
+<!-- Manually constructing the URL as a temporary workaround-->
 
+<a href="/log">Open Log</a>
         <a href="[% c.uri_for(c.controller('project').action_for('project')) %]">Projects</a>
 
     </div>
