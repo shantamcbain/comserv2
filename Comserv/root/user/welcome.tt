@@ -1,0 +1,33 @@
+[% PageVersion = '/user/welcome.tt,v 0.01 2024/11/24 shanta Exp shanta ' %]
+[% META title = 'Edit User' %]
+[% IF debug_mode == 1 %]
+[% END %]
+  [% PageVersion %]
+    [% INCLUDE 'debug.tt' %]
+[% END %]
+
+<h1>Welcome to the Application!</h1>
+
+<p>Thank you for registering, [% c.session.first_name %]!</p>
+<p>Your account has been created successfully. Please log in to continue.</p>
+
+<form method="post" action="/user/do_login">
+    <label for="username">Username</label>
+    <input type="text" id="username" name="username" value="[% c.session.username %]" readonly>
+
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password">
+
+    <input type="submit" value="Login">
+</form>
+
+<style>
+    .success {
+        color: green;
+        font-weight: bold;
+    }
+    .error {
+        color: red;
+        font-weight: bold;
+    }
+</style>

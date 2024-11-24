@@ -6,7 +6,7 @@ use Data::Dumper;
 use Email::Sender::Simple qw(sendmail);
 use Email::Simple;
 use Email::Simple::Creator;
-
+use Email::Sender::Transport::SMTP;
 BEGIN { extends 'Catalyst::Controller'; }
 sub base :Chained('/') :PathPart('user') :CaptureArgs(0) {
     my ( $self, $c ) = @_;
@@ -48,6 +48,9 @@ sub do_login :Local {
     my $username = $c->request->params->{username};
     my $password = $c->request->params->{password};
 
+    # Debugging: Print login attempt
+    print "Attempting login for: $username\n";
+
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
 
@@ -64,6 +67,8 @@ sub do_login :Local {
         # Compare the hashed password with the one stored in the database
         if ($hashed_password eq $user->password) {
             # The passwords match, so the login is successful
+            print "Login successful for: $username\n";
+
             # Store the user's roles and other details in the session
             $c->session->{roles} = $user->roles;
             $c->session->{username} = $user->username;
@@ -83,11 +88,13 @@ sub do_login :Local {
             $c->res->redirect($referer);
         } else {
             # The passwords don't match, so the login is unsuccessful
+            print "Invalid password for: $username\n";
             $c->stash(template => 'user/login.tt', error => 'Invalid username or password');
             $c->forward($c->view('TT'));
         }
     } else {
         # The user was not found in the database
+        print "User not found: $username\n";
         $c->stash(template => 'user/login.tt', error => 'Invalid username or password');
         $c->forward($c->view('TT'));
     }
@@ -97,32 +104,34 @@ sub hash_password {
     my ($self, $password) = @_;
     return sha256_hex($password);
 }
-sub create_account :Local {
-    my ($self, $c) = @_;
-
-    # Display the account creation form
-    $c->stash(template => '/user/create_account.tt');
-}
 sub do_create_account :Local {
     my ($self, $c) = @_;
 
     # Retrieve the form data
     my $username = $c->request->params->{username};
     my $password = $c->request->params->{password};
-    my $password_confirm = $c->request->params->{password_confirm};  # Retrieve the confirmation password
+    my $password_confirm = $c->request->params->{password_confirm};
     my $first_name = $c->request->params->{first_name};
     my $last_name = $c->request->params->{last_name};
     my $email = $c->request->params->{email};
 
-    # Check if the password and confirmation password match
-    if ($password ne $password_confirm) {
-        $c->stash(template => 'user/register.tt', error => 'Passwords do not match');
-        $c->forward($c->view('TT'));
-        return;
+    # Initialize an error hash
+    my %errors;
+
+    # Check if all required fields are present
+    unless ($username && $password && $password_confirm && $first_name && $last_name && $email) {
+        $errors{general} = 'All fields are required';
     }
 
-    # Hash the password
-    my $hashed_password = $self->hash_password($password);
+    # Check if the password and confirmation password match
+    if ($password ne $password_confirm) {
+        $errors{password} = 'Passwords do not match';
+    }
+
+    # Validate email format
+    unless ($email =~ /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/) {
+        $errors{email} = 'Invalid email format';
+    }
 
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
@@ -130,46 +139,114 @@ sub do_create_account :Local {
     # Get a DBIx::Class::ResultSet object
     my $rs = $schema->resultset('User');
 
-    # Create a new user in the database
-    my $user = $rs->create({
-        username => $username,
-        password => $hashed_password,
-        first_name => $first_name,
-        last_name => $last_name,
-        email => $email,
-    });
-     # If there was an error, catch it and report it to the browser
-    if ($@) {
-        $c->stash(template => 'user/register.tt', error => "An error occurred: $@");
+    # Check if the username is already taken
+    if ($rs->find({ username => $username })) {
+        $errors{username} = 'Username is already taken';
+    }
+
+    # If there are any errors, set them in the stash and return
+    if (%errors) {
+        $c->stash(
+            template => 'user/register.tt',
+            errors   => \%errors,
+            username => $username,
+            email    => $email,
+            first_name => $first_name,
+            last_name  => $last_name,
+        );
         $c->forward($c->view('TT'));
         return;
     }
 
-# After the user is created, send an email to the support address
-my $support_address = $c->stash->{mail_to_admin};
+    # Hash the password
+    my $hashed_password = $self->hash_password($password);
 
+    # Create a new user in the database
+    my $user;
+    eval {
+        $user = $rs->create({
+            username   => $username,
+            password   => $hashed_password,
+            first_name => $first_name,
+            last_name  => $last_name,
+            email      => $email,
+            roles      => 'normal',
+        });
+    };
 
-     $email = Email::Simple->create(
+    if ($@) {
+        warn "Error creating user: $@";
+        $c->stash(template => 'user/register.tt', error => "An error occurred while creating the account: $@");
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    # Debugging: Confirm user creation
+    print "User created: " . Dumper($user);
+
+    # Retrieve email addresses from the stash
+    my $admin_email = $c->stash->{mail_to_admin};
+    my $user_email = $email;
+    my $mail_from = $c->stash->{mail_from};
+
+    # Send welcome email to the user
+    my $user_email_obj = Email::Simple->create(
         header => [
-            To      => $support_address,
-            From    => $c->stash->{mail_replyto},
-            Subject => 'New user registration',
+            To      => $user_email,
+            From    => $mail_from,
+            Subject => "Welcome to the Application",
         ],
-        body => "A new user has registered. Username: $username, Email: $email, First Name: $first_name , Last name: $last_name",
+        body => "Hello $first_name,\n\nWelcome to our application! Your account has been successfully created.\n\nBest regards,\nThe Team",
     );
 
-eval {
-    sendmail($email);
-};
+    eval { sendmail($user_email_obj) };
+    if ($@) {
+        warn "Failed to send email to user: $@";
+    }
 
-if ($@) {
-    $c->stash(template => 'user/register.tt', error => "An error occurred while sending the email: $@");
-    $c->forward($c->view('TT'));
-    return;
+    # Send notification email to the admin
+    my $admin_email_obj = Email::Simple->create(
+        header => [
+            To      => $admin_email,
+            From    => $mail_from,
+            Subject => "New User Account Created",
+        ],
+        body => "A new user account has been created for $first_name $last_name ($username).",
+    );
+
+    eval { sendmail($admin_email_obj) };
+    if ($@) {
+        warn "Failed to send email to admin: $@";
+    }
+
+    # Set a success message in the session
+    $c->session->{success_msg} = "Welcome, $first_name! Your account has been created successfully. Please log in.";
+
+    # Redirect to the welcome page
+    $c->res->redirect($c->uri_for('/user/welcome'));
 }
-    # Redirect to the login page
-    $c->res->redirect($c->uri_for('/user/login'));
+
+sub logout :Local {
+    my ($self, $c) = @_;
+
+    # Remove specific user information from the session
+    delete $c->session->{roles};
+    delete $c->session->{username};
+    delete $c->session->{first_name};
+    delete $c->session->{last_name};
+    delete $c->session->{email};
+    delete $c->session->{user_id};
+
+    # Clear the entire session
+    $c->logout;
+
+    # Retrieve the referrer URL from the session
+    my $referer = $c->session->{referer} || $c->uri_for('/'); # Default to home if no referrer
+
+    # Redirect to the referrer URL
+    $c->res->redirect($referer);
 }
+
 sub list_users :Local :Args(0) {
     my ($self, $c) = @_;
 
@@ -250,6 +327,14 @@ sub register :Local {
     # Display the registration form
     $c->stash(template => 'user/register.tt');
 }
+sub welcome :Local {
+    my ($self, $c) = @_;
+
+    # Display the welcome page
+    $c->stash(template => 'user/welcome.tt');
+    $c->forward($c->view('TT'));
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;

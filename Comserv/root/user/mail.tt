@@ -1,5 +1,5 @@
 [%# INCLUDE 'layout.tt' %]
-[% PageVersion	= 'usrer/mail.tt,v 0.01 2024/01/09 shanta Exp shanta '	%]
+[% PageVersion	= 'user/mail.tt,v 0.01 2024/01/09 shanta Exp shanta '	%]
 [% IF c.session.debug_mode == 1 %]
  [%	PageVersion %]
     [% "Debugging HostName: " _ HostName %]

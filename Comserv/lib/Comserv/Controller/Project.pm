@@ -31,7 +31,15 @@ sub add_project :Path('addproject') :Args(0) {
     $c->stash->{projects} = \@sorted_projects;
 
     my $site_model = $c->model('Site');
-    my $sites = $site_model->get_all_sites();
+    my $sites;
+
+    # Fetch sites based on the current site name
+    if (lc($c->session->{SiteName}) eq 'csc') {
+        $sites = $site_model->get_all_sites();
+    } else {
+        my $site = $site_model->get_site_details_by_name($c->session->{SiteName});
+        $sites = [$site] if $site;
+    }
 
     $c->stash->{sites} = $sites;
 

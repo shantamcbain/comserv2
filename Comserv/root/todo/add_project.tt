@@ -17,7 +17,7 @@
         [% FOREACH site IN sites %]
             <option value="[% site.name %]" [% IF site.id == form_data.sitename OR site.id == session.sitename %]selected[% END %]>[% site.name %]</option>
         [% END %]
-    </select>
+    </select><br>
     <!-- Add the project name input field -->
     <label for="name">Project Name:</label><br>
     <input type="text" id="name" name="name" value="[% form_data.name %]" required><br>

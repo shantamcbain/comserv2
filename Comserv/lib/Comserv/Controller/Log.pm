@@ -108,21 +108,38 @@ sub update :Path('/log/update') :Args(0) {
     my $start_time_str = $c->request->body_parameters->{start_time};
     my $end_time_str = $c->request->body_parameters->{end_time};
 
+    # Get the status from the form data
+    my $status = $c->request->body_parameters->{status};
+
     # Create a DateTime::Format::Strptime object for parsing the time strings
     my $strp = DateTime::Format::Strptime->new(
         pattern   => '%H:%M',
         time_zone => 'local',
     );
 
-    # Convert the start_time and end_time strings to DateTime objects
+    # Convert the start_time string to a DateTime object
     my $start_time = $strp->parse_datetime($start_time_str);
-    my $end_time = $strp->parse_datetime($end_time_str);
+    my $end_time;
+    my $time;
 
-    # Calculate the difference between the end time and the start time
-    my $duration = $end_time->subtract_datetime($start_time);
+    # Calculate the elapsed time only if the status is set to 'DONE' (3)
+    if ($status == 3) {
+        # Set the end_time to the current time
+        $end_time = DateTime->now(time_zone => 'local');
 
-    # Convert the duration to the format 'HH:MM'
-    my $time = sprintf("%02d:%02d", $duration->hours, $duration->minutes);
+        # Calculate the difference between the end time and the start time
+        my $duration = $end_time->subtract_datetime($start_time);
+
+        # Convert the duration to the format 'HH:MM'
+        $time = sprintf("%02d:%02d", $duration->hours, $duration->minutes);
+
+        # Update the end_time_str to the current time
+        $end_time_str = $end_time->strftime('%H:%M');
+    } else {
+        # If not 'DONE', use the provided end_time_str and do not calculate time
+        $end_time = $strp->parse_datetime($end_time_str);
+        $time = $c->request->body_parameters->{time}; # Use existing time value
+    }
 
     # Get the new values from the form data
     my $new_values = {
@@ -136,7 +153,7 @@ sub update :Path('/log/update') :Args(0) {
         end_time => $end_time_str,
         time => $time,
         group_of_poster => $c->session->{roles},
-        status => $c->request->body_parameters->{status},
+        status => $status,
         priority => $c->request->body_parameters->{priority},
         comments => $c->request->body_parameters->{comments},
     };

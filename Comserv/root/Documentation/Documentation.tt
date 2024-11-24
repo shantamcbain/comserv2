@@ -1,8 +1,7 @@
-[% PageVersion = 'Documentation/ComservDocumentation.tt,v 0.02 2024/05/22 Shanta Exp shanta ' %]
+[% PageVersion = 'Documentation/ComservDocumentation.tt,v 0.03 2024/11/22 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
 [% PageVersion -%]
 [% END %]
-
 
 <!--
 Please ensure that all navigation links within each sub-document are unique. This includes the "Back to top" links, as well as any other navigation links present. Each link should be specific to the content within that particular sub-document to enhance clarity and organization within the documentation.
@@ -23,6 +22,7 @@ Please ensure that all navigation links within each sub-document are unique. Thi
     <a href="#calendar">Calendar</a> |
     <a href="#login">Login</a> |
     <a href="#logging">Logging</a> |
+    <a href="#mail">Mail</a> | <!-- Added Mail section -->
     <a href="#projects">Projects</a> |
     <a href="#guidelines">Guidelines</a>    |
     <a href="#root">Root</a> |
@@ -43,8 +43,7 @@ Please ensure that all navigation links within each sub-document are unique. Thi
 <h3 id="admin"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Admin.tt' %]
 <h3 id="ai"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/AI.tt' %] 
-
+[% INCLUDE 'Documentation/AI.tt' %]
 
 <h3 id="dbi"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/DBIDocument.tt' %]
@@ -60,13 +59,10 @@ Please ensure that all navigation links within each sub-document are unique. Thi
 [% INCLUDE 'Documentation/DocumentManagement.tt' %]
 
 <h3 id="ENCY"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/ENCY.tt' %] 
+[% INCLUDE 'Documentation/ENCY.tt' %]
 
 <h3 id="files"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Files.tt' %]
-
-
-
 
 <h3 id="guidelines"><a href="#top">Back to top of Documentation</a></h3>
 
@@ -86,6 +82,9 @@ Please ensure that all navigation links within each sub-document are unique. Thi
 
 [% INCLUDE 'Documentation/Logging.tt' %]
 
+<h3 id="mail"><a href="#top">Back to top of Documentation</a></h3> <!-- Added Mail section -->
+[% INCLUDE 'Documentation/Mail.tt' %] <!-- Include Mail documentation -->
+
 <h3 id="projects"><a href="#top">Back to top of Documentation</a></h3>
 
 [% INCLUDE 'Documentation/Projects.tt' %]
@@ -95,8 +94,6 @@ Please ensure that all navigation links within each sub-document are unique. Thi
 [% INCLUDE 'Documentation/Root.tt' %]
 
 <h3 id="session-plan"><a href="#top">Back to top of Documentation</a></h3>
-
-
 
 [% INCLUDE 'Documentation/sessionplan.tt' %]
 <h3 id="schema"><a href="#top">Back to top of Documentation</a></h3>

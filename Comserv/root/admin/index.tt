@@ -17,6 +17,8 @@
     <li><a href="update_software">Update Software</a></li>
     <li><a href="change_roles">Change User Roles</a></li>
     <li><a href="log">Access Logging</a></li>
+    <li>   <a href="/mail/add_mail_config_form">Mail Configuration</a></li>
+
 </ul>
 
 <h2>Database Schema Management</h2>

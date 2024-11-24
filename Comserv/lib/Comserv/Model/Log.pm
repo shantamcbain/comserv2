@@ -1,5 +1,6 @@
 package Comserv::Model::Log;
 use Moose;
+use Data::Dumper; # Import Data::Dumper for debugging
 
 has 'record_id' => (is => 'rw', isa => 'Str');
 has 'priority' => (is => 'rw', isa => 'HashRef');
@@ -14,26 +15,35 @@ sub BUILD {
         3 => 'DONE',
     });
 }
+
 sub get_logs {
     my ($self, $c, $status) = @_;
     my $schema = $c->model('DBEncy');
 
-    # Define search criteria
-    my $search_criteria = { SiteName => $c->session->{SiteName} };
+    # Define search criteria with sitename
+    my $search_criteria = { sitename => $c->session->{SiteName} };
 
-    # Add status to search criteria if not 'all'
+    # Add status to search criteria
     if ($status eq 'open') {
         $search_criteria->{status} = { '!=' => 3 }; # Exclude DONE logs
-    } elsif ($status ne 'all') {
-        $search_criteria->{status} = $status; # Specific status
+    } elsif ($status eq 'all') {
+        # No additional status filter needed for 'all'
+    } else {
+        # Assume $status is a specific numeric value
+        $search_criteria->{status} = $status;
     }
+
+    # Log the search criteria for debugging
+    $c->log->debug("Search criteria: " . Dumper($search_criteria));
 
     # Retrieve all log records
     my $logs = $schema->resultset('Log')->search($search_criteria, { order_by => 'start_date' });
+
+    # Log the number of logs found
+    $c->log->debug("Number of logs found: " . $logs->count);
+
     return $logs;
 }
-
-
 
 sub modify {
     my ($self, $log, $new_values) = @_;
@@ -49,6 +59,7 @@ sub modify {
 
     return $log;
 }
+
 sub calculate_accumulative_time {
     my ($self, $c, $todo_record_id) = @_;
     my $schema = $c->model('DBEncy');
