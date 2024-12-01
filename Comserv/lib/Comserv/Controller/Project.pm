@@ -26,7 +26,7 @@ sub add_project :Path('addproject') :Args(0) {
     # Sort projects alphabetically by name
     my @sorted_projects = sort { $a->{name} cmp $b->{name} } @$projects;
 
-    Comserv::Util::Logging->instance->log_with_details($c, __FILE__, __LINE__, 'add_project', Dumper(\@sorted_projects));
+    #Comserv::Util::Logging->instance->log_with_details($c, __FILE__, __LINE__, 'add_project', Dumper(\@sorted_projects));
 
     $c->stash->{projects} = \@sorted_projects;
 
@@ -120,21 +120,71 @@ sub project :Path('project') :Args(0) {
 
 sub details :Path('details') :Args(0) {
     my ( $self, $c ) = @_;
-    my $schema = $c->model('DBEncy');
+
+    # Retrieve the project_id from the request parameters
     my $project_id = $c->request->body_parameters->{project_id};
-    my $project_model = $c->model('Project');
-    my $project = $project_model->get_project($schema, $project_id);
+
+    # Get the project details
+    my $schema = $c->model('DBEncy');
+    my $project = $schema->resultset('Project')->find($project_id);
+
+    # Declare variables for todos and accumulated time
+    my @todos;
+    my $total_accumulated_time = 0;
 
     # Fetch todos associated with the project
-    my @todos = $schema->resultset('Todo')->search(
+    @todos = $schema->resultset('Todo')->search(
         { project_id => $project_id },
         { order_by => { -asc => 'start_date' } }
     );
 
-    # Add the project and todos to the stash
+    # Fetch logs associated with each todo and calculate accumulated time
+    foreach my $todo (@todos) {
+        my $log_rs = $schema->resultset('Log')->search({ todo_record_id => $todo->record_id });
+        my $accumulated_time = 0;
+        my @logs;
+
+        while (my $log = $log_rs->next) {
+            my $start_time = $log->start_time;
+            my $end_time = $log->end_time || '00:00:00';
+            my ($start_hour, $start_min) = split(':', $start_time);
+            my ($end_hour, $end_min) = split(':', $end_time);
+
+            # Adjust for midnight crossover
+            if ($end_hour < $start_hour || ($end_hour == $start_hour && $end_min < $start_min)) {
+                $end_hour += 24;
+            }
+
+            my $time_diff_in_minutes = ($end_hour - $start_hour) * 60 + ($end_min - $start_min);
+            $accumulated_time += $time_diff_in_minutes * 60; # Convert minutes to seconds
+
+            # Collect log details
+            push @logs, {
+                start_time => $start_time,
+                end_time => $end_time,
+                time_spent => sprintf("%02d:%02d", int($time_diff_in_minutes / 60), $time_diff_in_minutes % 60),
+            };
+        }
+
+        # Format accumulated time as 'HH:MM'
+        my $hours = int($accumulated_time / 3600);
+        my $minutes = int(($accumulated_time % 3600) / 60);
+        $todo->{formatted_accumulated_time} = sprintf("%02d:%02d", $hours, $minutes);
+        $todo->{logs} = \@logs; # Attach logs to the todo
+
+        $total_accumulated_time += $accumulated_time;
+    }
+
+    # Format total accumulated time as 'HH:MM'
+    my $total_hours = int($total_accumulated_time / 3600);
+    my $total_minutes = int(($total_accumulated_time % 3600) / 60);
+    my $formatted_total_time = sprintf("%02d:%02d", $total_hours, $total_minutes);
+
+    # Pass formatted times to the template
     $c->stash(
         project => $project,
         todos => \@todos,
+        total_accumulated_time => $formatted_total_time,
         template => 'todo/projectdetails.tt'
     );
 

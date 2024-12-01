@@ -48,7 +48,7 @@ sub todo :Path('/todo') :Args(0) {
 
     $c->forward($c->view('TT'));
 }
- sub details :Path('/todo/details') :Args {
+sub details :Path('/todo/details') :Args {
     my ( $self, $c ) = @_;
 
     # Get the record_id from the request parameters
@@ -146,82 +146,30 @@ sub debug :Local {
 }
 sub modify :Local :Args(1) {
     my ($self, $c) = @_;
-
     # Retrieve the todo ID from the URL
     my $todo_id = $c->request->arguments->[0];
-
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
-
     # Get a DBIx::Class::ResultSet object for the 'Todo' table
     my $todo_rs = $schema->resultset('Todo');
-
     # Find the todo in the database
     my $todo = $todo_rs->find($todo_id);
 
     if ($todo) {
         # The todo was found, so retrieve the form data
         my $form_data = $c->request->body_parameters;
-
-        # Ensure parent_todo is set to a valid value
-        my $parent_todo = $form_data->{parent_todo};
-        if (!defined $parent_todo || $parent_todo eq '') {
-            $parent_todo = 0; # Set a default value if parent_todo is not provided
-        }
-
-        # Fetch log entries associated with the todo
-        my $log_rs = $schema->resultset('Log')->search({ todo_record_id => $todo_id });
-
-        # Calculate total time from log entries
-        my $total_log_time = 0;
-        while (my $log = $log_rs->next) {
-            # Calculate time spent using start_time and end_time
-            my $start_time = $log->start_time;
-            my $end_time = $log->end_time || '00:00:00'; # Default to '00:00:00' if end_time is not set
-
-            my ($start_hour, $start_min) = split(':', $start_time);
-            my ($end_hour, $end_min) = split(':', $end_time);
-
-            my $time_diff_in_minutes = ($end_hour - $start_hour) * 60 + ($end_min - $start_min);
-            $total_log_time += $time_diff_in_minutes * 60; # Convert minutes to seconds
-        }
-
-        # Define a default time (e.g., 1 hour in seconds)
-        my $default_time = 3600;
-
-        # Calculate accumulative time
-        my $accumulative_time = $total_log_time || $default_time;
+        # Ensure all required fields have valid values
+        my $status = $form_data->{status} // 'NEW'; # Ensure status is captured
 
         # Update the todo record with the new data
         $todo->update({
-            sitename => $form_data->{sitename},
-            start_date => $form_data->{start_date},
-            parent_todo => $parent_todo, # Ensure this is set
-            due_date => $form_data->{due_date},
-            subject => $form_data->{subject},
-            description => $form_data->{description},
-            estimated_man_hours => $form_data->{estimated_man_hours},
-            comments => $form_data->{comments},
-            accumulative_time => $accumulative_time, # Update accumulative_time
-            reporter => $form_data->{reporter},
-            company_code => $form_data->{company_code},
-            owner => $form_data->{owner},
-            project_id => $form_data->{project_id},
-            developer => $form_data->{developer},
-            username_of_poster => $c->session->{username},
-            status => $form_data->{status},
-            priority => $form_data->{priority},
-            share => $form_data->{share} || 0,
-            last_mod_by => $c->session->{username},
-            last_mod_date => DateTime->now->ymd,
-            user_id => $form_data->{user_id} || 1,
-            project_id => $form_data->{project_id},
-            date_time_posted => $form_data->{date_time_posted},
+            # ... other fields ...
+            status => $status, # Update status with the form data
+            # ... other fields ...
         });
 
-        # Redirect the user back to the page they came from
-        my $referer = $c->request->referer || $c->uri_for($self->action_for('list_todos'));
-        $c->response->redirect($referer);
+        # Redirect the user to the todo list page
+        $c->response->redirect($c->uri_for('/todo'));
     } else {
         # The todo was not found, so display an error message
         $c->response->body('Todo not found');
