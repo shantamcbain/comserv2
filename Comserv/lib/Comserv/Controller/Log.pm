@@ -33,7 +33,9 @@ sub BUILD {
 
 sub index :Path('/log') :Args(0) {
     my ( $self, $c ) = @_;
-
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'index', "Accessed log index");
+    $c->stash->{debug_errors} //= [];
+    $c->stash(debug_errors => []);
     # Retrieve the status from the query parameters, default to 'open'
     my $status = $c->request->params->{status} // 'open';
 
@@ -53,6 +55,7 @@ sub index :Path('/log') :Args(0) {
     # Debug: Print all logs
     $self->logging->log_with_details($c, __FILE__, __LINE__, 'index', "Fetched logs: " . Dumper([$rs->all]));
 
+    $c->stash->{debug_errors} //= [];  # Ensure debug_errors is initialized
     # Pass the logs and status to the template
     $c->stash(
         logs => [$rs->all],
@@ -86,7 +89,6 @@ sub details :Path('/log/details') :Args(0) {
         $c->response->body('Log entry not found.');
     }
 }
-
 
 sub update :Path('/log/update') :Args(0) {
     my ( $self, $c ) = @_;
@@ -216,7 +218,6 @@ sub log_form :Path('/log/log_form'):Args() {
     # Render the form
     $c->stash->{template} = 'log/log_form.tt';
 }
-
 
 sub create_log :Path('/log/create_log'):Args() {
     my ( $self, $c) = @_;

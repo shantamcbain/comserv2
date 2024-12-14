@@ -18,11 +18,11 @@ __PACKAGE__->config(namespace => '');
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
 
-    $self->logging->log_with_details($c, __FILE__, __LINE__, "Starting index action");
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'index', "Starting index action");
     $c->log->debug('About to fetch SiteName from session');
     my $SiteName = $c->session->{SiteName};
     my $ControllerName = $c->session->{SiteName};
-    $self->logging->log_with_details($c, __FILE__, __LINE__, "Site setup called");
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'index', "Site setup called");
     $c->log->debug("Fetched SiteName from session: $SiteName");
     $c->log->debug("Fetched ControllerName from session: $ControllerName");
 
@@ -48,7 +48,7 @@ sub index :Path :Args(0) {
 
 sub auto :Private {
     my ($self, $c) = @_;
-    $self->logging->log_with_details($c, __FILE__, __LINE__, "Starting auto action");
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'auto', "Starting auto action");
 
     my $SiteName = $c->session->{SiteName};
 
@@ -191,7 +191,7 @@ sub site_setup {
     my $SiteName = $c->session->{SiteName};
 
     unless (defined $SiteName) {
-        $c->log->debug("SiteName is not defined in the session");
+        $c->log->debug("SiteName is not defined in the session" );
         return;
     }
 

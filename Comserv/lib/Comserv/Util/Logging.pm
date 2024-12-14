@@ -1,15 +1,21 @@
 package Comserv::Util::Logging;
 
-use Moose;
+use strict;
+use warnings;
 use namespace::autoclean;
 
-my $instance;
-
-sub instance {
-    return $instance //= __PACKAGE__->new;
+sub new {
+    my ($class) = @_;
+    my $self = bless { }, $class;
+    return $self;
 }
 
-# Fixed the log_with_details method to handle undefined message
+sub instance {
+    my $class = shift;
+    my $instance = $class->new();
+    return $instance;
+}
+
 sub log_with_details {
     my ($self, $c, $file, $line, $subroutine, $message) = @_;
 
@@ -21,42 +27,35 @@ sub log_with_details {
     # Ensure message is defined
     $message //= 'No message provided';
 
-    my $log_message = sprintf("[%s:%d] %s - %s", $file, $line, $subroutine, $message);
+    my $log_message = sprintf("[%s:%d] %s - %s", $file, $line, $subroutine // 'unknown', $message);
 
+    # Log to Catalyst's debug log if available
     if ($c->can('log')) {
         $c->log->debug($log_message);
     } else {
         warn "Logging object not available in context";
     }
 
-    my $debug_error = $c->stash->{debug_error} ||= [];
-    my $debug_errors = $c->stash->{debug_errors} ||= [];  # Ensure debug_errors is initialized
-    push @$debug_error, $log_message;
-    push @$debug_errors, $log_message;  # Add log message to debug_errors
+    # Add log message to stash
+    my $debug_errors = $c->stash->{debug_errors} ||= [];
+    push @$debug_errors, $log_message;
 
+    # Print to STDERR for immediate visibility (optional, for debugging)
     print STDERR "$log_message\n";
 }
 
-
 sub log_error {
-    my ($self, $c, $error) = @_;
-    my ($package, $filename, $line) = caller(2); # Adjusted to caller(2) for correct context
-    my $log_message = sprintf("[%s:%d] Error: %s", $filename, $line, $error);
+    my ($self, $c, $file, $line, $error_message) = @_;
 
-    if ($c->can('log')) {
+    if (defined $c && ref($c) eq 'Catalyst') {
+        my $log_message = "[ERROR] - $file:$line - $error_message";
+
+        push @{$c->stash->{debug_errors}}, $log_message;
+
         $c->log->error($log_message);
     } else {
-        warn "Logging object not available in context";
+        warn "Attempted to log error with an invalid Catalyst context: $c";
     }
-
-    my $debug_error = $c->stash->{debug_error} ||= [];
-    my $debug_errors = $c->stash->{debug_errors} ||= [];  # Ensure debug_errors is initialized
-    push @$debug_error, $log_message;
-    push @$debug_errors, $log_message;  # Add log message to debug_errors
-
-    print STDERR "From log_error: $log_message\n";
 }
 
-__PACKAGE__->meta->make_immutable;
-
-1;
+1; # End of module

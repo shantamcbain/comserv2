@@ -17,7 +17,7 @@ sub index :Path(/todo) :Args(0) {
 
     # Set the TT template to use.
     $c->stash(template => 'todo/todo.tt');
-    Comserv::Util::Logging->instance->log_with_details($c, __FILE__, __LINE__, 'index', 'Fetched todos for the todo page');
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'index', 'Fetched todos for the todo page');
     $c->forward($c->view('TT'));
 }
 sub todo :Path('/todo') :Args(0) {
@@ -133,14 +133,14 @@ sub debug :Local {
     my ($self, $c) = @_;
 
     # Print the @INC path
-    Comserv::Util::Logging->instance->log_with_details($c, __FILE__, __LINE__, 'debug', "INC: " . join(", ", @INC));
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'debug', "INC: " . join(", ", @INC));
 
     # Check if the DateTime plugin is installed
     my $is_installed = eval {
         require Template::Plugin::DateTime;
         1;
     };
-    Comserv::Util::Logging->instance->log_with_details($c, __FILE__, __LINE__, 'debug', "DateTime plugin is " . ($is_installed ? "" : "not ") . "installed");
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'debug', "DateTime plugin is " . ($is_installed ? "" : "not ") . "installed");
 
     $c->response->body("Debugging information has been logged");
 }

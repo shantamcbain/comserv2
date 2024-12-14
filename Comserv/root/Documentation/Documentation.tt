@@ -14,7 +14,7 @@ Please ensure that all navigation links within each sub-document are unique. Thi
     <a href="#admin_module">Admin Module</a> |
     <a href="#dbi">DBI</a> |
     <a href="#bmaster">BMaster</a> |
-    <a href="#document-management">Document Management</a>  |
+    <a href="#document-management">Document Management</a> |
     <a href="#ENCY">The Encyclopedia of Biological Life</a> |
     <a href="#files">Files</a> |
     <a href="#git">Git</a> |
@@ -22,7 +22,7 @@ Please ensure that all navigation links within each sub-document are unique. Thi
     <a href="#calendar">Calendar</a> |
     <a href="#login">Login</a> |
     <a href="#logging">Logging</a> |
-    <a href="#mail">Mail</a> | <!-- Added Mail section -->
+    <a href="#mail">Mail</a> |
     <a href="#projects">Projects</a> |
     <a href="#guidelines">Guidelines</a>    |
     <a href="#root">Root</a> |
@@ -34,40 +34,52 @@ Please ensure that all navigation links within each sub-document are unique. Thi
     <a href="#ve7tit">Ve7tit Application</a> |
     <a href="#AI">AI Integration Plan</a> |
     <a href="#session-plan">Session Plan</a> |
-    <a href="#user-management">User Management</a>
+    <a href="#user-management">User Management</a> |
+    <a href="#inventory">Inventory</a>
 </nav>
 
 <h3 id="overview"><a href="#top">Back to top of Documentation</a></h3>
 
 [% INCLUDE 'Documentation/Overview.tt' %]
-<h3 id="admin"><a href="#top">Back to top of Documentation</a></h3>
+
+<h3 id="admin_module"><a href="#top">Back to top of Documentation</a></h3>
+
 [% INCLUDE 'Documentation/Admin.tt' %]
+
 <h3 id="ai"><a href="#top">Back to top of Documentation</a></h3>
+
 [% INCLUDE 'Documentation/AI.tt' %]
 
 <h3 id="dbi"><a href="#top">Back to top of Documentation</a></h3>
+
 [% INCLUDE 'Documentation/DBIDocument.tt' %]
 
-<h3 id="bmaster">
-<h3><a href="#top">Back to top of Documentation</a></h3>
+<h3 id="bmaster"><a href="#top">Back to top of Documentation</a></h3>
+
 [% INCLUDE 'Documentation/BMaster.tt' %]
 
 <h3 id="calendar"><a href="#top">Back to top of Documentation</a></h3>
+
 [% INCLUDE 'Documentation/Calendar.tt' %]
+
 <h3 id="document-management"><a href="#top">Back to top of Documentation</a></h3>
 
 [% INCLUDE 'Documentation/DocumentManagement.tt' %]
 
 <h3 id="ENCY"><a href="#top">Back to top of Documentation</a></h3>
+
 [% INCLUDE 'Documentation/ENCY.tt' %]
 
 <h3 id="files"><a href="#top">Back to top of Documentation</a></h3>
+
 [% INCLUDE 'Documentation/Files.tt' %]
 
 <h3 id="guidelines"><a href="#top">Back to top of Documentation</a></h3>
 
 [% INCLUDE 'Documentation/guidelines.tt' %]
+
 <h3 id="git"><a href="#top">Back to top of Documentation</a></h3>
+
 [% INCLUDE 'Documentation/Git.tt' %]
 
 <h3 id="installation"><a href="#top">Back to top of Documentation</a></h3>
@@ -75,15 +87,16 @@ Please ensure that all navigation links within each sub-document are unique. Thi
 [% INCLUDE 'Documentation/Installation.tt' %]
 
 <h3 id="login"><a href="#top">Back to top of Documentation</a></h3>
-<h3><a href="#top">Back to top of Documentation</a></h3>
+
 [% INCLUDE 'Documentation/Login.tt' %]
 
 <h3 id="logging"><a href="#top">Back to top of Documentation</a></h3>
 
 [% INCLUDE 'Documentation/Logging.tt' %]
 
-<h3 id="mail"><a href="#top">Back to top of Documentation</a></h3> <!-- Added Mail section -->
-[% INCLUDE 'Documentation/Mail.tt' %] <!-- Include Mail documentation -->
+<h3 id="mail"><a href="#top">Back to top of Documentation</a></h3>
+
+[% INCLUDE 'Documentation/Mail.tt' %]
 
 <h3 id="projects"><a href="#top">Back to top of Documentation</a></h3>
 
@@ -96,7 +109,9 @@ Please ensure that all navigation links within each sub-document are unique. Thi
 <h3 id="session-plan"><a href="#top">Back to top of Documentation</a></h3>
 
 [% INCLUDE 'Documentation/sessionplan.tt' %]
+
 <h3 id="schema"><a href="#top">Back to top of Documentation</a></h3>
+
 [% INCLUDE 'Documentation/Schema.tt' %]
 
 <h3 id="user-management"><a href="#top">Back to top of Documentation</a></h3>
@@ -105,7 +120,7 @@ Please ensure that all navigation links within each sub-document are unique. Thi
 
 <h3 id="sites"><a href="#top">Back to top of Documentation</a></h3>
 
-[% INCLUDE 'Documentation/Sites.tt' %] 
+[% INCLUDE 'Documentation/Sites.tt' %]
 
 <h3 id="starman-setup"><a href="#top">Back to top of Documentation</a></h3>
 
@@ -118,10 +133,14 @@ Please ensure that all navigation links within each sub-document are unique. Thi
 <h3 id="workshop-management"><a href="#top">Back to top of Documentation</a></h3>
 
 [% INCLUDE 'Documentation/WorkShops.tt' %]
+
 <h3 id="ve7tit"><a href="#top">Back to top of Documentation</a></h3>
+
 [% INCLUDE 'Documentation/Ve7tit.tt' %]
-<h3 id="AI"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/AI.tt' %]
+
+<h3 id="inventory"><a href="#top">Back to top of Documentation</a></h3>
+
+[% INCLUDE 'Documentation/Inventory.tt' %]
 
 <h2>Instructions for Developers</h2>
 <p>Welcome to the Comserv Application Documentation. Here are some guidelines and best practices to keep in mind while working with this project:</p>

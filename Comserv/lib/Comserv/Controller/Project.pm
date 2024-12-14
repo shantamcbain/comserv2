@@ -11,13 +11,13 @@ has 'logging' => (
 );
 sub index :Path :Args(0) {
     my ( $self, $c ) = @_;
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'Starting index action');
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'index', 'Starting index action');
     $c->res->redirect($c->uri_for($self->action_for('project')));
 }
 
 sub add_project :Path('addproject') :Args(0) {
     my ( $self, $c ) = @_;
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'Starting add_project action');
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'add_project', 'Starting add_project action' );
     $c->session->{previous_url} = $c->req->referer;
 
     my $project_model = $c->model('Project');
@@ -25,7 +25,7 @@ sub add_project :Path('addproject') :Args(0) {
 
     # Sort projects alphabetically by name
     my @sorted_projects = sort { $a->{name} cmp $b->{name} } @$projects;
-
+    
     Comserv::Util::Logging->instance->log_with_details($c, __FILE__, __LINE__, 'add_project', Dumper(\@sorted_projects));
 
     $c->stash->{projects} = \@sorted_projects;

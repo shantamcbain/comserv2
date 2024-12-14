@@ -15,7 +15,7 @@
 <p>The <code>Comserv::Controller::Log</code> module handles the routing and logic for log-related actions:</p>
 <ul>
     <li><strong>Index:</strong> Fetches logs based on status, defaults to excluding status 3 (DONE).</li>
-    <li><strong>Edit:</strong> Fetches a log entry by record ID, sets the <code>end_time</code> to the current local time, and passes data to the template.</li>
+    <li><strong>Details:</strong> Fetches a log entry by record ID, sets the <code>end_time</code> to the current local time, and passes data to the template.</li>
     <li><strong>Update:</strong> Updates a log entry with new values from form data, calculates time difference, and redirects to log details.</li>
     <li><strong>Log Form:</strong> Displays a form for log entry, pre-filling data from a todo record.</li>
     <li><strong>Create Log:</strong> Creates a new log entry with form data, calculates time difference, and handles default values.</li>
