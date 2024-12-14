@@ -334,6 +334,8 @@ sub welcome :Local {
     $c->stash(template => 'user/welcome.tt');
     $c->forward($c->view('TT'));
 }
+sub forgot_password :Local {
+    my ($self, $c) = @_;}
 
 __PACKAGE__->meta->make_immutable;
 
