@@ -2,7 +2,6 @@ Comserv2.iml
 workspace.xml
 /Comserv/comserv.psgi
 DefaultDBI.tt
-workspace.xml
 Comserv/comserv.psgi
 .idea/workspace.xml
 .idea.*
@@ -15,3 +14,4 @@ Comserv/comserv.psgi
 /.idea/inspectionProfiles/profiles_settings.xml
 /.idea/vcs.xml
 /.idea/perl5local.xml
+/aimanager/__init__.py

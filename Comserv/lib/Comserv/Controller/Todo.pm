@@ -98,28 +98,36 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
     my $SiteName = $c->session->{SiteName};
 
     # Fetch projects and their sub-projects
-# Fetch projects and their sub-projects
-my $project_rs = $schema->resultset('Project')->search(
-    { 'me.sitename' => $SiteName }, # Filter by site name
-    {
-        prefetch => 'sub_projects', # Prefetch sub-projects
-        order_by => ['me.name'] # Order by project name
-    }
-);
+    my $project_rs = $schema->resultset('Project')->search(
+        { 'me.sitename' => $SiteName }, # Filter by site name
+        {
+            prefetch => 'sub_projects', # Prefetch sub-projects
+            order_by => ['me.name'] # Order by project name
+        }
+    );
 
-# Convert the resultset to an array of hashrefs for use in the template
-my @projects = map {
-    {
-        id => $_->id,
-        name => $_->name,
-        sub_projects => [ map { { id => $_->id, name => $_->name } } $_->sub_projects->all ]
-    }
-} $project_rs->all;
+    # Convert the resultset to an array of hashrefs for use in the template
+    my @projects = map {
+        {
+            id => $_->id,
+            name => $_->name,
+            sub_projects => [ map { { id => $_->id, name => $_->name } } $_->sub_projects->all ]
+        }
+    } $project_rs->all;
 
-    # Add the projects and sitename to the stash
+    # Fetch all users to populate the user_id dropdown
+    my @users = $schema->resultset('User')->all;
+
+    # Log the list of user_ids
+    my @user_ids = map { $_->id } @users;
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'addtodo', 'User IDs: ' . join(', ', @user_ids));
+
+    # Add the projects, sitename, and user_id to the stash
     $c->stash(
         projects => \@projects,
-        sitename => $SiteName, # Add sitename to the stash
+        sitename => $SiteName,
+        users => \@users, # Pass users to the stash
+        user_id => $c->session->{user_id}, # Pass user_id to the stash
         template => 'todo/addtodo.tt',
     );
 

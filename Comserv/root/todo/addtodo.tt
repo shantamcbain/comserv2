@@ -104,19 +104,18 @@
         <input type="date" id="last_mod_date" name="last_mod_date" value="[% todo.last_mod_date OR '' %]">
     </div>
 
-    <div>
-        <label for="group_of_poster">Group of Poster:</label>
-        <input type="text" id="group_of_poster" name="group_of_poster" value="[% todo.group_of_poster || session.group_of_poster || 'default_group' %]">
-    </div>
 
-    <div>
-        <label for="user_id">User ID:</label>
-        <select id="user_id" name="user_id">
-            [% FOREACH user IN users %]
-                <option value="[% user.id %]" [% IF user.id == todo.user_id %]selected[% END %]>[% user.username %]</option>
-            [% END %]
-        </select>
-    </div>
+<div>
+    <label for="user_id">User ID:</label>
+    <select id="user_id" name="user_id">
+        [% FOREACH user IN users %]
+            <!-- Use user_id from the stash to set the selected option -->
+            <option value="[% user.id %]" [% IF user.id == user_id %]selected[% END %]>[% user.username %]</option>
+        [% END %]
+    </select>
+</div>
+
+
 
     <div>
         <input type="submit" value="Submit">

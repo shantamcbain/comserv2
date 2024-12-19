@@ -1,4 +1,5 @@
-[% PageVersion = 'Documentation/Git.tt,v 0.01 2024/03/10 Shanta Exp shanta ' %]
+[% PageVersion = 'Documentation/Git.tt,v 0.02 2024/12/18 Shanta Exp shanta ' %]
+[%# PageVersion = 'Documentation/Git.tt,v 0.01 2024/03/10 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -23,9 +24,55 @@
     <li>Commit Changes:
         <ul>
             <li>Use Alt+0 (Command+0 on Mac) to open the Commit tool window</li>
-            <li>Select changed files to commit</li>
-            <li>Write a descriptive commit message</li>
+            <li>Select changed files to commit (e.g., Forager.pm)</li>
+            <li>Write a descriptive commit message (e.g., "Add Forager controller for handling forager.com routes")</li>
             <li>Click "Commit" or "Commit and Push"</li>
+        </ul>
+    </li>
+</ol>
+
+<h2 id="workflows">Common Workflows</h2>
+
+<h3>Adding New Features to Production</h3>
+<ol>
+    <li>Create a New Branch:
+        <pre><code>git checkout -b feature/forager-controller</code></pre>
+    </li>
+    <li>Add and Commit Changes:
+        <pre><code>git add Forager.pm
+git commit -m "Add Forager controller for handling forager.com routes"</code></pre>
+    </li>
+    <li>Push to Remote:
+        <pre><code>git push origin feature/forager-controller</code></pre>
+    </li>
+    <li>Deploy to Staging for Testing:
+        <ul>
+            <li>Use your deployment tool to push to staging environment</li>
+            <li>Test thoroughly for correct site information and route handling</li>
+        </ul>
+    </li>
+    <li>Merge to Development/Staging:
+        <ul>
+            <li>Create a Pull Request if using GitHub or similar</li>
+            <li>Or directly merge:
+                <pre><code>git checkout development
+git merge feature/forager-controller</code></pre>
+            </li>
+        </ul>
+    </li>
+    <li>Final Test on Staging:
+        <ul>
+            <li>Re-run tests to ensure no issues post-merge</li>
+        </ul>
+    </li>
+    <li>Merge to Production:
+        <pre><code>git checkout production
+git merge development
+git push origin production</code></pre>
+    </li>
+    <li>Monitor Post-Deployment:
+        <ul>
+            <li>Watch for any live site issues</li>
         </ul>
     </li>
 </ol>
