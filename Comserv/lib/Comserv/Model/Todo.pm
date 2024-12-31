@@ -28,7 +28,7 @@ sub get_top_todos {
     );
 
     $self->logging->log_with_details($c, __FILE__, __LINE__, 'Visited the todo page');
-    $self->logging->log_with_details($c, __FILE__, __LINE__, "Number of todos fetched: " . scalar(@todos));
+    #$self->logging->log_with_details($c, __FILE__, __LINE__, "Number of todos fetched: " . scalar(@todos));
 
     $c->session(todos => \@todos);
 

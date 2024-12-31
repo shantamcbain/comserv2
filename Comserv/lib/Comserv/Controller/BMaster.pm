@@ -21,6 +21,8 @@ sub base :Chained('/') :PathPart('BMaster') :CaptureArgs(0) {
 sub index :Chained('base') :Path('') :Args(0) {
 
     my ( $self, $c ) = @_;
+       $c->session->{MailServer} = "http://webmail.beemaster.ca";
+
     $c->stash(template => 'BMaster/BMaster.tt');
     $c->forward($c->view('TT'));
 }

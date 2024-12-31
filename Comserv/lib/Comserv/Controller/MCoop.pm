@@ -6,6 +6,7 @@ BEGIN { extends 'Catalyst::Controller'; }
 
 sub index :Path :Args(0) {
     my ( $self, $c ) = @_;
+   $c->session->{MailServer} = "http://webmail.computersystemconsulting.ca";
 
     # Set the template to coop/index.tt
     $c->stash(template => 'coop/index.tt');

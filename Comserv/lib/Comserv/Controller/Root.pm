@@ -232,7 +232,7 @@ sub auto :Private {
     $c->log->debug('Entered auto action in Root.pm');
 
     my $schema = $c->model('DBEncy');
-    print "Schema: $schema\n";
+    #print "Schema: $schema\n";
 
     $SiteName = $self->fetch_and_set($c, $schema, 'site');
 
@@ -280,6 +280,8 @@ sub auto :Private {
             member_links => \@member_links,
         );
     }
+    # Set the mail server name based on the SiteName
+    my $mail_server;
 
     return 1;
 }
@@ -304,7 +306,7 @@ sub site_setup {
         return;
     }
 
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'site_setup', "Found site: " . Dumper($site));
+    #$self->logging->log_with_details($c, __FILE__, __LINE__, 'site_setup', "Found site: " . Dumper($site));
 
     my $css_view_name = $site->css_view_name || '/static/css/default.css';
     my $site_display_name = $site->site_display_name || 'none';
