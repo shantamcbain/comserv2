@@ -24,6 +24,7 @@ The landing page for the 3D feature.
 
 sub index :Path :Args(0) {
     my ( $self, $c ) = @_;
+   $c->session->{MailServer} = "http://webmail.usbm.ca";
 
     # Set the template for the 3D feature landing page
     $c->stash(template => '3d/index.tt');
