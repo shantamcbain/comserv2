@@ -1,5 +1,5 @@
-package Comserv::Model::BMasterModel;
 
+package Comserv::Controller::BMaster;
 use Moose;
 use namespace::autoclean;
 use DateTime;
