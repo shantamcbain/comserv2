@@ -1,8 +1,9 @@
 [% PageVersion = '3D Feature Landing Page, v0.1 2024/05/28 Shanta Exp shanta' %]
 [% IF c.session.debug_mode == 1 %]
-[% END %]
     [% PageVersion %]
-<h1 id="top">3D Feature Landing Page</h1>
+[% END %]
+
+<h1 id="top">Join us in our 3D Community!</h1>
 <nav>
     <a id="3dtop"></a>
     <a href="#overview">Overview</a>|

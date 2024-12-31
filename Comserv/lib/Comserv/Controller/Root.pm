@@ -331,6 +331,19 @@ sub debug :Path('/debug') {
     $c->stash(template => 'debug.tt');
     $c->forward($c->view('TT'));
 }
+# Subroutine to handle the /accounts route
+sub accounts :Path('/accounts') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Log the access to the accounts page
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'accounts', "Accessing accounts page");
+
+    # Set the template to accounts.tt
+    $c->stash(template => 'accounts.tt');
+
+    # Forward to the TT view for rendering
+    $c->forward($c->view('TT'));
+}
 
 sub default :Path {
     my ( $self, $c ) = @_;

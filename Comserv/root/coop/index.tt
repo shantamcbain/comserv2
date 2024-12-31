@@ -10,20 +10,16 @@
         <p>Welcome to the admin support site for Monashee Coop in Lumby, BC.</p>
         <p>Date: [% Date.format(Date.now, '%Y-%m-%d') %]</p>
     </header>
-    [% IF c %]
-        <p>Context is available</p>
-    [% ELSE %]
-        <p>Context is not available</p>
-    [% END %]
+   <nav>
 
-    <nav>
-        <ul>
-            <li><a href="[% c.uri_for('/') %]">Home</a></li>
-            <li><a href="[% c.uri_for('/site') %]">Sites</a></li>
-            <li><a href="[% c.uri_for('/mcoop') %]">Coop Admin</a></li>
+            <a href="[% c.uri_for('Http://monasheecoop.com') %]">Main website.</a> |
+
             <!-- Add more navigation links as needed -->
-        </ul>
+
     </nav>
+
+
+
 
     <main>
         <h2>Admin Dashboard</h2>

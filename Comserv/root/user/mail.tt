@@ -11,15 +11,15 @@
         SiteName == 'Forager' %]
    [% shop = 'cs' %]
    [% cat = '60001' %]
-    [% MailServerName = 'forager.com:2096' %]
-    [% MailServer = 'forager.com' %]
+    [% MailServerName = 'forager.com:20000' %]
+    [% MailServer = 'forager.com20000' %]
    [% END %]
    [% IF SiteName == 'CS' OR
         SiteName == 'LumbyThrift' OR
         SiteName == 'NOOP'  %]
     [% shop = 'cs' %]
    [% cat = '60001' %]
-    [% MailServerName = 'webmail.countrystores.ca:2096' %]
+    [% MailServerName = 'webmail.countrystores.ca:20000' %]
   [% MailServer = 'mail.countrystores.ca' %]
     [% END %]
   [% IF SiteName == 'Organic' OR
@@ -28,13 +28,13 @@
         SiteName == 'AltPower' %]
     [% shop = 'cs' %]
    [% cat = '60001' %]
-    [% MailServerName = 'webmail.computersystemconsulting.ca:2096' %]
+    [% MailServerName = 'webmail.computersystemconsulting.ca:20000' %]
   [% MailServer = 'mail.computersystemconsulting.ca' %]
     [% END %]
 [% IF SiteName == 'CSC' OR
       SiteName == 'CSCDev' OR
       SiteName == 'Extropia' %]
-   [% MailServerName = 'webmail.computersystemconsulting.ca:2096' %]
+   [% MailServerName = 'webmail.computersystemconsulting.ca:20000' %]
    [% MailServer = 'mail.computersystemconsulting.ca' %]
    [% shop = 'csc' %]
    [% cat = 'Memberships' %]
@@ -42,20 +42,28 @@
  [% IF SiteName == 'ECF' %]
    [% shop = 'apis' %]
    [% cat = 'Memberships' %]
-    [% MailServerName = 'webmail.beemaster.ca:2096' %]
+    [% MailServerName = 'webmail.beemaster.ca:20000' %]
    [% MailServer = 'mail.beemaster.ca' %]
+   [% END %]
+[% IF SiteName == 'USBM' OR
+      SiteName == '3d' OR
+      SiteName == 'ENCY' %]
+   [% MailServerName = 'webmail.usbm.ca:20000' %]
+   [% MailServer = 'mail.usbm.ca' %]
+   [% shop = 'csc' %]
+   [% cat = 'Memberships' %]
    [% END %]
 
  [% IF SiteName == 'HE' %]
    [% shop = 'HE' %]
    [% cat = 'Memberships' %]
-    [% MailServerName = 'webmail.helpfullearth.com:2096' %]
+    [% MailServerName = 'webmail.helpfullearth.com:20000' %]
    [% MailServer = 'mail.beemaster.ca' %]
    [% END %]
 [% IF SiteName == 'Skye' %]
    [% shop = 'Skye' %]
    [% cat = 'Memberships' %]
-    [% MailServerName = 'webmail.skyefarm.com:2096' %]
+    [% MailServerName = 'webmail.skyefarm.com:20000' %]
    [% MailServer = 'mail.beemaster.ca' %]
    [% END %]
 
@@ -67,7 +75,7 @@
        SiteName == 'TelMark'%]
    [% shop = 'cs' %]
    [% cat = '60001' %]
-    [% MailServerName = 'webmail.beemaster.ca:2096' %]
+    [% MailServerName = 'webmail.beemaster.ca:20000' %]
    [% MailServer = 'mail.beemaster.ca' %]
    [% END %]
 		<A NAME="PageTop"></A>
@@ -76,19 +84,20 @@
 
 		<tr>
 	<td >
-        <div align="center" [% c.session.username %]
-			[% IF c.session.username %]
+        <div align="center"> [%# c.session.username %]
+			[% IF c.session.username %]</div>
 
-		<h3> Hello  [% firstname%]&nbsp;  [% lastname%]! Welcome to [% MailServer %]'s Mail page!</h3>
+		<h3> Hello  [% c.session.first_name%]&nbsp;  [% c.session.last_name%]! Welcome to [% MailServer %]'s Mail page!</h3>
 <p>When you click the mail link, you will come to this page if you are not logged in. If you are logged in you will be prompted for your username@[% MailServer %] and your mail password. Once you are logged into the mail, forwarding and spam control functions. </p>
 
-<p><a href="https://[% MailServerName %]" Target="_blank">Mail</a></p>
-
+<p><a href="https://[% MailServerName %]" Target="_blank">Mail</a>
+</p>
+<!--<p><a href="https://[% MailServer %]/roundcube/index.php" Target="_blank">RoundCube Mail</a></p>-->
 
 			[% ELSE %]
 
-			<h3>  Hello!  Welcome to [% MailServer %]'s Mail Page!</h3
-		<h2> We offer to our members one free</a> email address. </h2>
+			<h3>  Hello!  Welcome to [% MailServer %]'s Mail Page!</h3>
+		<h2> We offer to our members one free email address. </h2>
 <p>When you join any of the hosted sites at [% MailServerName %] you will be given an email address based on your
     username, if available. You may access your mail by either your local mail reader for reading off-line, or you
     can use the Mail link on our sites. Once you log in, the application will know who you are and take you to your mail.</p>
@@ -99,7 +108,7 @@
 		</tr>
 		<tr>
 		<td >
-		</div>
+
 
 </td >
 		</tr>
