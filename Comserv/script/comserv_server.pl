@@ -4,6 +4,10 @@ BEGIN {
     $ENV{CATALYST_SCRIPT_GEN} = 40;
 }
 
+# Call the cpanm --installdeps . command before starting the application
+system('cpanm --installdeps .') == 0
+    or die "Failed to install dependencies: $!";
+
 use Catalyst::ScriptRunner;
 Catalyst::ScriptRunner->run('Comserv', 'Server');
 
@@ -57,4 +61,3 @@ This library is free software. You can redistribute it and/or modify
 it under the same terms as Perl itself.
 
 =cut
-

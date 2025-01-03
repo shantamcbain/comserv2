@@ -6,6 +6,7 @@ use DBIx::Class::Migration;
 use Comserv::Util::Logging;
 BEGIN { extends 'Catalyst::Controller'; }
 
+# Ensure logging is initialized
 has 'logging' => (
     is => 'ro',
     default => sub { Comserv::Util::Logging->instance }
@@ -132,6 +133,7 @@ sub migrate_schema :Path('migrate_schema') :Args(0) {
                 $c->stash(message => 'Schema migration completed successfully.');
             };
             if ($@) {
+                $self->logging->log_error($c, __FILE__, __LINE__, "An error occurred during migration: $@");
                 $c->stash(error_msg => "An error occurred during migration: $@");
             }
         } else {
@@ -149,10 +151,29 @@ sub migrate_schema :Path('migrate_schema') :Args(0) {
 }
 
 # Edit documentation action
-sub edit_documentation :Path('admin/edit_documentation') :Args(0) {
+sub edit_documentation :Path('edit_documentation') :Args(0) {
     my ( $self, $c ) = @_;
-    # Debug logging for edit_documentation action
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'edit_documentation', "Starting edit_documentation action");
+    
+    if ($c->req->method eq 'POST') {
+        my $params = $c->req->params;
+        my $schema = $c->model('DBEncy');
+        
+        eval {
+            $schema->resultset('Documentation')->create({
+                title => $params->{title},
+                content => $params->{content},
+                section => $params->{section},
+                version => $params->{version},
+                created_by => $c->user->id,
+                updated_by => $c->user->id,
+            });
+            $c->stash(success_msg => 'Documentation saved successfully');
+        };
+        if ($@) {
+            $c->stash(error_msg => "Failed to save documentation: $@");
+        }
+    }
+    
     $c->stash(template => 'admin/edit_documentation.tt');
     $c->forward($c->view('TT'));
 }
@@ -171,6 +192,24 @@ sub get_table_info :Path('admin/get_table_info') :Args(1) {
     );
 
     $c->forward($c->view('TT'));
+}
+
+# Add AutoCRUD actions
+sub autocrud_list :Local :Args(1) {
+    my ($self, $c, $table) = @_;
+    $c->stash(
+        template => 'admin/autocrud_list.tt',
+        table => $table,
+        records => $c->model('DBEncy')->resultset($table)->all
+    );
+}
+
+sub autocrud_edit :Local :Args(2) {
+    my ($self, $c, $table, $id) = @_;
+    $c->stash(
+        template => 'admin/autocrud_edit.tt',
+        record => $c->model('DBEncy')->resultset($table)->find($id)
+    );
 }
 
 __PACKAGE__->meta->make_immutable;

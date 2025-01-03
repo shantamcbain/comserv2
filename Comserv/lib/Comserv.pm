@@ -1,6 +1,7 @@
 package Comserv;
 use Moose;
 use namespace::autoclean;
+use Catalyst::Plugin::AutoCRUD;
 use Config::JSON;
 use FindBin '$Bin';
 
@@ -8,6 +9,7 @@ use Catalyst::Runtime 5.80;
 use Catalyst qw/
     ConfigLoader
     Static::Simple
+    AutoCRUD
     StackTrace
     Session
     Session::Store::File
@@ -35,22 +37,28 @@ __PACKAGE__->config(
     enable_catalyst_header => $ENV{CATALYST_HEADER} // 1,
     encoding => 'UTF-8',
     debug => $ENV{CATALYST_DEBUG} // 0,
-    'Plugin::Log::Dispatch' => {
-        dispatchers => [
-            {
-                class => 'Log::Dispatch::File',
-                min_level => 'debug',
-                filename => 'logs/application.log',
-                mode => 'append',
-                newline => 1,
-            },
+    
+    'Plugin::AutoCRUD' => {
+        model => 'DBEncy',
+        login_url => '/user/login',
+        logout_url => '/user/logout',
+        editable => 1,
+    },
+
+    'View::TT' => {
+        INCLUDE_PATH => [
+            __PACKAGE__->path_to('root'),
         ],
     },
 );
 
-sub psgi_app {
-    my $self = shift;
+sub check_and_update_schema {
+    my ($self) = @_;
+    # Code to check and update the schema
+}
 
+sub psgi_app {
+    my ($self) = shift;
     my $app = $self->SUPER::psgi_app(@_);
 
     return sub {
@@ -61,6 +69,16 @@ sub psgi_app {
 
         return $app->($env);
     };
+}
+
+sub schema_needs_update {
+    my ($self) = @_;
+    return $self->{schema_needs_update};
+}
+
+sub deploy_schema {
+    my ($self) = @_;
+    # Code to deploy the schema
 }
 
 __PACKAGE__->setup();

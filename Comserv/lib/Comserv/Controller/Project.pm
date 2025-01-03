@@ -53,19 +53,36 @@ sub add_project :Path('addproject') :Args(0) {
 
 sub create_project :Path('create_project') :Args(0) {
     my ( $self, $c ) = @_;
-    print Dumper($c->session);
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'create_project', 'Session data: ' . Dumper($c->session));
     my $form_data = $c->request->body_parameters;
     my $username_of_poster = $c->session->{username};
     my $schema = $c->model('DBEncy');
-    my $project_rs = $schema->resultset('Project');
-    my $group_of_poster = $c->session->{roles};
+    my $project_resultset = $schema->resultset('Project');
+    
+    # Validate required session data
+    unless ($c->session->{roles}) {
+        $c->stash(
+            error_msg => 'User roles not found in session. Please log in again.',
+            template => 'todo/add_project.tt'
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+    
+    # Ensure roles is an array reference
+    my $roles = $c->session->{roles};
+    unless (ref $roles eq 'ARRAY') {
+        $roles = [];  # Initialize as an empty array if not an array reference
+    }
+    
+    my $group_of_poster = join(',', @$roles);
     my $parent_id = $form_data->{parent_id};
     $parent_id = undef if $parent_id eq '';
     my $date_time_posted = DateTime->now;
     my $record_id = $form_data->{record_id} || 0;
 
     my $project = eval {
-        $project_rs->create({
+        $project_resultset->create({
             record_id => $record_id,
             sitename => $form_data->{sitename},
             name => $form_data->{name},
@@ -89,7 +106,7 @@ sub create_project :Path('create_project') :Args(0) {
         # Ensure the correct template is set for error handling
         $c->stash(
             form_data => $form_data,
-            error_message => 'There was an error creating the project: ' . $@,
+            error_msg => 'Error creating project: ' . $@ . "\nPlease ensure all required fields are filled out.",
             template => 'todo/add_project.tt'  # Ensure this template exists
         );
         $c->forward($c->view('TT'));
@@ -166,8 +183,8 @@ sub update_project :Local :Args(0)  {
     my $form_data = $c->request->body_parameters;
     my $project_id = $form_data->{project_id};
     my $schema = $c->model('DBEncy');
-    my $project_rs = $schema->resultset('Project');
-    my $project = $project_rs->find($project_id);
+    my $project_resultset = $schema->resultset('Project');
+    my $project = $project_resultset->find($project_id);
 
     if ($project) {
         $project->update({

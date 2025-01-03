@@ -14,6 +14,7 @@ Please ensure that all navigation links within each sub-document are unique. Thi
     <a href="#admin_module">Admin Module</a> |
     <a href="#dbi">DBI</a> |
     <a href="#bmaster">BMaster</a> |
+    <a href="#ContentManagement">Content Management</a>|
     <a href="#document-management">Document Management</a> |
     <a href="#ENCY">The Encyclopedia of Biological Life</a> |
     <a href="#files">Files</a> |
@@ -63,8 +64,11 @@ Please ensure that all navigation links within each sub-document are unique. Thi
 [% INCLUDE 'Documentation/Calendar.tt' %]
 
 <h3 id="document-management"><a href="#top">Back to top of Documentation</a></h3>
-
 [% INCLUDE 'Documentation/DocumentManagement.tt' %]
+<h3 id="ContentManagement"><a href="#top">Back to top of Commandment Management</a></h3>
+
+[% INCLUDE 'Documentation/ContentManagement.tt' %]
+
 
 <h3 id="ENCY"><a href="#top">Back to top of Documentation</a></h3>
 

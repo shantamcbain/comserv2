@@ -323,6 +323,163 @@ package B::UNOP_AUX {
 sub aux_list;
 sub string;
 }
+package B::Utils {
+sub anon_sub;
+sub blessed($) ;
+sub main_cv;
+sub main_root;
+sub main_start;
+sub ppname;
+sub shuffle(@) ;
+sub weaken($) ;
+}
+package Bit::Vector {
+sub Abs;
+sub Absolute;
+sub And;
+sub AndNot;
+sub Bit_Copy;
+sub Bit_Off;
+sub Bit_On;
+sub Block_Read;
+sub Block_Store;
+sub Chunk_List_Read;
+sub Chunk_List_Store;
+sub Chunk_Read;
+sub Chunk_Store;
+sub Clone;
+sub Closure;
+sub Compare;
+sub Complement;
+sub Concat;
+sub Concat_List;
+sub Copy;
+sub Create;
+sub DESTROY;
+sub Delete;
+sub Difference;
+sub Divide;
+sub Empty;
+sub Empty_Interval;
+sub ExclusiveOr;
+sub Fill;
+sub Fill_Interval;
+sub Flip;
+sub Flip_Interval;
+sub GCD;
+sub Index_List_Read;
+sub Index_List_Remove;
+sub Index_List_Store;
+sub Insert;
+sub Intersection;
+sub Interval_Copy;
+sub Interval_Empty;
+sub Interval_Fill;
+sub Interval_Flip;
+sub Interval_Reverse;
+sub Interval_Scan_dec;
+sub Interval_Scan_inc;
+sub Interval_Substitute;
+sub LSB;
+sub Lexicompare;
+sub Long_Bits;
+sub MSB;
+sub Max;
+sub Min;
+sub Move_Left;
+sub Move_Right;
+sub Multiplication;
+sub Multiply;
+sub Neg;
+sub Negate;
+sub Norm2;
+sub Norm3;
+sub Norm;
+sub Not;
+sub Or;
+sub Power;
+sub Primes;
+sub Product;
+sub Resize;
+sub Reverse;
+sub Shadow;
+sub Sign;
+sub Size;
+sub Transpose;
+sub Unfake;
+sub Union;
+sub Version;
+sub Word_Bits;
+sub Word_Delete;
+sub Word_Insert;
+sub Word_List_Read;
+sub Word_List_Store;
+sub Word_Read;
+sub Word_Size;
+sub Word_Store;
+sub Xor;
+sub add;
+sub bit_flip;
+sub bit_test;
+sub contains;
+sub dec;
+sub decrement;
+sub equal;
+sub flip;
+sub from_ASCII;
+sub from_Bin;
+sub from_Dec;
+sub from_Enum;
+sub from_Hex;
+sub from_string;
+sub in;
+sub inc;
+sub inclusion;
+sub increment;
+sub is_empty;
+sub is_full;
+sub lsb;
+sub msb;
+sub new;
+sub new_Bin;
+sub new_Dec;
+sub new_Enum;
+sub new_Hex;
+sub rotate_left;
+sub rotate_right;
+sub shift_left;
+sub shift_right;
+sub sub;
+sub subset;
+sub subtract;
+sub to_ASCII;
+sub to_Bin;
+sub to_Dec;
+sub to_Enum;
+sub to_Hex;
+sub to_String;
+}
+package Cache::FastMmap {
+sub fc_close($) ;
+sub fc_delete($$$) ;
+sub fc_dump_page($) ;
+sub fc_expunge($$$$) ;
+sub fc_get($$) ;
+sub fc_get_keys($$) ;
+sub fc_get_page_details($) ;
+sub fc_hash($$) ;
+sub fc_init($) ;
+sub fc_is_locked($) ;
+sub fc_lock($$) ;
+sub fc_new() ;
+sub fc_read($$$) ;
+sub fc_reset_page_details($) ;
+sub fc_set($$$) ;
+sub fc_set_param($$$) ;
+sub fc_set_time_override($) ;
+sub fc_unlock($) ;
+sub fc_write($$$$$$) ;
+}
 package Carp {
 sub _maybe_isa;
 sub downgrade;
@@ -674,6 +831,512 @@ sub type_all_string;
 sub unblessed_bool;
 sub utf8;
 }
+package Crypt::AuthEnc::CCM {
+sub DESTROY;
+sub ccm_decrypt_verify;
+sub ccm_encrypt_authenticate;
+sub clone;
+sub decrypt_add;
+sub decrypt_done;
+sub encrypt_add;
+sub encrypt_done;
+sub new;
+}
+package Crypt::AuthEnc::ChaCha20Poly1305 {
+sub DESTROY;
+sub adata_add;
+sub chacha20poly1305_decrypt_verify;
+sub chacha20poly1305_encrypt_authenticate;
+sub clone;
+sub decrypt_add;
+sub decrypt_done;
+sub encrypt_add;
+sub encrypt_done;
+sub new;
+sub set_iv;
+sub set_iv_rfc7905;
+}
+package Crypt::AuthEnc::EAX {
+sub DESTROY;
+sub adata_add;
+sub clone;
+sub decrypt_add;
+sub decrypt_done;
+sub eax_decrypt_verify;
+sub eax_encrypt_authenticate;
+sub encrypt_add;
+sub encrypt_done;
+sub new;
+}
+package Crypt::AuthEnc::GCM {
+sub DESTROY;
+sub adata_add;
+sub clone;
+sub decrypt_add;
+sub decrypt_done;
+sub encrypt_add;
+sub encrypt_done;
+sub gcm_decrypt_verify;
+sub gcm_encrypt_authenticate;
+sub iv_add;
+sub new;
+sub reset;
+}
+package Crypt::AuthEnc::OCB {
+sub DESTROY;
+sub adata_add;
+sub clone;
+sub decrypt_add;
+sub decrypt_done;
+sub decrypt_last;
+sub encrypt_add;
+sub encrypt_done;
+sub encrypt_last;
+sub new;
+sub ocb_decrypt_verify;
+sub ocb_encrypt_authenticate;
+}
+package Crypt::Checksum::Adler32 {
+sub DESTROY;
+sub add;
+sub adler32_data;
+sub adler32_data_hex;
+sub adler32_data_int;
+sub clone;
+sub digest;
+sub hexdigest;
+sub intdigest;
+sub new;
+sub reset;
+}
+package Crypt::Checksum::CRC32 {
+sub DESTROY;
+sub add;
+sub clone;
+sub crc32_data;
+sub crc32_data_hex;
+sub crc32_data_int;
+sub digest;
+sub hexdigest;
+sub intdigest;
+sub new;
+sub reset;
+}
+package Crypt::Cipher {
+sub DESTROY;
+sub blocksize;
+sub decrypt;
+sub default_rounds;
+sub encrypt;
+sub max_keysize;
+sub min_keysize;
+sub new;
+}
+package Crypt::Digest {
+sub DESTROY;
+sub add;
+sub b64digest;
+sub b64udigest;
+sub clone;
+sub digest;
+sub digest_data;
+sub digest_data_b64;
+sub digest_data_b64u;
+sub digest_data_hex;
+sub hashsize;
+sub hexdigest;
+sub new;
+sub reset;
+}
+package Crypt::Digest::SHAKE {
+sub DESTROY;
+sub add;
+sub clone;
+sub done;
+sub new;
+sub reset;
+}
+package Crypt::KeyDerivation {
+sub hkdf;
+sub hkdf_expand;
+sub hkdf_extract;
+sub pbkdf1;
+sub pbkdf2;
+}
+package Crypt::Mac::BLAKE2b {
+sub DESTROY;
+sub add;
+sub b64mac;
+sub b64umac;
+sub blake2b;
+sub blake2b_b64;
+sub blake2b_b64u;
+sub blake2b_hex;
+sub clone;
+sub hexmac;
+sub mac;
+sub new;
+}
+package Crypt::Mac::BLAKE2s {
+sub DESTROY;
+sub add;
+sub b64mac;
+sub b64umac;
+sub blake2s;
+sub blake2s_b64;
+sub blake2s_b64u;
+sub blake2s_hex;
+sub clone;
+sub hexmac;
+sub mac;
+sub new;
+}
+package Crypt::Mac::F9 {
+sub DESTROY;
+sub add;
+sub b64mac;
+sub b64umac;
+sub clone;
+sub f9;
+sub f9_b64;
+sub f9_b64u;
+sub f9_hex;
+sub hexmac;
+sub mac;
+sub new;
+}
+package Crypt::Mac::HMAC {
+sub DESTROY;
+sub add;
+sub b64mac;
+sub b64umac;
+sub clone;
+sub hexmac;
+sub hmac;
+sub hmac_b64;
+sub hmac_b64u;
+sub hmac_hex;
+sub mac;
+sub new;
+}
+package Crypt::Mac::OMAC {
+sub DESTROY;
+sub add;
+sub b64mac;
+sub b64umac;
+sub clone;
+sub hexmac;
+sub mac;
+sub new;
+sub omac;
+sub omac_b64;
+sub omac_b64u;
+sub omac_hex;
+}
+package Crypt::Mac::PMAC {
+sub DESTROY;
+sub add;
+sub b64mac;
+sub b64umac;
+sub clone;
+sub hexmac;
+sub mac;
+sub new;
+sub pmac;
+sub pmac_b64;
+sub pmac_b64u;
+sub pmac_hex;
+}
+package Crypt::Mac::Pelican {
+sub DESTROY;
+sub add;
+sub b64mac;
+sub b64umac;
+sub clone;
+sub hexmac;
+sub mac;
+sub new;
+sub pelican;
+sub pelican_b64;
+sub pelican_b64u;
+sub pelican_hex;
+}
+package Crypt::Mac::Poly1305 {
+sub DESTROY;
+sub add;
+sub b64mac;
+sub b64umac;
+sub clone;
+sub hexmac;
+sub mac;
+sub new;
+sub poly1305;
+sub poly1305_b64;
+sub poly1305_b64u;
+sub poly1305_hex;
+}
+package Crypt::Mac::XCBC {
+sub DESTROY;
+sub add;
+sub b64mac;
+sub b64umac;
+sub clone;
+sub hexmac;
+sub mac;
+sub new;
+sub xcbc;
+sub xcbc_b64;
+sub xcbc_b64u;
+sub xcbc_hex;
+}
+package Crypt::Misc {
+sub _bin_to_radix;
+sub _radix_to_bin;
+sub decode_b32b;
+sub decode_b32c;
+sub decode_b32r;
+sub decode_b32z;
+sub decode_b64;
+sub decode_b64u;
+sub encode_b32b;
+sub encode_b32c;
+sub encode_b32r;
+sub encode_b32z;
+sub encode_b64;
+sub encode_b64u;
+sub increment_octets_be;
+sub increment_octets_le;
+}
+package Crypt::Mode::CBC {
+sub DESTROY;
+sub add;
+sub finish;
+sub new;
+sub start_decrypt;
+sub start_encrypt;
+}
+package Crypt::Mode::CFB {
+sub DESTROY;
+sub add;
+sub finish;
+sub new;
+sub start_decrypt;
+sub start_encrypt;
+}
+package Crypt::Mode::CTR {
+sub DESTROY;
+sub add;
+sub finish;
+sub new;
+sub start_decrypt;
+sub start_encrypt;
+}
+package Crypt::Mode::ECB {
+sub DESTROY;
+sub add;
+sub finish;
+sub new;
+sub start_decrypt;
+sub start_encrypt;
+}
+package Crypt::Mode::OFB {
+sub DESTROY;
+sub add;
+sub finish;
+sub new;
+sub start_decrypt;
+sub start_encrypt;
+}
+package Crypt::PK::DH {
+sub DESTROY;
+sub _generate_key_dhparam;
+sub _generate_key_gp;
+sub _generate_key_size;
+sub _import;
+sub _import_raw;
+sub _new;
+sub export_key;
+sub export_key_raw;
+sub is_private;
+sub key2hash;
+sub params2hash;
+sub shared_secret;
+sub size;
+}
+package Crypt::PK::DSA {
+sub DESTROY;
+sub _generate_key_dsaparam;
+sub _generate_key_pqg_hex;
+sub _generate_key_size;
+sub _import;
+sub _import_hex;
+sub _import_openssh;
+sub _import_pem;
+sub _import_pkcs8;
+sub _new;
+sub decrypt;
+sub encrypt;
+sub export_key_der;
+sub is_private;
+sub key2hash;
+sub sign_hash;
+sub sign_message;
+sub size;
+sub size_q;
+sub verify_hash;
+sub verify_message;
+}
+package Crypt::PK::ECC {
+sub DESTROY;
+sub _import;
+sub _import_old;
+sub _import_openssh;
+sub _import_pem;
+sub _import_pkcs8;
+sub _import_x509;
+sub _new;
+sub decrypt;
+sub encrypt;
+sub export_key_der;
+sub export_key_raw;
+sub generate_key;
+sub import_key_raw;
+sub is_private;
+sub key2hash;
+sub recovery_pub;
+sub recovery_pub_eth;
+sub recovery_pub_rfc7518;
+sub shared_secret;
+sub sign_hash;
+sub sign_hash_eth;
+sub sign_hash_rfc7518;
+sub sign_message;
+sub sign_message_rfc7518;
+sub size;
+sub verify_hash;
+sub verify_hash_eth;
+sub verify_hash_rfc7518;
+sub verify_message;
+sub verify_message_rfc7518;
+}
+package Crypt::PK::Ed25519 {
+sub DESTROY;
+sub _import;
+sub _import_openssh;
+sub _import_pem;
+sub _import_pkcs8;
+sub _import_raw;
+sub _import_x509;
+sub _new;
+sub export_key_der;
+sub export_key_raw;
+sub generate_key;
+sub is_private;
+sub key2hash;
+sub sign_message;
+sub verify_message;
+}
+package Crypt::PK::RSA {
+sub DESTROY;
+sub _import;
+sub _import_hex;
+sub _import_openssh;
+sub _import_pem;
+sub _import_pkcs8;
+sub _import_x509;
+sub _new;
+sub decrypt;
+sub encrypt;
+sub export_key_der;
+sub generate_key;
+sub is_private;
+sub key2hash;
+sub sign_hash;
+sub sign_message;
+sub size;
+sub verify_hash;
+sub verify_message;
+}
+package Crypt::PK::X25519 {
+sub DESTROY;
+sub _import;
+sub _import_pem;
+sub _import_pkcs8;
+sub _import_raw;
+sub _import_x509;
+sub _new;
+sub export_key_der;
+sub export_key_raw;
+sub generate_key;
+sub is_private;
+sub key2hash;
+sub shared_secret;
+}
+package Crypt::PRNG {
+sub DESTROY;
+sub add_entropy;
+sub bytes;
+sub bytes_b64;
+sub bytes_b64u;
+sub bytes_hex;
+sub double;
+sub int32;
+sub new;
+}
+package Crypt::Rijndael {
+sub DESTROY;
+sub decrypt;
+sub encrypt;
+sub new;
+sub set_iv;
+}
+package Crypt::Stream::ChaCha {
+sub DESTROY;
+sub clone;
+sub crypt;
+sub keystream;
+sub new;
+}
+package Crypt::Stream::RC4 {
+sub DESTROY;
+sub clone;
+sub crypt;
+sub keystream;
+sub new;
+}
+package Crypt::Stream::Rabbit {
+sub DESTROY;
+sub clone;
+sub crypt;
+sub keystream;
+sub new;
+}
+package Crypt::Stream::Salsa20 {
+sub DESTROY;
+sub clone;
+sub crypt;
+sub keystream;
+sub new;
+}
+package Crypt::Stream::Sober128 {
+sub DESTROY;
+sub clone;
+sub crypt;
+sub keystream;
+sub new;
+}
+package Crypt::Stream::Sosemanuk {
+sub DESTROY;
+sub clone;
+sub crypt;
+sub keystream;
+sub new;
+}
+package CryptX {
+sub _ltc_build_settings;
+sub _ltc_mp_bits_per_digit;
+sub _ltc_mp_name;
+}
 package Cwd {
 sub CLONE;
 sub abs_path;
@@ -681,9 +1344,998 @@ sub fastcwd;
 sub getcwd;
 sub realpath;
 }
+package DBD::SQLite {
+sub ALTER_TABLE() ;
+sub ANALYZE() ;
+sub ATTACH() ;
+sub COPY() ;
+sub CREATE_INDEX() ;
+sub CREATE_TABLE() ;
+sub CREATE_TEMP_INDEX() ;
+sub CREATE_TEMP_TABLE() ;
+sub CREATE_TEMP_TRIGGER() ;
+sub CREATE_TEMP_VIEW() ;
+sub CREATE_TRIGGER() ;
+sub CREATE_VIEW() ;
+sub CREATE_VTABLE() ;
+sub DELETE() ;
+sub DENY() ;
+sub DETACH() ;
+sub DROP_INDEX() ;
+sub DROP_TABLE() ;
+sub DROP_TEMP_INDEX() ;
+sub DROP_TEMP_TABLE() ;
+sub DROP_TEMP_TRIGGER() ;
+sub DROP_TEMP_VIEW() ;
+sub DROP_TRIGGER() ;
+sub DROP_VIEW() ;
+sub DROP_VTABLE() ;
+sub FUNCTION() ;
+sub IGNORE() ;
+sub INSERT() ;
+sub OK() ;
+sub OPEN_CREATE() ;
+sub OPEN_EXRESCODE() ;
+sub OPEN_FULLMUTEX() ;
+sub OPEN_MEMORY() ;
+sub OPEN_NOFOLLOW() ;
+sub OPEN_NOMUTEX() ;
+sub OPEN_PRIVATECACHE() ;
+sub OPEN_READONLY() ;
+sub OPEN_READWRITE() ;
+sub OPEN_SHAREDCACHE() ;
+sub OPEN_SUPER_JOURNAL() ;
+sub OPEN_URI() ;
+sub PRAGMA() ;
+sub READ() ;
+sub RECURSIVE() ;
+sub REINDEX() ;
+sub SAVEPOINT() ;
+sub SELECT() ;
+sub TRANSACTION() ;
+sub UPDATE() ;
+sub _const__authorizer_action_codes() ;
+sub _const__authorizer_action_codes_3006008() ;
+sub _const__authorizer_action_codes_3008003() ;
+sub _const__authorizer_return_codes() ;
+sub _const__flags_for_file_open_operations() ;
+sub _const__flags_for_file_open_operations_3006002() ;
+sub _const__flags_for_file_open_operations_3006018() ;
+sub _const__flags_for_file_open_operations_3007007() ;
+sub _const__flags_for_file_open_operations_3007013() ;
+sub _const__flags_for_file_open_operations_3031000() ;
+sub _const__flags_for_file_open_operations_3033000() ;
+sub _const__flags_for_file_open_operations_3037000() ;
+sub compile_options;
+sub sqlite_status;
+sub strglob;
+sub strlike;
+}
+package DBD::SQLite::Constants {
+sub SQLITE_ABORT() ;
+sub SQLITE_ABORT_ROLLBACK() ;
+sub SQLITE_ALTER_TABLE() ;
+sub SQLITE_ANALYZE() ;
+sub SQLITE_ATTACH() ;
+sub SQLITE_AUTH() ;
+sub SQLITE_AUTH_USER() ;
+sub SQLITE_BLOB() ;
+sub SQLITE_BUSY() ;
+sub SQLITE_BUSY_RECOVERY() ;
+sub SQLITE_BUSY_SNAPSHOT() ;
+sub SQLITE_BUSY_TIMEOUT() ;
+sub SQLITE_CANTOPEN() ;
+sub SQLITE_CANTOPEN_CONVPATH() ;
+sub SQLITE_CANTOPEN_DIRTYWAL() ;
+sub SQLITE_CANTOPEN_FULLPATH() ;
+sub SQLITE_CANTOPEN_ISDIR() ;
+sub SQLITE_CANTOPEN_NOTEMPDIR() ;
+sub SQLITE_CANTOPEN_SYMLINK() ;
+sub SQLITE_CONSTRAINT() ;
+sub SQLITE_CONSTRAINT_CHECK() ;
+sub SQLITE_CONSTRAINT_COMMITHOOK() ;
+sub SQLITE_CONSTRAINT_DATATYPE() ;
+sub SQLITE_CONSTRAINT_FOREIGNKEY() ;
+sub SQLITE_CONSTRAINT_FUNCTION() ;
+sub SQLITE_CONSTRAINT_NOTNULL() ;
+sub SQLITE_CONSTRAINT_PINNED() ;
+sub SQLITE_CONSTRAINT_PRIMARYKEY() ;
+sub SQLITE_CONSTRAINT_ROWID() ;
+sub SQLITE_CONSTRAINT_TRIGGER() ;
+sub SQLITE_CONSTRAINT_UNIQUE() ;
+sub SQLITE_CONSTRAINT_VTAB() ;
+sub SQLITE_COPY() ;
+sub SQLITE_CORRUPT() ;
+sub SQLITE_CORRUPT_INDEX() ;
+sub SQLITE_CORRUPT_SEQUENCE() ;
+sub SQLITE_CORRUPT_VTAB() ;
+sub SQLITE_CREATE_INDEX() ;
+sub SQLITE_CREATE_TABLE() ;
+sub SQLITE_CREATE_TEMP_INDEX() ;
+sub SQLITE_CREATE_TEMP_TABLE() ;
+sub SQLITE_CREATE_TEMP_TRIGGER() ;
+sub SQLITE_CREATE_TEMP_VIEW() ;
+sub SQLITE_CREATE_TRIGGER() ;
+sub SQLITE_CREATE_VIEW() ;
+sub SQLITE_CREATE_VTABLE() ;
+sub SQLITE_DBCONFIG_DEFENSIVE() ;
+sub SQLITE_DBCONFIG_DQS_DDL() ;
+sub SQLITE_DBCONFIG_DQS_DML() ;
+sub SQLITE_DBCONFIG_ENABLE_FKEY() ;
+sub SQLITE_DBCONFIG_ENABLE_FTS3_TOKENIZER() ;
+sub SQLITE_DBCONFIG_ENABLE_LOAD_EXTENSION() ;
+sub SQLITE_DBCONFIG_ENABLE_QPSG() ;
+sub SQLITE_DBCONFIG_ENABLE_TRIGGER() ;
+sub SQLITE_DBCONFIG_ENABLE_VIEW() ;
+sub SQLITE_DBCONFIG_LEGACY_ALTER_TABLE() ;
+sub SQLITE_DBCONFIG_LEGACY_FILE_FORMAT() ;
+sub SQLITE_DBCONFIG_LOOKASIDE() ;
+sub SQLITE_DBCONFIG_MAINDBNAME() ;
+sub SQLITE_DBCONFIG_MAX() ;
+sub SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE() ;
+sub SQLITE_DBCONFIG_RESET_DATABASE() ;
+sub SQLITE_DBCONFIG_REVERSE_SCANORDER() ;
+sub SQLITE_DBCONFIG_STMT_SCANSTATUS() ;
+sub SQLITE_DBCONFIG_TRIGGER_EQP() ;
+sub SQLITE_DBCONFIG_TRUSTED_SCHEMA() ;
+sub SQLITE_DBCONFIG_WRITABLE_SCHEMA() ;
+sub SQLITE_DELETE() ;
+sub SQLITE_DENY() ;
+sub SQLITE_DETACH() ;
+sub SQLITE_DETERMINISTIC() ;
+sub SQLITE_DIRECTONLY() ;
+sub SQLITE_DONE() ;
+sub SQLITE_DROP_INDEX() ;
+sub SQLITE_DROP_TABLE() ;
+sub SQLITE_DROP_TEMP_INDEX() ;
+sub SQLITE_DROP_TEMP_TABLE() ;
+sub SQLITE_DROP_TEMP_TRIGGER() ;
+sub SQLITE_DROP_TEMP_VIEW() ;
+sub SQLITE_DROP_TRIGGER() ;
+sub SQLITE_DROP_VIEW() ;
+sub SQLITE_DROP_VTABLE() ;
+sub SQLITE_EMPTY() ;
+sub SQLITE_ERROR() ;
+sub SQLITE_ERROR_MISSING_COLLSEQ() ;
+sub SQLITE_ERROR_RETRY() ;
+sub SQLITE_ERROR_SNAPSHOT() ;
+sub SQLITE_FLOAT() ;
+sub SQLITE_FORMAT() ;
+sub SQLITE_FULL() ;
+sub SQLITE_FUNCTION() ;
+sub SQLITE_IGNORE() ;
+sub SQLITE_INNOCUOUS() ;
+sub SQLITE_INSERT() ;
+sub SQLITE_INTEGER() ;
+sub SQLITE_INTERNAL() ;
+sub SQLITE_INTERRUPT() ;
+sub SQLITE_IOERR() ;
+sub SQLITE_IOERR_ACCESS() ;
+sub SQLITE_IOERR_AUTH() ;
+sub SQLITE_IOERR_BEGIN_ATOMIC() ;
+sub SQLITE_IOERR_BLOCKED() ;
+sub SQLITE_IOERR_CHECKRESERVEDLOCK() ;
+sub SQLITE_IOERR_CLOSE() ;
+sub SQLITE_IOERR_COMMIT_ATOMIC() ;
+sub SQLITE_IOERR_CONVPATH() ;
+sub SQLITE_IOERR_CORRUPTFS() ;
+sub SQLITE_IOERR_DATA() ;
+sub SQLITE_IOERR_DELETE() ;
+sub SQLITE_IOERR_DELETE_NOENT() ;
+sub SQLITE_IOERR_DIR_CLOSE() ;
+sub SQLITE_IOERR_DIR_FSYNC() ;
+sub SQLITE_IOERR_FSTAT() ;
+sub SQLITE_IOERR_FSYNC() ;
+sub SQLITE_IOERR_GETTEMPPATH() ;
+sub SQLITE_IOERR_IN_PAGE() ;
+sub SQLITE_IOERR_LOCK() ;
+sub SQLITE_IOERR_MMAP() ;
+sub SQLITE_IOERR_NOMEM() ;
+sub SQLITE_IOERR_RDLOCK() ;
+sub SQLITE_IOERR_READ() ;
+sub SQLITE_IOERR_ROLLBACK_ATOMIC() ;
+sub SQLITE_IOERR_SEEK() ;
+sub SQLITE_IOERR_SHMLOCK() ;
+sub SQLITE_IOERR_SHMMAP() ;
+sub SQLITE_IOERR_SHMOPEN() ;
+sub SQLITE_IOERR_SHMSIZE() ;
+sub SQLITE_IOERR_SHORT_READ() ;
+sub SQLITE_IOERR_TRUNCATE() ;
+sub SQLITE_IOERR_UNLOCK() ;
+sub SQLITE_IOERR_VNODE() ;
+sub SQLITE_IOERR_WRITE() ;
+sub SQLITE_LIMIT_ATTACHED() ;
+sub SQLITE_LIMIT_COLUMN() ;
+sub SQLITE_LIMIT_COMPOUND_SELECT() ;
+sub SQLITE_LIMIT_EXPR_DEPTH() ;
+sub SQLITE_LIMIT_FUNCTION_ARG() ;
+sub SQLITE_LIMIT_LENGTH() ;
+sub SQLITE_LIMIT_LIKE_PATTERN_LENGTH() ;
+sub SQLITE_LIMIT_SQL_LENGTH() ;
+sub SQLITE_LIMIT_TRIGGER_DEPTH() ;
+sub SQLITE_LIMIT_VARIABLE_NUMBER() ;
+sub SQLITE_LIMIT_VDBE_OP() ;
+sub SQLITE_LIMIT_WORKER_THREADS() ;
+sub SQLITE_LOCKED() ;
+sub SQLITE_LOCKED_SHAREDCACHE() ;
+sub SQLITE_LOCKED_VTAB() ;
+sub SQLITE_MISMATCH() ;
+sub SQLITE_MISUSE() ;
+sub SQLITE_NOLFS() ;
+sub SQLITE_NOMEM() ;
+sub SQLITE_NOTADB() ;
+sub SQLITE_NOTFOUND() ;
+sub SQLITE_NOTICE() ;
+sub SQLITE_NOTICE_RBU() ;
+sub SQLITE_NOTICE_RECOVER_ROLLBACK() ;
+sub SQLITE_NOTICE_RECOVER_WAL() ;
+sub SQLITE_NULL() ;
+sub SQLITE_OK() ;
+sub SQLITE_OK_SYMLINK() ;
+sub SQLITE_OPEN_CREATE() ;
+sub SQLITE_OPEN_EXRESCODE() ;
+sub SQLITE_OPEN_FULLMUTEX() ;
+sub SQLITE_OPEN_MEMORY() ;
+sub SQLITE_OPEN_NOFOLLOW() ;
+sub SQLITE_OPEN_NOMUTEX() ;
+sub SQLITE_OPEN_PRIVATECACHE() ;
+sub SQLITE_OPEN_READONLY() ;
+sub SQLITE_OPEN_READWRITE() ;
+sub SQLITE_OPEN_SHAREDCACHE() ;
+sub SQLITE_OPEN_SUPER_JOURNAL() ;
+sub SQLITE_OPEN_URI() ;
+sub SQLITE_PERM() ;
+sub SQLITE_PRAGMA() ;
+sub SQLITE_PROTOCOL() ;
+sub SQLITE_RANGE() ;
+sub SQLITE_READ() ;
+sub SQLITE_READONLY() ;
+sub SQLITE_READONLY_CANTINIT() ;
+sub SQLITE_READONLY_CANTLOCK() ;
+sub SQLITE_READONLY_DBMOVED() ;
+sub SQLITE_READONLY_DIRECTORY() ;
+sub SQLITE_READONLY_RECOVERY() ;
+sub SQLITE_READONLY_ROLLBACK() ;
+sub SQLITE_RECURSIVE() ;
+sub SQLITE_REINDEX() ;
+sub SQLITE_RESULT_SUBTYPE() ;
+sub SQLITE_ROW() ;
+sub SQLITE_SAVEPOINT() ;
+sub SQLITE_SCHEMA() ;
+sub SQLITE_SELECT() ;
+sub SQLITE_SUBTYPE() ;
+sub SQLITE_TEXT() ;
+sub SQLITE_TOOBIG() ;
+sub SQLITE_TRANSACTION() ;
+sub SQLITE_TXN_NONE() ;
+sub SQLITE_TXN_READ() ;
+sub SQLITE_TXN_WRITE() ;
+sub SQLITE_UPDATE() ;
+sub SQLITE_VERSION_NUMBER() ;
+sub SQLITE_WARNING() ;
+sub SQLITE_WARNING_AUTOINDEX() ;
+sub _const_allowed_return_values_from_sqlite3_txn_state_3034000() ;
+sub _const_authorizer_action_codes() ;
+sub _const_authorizer_action_codes_3006008() ;
+sub _const_authorizer_action_codes_3008003() ;
+sub _const_authorizer_return_codes() ;
+sub _const_compile_time_library_version_numbers() ;
+sub _const_database_connection_configuration_options_3007000() ;
+sub _const_database_connection_configuration_options_3007006() ;
+sub _const_database_connection_configuration_options_3012002() ;
+sub _const_database_connection_configuration_options_3013000() ;
+sub _const_database_connection_configuration_options_3015000() ;
+sub _const_database_connection_configuration_options_3016000() ;
+sub _const_database_connection_configuration_options_3020000() ;
+sub _const_database_connection_configuration_options_3022000() ;
+sub _const_database_connection_configuration_options_3024000() ;
+sub _const_database_connection_configuration_options_3026000() ;
+sub _const_database_connection_configuration_options_3028000() ;
+sub _const_database_connection_configuration_options_3029000() ;
+sub _const_database_connection_configuration_options_3030000() ;
+sub _const_database_connection_configuration_options_3031000() ;
+sub _const_database_connection_configuration_options_3042000() ;
+sub _const_extended_result_codes_3006002() ;
+sub _const_extended_result_codes_3006005() ;
+sub _const_extended_result_codes_3006007() ;
+sub _const_extended_result_codes_3006012() ;
+sub _const_extended_result_codes_3007000() ;
+sub _const_extended_result_codes_3007007() ;
+sub _const_extended_result_codes_3007011() ;
+sub _const_extended_result_codes_3007012() ;
+sub _const_extended_result_codes_3007015() ;
+sub _const_extended_result_codes_3007016() ;
+sub _const_extended_result_codes_3007017() ;
+sub _const_extended_result_codes_3008000() ;
+sub _const_extended_result_codes_3008001() ;
+sub _const_extended_result_codes_3008002() ;
+sub _const_extended_result_codes_3008003() ;
+sub _const_extended_result_codes_3008007() ;
+sub _const_extended_result_codes_3009000() ;
+sub _const_extended_result_codes_3010000() ;
+sub _const_extended_result_codes_3021000() ;
+sub _const_extended_result_codes_3022000() ;
+sub _const_extended_result_codes_3024000() ;
+sub _const_extended_result_codes_3025000() ;
+sub _const_extended_result_codes_3031000() ;
+sub _const_extended_result_codes_3032000() ;
+sub _const_extended_result_codes_3034000() ;
+sub _const_extended_result_codes_3037000() ;
+sub _const_extended_result_codes_3041000() ;
+sub _const_extended_result_codes_3043000() ;
+sub _const_flags_for_file_open_operations() ;
+sub _const_flags_for_file_open_operations_3006002() ;
+sub _const_flags_for_file_open_operations_3006018() ;
+sub _const_flags_for_file_open_operations_3007007() ;
+sub _const_flags_for_file_open_operations_3007013() ;
+sub _const_flags_for_file_open_operations_3031000() ;
+sub _const_flags_for_file_open_operations_3033000() ;
+sub _const_flags_for_file_open_operations_3037000() ;
+sub _const_function_flags_3008003() ;
+sub _const_function_flags_3030000() ;
+sub _const_function_flags_3031000() ;
+sub _const_function_flags_3044001() ;
+sub _const_fundamental_datatypes() ;
+sub _const_result_codes() ;
+sub _const_result_codes_3007017() ;
+sub _const_run_time_limit_categories() ;
+sub _const_run_time_limit_categories_3006018() ;
+sub _const_run_time_limit_categories_3008007() ;
+}
+package DBD::SQLite::db {
+sub DESTROY;
+sub FETCH;
+sub SQL_ALL_TYPES() ;
+sub SQL_ARRAY() ;
+sub SQL_ARRAY_LOCATOR() ;
+sub SQL_BIGINT() ;
+sub SQL_BINARY() ;
+sub SQL_BIT() ;
+sub SQL_BLOB() ;
+sub SQL_BLOB_LOCATOR() ;
+sub SQL_BOOLEAN() ;
+sub SQL_CHAR() ;
+sub SQL_CLOB() ;
+sub SQL_CLOB_LOCATOR() ;
+sub SQL_DATE() ;
+sub SQL_DATETIME() ;
+sub SQL_DECIMAL() ;
+sub SQL_DOUBLE() ;
+sub SQL_FLOAT() ;
+sub SQL_GUID() ;
+sub SQL_INTEGER() ;
+sub SQL_INTERVAL() ;
+sub SQL_INTERVAL_DAY() ;
+sub SQL_INTERVAL_DAY_TO_HOUR() ;
+sub SQL_INTERVAL_DAY_TO_MINUTE() ;
+sub SQL_INTERVAL_DAY_TO_SECOND() ;
+sub SQL_INTERVAL_HOUR() ;
+sub SQL_INTERVAL_HOUR_TO_MINUTE() ;
+sub SQL_INTERVAL_HOUR_TO_SECOND() ;
+sub SQL_INTERVAL_MINUTE() ;
+sub SQL_INTERVAL_MINUTE_TO_SECOND() ;
+sub SQL_INTERVAL_MONTH() ;
+sub SQL_INTERVAL_SECOND() ;
+sub SQL_INTERVAL_YEAR() ;
+sub SQL_INTERVAL_YEAR_TO_MONTH() ;
+sub SQL_LONGVARBINARY() ;
+sub SQL_LONGVARCHAR() ;
+sub SQL_MULTISET() ;
+sub SQL_MULTISET_LOCATOR() ;
+sub SQL_NUMERIC() ;
+sub SQL_REAL() ;
+sub SQL_REF() ;
+sub SQL_ROW() ;
+sub SQL_SMALLINT() ;
+sub SQL_TIME() ;
+sub SQL_TIMESTAMP() ;
+sub SQL_TINYINT() ;
+sub SQL_TYPE_DATE() ;
+sub SQL_TYPE_TIME() ;
+sub SQL_TYPE_TIMESTAMP() ;
+sub SQL_TYPE_TIMESTAMP_WITH_TIMEZONE() ;
+sub SQL_TYPE_TIME_WITH_TIMEZONE() ;
+sub SQL_UDT() ;
+sub SQL_UDT_LOCATOR() ;
+sub SQL_UNKNOWN_TYPE() ;
+sub SQL_VARBINARY() ;
+sub SQL_VARCHAR() ;
+sub SQL_WCHAR() ;
+sub SQL_WLONGVARCHAR() ;
+sub SQL_WVARCHAR() ;
+sub STORE;
+sub _do;
+sub _login;
+sub backup_from_dbh;
+sub backup_from_file;
+sub backup_to_dbh;
+sub backup_to_file;
+sub busy_timeout;
+sub collation_needed;
+sub commit;
+sub commit_hook;
+sub create_aggregate;
+sub create_collation;
+sub create_function;
+sub create_module;
+sub db_config;
+sub db_filename;
+sub db_status;
+sub disconnect;
+sub enable_load_extension;
+sub error_offset;
+sub get_autocommit;
+sub last_insert_id;
+sub last_insert_rowid;
+sub limit;
+sub load_extension;
+sub profile;
+sub progress_handler;
+sub register_fts3_perl_tokenizer;
+sub rollback;
+sub rollback_hook;
+sub selectall_arrayref;
+sub selectrow_array;
+sub selectrow_arrayref;
+sub set_authorizer;
+sub sqlite_backup_from_dbh;
+sub sqlite_backup_from_file;
+sub sqlite_backup_to_dbh;
+sub sqlite_backup_to_file;
+sub sqlite_busy_timeout;
+sub sqlite_collation_needed;
+sub sqlite_commit_hook;
+sub sqlite_create_aggregate;
+sub sqlite_create_collation;
+sub sqlite_create_function;
+sub sqlite_create_module;
+sub sqlite_db_config;
+sub sqlite_db_filename;
+sub sqlite_db_status;
+sub sqlite_enable_load_extension;
+sub sqlite_error_offset;
+sub sqlite_get_autocommit;
+sub sqlite_last_insert_rowid;
+sub sqlite_limit;
+sub sqlite_load_extension;
+sub sqlite_profile;
+sub sqlite_progress_handler;
+sub sqlite_register_fts3_perl_tokenizer;
+sub sqlite_rollback_hook;
+sub sqlite_set_authorizer;
+sub sqlite_table_column_metadata;
+sub sqlite_trace;
+sub sqlite_txn_state;
+sub sqlite_update_hook;
+sub table_column_metadata;
+sub txn_state;
+sub update_hook;
+}
+package DBD::SQLite::dr {
+sub dbixs_revision;
+sub discon_all_;
+sub disconnect_all;
+}
+package DBD::SQLite::st {
+sub DESTROY;
+sub FETCH;
+sub FETCH_attrib;
+sub STORE;
+sub _prepare;
+sub bind_col;
+sub bind_param;
+sub bind_param_inout;
+sub blob_read;
+sub execute;
+sub fetch;
+sub fetchall_arrayref;
+sub fetchrow;
+sub fetchrow_array;
+sub fetchrow_arrayref;
+sub finish;
+sub rows;
+sub sqlite_st_status;
+sub st_status;
+}
+package DBD::_::common {
+sub DELETE;
+sub DESTROY;
+sub FETCH;
+sub STORE;
+sub debug;
+sub dump_handle;
+sub err;
+sub errstr;
+sub private_data;
+sub rows;
+sub set_err;
+sub state;
+sub swap_inner_handle;
+sub trace;
+sub trace_msg;
+}
+package DBD::_::db {
+sub connected;
+sub preparse;
+sub take_imp_data;
+}
+package DBD::_::dr {
+sub dbixs_revision;
+}
+package DBD::_::st {
+sub DESTROY;
+sub _get_fbav;
+sub _set_fbav;
+sub bind_col;
+sub fetch;
+sub fetchrow;
+sub fetchrow_array;
+sub fetchrow_arrayref;
+sub fetchrow_hashref;
+sub finish;
+sub rows;
+}
+package DBD::_mem::common {
+sub DESTROY;
+}
+package DBD::mysql {
+sub client_version;
+sub constant;
+}
+package DBD::mysql::GetInfo {
+sub dbd_mysql_get_info;
+}
+package DBD::mysql::db {
+sub DESTROY;
+sub FETCH;
+sub SQL_ALL_TYPES() ;
+sub SQL_ARRAY() ;
+sub SQL_ARRAY_LOCATOR() ;
+sub SQL_BIGINT() ;
+sub SQL_BINARY() ;
+sub SQL_BIT() ;
+sub SQL_BLOB() ;
+sub SQL_BLOB_LOCATOR() ;
+sub SQL_BOOLEAN() ;
+sub SQL_CHAR() ;
+sub SQL_CLOB() ;
+sub SQL_CLOB_LOCATOR() ;
+sub SQL_DATE() ;
+sub SQL_DATETIME() ;
+sub SQL_DECIMAL() ;
+sub SQL_DOUBLE() ;
+sub SQL_FLOAT() ;
+sub SQL_GUID() ;
+sub SQL_INTEGER() ;
+sub SQL_INTERVAL() ;
+sub SQL_INTERVAL_DAY() ;
+sub SQL_INTERVAL_DAY_TO_HOUR() ;
+sub SQL_INTERVAL_DAY_TO_MINUTE() ;
+sub SQL_INTERVAL_DAY_TO_SECOND() ;
+sub SQL_INTERVAL_HOUR() ;
+sub SQL_INTERVAL_HOUR_TO_MINUTE() ;
+sub SQL_INTERVAL_HOUR_TO_SECOND() ;
+sub SQL_INTERVAL_MINUTE() ;
+sub SQL_INTERVAL_MINUTE_TO_SECOND() ;
+sub SQL_INTERVAL_MONTH() ;
+sub SQL_INTERVAL_SECOND() ;
+sub SQL_INTERVAL_YEAR() ;
+sub SQL_INTERVAL_YEAR_TO_MONTH() ;
+sub SQL_LONGVARBINARY() ;
+sub SQL_LONGVARCHAR() ;
+sub SQL_MULTISET() ;
+sub SQL_MULTISET_LOCATOR() ;
+sub SQL_NUMERIC() ;
+sub SQL_REAL() ;
+sub SQL_REF() ;
+sub SQL_ROW() ;
+sub SQL_SMALLINT() ;
+sub SQL_TIME() ;
+sub SQL_TIMESTAMP() ;
+sub SQL_TINYINT() ;
+sub SQL_TYPE_DATE() ;
+sub SQL_TYPE_TIME() ;
+sub SQL_TYPE_TIMESTAMP() ;
+sub SQL_TYPE_TIMESTAMP_WITH_TIMEZONE() ;
+sub SQL_TYPE_TIME_WITH_TIMEZONE() ;
+sub SQL_UDT() ;
+sub SQL_UDT_LOCATOR() ;
+sub SQL_UNKNOWN_TYPE() ;
+sub SQL_VARBINARY() ;
+sub SQL_VARCHAR() ;
+sub SQL_WCHAR() ;
+sub SQL_WLONGVARCHAR() ;
+sub SQL_WVARCHAR() ;
+sub STORE;
+sub _ListDBs;
+sub _async_check;
+sub _login;
+sub commit;
+sub disconnect;
+sub do($$;$@) ;
+sub last_insert_id;
+sub mysql_async_ready;
+sub mysql_async_result;
+sub mysql_fd;
+sub ping($) ;
+sub quote($$;$) ;
+sub rollback;
+sub selectall_arrayref;
+sub selectrow_array;
+sub selectrow_arrayref;
+sub type_info_all;
+}
+package DBD::mysql::dr {
+sub SQL_ALL_TYPES() ;
+sub SQL_ARRAY() ;
+sub SQL_ARRAY_LOCATOR() ;
+sub SQL_BIGINT() ;
+sub SQL_BINARY() ;
+sub SQL_BIT() ;
+sub SQL_BLOB() ;
+sub SQL_BLOB_LOCATOR() ;
+sub SQL_BOOLEAN() ;
+sub SQL_CHAR() ;
+sub SQL_CLOB() ;
+sub SQL_CLOB_LOCATOR() ;
+sub SQL_DATE() ;
+sub SQL_DATETIME() ;
+sub SQL_DECIMAL() ;
+sub SQL_DOUBLE() ;
+sub SQL_FLOAT() ;
+sub SQL_GUID() ;
+sub SQL_INTEGER() ;
+sub SQL_INTERVAL() ;
+sub SQL_INTERVAL_DAY() ;
+sub SQL_INTERVAL_DAY_TO_HOUR() ;
+sub SQL_INTERVAL_DAY_TO_MINUTE() ;
+sub SQL_INTERVAL_DAY_TO_SECOND() ;
+sub SQL_INTERVAL_HOUR() ;
+sub SQL_INTERVAL_HOUR_TO_MINUTE() ;
+sub SQL_INTERVAL_HOUR_TO_SECOND() ;
+sub SQL_INTERVAL_MINUTE() ;
+sub SQL_INTERVAL_MINUTE_TO_SECOND() ;
+sub SQL_INTERVAL_MONTH() ;
+sub SQL_INTERVAL_SECOND() ;
+sub SQL_INTERVAL_YEAR() ;
+sub SQL_INTERVAL_YEAR_TO_MONTH() ;
+sub SQL_LONGVARBINARY() ;
+sub SQL_LONGVARCHAR() ;
+sub SQL_MULTISET() ;
+sub SQL_MULTISET_LOCATOR() ;
+sub SQL_NUMERIC() ;
+sub SQL_REAL() ;
+sub SQL_REF() ;
+sub SQL_ROW() ;
+sub SQL_SMALLINT() ;
+sub SQL_TIME() ;
+sub SQL_TIMESTAMP() ;
+sub SQL_TINYINT() ;
+sub SQL_TYPE_DATE() ;
+sub SQL_TYPE_TIME() ;
+sub SQL_TYPE_TIMESTAMP() ;
+sub SQL_TYPE_TIMESTAMP_WITH_TIMEZONE() ;
+sub SQL_TYPE_TIME_WITH_TIMEZONE() ;
+sub SQL_UDT() ;
+sub SQL_UDT_LOCATOR() ;
+sub SQL_UNKNOWN_TYPE() ;
+sub SQL_VARBINARY() ;
+sub SQL_VARCHAR() ;
+sub SQL_WCHAR() ;
+sub SQL_WLONGVARCHAR() ;
+sub SQL_WVARCHAR() ;
+sub _ListDBs;
+sub dbixs_revision;
+sub discon_all_;
+sub disconnect_all;
+}
+package DBD::mysql::st {
+sub DESTROY;
+sub FETCH;
+sub FETCH_attrib;
+sub STORE;
+sub _async_check;
+sub _prepare;
+sub bind_param;
+sub bind_param_inout;
+sub blob_read;
+sub dataseek($$) ;
+sub execute;
+sub fetch;
+sub fetchall_arrayref;
+sub fetchrow;
+sub fetchrow_array;
+sub fetchrow_arrayref;
+sub finish;
+sub more_results;
+sub mysql_async_ready;
+sub mysql_async_result;
+sub rows;
+}
+package DBI {
+sub DBIf_TRACE_CON() ;
+sub DBIf_TRACE_DBD() ;
+sub DBIf_TRACE_ENC() ;
+sub DBIf_TRACE_SQL() ;
+sub DBIf_TRACE_TXN() ;
+sub DBIpp_cm_XX() ;
+sub DBIpp_cm_br() ;
+sub DBIpp_cm_cs() ;
+sub DBIpp_cm_dd() ;
+sub DBIpp_cm_dw() ;
+sub DBIpp_cm_hs() ;
+sub DBIpp_ph_XX() ;
+sub DBIpp_ph_cn() ;
+sub DBIpp_ph_cs() ;
+sub DBIpp_ph_qm() ;
+sub DBIpp_ph_sp() ;
+sub DBIpp_st_XX() ;
+sub DBIpp_st_bs() ;
+sub DBIpp_st_qq() ;
+sub DBIstcf_DISCARD_STRING() ;
+sub DBIstcf_STRICT() ;
+sub SQL_ALL_TYPES() ;
+sub SQL_ARRAY() ;
+sub SQL_ARRAY_LOCATOR() ;
+sub SQL_BIGINT() ;
+sub SQL_BINARY() ;
+sub SQL_BIT() ;
+sub SQL_BLOB() ;
+sub SQL_BLOB_LOCATOR() ;
+sub SQL_BOOLEAN() ;
+sub SQL_CHAR() ;
+sub SQL_CLOB() ;
+sub SQL_CLOB_LOCATOR() ;
+sub SQL_CURSOR_DYNAMIC() ;
+sub SQL_CURSOR_FORWARD_ONLY() ;
+sub SQL_CURSOR_KEYSET_DRIVEN() ;
+sub SQL_CURSOR_STATIC() ;
+sub SQL_CURSOR_TYPE_DEFAULT() ;
+sub SQL_DATE() ;
+sub SQL_DATETIME() ;
+sub SQL_DECIMAL() ;
+sub SQL_DOUBLE() ;
+sub SQL_FLOAT() ;
+sub SQL_GUID() ;
+sub SQL_INTEGER() ;
+sub SQL_INTERVAL() ;
+sub SQL_INTERVAL_DAY() ;
+sub SQL_INTERVAL_DAY_TO_HOUR() ;
+sub SQL_INTERVAL_DAY_TO_MINUTE() ;
+sub SQL_INTERVAL_DAY_TO_SECOND() ;
+sub SQL_INTERVAL_HOUR() ;
+sub SQL_INTERVAL_HOUR_TO_MINUTE() ;
+sub SQL_INTERVAL_HOUR_TO_SECOND() ;
+sub SQL_INTERVAL_MINUTE() ;
+sub SQL_INTERVAL_MINUTE_TO_SECOND() ;
+sub SQL_INTERVAL_MONTH() ;
+sub SQL_INTERVAL_SECOND() ;
+sub SQL_INTERVAL_YEAR() ;
+sub SQL_INTERVAL_YEAR_TO_MONTH() ;
+sub SQL_LONGVARBINARY() ;
+sub SQL_LONGVARCHAR() ;
+sub SQL_MULTISET() ;
+sub SQL_MULTISET_LOCATOR() ;
+sub SQL_NUMERIC() ;
+sub SQL_REAL() ;
+sub SQL_REF() ;
+sub SQL_ROW() ;
+sub SQL_SMALLINT() ;
+sub SQL_TIME() ;
+sub SQL_TIMESTAMP() ;
+sub SQL_TINYINT() ;
+sub SQL_TYPE_DATE() ;
+sub SQL_TYPE_TIME() ;
+sub SQL_TYPE_TIMESTAMP() ;
+sub SQL_TYPE_TIMESTAMP_WITH_TIMEZONE() ;
+sub SQL_TYPE_TIME_WITH_TIMEZONE() ;
+sub SQL_UDT() ;
+sub SQL_UDT_LOCATOR() ;
+sub SQL_UNKNOWN_TYPE() ;
+sub SQL_VARBINARY() ;
+sub SQL_VARCHAR() ;
+sub SQL_WCHAR() ;
+sub SQL_WLONGVARCHAR() ;
+sub SQL_WVARCHAR() ;
+sub _clone_dbis;
+sub _concat_hash_sorted;
+sub _dbi_state_lval;
+sub _debug_dispatch;
+sub _get_imp_data;
+sub _handles;
+sub _install_method;
+sub _new_handle;
+sub _setup_handle;
+sub _svdump;
+sub constant() ;
+sub dbi_profile;
+sub dbi_profile_merge;
+sub dbi_profile_merge_nodes;
+sub dbi_time;
+sub dump_handle;
+sub hash;
+sub looks_like_number;
+sub neat;
+sub set_err;
+sub sql_type_cast;
+sub trace;
+sub trace_msg;
+}
+package DBI::common {
+sub CLEAR;
+sub DELETE;
+sub DESTROY;
+sub EXISTS;
+sub FETCH;
+sub FETCH_many;
+sub FIRSTKEY;
+sub NEXTKEY;
+sub STORE;
+sub can;
+sub debug;
+sub dump_handle;
+sub err;
+sub errstr;
+sub func;
+sub parse_trace_flag;
+sub parse_trace_flags;
+sub private_attribute_info;
+sub private_data;
+sub set_err;
+sub state;
+sub swap_inner_handle;
+sub trace;
+sub trace_msg;
+sub visit_child_handles;
+}
+package DBI::db {
+sub TIEHASH;
+sub begin_work;
+sub clone;
+sub column_info;
+sub commit;
+sub connected;
+sub data_sources;
+sub disconnect;
+sub do;
+sub foreign_key_info;
+sub get_info;
+sub last_insert_id;
+sub ping;
+sub prepare;
+sub prepare_cached;
+sub preparse;
+sub primary_key;
+sub primary_key_info;
+sub quote;
+sub quote_identifier;
+sub rollback;
+sub rows;
+sub selectall_array;
+sub selectall_arrayref;
+sub selectall_hashref;
+sub selectcol_arrayref;
+sub selectrow_array;
+sub selectrow_arrayref;
+sub selectrow_hashref;
+sub statistics_info;
+sub table_info;
+sub tables;
+sub take_imp_data;
+sub type_info;
+sub type_info_all;
+}
+package DBI::dr {
+sub TIEHASH;
+sub connect;
+sub connect_cached;
+sub data_sources;
+sub dbixs_revision;
+sub default_user;
+sub disconnect_all;
+}
+package DBI::st {
+sub TIEHASH;
+sub _get_fbav;
+sub _set_fbav;
+sub bind_col;
+sub bind_columns;
+sub bind_param;
+sub bind_param_array;
+sub bind_param_inout;
+sub bind_param_inout_array;
+sub blob_copy_to_file;
+sub blob_read;
+sub cancel;
+sub dump_results;
+sub execute;
+sub execute_array;
+sub execute_for_fetch;
+sub fetch;
+sub fetchall_arrayref;
+sub fetchall_hashref;
+sub fetchrow;
+sub fetchrow_array;
+sub fetchrow_arrayref;
+sub fetchrow_hashref;
+sub finish;
+sub last_insert_id;
+sub more_results;
+sub rows;
+}
+package DBI::var {
+sub FETCH;
+}
+package Data::Dump::Streamer {
+sub SvREADONLY_ref($;$) ;
+sub SvREFCNT_ref($;$) ;
+sub _could_be_dualvar($) ;
+sub _globname($) ;
+sub _make_ro($) ;
+sub alias_av(\@$$) ;
+sub alias_hv(\%$$) ;
+sub alias_ref;
+sub all_keys(\%\@\@) ;
+sub blessed($) ;
+sub dualvar($$) ;
+sub globname($) ;
+sub hidden_keys(\%) ;
+sub is_numeric($) ;
+sub is_regexp($) ;
+sub isweak($) ;
+sub legal_keys(\%) ;
+sub looks_like_number($) ;
+sub make_ro($) ;
+sub push_alias(\@$) ;
+sub readonly($) ;
+sub readonly_set($) ;
+sub refaddr($) ;
+sub refaddr_or_glob($) ;
+sub refcount($) ;
+sub reftype($) ;
+sub reftype_or_glob($) ;
+sub regex($) ;
+sub regexp_pattern($) ;
+sub sv_refcount($) ;
+sub weak_refcount($) ;
+sub weaken($) ;
+}
 package Data::Dumper {
 sub Dumpxs($;$$) ;
 sub _vstring($) ;
+}
+package Data::UUID {
+sub DESTROY;
+sub compare;
+sub create;
+sub create_b64;
+sub create_bin;
+sub create_from_name;
+sub create_from_name_b64;
+sub create_from_name_bin;
+sub create_from_name_hex;
+sub create_from_name_str;
+sub create_hex;
+sub create_str;
+sub from_b64string;
+sub from_hexstring;
+sub from_string;
+sub new;
+sub to_b64string;
+sub to_hexstring;
+sub to_string;
+}
+package DateTime {
+sub _accumulated_leap_seconds($$) ;
+sub _day_has_leap_second($$) ;
+sub _day_length($$) ;
+sub _is_leap_year($$) ;
+sub _normalize_leap_seconds($$$) ;
+sub _normalize_tai_seconds($$$) ;
+sub _rd2ymd($$;$) ;
+sub _seconds_as_components($$;$$) ;
+sub _time_as_seconds($$$$) ;
+sub _ymd2rd($$$$) ;
 }
 package Devel::Caller {
 sub _context_cv;
@@ -708,6 +2360,9 @@ sub mstat;
 sub mstats2hash($\%;$) ;
 sub mstats_fillhash(\%;$) ;
 sub runops_debug;
+}
+package Devel::StackTrace {
+sub blessed($) ;
 }
 package Digest::MD5 {
 sub DESTROY;
@@ -785,6 +2440,56 @@ sub shainit($$) ;
 sub sharewind($) ;
 sub shawrite($$$) ;
 }
+package Digest::SHA1 {
+sub DESTROY;
+sub add;
+sub addfile;
+sub b64digest;
+sub clone;
+sub digest;
+sub hexdigest;
+sub new;
+sub sha1;
+sub sha1_base64;
+sub sha1_hex;
+sub sha1_transform;
+}
+package Digest::SHA3 {
+sub DESTROY($) ;
+sub _addfilebin($$) ;
+sub _addfileuniv($$) ;
+sub add($;@) ;
+sub algorithm($) ;
+sub b64digest($) ;
+sub clone($) ;
+sub digest($) ;
+sub getcwd;
+sub hashsize($) ;
+sub hexdigest($) ;
+sub newSHA3($$) ;
+sub sha3_224(;@) ;
+sub sha3_224_base64(;@) ;
+sub sha3_224_hex(;@) ;
+sub sha3_256(;@) ;
+sub sha3_256_base64(;@) ;
+sub sha3_256_hex(;@) ;
+sub sha3_384(;@) ;
+sub sha3_384_base64(;@) ;
+sub sha3_384_hex(;@) ;
+sub sha3_512(;@) ;
+sub sha3_512_base64(;@) ;
+sub sha3_512_hex(;@) ;
+sub shainit($$) ;
+sub shake128(;@) ;
+sub shake128_base64(;@) ;
+sub shake128_hex(;@) ;
+sub shake256(;@) ;
+sub shake256_base64(;@) ;
+sub shake256_hex(;@) ;
+sub sharewind($) ;
+sub shawrite($$$) ;
+sub squeeze($) ;
+}
 package Digest::base {
 sub add;
 sub clone;
@@ -799,6 +2504,13 @@ sub dl_install_xsub;
 sub dl_load_file;
 sub dl_undef_symbols;
 sub dl_unload_file;
+}
+package Email::Address::XS {
+sub compose_address;
+sub format_email_groups;
+sub is_obj;
+sub parse_email_groups;
+sub split_address;
 }
 package Encode {
 sub _utf8_off($) ;
@@ -891,6 +2603,13 @@ sub encode;
 package Eval::Closure {
 sub reftype($) ;
 }
+package Exception::Class {
+sub blessed($) ;
+sub reftype($) ;
+}
+package Exception::Class::Base {
+sub blessed($) ;
+}
 package Fcntl {
 sub AUTOLOAD;
 sub FCREAT() ;
@@ -966,6 +2685,10 @@ sub csh_glob;
 package File::Path {
 sub getcwd;
 }
+package File::ShareDir {
+sub _STRING($) ;
+sub firstres(&@) ;
+}
 package File::Spec::Unix {
 sub _fn_canonpath;
 sub _fn_catdir;
@@ -1009,6 +2732,10 @@ sub unbroken_text;
 sub utf8_mode;
 sub xml_mode;
 sub xml_pic;
+}
+package HTTP::Parser::XS {
+sub parse_http_request($$) ;
+sub parse_http_response;
 }
 package Hash::Util {
 sub _clear_placeholders(\%) ;
@@ -1054,6 +2781,16 @@ sub quality($$) ;
 sub window($$) ;
 }
 package IO::File {
+sub O_ALIAS() ;
+sub O_DEFER() ;
+sub O_EXLOCK() ;
+sub O_NOINHERIT() ;
+sub O_RANDOM() ;
+sub O_RAW() ;
+sub O_RSRC() ;
+sub O_SEQUENTIAL() ;
+sub O_SHLOCK() ;
+sub O_TEMPORARY() ;
 sub new_tmpfile;
 }
 package IO::Handle {
@@ -1113,6 +2850,10 @@ sub V;
 sub hv_clear_placeholders(\%) ;
 sub stack_refcounted;
 }
+package JSON {
+sub decode_json($) ;
+sub encode_json($) ;
+}
 package JSON::XS {
 sub CLONE;
 sub DESTROY;
@@ -1162,6 +2903,84 @@ sub shrink;
 sub space_after;
 sub space_before;
 sub utf8;
+}
+package List::MoreUtils {
+sub _XScompiled;
+sub after(&@) ;
+sub after_incl(&@) ;
+sub all(&@) ;
+sub all_u(&@) ;
+sub any(&@) ;
+sub any_u(&@) ;
+sub apply(&@) ;
+sub arrayify;
+sub before(&@) ;
+sub before_incl(&@) ;
+sub binsert(&$\@) ;
+sub bremove(&\@) ;
+sub bsearch(&@) ;
+sub bsearch_index(&@) ;
+sub bsearch_insert(&$\@) ;
+sub bsearch_remove(&\@) ;
+sub bsearchidx(&@) ;
+sub distinct(@) ;
+sub duplicates(@) ;
+sub each_array(\@;\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@) ;
+sub each_arrayref;
+sub equal_range(&@) ;
+sub false(&@) ;
+sub first_index(&@) ;
+sub first_result(&@) ;
+sub first_value(&@) ;
+sub firstidx(&@) ;
+sub firstres(&@) ;
+sub firstval(&@) ;
+sub frequency(@) ;
+sub indexes(&@) ;
+sub insert_after(&$\@) ;
+sub insert_after_string($$\@) ;
+sub last_index(&@) ;
+sub last_result(&@) ;
+sub last_value(&@) ;
+sub lastidx(&@) ;
+sub lastres(&@) ;
+sub lastval(&@) ;
+sub listcmp(\@\@;\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@) ;
+sub lower_bound(&@) ;
+sub mesh(\@\@;\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@) ;
+sub minmax(@) ;
+sub minmaxstr(@) ;
+sub mode(@) ;
+sub natatime($@) ;
+sub none(&@) ;
+sub none_u(&@) ;
+sub notall(&@) ;
+sub notall_u(&@) ;
+sub occurrences(@) ;
+sub one(&@) ;
+sub one_u(&@) ;
+sub only_index(&@) ;
+sub only_result(&@) ;
+sub only_value(&@) ;
+sub onlyidx(&@) ;
+sub onlyres(&@) ;
+sub onlyval(&@) ;
+sub pairwise(&\@\@) ;
+sub part(&@) ;
+sub qsort(&\@) ;
+sub reduce_0(&@) ;
+sub reduce_1(&@) ;
+sub reduce_u(&@) ;
+sub samples($@) ;
+sub singleton(@) ;
+sub slide(&@) ;
+sub slideatatime($@) ;
+sub true(&@) ;
+sub uniq(@) ;
+sub upper_bound(&@) ;
+sub zip(\@\@;\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@) ;
+sub zip6(\@\@;\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@) ;
+sub zip_unflatten(\@\@;\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@\@) ;
 }
 package List::MoreUtils::XS {
 sub _XScompiled;
@@ -1304,6 +3123,66 @@ sub _one;
 sub _ten;
 sub _two;
 sub _zero;
+}
+package Math::BigInt::LTM {
+sub DESTROY;
+sub STORABLE_freeze;
+sub STORABLE_thaw;
+sub _1ex;
+sub _acmp;
+sub _add;
+sub _alen;
+sub _and;
+sub _as_bytes;
+sub _copy;
+sub _dec;
+sub _div;
+sub _from_base;
+sub _from_bin;
+sub _from_bytes;
+sub _from_hex;
+sub _from_oct;
+sub _gcd;
+sub _inc;
+sub _is_even;
+sub _is_odd;
+sub _is_one;
+sub _is_ten;
+sub _is_two;
+sub _is_zero;
+sub _lcm;
+sub _len;
+sub _lsft;
+sub _mod;
+sub _modinv;
+sub _modpow;
+sub _mul;
+sub _new;
+sub _one;
+sub _or;
+sub _pow;
+sub _root;
+sub _rsft;
+sub _set;
+sub _sqrt;
+sub _str;
+sub _sub;
+sub _ten;
+sub _to_base;
+sub _to_bin;
+sub _to_bytes;
+sub _to_hex;
+sub _to_oct;
+sub _two;
+sub _xor;
+sub _zero;
+sub _zeros;
+}
+package Math::Random::ISAAC::XS {
+sub DESTROY;
+sub irand;
+sub new;
+sub rand;
 }
 package Moose {
 sub is_class_loaded;
@@ -2674,12 +4553,50 @@ sub validate(\@$) ;
 sub validate_pos(\@@) ;
 sub validate_with;
 }
+package Params::ValidationCompiler::Compiler {
+sub blessed($) ;
+sub looks_like_number($) ;
+sub pairkeys(@) ;
+sub pairvalues(@) ;
+sub perlstring;
+sub reftype($) ;
+sub set_subname;
+}
 package PerlIO {
 sub get_layers(*;@) ;
 }
 package PerlIO::Layer {
 sub NoWarnings;
 sub find;
+}
+package Ref::Util {
+sub _using_custom_ops;
+sub is_arrayref($) ;
+sub is_blessed_arrayref($) ;
+sub is_blessed_coderef($) ;
+sub is_blessed_formatref($) ;
+sub is_blessed_globref($) ;
+sub is_blessed_hashref($) ;
+sub is_blessed_ref($) ;
+sub is_blessed_refref($) ;
+sub is_blessed_scalarref($) ;
+sub is_coderef($) ;
+sub is_formatref($) ;
+sub is_globref($) ;
+sub is_hashref($) ;
+sub is_ioref($) ;
+sub is_plain_arrayref($) ;
+sub is_plain_coderef($) ;
+sub is_plain_formatref($) ;
+sub is_plain_globref($) ;
+sub is_plain_hashref($) ;
+sub is_plain_ref($) ;
+sub is_plain_refref($) ;
+sub is_plain_scalarref($) ;
+sub is_ref($) ;
+sub is_refref($) ;
+sub is_regexpref($) ;
+sub is_scalarref($) ;
 }
 package Ref::Util::XS {
 sub _using_custom_ops;
@@ -2719,6 +4636,9 @@ sub constant;
 sub is_regexp;
 sub regexp_seen_evals;
 }
+package Role::Tiny {
+sub _linear_isa($;$) ;
+}
 package SDBM_File {
 sub DELETE;
 sub DESTROY;
@@ -2749,6 +4669,72 @@ sub reftype($) ;
 sub tainted($) ;
 sub unweaken($) ;
 sub weaken($) ;
+}
+package Sereal::Decoder {
+sub DESTROY;
+sub bytes_consumed;
+sub decode($$;$) ;
+sub decode_only_header($$;$) ;
+sub decode_only_header_with_offset($$$;$) ;
+sub decode_sereal;
+sub decode_sereal_with_header_data;
+sub decode_with_header($$;$$) ;
+sub decode_with_header_and_offset($$$;$$) ;
+sub decode_with_offset($$$;$) ;
+sub flags;
+sub looks_like_sereal;
+sub new;
+sub regexp_internals_type;
+sub scalar_looks_like_sereal($) ;
+sub sereal_decode_only_header_with_object($$;$) ;
+sub sereal_decode_only_header_with_offset_with_object($$$;$) ;
+sub sereal_decode_with_header_and_offset_with_object($$$;$$) ;
+sub sereal_decode_with_header_with_object($$;$$) ;
+sub sereal_decode_with_object($$;$) ;
+sub sereal_decode_with_offset_with_object($$$;$) ;
+}
+package Sereal::Encoder {
+sub DESTROY;
+sub encode($$;$) ;
+sub encode_sereal;
+sub encode_sereal_with_header_data;
+sub flags;
+sub new;
+sub sereal_encode_with_object($$;$) ;
+}
+package Sereal::Encoder::_ptabletest {
+sub test;
+}
+package Set::Object {
+sub DESTROY;
+sub _STORABLE_thaw;
+sub _ish_int($) ;
+sub _strengthen;
+sub _weaken;
+sub blessed($) ;
+sub clear;
+sub get_flat($) ;
+sub get_magic($) ;
+sub includes;
+sub insert;
+sub is_double($) ;
+sub is_int($) ;
+sub is_null;
+sub is_object($) ;
+sub is_overloaded($) ;
+sub is_string($) ;
+sub is_weak;
+sub members;
+sub new;
+sub rc;
+sub refaddr($) ;
+sub reftype($) ;
+sub remove;
+sub rvrc;
+sub size;
+}
+package Set::Object::Weak {
+sub blessed($) ;
 }
 package Socket {
 sub AF_802() ;
@@ -2860,6 +4846,61 @@ sub unpack_sockaddr_in6;
 sub unpack_sockaddr_in;
 sub unpack_sockaddr_un;
 }
+package Specio::Constraint::AnyCan {
+sub perlstring;
+}
+package Specio::Constraint::Enum {
+sub dclone($) ;
+sub refaddr($) ;
+}
+package Specio::Constraint::ObjectCan {
+sub perlstring;
+}
+package Specio::Constraint::ObjectIsa {
+sub perlstring;
+}
+package Specio::Constraint::Parameterized {
+sub dclone($) ;
+}
+package Specio::Constraint::Role::CanType {
+sub blessed($) ;
+sub dclone($) ;
+}
+package Specio::Constraint::Role::Interface {
+sub all(&@) ;
+sub any(&@) ;
+sub first(&@) ;
+}
+package Specio::Constraint::Role::IsaType {
+sub blessed($) ;
+sub dclone($) ;
+}
+package Specio::Constraint::Union {
+sub all(&@) ;
+sub any(&@) ;
+sub dclone($) ;
+}
+package Specio::Exception {
+sub blessed($) ;
+}
+package Specio::Helpers {
+sub blessed($) ;
+sub perlstring;
+}
+package Specio::OO {
+sub all(&@) ;
+sub dclone($) ;
+sub perlstring;
+sub weaken($) ;
+}
+package Specio::PartialDump {
+sub blessed($) ;
+sub looks_like_number($) ;
+sub reftype($) ;
+}
+package Specio::TypeChecks {
+sub blessed($) ;
+}
 package Storable {
 sub dclone($) ;
 sub init_perinterp() ;
@@ -2874,6 +4915,9 @@ sub pretrieve($;$) ;
 sub pstore($$) ;
 sub stack_depth() ;
 sub stack_depth_hash() ;
+}
+package String::Compare::ConstantTime {
+sub equals($$) ;
 }
 package Sub::Name {
 sub subname;
@@ -3071,6 +5115,13 @@ sub _runops_installed;
 sub _start;
 sub count_sv;
 }
+package Test::Taint {
+sub _taint;
+}
+package Text::Soundex {
+sub soundex;
+sub soundex_xs;
+}
 package Text::VisualWidth::EUC_JP {
 sub xs_get_visualwidth_eucjp($) ;
 sub xs_trim_visualwidth_eucjp($$) ;
@@ -3120,6 +5171,13 @@ sub _strftime($$;$) ;
 sub _strptime($$$$) ;
 sub _tzset() ;
 sub blessed($) ;
+}
+package Time::Warp {
+sub install_time_api() ;
+sub reset() ;
+sub scale(;@) ;
+sub time() ;
+sub to($) ;
 }
 package Try::Tiny {
 sub _subname;
@@ -3251,6 +5309,20 @@ sub cast(\[$@%&*]$@) ;
 sub dispell(\[$@%&*]$) ;
 sub getdata(\[$@%&*]$) ;
 }
+package XString {
+sub cstring;
+sub perlstring;
+}
+package YAML::Syck {
+sub DumpJSON;
+sub DumpJSONFile;
+sub DumpJSONInto;
+sub DumpYAML;
+sub DumpYAMLFile;
+sub DumpYAMLInto;
+sub LoadJSON;
+sub LoadYAML;
+}
 package attributes {
 sub _fetch_attrs($) ;
 sub _guess_stash($) ;
@@ -3283,6 +5355,10 @@ sub weaken($) ;
 }
 package constant {
 sub _make_const(\[$@]) ;
+}
+package indirect {
+sub _global($) ;
+sub _tag($) ;
 }
 package mro {
 sub _nextcan;

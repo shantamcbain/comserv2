@@ -22,7 +22,7 @@ sub index :Path(/todo) :Args(0) {
 }
 sub todo :Path('/todo') :Args(0) {
     my ( $self, $c ) = @_;
-
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'todo', 'Fetching todos for the todo page');
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
 
@@ -138,7 +138,7 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
 
 
 sub debug :Local {
-    my ($self, $c) = @_;
+    my ( $self, $c ) = @_;
 
     # Print the @INC path
     $self->logging->log_with_details($c, __FILE__, __LINE__, 'debug', "INC: " . join(", ", @INC));
@@ -350,7 +350,8 @@ sub day :Path('/todo/day') :Args {
     }
 # Calculate the previous and next dates
 my $dt = DateTime::Format::ISO8601->parse_datetime($date);
-my $previous_date = $dt->clone->subtract(days => 1)->strftime('%Y-%m-%d');
+my $previous_date = $dt->clone->subtract(days =>
+ 1)->strftime('%Y-%m-%d');
 my $next_date = $dt->clone->add(days => 1)->strftime('%Y-%m-%d');
 
     # Get the Todo model

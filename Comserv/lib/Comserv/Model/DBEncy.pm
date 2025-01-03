@@ -42,6 +42,7 @@ sub get_active_projects {
 
     return \@projects;
 }
+
 sub get_table_info {
     my ($self, $table_name) = @_;
 
@@ -60,6 +61,11 @@ sub get_table_info {
         # The table does not exist
         return;
     }
+}
+
+sub compare_schemas {
+    my ($self) = @_;
+    # Code to compare schemas
 }
 
 1;

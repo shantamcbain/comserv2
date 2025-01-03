@@ -1,8 +1,8 @@
 requires 'Moose';
 requires 'namespace::autoclean';
 requires 'JSON::MaybeXS';
-
-# System modules
+requires 'Catalyst::Plugin::AutoCRUD';
+requires 'DBIx::Class::Schema::Loader';
 requires 'Socket';
 requires 'Sys::Hostname';
 requires 'MooseX::MarkAsMethods';
@@ -16,16 +16,12 @@ requires 'DBIx::Class::TimeStamp';
 requires 'DBIx::Class::Migration';
 requires 'DBIx::Class::EncodedColumn';
 requires 'SQL::Translator';
-
-# Template Toolkit and plugins
 requires 'Template';
 requires 'Template::Plugin::DateTime';
 requires 'Template::Plugin::JSON';
 requires 'Template::Plugin::Number::Format';
 requires 'Template::Plugin::URL';
 requires 'Template::Plugin::DBI';
-
-# Catalyst Plugins
 requires 'Catalyst::Plugin::ConfigLoader';
 requires 'Catalyst::Plugin::Static::Simple';
 requires 'Catalyst::Plugin::StackTrace';
@@ -42,31 +38,19 @@ requires 'Catalyst::Plugin::Authorization::ACL';
 requires 'Catalyst::Plugin::Log::Dispatch';
 requires 'Log::Dispatch::Config';
 requires 'Catalyst::View::TT';
-
-# DateTime related
 requires 'DateTime';
 requires 'DateTime::Event::Recurrence';
 requires 'DateTime::Format::Strptime';
 requires 'DateTime::Format::ISO8601';
-
-# File handling
 requires 'File::Find';
 requires 'File::Basename';
-
-# Cryptography and Security
 requires 'Digest::SHA';
-
-# Email handling
 requires 'Email::Simple';
 requires 'Email::Simple::Creator';
 requires 'Email::Sender::Simple';
-
-# Utility modules
 requires 'JSON';
 requires 'URI::Escape';
 requires 'Data::FormValidator';
-
-# Development and testing
 requires 'Term::ReadPassword';
 requires 'Text::CSV';
 requires 'Starman';
