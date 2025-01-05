@@ -4,6 +4,7 @@ use namespace::autoclean;
 use DateTime;
 use Data::Dumper;
 use Comserv::Util::Logging;
+use List::Util 'sum';
 BEGIN { extends 'Catalyst::Controller'; }
 has 'logging' => (
     is => 'ro',
@@ -142,11 +143,21 @@ sub details :Path('details') :Args(0) {
     my $project_model = $c->model('Project');
     my $project = $project_model->get_project($schema, $project_id);
 
-    # Fetch todos associated with the project
+    # Fetch todos and their associated logs
     my @todos = $schema->resultset('Todo')->search(
         { project_id => $project_id },
-        { order_by => { -asc => 'start_date' } }
+        { 
+            order_by => { -asc => 'me.start_date' },  # Explicitly reference the table
+            prefetch => ['logs'],  # Prefetch related logs
+            '+select' => ['logs.time'],
+            '+as' => ['total_logged_time']
+        }
     );
+
+    # Calculate total logged time for each todo
+    foreach my $todo (@todos) {
+        $todo->{total_logged_time} = sum map { $_->time } $todo->logs;
+    }
 
     # Add the project and todos to the stash
     $c->stash(

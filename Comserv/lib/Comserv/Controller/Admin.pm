@@ -81,6 +81,22 @@ sub add_schema :Path('add_schema') :Args(0) {
     $c->forward($c->view('TT'));
 }
 
+sub edit_documentation :Path('edit_documentation') :Args(0) {
+    my ( $self, $c ) = @_;
+    
+    if ($c->req->method eq 'POST') {
+        my $params = $c->req->params;
+        my $schema = $c->model('DBEncy');
+        
+        $schema->resultset('Documentation')->create({
+            title => $params->{title}, content => $params->{content}, section => $params->{section}, version => $params->{version}, created_by => $c->user->id, updated_by => $c->user->id,
+        });
+    }
+    
+    $c->stash(template => 'admin/edit_documentation.tt');
+    $c->forward($c->view('TT'));
+}
+
 # Compare schema versions
 sub compare_schema :Path('compare_schema') :Args(0) {
     my ($self, $c) = @_;
@@ -150,34 +166,6 @@ sub migrate_schema :Path('migrate_schema') :Args(0) {
     $c->forward($c->view('TT'));
 }
 
-# Edit documentation action
-sub edit_documentation :Path('edit_documentation') :Args(0) {
-    my ( $self, $c ) = @_;
-    
-    if ($c->req->method eq 'POST') {
-        my $params = $c->req->params;
-        my $schema = $c->model('DBEncy');
-        
-        eval {
-            $schema->resultset('Documentation')->create({
-                title => $params->{title},
-                content => $params->{content},
-                section => $params->{section},
-                version => $params->{version},
-                created_by => $c->user->id,
-                updated_by => $c->user->id,
-            });
-            $c->stash(success_msg => 'Documentation saved successfully');
-        };
-        if ($@) {
-            $c->stash(error_msg => "Failed to save documentation: $@");
-        }
-    }
-    
-    $c->stash(template => 'admin/edit_documentation.tt');
-    $c->forward($c->view('TT'));
-}
-
 # Get table information
 sub get_table_info :Path('admin/get_table_info') :Args(1) {
     my ($self, $c, $table_name) = @_;
@@ -206,10 +194,60 @@ sub autocrud_list :Local :Args(1) {
 
 sub autocrud_edit :Local :Args(2) {
     my ($self, $c, $table, $id) = @_;
+    my $record = $id eq 'new' ? undef : 
+        $c->model('DBEncy')->resultset($table)->find($id);
+    
     $c->stash(
         template => 'admin/autocrud_edit.tt',
-        record => $c->model('DBEncy')->resultset($table)->find($id)
+        table => $table,
+        record => $record
     );
+}
+
+sub list_migrations :Path('list_migrations') :Args(0) {
+    my ($self, $c) = @_;
+    my $migrations_dir = $c->path_to('script', 'migrations');
+    
+    my @migration_files;
+    if (-d $migrations_dir) {
+        opendir(my $dh, $migrations_dir) || die "Can't open directory: $!";
+        @migration_files = sort grep { /^\d{4}_.*\.pl$/ } readdir($dh);
+        closedir $dh;
+    }
+    
+    $c->stash(
+        migration_files => \@migration_files,
+        migrations_dir => $migrations_dir,
+        template => 'admin/list_migrations.tt'
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub view_migration :Path('view_migration') :Args(1) {
+    my ($self, $c, $filename) = @_;
+    my $migrations_dir = $c->path_to('script', 'migrations');
+    my $file_path = "$migrations_dir/$filename";
+    
+    if (-f $file_path) {
+        open my $fh, '<', $file_path or die "Cannot open $file_path: $!";
+        my $content = do { local $/; <$fh> };
+        close $fh;
+        
+        $c->stash(
+            migration_content => $content,
+            template => 'admin/view_migration.tt'
+        );
+    } else {
+        $c->stash(error_msg => "Migration file not found");
+    }
+}
+
+sub run_migration :Path('run_migration') :Args(1) {
+    my ($self, $c, $filename) = @_;
+    my $migrations_dir = $c->path_to('script', 'migrations');
+    system("perl $migrations_dir/$filename") == 0
+        or $c->stash(error_msg => "Failed to run migration: $!");
+    $c->response->redirect($c->uri_for($self->action_for('list_migrations')));
 }
 
 __PACKAGE__->meta->make_immutable;

@@ -5,8 +5,9 @@ use DateTime;
 use DateTime::TimeZone;
 use DateTime::Format::Strptime;
 use Data::Dumper;
+use Catalyst::Plugin::AutoCRUD;
 use Comserv::Util::Logging;
-#use Comserv::Util::Logging; # Import the logging utility
+
 BEGIN { extends 'Catalyst::Controller'; }
 
 has 'record_id' => (is => 'rw', isa => 'Str');
@@ -19,6 +20,12 @@ has 'logging' => (
 );
 sub _build_logging {
     return Comserv::Util::Logging->instance;
+}
+
+# Set content type negotiation
+sub begin :Private {
+    my ($self, $c) = @_;
+    $c->response->content_type('text/html');
 }
 
 sub BUILD {
@@ -66,28 +73,23 @@ sub index :Path('/log') :Args(0) {
 
 sub details :Path('/log/details') :Args(0) {
     my ($self, $c) = @_;
+    # Only handle JSON requests if explicitly requested
+    if ($c->req->headers->header('Accept') eq 'application/json') {
+        $c->stash->{current_view} = 'JSON';
+        $c->forward('handle_autocrud_request');
+        return;
+    }
 
-    # Retrieve the record_id from the request parameters
     my $record_id = $c->request->body_parameters->{record_id};
-
-    # Fetch the log entry from the database
     my $log = $c->model('DBEncy')->resultset('Log')->find($record_id);
 
     if ($log) {
-        # Get the current local time
-        my $current_time = DateTime->now(time_zone => 'local')->strftime('%H:%M');
-
-        # Pass the log entry and dropdown data to the template
         $c->stash(
             log => $log,
-            build_priority => $self->priority,
-            build_status   => $self->status,
-            end_time       => $current_time,  # Set end_time to current local time
-            template       => 'log/details.tt'
+            template => 'log/details.tt'
         );
-    } else {
-        $c->response->body('Log entry not found.');
     }
+    $c->forward($c->view('TT'));
 }
 
 sub update :Path('/log/update') :Args(0) {

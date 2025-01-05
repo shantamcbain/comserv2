@@ -24,7 +24,7 @@ sub get_top_todos {
     # Add a condition to only fetch todos where status is not 3
     my @todos = $rs->search(
         { sitename => $SiteName, status => { '!=' => 3 } },
-        { order_by => { -asc => ['priority', 'start_date'] }, rows => 10 }
+        { order_by => { -asc => [{ -numeric => 'priority' }, 'start_date'] }, rows => 10 }
     );
 
     $self->logging->log_with_details($c, __FILE__, __LINE__, 'get_top_todos','Visited the todo page');
@@ -63,7 +63,7 @@ sub fetch_todo_record {
 
     # Fetch the todo record based on $record_id
     my $todo_record = $rs->find($record_id);
-    $self->logging->log_with_details($c, __FILE__, __LINE__, "Fetched todo record");
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'todo',"Fetched todo record");
     return $todo_record;
 }
 

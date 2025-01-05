@@ -27,8 +27,7 @@
     <li>Date Time Posted: [% project.date_time_posted %]</li>
 </ul>
 
-<!-- List of Todos associated with the project -->
-<!-- List of Todos associated with the project -->
+<!-- List of Todos associated with the project with edit and log buttons -->
 <h2>Todos for this Project</h2>
 <ul>
     [% FOREACH todo IN todos %]
@@ -39,10 +38,34 @@
             <strong>Due Date:</strong> [% todo.due_date %] <br>
             <strong>Status:</strong> [% todo.status %] <br>
             <strong>Priority:</strong> [% todo.priority %]
+            <!-- Add Edit and Log buttons -->
+            <div class="todo-actions">
+                <form action="/todo/details" method="POST" style="display: inline;">
+                    <input type="hidden" name="record_id" value="[% todo.record_id %]">
+                    <button type="submit">Edit Todo</button>
+                </form>
+                <form action="/log/log_form" method="POST" target="_blank" style="display: inline;">
+                    <input type="hidden" name="record_id" value="[% todo.record_id %]">
+                    <button type="submit">Add Log Entry</button>
+                </form>
+            </div>
+            <!-- Display log entries for this todo -->
+            [% IF todo.logs.size %]
+                <div class="log-entries">
+                    <h4>Log Entries:</h4>
+                    <ul>
+                        [% FOREACH log IN todo.logs %]
+                            <li>
+                                <strong>[% log.start_date %]:</strong> [% log.abstract %]
+                                ([% log.time %] hours)
+                            </li>
+                        [% END %]
+                    </ul>
+                </div>
+            [% END %]
         </li>
     [% END %]
 </ul>
-
 
 <!-- Button to go back to the project list -->
 <button type="button" onclick="window.location.href='/project';">Back to Projects</button>
@@ -65,4 +88,3 @@
     <input type="hidden" name="project_id" value="[% project.id %]">
     <button type="submit">Add New Todo</button>
 </form>
-

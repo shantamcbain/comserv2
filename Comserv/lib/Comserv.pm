@@ -35,6 +35,7 @@ __PACKAGE__->config(
     name => 'Comserv',
     disable_component_resolution_regex_fallback => 1,
     enable_catalyst_header => $ENV{CATALYST_HEADER} // 1,
+    default_view => 'TT',  # Set default view
     encoding => 'UTF-8',
     debug => $ENV{CATALYST_DEBUG} // 0,
     
@@ -43,12 +44,19 @@ __PACKAGE__->config(
         login_url => '/user/login',
         logout_url => '/user/logout',
         editable => 1,
+        page_size => 25,
+        exclude_tables => ['sessions', 'users'],
+        default_view => 'TT'
     },
 
     'View::TT' => {
         INCLUDE_PATH => [
             __PACKAGE__->path_to('root'),
+            __PACKAGE__->path_to('root', 'log'),
         ],
+        TEMPLATE_EXTENSION => '.tt',
+        ERROR => 'error.tt',
+        WRAPPER => 'layout.tt',
     },
 );
 

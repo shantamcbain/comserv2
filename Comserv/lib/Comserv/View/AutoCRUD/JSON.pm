@@ -5,10 +5,13 @@ use namespace::autoclean;
 extends 'Catalyst::View::JSON';
 
 __PACKAGE__->config(
-    expose_stash => 'json_data',
+    expose_stash => [ qw(json_data records schema_info errors) ],
     json_encoder_args => {
         pretty => 1,
         canonical => 1,
+        convert_blessed => 1,
+        allow_blessed => 1,
+        allow_nonref => 1
     },
 );
 

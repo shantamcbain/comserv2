@@ -141,100 +141,10 @@ sub auto :Private {
     $c->log->debug('Entered auto action in Root.pm');
 
     my $schema = $c->model('DBEncy');
-    print "Schema: $schema\n";
+    # Removed duplicate print statement
+    # print "Schema: $schema\n";
 
-    $SiteName = $self->fetch_and_set($c, $schema, 'site');
-
-    unless ($c->session->{group}) {
-        $c->session->{group} = 'normal';
-    }
-
-    my $debug_param = $c->req->param('debug');
-    if (defined $debug_param) {
-        if ($c->session->{debug_mode} ne $debug_param) {
-            $c->session->{debug_mode} = $debug_param;
-            $c->stash->{debug_mode} = $debug_param;
-        }
-    } elsif (defined $c->session->{debug_mode}) {
-        $c->stash->{debug_mode} = $c->session->{debug_mode};
-    }
-
-    my $page = $c->req->param('page');
-    if (defined $page) {
-        if ($c->session->{page} ne $page) {
-            $c->session->{page} = $page;
-            $c->stash->{page} = $page;
-        }
-    } elsif (defined $c->session->{page}) {
-        $c->stash->{page} = $c->session->{page};
-    }
-
-    $c->stash->{HostName} = $c->request->base;
-    my @todos = $c->model('Todo')->get_top_todos($c, $SiteName);
-    my $todos = $c->session->{todos};
-    $c->stash(todos => $todos);
-
-    if (ref($c) eq 'Catalyst::Context') {
-        my @main_links = $c->model('DB')->get_links($c, 'Main');
-        my @login_links = $c->model('DB')->get_links($c, 'Login');
-        my @global_links = $c->model('DB')->get_links($c, 'Global');
-        my @hosted_links = $c->model('DB')->get_links($c, 'Hosted');
-        my @member_links = $c->model('DB')->get_links($c, 'Member');
-
-        $c->session(
-            main_links => \@main_links,
-            login_links => \@login_links,
-            global_links => \@global_links,
-            hosted_links => \@hosted_links,
-            member_links => \@member_links,
-        );
-    }
-
-    return 1;
-}sub auto :Private {
-    my ($self, $c) = @_;
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'auto', "Starting auto action");
-
-    my $SiteName = $c->session->{SiteName};
-
-    if (!defined $SiteName || $SiteName eq 'none' || $SiteName eq 'root') {
-        $c->log->debug("SiteName is either undefined, 'none', or 'root'. Proceeding with domain extraction and site domain retrieval");
-
-        my $domain = $c->req->base->host;
-        $domain =~ s/:.*//;
-
-        my $site_domain = $c->model('Site')->get_site_domain($domain);
-        $c->log->debug(__PACKAGE__ . " . (split '::', __SUB__)[-1] . \" line \" . __LINE__ . \": site_domain in auto = $site_domain");
-
-        if ($site_domain) {
-            my $site_id = $site_domain->site_id;
-            my $site = $c->model('Site')->get_site_details($site_id);
-
-            if ($site) {
-                $SiteName = $site->name;
-                $c->stash->{SiteName} = $SiteName;
-                $c->session->{SiteName} = $SiteName;
-            }
-        } else {
-            $SiteName = $self->fetch_and_set($c, 'site');
-            $c->log->debug(__PACKAGE__ . " . (split '::', __SUB__)[-1] . \" line \" . __LINE__ . \": SiteName in auto = $SiteName");
-
-            if (!defined $SiteName) {
-                $c->stash(template => 'index.tt');
-                $c->forward($c->view('TT'));
-                return 0;
-            }
-        }
-    }
-
-    $self->site_setup($c, $c->session->{SiteName});
-
-    $c->log->debug('Entered auto action in Root.pm');
-
-    my $schema = $c->model('DBEncy');
-    #print "Schema: $schema\n";
-
-    $SiteName = $self->fetch_and_set($c, $schema, 'site');
+    $SiteName = $self->fetch_and_set($c, 'site'); # Corrected method call
 
     unless ($c->session->{group}) {
         $c->session->{group} = 'normal';
@@ -281,12 +191,10 @@ sub auto :Private {
         );
     }
     # Set the mail server name based on the SiteName
-    my $mail_server;
+    my $mail_server; # Added missing semicolon
 
     return 1;
 }
-
-
 
 sub site_setup {
     my ($self, $c) = @_;
@@ -333,7 +241,7 @@ sub debug :Path('/debug') {
     $c->stash(template => 'debug.tt');
     $c->forward($c->view('TT'));
 }
-# Subroutine to handle the /accounts route
+
 sub accounts :Path('/accounts') :Args(0) {
     my ($self, $c) = @_;
 
@@ -344,31 +252,6 @@ sub accounts :Path('/accounts') :Args(0) {
     $c->stash(template => 'accounts.tt');
 
     # Forward to the TT view for rendering
-    $c->forward($c->view('TT'));
-}
-
-sub default :Path {
-    my ( $self, $c ) = @_;
-    $c->response->body( 'Page not found' );
-    $c->response->status(404);
-}
-
-sub documentation :Path('documentation') :Args(0) {
-    my ( $self, $c ) = @_;
-    $c->stash(template => 'Documentation/Documentation.tt');
-}
-
-sub end : ActionClass('RenderView') {}
-
-__PACKAGE__->meta->make_immutable;
-
-1;
-
-sub debug :Path('/debug') {
-    my ($self, $c) = @_;
-
-    my $site_name = $c->stash->{SiteName};
-    $c->stash(template => 'debug.tt');
     $c->forward($c->view('TT'));
 }
 

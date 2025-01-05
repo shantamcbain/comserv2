@@ -205,7 +205,7 @@ sub modify :Local :Args(1) {
             sitename => $form_data->{sitename},
             start_date => $form_data->{start_date},
             parent_todo => $parent_todo, # Ensure this is set
-            due_date => $form_data->{due_date},
+            due_date => $form_data->{due_date} || DateTime->now->add(days => 7)->ymd, # Set default value if not provided
             subject => $form_data->{subject},
             description => $form_data->{description},
             estimated_man_hours => $form_data->{estimated_man_hours},
@@ -214,13 +214,12 @@ sub modify :Local :Args(1) {
             reporter => $form_data->{reporter},
             company_code => $form_data->{company_code},
             owner => $form_data->{owner},
-            project_id => $form_data->{project_id},
             developer => $form_data->{developer},
             username_of_poster => $c->session->{username},
             status => $form_data->{status},
             priority => $form_data->{priority},
             share => $form_data->{share} || 0,
-            last_mod_by => $c->session->{username},
+            last_mod_by => $c->session->{username} || 'system', # Set default value if not provided
             last_mod_date => DateTime->now->ymd,
             user_id => $form_data->{user_id} || 1,
             project_id => $form_data->{project_id},
@@ -247,7 +246,7 @@ sub create :Local {
     my $sitename = $c->request->params->{sitename};
     my $start_date = $c->request->params->{start_date};
     my $parent_todo = $c->request->params->{parent_todo} || 0;
-    my $due_date = $c->request->params->{due_date};
+    my $due_date = $c->request->params->{due_date} || DateTime->now->add(days => 7)->ymd; # Set default value if not provided
     my $subject = $c->request->params->{subject};
     my $schema = $c->model('DBEncy');
     my $description = $c->request->params->{description};
@@ -262,8 +261,8 @@ sub create :Local {
     my $status = $c->request->params->{status};
     my $priority = $c->request->params->{priority};
     my $share = $c->request->params->{share} || 0;
-    my $last_mod_by = $c->session->{username} || 'default_user';
-    my $last_mod_date = $c->request->params->{last_mod_date};
+    my $last_mod_by = $c->session->{username} || 'system'; # Set default value if not provided
+    my $last_mod_date = DateTime->now->ymd;
     my $group_of_poster = $c->session->{roles} || 'default_group';
     my $project_id = $c->request->params->{project_id};
     my $manual_project_id = $c->request->params->{manual_project_id};
@@ -304,7 +303,7 @@ sub create :Local {
         sitename => $sitename,
         start_date => $start_date,
         parent_todo => $parent_todo,
-        due_date => $due_date,
+        due_date => $due_date, # Now using default value if not provided
         subject => $subject,
         description => $description,
         estimated_man_hours => $estimated_man_hours,

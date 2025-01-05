@@ -3,9 +3,9 @@
     [% PageVersion %]
 [% END %]
 
-<h2>Edit Log Entry</h2>
+<h2>Log Entry Details</h2>
 
-<form method="post" action="/log/update">
+<form method="post" action="[% c.uri_for('/log/update') %]" class="log-form">
     <input type="hidden" name="record_id" value="[% log.record_id %]">
 
     <label for="sitename">Site Name:</label><br>
@@ -51,5 +51,10 @@
     <label for="comments">Comments:</label><br>
     <textarea id="comments" name="comments" rows="4" cols="50">[% log.comments %]</textarea><br>
 
-    <input type="submit" value="Update">
+    <div class="form-actions">
+        <input type="submit" value="Update" class="btn btn-primary">
+        <button type="button" onclick="window.history.back()" class="btn btn-secondary">Cancel</button>
+    </div>
 </form>
+
+<link rel="stylesheet" href="/static/css/log.css">
