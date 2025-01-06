@@ -20,11 +20,13 @@ sub get_top_todos {
     # Get a DBIx::Class::ResultSet object for the 'Todo' table
     my $rs = $schema->resultset('Todo');
 
-    # Fetch the top 10 todos for the given site, ordered by priority and start_date
-    # Add a condition to only fetch todos where status is not 3
+    # Fix the order_by clause to use proper DBIC syntax
     my @todos = $rs->search(
         { sitename => $SiteName, status => { '!=' => 3 } },
-        { order_by => { -asc => [{ -numeric => 'priority' }, 'start_date'] }, rows => 10 }
+        { 
+            order_by => [ { -asc => 'priority' }, { -asc => 'start_date' } ],
+            rows => 10 
+        }
     );
 
     $self->logging->log_with_details($c, __FILE__, __LINE__, 'get_top_todos','Visited the todo page');

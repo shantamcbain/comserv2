@@ -147,7 +147,10 @@ sub details :Path('details') :Args(0) {
     my @todos = $schema->resultset('Todo')->search(
         { project_id => $project_id },
         { 
-            order_by => { -asc => 'me.start_date' },  # Explicitly reference the table
+            order_by => [
+                { -asc => 'me.priority' },
+                { -asc => 'me.start_date' }
+            ],
             prefetch => ['logs'],  # Prefetch related logs
             '+select' => ['logs.time'],
             '+as' => ['total_logged_time']

@@ -15,6 +15,11 @@ __PACKAGE__->add_columns(
     start_time => { data_type => 'time' },
     end_time => { data_type => 'time' },
     time => { data_type => 'time' },
+    status => { data_type => 'int' },
+    priority => { data_type => 'int' },
+    last_mod_by => { data_type => 'varchar', size => 255 },
+    last_mod_date => { data_type => 'date' },
+    group_of_poster => { data_type => 'varchar', size => 255 },  # Add the group_of_poster column
     comments => { data_type => 'text' },
 );
 

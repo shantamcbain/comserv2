@@ -263,10 +263,10 @@ sub create :Local {
     my $share = $c->request->params->{share} || 0;
     my $last_mod_by = $c->session->{username} || 'system'; # Set default value if not provided
     my $last_mod_date = DateTime->now->ymd;
+    my $date_time_posted = DateTime->now->strftime('%Y-%m-%d %H:%M:%S');
     my $group_of_poster = $c->session->{roles} || 'default_group';
-    my $project_id = $c->request->params->{project_id};
     my $manual_project_id = $c->request->params->{manual_project_id};
-    my $date_time_posted = $c->request->params->{date_time_posted};
+    my $project_id = $c->request->params->{project_id};
 
     # If manual_project_id is not empty, use it as the project ID
     my $selected_project_id = $manual_project_id ? $manual_project_id : $project_id;
