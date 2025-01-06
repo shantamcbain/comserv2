@@ -1,7 +1,7 @@
 [% PageVersion = 'log/index.tt,v 0.02 2024/01/28 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
-    [% PageVersion %]
 [% END %]
+    [% PageVersion %]
 
 <h2>Log Entry Details</h2>
 
@@ -32,6 +32,7 @@
     <label for="end_time">End Time:</label><br>
     <input type="time" id="end_time" name="end_time" value="[% log.end_time %]"><br>
 
+    <label for="group_of_poster">Group of Poster:</label><br>
     <input type="text" id="group_of_poster" name="group_of_poster" value="[% log.group_of_poster %]" readonly><br>
 
     <label for="priority">Priority:</label><br>

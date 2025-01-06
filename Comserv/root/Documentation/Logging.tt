@@ -28,3 +28,7 @@
     <li><strong>Modify:</strong> Updates a log record with new values.</li>
     <li><strong>Calculate Accumulative Time:</strong> Calculates total time from log entries for a specific todo.</li>
 </ul>
+<h2 id="priority-status">Priority and Status Fields</h2>
+<p>
+    The log details form has been updated to include the `priority` and `status` fields. These fields are now populated from the controller and displayed as drop-down lists in the form. The `priority` and `status` values are fetched from the database and passed to the template, ensuring that the form displays the correct options for these fields.
+</p>

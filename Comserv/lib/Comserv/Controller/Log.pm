@@ -75,12 +75,6 @@ sub index :Path('/log') :Args(0) {
 
 sub details :Path('/log/details') :Args(0) {
     my ($self, $c) = @_;
-    # Only handle JSON requests if explicitly requested
-    if ($c->req->headers->header('Accept') eq 'application/json') {
-        $c->stash->{current_view} = 'JSON';
-        $c->forward('handle_autocrud_request');
-        return;
-    }
 
     my $record_id = $c->request->body_parameters->{record_id};
     my $log = $c->model('DBEncy')->resultset('Log')->find($record_id);
@@ -88,12 +82,13 @@ sub details :Path('/log/details') :Args(0) {
     if ($log) {
         $c->stash(
             log => $log,
+            build_priority => $self->priority,
+            build_status => $self->status,
             template => 'log/details.tt'
         );
     }
     $c->forward($c->view('TT'));
 }
-
 sub update :Path('/log/update') :Args(0) {
     my ( $self, $c ) = @_;
 
