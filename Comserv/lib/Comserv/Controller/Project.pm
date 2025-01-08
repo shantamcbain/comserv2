@@ -59,7 +59,7 @@ sub create_project :Path('create_project') :Args(0) {
     my $username_of_poster = $c->session->{username};
     my $schema = $c->model('DBEncy');
     my $project_resultset = $schema->resultset('Project');
-    
+
     # Validate required session data
     unless ($c->session->{roles}) {
         $c->stash(
@@ -69,18 +69,32 @@ sub create_project :Path('create_project') :Args(0) {
         $c->forward($c->view('TT'));
         return;
     }
-    
+
     # Ensure roles is an array reference
     my $roles = $c->session->{roles};
     unless (ref $roles eq 'ARRAY') {
         $roles = [];  # Initialize as an empty array if not an array reference
     }
-    
+
     my $group_of_poster = join(',', @$roles);
     my $parent_id = $form_data->{parent_id};
     $parent_id = undef if $parent_id eq '';
     my $date_time_posted = DateTime->now;
     my $record_id = $form_data->{record_id} || 0;
+
+    # Validate required fields
+    my @required_fields = qw(client_name description developer_name name project_code sitename start_date status);
+    foreach my $field (@required_fields) {
+        unless (defined $form_data->{$field} && $form_data->{$field} ne '') {
+            $c->stash(
+                error_msg => "Field '$field' is required.",
+                form_data => $form_data,
+                template => 'todo/add_project.tt'
+            );
+            $c->forward($c->view('TT'));
+            return;
+        }
+    }
 
     my $project = eval {
         $project_resultset->create({

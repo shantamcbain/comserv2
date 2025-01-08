@@ -1,32 +1,31 @@
-
 [% PageVersion = 'coop/index.tt,v 0.01 2024/11/22 shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 [% USE Date %]
+
 <div class="container">
-    <header>
 
-        <p>Welcome to the admin support site for Monashee Coop in Lumby, BC.</p>
-        <p>Date: [% Date.format(Date.now, '%Y-%m-%d') %]</p>
-    </header>
-   <nav>
-
-            <a href="[% c.uri_for('Http://monasheecoop.com') %]">Main website.</a> |
-
-            <!-- Add more navigation links as needed -->
-
+    <nav>
+        <a href="[% c.uri_for('Http://monasheecoop.com') %]">Main website.</a> |
+        <!-- Add more navigation links as needed -->
     </nav>
-
-
-
-
     <main>
-        <h2>Admin Dashboard</h2>
-        <p>Use this dashboard to manage coop operations and support tasks.</p>
-        <!-- Add more content and functionality as needed -->
+        [% IF c.user.role == 'admin' %]
+            <h2>Admin Dashboard</h2>
+            <p>Use this dashboard to manage coop operations and support tasks.</p>
+            <div class="autocrud-controls">
+                <a href="[% c.uri_for('/admin/autocrud_list', 'documentation') %]" class="button">Edit Documentation</a>
+                <a href="[% c.uri_for('/admin/autocrud_list', 'user') %]" class="button">Manage Users</a>
+                <a href="[% c.uri_for('/admin/autocrud_list', 'ticket') %]" class="button">Manage Tickets</a>
+                <a href="[% c.uri_for('/admin/autocrud_list', 'comment') %]" class="button">Manage Comments</a>
+                <a href="[% c.uri_for('/admin/list_migrations') %]" class="button">Database Migrations</a>
+            </div>
+        [% ELSE %]
+            <h2>Support for the Website</h2>
+            <p>Please create an account and log in to access support features.</p>
+        [% END %]
     </main>
-
     <footer>
         <p>&copy; [% Date.format(Date.now, '%Y') %] Monashee Coop. All rights reserved.</p>
     </footer>
