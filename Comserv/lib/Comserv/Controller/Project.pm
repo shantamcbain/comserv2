@@ -26,12 +26,11 @@ sub add_project :Path('addproject') :Args(0) {
 
     # Sort projects alphabetically by name
     my @sorted_projects = sort { $a->{name} cmp $b->{name} } @$projects;
-    
-    Comserv::Util::Logging->instance->log_with_details($c, __FILE__, __LINE__, 'add_project', Dumper(\@sorted_projects));
 
     $c->stash->{projects} = \@sorted_projects;
 
     my $site_model = $c->model('Site');
+    #$c->log->debug("Current SiteName from session: " . $c->session->{SiteName});
     my $sites;
 
     # Fetch sites based on the current site name
@@ -42,9 +41,9 @@ sub add_project :Path('addproject') :Args(0) {
         $sites = [$site] if $site;
     }
 
-    $c->stash->{sites} = $sites;
-
     $c->stash(
+        sites => $sites,
+        current_site => $c->session->{SiteName},
         template => 'todo/add_project.tt'
     );
 
