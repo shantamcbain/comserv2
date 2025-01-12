@@ -16,24 +16,19 @@
 <form method="POST" action="/project/update_project">
     <input type="hidden" id="project_id" name="project_id" value="[% project.id %]">
     <label for="sitename">Site Name:</label><br>
-<select id="sitename" name="sitename" required>
-    [% FOREACH site IN sites %]
-
-        <option value="[% site.name %]" [% IF site.id == project.sitename OR site.id == session.SiteName %]selected[% END %]>[% site.name %]</option>
-
-    [% END %]
-</select>
-<button type="button" onclick="openAddSiteForm()">Add Site</button><br>
+       [% INCLUDE 'site_selection.tt' %]
 
     <label for="name">Project Name:</label><br>
     <input type="text" id="name" name="name" value="[% project.name %]" required><br>
+
 <label for="parent_id">Parent Project:</label><br>
 <select id="parent_id" name="parent_id">
-    <option value="[% project.parent_id %]">None</option> <!-- Change this line -->
-    [% FOREACH project IN projects %]
-        <option value="[% project.id %]">[% project.name %]</option>
+    <option value="" [% IF project.parent_id == '' OR project.parent_id == 0 %]selected[% END %]>None</option>
+    [% FOREACH proj IN projects %]
+        <option value="[% proj.id %]" [% IF proj.id == project.parent_id %]selected[% END %]>[% proj.name %]</option>
     [% END %]
 </select><br>
+
 
     <label for="description">Description:</label><br>
     <textarea id="description" name="description" required>[% project.description %]</textarea><br>

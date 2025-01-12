@@ -1,8 +1,6 @@
 [% META title = 'Add Project' %]
 
-
-
-[% PageVersion = 'todo/add_project.tt,v 0.02 2025/01/08 shanta Exp shanta ' %]
+[% PageVersion = 'todo/add_project.tt,v 0.03 2025/01/11 shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -14,17 +12,9 @@
   <!--  <p class="error">[% error_message %]</p> -->
 [% END %]
 
-
-
-
 <form method="POST" action="/project/create_project">
-    <label for="sitename">Site Name:</label><br>
-    <select id="sitename" name="sitename" required>
-    <option value="" disabled [% IF !form_data.sitename %]selected[% END %]>Select a site</option>
-    [% FOREACH site IN sites %]
-        <option value="[% site.name %]" [% IF site.name == form_data.sitename %]selected[% END %]>[% site.name %]</option>
-    [% END %]
-</select><br>
+    <!-- Include the site selection dropdown -->
+    [% INCLUDE 'site_selection.tt' %]
 
     <label for="name">Project Name:</label><br>
     <input type="text" id="name" name="name" value="[% form_data.name %]" required><br>
@@ -82,6 +72,7 @@
 
     <input type="submit" value="Add Project">
 </form>
+
 <script>
 function openAddSiteForm() {
     var url = window.location.origin + '/site/add_site_form';

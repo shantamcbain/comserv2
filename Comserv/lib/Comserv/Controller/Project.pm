@@ -4,6 +4,7 @@ use namespace::autoclean;
 use DateTime;
 use Data::Dumper;
 use Comserv::Util::Logging;
+use Comserv::Util::SiteHelper;
 use List::Util 'sum';
 BEGIN { extends 'Catalyst::Controller'; }
 has 'logging' => (
@@ -16,39 +17,31 @@ sub index :Path :Args(0) {
     $c->res->redirect($c->uri_for($self->action_for('project')));
 }
 
+use Comserv::Util::SiteHelper;
+
 sub add_project :Path('addproject') :Args(0) {
     my ( $self, $c ) = @_;
     $self->logging->log_with_details($c, __FILE__, __LINE__, 'add_project', 'Starting add_project action' );
     $c->session->{previous_url} = $c->req->referer;
-
     my $project_model = $c->model('Project');
     my $projects = $project_model->get_projects($c->model('DBEncy'), $c->session->{SiteName});
 
     # Sort projects alphabetically by name
     my @sorted_projects = sort { $a->{name} cmp $b->{name} } @$projects;
-
     $c->stash->{projects} = \@sorted_projects;
 
     my $site_model = $c->model('Site');
-    #$c->log->debug("Current SiteName from session: " . $c->session->{SiteName});
-    my $sites;
-
-    # Fetch sites based on the current site name
-    if (lc($c->session->{SiteName}) eq 'csc') {
-        $sites = $site_model->get_all_sites();
-    } else {
-        my $site = $site_model->get_site_details_by_name($c->session->{SiteName});
-        $sites = [$site] if $site;
-    }
+    my $sites = Comserv::Util::SiteHelper::get_sites($c, $site_model);
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'add_project', 'Current site: ' . $c->session->{SiteName});
 
     $c->stash(
         sites => $sites,
         current_site => $c->session->{SiteName},
         template => 'todo/add_project.tt'
     );
-
     $c->forward($c->view('TT'));
 }
+
 
 
 sub create_project :Path('create_project') :Args(0) {
@@ -193,17 +186,20 @@ sub editproject :Path('editproject') :Args(0) {
     my $project_id = $c->request->body_parameters->{project_id};
     my $project_model = $c->model('Project');
     my $project = $project_model->get_project($c->model('DBEncy'), $project_id);
-    my $projects = $project_model->get_projects($c->model('DBEncy'), $c->session->{SiteName});
-
-    $c->stash->{projects} = $projects;
-    $c->stash->{project} = $project;
+    my $site_model = $c->model('Site');
+    my $sites = Comserv::Util::SiteHelper::get_sites($c, $site_model);
 
     $c->stash(
+        projects => $project_model->get_projects($c->model('DBEncy'), $c->session->{SiteName}),
+        project => $project,
+        sites => $sites,
+        current_site => $c->session->{SiteName},
         template => 'todo/editproject.tt'
     );
 
     $c->forward($c->view('TT'));
 }
+
 
 sub update_project :Local :Args(0)  {
     my ( $self, $c ) = @_;
@@ -214,6 +210,9 @@ sub update_project :Local :Args(0)  {
     my $project = $project_resultset->find($project_id);
 
     if ($project) {
+        # Update the project, setting parent_id to undef if "None" is selected
+        my $parent_id = $form_data->{parent_id} eq '' ? undef : $form_data->{parent_id};
+
         $project->update({
             sitename => $form_data->{sitename},
             name => $form_data->{name},
@@ -227,13 +226,16 @@ sub update_project :Local :Args(0)  {
             developer_name => $form_data->{developer_name},
             client_name => $form_data->{client_name},
             comments => $form_data->{comments},
+            parent_id => $parent_id, # Correctly handle parent_id
         });
 
-        $c->res->redirect($c->uri_for($self->action_for('project')));
+        $c->flash->{success_message} = 'Project updated successfully';
+        $c->res->redirect($c->uri_for($self->action_for('details'), { project_id => $project_id }));
     } else {
-        $c->response->status(404);
-        $c->response->body('Project not found');
+        $c->flash->{error_message} = 'Project not found';
+        $c->res->redirect($c->uri_for($self->action_for('index')));
     }
 }
+
 __PACKAGE__->meta->make_immutable;
 1;

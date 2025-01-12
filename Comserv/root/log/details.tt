@@ -32,9 +32,8 @@
     <label for="end_time">End Time:</label><br>
     <input type="time" id="end_time" name="end_time" value="[% log.end_time %]"><br>
 
-    <label for="group_of_poster">Group of Poster:</label><br>
-    <input type="text" id="group_of_poster" name="group_of_poster" value="[% log.group_of_poster %]" readonly><br>
-
+<label for="group_of_poster">Group of Poster:</label><br>
+<input type="text" id="group_of_poster" name="group_of_poster" value="[% log.group_of_poster %]"><br>
     <label for="priority">Priority:</label><br>
     <select id="priority" name="priority">
         [% FOREACH key IN build_priority.keys.sort %]
