@@ -1,11 +1,10 @@
-# the ENCY template
-#	$Id: BotanicalNameView.ttml,v 1.2 2011/09/21 19:25:15 shanta Exp $
-#file location/cgi-bin/HTMLTemplates/ENCY
-[% ViewVersion = 'v 1.22 2025/01/12 /cgi-bin/HTMLTemplates/ENCY/BotanicalNameView.ttml,'%]
-[%
+
+[% ViewVersion = 'v 1.23 2025/01/14 /cgi-bin/HTMLTemplates/ENCY/BotanicalNameView.ttml,'%]
 
 
-%]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
 
 
 

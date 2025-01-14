@@ -1,7 +1,8 @@
 [% PageVersion = 'log/index.tt,v 0.02 2024/01/28 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
-[% END %]
     [% PageVersion %]
+[% END %]
+
 
 <h2>Log Entry Details</h2>
 
