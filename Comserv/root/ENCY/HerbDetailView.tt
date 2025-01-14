@@ -1,4 +1,9 @@
-<h1>[% herb.botanical_name %]</h1>
+
+[% PageVersion = 'ency/HerbDetail.tt,v 0.01 2025/01/12 shanta Exp shanta ' %]
+[%# PageVersion = 'pagetop.tt,v 0.02 2023/08/30 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+ [% END %]<h1>[% herb.botanical_name %]</h1>
 <p>Common Names: [% herb.common_names %]</p>
 <img src="[% herb.image %]" WIDTH="300" HEIGHT="325" />
 <p>Pollinator Forage [% herb.apis %]
@@ -28,3 +33,7 @@
 <p>Non Med [% herb.non_med %]</p>
 <p>History [% herb.history %] </p>
 <p>Reference [% herb.reference %]</p>
+<!-- Display the Add Herb button only for admin users -->
+[% IF user.role == 'admin' %]
+    <button onclick="window.location.href='/ENCY/add_herb';">Add Herb</button>
+[% END %]

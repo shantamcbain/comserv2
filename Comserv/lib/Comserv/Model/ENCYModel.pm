@@ -22,7 +22,12 @@ sub COMPONENT {
     return $class->new({ %$args, ency_schema => $ency_schema, forager_schema => $forager_schema });
 }
 
-
+# Method to add a new herb record
+sub add_herb {
+    my ($self, $herb_data) = @_;
+    my $herb_rs = $self->forager_schema->resultset('Herb');
+    return $herb_rs->create($herb_data);
+}
 
 sub get_reference_by_id {
     my ($self, $id) = @_;
