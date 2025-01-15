@@ -22,6 +22,13 @@ sub COMPONENT {
     return $class->new({ %$args, ency_schema => $ency_schema, forager_schema => $forager_schema });
 }
 
+# Method to add a new herb to the forager database
+sub add_herb {
+    my ($self, $herb_data) = @_;
+    # Logic to save the herb data to the database
+    $self->forager_schema->resultset('Herb')->create($herb_data);
+}
+
 
 
 sub get_reference_by_id {
