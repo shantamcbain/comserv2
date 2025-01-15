@@ -30,9 +30,9 @@ The BeePastureView give a current list of all the plants that are used by pollin
 
 <p>The 'searchHerbs' function in the 'Comserv/lib/Comserv/Model/DBForager.pm' file has been updated to improve the search functionality in the BMaster system. The function now uses normalized field names that match the field names in the database and the view. It also stores all debug messages in an array and puts that array into the stash, allowing all debug messages to be passed to the template and displayed in the browser. In the case where no records are returned from the search, a specific debug message stating "No results found" is added to the debug messages array.</p>
 
-<h3 id="Controller"><a href="#top">Back to top</a> </h3>
+<h3 id="Controller"><a href="#BMaster_top">Back to top BMaster</a> </h3>
 [% INCLUDE 'Documentation/BMasterController.tt' %]
-<h3 id="Model"><a href="#top">Back to top</a> </h3>
+<h3 id="Model"><a href="#BMaster_top">Back to top BMaster</a> </h3>
 [% INCLUDE 'Documentation/BMaserModel.tt' %]
-<h3 id="Model"><a href="#top">Back to top</a> </h3>
+<h3 id="Model"><a href="#BMaster_top">Back to top BMaster</a> </h3>
 [% INCLUDE 'Documentation/Queens.tt' %]

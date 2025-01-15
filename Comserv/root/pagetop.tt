@@ -1,12 +1,14 @@
 [% PageVersion = 'pagetop.tt,v 0.021 2024/01/01 shanta Exp shanta ' %]
 [%# PageVersion = 'pagetop.tt,v 0.02 2023/08/30 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
-
     [% PageVersion %]
     [%# "Debugging HostName: " _ HostName %]
-<!-- Include the unified message template -->
-    [% INCLUDE 'messages.tt' %]
     [% INCLUDE 'debug.tt' %]
+[% IF c.stash.debug_msg %]
+    [% FOREACH msg IN c.stash.debug_msg %]
+        <p class="debug">Debug: [% msg %]</p>
+    [% END %]
+[% END %]
 
 [% END %]
 <header>
@@ -23,11 +25,16 @@
             [% INCLUDE 'Navigation/TopDropListHosted.tt' %]
             [% INCLUDE 'Navigation/TopDropListMember.tt' %]
         [% IF c.session.roles == "admin" %]
-        [% END %]
             [% INCLUDE 'Navigation/admintopmenu.tt' %]
+        [% END %]
 
         [% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]
         </ul>
     </nav>
 </header>
-
+[% IF error_msg %]
+    <p>Error: [% error_msg %]</p>
+[% END %]
+[% IF success_msg %]
+    <p>Error: [% success_msg %]</p>
+[% END %]

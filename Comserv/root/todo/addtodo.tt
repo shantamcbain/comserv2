@@ -1,7 +1,7 @@
-[% PageVersion	= 'addtodo.tt,v 0.02 2023/11/28shanta Exp shanta '	%]
+[% PageVersion = 'addtodo.tt,v 0.02 2023/11/28shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
- [%	PageVersion %]
- [% END %]
+ [% PageVersion %]
+[% END %]
 
 <form action="/todo/create" method="post">
 
@@ -11,14 +11,32 @@
     </div>
 
     <div>
-    <label for="start_date">Start Date:</label>
-    <input type="date" id="start_date" name="start_date" value="[% start_date OR '' %]">
-</div>
-    <div>
-    [% INCLUDE 'todo/project_list.tt' %]
+        <label for="start_date">Start Date:</label>
+        <input type="date" id="start_date" name="start_date" value="[% start_date OR '' %]">
+    </div>
 
-<label for="manual_project_id">Manual Project ID:</label>
-<input type="text" id="manual_project_id" name="manual_project_id">
+    <div>
+        <label for="parent_id">Parent Project:</label><br>
+        <select id="parent_id" name="parent_id" onchange="document.getElementById('manual_project_id').value = this.value;">
+            <option value="">None</option>
+            <!-- Include the project list as options -->
+            [% FOREACH project IN projects %]
+                [% IF !project.parent_id %]
+                    <option value="[% project.id %]" [% IF project.id == project_id %]selected[% END %]>[% project.name %]</option>
+                    <!-- Display the list of sub-projects -->
+                    [% IF project.sub_projects.size %]
+                        [% FOREACH sub_project IN project.sub_projects %]
+                            <option value="[% sub_project.id %]" [% IF sub_project.id == project_id %]selected[% END %]>--- [% sub_project.name %]</option>
+                        [% END %]
+                    [% END %]
+                [% END %]
+            [% END %]
+        </select><br>
+    </div>
+
+    <div>
+        <label for="manual_project_id">Manual Project ID:</label>
+        <input type="text" id="manual_project_id" name="manual_project_id" value="[% project_id OR '' %]">
     </div>
 
     <div>
@@ -36,7 +54,6 @@
         <textarea id="description" name="description">[% todo.description OR '' %]</textarea>
     </div>
 
-
     <div>
         <label for="estimated_man_hours">Estimated Man Hours:</label>
         <select id="estimated_man_hours" name="estimated_man_hours">
@@ -46,14 +63,12 @@
         </select>
     </div>
 
-
     <div>
         <label for="accumulative_time">Accumulative Time:</label>
         <input type="number" id="accumulative_time" name="accumulative_time" value="[% todo.accumulative_time OR '' %]">
     </div>
 
-
-   <div>
+    <div>
         <label for="status">Status:</label>
         <select id="status" name="status">
             <option value="1" [% IF todo.status == 'NEW' %]selected[% END %]>NEW</option>
@@ -61,6 +76,7 @@
             <option value="3" [% IF todo.status == 'DONE' %]selected[% END %]>DONE</option>
         </select>
     </div>
+
     <div>
         <label for="priority">Priority:</label>
         <select id="priority" name="priority">
@@ -88,18 +104,18 @@
         <input type="date" id="last_mod_date" name="last_mod_date" value="[% todo.last_mod_date OR '' %]">
     </div>
 
+
 <div>
-    <label for="group_of_poster">Group of Poster:</label>
-    <input type="text" id="group_of_poster" name="group_of_poster" value="[% todo.group_of_poster OR session.group_of_poster OR '' %]">
+    <label for="user_id">User ID:</label>
+    <select id="user_id" name="user_id">
+        [% FOREACH user IN users %]
+            <!-- Use user_id from the stash to set the selected option -->
+            <option value="[% user.id %]" [% IF user.id == user_id %]selected[% END %]>[% user.username %]</option>
+        [% END %]
+    </select>
 </div>
-    <div>
-        <label for="user_id">User ID:</label>
-        <select id="user_id" name="user_id">
-            [% FOREACH user IN users %]
-                <option value="[% user.id %]" [% IF user.id == todo.user_id %]selected[% END %]>[% user.username %]</option>
-            [% END %]
-        </select>
-    </div>
+
+
 
     <div>
         <input type="submit" value="Submit">

@@ -1,3 +1,4 @@
+
 package Comserv::Controller::BMaster;
 use Moose;
 use namespace::autoclean;
@@ -6,14 +7,22 @@ use DateTime::Event::Recurrence;
 use Comserv::Model::BMasterModel;
 use Comserv::Model::DBForager;
 BEGIN { extends 'Catalyst::Controller'; }
+has 'logging' => (
+    is => 'ro',
+    default => sub { Comserv::Util::Logging->instance }
+);
+
 sub base :Chained('/') :PathPart('BMaster') :CaptureArgs(0) {
     my ($self, $c) = @_;
     # This will be the root of the chained actions
     # You can put common setup code here if needed
 }
+
 sub index :Chained('base') :Path('') :Args(0) {
 
     my ( $self, $c ) = @_;
+       $c->session->{MailServer} = "http://webmail.beemaster.ca";
+
     $c->stash(template => 'BMaster/BMaster.tt');
     $c->forward($c->view('TT'));
 }

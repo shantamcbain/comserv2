@@ -2,30 +2,28 @@ package Comserv::Controller::User;
 use Moose;
 use namespace::autoclean;
 use Digest::SHA qw(sha256_hex);  # For hashing passwords
-use MIME::Base64 qw(encode_base64url decode_base64url);  # Import the necessary module
 use Data::Dumper;
 use Email::Sender::Simple qw(sendmail);
 use Email::Simple;
 use Email::Simple::Creator;
-use Email::Sender::Transport::SMTP qw();
-
+use Email::Sender::Transport::SMTP;
 BEGIN { extends 'Catalyst::Controller'; }
-
 sub base :Chained('/') :PathPart('user') :CaptureArgs(0) {
     my ( $self, $c ) = @_;
     # This will capture /user in the URL
 }
 
-sub login :Chained('base') :PathPart('login') :Args(0) {
+sub login :Local {
     my ($self, $c) = @_;
+   # Store the referrer URL and form data in the session
+    $c->session->{referer} = $c->req->header('referer');
+    $c->session->{form_data} = $c->req->body_params;
 
-    # Handle the login functionality here
-    # For example, you can check the user's credentials and start a session
-
-    # Set the template for the login page
+    # Display the login form
     $c->stash(template => 'user/login.tt');
-}
+    $c->forward($c->view('TT'));
 
+}
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
 
@@ -50,6 +48,9 @@ sub do_login :Local {
     my $username = $c->request->params->{username};
     my $password = $c->request->params->{password};
 
+    # Debugging: Print login attempt
+    print "Attempting login for: $username\n";
+
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
 
@@ -66,125 +67,187 @@ sub do_login :Local {
         # Compare the hashed password with the one stored in the database
         if ($hashed_password eq $user->password) {
             # The passwords match, so the login is successful
-            # Store the user's roles in the session
+            print "Login successful for: $username\n";
+
+            # Store the user's roles and other details in the session
             $c->session->{roles} = $user->roles;
             $c->session->{username} = $user->username;
             $c->session->{first_name} = $user->first_name;
             $c->session->{last_name} = $user->last_name;
             $c->session->{email} = $user->email;
+            $c->session->{user_id} = $user->id;  # Store user_id in the session
 
             # Store the user object in the session
             $c->set_authenticated(Comserv::Model::User->new(_user => $user));
 
-            # Place the user's roles in the stash
-            $c->stash->{roles} = $user->roles;
-
             # Retrieve the referrer URL and form data from the session
-            my $referer = $c->session->{referer} || $c->uri_for('/');  # Default to home if no referrer
+            my $referer = $c->session->{referer};
+            my $form_data = $c->session->{form_data};
 
             # Redirect to the previous page
             $c->res->redirect($referer);
-            return;
         } else {
             # The passwords don't match, so the login is unsuccessful
-            $c->stash->{error_msg} = 'Invalid password';
+            print "Invalid password for: $username\n";
+            $c->stash(template => 'user/login.tt', error => 'Invalid username or password');
+            $c->forward($c->view('TT'));
         }
     } else {
         # The user was not found in the database
-        $c->stash->{error_msg} = 'Invalid username';
+        print "User not found: $username\n";
+        $c->stash(template => 'user/login.tt', error => 'Invalid username or password');
+        $c->forward($c->view('TT'));
     }
-
-    # If we reach here, authentication failed, so display the login form again
-    $c->stash(template => 'user/login.tt');
-    $c->forward($c->view('TT'));
 }
 
 sub hash_password {
     my ($self, $password) = @_;
     return sha256_hex($password);
 }
-
-sub create_account :Local {
-    my ($self, $c) = @_;
-
-    # Display the account creation form
-    $c->stash(template => '/user/create_account.tt');
-}
-
 sub do_create_account :Local {
     my ($self, $c) = @_;
 
-    # Retrieve form data
-    my $email = $c->request->params->{email};
+    # Retrieve the form data
+    my $username = $c->request->params->{username};
+    my $password = $c->request->params->{password};
+    my $password_confirm = $c->request->params->{password_confirm};
     my $first_name = $c->request->params->{first_name};
     my $last_name = $c->request->params->{last_name};
-    my $password = $c->request->params->{password};
-    my $username = $c->request->params->{username};
+    my $email = $c->request->params->{email};
 
-    # Debug: Print form data
-    $c->log->debug("Form data: email=$email, first_name=$first_name, last_name=$last_name, password=$password, username=$username");
+    # Initialize an error hash
+    my %errors;
 
-    # Check if first_name is defined
-    if (!defined $first_name || $first_name eq '') {
-        $c->stash->{error_msg} = "First name is required. Received values: email=$email, first_name=$first_name, last_name=$last_name, password=$password, username=$username";
-        $c->stash(template => 'user/register.tt');
+    # Check if all required fields are present
+    unless ($username && $password && $password_confirm && $first_name && $last_name && $email) {
+        $errors{general} = 'All fields are required';
+    }
+
+    # Check if the password and confirmation password match
+    if ($password ne $password_confirm) {
+        $errors{password} = 'Passwords do not match';
+    }
+
+    # Validate email format
+    unless ($email =~ /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/) {
+        $errors{email} = 'Invalid email format';
+    }
+
+    # Get a DBIx::Class::Schema object
+    my $schema = $c->model('DBEncy');
+
+    # Get a DBIx::Class::ResultSet object
+    my $rs = $schema->resultset('User');
+
+    # Check if the username is already taken
+    if ($rs->find({ username => $username })) {
+        $errors{username} = 'Username is already taken';
+    }
+
+    # If there are any errors, set them in the stash and return
+    if (%errors) {
+        $c->stash(
+            template => 'user/register.tt',
+            errors   => \%errors,
+            username => $username,
+            email    => $email,
+            first_name => $first_name,
+            last_name  => $last_name,
+        );
         $c->forward($c->view('TT'));
         return;
     }
 
-    # Insert user into the database
-    eval {
-        # Call the create_user subroutine from the User model
-        my $user_model = $c->model('User');
-        die "User model not found" unless $user_model;
+    # Hash the password
+    my $hashed_password = $self->hash_password($password);
 
-        $user_model->create_user({
-            email      => $email,
+    # Create a new user in the database
+    my $user;
+    eval {
+        $user = $rs->create({
+            username   => $username,
+            password   => $hashed_password,
             first_name => $first_name,
             last_name  => $last_name,
-            password   => $password,
-            username   => $username,
+            email      => $email,
+            roles      => 'normal',
         });
-
-    # Email sending logic
-    my $email = Email::Simple->create(
-        header => [
-            To      => '$email',
-            From    => 'admin@computersystemconsulting.ca',
-            Subject => 'Welcome!',
-        ],
-        body => 'Welcome to our service!',
-    );
-
-        # Send email to admin
-        my $email = Email::Simple->create(
-            header => [
-                To      => 'shanta@computersystemconsulting.ca',
-                From    => 'noreply@computersystemconsulting.ca',
-                Subject => 'New User Registration',
-            ],
-            body => "A new user has registered with the username: $username",
-        );
-      my $transport = Email::Sender::Transport::SMTP->new({
-        host => 'localhost',
-        port => 25,
-    });
-
     };
+
     if ($@) {
-        $c->stash->{error_msg} = "Failed to create user: $@. Received values: email=$email, first_name=$first_name, last_name=$last_name, password=$password, username=$username";
-        $c->stash(template => 'user/register.tt');
-    } else {
-        $c->stash->{success_msg} = "User created successfully.";
-        $c->response->redirect($c->uri_for('/user/login'));
+        warn "Error creating user: $@";
+        $c->stash(template => 'user/register.tt', error => "An error occurred while creating the account: $@");
+        $c->forward($c->view('TT'));
         return;
     }
 
-    # Forward to the view
-    $c->forward($c->view('TT'));
+    # Debugging: Confirm user creation
+    print "User created: " . Dumper($user);
+
+    # Retrieve email addresses from the stash
+    my $admin_email = $c->stash->{mail_to_admin};
+    my $user_email = $email;
+    my $mail_from = $c->stash->{mail_from};
+
+    # Send welcome email to the user
+    my $user_email_obj = Email::Simple->create(
+        header => [
+            To      => $user_email,
+            From    => $mail_from,
+            Subject => "Welcome to the Application",
+        ],
+        body => "Hello $first_name,\n\nWelcome to our application! Your account has been successfully created.\n\nBest regards,\nThe Team",
+    );
+
+    eval { sendmail($user_email_obj) };
+    if ($@) {
+        warn "Failed to send email to user: $@";
+    }
+
+    # Send notification email to the admin
+    my $admin_email_obj = Email::Simple->create(
+        header => [
+            To      => $admin_email,
+            From    => $mail_from,
+            Subject => "New User Account Created",
+        ],
+        body => "A new user account has been created for $first_name $last_name ($username).",
+    );
+
+    eval { sendmail($admin_email_obj) };
+    if ($@) {
+        warn "Failed to send email to admin: $@";
+    }
+
+    # Set a success message in the session
+    $c->session->{success_msg} = "Welcome, $first_name! Your account has been created successfully. Please log in.";
+
+    # Redirect to the welcome page
+    $c->res->redirect($c->uri_for('/user/welcome'));
 }
 
-sub list_users :Chained('base') :PathPart('list_users') :Args(0) {
+sub logout :Local {
+    my ($self, $c) = @_;
+
+    # Remove specific user information from the session
+    delete $c->session->{roles};
+    delete $c->session->{username};
+    delete $c->session->{first_name};
+    delete $c->session->{last_name};
+    delete $c->session->{email};
+    delete $c->session->{user_id};
+
+    # Clear the entire session
+    $c->logout;
+
+    # Retrieve the referrer URL from the session
+    my $referer = $c->session->{referer} || $c->uri_for('/'); # Default to home if no referrer
+
+    # Redirect to the referrer URL
+    $c->res->redirect($referer);
+}
+
+sub list_users :Local :Args(0) {
     my ($self, $c) = @_;
 
     # Fetch the list of users and pass it to the view
@@ -194,10 +257,11 @@ sub list_users :Chained('base') :PathPart('list_users') :Args(0) {
     # Display the list of users
     $c->stash(template => 'user/list_users.tt');
 }
+sub edit_user :Local :Args(1) {
+    my ($self, $c) = @_;
 
-
-sub load_user :Chained('base') :PathPart('edit_user') :CaptureArgs(1) {
-    my ($self, $c, $user_id) = @_;
+    # Retrieve the user ID from the URL
+    my $user_id = $c->request->arguments->[0];
 
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
@@ -211,20 +275,14 @@ sub load_user :Chained('base') :PathPart('edit_user') :CaptureArgs(1) {
     if ($user) {
         # The user was found, so store the user object in the stash
         $c->stash(user => $user);
+
+        # Set the template for the response
+        $c->stash(template => 'user/edit_user.tt');
     } else {
         # The user was not found, so display an error message
         $c->response->body('User not found');
-        $c->detach();
     }
 }
-
-sub edit_user :Chained('load_user') :PathPart('') :Args(0) {
-    my ($self, $c) = @_;
-
-    # Set the template for the response
-    $c->stash(template => 'user/edit_user.tt');
-}
-
 sub do_edit_user :Local :Args(1) {
     my ($self, $c) = @_;
 
@@ -244,22 +302,17 @@ sub do_edit_user :Local :Args(1) {
         # The user was found, so retrieve the form data
         my $form_data = $c->request->body_parameters;
 
+        # Print the form data
+        print "Form data: " . Dumper($form_data);
+
         # Update the user record with the new data
-        my %update_data = (
+        $user->update({
             username   => $form_data->{username},
             first_name => $form_data->{first_name},
             last_name  => $form_data->{last_name},
             email      => $form_data->{email},
             roles      => $form_data->{roles},
-        );
-
-        # Check if the password field is provided and not empty
-        if ($form_data->{password}) {
-            # Hash the new password before storing it
-            $update_data{password} = sha256_hex($form_data->{password});
-        }
-
-        $user->update(\%update_data);
+        });
 
         # Redirect the user back to the list of users
         $c->response->redirect($c->uri_for($self->action_for('list_users')));
@@ -268,85 +321,21 @@ sub do_edit_user :Local :Args(1) {
         $c->response->body('User not found');
     }
 }
-sub change_password_request :Path('/user/change_password_request') :Args(0) {
-    my ($self, $c) = @_;
-    $c->stash(template => 'user/change_password_request.tt');
-}
-
-sub do_change_password_request :Path('/user/do_change_password_request') :Args(0) {
-    my ($self, $c) = @_;
-    my $username = $c->request->params->{username};
-    my $user = $c->model('DBEncy::User')->find({ username => $username });
-
-    if ($user) {
-        my $token = $self->generate_token($user->id);
-        my $change_password_url = $c->uri_for('/user/change_password', { token => $token });
-
-        my $subject = 'Password Change Request';
-        my $body = "Click the following link to change your password: $change_password_url";
-
-        if ($c->model('Mail')->send_email($user->email, $subject, $body)) {
-            $c->stash->{success_msg} = 'An email has been sent with instructions to change your password.';
-        } else {
-            $c->stash->{error_msg} = 'Failed to send email. Please try again later.';
-        }
-    } else {
-        $c->stash->{error_msg} = 'Username not found.';
-    }
-
-    $c->stash(template => 'user/change_password_request.tt');
-}
-
-
-sub change_password :Path('/user/change_password') :Args(0) {
-    my ($self, $c) = @_;
-    my $token = $c->request->params->{token};
-    my $user_id = $self->validate_token($token);
-
-    if ($user_id) {
-        $c->stash(user_id => $user_id, template => 'user/change_password.tt');
-    } else {
-        $c->stash->{error_msg} = 'Invalid or expired token.';
-        $c->stash(template => 'user/change_password_request.tt');
-    }
-}
-
-sub do_change_password :Path('/user/do_change_password') :Args(0) {
-    my ($self, $c) = @_;
-    my $user_id = $c->request->params->{user_id};
-    my $new_password = $c->request->params->{password};
-
-    my $user = $c->model('DBEncy::User')->find($user_id);
-
-    if ($user) {
-        $user->update({ password => sha256_hex($new_password) });
-        $c->stash->{success_msg} = 'Password changed successfully. Please log in with your new password.';
-        $c->response->redirect($c->uri_for('/user/login'));
-    } else {
-        $c->stash->{error_msg} = 'User not found.';
-        $c->stash(template => 'user/change_password.tt');
-    }
-}
-
-sub generate_token {
-    my ($self, $user_id) = @_;
-    return encode_base64url($user_id . ':' . time);
-}
-
-sub validate_token {
-    my ($self, $token) = @_;
-    my ($user_id, $timestamp) = split(':', decode_base64url($token));
-    return $user_id if $timestamp > time - 3600;
-    return;
-}
-
-
 sub register :Local {
     my ($self, $c) = @_;
 
     # Display the registration form
     $c->stash(template => 'user/register.tt');
 }
+sub welcome :Local {
+    my ($self, $c) = @_;
+
+    # Display the welcome page
+    $c->stash(template => 'user/welcome.tt');
+    $c->forward($c->view('TT'));
+}
+sub forgot_password :Local {
+    my ($self, $c) = @_;}
 
 __PACKAGE__->meta->make_immutable;
 

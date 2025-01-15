@@ -7,6 +7,8 @@ BEGIN { extends 'Catalyst::Controller'; }
 
 sub index :Path('/ENCY') :Args(0) {
     my ( $self, $c ) = @_;
+       $c->session->{MailServer} = "http://webmail.usbm.ca";
+
     # The index action will display the 'index.tt' template
     $c->stash(template => 'ENCY/index.tt');
 }

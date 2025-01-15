@@ -1,48 +1,47 @@
-<h1>Stash Information</h1>
-<h2>Last Error</h2>
-<p>[% session.last_error OR 'No errors' %]</p>
-<h2>DBI Connection Status</h2>
-<p>[% session.dbi_connected ? 'Connected' : 'Not connected' %]
-</p>
-<h3>Stash Values.</h3><table>
-    <tr>
-        <th>Variable</th>
-        <th>Value</th>
-    </tr>
-   [% FOREACH key IN c.stash.keys.sort %]
-<tr>
-    <td>[% key %]</td>
-    <td>
-        [%# Check if the stash variable is an array reference %]
-        [% IF ref(c.stash.$key) == 'ARRAY' %]
-            [%# Use Dumper to display the contents of the array %]
-            [% Dumper(c.stash.$key) | html %]
-        [% ELSE %]
-            [% c.stash.$key | html %]
+[% META title = 'Projects Documentation' %]
+[% PageVersion = 'Documentation/Projects.tt,v 0.01 2024/05/28 Shanta Exp shanta ' %]Debug Information
+
+
+Debug Errors
+
+[% IF c.stash.debug_errors %]
+    <h2>Debugging Information</h2>
+    <ul>
+        <!-- Iterate over each error and display it in a list item -->
+        [% FOREACH error IN c.stash.debug_errors %]
+            <li>[% error | html %]</li>
         [% END %]
-    </td>
-</tr>
+    </ul>
+[% ELSE %]
+    <p>No debug errors.</p>
 [% END %]
-</table>
-[% USE Dumper %]
-<h1>Session Information</h1>
-<table>
-    <tr>
-        <th>Variable</th>
-        <th>Value</th>
-    </tr>
+
+<h2>Stash Information</h2>
+<ul>
+    <!-- Iterate over each key in the stash and display its value -->
+    [% FOREACH key IN c.stash.keys.sort %]
+        <li>
+            <strong>[% key %]:</strong>
+            [% IF ref(c.stash.$key) == 'ARRAY' %]
+                [% Dumper(c.stash.$key) | html %]
+            [% ELSE %]
+                [% c.stash.$key | html %]
+            [% END %]
+        </li>
+    [% END %]
+</ul>
+
+<h2>Session Information</h2>
+<ul>
+    <!-- Iterate over each key in the session and display its value -->
     [% FOREACH key IN c.session.keys.sort %]
-    <tr>
-        <td>[% key %]</td>
-        <td>
-            [%# Check if the session variable is an array reference %]
+        <li>
+            <strong>[% key %]:</strong>
             [% IF ref(c.session.$key) == 'ARRAY' %]
-                [%# Use Dumper to display the contents of the array %]
                 [% Dumper(c.session.$key) | html %]
             [% ELSE %]
                 [% c.session.$key | html %]
             [% END %]
-        </td>
-    </tr>
+        </li>
     [% END %]
-</table>
+</ul>

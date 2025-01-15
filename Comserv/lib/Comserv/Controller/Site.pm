@@ -1,23 +1,44 @@
+
 package Comserv::Controller::Site;
 use Moose;
 use namespace::autoclean;
-
+use Comserv::Util::Logging;
 BEGIN { extends 'Catalyst::Controller'; }
 # In your controller or script file
 use Try::Tiny;
 use Comserv::Model::Site;
-
-
-
+has 'logging' => (
+    is => 'ro',
+    default => sub { Comserv::Util::Logging->instance }
+);
 sub index :Path :Args(0) {
     my ( $self, $c ) = @_;
-# Get a DBIx::Class::Schema object
-my $schema = $c->model('DBEncy');
 
-# Create a new Comserv::Model::Site object
-my $site_model = Comserv::Model::Site->new(schema => $schema);
-   # Get all sites
-    my $sites = $c->model('Site')->get_all_sites();
+    # Log entry into the index method
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'index', 'Enter in index');
+
+    # Get the current site name from the session
+    my $current_site_name = $c->session->{SiteName};
+
+    # Log the current site name
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'index',"Got current site name $current_site_name");
+
+    # Get a DBIx::Class::Schema object
+    my $schema = $c->model('DBEncy');
+
+    # Create a new Comserv::Model::Site object
+    my $site_model = Comserv::Model::Site->new(schema => $schema);
+
+    # Determine which sites to fetch based on the current site name
+    my $sites;
+    if (lc($current_site_name) eq 'csc') {
+        # If the current site is 'csc', fetch all sites
+        $sites = $site_model->get_all_sites();
+    } else {
+        # Otherwise, fetch only the current site
+        my $site = $site_model->get_site_details_by_name($current_site_name);
+        $sites = [$site] if $site;
+    }
 
     # Pass the sites to the template
     $c->stash->{sites} = $sites;
@@ -25,6 +46,8 @@ my $site_model = Comserv::Model::Site->new(schema => $schema);
     # Set the template to site/index.tt
     $c->stash(template => 'site/index.tt');
 }
+
+
 sub add_site :Local {
     my ($self, $c) = @_;
 
@@ -97,6 +120,41 @@ sub details :Local {
     # Set the template to site/details.tt
     $c->stash(template => 'site/details.tt');
 }
+
+# Add the new method to handle adding a domain
+sub add_domain :Local {
+    my ($self, $c) = @_;
+
+    # Get the site_id from the request parameters
+    my $site_id = $c->request->parameters->{site_id};
+
+    # Get the new_domain from the request parameters
+    my $new_domain = $c->request->parameters->{new_domain};
+
+    # Check if the new_domain is defined and not empty
+    if (defined $new_domain && $new_domain ne '') {
+        # Create a new record in the SiteDomain table
+        my $site_domain = $c->model('DBEncy::SiteDomain')->create({
+            site_id => $site_id,
+            domain => $new_domain,
+        });
+
+        # Fetch the newly created site domain
+        my $new_domain_record = $c->model('Site')->get_site_domain($new_domain);
+
+        # Pass the new domain to the template
+        $c->stash->{new_domain} = $new_domain_record;
+
+        # Redirect the user back to the site details page
+        # Pass the site ID to ensure the correct details page is loaded
+        $c->res->redirect($c->uri_for($self->action_for('details'), { id => $site_id }));
+    } else {
+        # Handle the error case where the domain is not provided
+        $c->flash->{error} = 'Domain cannot be empty';
+        $c->res->redirect($c->uri_for($self->action_for('details'), { id => $site_id }));
+    }
+}
+
 sub get_site_domain {
     my ($self, $domain) = @_;
     return $self->resultset('SiteDomain')->find({ domain => $domain });
@@ -106,6 +164,14 @@ sub get_site_details {
     my ($self, $site_id) = @_;
     return $self->resultset('Site')->find({ id => $site_id });
 }
+
+sub delete_domain :Local {
+    my ($self, $c) = @_;
+    my $domain_id = $c->request->parameters->{domain_id};
+    $c->model('DBEncy::SiteDomain')->find($domain_id)->delete;
+    $c->res->redirect($c->uri_for($self->action_for('details'), [$c->request->parameters->{site_id}]));
+}
+
 sub modify :Local {
     my ($self, $c) = @_;
 

@@ -1,5 +1,6 @@
 package Comserv::Model::Schema::Ency::Result::Todo;
 use base 'DBIx::Class::Core';
+use warnings FATAL => 'all';
 
 __PACKAGE__->table('todo');
 __PACKAGE__->add_columns(

@@ -1,4 +1,4 @@
-[% META title = 'Project Success' %]
+[% META title = 'Project Details' %]
 [% PageVersion = 'todo/projectdetails.tt,v 0.01 2024/03/15 shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
         [% PageVersion %]
@@ -27,6 +27,23 @@
     <li>Date Time Posted: [% project.date_time_posted %]</li>
 </ul>
 
+<!-- List of Todos associated with the project -->
+<!-- List of Todos associated with the project -->
+<h2>Todos for this Project</h2>
+<ul>
+    [% FOREACH todo IN todos %]
+        <li>
+            <strong>Subject:</strong> [% todo.subject %] <br>
+            <strong>Description:</strong> [% todo.description OR 'No description' %] <br>
+            <strong>Start Date:</strong> [% todo.start_date %] <br>
+            <strong>Due Date:</strong> [% todo.due_date %] <br>
+            <strong>Status:</strong> [% todo.status %] <br>
+            <strong>Priority:</strong> [% todo.priority %]
+        </li>
+    [% END %]
+</ul>
+
+
 <!-- Button to go back to the project list -->
 <button type="button" onclick="window.location.href='/project';">Back to Projects</button>
 
@@ -35,3 +52,17 @@
     <input type="hidden" name="project_id" value="[% project.id %]">
     <button type="submit">Edit Project [% project.id %]</button>
 </form>
+<!-- Button to add a sub-project for this project -->
+<!-- This button redirects to the add_project page with the current project ID as the parent project -->
+<form action="/project/addproject" method="GET">
+    <input type="hidden" name="parent_id" value="[% project.id %]">
+    <button type="submit">Add Sub-Project</button>
+</form>
+
+<!-- Button to add a new todo for this project -->
+<!-- This button redirects to the addtodo page with the current project ID -->
+<form action="/todo/addtodo" method="GET">
+    <input type="hidden" name="project_id" value="[% project.id %]">
+    <button type="submit">Add New Todo</button>
+</form>
+

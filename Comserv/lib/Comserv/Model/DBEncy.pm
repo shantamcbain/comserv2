@@ -7,7 +7,6 @@ use Socket;
 use JSON;
 use Data::Dumper;
 
-# Load the database configuration from db_config.json
 my $json_text;
 {
     local $/; # Enable 'slurp' mode
@@ -43,7 +42,6 @@ sub get_active_projects {
 
     return \@projects;
 }
-
 sub get_table_info {
     my ($self, $table_name) = @_;
 
@@ -62,11 +60,6 @@ sub get_table_info {
         # The table does not exist
         return;
     }
-}
-
-sub schema {
-    my ($self) = @_;
-    return $self->schema_class->connect($self->connect_info);
 }
 
 1;

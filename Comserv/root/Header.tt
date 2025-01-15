@@ -24,7 +24,7 @@
     [% ELSE %]
         <meta name="description" content="[% http_header_description %]">
     [% END %]
-    <link rel="shortcut icon" href="[% favicon %]">
+<link rel="shortcut icon" href="[% favicon | uri('imagesfavicon.ico') %]">
     [% IF SiteName == "CSC" %]
         [% embed('CSCWHMCSInterface') %]
     [% END %]

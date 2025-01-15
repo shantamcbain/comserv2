@@ -2,171 +2,176 @@ package Comserv::Controller::Admin;
 use Moose;
 use namespace::autoclean;
 use Data::Dumper;
-use Comserv::Model::DBSchemaManager;
-
+use DBIx::Class::Migration;
+use Comserv::Util::Logging;
 BEGIN { extends 'Catalyst::Controller'; }
 
+has 'logging' => (
+    is => 'ro',
+    default => sub { Comserv::Util::Logging->instance }
+);
+
+# Authentication check at the beginning of each request
 sub begin : Private {
     my ( $self, $c ) = @_;
+    # Debug logging for begin action
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'begin', "Starting begin action");
+
+    $c->stash->{debug_errors} //= [];  # Ensure debug_errors is initialized
 
     # Check if the user is logged in
-    if (!$c->user_exists) {
-        # If the user isn't logged in, call the index method
+    if ( !$c->user_exists ) {
         $self->index($c);
-        return;
-    }
-    # Fetch the roles from the session
-    my $roles = $c->session->{roles};
-    # Log the roles
-    $c->log->info("admin begin Roles: " . Dumper($roles));  # Change this line
-    # Check if roles is defined and is an array reference
-    if (defined $roles && ref $roles eq 'ARRAY') {
-        # Check if the user has the 'admin' role
-        if (grep { $_ eq 'admin' } @$roles) {
-            # User is an admin, proceed with the request
-        } else {
-            # User is not an admin, call the index method
-            $self->index($c);
-            return;
-        }
     } else {
-        # Roles is not defined or not an array, call the index method
-        $self->index($c);
-        return;
+        # Fetch the roles from the session
+        my $roles = $c->session->{roles};
+        $c->log->info("admin begin Roles: " . Dumper($roles));
+
+        # Check if roles is defined and is an array reference
+        if ( defined $roles && ref $roles eq 'ARRAY' ) {
+            if ( !grep { $_ eq 'admin' } @$roles ) {
+                $self->index($c);
+            }
+        } else {
+            $self->index($c);
+        }
     }
 }
 
+# Main admin page
 sub index :Path :Args(0) {
     my ( $self, $c ) = @_;
-
-    # Log the application's configured template path
+    # Debug logging for index action
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'index', "Starting index action");
     $c->log->debug("Template path: " . $c->path_to('root'));
-
-    # Set the TT template to use.
     $c->stash(template => 'admin/index.tt');
-
-    # Forward to the view
     $c->forward($c->view('TT'));
 }
 
-sub edit_documentation :Path('/edit_documentation') :Args(0) {
+# Add a new schema
+sub add_schema :Path('add_schema') :Args(0) {
     my ( $self, $c ) = @_;
-    $c->stash(template => 'admin/edit_documentation.tt');
-}
+    # Debug logging for add_schema action
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'add_schema', "Starting add_schema action");
 
-sub add_schema :Path('/add_schema') :Args(0) {
-    my ( $self, $c ) = @_;
+    if ( $c->request->method eq 'POST' ) {
+        my $migration = DBIx::Class::Migration->new(
+            schema_class => 'Comserv::Model::Schema::Ency',
+            target_dir   => $c->path_to('root', 'migrations')->stringify
+        );
 
-    if ($c->request->method eq 'POST') {
-        # Get the schema name and description from the form
-        my $schema_name = $c->request->params->{schema_name};
-        my $schema_description = $c->request->params->{schema_description};
+        my $schema_name        = $c->request->params->{schema_name} // '';
+        my $schema_description = $c->request->params->{schema_description} // '';
 
-        # Run the create_migration_script.pl script
-        my $output = `create_migration_script.pl $schema_name $schema_description`;
-
-        # Check if the script ran successfully
-        if ($? == 0) {
-            $c->stash(message => 'Migration script created successfully.');
+        if ( $schema_name ne '' && $schema_description ne '' ) {
+            eval {
+                $migration->make_schema;
+                $c->stash(message => 'Migration script created successfully.');
+            };
+            if ($@) {
+                $c->stash(error_msg => 'Failed to create migration script: ' . $@);
+            }
         } else {
-            $c->stash(message => 'Failed to create migration script.');
+            $c->stash(error_msg => 'Schema name and description cannot be empty.');
         }
-
-        # Add the output to the stash so it can be displayed in the template
-        $c->stash(output => $output);
     }
 
     $c->stash(template => 'admin/add_schema.tt');
+    $c->forward($c->view('TT'));
 }
 
-sub check_and_update_schema {
-    my ($self) = @_;
-
-    try {
-        my $schema = Comserv::Model::DBEncy->new->schema;
-        my $dbh = $schema->storage->dbh;
-
-        # Check if the schema is up-to-date
-        my $tables_exist = $dbh->selectrow_array("SHOW TABLES LIKE 'sitedomain'");
-
-        if ($tables_exist) {
-            my $differences = $self->compare_schemas();
-            if (@$differences) {
-                $self->{schema_needs_update} = 1;
-            } else {
-                $self->{schema_needs_update} = 0;
-            }
-        } else {
-            $self->deploy_schema();
-            $self->{schema_needs_update} = 0;
-        }
-    } catch {
-        ERROR("Error in check_and_update_schema: $_");
-        $self->{schema_needs_update} = 1;
-    };
-}
-
-sub schema_needs_update {
-    my ($self) = @_;
-    return $self->{schema_needs_update};
-}
-sub toggle_debug :Path('/toggle_debug') :Args(0) {
-    my ( $self, $c ) = @_;
-
-    # Toggle the CATAYST_DEBUG environment variable
-    if ($ENV{CATALYST_DEBUG} // 0) {
-        $ENV{CATALYST_DEBUG} = 0;
-    } else {
-        $ENV{CATALYST_DEBUG} = 1;
-    }
-
-    # Redirect to the admin index page
-    $c->response->redirect($c->uri_for('/admin'));
-}
-
-sub get_table_info :Path('/get_table_info') :Args(1) {
-    my ($self, $c, $table_name) = @_;
-
-    # Get the table info from the DBEncy model
-    my $table_info = $c->model('DBEncy')->get_table_info($table_name);
-
-    if ($table_info) {
-        # The table exists, display its schema
-        $c->stash(table_info => $table_info);
-    } else {
-        # The table does not exist, display an error message
-        $c->stash(error => "The table $table_name does not exist.");
-    }
-
-    $c->stash(template => 'admin/get_table_info.tt');
-}
-sub schema_update :Local {
+# Compare schema versions
+sub compare_schema :Path('compare_schema') :Args(0) {
     my ($self, $c) = @_;
+    # Debug logging for compare_schema action
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'compare_schema', "Starting compare_schema action");
 
-    my $db_schema_manager = Comserv::Model::DBSchemaManager->new();
-    my $differences = $db_schema_manager->compare_schemas();
+    my $migration = DBIx::Class::Migration->new(
+        schema_class => 'Comserv::Model::Schema::Ency',
+        target_dir   => $c->path_to('root', 'migrations')->stringify
+    );
+
+    my $current_version = $migration->version;
+    my $db_version;
+
+    eval {
+        $db_version = $migration->schema->resultset('dbix_class_schema_versions')->find({ version => { '!=' => '' } })->version;
+    };
+
+    $db_version ||= '0';  # Default if no migrations have been run
+    my $changes = ( $current_version != $db_version )
+        ? "Schema version mismatch detected. Check migration scripts for changes from $db_version to $current_version."
+        : "No changes detected between schema and database.";
 
     $c->stash(
-        differences => $differences,
-        template    => 'admin/schema_update.tt2'
+        current_version => $current_version,
+        db_version      => $db_version,
+        changes         => $changes,
+        template        => 'admin/compare_schema.tt'
     );
+
+    $c->forward($c->view('TT'));
 }
 
-sub apply_schema_update :Local {
+# Migrate schema if changes are confirmed
+sub migrate_schema :Path('migrate_schema') :Args(0) {
     my ($self, $c) = @_;
+    # Debug logging for migrate_schema action
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'migrate_schema', "Starting migrate_schema action");
 
-    my $action = $c->req->params->{action};
-    my $db_schema_manager = Comserv::Model::DBSchemaManager->new();
+    if ( $c->request->method eq 'POST' ) {
+        my $migration = DBIx::Class::Migration->new(
+            schema_class => 'Comserv::Model::Schema::Ency',
+            target_dir   => $c->path_to('root', 'migrations')->stringify
+        );
 
-    if ($action eq 'deploy') {
-        $db_schema_manager->deploy_schema();
-    } elsif ($action eq 'update') {
-        $db_schema_manager->update_schema();
+        my $confirm = $c->request->params->{confirm};
+        if ($confirm) {
+            eval {
+                $migration->install;
+                $c->stash(message => 'Schema migration completed successfully.');
+            };
+            if ($@) {
+                $c->stash(error_msg => "An error occurred during migration: $@");
+            }
+        } else {
+            $c->res->redirect($c->uri_for($self->action_for('compare_schema')));
+        }
     }
 
-    $c->response->redirect($c->uri_for('/admin/schema_update'));
+    $c->stash(
+        message   => $c->stash->{message} || '',
+        error_msg => $c->stash->{error_msg} || '',
+        template  => 'admin/migrate_schema.tt'
+    );
+
+    $c->forward($c->view('TT'));
+}
+
+# Edit documentation action
+sub edit_documentation :Path('admin/edit_documentation') :Args(0) {
+    my ( $self, $c ) = @_;
+    # Debug logging for edit_documentation action
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'edit_documentation', "Starting edit_documentation action");
+    $c->stash(template => 'admin/edit_documentation.tt');
+    $c->forward($c->view('TT'));
+}
+
+# Get table information
+sub get_table_info :Path('admin/get_table_info') :Args(1) {
+    my ($self, $c, $table_name) = @_;
+    # Debug logging for get_table_info action
+    $self->logging->log_with_details($c, __FILE__, __LINE__, "Starting get_table_info action");
+
+    my $table_info = $c->model('DBEncy')->get_table_info($table_name);
+    $c->stash(
+        table_info => $table_info,
+        error      => $table_info ? undef : "The table $table_name does not exist.",
+        template   => 'admin/get_table_info.tt'
+    );
+
+    $c->forward($c->view('TT'));
 }
 
 __PACKAGE__->meta->make_immutable;
-
 1;

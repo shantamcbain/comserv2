@@ -1,21 +1,15 @@
 package Comserv::Model::User;
 use Moose;
 use namespace::autoclean;
-use namespace::autoclean;
 use Email::Sender::Simple qw(sendmail);
 use Email::Sender::Transport::SMTP qw();
 use Email::Simple;
 use Email::Simple::Creator;
 
-extends 'Catalyst::Model';
-extends 'Catalyst::Authentication::User';
-
-# Ensure the correct path to the module
-use Comserv::Model::DBEncy;
+extends 'Catalyst::Model', 'Catalyst::Authentication::User';
 
 has '_user' => (
     is => 'ro',
-    isa => 'Maybe[Object]',  # Corrected to use Object instead of HashRef
     lazy => 1,
     default => sub {
         die "_user attribute must be set before it's used";
@@ -42,14 +36,12 @@ sub supports {
     return 1 if $feature eq 'session';
     return 0;
 }
-
 sub roles {
     my $self = shift;
-    return [ map { $_->role } $self->_user->roles->all ];
+    return [ map $_->role, $self->_user->roles->all ];
 }
 
 
-# Ensured correct database connection and user creation
 # Ensured correct database connection and user creation
 sub create_user {
     my ($self, $user_data) = @_;
