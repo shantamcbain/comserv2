@@ -191,7 +191,8 @@ sub auto :Private {
     }
 
     return 1;
-}sub auto :Private {
+}
+sub auto :Private {
     my ($self, $c) = @_;
     $self->logging->log_with_details($c, __FILE__, __LINE__, 'auto', "Starting auto action");
 
