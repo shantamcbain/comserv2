@@ -12,7 +12,7 @@ BEGIN { extends 'Catalyst::Controller'; }
 has 'record_id' => (is => 'rw', isa => 'Str');
 has 'priority' => (is => 'rw', isa => 'HashRef');
 has 'status' => (is => 'rw', isa => 'HashRef');
-has 'logging' => (is => 'ro', isa => 'Comserv::Util::Logging', lazy => 1, builder => '_build_logging');
+
 has 'logging' => (
     is => 'ro',
     default => sub { Comserv::Util::Logging->instance }
@@ -33,7 +33,7 @@ sub BUILD {
 
 sub index :Path('/log') :Args(0) {
     my ( $self, $c ) = @_;
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'index', "Accessed log index");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Accessed log index");
     $c->stash->{debug_errors} //= [];
     $c->stash(debug_errors => []);
     # Retrieve the status from the query parameters, default to 'open'
@@ -53,7 +53,7 @@ sub index :Path('/log') :Args(0) {
     }
 
     # Debug: Print all logs
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'index', "Fetched logs: " . Dumper([$rs->all]));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Fetched logs: " . Dumper([$rs->all]));
 
     $c->stash->{debug_errors} //= [];  # Ensure debug_errors is initialized
     # Pass the logs and status to the template
@@ -301,7 +301,7 @@ sub create_log :Path('/log/create_log'):Args() {
     });
 
     if ($logEntry) {
-        $self->logging->log_with_details($c, __FILE__, __LINE__, 'create_log', "Created new log entry: " . Dumper($logEntry));
+        $self->logging->log_with_details($c, 'info',__FILE__, __LINE__, 'create_log', "Created new log entry: " . Dumper($logEntry));
         $c->response->redirect($c->uri_for('/'));
     } else {
         $c->response->body('Error creating log entry.');

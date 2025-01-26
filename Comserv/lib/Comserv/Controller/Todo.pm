@@ -17,7 +17,7 @@ sub index :Path(/todo) :Args(0) {
 
     # Set the TT template to use.
     $c->stash(template => 'todo/todo.tt');
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'index', 'Fetched todos for the todo page');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 'Fetched todos for the, todo page');
     $c->forward($c->view('TT'));
 }
 sub todo :Path('/todo') :Args(0) {
@@ -120,7 +120,7 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
 
     # Log the list of user_ids
     my @user_ids = map { $_->id } @users;
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'addtodo', 'User IDs: ' . join(', ', @user_ids));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'addtodo', 'User IDs: ' . join(', ', @user_ids));
 
     # Add the projects, sitename, and user_id to the stash
     $c->stash(
@@ -141,14 +141,14 @@ sub debug :Local {
     my ($self, $c) = @_;
 
     # Print the @INC path
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'debug', "INC: " . join(", ", @INC));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'debug', "INC: " . join(", ", @INC));
 
     # Check if the DateTime plugin is installed
     my $is_installed = eval {
         require Template::Plugin::DateTime;
         1;
     };
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'debug', "DateTime plugin is " . ($is_installed ? "" : "not ") . "installed");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'debug', "DateTime plugin is " . ($is_installed ? "" : "not ") . "installed");
 
     $c->response->body("Debugging information has been logged");
 }
