@@ -13,15 +13,7 @@ sub base :Chained('/') :PathPart('user') :CaptureArgs(0) {
     # This will capture /user in the URL
 }
 
-sub login :Chained('base') :PathPart('login') :Args(0) {
-    my ($self, $c) = @_;
 
-    # Handle the login functionality here
-    # For example, you can check the user's credentials and start a session
-
-    # Set the template for the login page
-    $c->stash(template => 'User/login.tt');
-}
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
 

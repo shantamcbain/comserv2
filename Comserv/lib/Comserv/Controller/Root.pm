@@ -278,27 +278,4 @@ __PACKAGE__->meta->make_immutable;
 
 1;
 
-sub debug :Path('/debug') {
-    my ($self, $c) = @_;
 
-    my $site_name = $c->stash->{SiteName};
-    $c->stash(template => 'debug.tt');
-    $c->forward($c->view('TT'));
-}
-
-sub default :Path {
-    my ( $self, $c ) = @_;
-    $c->response->body( 'Page not found' );
-    $c->response->status(404);
-}
-
-sub documentation :Path('documentation') :Args(0) {
-    my ( $self, $c ) = @_;
-    $c->stash(template => 'Documentation/Documentation.tt');
-}
-
-sub end : ActionClass('RenderView') {}
-
-__PACKAGE__->meta->make_immutable;
-
-1;

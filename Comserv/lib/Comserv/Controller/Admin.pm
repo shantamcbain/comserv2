@@ -15,7 +15,7 @@ has 'logging' => (
 sub begin : Private {
     my ( $self, $c ) = @_;
     # Debug logging for begin action
-    $self->logging->log_with_details($c, 'info'. __FILE__, __LINE__, 'begin', "Starting begin action");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "Starting begin action");
 
     $c->stash->{debug_errors} //= [];  # Ensure debug_errors is initialized
 
@@ -26,7 +26,7 @@ sub begin : Private {
         # Fetch the roles from the session
         my $roles = $c->session->{roles};
 
-        $self->logging->log_with_details($c, __FILE__, __LINE__, 'begin', "Roles: " . Dumper($roles));
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "Roles: " . Dumper($roles));
 
         # Check if roles is defined and is an array reference
         if ( defined $roles && ref $roles eq 'ARRAY' ) {
@@ -45,7 +45,7 @@ sub index :Path :Args(0) {
     # Debug logging for index action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Starting index action");
 
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'index', "Template path: " . $c->path_to('root'));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Template path: " . $c->path_to('root'));
     $c->stash(template => 'admin/index.tt');
     $c->forward($c->view('TT'));
 }
@@ -81,6 +81,214 @@ sub add_schema :Path('add_schema') :Args(0) {
     $c->stash(template => 'admin/add_schema.tt');
     $c->forward($c->view('TT'));
 }
+
+sub schema_manager :Path('/admin/schema_manager') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Log the beginning of the schema_manager action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_manager', "Starting schema_manager action");
+
+    # Get the selected database (default to 'ENCY')
+    my $selected_db = $c->req->param('database') || 'ENCY';
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_manager', "Selected database: $selected_db");
+
+    # Determine the model to use
+    my $model = $selected_db eq 'FORAGER' ? 'DBForager' : 'DBEncy';
+
+    # Attempt to fetch list of tables from the selected model
+    my $tables;
+    eval {
+        # Corrected line to pass the selected database to list_tables
+$tables = $c->model('DBSchemaManager')->list_tables($c, $selected_db);
+
+    };
+    if ($@) {
+        # Log the table retrieval error
+        $self->logging->log_with_details(
+            $c,
+            'error',
+            __FILE__,
+            __LINE__,
+            'schema_manager',
+            "Failed to list tables for database '$selected_db': $@"
+        );
+
+        # Set error message in stash and render error template
+        $c->stash(
+            error_msg => "Failed to list tables for database '$selected_db': $@",
+            template  => 'admin/SchemaManager.tt',
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    # Log successful table retrieval
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_manager', "Successfully retrieved tables for '$selected_db'");
+
+    # Pass data to the stash for rendering the SchemaManager template
+    $c->stash(
+        database  => $selected_db,
+        tables    => $tables,
+        template  => 'admin/SchemaManager.tt',
+    );
+
+    $c->forward($c->view('TT'));
+}
+
+sub map_table_to_result :Path('/admin/map_table_to_result') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Get database and table from request
+    my $selected_db = $c->req->param('database') || 'ENCY';
+    my $table       = $c->req->param('table');
+    my $model       = $selected_db eq 'FORAGER' ? 'DBForager' : 'DBEncy';
+
+    # Fetch table columns
+    my $columns;
+    eval {
+        $columns = $c->model($model)->get_table_columns($table);
+    };
+    if ($@) {
+        # Handle error if column retrieval fails
+        $c->stash(
+            error_msg => "Failed to fetch columns for table '$table': $@",
+            template  => 'admin/SchemaManager.tt',
+        );
+        return;
+    }
+
+    # Generate or update result file for the table
+    my $result_file = "lib/Comserv/Model/Result/" . ucfirst($table) . ".pm";
+    if (!-e $result_file || $c->req->param('update')) {
+        $self->generate_result_file($table, $columns, $result_file);
+    }
+
+    # Set success message and redirect
+    $c->flash->{success} = "Result file for table '$table' updated successfully!";
+    $c->response->redirect('/Admin/schema_manager?database=' . $selected_db);
+}
+
+# Generate or update a result file
+sub generate_result_file {
+    my ($self, $table, $columns, $file_path) = @_;
+
+    my $content = <<"EOF";
+package Comserv::Model::Result::${table};
+use base qw/DBIx::Class::Core/;
+
+__PACKAGE__->table('$table');
+
+# Define columns
+EOF
+
+    foreach my $column (@$columns) {
+        my $nullable = $column->{nullable} eq 'YES' ? '1' : '0';
+        $content .= "__PACKAGE__->add_columns(q{$column->{name}}, { data_type => q{$column->{type}}, is_nullable => $nullable });\n";
+    }
+
+    $content .= "\n1;\n";
+
+    # Write the result file
+    open my $fh, '>', $file_path or die $!;
+    print $fh $content;
+    close $fh;
+}
+
+# Action to handle table-to-result mapping
+sub map_table_to_result :Path('/Admin/map_table_to_result') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $database = $c->req->param('database');
+    my $table    = $c->req->param('table');
+
+    # Check if the result file exists
+    my $result_file = "lib/Comserv/Model/Result/" . ucfirst($table) . ".pm";
+    my $file_exists = -e $result_file;
+
+    # Fetch table columns
+    my $columns = $c->model('DBSchemaManager')->get_table_columns($database, $table);
+
+    # Generate or update the result file based on the table schema
+    if (!$file_exists || $c->req->param('update')) {
+        $self->generate_result_file($table, $columns, $result_file);
+    }
+
+    $c->flash->{success} = "Result file for table '$table' has been successfully updated!";
+    $c->response->redirect('/Admin/schema_manager');
+}
+
+# Helper to generate or update a result file
+sub generate_result_file {
+    my ($self, $table, $columns, $file_path) = @_;
+
+    my $content = <<"EOF";
+package Comserv::Model::Result::${table};
+use base qw/DBIx::Class::Core/;
+
+__PACKAGE__->table('$table');
+
+# Define columns
+EOF
+
+    foreach my $column (@$columns) {
+        $content .= "__PACKAGE__->add_columns(q{$column->{name}});\n";
+    }
+
+    $content .= "\n1;\n";
+
+    # Write the file
+    open my $fh, '>', $file_path or die $!;
+    print $fh $content;
+    close $fh;
+}
+
+sub map_table_to_result :Path('/Admin/map_table_to_result') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $database = $c->req->param('database');
+    my $table    = $c->req->param('table');
+
+    # Check if the result file exists
+    my $result_file = "lib/Comserv/Model/Result/" . ucfirst($table) . ".pm";
+    my $file_exists = -e $result_file;
+
+    # Fetch table columns
+    my $columns = $c->model('DBSchemaManager')->get_table_columns($database, $table);
+
+    # Generate or update the result file based on the table schema
+    if (!$file_exists || $c->req->param('update')) {
+        $self->generate_result_file($table, $columns, $result_file);
+    }
+
+    $c->flash->{success} = "Result file for table '$table' has been successfully updated!";
+    $c->response->redirect('/Admin/schema_manager');
+}
+
+# Helper to generate or update a result file
+sub generate_result_file {
+    my ($self, $table, $columns, $file_path) = @_;
+
+    my $content = <<"EOF";
+package Comserv::Model::Result::${table};
+use base qw/DBIx::Class::Core/;
+
+__PACKAGE__->table('$table');
+
+# Define columns
+EOF
+
+    foreach my $column (@$columns) {
+        $content .= "__PACKAGE__->add_columns(q{$column->{name}});\n";
+    }
+
+    $content .= "\n1;\n";
+
+    # Write the file
+    open my $fh, '>', $file_path or die $!;
+    print $fh $content;
+    close $fh;
+}
+
 
 # Compare schema versions
 sub compare_schema :Path('compare_schema') :Args(0) {

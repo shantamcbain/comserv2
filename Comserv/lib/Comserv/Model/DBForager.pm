@@ -24,6 +24,14 @@ __PACKAGE__->config(
         password => $config->{shanta_forager}->{password},
     }
 );
+sub list_tables {
+    my $self = shift;
+
+    # Perform a database-specific query to get the list of tables
+    return $self->schema->storage->dbh->selectcol_arrayref(
+        "SHOW TABLES"  # MySQL-specific; adapt for other databases
+    );
+}
 sub get_herbal_data {
     my ($self) = @_;
     my $dbforager = $self->schema->resultset('Herb')->search(

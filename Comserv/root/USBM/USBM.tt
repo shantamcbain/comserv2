@@ -4,7 +4,7 @@
     [% INCLUDE 'debug.tt' %]
 [% END %]
 
-% # Check the session variable 'Domain' for the current domain %]
+[% # Check the session variable 'Domain' for the current domain %]
 [% IF c.session.Domain == "3d.usbm.ca" || c.session.Domain == "3d.local" %]
     <!-- Include `3d/index.tt` only for the specified domains -->
     [% INCLUDE "3d/index.tt" %]
