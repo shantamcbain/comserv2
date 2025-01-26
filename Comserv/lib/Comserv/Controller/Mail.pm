@@ -5,7 +5,11 @@ BEGIN { extends 'Catalyst::Controller'; }
 
 sub index :Path :Args(0) {
     my ( $self, $c ) = @_;
-    $c->response->body('Matched Comserv::Controller::Mail in Mail.');
+     # Set the template to users/index .tt
+    $c->stash(template => 'user/mail.tt');
+
+    # Forward to the TT view to render the template
+    $c->forward($c->view('TT'));
 }
 
 sub send_welcome_email :Local {

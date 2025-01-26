@@ -12,7 +12,7 @@ has 'logging' => (
 sub get_top_todos {
     my ($self, $c, $SiteName) = @_;
     $SiteName = $c->session->{'SiteName'};
-    $self->logging->log_with_details($c, __FILE__, __LINE__, "Site name: $SiteName");
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'get_top_todos', "Site name: $SiteName");
 
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
@@ -27,8 +27,8 @@ sub get_top_todos {
         { order_by => { -asc => ['priority', 'start_date'] }, rows => 10 }
     );
 
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'Visited the todo page');
-    $self->logging->log_with_details($c, __FILE__, __LINE__, "Number of todos fetched: " . scalar(@todos));
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'get_top_todos','Visited the todo page');
+    #$self->logging->log_with_details($c, __FILE__, __LINE__, "Number of todos fetched: " . scalar(@todos));
 
     $c->session(todos => \@todos);
 

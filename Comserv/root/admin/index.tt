@@ -1,5 +1,5 @@
 [% PageVersion = 'Admin/index.tt,v 0.02 2024/05/30 shanta Exp shanta ' %]
-[% IF debug_mode == 1 %]
+[% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
@@ -12,24 +12,26 @@
 <ul>
     <li><a href="edit_documentation">Edit Documentation</a></li>
     <li><a href="change_styles">Change Styles</a></li>
-    <li><a href="add_schema">Add Schema</a></li>
-    <li><a href="get_table_info">Get Table Information</a></li>
+    <li><a href="admin/add_schema">Add Schema</a></li>
+    <li><a href="admin/get_table_info">Get Table Information</a></li>
+    <li><a href="migrate_schema">Migrate Schema</a></li>
     <li><a href="update_software">Update Software</a></li>
     <li><a href="change_roles">Change User Roles</a></li>
     <li><a href="log">Access Logging</a></li>
-    <li>   <a href="/mail/add_mail_config_form">Mail Configuration</a></li>
-
 </ul>
 
 <h2>Database Schema Management</h2>
 
-<p>Our current focus is on managing database schema changes from within the application. You can add new schemas, get information about existing tables, and update the database as needed.</p>
+<h2>Database Schema Management</h2>
+
+<p>Our current focus is on managing database schema changes from within the application. You can add new schemas, compare schemas, get information about existing tables, and update the database as needed.</p>
 
 <ul>
-    <li><a href="add_schema">Add New Schema</a></li>
-    <li><a href="get_table_info">Get Table Information</a></li>
+    <li><a href="admin/add_schema">Add New Schema</a></li>
+    <li><a href="admin/compare_schema">Compare Schemas</a></li>
+    <li><a href="admin/get_table_info">Get Table Information</a></li>
+    <li><a href="admin/migrate_schema">Migrate Schema</a></li>
 </ul>
-
 <p>For more information on how to use these features, please refer to our <a href="[% c.uri_for('/Documentation/Admin') %]">Admin Module Documentation</a>.</p>
 
 <p>For more information or assistance, please contact us.</p>

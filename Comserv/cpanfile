@@ -15,6 +15,7 @@ requires 'DBIx::Class::Schema::Loader';
 requires 'DBIx::Class::TimeStamp';
 requires 'DBIx::Class::Migration';
 requires 'DBIx::Class::EncodedColumn';
+requires 'SQL::Translator';
 
 # Template Toolkit and plugins
 requires 'Template';
@@ -74,3 +75,4 @@ requires 'Test::Pod';
 requires 'Test::Pod::Coverage';
 requires 'Test::WWW::Mechanize::Catalyst';
 requires 'Catalyst::ScriptRunner';
+requires 'Log::Log4perl';

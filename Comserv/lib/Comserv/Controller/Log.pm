@@ -33,7 +33,9 @@ sub BUILD {
 
 sub index :Path('/log') :Args(0) {
     my ( $self, $c ) = @_;
-
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'index', "Accessed log index");
+    $c->stash->{debug_errors} //= [];
+    $c->stash(debug_errors => []);
     # Retrieve the status from the query parameters, default to 'open'
     my $status = $c->request->params->{status} // 'open';
 
@@ -51,8 +53,9 @@ sub index :Path('/log') :Args(0) {
     }
 
     # Debug: Print all logs
-    #$self->logging->log_with_details($c, __FILE__, __LINE__, 'index', "Fetched logs: " . Dumper([$rs->all]));
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'index', "Fetched logs: " . Dumper([$rs->all]));
 
+    $c->stash->{debug_errors} //= [];  # Ensure debug_errors is initialized
     # Pass the logs and status to the template
     $c->stash(
         logs => [$rs->all],
@@ -87,9 +90,8 @@ sub details :Path('/log/details') :Args(0) {
     }
 }
 
-
 sub update :Path('/log/update') :Args(0) {
-    my ($self, $c) = @_;
+    my ( $self, $c ) = @_;
 
     # Get the record_id from the form data
     my $record_id = $c->request->body_parameters->{record_id};
@@ -217,49 +219,81 @@ sub log_form :Path('/log/log_form'):Args() {
     $c->stash->{template} = 'log/log_form.tt';
 }
 
-
-sub create_log :Path('/log/create_log') :Args() {
-    my ($self, $c) = @_;
+sub create_log :Path('/log/create_log'):Args() {
+    my ( $self, $c) = @_;
 
     # Create new log entry
     my $schema = $c->model('DBEncy');
     my $rs = $schema->resultset('Log');
 
-    # Retrieve start_time and end_time from form data
-    my $start_time = $c->request->body_parameters->{start_time};
-    my $end_time = $c->request->body_parameters->{end_time} || '00:00:00';  # Set a default end time if not provided
+    # Retrieve start_date from form data
+    my $start_date = $c->request->body_parameters->{start_date};
+    # Set owner to 'none' if it's not provided
+    my $owner = $c->request->body_parameters->{owner} || 'none';
 
-    # Calculate the time difference
-    my $time_diff;
-    if ($start_time && $end_time) {
-        my ($start_hour, $start_min) = split(':', $start_time);
-        my ($end_hour, $end_min) = split(':', $end_time);
-
-        # Adjust for midnight crossover
-        if ($end_hour < $start_hour || ($end_hour == $start_hour && $end_min < $start_min)) {
-            $end_hour += 24;
-        }
-
-        my $time_diff_in_minutes = ($end_hour - $start_hour) * 60 + ($end_min - $start_min);
-        $time_diff = sprintf("%02d:%02d", int($time_diff_in_minutes / 60), $time_diff_in_minutes % 60);
-    } else {
-        $time_diff = '00:00';  # Default time if calculation is not possible
+    # Check if start_date is empty
+    if ($start_date eq '') {
+        $start_date = undef;  # Set start_date to NULL if it's empty
     }
 
+    # Retrieve subject from form data
+    my $subject = $c->request->body_parameters->{abstract};
+
+    # Check if subject is empty or undefined
+    if (!defined $subject || $subject eq '') {
+        # Set an error message
+        $c->stash(error_msg => 'abstract cannot be empty');
+
+        # Stash the form data
+        $c->stash(
+            todo_record_id => $c->request->body_parameters->{todo_record_id},
+            owner => $c->request->body_parameters->{owner}||'none',
+            sitename => $c->session->{SiteName},
+            start_date => $start_date,
+            project_code => $c->request->body_parameters->{project_code},
+            due_date => $c->request->body_parameters->{due_date},
+            abstract => $subject,
+            # Add other necessary fields here
+        );
+
+        # Render the form again
+        $c->stash->{template} = 'log/log_form.tt';
+        return;
+    }
+
+    # Retrieve start_time and end_time from form data
+    my $start_time = $c->request->body_parameters->{start_time};
+    my $end_time = $c->request->body_parameters->{end_time};
+
+    # Set end_time to a default value if it's an empty string or undefined
+    $end_time = '00:00:00' if !defined $end_time || $end_time eq '';
+
+    # Calculate time difference
+    my ($start_hour, $start_min) = split(':', $start_time);
+    my ($end_hour, $end_min) = defined $end_time ? split(':', $end_time) : (0, 0);
+    my $time_diff_in_minutes = ($end_hour - $start_hour) * 60 + ($end_min - $start_min);
+
+    # Convert time difference in minutes to 'HH:MM:SS' format
+    my $hours = int($time_diff_in_minutes / 60);
+    my $minutes = $time_diff_in_minutes % 60;
+    my $seconds = 0;  # Assuming there are no seconds in the time difference
+    my $time_diff = sprintf("%02d:%02d:%02d", $hours, $minutes, $seconds);
+
+    my $current_date = DateTime->now->ymd;
     my $logEntry = $rs->create({
         todo_record_id => $c->request->body_parameters->{todo_record_id},
-        owner => $c->request->body_parameters->{owner} || 'none',
+        owner => $owner,
         sitename => $c->session->{SiteName},
-        start_date => $c->request->body_parameters->{start_date} || DateTime->now->ymd,
+        start_date => $start_date || $current_date,
         project_code => $c->request->body_parameters->{project_code},
         due_date => $c->request->body_parameters->{due_date},
-        abstract => $c->request->body_parameters->{abstract},
+        abstract => $subject,
         details => $c->request->body_parameters->{details},
         start_time => $start_time,
-        end_time => $end_time,  # Ensure end_time is not null
-        time => $time_diff,     # Ensure time is not null
+        end_time => $end_time,  # Use default value if not provided
+        time => $time_diff,
         group_of_poster => $c->session->{roles},
-        status => 2,            # Set status to 'IN PROGRESS'
+        status => $c->request->body_parameters->{status},
         priority => $c->request->body_parameters->{priority},
         last_mod_by => $c->session->{username},
         last_mod_date => DateTime->now->ymd,

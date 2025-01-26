@@ -1,5 +1,6 @@
 package Comserv::Model::Log;
 use Moose;
+use namespace::autoclean;
 use Data::Dumper; # Import Data::Dumper for debugging
 
 has 'record_id' => (is => 'rw', isa => 'Str');
@@ -21,7 +22,9 @@ sub get_logs {
     my $schema = $c->model('DBEncy');
 
     # Define search criteria with sitename
-    my $search_criteria = { sitename => $c->session->{SiteName} };
+    my $search_criteria = {
+        sitename => $c->session->{SiteName}
+    };
 
     # Add status to search criteria
     if ($status eq 'open') {
@@ -29,7 +32,6 @@ sub get_logs {
     } elsif ($status eq 'all') {
         # No additional status filter needed for 'all'
     } else {
-        # Assume $status is a specific numeric value
         $search_criteria->{status} = $status;
     }
 

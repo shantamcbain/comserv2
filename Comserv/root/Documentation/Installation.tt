@@ -54,18 +54,5 @@ cpanm --installdeps .</code></pre>
     <li>Verify installations:
         <pre><code>perl -MModule::Name -e 'print $Module::Name::VERSION'</code></pre>
     </li>
-    <li>Troubleshooting module installation:
-        <ul>
-            <li>If you encounter permission issues:
-                <pre><code>cpanm --sudo --installdeps .</code></pre>
-            </li>
-            <li>For verbose output during installation:
-                <pre><code>cpanm -v --installdeps .</code></pre>
-            </li>
-            <li>To force install dependencies:
-                <pre><code>cpanm --force --installdeps .</code></pre>
-            </li>
-        </ul>
-    </li>
 </ol>
 <p>Remember to always test each step in a safe environment before applying them to the production server.</p>

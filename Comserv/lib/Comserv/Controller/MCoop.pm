@@ -4,24 +4,9 @@ use namespace::autoclean;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
-=head1 NAME
-
-Comserv::Controller::MCoop - Catalyst Controller
-
-=head1 DESCRIPTION
-
-Catalyst Controller for Monashee Coop in Lumby BC.
-
-=head1 METHODS
-
-=cut
-
-=head2 index
-
-=cut
-
 sub index :Path :Args(0) {
     my ( $self, $c ) = @_;
+   $c->session->{MailServer} = "http://webmail.computersystemconsulting.ca";
 
     # Set the template to coop/index.tt
     $c->stash(template => 'coop/index.tt');
