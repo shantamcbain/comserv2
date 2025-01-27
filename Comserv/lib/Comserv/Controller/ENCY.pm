@@ -24,29 +24,34 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
 
     # Fetch the record_id from the session
     my $record_id = $c->session->{record_id};
-    unless ($record_id) {
-        # Log an error if record_id is missing from the session
+
+    # Validate the record_id; if invalid, show error (stay on the HerbView page)
+    unless (defined $record_id && $record_id =~ /^\d+$/) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_herb',
-            "Missing record_id in session. Cannot proceed with editing.");
-        $c->flash->{error} = "No herb record selected for editing.";
-        $c->response->redirect('/ENCY/edit_herb'); # Redirect back to self in error
-        return;
+            "Invalid or missing record_id in session.");
+        $c->stash(
+            error_msg => "Invalid or missing herb record for editing. Please try again.",
+            template  => 'ENCY/HerbView.tt',
+            edit_mode => 0, # Keep edit_mode off since no valid record is loaded
+        );
+        return; # Do not redirect; just render the view with an error message
     }
 
-    # Retrieve the herb record from the database using the model
+    # Retrieve the herb record
     my $herb = $c->model('ENCYModel')->get_herb_by_id($record_id);
     unless ($herb) {
-        # Log if the herb record cannot be found
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_herb',
             "Herb record not found in the database for record_id: $record_id.");
-        $c->flash->{error} = "Herb not found in the database.";
-        $c->response->redirect('/ENCY/edit_herb'); # Redirect back to self in error
-        return;
+        $c->stash(
+            error_msg => "Herb not found in the database. Please try again.",
+            template  => 'ENCY/HerbView.tt',
+            edit_mode => 0, # Render view mode since no valid herb is loaded
+        );
+        return; # Do not redirect; just render the view
     }
 
-    # If the request is a POST, attempt to update the record
+    # Handle POST request for herb updates (if applicable)
     if ($c->request->method eq 'POST') {
-        # Collect form data from the request
         my $form_data = {
             botanical_name      => $c->request->params->{botanical_name} // '',
             common_names        => $c->request->params->{common_names} // '',
@@ -62,48 +67,43 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
             key_name            => $c->request->params->{key_name} // '',
         };
 
-        # Log the submitted form data for debugging
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_herb',
-            "Form data received for update: " . join(", ", map { "$_: $form_data->{$_}" } keys %$form_data));
-
-        # Perform the update operation
+        # Attempt to update the herb record and handle success or failure
         my ($status, $error_message) = $c->model('ENCYModel')->update_herb($c, $record_id, $form_data);
 
         if ($status) {
-            # Log success of the update
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_herb',
-                "Herb updated successfully. record_id: $record_id");
-
-            # Redirect to the HerbView.tt in view mode to confirm changes
-            $c->flash->{success} = "Herb details updated successfully.";
-            $c->response->redirect('/ENCY/edit_herb'); # Show updated data in view mode
-            return;
-        } else {
-            # Log failure of the update
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_herb',
-                "Failed to update herb: $error_message");
-
-            # Pass errors and form data back to the stash
+                "Herb updated successfully for record_id: $record_id.");
             $c->stash(
-                herb      => { %$herb, %$form_data }, # Merge submitted data with original herb data
+                success_msg => "Herb details updated successfully.",
+                herb        => $herb,
+                edit_mode   => 0, # Switch back to view mode after successful update
+                template    => 'ENCY/HerbView.tt',
+            );
+            return; # Render the updated herb view
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_herb',
+                "Failed to update herb: $error_message.");
+            $c->stash(
                 error_msg => "Failed to update herb: $error_message",
-                edit_mode => 1, # Stay in edit mode with the submitted data
+                herb      => { %$herb, %$form_data }, # Combine original and submitted data for display
+                edit_mode => 1, # Stay in edit mode for correction
                 template  => 'ENCY/HerbView.tt',
             );
-
-            return; # Re-render the template in edit mode
+            return; # Re-render the form with an error message
         }
     }
 
-    # Render the HerbView.tt in view mode by default if no data submission
+    # Render the herb in edit mode when Edit Herb button is clicked
     $c->stash(
-        herb     => $herb,
-        template => 'ENCY/HerbView.tt',
-        edit_mode => 0, # Default to view mode
+        herb      => $herb,
+        edit_mode => 1, # Enable edit mode
+        template  => 'ENCY/HerbView.tt',
     );
 
     return;
 }
+
+
 sub botanical_name_view :Path('/ENCY/BotanicalNameView') :Args(0) {
     my ( $self, $c ) = @_;
 

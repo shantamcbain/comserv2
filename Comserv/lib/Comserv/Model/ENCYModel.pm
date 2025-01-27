@@ -46,10 +46,9 @@ sub add_herb {
 
 sub update_herb {
     my ($self, $c, $id, $form_data, $record_herb_data) = @_;
-$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_herb', "Updating herb with record ID: $id");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_herb', "Updating herb with record ID: $id");
 
-    # Attempt to fetch the herb record by ID
-    my $herb = $self->forager_schema->resultset('Herb')->find($id);   # Validate inputs
+    # Validate inputs
     unless ($id) {
         return (0, "Missing record ID.");
     }
@@ -57,10 +56,14 @@ $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_herb', 
         return (0, "Invalid form data structure (Expected HASHREF).");
     }
 
+    # Log the current form data
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_herb', "Form data being used for update: " . Dumper($form_data));
 
+    # Attempt to fetch the herb record by ID
+    my $herb = $self->forager_schema->resultset('Herb')->find($id);
     unless ($herb) {
         # Log and return error if no record is found
-        $self->logging->log_with_details('error', __FILE__, __LINE__, 'update_herb', "No herb found with ID: $id. Update aborted.");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_herb', "No herb found with ID: $id. Update aborted.");
         return (0, "Herb with ID $id not found.");
     }
 
@@ -69,11 +72,13 @@ $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_herb', 
         $herb->update($form_data);
 
         # Log success if the update operation is successful
-        $self->logging->log_with_details('info', __FILE__, __LINE__, 'update_herb', "Herb with ID $id updated successfully.");
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_herb', "Herb with ID $id updated successfully.");
     } or do {
         # Log error if the update operation fails
-        my $error = $@ || "Unknown error";
-        $self->logging->log_with_details('error', __FILE__, __LINE__, 'update_herb', "Failed to update herb with ID $id: $error");
+        my $error = $@ || "Unknown error 2";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_herb', "Failed to update herb with ID $id: $error");
+
+        # Return detailed error to the caller
         return (0, "Failed to update herb with ID $id: $error");
     };
 
@@ -81,11 +86,11 @@ $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_herb', 
     return (1, "Herb with ID $id updated successfully.");
 }
 sub get_herb_by_id {
-    my ($self, $id) = @_;
+    my ($self, $c, $id) = @_;
     print "Fetching herb with ID: $id\n";  # Add logging
     my $herb = $self->forager_schema->resultset('Herb')->find($id);
     if ($herb) {
-        print "Fetched herb: ", $herb->botanical_name, "\n";  # Add logging
+        print "Fetched herb: ", $herb->botanical_name, "\n";  $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_herb_by_id', "Herb with ID $id fetched successfully.");
     } else {
         print "No herb found with ID: $id\n";  # Add logging
     }
