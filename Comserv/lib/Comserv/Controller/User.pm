@@ -70,8 +70,8 @@ sub do_login :Local {
             $c->session->{first_name} = $user->first_name;
             $c->session->{last_name} = $user->last_name;
             $c->session->{email} = $user->email;
+            $c->session->{user_id} = $user->id;
 
-# Store the user object in the session
 
 $c->set_authenticated(Comserv::Model::User->new(_user => $user));
             # Retrieve the referrer URL and form data from the session

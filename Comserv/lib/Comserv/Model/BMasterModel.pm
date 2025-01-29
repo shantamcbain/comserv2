@@ -1,4 +1,5 @@
-package Comserv::Model::BMaster;
+
+package Comserv::Model::BMasterModel;
 use Moose;
 use namespace::autoclean;
 

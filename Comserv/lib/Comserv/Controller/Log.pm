@@ -82,7 +82,7 @@ sub details :Path('/log/details') :Args(0) {
             log => $log,
             build_priority => $self->priority,
             build_status   => $self->status,
-            end_time       => $current_time,  # Set end_time to current local time
+            end_time       => $current_time,  # Use $current_time here
             template       => 'log/details.tt'
         );
     } else {
@@ -183,14 +183,15 @@ sub log_form :Path('/log/log_form'):Args() {
     my ( $self, $c) = @_;
     my $schema = $c->model('DBEncy');
 
+    # Declare $current_time and initialize it
+    my $current_time = DateTime->now(time_zone => 'local')->strftime('%H:%M');
+
     my $record_id = $c->request->body_parameters->{record_id};
 
     my $log = Comserv::Model::Log->new(record_id => $record_id);
     my $todo = Comserv::Model::Todo->new();
     my $todo_record = $todo->fetch_todo_record($c, $record_id);
 
-    # Get the current time
-    my $current_time = DateTime->now->strftime('%H:%M:%S');
 
     # Add the priority, status, and record_id to the stash
     $c->stash(
