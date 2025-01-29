@@ -1,10 +1,11 @@
+
 package Comserv::Controller::Site;
 use Moose;
 use namespace::autoclean;
-use Comserv::Util::SiteHelper;
 use Comserv::Util::Logging;
 BEGIN { extends 'Catalyst::Controller'; }
-
+# In your controller or script file
+use Comserv::Model::Site;
 has 'logging' => (
     is => 'ro',
     default => sub { Comserv::Util::Logging->instance }
@@ -19,10 +20,36 @@ sub index :Path :Args(0) {
     my ( $self, $c ) = @_;
 
     # Log entry into the index method
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'index', 'Enter in index');
-    
-    my $sites = $self->site_helper->get_cached_sites($c, $c->session->{SiteName});
-    $c->stash(sites => $sites, template => 'site/index.tt');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 'Enter in index');
+
+    # Get the current site name from the session
+    my $current_site_name = $c->session->{SiteName};
+
+    # Log the current site name
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',"Got current site name $current_site_name");
+
+    # Get a DBIx::Class::Schema object
+    my $schema = $c->model('DBEncy');
+
+    # Create a new Comserv::Model::Site object
+    my $site_model = Comserv::Model::Site->new(schema => $schema);
+
+    # Determine which sites to fetch based on the current site name
+    my $sites;
+    if (lc($current_site_name) eq 'csc') {
+        # If the current site is 'csc', fetch all sites
+        $sites = $site_model->get_all_sites();
+    } else {
+        # Otherwise, fetch only the current site
+        my $site = $site_model->get_site_details_by_name($current_site_name);
+        $sites = [$site] if $site;
+    }
+
+    # Pass the sites to the template
+    $c->stash->{sites} = $sites;
+
+    # Set the template to site/index.tt
+    $c->stash(template => 'site/index.tt');
 }
 
 sub add_site :Local {
@@ -53,7 +80,6 @@ sub add_site :Local {
     # Redirect to the add_site_form action
     $c->res->redirect($c->uri_for($self->action_for('add_site_form')));
 }
-
 sub add_site_form :Local {
     my ($self, $c) = @_;
 
@@ -62,7 +88,6 @@ sub add_site_form :Local {
     # Set the template to site/add_site_form.tt
     $c->stash(template => 'site/add_site_form.tt');
 }
-
 sub details :Local {
     my ($self, $c) = @_;
 
@@ -159,7 +184,7 @@ sub modify :Local {
 
     # Get the new site details from the request body
     my $new_site_details = $c->request->body_parameters;
-    # Check for empty strings in integer fields and set them to 0
+  # Check for empty strings in integer fields and set them to 0
     for my $field (qw(affiliate pid app_logo_width app_logo_height)) {
         if (exists $new_site_details->{$field} && $new_site_details->{$field} eq '') {
             $new_site_details->{$field} = 0;
@@ -181,8 +206,8 @@ sub modify :Local {
         $site->update($new_site_details);
 
         # Redirect to the details page for the site
-        $c->flash->{error} = 'You made the change.';
-        $c->res->redirect($c->uri_for($self->action_for('index')));
+           $c->flash->{error} = 'You made the change.';
+    $c->res->redirect($c->uri_for($self->action_for('index')));
     } else {
         # Redirect to the details page with an error message
         $c->flash->{error} = 'Site not found';

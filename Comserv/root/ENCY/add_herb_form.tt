@@ -1,4 +1,3 @@
-
 [% PageVersion = 'ency/add_herb_form.tt,v 0.01 2025/01/12 shanta Exp shanta ' %]
 [%# PageVersion = 'pagetop.tt,v 0.02 2023/08/30 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
@@ -38,7 +37,7 @@
     <textarea id="ident_character" name="ident_character" required></textarea><br>
 
     <label for="image">Image URL:</label><br>
-    <input type="url" id="image" name="image"><br>
+    <input type="url" id="image" name="image" maxlength="200" required><br>
 
     <label for="stem">Stem:</label><br>
     <textarea id="stem" name="stem"></textarea><br>
@@ -61,26 +60,52 @@
     <label for="fruit">Fruit:</label><br>
     <textarea id="fruit" name="fruit"></textarea><br>
 
+    <label for="root">Root:</label><br>
+    <textarea id="root" name="root"></textarea><br>
+
     <label for="taste">Taste:</label><br>
     <textarea id="taste" name="taste"></textarea><br>
 
     <label for="odour">Odour:</label><br>
-    <textarea id="odour" name="odour"></textarea><br>
+    <input type="text" id="odour" name="odour" maxlength="100" required><br>
 
     <label for="distribution">Distribution:</label><br>
-    <textarea id="distribution" name="distribution" required></textarea><br>
+    <input type="text" id="distribution" name="distribution" maxlength="100" required><br>
 
     <label for="url">URL:</label><br>
-    <input type="url" id="url" name="url"><br>
+    <input type="url" id="url" name="url" maxlength="150" required><br>
 
-    <label for="root">Root:</label><br>
-    <textarea id="root" name="root"></textarea><br>
+<label for="nectar">Nectar:</label><br>
+    <select id="nectar" name="nectar" required>
+        <option value="0">No</option>
+        <option value="1">Yes</option>
+    </select><br>
+   <div>
+        <label for="nectarnotes">Nectar Notes:</label><br>
+        <textarea id="nectarnotes" name="nectarnotes" required></textarea>
+    </div>
 
+    <label for="pollinator">Pollinator:</label><br>
+    <input type="text" id="pollinator" name="pollinator" maxlength="100" required><br>
+
+    <label for="pollen">Pollen:</label><br>
+    <select id="pollen" name="pollen" required>
+        <option value="0">No</option>
+        <option value="1">Yes</option>
+    </select><br>
+    <div>
+        <label for="pollennotes">Pollen Notes:</label>
+        <textarea id="pollennotes" name="pollennotes" required></textarea>
+    </div>
+     <div>
+        <label for="apis">Apis:</label>
+        <input type="text" id="apis" name="apis" maxlength="100" required>
+    </div>
     <label for="constituents">Constituents:</label><br>
     <textarea id="constituents" name="constituents"></textarea><br>
 
     <label for="solvents">Solvents:</label><br>
-    <textarea id="solvents" name="solvents"></textarea><br>
+    <input type="text" id="solvents" name="solvents" maxlength="100" required><br>
 
     <label for="chinese">Chinese:</label><br>
     <textarea id="chinese" name="chinese"></textarea><br>
@@ -89,7 +114,7 @@
     <textarea id="culinary" name="culinary"></textarea><br>
 
     <label for="contra_indications">Contra Indications:</label><br>
-    <textarea id="contra_indications" name="contra_indications"></textarea><br>
+    <input type="text" id="contra_indications" name="contra_indications" maxlength="150" required><br>
 
     <label for="dosage">Dosage:</label><br>
     <textarea id="dosage" name="dosage"></textarea><br>
@@ -107,7 +132,7 @@
     <textarea id="cultivation" name="cultivation"></textarea><br>
 
     <label for="sister_plants">Sister Plants:</label><br>
-    <textarea id="sister_plants" name="sister_plants"></textarea><br>
+    <input type="text" id="sister_plants" name="sister_plants" maxlength="100" required><br>
 
     <label for="harvest">Harvest:</label><br>
     <textarea id="harvest" name="harvest"></textarea><br>
@@ -121,5 +146,17 @@
     <label for="reference">Reference:</label><br>
     <textarea id="reference" name="reference"></textarea><br>
 
+    <!-- New fields -->
+    <div>
+        <label for="share">Share:</label>
+          <select id="share" name="share">
+            <option value="0">Public</option>
+            <option value="1">Private</option>
+        </select>
+ </div>
+    <label for="preparation">Preparation:</label>
+        <input type="text" id="preparation" name="preparation" maxlength="150" required>
+    </div>
+<br>
     <input type="submit" value="Add Herb">
 </form>

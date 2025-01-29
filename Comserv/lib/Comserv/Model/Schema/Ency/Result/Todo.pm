@@ -20,7 +20,6 @@ __PACKAGE__->add_columns(
     },
     due_date => {
         data_type => 'date',
-        is_nullable => 0,
     },
     subject => {
         data_type => 'varchar',
@@ -32,47 +31,25 @@ __PACKAGE__->add_columns(
     estimated_man_hours => {
         data_type => 'integer',
     },
-    comments => {
-        data_type => 'text',
-        is_nullable => 1,
-    },
+  "comments",
+  { data_type => "text", is_nullable => 1 },
     accumulative_time => {
-        data_type => 'integer',
+        data_type => 'time',
     },
-    reporter => {
-        data_type => 'varchar',
-        default_value => "",
-        is_nullable => 1,
-        size => 50,
-    },
-    company_code => {
-        data_type => 'varchar',
-        default_value => "",
-        is_nullable => 1,
-        size => 30,
-    },
-    owner => {
-        data_type => 'varchar',
-        default_value => "",
-        is_nullable => 1,
-        size => 30,
-    },
+    "reporter",
+    { data_type => "varchar", default_value => "", is_nullable => 1, size => 50 },
+    "company_code",
+    { data_type => "varchar", default_value => "", is_nullable => 1, size => 30 },
+    "owner",
+    { data_type => "varchar", default_value => "", is_nullable => 1, size => 30 },
     project_code => {
         data_type => 'varchar',
         size => 255,
     },
-    developer => {
-        data_type => 'varchar',
-        default_value => "",
-        is_nullable => 1,
-        size => 50,
-    },
-    username_of_poster => {
-        data_type => 'varchar',
-        default_value => "",
-        is_nullable => 1,
-        size => 30,
-    },
+    "developer",
+    { data_type => "varchar", default_value => "", is_nullable => 1, size => 50 },
+    "username_of_poster",
+    { data_type => "varchar", default_value => "", is_nullable => 1, size => 30 },
     status => {
         data_type => 'varchar',
         size => 255,
@@ -102,12 +79,8 @@ __PACKAGE__->add_columns(
     project_id => {
         data_type => 'integer',
     },
-    date_time_posted => {
-        data_type => 'varchar',
-        default_value => "",
-        is_nullable => 1,
-        size => 30,
-    },
+    "date_time_posted",
+    { data_type => "varchar", default_value => "", is_nullable => 1, size => 30 },
 );
 
 __PACKAGE__->set_primary_key('record_id');

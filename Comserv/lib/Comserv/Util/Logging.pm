@@ -17,7 +17,7 @@ sub instance {
 }
 
 sub log_with_details {
-    my ($self, $c, $file, $line, $subroutine, $message) = @_;
+    my ($self, $c, $level, $file, $line, $subroutine, $message) = @_;
 
     unless ($c && ref($c) && $c->can('stash')) {
         warn "log_with_details called without a valid context object";

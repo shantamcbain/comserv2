@@ -4,7 +4,11 @@
     [% INCLUDE 'debug.tt' %]
 [% END %]
 
-
+[% # Check the session variable 'Domain' for the current domain %]
+[% IF c.session.Domain == "3d.usbm.ca" || c.session.Domain == "3d.local" %]
+    <!-- Include `3d/index.tt` only for the specified domains -->
+    [% INCLUDE "3d/index.tt" %]
+[% ELSE %]
     <p>This is the home page for the USBM (Universal School of Biological Life).</p>
     <p>We are dedicated to teaching users how to live in harmony and respect for each other and the planet we live on.</p>
 
@@ -20,5 +24,5 @@
     <p>If you're interested in joining our community and learning more about sustainable living and environmental harmony, please get in touch with us.</p>
     <p>Contact us at: <a href="mailto:info@usbm.ca">info@usbm.ca</a></p>
 
-
+[% END %]
 

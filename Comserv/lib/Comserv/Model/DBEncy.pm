@@ -25,6 +25,13 @@ __PACKAGE__->config(
         password => $config->{shanta_ency}->{password},
     }
 );
+sub list_tables {
+    my $self = shift;
+
+    return $self->schema->storage->dbh->selectcol_arrayref(
+        "SHOW TABLES"  # Adjust if the database uses a different query for metadata
+    );
+}
 
 sub get_active_projects {
     my ($self, $site_name) = @_;

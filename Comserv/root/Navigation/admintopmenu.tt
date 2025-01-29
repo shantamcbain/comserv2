@@ -152,7 +152,7 @@
                         <a href="[% c.session.return_url %]?debug=1">Toggle Debug Mode ON</a>
                     [% END %]
             <a href="/debug" target="_blank">Debug</a>
-                   <a href="https://forager.com:2087" target="_blank">Sunfire WHM</a>
+                   <a href="https://computersystemconsulting.ca:10000" target="_blank">Sunfire WHM</a>
                 </div>
             </div>
         </div>

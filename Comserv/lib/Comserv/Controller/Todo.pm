@@ -17,12 +17,12 @@ sub index :Path(/todo) :Args(0) {
 
     # Set the TT template to use.
     $c->stash(template => 'todo/todo.tt');
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'index', 'Fetched todos for the todo page');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 'Fetched todos for the, todo page');
     $c->forward($c->view('TT'));
 }
 sub todo :Path('/todo') :Args(0) {
     my ( $self, $c ) = @_;
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'todo', 'Fetching todos for the todo page');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'todo', 'Fetching todos for the todo page');
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
 
@@ -48,7 +48,7 @@ sub todo :Path('/todo') :Args(0) {
 
     $c->forward($c->view('TT'));
 }
- sub details :Path('/todo/details') :Args {
+sub details :Path('/todo/details') :Args {
     my ( $self, $c ) = @_;
 
     # Get the record_id from the request parameters
@@ -120,7 +120,7 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
 
     # Log the list of user_ids
     my @user_ids = map { $_->id } @users;
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'addtodo', 'User IDs: ' . join(', ', @user_ids));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'addtodo', 'User IDs: ' . join(', ', @user_ids));
 
     # Add the projects, sitename, and user_id to the stash
     $c->stash(
@@ -138,67 +138,36 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
 
 
 sub debug :Local {
-    my ( $self, $c ) = @_;
+    my ($self, $c) = @_;
 
     # Print the @INC path
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'debug', "INC: " . join(", ", @INC));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'debug', "INC: " . join(", ", @INC));
 
     # Check if the DateTime plugin is installed
     my $is_installed = eval {
         require Template::Plugin::DateTime;
         1;
     };
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'debug', "DateTime plugin is " . ($is_installed ? "" : "not ") . "installed");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'debug', "DateTime plugin is " . ($is_installed ? "" : "not ") . "installed");
 
     $c->response->body("Debugging information has been logged");
 }
 sub modify :Local :Args(1) {
     my ($self, $c) = @_;
-
     # Retrieve the todo ID from the URL
     my $todo_id = $c->request->arguments->[0];
-
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
-
     # Get a DBIx::Class::ResultSet object for the 'Todo' table
     my $todo_rs = $schema->resultset('Todo');
-
     # Find the todo in the database
     my $todo = $todo_rs->find($todo_id);
 
     if ($todo) {
         # The todo was found, so retrieve the form data
         my $form_data = $c->request->body_parameters;
-
-        # Ensure parent_todo is set to a valid value
-        my $parent_todo = $form_data->{parent_todo};
-        if (!defined $parent_todo || $parent_todo eq '') {
-            $parent_todo = 0; # Set a default value if parent_todo is not provided
-        }
-
-        # Fetch log entries associated with the todo
-        my $log_rs = $schema->resultset('Log')->search({ todo_record_id => $todo_id });
-
-        # Calculate total time from log entries
-        my $total_log_time = 0;
-        while (my $log = $log_rs->next) {
-            # Calculate time spent using start_time and end_time
-            my $start_time = $log->start_time;
-            my $end_time = $log->end_time || '00:00:00'; # Default to '00:00:00' if end_time is not set
-
-            my ($start_hour, $start_min) = split(':', $start_time);
-            my ($end_hour, $end_min) = split(':', $end_time);
-
-            my $time_diff_in_minutes = ($end_hour - $start_hour) * 60 + ($end_min - $start_min);
-            $total_log_time += $time_diff_in_minutes * 60; # Convert minutes to seconds
-        }
-
-        # Define a default time (e.g., 1 hour in seconds)
-        my $default_time = 3600;
-
-        # Calculate accumulative time
-        my $accumulative_time = $total_log_time || $default_time;
+        # Ensure all required fields have valid values
+        my $status = $form_data->{status} // 'NEW'; # Ensure status is captured
 
         # Update the todo record with the new data
         $todo->update({
@@ -261,12 +230,12 @@ sub create :Local {
     my $status = $c->request->params->{status};
     my $priority = $c->request->params->{priority};
     my $share = $c->request->params->{share} || 0;
-    my $last_mod_by = $c->session->{username} || 'system'; # Set default value if not provided
-    my $last_mod_date = DateTime->now->ymd;
-    my $date_time_posted = DateTime->now->strftime('%Y-%m-%d %H:%M:%S');
+    my $last_mod_by = $c->session->{username} || 'default_user';
+    my $last_mod_date = $c->request->params->{last_mod_date};
     my $group_of_poster = $c->session->{roles} || 'default_group';
-    my $manual_project_id = $c->request->params->{manual_project_id};
     my $project_id = $c->request->params->{project_id};
+    my $manual_project_id = $c->request->params->{manual_project_id};
+    my $date_time_posted = $c->request->params->{date_time_posted};
 
     # If manual_project_id is not empty, use it as the project ID
     my $selected_project_id = $manual_project_id ? $manual_project_id : $project_id;
@@ -303,7 +272,7 @@ sub create :Local {
         sitename => $sitename,
         start_date => $start_date,
         parent_todo => $parent_todo,
-        due_date => $due_date, # Now using default value if not provided
+        due_date => $due_date,
         subject => $subject,
         description => $description,
         estimated_man_hours => $estimated_man_hours,
@@ -349,8 +318,7 @@ sub day :Path('/todo/day') :Args {
     }
 # Calculate the previous and next dates
 my $dt = DateTime::Format::ISO8601->parse_datetime($date);
-my $previous_date = $dt->clone->subtract(days =>
- 1)->strftime('%Y-%m-%d');
+my $previous_date = $dt->clone->subtract(days => 1)->strftime('%Y-%m-%d');
 my $next_date = $dt->clone->add(days => 1)->strftime('%Y-%m-%d');
 
     # Get the Todo model

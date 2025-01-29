@@ -91,7 +91,7 @@ sub calculate_accumulative_time {
     # Get the related log entries for this todo
     my $log_rs = $schema->resultset('Log')->search({
         todo_record_id => $todo_record_id,
-        status => 'DONE', # Assuming 'DONE' is the status for completed logs
+        status => 3, # Assuming 3 is the status for completed logs
     });
 
     # Calculate total time from log entries
@@ -102,6 +102,11 @@ sub calculate_accumulative_time {
 
         my ($start_hour, $start_min) = split(':', $start_time);
         my ($end_hour, $end_min) = split(':', $end_time);
+
+        # Adjust for midnight crossover
+        if ($end_hour < $start_hour || ($end_hour == $start_hour && $end_min < $start_min)) {
+            $end_hour += 24;
+        }
 
         my $time_diff_in_minutes = ($end_hour - $start_hour) * 60 + ($end_min - $start_min);
         $total_log_time += $time_diff_in_minutes * 60; # Convert minutes to seconds

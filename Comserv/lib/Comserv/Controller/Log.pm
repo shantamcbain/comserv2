@@ -13,7 +13,7 @@ BEGIN { extends 'Catalyst::Controller'; }
 has 'record_id' => (is => 'rw', isa => 'Str');
 has 'priority' => (is => 'rw', isa => 'HashRef');
 has 'status' => (is => 'rw', isa => 'HashRef');
-has 'logging' => (is => 'ro', isa => 'Comserv::Util::Logging', lazy => 1, builder => '_build_logging');
+
 has 'logging' => (
     is => 'ro',
     default => sub { Comserv::Util::Logging->instance }
@@ -40,7 +40,7 @@ sub BUILD {
 
 sub index :Path('/log') :Args(0) {
     my ( $self, $c ) = @_;
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'index', "Accessed log index");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Accessed log index");
     $c->stash->{debug_errors} //= [];
     $c->stash(debug_errors => []);
     # Retrieve the status from the query parameters, default to 'open'
@@ -50,24 +50,22 @@ sub index :Path('/log') :Args(0) {
     my $log_model = Comserv::Model::Log->new();
 
     # Fetch logs based on the status
-    my $result_set;
+    my $rs;
     if ($status eq 'all') {
-        $result_set = $log_model->get_logs($c, 'all');  # Fetch all logs without status filter
+        $rs = $log_model->get_logs($c, 'all');  # Fetch all logs without status filter
     } elsif ($status eq 'open') {
-        $result_set = $log_model->get_logs($c, 'open');  # Fetch open logs (status not equal to 3)
+        $rs = $log_model->get_logs($c, 'open');  # Fetch open logs (status not equal to 3)
     } else {
-        $result_set = $log_model->get_logs($c, $status, {
-            order_by => [ { -asc => 'start_date' }, { -asc => 'start_time' } ]
-        });  # Fetch logs with specific status
+        $rs = $log_model->get_logs($c, $status);  # Fetch logs with specific status
     }
 
     # Debug: Print all logs
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'index', "Fetched logs: " . Dumper([$result_set->all]));
+    #$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Fetched logs: " . Dumper([$rs->all]));
 
     $c->stash->{debug_errors} //= [];  # Ensure debug_errors is initialized
     # Pass the logs and status to the template
     $c->stash(
-        logs => [$result_set->all],
+        logs => [$rs->all],
         status => $status,  # Pass the current status to the template
         template => 'log/index.tt'
     );
@@ -83,9 +81,12 @@ sub details :Path('/log/details') :Args(0) {
         $c->stash(
             log => $log,
             build_priority => $self->priority,
-            build_status => $self->status,
-            template => 'log/details.tt'
+            build_status   => $self->status,
+            end_time       => $current_time,  # Set end_time to current local time
+            template       => 'log/details.tt'
         );
+    } else {
+        $c->response->body('Log entry not found.');
     }
     $c->forward($c->view('TT'));
 }
@@ -223,7 +224,7 @@ sub create_log :Path('/log/create_log'):Args() {
 
     # Create new log entry
     my $schema = $c->model('DBEncy');
-    my $result_set = $schema->resultset('Log');
+    my $rs = $schema->resultset('Log');
 
     # Retrieve start_date from form data
     my $start_date = $c->request->body_parameters->{start_date};
@@ -279,7 +280,7 @@ sub create_log :Path('/log/create_log'):Args() {
     my $time_diff = sprintf("%02d:%02d:%02d", $hours, $minutes, $seconds);
 
     my $current_date = DateTime->now->ymd;
-    my $log_entry = $result_set->create({
+    my $logEntry = $rs->create({
         todo_record_id => $c->request->body_parameters->{todo_record_id},
         owner => $owner,
         sitename => $c->session->{SiteName},
@@ -299,8 +300,8 @@ sub create_log :Path('/log/create_log'):Args() {
         comments => $c->request->body_parameters->{comments}
     });
 
-    if ($log_entry) {
-        $self->logging->log_with_details($c, __FILE__, __LINE__, 'create_log', "Created new log entry: " . Dumper($log_entry));
+    if ($logEntry) {
+        $self->logging->log_with_details($c, 'info',__FILE__, __LINE__, 'create_log', "Created new log entry: " . Dumper($logEntry));
         $c->response->redirect($c->uri_for('/'));
     } else {
         $c->response->body('Error creating log entry.');
