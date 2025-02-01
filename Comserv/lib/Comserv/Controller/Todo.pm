@@ -17,12 +17,12 @@ sub index :Path(/todo) :Args(0) {
 
     # Set the TT template to use.
     $c->stash(template => 'todo/todo.tt');
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'index', 'Fetched todos for the todo page');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 'Fetched todos for the, todo page');
     $c->forward($c->view('TT'));
 }
 sub todo :Path('/todo') :Args(0) {
     my ( $self, $c ) = @_;
-
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'todo', 'Fetching todos for the todo page');
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
 
@@ -48,7 +48,7 @@ sub todo :Path('/todo') :Args(0) {
 
     $c->forward($c->view('TT'));
 }
- sub details :Path('/todo/details') :Args {
+sub details :Path('/todo/details') :Args {
     my ( $self, $c ) = @_;
 
     # Get the record_id from the request parameters
@@ -120,7 +120,7 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
 
     # Log the list of user_ids
     my @user_ids = map { $_->id } @users;
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'addtodo', 'User IDs: ' . join(', ', @user_ids));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'addtodo', 'User IDs: ' . join(', ', @user_ids));
 
     # Add the projects, sitename, and user_id to the stash
     $c->stash(
@@ -134,106 +134,182 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
     $c->forward($c->view('TT'));
 }
 
-
-
-
 sub debug :Local {
     my ($self, $c) = @_;
 
     # Print the @INC path
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'debug', "INC: " . join(", ", @INC));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'debug', "INC: " . join(", ", @INC));
 
     # Check if the DateTime plugin is installed
     my $is_installed = eval {
         require Template::Plugin::DateTime;
         1;
     };
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'debug', "DateTime plugin is " . ($is_installed ? "" : "not ") . "installed");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'debug', "DateTime plugin is " . ($is_installed ? "" : "not ") . "installed");
 
     $c->response->body("Debugging information has been logged");
 }
-sub modify :Local :Args(1) {
-    my ($self, $c) = @_;
+sub modify :Path('/todo/modify') :Args(1) {
+    my ( $self, $c, $record_id ) = @_;
 
-    # Retrieve the todo ID from the URL
-    my $todo_id = $c->request->arguments->[0];
+    # Log the entry into the modify action
+    $self->logging->log_with_details(
+        $c,
+        'info',
+        __FILE__,
+        __LINE__,
+        'modify',
+        "Entered modify action for record_id: " . ( $record_id || 'undefined' )
+    );
 
-    # Get a DBIx::Class::Schema object
+    # Error handling for record_id
+    unless ($record_id) {
+        $self->logging->log_with_details(
+            $c,
+            'error',
+            __FILE__,
+            __LINE__,
+            'modify.record_id',
+            'Record ID is missing in the URL.'
+        );
+        $c->stash(
+            error_msg => 'Record ID is required but was not provided.',
+            form_data => $c->request->params, # Preserve form values
+            template  => 'todo/details.tt',    # Re-render the form
+        );
+        return; # Return to allow the user to fix the error
+    }
+
+    # Initialize the schema to fetch data
     my $schema = $c->model('DBEncy');
 
-    # Get a DBIx::Class::ResultSet object for the 'Todo' table
-    my $todo_rs = $schema->resultset('Todo');
+    # Fetch the todo item with the given record_id
+    my $todo = $schema->resultset('Todo')->find($record_id);
 
-    # Find the todo in the database
-    my $todo = $todo_rs->find($todo_id);
-
-    if ($todo) {
-        # The todo was found, so retrieve the form data
-        my $form_data = $c->request->body_parameters;
-
-        # Ensure parent_todo is set to a valid value
-        my $parent_todo = $form_data->{parent_todo};
-        if (!defined $parent_todo || $parent_todo eq '') {
-            $parent_todo = 0; # Set a default value if parent_todo is not provided
-        }
-
-        # Fetch log entries associated with the todo
-        my $log_rs = $schema->resultset('Log')->search({ todo_record_id => $todo_id });
-
-        # Calculate total time from log entries
-        my $total_log_time = 0;
-        while (my $log = $log_rs->next) {
-            # Calculate time spent using start_time and end_time
-            my $start_time = $log->start_time;
-            my $end_time = $log->end_time || '00:00:00'; # Default to '00:00:00' if end_time is not set
-
-            my ($start_hour, $start_min) = split(':', $start_time);
-            my ($end_hour, $end_min) = split(':', $end_time);
-
-            my $time_diff_in_minutes = ($end_hour - $start_hour) * 60 + ($end_min - $start_min);
-            $total_log_time += $time_diff_in_minutes * 60; # Convert minutes to seconds
-        }
-
-        # Define a default time (e.g., 1 hour in seconds)
-        my $default_time = 3600;
-
-        # Calculate accumulative time
-        my $accumulative_time = $total_log_time || $default_time;
-
-        # Update the todo record with the new data
-        $todo->update({
-            sitename => $form_data->{sitename},
-            start_date => $form_data->{start_date},
-            parent_todo => $parent_todo, # Ensure this is set
-            due_date => $form_data->{due_date},
-            subject => $form_data->{subject},
-            description => $form_data->{description},
-            estimated_man_hours => $form_data->{estimated_man_hours},
-            comments => $form_data->{comments},
-            accumulative_time => $accumulative_time, # Update accumulative_time
-            reporter => $form_data->{reporter},
-            company_code => $form_data->{company_code},
-            owner => $form_data->{owner},
-            project_id => $form_data->{project_id},
-            developer => $form_data->{developer},
-            username_of_poster => $c->session->{username},
-            status => $form_data->{status},
-            priority => $form_data->{priority},
-            share => $form_data->{share} || 0,
-            last_mod_by => $c->session->{username},
-            last_mod_date => DateTime->now->ymd,
-            user_id => $form_data->{user_id} || 1,
-            project_id => $form_data->{project_id},
-            date_time_posted => $form_data->{date_time_posted},
-        });
-
-        # Redirect the user back to the page they came from
-        my $referer = $c->request->referer || $c->uri_for($self->action_for('list_todos'));
-        $c->response->redirect($referer);
-    } else {
-        # The todo was not found, so display an error message
-        $c->response->body('Todo not found');
+    if (!$todo) {
+        $self->logging->log_with_details(
+            $c,
+            'error',
+            __FILE__,
+            __LINE__,
+            'modify.record_not_found',
+            "Todo item not found for record ID: $record_id."
+        );
+        $c->stash(
+            error_msg => "No todo item found for record ID: $record_id.",
+            form_data => $c->request->params, # Preserve form values
+            template  => 'todo/details.tt',    # Re-render the form
+        );
+        return;
     }
+
+    # Retrieve form data from the user's request
+    my $form_data = $c->request->params;
+
+    # Log form data for debugging
+    $self->logging->log_with_details(
+        $c,
+        'debug',
+        __FILE__,
+        __LINE__,
+        'modify.form_data',
+        "Form data received: " . join(", ", map { "$_: $form_data->{$_}" } keys %$form_data)
+    );
+
+    # Validate mandatory fields (example: "sitename" is required)
+    unless ($form_data->{sitename}) {
+        $self->logging->log_with_details(
+            $c,
+            'warn',
+            __FILE__,
+            __LINE__,
+            'modify.validation',
+            'Sitename is required but missing in the form data.'
+        );
+        $c->stash(
+            error_msg => 'Sitename is required. Please provide it.',
+            form_data => $form_data,          # Preserve form values
+            record    => $todo,              # Pass the current todo item
+            template  => 'todo/details.tt',   # Re-render the form
+        );
+        return; # Early exit to allow the user to fix the error
+    }
+
+    # Declare and initialize variables with form data or defaults
+    my $parent_todo = $form_data->{parent_todo} || $todo->parent_todo || '';
+    my $accumulative_time = $form_data->{accumulative_time} || 0;
+
+    # Log the start of the update process
+    $self->logging->log_with_details(
+        $c,
+        'info',
+        __FILE__,
+        __LINE__,
+        'modify.update',
+        "Updating todo item with record ID: $record_id."
+    );
+
+    # Attempt to update the todo record
+    eval {
+        $todo->update({
+            sitename             => $form_data->{sitename},
+            start_date           => $form_data->{start_date},
+            parent_todo          => $parent_todo,
+            due_date             => $form_data->{due_date} || DateTime->now->add(days => 7)->ymd,
+            subject              => $form_data->{subject},
+            description          => $form_data->{description},
+            estimated_man_hours  => $form_data->{estimated_man_hours},
+            comments             => $form_data->{comments},
+            accumulative_time    => $accumulative_time,
+            reporter             => $form_data->{reporter},
+            company_code         => $form_data->{company_code},
+            owner                => $form_data->{owner},
+            developer            => $form_data->{developer},
+            username_of_poster   => $c->session->{username},
+            status               => $form_data->{status},
+            priority             => $form_data->{priority},
+            share                => $form_data->{share} || 0,
+            last_mod_by          => $c->session->{username} || 'system',
+            last_mod_date        => DateTime->now->ymd,
+            user_id              => $form_data->{user_id} || 1,
+            project_id           => $form_data->{project_id},
+            date_time_posted     => $form_data->{date_time_posted},
+        });
+    };
+    if ($@) {
+        $self->logging->log_with_details(
+            $c,
+            'error',
+            __FILE__,
+            __LINE__,
+            'modify.update_failure',
+            "Failed to update todo item for record ID: $record_id. Error: $@"
+        );
+        $c->stash(
+            error_msg => "An error occurred while updating the record: $@",
+            form_data => $form_data,          # Preserve form values
+            record    => $todo,              # Pass the current todo item
+            template  => 'todo/details.tt',   # Re-render the form
+        );
+        return; # Early exit on database error
+    }
+
+    # Log the successful update
+    $self->logging->log_with_details(
+        $c,
+        'info',
+        __FILE__,
+        __LINE__,
+        'modify.success',
+        "Todo item successfully updated for record ID: $record_id."
+    );
+
+    # Handle successful update
+    $c->stash(
+        success_msg => "Todo item with ID $record_id has been successfully updated.",
+        record      => $todo,             # Provide updated data
+        template    => 'todo/details.tt',  # Redirect back to the form for review
+    );
 }
 
 
@@ -247,7 +323,7 @@ sub create :Local {
     my $sitename = $c->request->params->{sitename};
     my $start_date = $c->request->params->{start_date};
     my $parent_todo = $c->request->params->{parent_todo} || 0;
-    my $due_date = $c->request->params->{due_date};
+    my $due_date = $c->request->params->{due_date} || DateTime->now->add(days => 7)->ymd; # Set default value if not provided
     my $subject = $c->request->params->{subject};
     my $schema = $c->model('DBEncy');
     my $description = $c->request->params->{description};

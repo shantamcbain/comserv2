@@ -2,13 +2,32 @@
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
-<h1 id="overview_top"><a href="#top">Overview</a></h1>
-<nav>
+<h1 id="overview_top">Comserv Application Overview</h1>
 
-<a href="#main_features">Main Features</a> |
-<a href="#suggestions">Suggestions for Improvement and Expansion</a> |
-<a href="#instructions">Instructions for Developers</a>
-</nav>
+<p>The Comserv application is a comprehensive multi-tenant web platform designed to serve multiple domains and provide a wide range of functionalities for different user types. At its core, it's a modular system that enables:</p>
+
+<h2>Core Architecture</h2>
+<ul>
+    <li><strong>Multi-tenant Architecture:</strong> Supports multiple domains and sites through a single codebase</li>
+    <li><strong>Domain-specific Customization:</strong> Each domain can have its own:
+        <ul>
+            <li>Custom styling and branding</li>
+            <li>Specific feature sets</li>
+            <li>Unique user management</li>
+            <li>Independent data storage</li>
+        </ul>
+    </li>
+    <li><strong>Modular Design:</strong> Features are implemented as independent modules including:
+        <ul>
+            <li>ENCY (Encyclopedia of Natural Life)</li>
+            <li>BMaster (Beekeeping Management)</li>
+            <li>CSC (Computer System Consulting)</li>
+            <li>Project Management</li>
+            <li>User Management</li>
+            <li>File Management</li>
+        </ul>
+    </li>
+</ul>
 
 <h2 id="main_features">Main Features of the New Site:</h2>
 <nav>
@@ -78,3 +97,21 @@
 
 <h2><a href="#overview_top">Back to top of Overview</a></h2>
 
+<h2>Key Technical Features</h2>
+<ul>
+    <li><strong>Database Integration:</strong> Uses MySQL with DBIx::Class for robust data management</li>
+    <li><strong>Authentication & Authorization:</strong> Role-based access control system</li>
+    <li><strong>Template System:</strong> Template Toolkit for flexible view rendering</li>
+    <li><strong>Logging System:</strong> Comprehensive logging for debugging and auditing</li>
+    <li><strong>API Integration:</strong> Support for external service integration</li>
+</ul>
+
+<h2>User Types and Access Levels</h2>
+<ul>
+    <li><strong>Administrators:</strong> Full system access and configuration capabilities</li>
+    <li><strong>Domain Managers:</strong> Management of specific domain settings and users</li>
+    <li><strong>Content Editors:</strong> Content creation and modification privileges</li>
+    <li><strong>Regular Users:</strong> Access to domain-specific features</li>
+    <li><strong>API Users:</strong> Programmatic access to specific functionalities</li>
+    <li><strong>Guests:</strong> Limited access to public content</li>
+</ul>

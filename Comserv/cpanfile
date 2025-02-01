@@ -9,6 +9,7 @@ requires 'MooseX::MarkAsMethods';
 requires 'DBD::mysql';
 requires 'Catalyst::Runtime' => '5.90130';
 requires 'Catalyst::Model';
+requires 'Catalyst::Restarter';
 requires 'DBI';
 requires 'DBIx::Class';
 requires 'DBIx::Class::Schema::Loader';
@@ -16,6 +17,14 @@ requires 'DBIx::Class::TimeStamp';
 requires 'DBIx::Class::Migration';
 requires 'DBIx::Class::EncodedColumn';
 requires 'SQL::Translator';
+
+#json
+requires 'JSON';
+requires 'Config::JSON';
+
+#json
+requires 'JSON';
+requires 'Config::JSON';
 
 # Template Toolkit and plugins
 requires 'Template';
@@ -42,7 +51,7 @@ requires 'Catalyst::Plugin::Authorization::ACL';
 requires 'Catalyst::Plugin::Log::Dispatch';
 requires 'Log::Dispatch::Config';
 requires 'Catalyst::View::TT';
-
+requires 'Catalyst::Authentication::Store::DBIx::Class';
 # DateTime related
 requires 'DateTime';
 requires 'DateTime::Event::Recurrence';

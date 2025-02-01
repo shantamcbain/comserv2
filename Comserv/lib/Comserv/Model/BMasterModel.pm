@@ -1,20 +1,16 @@
-package Comserv::Model::BMasterModel;
 
+package Comserv::Model::BMasterModel;
 use Moose;
 use namespace::autoclean;
-use Try::Tiny;
-use Log::Log4perl qw(:easy);
+
 
 extends 'Catalyst::Model';
-
-# Initialize logger
-Log::Log4perl->easy_init($DEBUG);
 
 sub get_frames_for_queen {
     my ($self, $queen_tag_number) = @_;
 
     my @frames;
-    try {
+    eval {
         # Get a DBIx::Class::Schema object
         my $schema = $self->schema;
 
@@ -30,12 +26,11 @@ sub get_frames_for_queen {
 
     return \@frames;
 }
-
 sub get_yards_for_site {
     my ($self, $site_name) = @_;
 
     my @yards;
-    try {
+    eval {
         # Get a DBIx::Class::Schema object
         my $schema = $self->schema;
 
@@ -44,8 +39,10 @@ sub get_yards_for_site {
 
         # Fetch all yards for the given site
         @yards = $rs->search({ sitename => $site_name });
-    } catch {
-        ERROR("An error occurred while fetching yards: $_");
+    };
+    if ($@) {
+        # An error occurred, handle it here
+        warn "An error occurred while fetching yards: $@";
         return;
     }
 

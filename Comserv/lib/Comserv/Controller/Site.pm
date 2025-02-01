@@ -15,13 +15,13 @@ sub index :Path :Args(0) {
     my ( $self, $c ) = @_;
 
     # Log entry into the index method
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'index', 'Enter in index');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 'Enter in index');
 
     # Get the current site name from the session
     my $current_site_name = $c->session->{SiteName};
 
     # Log the current site name
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'index',"Got current site name $current_site_name");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',"Got current site name $current_site_name");
 
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');

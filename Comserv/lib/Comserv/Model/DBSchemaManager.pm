@@ -2,7 +2,10 @@ package Comserv::Model::DBSchemaManager;
 
 use strict;
 use warnings;
-use base 'Catalyst::Model';
+use Moose;  # Use Moose for object system
+use namespace::autoclean;  # Clean up imported functions
+extends 'Catalyst::Model';  # Use extends instead of base
+use Comserv::Util::Logging;
 use DBI;
 use JSON;
 use File::Slurp;
@@ -11,14 +14,22 @@ use Try::Tiny;
 use Log::Log4perl qw(:easy);
 use Comserv::Model::DBEncy;
 use Data::Dumper;
+
+# Define an attribute 'logging' using Moose
+has 'logging' => (
+    is      => 'ro',
+    default => sub { Comserv::Util::Logging->instance }
+);
+
 print Dumper(\@INC);
+
 # Initialize logger
 Log::Log4perl->easy_init($DEBUG);
 
 # Load the database configuration from db_config.json
 my $json_text;
 {
-    local $/; # Enable 'slurp' mode
+    local $/;    # Enable 'slurp' mode
     open my $fh, "<", "$FindBin::Bin/../db_config.json" or die "Could not open db_config.json: $!";
     $json_text = <$fh>;
     close $fh;
@@ -38,46 +49,34 @@ sub check_and_create_database {
 
         # Check if the 'ency' database exists
         my $database_exists = $dbh->selectrow_array("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = 'ency'");
+# List tables in the appropriate database
+sub list_tables {
+    my ($self, $c, $database) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'list_tables', "Starting list_tables action for database: $database");
 
-        unless ($database_exists) {
-            $dbh->do("CREATE DATABASE ency");
-            $self->deploy_schema();
-            $self->restore_backup();
-            $self->{redirect_to} = 'admin/index.tt';
-            $self->{error_msg} = 'Database created and schema deployed.';
-        } else {
-            # Connect to the 'ency' databasea
-            $dsn = "DBI:mysql:ency;host=$config->{shanta_forager}->{host};port=$config->{shanta_forager}->{port}";
-            $dbh = DBI->connect($dsn, $username, $password, { RaiseError => 1, PrintError => 0 });
-
-            $self->check_and_update_schema();
-            my $tables_exist = $dbh->selectrow_array("SHOW TABLES LIKE 'sitedomain'");
-            if (!$tables_exist) {
-                $self->{redirect_to} = 'admin/add_schema.tt';
-                $self->{error_msg} = 'No tables found. Please add the schema.';
-            } else {
-                my $tables_empty = $dbh->selectrow_array("SELECT COUNT(*) FROM sitedomain") == 0;
-                if ($tables_empty) {
-                    $self->restore_backup();
-                    $self->{redirect_to} = 'admin/restore.tt';
-                    $self->{error_msg} = 'Tables are empty. Please restore from backup.';
-                } else {
-                    $self->{redirect_to} = undef;
-                }
-            }
-        }
-
-        $dbh->disconnect;
-    } catch {
-        ERROR("Error in check_and_create_database: $_");
-        $self->{redirect_to} = 'admin/index.tt';
-        $self->{error_msg} = "Error: $_";
-    };
+    my $model;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'list_tables', "Accessing model for database: $database Model: $model");
+ if ($database eq 'FORAGER') {
+    $model = $c->model('DBForager');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'list_tables', "Accessing DBForager model");
+} elsif ($database eq 'ENCY') {
+    $model = $c->model('DBEncy');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'list_tables', "Accessing DBEncy model");
+} else {
+    die "Unknown database: $database";
 }
 
 sub restore_backup {
     my ($self, $c) = @_;  # Ensure context is passed
 
+    my $tables;
+    eval {
+        $tables = $model->list_tables();
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'list_tables', "Error listing tables: $@");
+        die "Failed to list tables: $@";
+    }
     try {
         my $backup_file = "$FindBin::Bin/../ency.sql";
         my $dsn = "DBI:mysql:ency;host=$config->{shanta_forager}->{host};port=$config->{shanta_forager}->{port}";
@@ -103,6 +102,8 @@ sub restore_backup {
             }
         }
 
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'list_tables', "Successfully listed tables for database: $database");
+    return $tables;
         $self->{backup_success} = "Backup restored successfully.";
         $dbh->disconnect;
 
@@ -116,6 +117,23 @@ sub restore_backup {
 }
 
 
+# Fetch column metadata for a given table
+sub get_table_columns {
+    my ($self, $database, $table) = @_;
+    my $dbh = $self->get_dbh($database);
+    my $sth = $dbh->column_info(undef, undef, $table, undef);
+    my @columns;
+    while (my $row = $sth->fetchrow_hashref) {
+        push @columns, {
+            name     => $row->{COLUMN_NAME},
+            type     => $row->{TYPE_NAME},
+            size     => $row->{COLUMN_SIZE},
+            nullable => $row->{NULLABLE},
+        };
+    }
+    $sth->finish;
+    return \@columns;
+}
 
 sub get_redirect_info {
     my ($self) = @_;
@@ -186,4 +204,5 @@ sub compare_schemas {
     };
 }
 
+__PACKAGE__->meta->make_immutable;  # Make the package immutable for performance
 1;

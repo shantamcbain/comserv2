@@ -12,7 +12,7 @@ BEGIN { extends 'Catalyst::Controller'; }
 has 'record_id' => (is => 'rw', isa => 'Str');
 has 'priority' => (is => 'rw', isa => 'HashRef');
 has 'status' => (is => 'rw', isa => 'HashRef');
-has 'logging' => (is => 'ro', isa => 'Comserv::Util::Logging', lazy => 1, builder => '_build_logging');
+
 has 'logging' => (
     is => 'ro',
     default => sub { Comserv::Util::Logging->instance }
@@ -33,7 +33,7 @@ sub BUILD {
 
 sub index :Path('/log') :Args(0) {
     my ( $self, $c ) = @_;
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'index', "Accessed log index");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Accessed log index");
     $c->stash->{debug_errors} //= [];
     $c->stash(debug_errors => []);
     # Retrieve the status from the query parameters, default to 'open'
@@ -53,7 +53,7 @@ sub index :Path('/log') :Args(0) {
     }
 
     # Debug: Print all logs
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'index', "Fetched logs: " . Dumper([$rs->all]));
+    #$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Fetched logs: " . Dumper([$rs->all]));
 
     $c->stash->{debug_errors} //= [];  # Ensure debug_errors is initialized
     # Pass the logs and status to the template
@@ -82,7 +82,7 @@ sub details :Path('/log/details') :Args(0) {
             log => $log,
             build_priority => $self->priority,
             build_status   => $self->status,
-            end_time       => $current_time,  # Set end_time to current local time
+            end_time       => $current_time,  # Use $current_time here
             template       => 'log/details.tt'
         );
     } else {
@@ -183,14 +183,15 @@ sub log_form :Path('/log/log_form'):Args() {
     my ( $self, $c) = @_;
     my $schema = $c->model('DBEncy');
 
+    # Declare $current_time and initialize it
+    my $current_time = DateTime->now(time_zone => 'local')->strftime('%H:%M');
+
     my $record_id = $c->request->body_parameters->{record_id};
 
     my $log = Comserv::Model::Log->new(record_id => $record_id);
     my $todo = Comserv::Model::Todo->new();
     my $todo_record = $todo->fetch_todo_record($c, $record_id);
 
-    # Get the current time
-    my $current_time = DateTime->now->strftime('%H:%M:%S');
 
     # Add the priority, status, and record_id to the stash
     $c->stash(
@@ -301,7 +302,7 @@ sub create_log :Path('/log/create_log'):Args() {
     });
 
     if ($logEntry) {
-        $self->logging->log_with_details($c, __FILE__, __LINE__, 'create_log', "Created new log entry: " . Dumper($logEntry));
+        $self->logging->log_with_details($c, 'info',__FILE__, __LINE__, 'create_log', "Created new log entry: " . Dumper($logEntry));
         $c->response->redirect($c->uri_for('/'));
     } else {
         $c->response->body('Error creating log entry.');

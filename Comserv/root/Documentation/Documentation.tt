@@ -1,4 +1,4 @@
-[% PageVersion = 'Documentation/ComservDocumentation.tt,v 0.03 2024/11/22 Shanta Exp shanta ' %]
+[% PageVersion = 'Documentation/Documentation.tt,v 0.03 2024/11/22 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
 [% PageVersion -%]
 [% END %]
@@ -6,6 +6,14 @@
 <!--
 Please ensure that all navigation links within each sub-document are unique. This includes the "Back to top" links, as well as any other navigation links present. Each link should be specific to the content within that particular sub-document to enhance clarity and organization within the documentation.
 -->
+<!-- AI Integration Guidelines -->
+<h2>AI Integration Guidelines</h2>
+<p>To ensure consistency and quality in AI-assisted code modifications, please adhere to the following guidelines:</p>
+<ul>
+    <li><strong>Avoid Placeholders:</strong> AI tools should return complete code without placeholders. Ensure all variables and functions are fully defined and functional.</li>
+    <li><strong>Preserve Existing Functions:</strong> When fixing errors, do not remove or alter existing functions unless they are directly related to the issue being addressed. This helps maintain the integrity of the codebase.</li>
+    <li><strong>Patch Application:</strong> Consider experimenting with applying patches instead of returning entire code blocks. This can help minimize errors and maintain code consistency. Use the `git apply` command to manually apply patches if necessary.</li>
+</ul>
 
 <h1 id="top">Comserv Application Documentation</h1>
 
@@ -46,7 +54,7 @@ Please ensure that all navigation links within each sub-document are unique. Thi
 
 [% INCLUDE 'Documentation/Admin.tt' %]
 
-<h3 id="ai"><a href="#top">Back to top of Documentation</a></h3>
+<h3 id="AI"><a href="#top">Back to top of Documentation</a></h3>
 
 [% INCLUDE 'Documentation/AI.tt' %]
 
