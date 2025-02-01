@@ -1,15 +1,20 @@
-package Comserv::Model::BMaster;
+package Comserv::Model::BMasterModel;
+
 use Moose;
 use namespace::autoclean;
-
+use Try::Tiny;
+use Log::Log4perl qw(:easy);
 
 extends 'Catalyst::Model';
+
+# Initialize logger
+Log::Log4perl->easy_init($DEBUG);
 
 sub get_frames_for_queen {
     my ($self, $queen_tag_number) = @_;
 
     my @frames;
-    eval {
+    try {
         # Get a DBIx::Class::Schema object
         my $schema = $self->schema;
 
@@ -18,20 +23,19 @@ sub get_frames_for_queen {
 
         # Fetch the frames for the given queen
         @frames = $rs->search({ queen_id => $queen_tag_number });
-    };
-    if ($@) {
-        # An error occurred, handle it here
-        warn "An error occurred while fetching frames for queen: $@";
+    } catch {
+        ERROR("An error occurred while fetching frames for queen: $_");
         return;
     }
 
     return \@frames;
 }
+
 sub get_yards_for_site {
     my ($self, $site_name) = @_;
 
     my @yards;
-    eval {
+    try {
         # Get a DBIx::Class::Schema object
         my $schema = $self->schema;
 
@@ -40,16 +44,14 @@ sub get_yards_for_site {
 
         # Fetch all yards for the given site
         @yards = $rs->search({ sitename => $site_name });
-    };
-    if ($@) {
-        # An error occurred, handle it here
-        warn "An error occurred while fetching yards: $@";
+    } catch {
+        ERROR("An error occurred while fetching yards: $_");
         return;
     }
 
     return \@yards;
 }
-#
+
 __PACKAGE__->meta->make_immutable;
 
 1;

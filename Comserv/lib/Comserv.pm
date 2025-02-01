@@ -34,7 +34,17 @@ __PACKAGE__->config(
     disable_component_resolution_regex_fallback => 1,
     enable_catalyst_header => $ENV{CATALYST_HEADER} // 1,
     encoding => 'UTF-8',
-    debug => $ENV{CATALYST_DEBUG} // 0,
+     'View::TT' => {
+        INCLUDE_PATH => [
+            __PACKAGE__->path_to('root'),  # Ensure this path is correct
+            __PACKAGE__->path_to('root', 'src'),
+            __PACKAGE__->path_to('root', 'lib'),
+        ],
+        TEMPLATE_EXTENSION => '.tt', # Add this line to recognize .tt2 files
+        WRAPPER => 'layout.tt',
+        ERROR => 'error.tt',
+    },
+   debug => $ENV{CATALYST_DEBUG} // 0,
     'Plugin::Log::Dispatch' => {
         dispatchers => [
             {
@@ -64,6 +74,16 @@ sub psgi_app {
 }
 
 __PACKAGE__->setup();
+
+# Call the initialize_db.pl script during application startup
+BEGIN {
+    my $script_path = "$FindBin::Bin/../script/initialize_db.pl";
+    unless (-x $script_path) {
+        die "Failed to initialize database: $script_path is not executable";
+    }
+    system($script_path) == 0
+        or die "Failed to initialize database: $!";
+}
 
 =encoding utf8
 

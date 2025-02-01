@@ -2,7 +2,7 @@ package Comserv::Model::DBForager;
 
 use strict;
 
-use JSON;  # Add this line-*`
+use JSON;
 use base 'Catalyst::Model::DBIC::Schema';
 
 # Load the database configuration from db_config.json
@@ -33,8 +33,6 @@ sub get_herbal_data {
     return [$dbforager->all]
 
 }
-# In Comserv::Model::DBForager
-# In Comserv::Model::DBForager
 sub get_herbs_with_apis {
     my ($self) = @_;
     my $herbs_with_apis = $self->schema->resultset('Herb')->search(

@@ -7,7 +7,7 @@
 <ul>
 [% FOREACH user IN users %]
     <li>
-        <a href="/user/edit_user/[% user.id %]">Edit</a>
+        <a href="[% c.uri_for('/user/edit_user', user.id) %]">Edit</a>
         [% user.username %]
     </li>
 [% END %]
