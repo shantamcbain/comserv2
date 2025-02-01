@@ -54,7 +54,7 @@ Please ensure that all navigation links within each sub-document are unique. Thi
 
 [% INCLUDE 'Documentation/Admin.tt' %]
 
-<h3 id="ai"><a href="#top">Back to top of Documentation</a></h3>
+<h3 id="AI"><a href="#top">Back to top of Documentation</a></h3>
 
 [% INCLUDE 'Documentation/AI.tt' %]
 
