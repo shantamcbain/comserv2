@@ -1,7 +1,7 @@
-[% PageVersion	= 'USBM.tt,v 0.01 2023/08/30 shanta Exp shanta '	%]
-[% IF debug_mode == 1 %]
-  [% PageVersion %]
-    [% INCLUDE 'debug.tt' %]
+
+[% PageVersion = 'USBM/USBM.tt,v 0.01 2024/05/10 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
 [% END %]
 
 [% # Check the session variable 'Domain' for the current domain %]

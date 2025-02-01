@@ -2,6 +2,7 @@ package Comserv::Model::ENCYModel;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+     use Try::Tiny;
 extends 'Catalyst::Model';
 
 has 'ency_schema' => (
