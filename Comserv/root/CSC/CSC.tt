@@ -11,7 +11,10 @@
 
 
 <A NAME="PageTop"></A>
-
+[% IF c.session.Domain == "demo.computersystemconsulting.ca" || c.session.Domain == "demo.local" %]
+    <!-- Include `3d/index.tt` only for the specified domains -->
+    [% INCLUDE "CSC/demo.tt" %]
+[% ELSE %]
 <table>
 <tr>
 	<td>
@@ -44,3 +47,4 @@ New</strong>Pay for your services with us. Two BitCoin exchanges
 
 </td></tr>
 </table>
+[% END %]
