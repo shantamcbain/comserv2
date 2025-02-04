@@ -36,5 +36,5 @@
     <p>Error: [% error_msg %]</p>
 [% END %]
 [% IF success_msg %]
-    <p>Error: [% success_msg %]</p>
+    <p>Success: [% success_msg %]</p>
 [% END %]

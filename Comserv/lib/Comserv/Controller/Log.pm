@@ -181,13 +181,14 @@ sub update :Path('/log/update') :Args(0) {
 # This method will only display the form
 sub log_form :Path('/log/log_form'):Args() {
     my ( $self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'log_form', "Accessed log form");
     my $schema = $c->model('DBEncy');
 
     # Declare $current_time and initialize it
     my $current_time = DateTime->now(time_zone => 'local')->strftime('%H:%M');
 
-    my $record_id = $c->request->body_parameters->{record_id};
-
+   my $record_id = $c->request->body_parameters->{todo_record_id} || $c->stash->{record_id};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'log_form', "Record ID: $record_id");
     my $log = Comserv::Model::Log->new(record_id => $record_id);
     my $todo = Comserv::Model::Todo->new();
     my $todo_record = $todo->fetch_todo_record($c, $record_id);
@@ -221,16 +222,20 @@ sub log_form :Path('/log/log_form'):Args() {
 }
 
 sub create_log :Path('/log/create_log'):Args() {
-    my ( $self, $c) = @_;
+    my ( $self, $c ) = @_;
 
     # Create new log entry
     my $schema = $c->model('DBEncy');
     my $rs = $schema->resultset('Log');
+    my $referer = $c->request->referer;
 
-    # Retrieve start_date from form data
-    my $start_date = $c->request->body_parameters->{start_date};
-    # Set owner to 'none' if it's not provided
+    # Log the referring page for debugging
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_log', "Referring page: $referer");
+
+    # Retrieve input parameters
+    my $start_date = $c->request->body_parameters->{start_date} // '';
     my $owner = $c->request->body_parameters->{owner} || 'none';
+    my $record_id = $c->request->body_parameters->{record_id};
 
     # Check if start_date is empty
     if ($start_date eq '') {
@@ -242,10 +247,10 @@ sub create_log :Path('/log/create_log'):Args() {
 
     # Check if subject is empty or undefined
     if (!defined $subject || $subject eq '') {
-        # Set an error message
-        $c->stash(error_msg => 'abstract cannot be empty');
+        # Log the validation failure
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_log', "Abstract is missing or empty.");
 
-        # Stash the form data
+        # Redirect back to log_form with an error message
         $c->stash(
             todo_record_id => $c->request->body_parameters->{todo_record_id},
             owner => $c->request->body_parameters->{owner}||'none',
@@ -280,6 +285,7 @@ sub create_log :Path('/log/create_log'):Args() {
     my $seconds = 0;  # Assuming there are no seconds in the time difference
     my $time_diff = sprintf("%02d:%02d:%02d", $hours, $minutes, $seconds);
 
+    # Default to current date if no start_date is provided
     my $current_date = DateTime->now->ymd;
     my $logEntry = $rs->create({
         todo_record_id => $c->request->body_parameters->{todo_record_id},
@@ -301,12 +307,29 @@ sub create_log :Path('/log/create_log'):Args() {
         comments => $c->request->body_parameters->{comments}
     });
 
-    if ($logEntry) {
-        $self->logging->log_with_details($c, 'info',__FILE__, __LINE__, 'create_log', "Created new log entry: " . Dumper($logEntry));
-        $c->response->redirect($c->uri_for('/'));
-    } else {
-        $c->response->body('Error creating log entry.');
+    # Error handling during log creation
+    if ($@ || !$logEntry) {
+        $self->logging->log_with_details(
+            $c, 'error', __FILE__, __LINE__, 'create_log',
+            "Failed to create log entry. Error: $@"
+        );
+
+        $c->stash(error_msg => 'Error creating log entry, please try again.');
+        $c->response->redirect($c->uri_for('/', { record_id => $record_id }));
+        return;
     }
+
+    # Log the success event
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_log', "Log entry created successfully: ID " . $logEntry->id);
+
+    # Redirect to the referring page and retain necessary parameters
+    my $redirect_url = $referer;
+    $redirect_url .= "?record_id=" . $logEntry->id if $logEntry->id;
+
+    # Log the redirection URL
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_log', "Redirecting to: $redirect_url");
+$c->flash->{success_msg} = 'Log entry created successfully';
+$c->response->redirect($c->uri_for('/todo/details', { record_id => $logEntry->todo_record_id }));
 }
 
 __PACKAGE__->meta->make_immutable;

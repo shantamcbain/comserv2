@@ -15,7 +15,14 @@ window.onload = function() {
     document.getElementById('start_time').value = hours + ":" + minutes;
 };
 </script>
-<form action="/log/create_log" method="POST">
+<h1>Log Form</h1>
+[% IF error_msg %]
+    <p>Error: [% error_msg %]</p>
+[% END %]
+[% IF success_msg %]
+    <p>Success: [% success_msg %]</p>
+[% END %]
+<form action="[% form_submit_url %]" method="POST">
 
     <label for="record_id">Todo Record ID:</label><br>
     <input type="text" id="todo_record_id" name="todo_record_id" value="[% todo_record_id %]">  <a href="[% c.uri_for('/todo/addtodo') %]"> Add Todo</a><br>
