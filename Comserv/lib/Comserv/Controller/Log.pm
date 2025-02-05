@@ -6,7 +6,6 @@ use DateTime::TimeZone;
 use DateTime::Format::Strptime;
 use Data::Dumper;
 use Comserv::Util::Logging;
-#use Comserv::Util::Logging; # Import the logging utility
 BEGIN { extends 'Catalyst::Controller'; }
 
 has 'record_id' => (is => 'rw', isa => 'Str');
@@ -27,7 +26,7 @@ sub BUILD {
     $self->status({
         1 => 'NEW',
         2 => 'IN PROGRESS',
-        3 => 'DONE',
+        3 => 'COMPLETED',
     });
 }
 
@@ -124,7 +123,7 @@ sub update :Path('/log/update') :Args(0) {
     my $end_time;
     my $time;
 
-    # Calculate the elapsed time only if the status is set to 'DONE' (3)
+    # Calculate the elapsed time only if the status is set to 'COMPLETED' (3)
     if ($status == 3) {
         # Set the end_time to the current time
         $end_time = DateTime->now(time_zone => 'local');
@@ -135,10 +134,10 @@ sub update :Path('/log/update') :Args(0) {
         # Convert the duration to the format 'HH:MM'
         $time = sprintf("%02d:%02d", $duration->hours, $duration->minutes);
 
-        # Update the end_time_str to the current time
+        # Update the end_time_str to the current time for COMPLETED status
         $end_time_str = $end_time->strftime('%H:%M');
     } else {
-        # If not 'DONE', use the provided end_time_str and do not calculate time
+        # If not 'COMPLETED', use the provided end_time_str and do not calculate time
         $end_time = $strp->parse_datetime($end_time_str);
         $time = $c->request->body_parameters->{time}; # Use existing time value
     }
@@ -174,51 +173,77 @@ sub update :Path('/log/update') :Args(0) {
     # Call the modify method on the Log model instance
     $log_model->modify($log, $new_values);
 
-    # Redirect to the log details page
+    # Redirect to the log details page after successful update
     $c->response->redirect($c->uri_for("/log", { record_id => $record_id }));
 }
 
 # This method will only display the form
-sub log_form :Path('/log/log_form'):Args() {
-    my ( $self, $c) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'log_form', "Accessed log form");
-    my $schema = $c->model('DBEncy');
+sub log_form :Path('/log/log_form') :Args(0) {
+    my ($self, $c) = @_;
 
-    # Declare $current_time and initialize it
-    my $current_time = DateTime->now(time_zone => 'local')->strftime('%H:%M');
+    # Retrieve the record_id (todo_id) from the POST request parameters
+    my $todo_id = $c->request->body_parameters->{record_id};
 
-   my $record_id = $c->request->body_parameters->{todo_record_id} || $c->stash->{record_id};
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'log_form', "Record ID: $record_id");
-    my $log = Comserv::Model::Log->new(record_id => $record_id);
-    my $todo = Comserv::Model::Todo->new();
-    my $todo_record = $todo->fetch_todo_record($c, $record_id);
-
-
-    # Add the priority, status, and record_id to the stash
-    $c->stash(
-        build_priority => $self->priority,
-        build_status   => $self->status,
-        priority => $todo_record->priority,
-        status   => $todo_record->status,
-        project_code   => $todo_record->project_id,
-        todo_record => $todo_record->record_id,
-        start_date  => $todo_record->start_date,
-        site_name   => $todo_record->sitename,
-        due_date    => $todo_record->due_date,
-        abstract    => $todo_record->subject,
-        details     => $todo_record->description,
-        comments    => $todo_record->comments,
-        end_time    => $current_time,  # Set end_time to current time
-    );
-
-    # Check if record_id is provided
-    if (defined $log->record_id) {
-        $c->stash(record_id => $log->record_id);
-        $c->stash(todo_record_id => $log->record_id);  # Add this line
+    # Ensure todo_id is provided
+    unless ($todo_id) {
+        $c->response->body('Todo ID (record_id) is required.');
+        return;
     }
 
-    # Render the form
-    $c->stash->{template} = 'log/log_form.tt';
+    # Fetch the todo record from the 'todo' table using the correct model
+    my $todo = $c->model('DBEncy')->resultset('Todo')->find($todo_id);
+
+    # Ensure the todo record exists
+    # Fetch the project_id from the todo record
+    my $project_id = $todo ? $todo->project_id : undef;
+
+    # Fetch the current project details if project_id exists
+    my $current_project;
+    if ($project_id) {
+        $current_project = $c->model('DBEncy')->resultset('Project')->find($project_id);
+    }
+
+    unless ($todo) {
+        $c->response->body('Todo record not found.');
+        return;
+    }
+
+    # Extract values from the todo record for the form
+    my $sitename     = $todo->sitename // '';         # Site name
+    my $priority     = $todo->priority // '';         # Priority level
+    my $status       = $todo->status // '';           # Status
+    my $start_date   = $todo->start_date // '';       # Start date
+    my $due_date     = $todo->due_date // '';         # Due date
+    my $abstract     = $todo->subject // '';          # Use 'subject' instead of 'abstract'
+    my $details      = $todo->description // '';      # Use 'description' instead of 'details'
+    my $comments     = $todo->comments // '';         # Comments
+
+    # Get dropdown values for priority and status from Log's BUILD method
+    my $build_priority = $self->priority;  # Retrieves priority dropdown from BUILD
+    my $build_status   = $self->status;    # Retrieves status dropdown from BUILD
+
+    # Fetch project data from the Project Controller
+    my $project_controller = $c->controller('Project');
+    my $projects = $project_controller->fetch_projects_with_subprojects($c);
+
+    # Set the values to the stash for rendering the template
+    $c->stash(
+        template        => 'log/log_form.tt',
+        todo_record_id  => $todo_id,        # Pass todo_id for the form
+        site_name       => $sitename,       # Matched to [% site_name %] in the template
+        projects        => $projects,       # Project list passed to template
+        start_date      => $start_date,
+        due_date        => $due_date,
+        current_project_id => $project_id,  # Pass project_id to template
+        current_project    => $current_project,  # Pass current project details
+        abstract        => $abstract,       # Use 'subject' for [% abstract %]
+        details         => $details,        # Use 'description' for [% details %]
+        priority        => $priority,       # Matches [% priority %] in the template
+        status          => $status,         # Matches [% status %] in the template
+        build_priority  => $build_priority, # Dropdown priority list from BUILD
+        build_status    => $build_status,   # Dropdown status list from BUILD
+        comments        => $comments,
+    );
 }
 
 sub create_log :Path('/log/create_log'):Args() {
@@ -246,7 +271,7 @@ sub create_log :Path('/log/create_log'):Args() {
     my $subject = $c->request->body_parameters->{abstract};
 
     # Check if subject is empty or undefined
-    if (!defined $subject || $subject eq '') {
+    if (!defined $subject || $subject =~ /^\s*$/) {
         # Log the validation failure
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_log', "Abstract is missing or empty.");
 
@@ -286,7 +311,7 @@ sub create_log :Path('/log/create_log'):Args() {
     my $time_diff = sprintf("%02d:%02d:%02d", $hours, $minutes, $seconds);
 
     # Default to current date if no start_date is provided
-    my $current_date = DateTime->now->ymd;
+    my $current_date = DateTime->now(time_zone => 'local')->ymd;
     my $logEntry = $rs->create({
         todo_record_id => $c->request->body_parameters->{todo_record_id},
         owner => $owner,
@@ -304,18 +329,20 @@ sub create_log :Path('/log/create_log'):Args() {
         priority => $c->request->body_parameters->{priority},
         last_mod_by => $c->session->{username},
         last_mod_date => DateTime->now->ymd,
-        comments => $c->request->body_parameters->{comments}
+        comments => $c->request->body_parameters->{comments} // ''
     });
 
     # Error handling during log creation
-    if ($@ || !$logEntry) {
+    if ($@ || !$logEntry)
+ {
         $self->logging->log_with_details(
             $c, 'error', __FILE__, __LINE__, 'create_log',
             "Failed to create log entry. Error: $@"
         );
 
         $c->stash(error_msg => 'Error creating log entry, please try again.');
-        $c->response->redirect($c->uri_for('/', { record_id => $record_id }));
+        $c->response->redirect($c->uri_for('/', { record_id =>
+ $record_id }));
         return;
     }
 
@@ -327,7 +354,7 @@ sub create_log :Path('/log/create_log'):Args() {
     $redirect_url .= "?record_id=" . $logEntry->id if $logEntry->id;
 
     # Log the redirection URL
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_log', "Redirecting to: $redirect_url");
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_log', "Redirecting to: $redirect_url");
 $c->flash->{success_msg} = 'Log entry created successfully';
 $c->response->redirect($c->uri_for('/todo/details', { record_id => $logEntry->todo_record_id }));
 }

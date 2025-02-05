@@ -89,49 +89,60 @@ sub details :Path('/todo/details') :Args {
 
 
 sub addtodo :Path('/todo/addtodo') :Args(0) {
-    my ( $self, $c ) = @_;
+    my ($self, $c) = @_;
 
-    # Get a DBIx::Class::Schema object
+    # Logging the start of the addtodo method
+    $self->logging->log_with_details(
+        $c, 'info', __FILE__, __LINE__, 'addtodo', 'Initiating addtodo subroutine'
+    );
+
+    # Fetch project data from the Project Controller
+    my $project_controller = $c->controller('Project');
+    my $projects = $project_controller->fetch_projects_with_subprojects($c);
+
+    # Fetch the project_id from query parameters (if any)
+    my $project_id = $c->request->query_parameters->{project_id};
+    my $current_project;
+
+    # Attempt to locate the current project based on project_id
+    if ($project_id) {
+        my $schema = $c->model('DBEncy');
+        $current_project = $schema->resultset('Project')->find($project_id);
+        if ($current_project) {
+            $self->logging->log_with_details(
+                $c, 'info', __FILE__, __LINE__, 'addtodo',
+                "Located current project with ID: $project_id (" . $current_project->name . ")"
+            );
+        } else {
+            $self->logging->log_with_details(
+                $c, 'warn', __FILE__, __LINE__, 'addtodo',
+                "Invalid project ID passed in query: $project_id"
+            );
+        }
+    }
+
+    # Fetch all users to populate the user drop-down
     my $schema = $c->model('DBEncy');
+    my @users = $schema->resultset('User')->search({}, { order_by => 'id' });
 
-    # Get the SiteName from the session
-    my $SiteName = $c->session->{SiteName};
-
-    # Fetch projects and their sub-projects
-    my $project_rs = $schema->resultset('Project')->search(
-        { 'me.sitename' => $SiteName }, # Filter by site name
-        {
-            prefetch => 'sub_projects', # Prefetch sub-projects
-            order_by => ['me.name'] # Order by project name
-        }
+    # Log a message confirming users were fetched
+    $self->logging->log_with_details(
+        $c, 'info', __FILE__, __LINE__, 'addtodo',
+        'Fetched users to populate user_id dropdown'
     );
 
-    # Convert the resultset to an array of hashrefs for use in the template
-    my @projects = map {
-        {
-            id => $_->id,
-            name => $_->name,
-            sub_projects => [ map { { id => $_->id, name => $_->name } } $_->sub_projects->all ]
-        }
-    } $project_rs->all;
-
-    # Fetch all users to populate the user_id dropdown
-    my @users = $schema->resultset('User')->all;
-
-    # Log the list of user_ids
-    my @user_ids = map { $_->id } @users;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'addtodo', 'User IDs: ' . join(', ', @user_ids));
-
-    # Add the projects, sitename, and user_id to the stash
+    # Stash the data for the template
     $c->stash(
-        projects => \@projects,
-        sitename => $SiteName,
-        users => \@users, # Pass users to the stash
-        user_id => $c->session->{user_id}, # Pass user_id to the stash
-        template => 'todo/addtodo.tt',
+        projects        => $projects,        # Parent projects with nested sub-projects
+        current_project => $current_project, # Selected project for the form (if any)
+        users           => \@users,          # List of users to populate dropdown
+        template        => 'todo/addtodo.tt' # Template for rendering
     );
 
-    $c->forward($c->view('TT'));
+    # Log the end of the addtodo subroutine
+    $self->logging->log_with_details(
+        $c, 'info', __FILE__, __LINE__, 'addtodo', 'Completed addtodo subroutine'
+    );
 }
 
 sub debug :Local {

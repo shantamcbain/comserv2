@@ -1,7 +1,7 @@
 [% PageVersion  = 'todo.tt,v 0.1 2023/11/09 Shanta Exp Shanta' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
-    [% "Debugging HostName: " _ HostName %]
+    [%# "Debugging HostName: " _ HostName %]
     [%# INCLUDE 'debug.tt' %]
 [% END %]
 <!-- Include the new CSS file -->
