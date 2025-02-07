@@ -33,3 +33,6 @@ inc/
 /MANIFEST.bak
 /pm_to_blib
 /*.zip
+/.idea/.gitignore
+/.idea/comserv2.iml
+/.codebuddy/.gitignore
