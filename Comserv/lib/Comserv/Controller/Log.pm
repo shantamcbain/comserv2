@@ -257,10 +257,42 @@ sub create_log :Path('/log/create_log'):Args() {
     # Log the referring page for debugging
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_log', "Referring page: $referer");
 
+    # Check if record_id is provided and valid
+    my $record_id = $c->request->body_parameters->{todo_record_id};
+
+    # Enhanced validation for record_id
+    unless ($record_id) {
+        $self->logging->log_with_details(
+            $c, 
+            'error', 
+            __FILE__, 
+            __LINE__, 
+            'create_log', 
+            'Todo record ID is missing or invalid.'
+        );
+        $c->stash(error_msg => 'Invalid Todo Record. Please select a valid Todo.');
+        $c->stash(template => 'log/log_form.tt');
+        return;
+    }
+
+    # Validate that the todo record exists
+    my $todo = $schema->resultset('Todo')->find($record_id);
+    unless ($todo) {
+        $self->logging->log_with_details(
+            $c, 
+            'error', 
+            __FILE__, 
+            __LINE__, 
+            'create_log', "Todo record with ID $record_id not found."
+        );
+        $c->stash(error_msg => "Todo record not found. Please select a valid Todo.");
+        $c->stash(template => 'log/log_form.tt');
+        return;
+    }
+
     # Retrieve input parameters
     my $start_date = $c->request->body_parameters->{start_date} // '';
     my $owner = $c->request->body_parameters->{owner} || 'none';
-    my $record_id = $c->request->body_parameters->{record_id};
 
     # Check if start_date is empty
     if ($start_date eq '') {
@@ -313,7 +345,7 @@ sub create_log :Path('/log/create_log'):Args() {
     # Default to current date if no start_date is provided
     my $current_date = DateTime->now(time_zone => 'local')->ymd;
     my $logEntry = $rs->create({
-        todo_record_id => $c->request->body_parameters->{todo_record_id},
+        todo_record_id => $record_id,
         owner => $owner,
         sitename => $c->session->{SiteName},
         start_date => $start_date || $current_date,

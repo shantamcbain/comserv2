@@ -22,7 +22,7 @@ window.onload = function() {
 [% IF success_msg %]
     <p>Success: [% success_msg %]</p>
 [% END %]
-<form action="[% form_submit_url %]" method="POST">
+<form action="/log/create_log" method="POST">
 
     <label for="record_id">Todo Record ID:</label><br>
     <input type="text" id="todo_record_id" name="todo_record_id" value="[% todo_record_id %]">  <a href="[% c.uri_for('/todo/addtodo') %]"> Add Todo</a><br>
