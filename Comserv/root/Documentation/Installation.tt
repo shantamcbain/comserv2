@@ -8,58 +8,50 @@
     <a href="#module-installation">Module Installation</a>
 </nav>
 
-<h2 id="module-installation">Module Installation with Perlbrew</h2>
-<h3>Installing Perlbrew on Linux/macOS</h3>
+<h2 id="module-installation">Automated Setup with install_comserv.pl</h2>
+<h3>Running the Installation Script</h3>
 <ol>
-    <li><strong>Ensure prerequisites are met:</strong>
-        <pre><code>sudo apt-get update && sudo apt-get install -y curl build-essential</code></pre>
-        On macOS, use Homebrew:
-        <pre><code>brew install curl</code></pre>
+    <li><strong>Download the installation script:</strong>
+        <pre><code>curl -O https://raw.githubusercontent.com/comserv2/Comserv/main/install_comserv.pl</code></pre>
     </li>
-    <li><strong>Install Perlbrew:</strong>
-        <pre><code>curl -L https://install.perlbrew.pl | bash</code></pre>
+    <li><strong>Make the script executable:</strong>
+        <pre><code>chmod +x install_comserv.pl</code></pre>
     </li>
-    <li><strong>Set up perlbrew in the shell environment:</strong>
-        <pre><code>echo "source ~/perl5/perlbrew/etc/bashrc" >> ~/.bashrc</code></pre>
-        For Zsh users:
-        <pre><code>echo "source ~/perl5/perlbrew/etc/bashrc" >> ~/.zshrc</code></pre>
-        Restart your terminal or source the file:
-        <pre><code>source ~/.bashrc</code></pre>
+    <li><strong>Run the script:</strong>
+        <pre><code>./install_comserv.pl</code></pre>
+        Follow the prompts to input your database connection details when prompted.
     </li>
-    <li><strong>Install a Perl version:</strong>
-        <pre><code>perlbrew install perl-5.40.0</code></pre>
-    </li>
-    <li><strong>Switch to Perl 5.40.0:</strong>
-        <pre><code>perlbrew switch perl-5.40.0</code></pre>
+    <li><strong>Verify the setup was successful:</strong>
+        <pre><code>perl -MModule::Name -e 'print $Module::Name::VERSION'</code></pre>
+        Replace <code>Module::Name</code> with the module you wish to verify.
     </li>
 
-<h3>Installing Perl on Windows (Strawberry Perl)</h3>
-Install Strawberry Perl, an alternative to perlbrew:
-    <ol>
-        <li><strong>Download and install:</strong>
-            <pre><code>https://strawberryperl.com/</code></pre>
-        </li>
-        <li><strong>Verify installation:</strong>
-            <pre><code>perl -v</code></pre>
-            Ensure Perl is available in your terminal by outputting the installed version.
-        </li>
+<h3>Installing Perl on Windows</h3>
+<ol>
+    <li><strong>Ensure Strawberry Perl is installed:</strong>
+        Download and install from:
+        <pre><code>https://strawberryperl.com/</code></pre>
+    </li>
+    <li><strong>Run the `install_comserv.pl` script:</strong>
+        Open Command Prompt and execute:
+        <pre><code>perl install_comserv.pl</code></pre>
+        Follow the prompts to input appropriate database connection details.
+    </li>
+</ol>
     </ol>
 <h3>Installing Module Dependencies</h3>
-    <li><strong>Switch to Perl 5.40.0:</strong>
-        <pre><code>perlbrew switch perl-5.40.0</code></pre>
+    <li><strong>Use the correct Perl version:</strong>
+        The `install_comserv.pl` script automatically configures the proper Perl version for you.
     </li>
-
     <li><strong>Ensure PATH includes Perlbrew's bin:</strong>
         Ensure `~/perl5/perlbrew/bin` and
 `~/perl5/perlbrew/perls/perl-5.40.0/bin` are included.
 `/home/comserv/perl5/perlbrew/perls/perl-5.40.0/bin` are included.
     </li>
 
-    <li><strong>Set up local::lib for user-level installations:</strong>
-        <pre><code>cpanm --local-lib=~/perl5 local::lib && eval $(perl -I
-~/perl5/lib Perl5::Local::lib)</code></pre>
-        Add this to your shell configuration file (e.g., `.bashrc` or
-`.zshrc`) for persistence across sessions.
+    <li><strong>Set up user-level modules:</strong>
+        Local module management is handled automatically by the `install_comserv.pl` script.
+        Ensure you follow the input prompts during setup for best results.
     </li>
 
     <li><strong>Check Perl library paths:</strong>
@@ -69,10 +61,8 @@ Install Strawberry Perl, an alternative to perlbrew:
 listed.
     </li>
 
-    <li><strong>Install Dependencies from cpanfile:</strong>
-        <pre><code>cpanm --installdeps .</code></pre>
-        This command reads your `cpanfile` and installs all listed
-dependencies
+    <li><strong>Install Dependencies:</strong>
+        The `install_comserv.pl` script automatically handles all required dependency installations.
     </li>
     <li>Create a directory for Comserv:
         <pre><code>mkdir /path/to/Comserv</code></pre>

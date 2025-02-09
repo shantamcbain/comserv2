@@ -1,26 +1,18 @@
-yrequires 'Moose';
+requires 'Moose';
 requires 'namespace::autoclean';
 requires 'JSON::MaybeXS';
 
-# System modules
-requires 'Socket';
-requires 'Sys::Hostname';
 requires 'MooseX::MarkAsMethods';
-requires 'DBD::mysql';
 requires 'Catalyst::Runtime' => '5.90130';
 requires 'Catalyst::Model';
 requires 'Catalyst::Restarter';
-requires 'DBI';
 requires 'DBIx::Class';
 requires 'DBIx::Class::Schema::Loader';
 requires 'DBIx::Class::TimeStamp';
 requires 'DBIx::Class::Migration';
 requires 'DBIx::Class::EncodedColumn';
 requires 'SQL::Translator';
-
-#json
-requires 'JSON';
-requires 'Config::JSON';
+requires 'DBD::mysql';
 
 #json
 requires 'JSON';
