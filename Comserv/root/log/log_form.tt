@@ -25,7 +25,10 @@ window.onload = function() {
 <form action="/log/create_log" method="POST">
 
     <label for="record_id">Todo Record ID:</label><br>
-    <input type="text" id="todo_record_id" name="todo_record_id" value="[% todo_record_id %]">  <a href="[% c.uri_for('/todo/addtodo') %]"> Add Todo</a><br>
+    <input type="hidden" id="todo_record_id" name="todo_record_id" value="[% todo_record_id %]">
+    <input type="text" id="todo_record_id" name="todo_record_id" value="[% todo_record_id %]">
+
+    <a href="[% c.uri_for('/todo/addtodo') %]"> Add Todo</a><br>
 
     <label for="sitename">Site Name:</label><br>
     <input type="text" id="sitename" name="sitename" value="[% site_name %]" readonly><br>
