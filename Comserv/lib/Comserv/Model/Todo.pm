@@ -11,6 +11,13 @@ has 'logging' => (
 
 sub get_top_todos {
     my ($self, $c, $SiteName) = @_;
+
+    # Check if the user has the 'admin' role
+    unless (grep { $_ eq 'admin' } @{$c->session->{roles}}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_top_todos', 'Unauthorized access attempt by non-admin user');
+        return []; # Return an empty list if the user is not an admin
+    }
+
     $SiteName = $c->session->{'SiteName'};
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_top_todos', "Site name: $SiteName");
 
@@ -28,8 +35,6 @@ sub get_top_todos {
     );
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_top_todos','Visited the todo page');
-    #$self->logging->log_with_details($c, __FILE__, __LINE__, "Number of todos fetched: " . scalar(@todos));
-
     $c->session(todos => \@todos);
 
     return \@todos;
@@ -37,6 +42,13 @@ sub get_top_todos {
 
 sub get_todos_for_date {
     my ($self, $c, $date) = @_;
+
+    # Check if the user has the 'admin' role
+    unless (grep { $_ eq 'admin' } @{$c->session->{roles}}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_todos_for_date', 'Unauthorized access attempt by non-admin user');
+        return []; # Return an empty list if the user is not an admin
+    }
+
     my $SiteName = $c->session->{SiteName};
 
     # Get a DBIx::Class::Schema object
@@ -53,6 +65,7 @@ sub get_todos_for_date {
 
     return \@todos;
 }
+
 
 sub fetch_todo_record {
     my ($self, $c, $record_id) = @_;
