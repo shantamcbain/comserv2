@@ -2,7 +2,20 @@
 
 BEGIN {
     $ENV{CATALYST_SCRIPT_GEN} = 40;
+
+    # Set up local::lib for local installations
+    use FindBin;
+    use local::lib "$FindBin::Bin/../local";
+
+    # Add local lib to @INC to ensure Perl can find modules
+    use lib "$FindBin::Bin/../local/lib/perl5";
+    $ENV{PERL5LIB} = "$FindBin::Bin/../local/lib/perl5:$ENV{PERL5LIB}";
+    $ENV{PATH} = "$FindBin::Bin/../local/bin:$ENV{PATH}";
 }
+
+# Automatically install dependencies locally
+system("cpanm --local-lib=local --installdeps .") == 0
+    or warn "Some dependencies may not have been installed. Check your cpanfile.\n";
 
 use Catalyst::ScriptRunner;
 Catalyst::ScriptRunner->run('Comserv', 'Server');
@@ -16,32 +29,6 @@ comserv_server.pl - Catalyst Test Server
 =head1 SYNOPSIS
 
 comserv_server.pl [options]
-
-   -d --debug           force debug mode
-   -f --fork            handle each request in a new process
-                        (defaults to false)
-   -? --help            display this help and exits
-   -h --host            host (defaults to all)
-   -p --port            port (defaults to 3000)
-   -k --keepalive       enable keep-alive connections
-   -r --restart         restart when files get modified
-                        (defaults to false)
-   -rd --restart_delay  delay between file checks
-                        (ignored if you have Linux::Inotify2 installed)
-   -rr --restart_regex  regex match files that trigger
-                        a restart when modified
-                        (defaults to '\.yml$|\.yaml$|\.conf|\.pm$')
-   --restart_directory  the directory to search for
-                        modified files, can be set multiple times
-                        (defaults to '[SCRIPT_DIR]/..')
-   --follow_symlinks    follow symlinks in search directories
-                        (defaults to false. this is a no-op on Win32)
-   --background         run the process in the background
-   --pidfile            specify filename for pid file
-
- See also:
-   perldoc Catalyst::Manual
-   perldoc Catalyst::Manual::Intro
 
 =head1 DESCRIPTION
 
@@ -57,4 +44,3 @@ This library is free software. You can redistribute it and/or modify
 it under the same terms as Perl itself.
 
 =cut
-
