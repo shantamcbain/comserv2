@@ -1,0 +1,12 @@
+
+[% PageVersion = 'admin/view_log.tt,v 0.01 2023/08/30 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+    <h1>Application Log</h1>
+    <pre>
+        [% log_content | html %]
+    </pre>
+</body>
+</html>

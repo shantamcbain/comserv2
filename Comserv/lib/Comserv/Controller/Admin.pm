@@ -4,6 +4,7 @@ use namespace::autoclean;
 use Data::Dumper;
 use DBIx::Class::Migration;
 use Comserv::Util::Logging;
+use File::Slurp;
 BEGIN { extends 'Catalyst::Controller'; }
 
 has 'logging' => (
@@ -200,6 +201,7 @@ EOF
 
 
 
+
 # Compare schema versions
 sub compare_schema :Path('compare_schema') :Args(0) {
     my ($self, $c) = @_;
@@ -263,6 +265,37 @@ sub migrate_schema :Path('migrate_schema') :Args(0) {
         message   => $c->stash->{message} || '',
         error_msg => $c->stash->{error_msg} || '',
         template  => 'admin/migrate_schema.tt'
+    );
+
+    $c->forward($c->view('TT'));
+}
+# Action to display the log file
+sub view_log :Path('/admin/view_log') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Check if the user has the 'admin' role
+    unless (grep { $_ eq 'admin' } @{$c->session->{roles}}) {
+        $c->response->body('Unauthorized access. Admins only.');
+        return;
+    }
+
+    # Path to the log file
+    my $log_file_path = $c->path_to('log', 'application.log');
+
+    # Read the log file content
+    my $log_content;
+    eval {
+        $log_content = read_file($log_file_path);
+    };
+    if ($@) {
+        $c->response->body("Failed to read log file: $@");
+        return;
+    }
+
+    # Pass the log content to the template
+    $c->stash(
+        log_content => $log_content,
+        template    => 'admin/view_log.tt'
     );
 
     $c->forward($c->view('TT'));
