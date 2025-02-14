@@ -1,6 +1,8 @@
 requires 'Moose';
 requires 'namespace::autoclean';
 requires 'JSON::MaybeXS';
+requires 'Term::Menus';
+
 
 requires 'MooseX::MarkAsMethods';
 requires 'Catalyst::Runtime' => '5.90130';
@@ -78,3 +80,5 @@ requires 'Test::Pod::Coverage';
 requires 'Test::WWW::Mechanize::Catalyst';
 requires 'Catalyst::ScriptRunner';
 requires 'Log::Log4perl';
+requires 'Catalyst::ScriptRunner';
+requires 'local::lib';

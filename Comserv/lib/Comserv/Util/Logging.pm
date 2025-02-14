@@ -19,9 +19,13 @@ sub instance {
 sub log_with_details {
     my ($self, $c, $level, $file, $line, $subroutine, $message) = @_;
 
-    unless ($c && ref($c) && $c->can('stash')) {
-        warn "log_with_details called without a valid context object";
-        return;
+    # Handle missing or invalid context object
+    if (!$c || !ref($c) || !$c->can('stash')) {
+        my $error_msg = sprintf("[%s:%d] %s - %s (NO CONTEXT)", 
+            $file, $line, $subroutine // 'unknown', $message // 'No message');
+        warn $error_msg;
+        print STDERR "$error_msg\n";
+        return 0;
     }
 
     # Ensure message is defined

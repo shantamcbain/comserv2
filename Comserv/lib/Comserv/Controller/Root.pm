@@ -18,10 +18,15 @@ __PACKAGE__->config(namespace => '');
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
 
+    # Log entry into index action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Starting index action");
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "About to fetch SiteName from session");
+    
+    # Get SiteName from session
     my $SiteName = $c->session->{SiteName};
+    
+    # Get ControllerName from session
     my $ControllerName = $c->session->{SiteName};
+
     $self->logging->log_with_details($c,  'info', __FILE__, __LINE__, 'index', "Site setup called");
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Fetched SiteName from session: $SiteName");
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Fetched ControllerName from session: $ControllerName");
@@ -104,12 +109,20 @@ sub fetch_and_set {
 sub auto :Private {
     my ($self, $c) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Starting auto action");
+    # Check if setup is needed
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Checking if setup is needed");
+    unless (-f $c->path_to('db_config.json')) {
+        $c->response->redirect($c->uri_for('/setup'))
+            unless $c->action->private_path =~ /^\/setup/;
+        return 0;
+    }
+    
 
     my $SiteName = $c->session->{SiteName};
 
     if (!defined $SiteName || $SiteName eq 'none' || $SiteName eq 'root') {
 
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "SiteName is either undefined, 'none', or 'root'. Proceeding with domain extraction and site domain retrieval");
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "SiteName $SiteName is either undefined, 'none', or 'root'. Proceeding with domain extraction and site domain retrieval");
 
         my $domain = $c->req->base->host;
         $domain =~ s/:.*//;
@@ -200,8 +213,6 @@ sub auto :Private {
     return 1;
 }
 
-
-
 sub site_setup {
     my ($self, $c) = @_;
     my $SiteName = $c->session->{SiteName};
@@ -277,5 +288,3 @@ sub end : ActionClass('RenderView') {}
 __PACKAGE__->meta->make_immutable;
 
 1;
-
-
