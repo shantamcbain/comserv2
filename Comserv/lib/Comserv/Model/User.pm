@@ -5,7 +5,7 @@ use Email::Sender::Simple qw(sendmail);
 use Email::Sender::Transport::SMTP qw();
 use Email::Simple;
 use Email::Simple::Creator;
-
+use Comserv::Util::Logging;
 extends 'Catalyst::Model', 'Catalyst::Authentication::User';
 
 has '_user' => (
@@ -38,9 +38,13 @@ sub supports {
 }
 sub roles {
     my $self = shift;
-    return [ map $_->role, $self->_user->roles->all ];
-}
 
+    # Fetch the role from the user object directly
+    my $role = $self->_user->role;
+
+    # Return it as an array reference (since the session expects an array)
+    return [ $role ];
+}
 
 # Ensured correct database connection and user creation
 sub create_user {

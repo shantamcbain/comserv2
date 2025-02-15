@@ -1,3 +1,4 @@
+
 package Comserv::Controller::Todo;
 use Moose;
 use namespace::autoclean;
@@ -9,6 +10,49 @@ has 'logging' => (
     is => 'ro',
     default => sub { Comserv::Util::Logging->instance }
 );
+# Apply restrictions to the entire controller
+sub begin :Private {
+    my ($self, $c) = @_;
+
+    # Log the path the user is accessing
+    $self->logging("debug", "User accessing path: " . $c->req->uri);
+
+    # Fetch the user's roles from the session
+    my $roles = $c->session->{roles} || [];
+
+    # Ensure roles are an array reference
+    if (ref $roles ne 'ARRAY') {
+        $self->logging("error", "Invalid or undefined roles in session for user: " . ($c->session->{username} || 'Guest'));
+
+        # Stash the current path so it can be used for redirection after login
+        $c->stash->{template} = $c->req->uri;
+
+        # Set error message for session problems
+        $c->stash->{error_msg} = "Session expired or invalid. Please log in again.";
+
+        # Redirect to login
+        $self->logging("debug", "Redirecting to login page due to missing or invalid roles.");
+        $c->res->redirect($c->uri_for('/login'));
+        $c->detach;
+    }
+
+    # Check if the user has the 'admin' role
+    unless (grep { $_ eq 'admin' } @$roles) {
+        $self->logging("warn", "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest'));
+
+        # Stash the current path for potential use
+        $c->stash->{redirect_to} = $c->req->uri;
+
+        # Redirect unauthorized users to the home page with an error message
+        $c->stash->{error_msg} = "Unauthorized access. You do not have permission to view this page.";
+        $self->logging("debug", "Redirecting unauthorized user to the home page.");
+        $c->res->redirect($c->uri_for('/'));
+        $c->detach;
+    }
+
+    # If we get here, the user is authorized
+    $self->logging("debug", "User authorized to access Todo: " . ($c->session->{username} || 'Guest'));
+}
 sub index :Path(/todo) :Args(0) {
     my ( $self, $c ) = @_;
 
