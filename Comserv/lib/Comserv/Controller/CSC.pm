@@ -13,9 +13,9 @@ sub index :Path('/CSC/index') :Args(0) {
 
     # Set the MailServer in the session
     $c->session->{MailServer} = "http://webmail.computersystemconsulting.ca";
-    $self->logging->log_with_details($c, __FILE__, __LINE__, "Entered Index Method");
+    $self->logging->log_with_details($c,'info', __FILE__, __LINE__, "Entered Index Method");
 
-    $self->logging->log_with_details($c, __FILE__, __LINE__, "Rendering CSC template");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, "Rendering CSC template");
     $c->stash(template => 'CSC/CSC.tt');
     $c->forward($c->view('TT'));
 }

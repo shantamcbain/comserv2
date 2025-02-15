@@ -259,11 +259,17 @@ sub create_log :Path('/log/create_log'):Args() {
 
     # Check if record_id is provided and valid
     my $record_id = $c->request->body_parameters->{todo_record_id};
+    if (ref $record_id eq 'ARRAY') {
+        $record_id = $record_id->[0];  # Take the first element if it's an array
+    }
     unless ($record_id) {
         my $error_msg = 'Todo record ID is missing or invalid.';
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_log', $error_msg);
-        $c->stash(error_msg => $error_msg);
-        $c->stash(template => 'log/log_form.tt');
+        $c->stash(
+            error_msg => $error_msg,
+            template => 'log/log_form.tt',
+            form_data => $c->request->body_parameters  # Pass the submitted data back to the form
+        );
         return;
     }
 
@@ -272,8 +278,11 @@ sub create_log :Path('/log/create_log'):Args() {
     unless ($todo) {
         my $error_msg = "Todo record with ID $record_id not found.";
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_log', $error_msg);
-        $c->stash(error_msg => $error_msg);
-        $c->stash(template => 'log/log_form.tt');
+        $c->stash(
+            error_msg => $error_msg,
+            template => 'log/log_form.tt',
+            form_data => $c->request->body_parameters  # Pass the submitted data back to the form
+        );
         return;
     }
 
@@ -287,8 +296,11 @@ sub create_log :Path('/log/create_log'):Args() {
     if (!defined $subject || $subject =~ /^\s*$/) {
         my $error_msg = 'Abstract is required.';
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_log', $error_msg);
-        $c->stash(error_msg => $error_msg);
-        $c->stash(template => 'log/log_form.tt');
+        $c->stash(
+            error_msg => $error_msg,
+            template => 'log/log_form.tt',
+            form_data => $c->request->body_parameters  # Pass the submitted data back to the form
+        );
         return;
     }
 
@@ -343,8 +355,11 @@ sub create_log :Path('/log/create_log'):Args() {
     };
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_log', "Failed to create log entry. Error: $@");
-        $c->stash(error_msg => 'Error creating log entry, please try again.');
-        $c->stash(template => 'log/log_form.tt');
+        $c->stash(
+            error_msg => 'Error creating log entry, please try again.',
+            template => 'log/log_form.tt',
+            form_data => $c->request->body_parameters  # Pass the submitted data back to the form
+        );
         return;
     }
 }

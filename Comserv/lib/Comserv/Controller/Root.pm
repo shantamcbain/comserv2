@@ -154,7 +154,11 @@ sub auto :Private {
     }
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "Session Roles: " . join(', ', @{$c->session->{roles}}));
 
-
+    # Check for debug=1 in the URL and set debug mode in the stash
+    if ($c->req->params->{debug} && $c->req->params->{debug} == 1) {
+        $c->session->{debug_mode} = 1;
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "Debug mode enabled");
+    }
 
     if (ref($c) eq 'Catalyst::Context') {
         my @main_links = $c->model('DB')->get_links($c, 'Main');
