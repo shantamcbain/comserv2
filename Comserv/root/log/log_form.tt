@@ -37,6 +37,9 @@ window.onload = function() {
     <input type="date" id="start_date" name="start_date" value="[% start_date %]"><br>
 
 
+
+
+
     <label for="project_id">Select Project:</label>
     <select id="project_id" name="project_id" class="form-select" required>
         [% FOREACH project IN projects %]

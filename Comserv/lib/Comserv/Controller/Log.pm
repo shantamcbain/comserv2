@@ -246,6 +246,7 @@ sub log_form :Path('/log/log_form') :Args(0) {
     );
 }
 
+
 sub create_log :Path('/log/create_log'):Args() {
     my ( $self, $c ) = @_;
 
@@ -321,6 +322,19 @@ sub create_log :Path('/log/create_log'):Args() {
     # Default to current date if no start_date is provided
     my $current_date = DateTime->now(time_zone => 'local')->ymd;
 
+    # Retrieve project_id from form data
+    my $project_id = $c->request->body_parameters->{project_id};  # Ensure project_id is passed correctly
+    unless (defined $project_id) {
+        my $error_msg = 'Project ID is required.';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_log', $error_msg);
+        $c->stash(
+            error_msg => $error_msg,
+            template => 'log/log_form.tt',
+            form_data => $c->request->body_parameters  # Pass the submitted data back to the form
+        );
+        return;
+    }
+
     # Error handling during log creation
     eval {
         my $logEntry = $rs->create({
@@ -328,7 +342,7 @@ sub create_log :Path('/log/create_log'):Args() {
             owner => $owner,
             sitename => $c->session->{SiteName},
             start_date => $start_date || $current_date,
-            project_code => $c->request->body_parameters->{project_code},
+            project_code => $project_id,  # Ensure project_id is passed correctly
             due_date => $c->request->body_parameters->{due_date},
             abstract => $subject,
             details => $c->request->body_parameters->{details},
@@ -354,16 +368,16 @@ sub create_log :Path('/log/create_log'):Args() {
         $c->response->redirect($c->uri_for('/todo/details', { record_id => $logEntry->todo_record_id }));
     };
     if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_log', "Failed to create log entry. Error: $@");
+        my $error_msg = "Failed to create log entry. Error: $@";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_log', $error_msg);
         $c->stash(
-            error_msg => 'Error creating log entry, please try again.',
+            error_msg => $error_msg,
             template => 'log/log_form.tt',
             form_data => $c->request->body_parameters  # Pass the submitted data back to the form
         );
         return;
     }
 }
-
 
 __PACKAGE__->meta->make_immutable;
 

@@ -99,8 +99,6 @@ sub fetch_and_set {
 
     return $value;
 }
-
-
 sub auto :Private {
     my ($self, $c) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Starting auto action");
@@ -178,6 +176,11 @@ sub auto :Private {
 
     return 1;
 }
+
+
+
+
+
 
 
 
