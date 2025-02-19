@@ -5,6 +5,22 @@ BEGIN {
 
     # Set up local::lib for local installations
     use FindBin;
+    # Check if local::lib is available
+eval {
+    require local::lib;
+};
+if ($@) {
+    print "local::lib module not found. Installing...\n";
+
+    # Install local::lib into the local environment
+    system("cpanm local::lib") == 0
+        or die "Failed to install local::lib. Please install it manually.\n";
+
+    # Reload environment to use the newly installed local::lib
+    exec($^X, $0, @ARGV);
+    exit;
+}
+
     use local::lib "$FindBin::Bin/../local";
 
     # Add local lib to @INC to ensure Perl can find modules
