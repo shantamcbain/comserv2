@@ -94,6 +94,7 @@ if ($ControllerName =~ m/\.tt$/) {
 <ul>
     <li><b>Domain Setup:</b> Runs `fetch_and_set` to resolve the current tenant.</li>
     <li><b>Session Context:</b> Prepares variables in both session and stash environments.</li>
+    <li><b>Debug Mode Toggling:</b> The `auto` action checks for a `debug` parameter in the URL. If `debug=1`, it enables the debug mode by setting `c.session.debug_mode` to `1`. If `debug=0`, it disables the debug mode by setting `c.session.debug_mode` to `0`. This allows for dynamic toggling of debug mode based on URL parameters.</li>
 </ul>
 <a href="#roottop">back to top</a>
 
