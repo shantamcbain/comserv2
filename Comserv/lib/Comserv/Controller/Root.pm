@@ -152,10 +152,15 @@ sub auto :Private {
     }
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "Session Roles: " . join(', ', @{$c->session->{roles}}));
 
-    # Check for debug=1 in the URL and set debug mode in the stash
-    if ($c->req->params->{debug} && $c->req->params->{debug} == 1) {
-        $c->session->{debug_mode} = 1;
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "Debug mode enabled");
+    # Check for debug parameter in the URL and toggle debug mode accordingly
+    if (defined $c->req->params->{debug}) {
+        if ($c->req->params->{debug} == 1) {
+            $c->session->{debug_mode} = 1;
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "Debug mode enabled");
+        } elsif ($c->req->params->{debug} == 0) {
+            $c->session->{debug_mode} = 0;
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "Debug mode disabled");
+        }
     }
 
     if (ref($c) eq 'Catalyst::Context') {
