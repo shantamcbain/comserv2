@@ -26,13 +26,15 @@
     <a href="https://skyefarm.com:20000" target="_Blank">skyefarm.com</a>
     <a href="https://usbm.ca:20000" target="_Blank">Usbm</a>
     <a href="https://weaverbeck.com:20000" target="_Blank">Weaverback</a>
+[% END %][%# HostName %][% MailServer %]
+ <!-- Ensure the URL does not include a port number -->
+[% IF c.session.first_name %]
+    <!-- Construct the URL without a port number -->
+    <A HREF="[% c.session.MailServer.replace(':80', '') %]" target="_Blank">[%c.session.first_name %]'s Mail</a>
+[% ELSE %]
+    <A HREF="[% c.session.MailServer.replace(':3000', '') %]" target="_Blank">Mail</a>
 [% END %]
- [% IF firstname %]
-     <A HREF ="http://webmail.[% HostName %]" target="_Blank">Mail</a>
 
- [% ELSE %]
-	   <A  HREF =":20000" >Mail</a>
- [% END %]
  </div>
             </div>
                     <ul>

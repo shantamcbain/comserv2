@@ -1,4 +1,5 @@
-[% PageVersion = 'Documentation/Todo.tt,v 0.01 2024/01/28 Shanta Exp shanta ' %]
+
+[% PageVersion = 'Documentation/Todo.tt,v 0.02 2024/11/21 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
     [%# "Debugging HostName: " _ HostName %]
@@ -45,3 +46,23 @@
     <li>status is selected in with value todo record the word open.</li>
 </ol>
 </p>
+<h2 id="controller">Controller</h2>
+<p>The <code>Comserv::Controller::Todo</code> module handles the routing and logic for todo-related actions:</p>
+<ul>
+    <li><strong>Index:</strong> Fetches all todo records and stores them in the stash.</li>
+    <li><strong>Todo:</strong> Fetches todos for the site, ordered by priority and start date, excluding status 3.</li>
+    <li><strong>Details:</strong> Fetches a specific todo by record ID and calculates accumulative time.</li>
+    <li><strong>Add Todo:</strong> Prepares data for adding a new todo, including fetching projects and sub-projects.</li>
+    <li><strong>Modify:</strong> Updates a todo record with new data, calculates total log time, and updates accumulative time.</li>
+    <li><strong>Create:</strong> Creates a new todo record with form data, handles project code, and validates user ID.</li>
+    <li><strong>Day:</strong> Fetches todos for a specific day, excluding status 3, and calculates previous and next dates.</li>
+    <li><strong>Week:</strong> Fetches todos for a specific week, excluding status 3, and calculates start and end of the week.</li>
+</ul>
+
+<h2 id="model">Model</h2>
+<p>The <code>Comserv::Model::Todo</code> module provides methods for interacting with the todo data:</p>
+<ul>
+    <li><strong>Get Top Todos:</strong> Retrieves the top 10 todos for a site, ordered by priority and start date, excluding status 3.</li>
+    <li><strong>Get Todos for Date:</strong> Retrieves todos for a specific date, ordered by priority and start date, excluding status 3.</li>
+    <li><strong>Fetch Todo Record:</strong> Retrieves a specific todo record by ID.</li>
+</ul>

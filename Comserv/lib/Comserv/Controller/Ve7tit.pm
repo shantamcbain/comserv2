@@ -6,6 +6,8 @@ BEGIN { extends 'Catalyst::Controller'; }
 
 sub index :Path :Args(0) {
     my ( $self, $c ) = @_;
+       $c->session->{MailServer} = "http://webmail.ve7tit.com";
+
      $c->stash(template => 've7tit/index.tt');
 }
 

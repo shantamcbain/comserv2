@@ -55,6 +55,7 @@
     <a href="/add_schema" target="_blank">Add New Schema</a>
     </li>
     <li><strong><a href="#get_table_information">Get Table Information</a></strong> Retrieves information about a specific table from the 'DBEncy' model. If the table exists, displays its schema. If the table does not exist, displays an error message.</li>
+    <li><strong><a href="#migrate_schema">Migrate Schema</a></strong> Handles the migration of schemas. If the request method is 'POST', runs the 'migrate_schema.pl' script.</li>
 </ul>
 
 <p>For more information on how to use these features, please refer to the specific documentation for each feature.</p>

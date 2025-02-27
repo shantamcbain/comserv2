@@ -15,10 +15,20 @@ window.onload = function() {
     document.getElementById('start_time').value = hours + ":" + minutes;
 };
 </script>
+<h1>Log Form</h1>
+[% IF error_msg %]
+    <p>Error: [% error_msg %]</p>
+[% END %]
+[% IF success_msg %]
+    <p>Success: [% success_msg %]</p>
+[% END %]
 <form action="/log/create_log" method="POST">
 
     <label for="record_id">Todo Record ID:</label><br>
-    <input type="text" id="todo_record_id" name="todo_record_id" value="[% todo_record_id %]">  <a href="[% c.uri_for('/todo/addtodo') %]"> Add Todo</a><br>
+    <input type="hidden" id="todo_record_id" name="todo_record_id" value="[% todo_record_id %]">
+    <input type="text" id="todo_record_id" name="todo_record_id" value="[% todo_record_id %]">
+
+    <a href="[% c.uri_for('/todo/addtodo') %]"> Add Todo</a><br>
 
     <label for="sitename">Site Name:</label><br>
     <input type="text" id="sitename" name="sitename" value="[% site_name %]" readonly><br>
@@ -26,8 +36,23 @@ window.onload = function() {
     <label for="start_date">Start Date:</label><br>
     <input type="date" id="start_date" name="start_date" value="[% start_date %]"><br>
 
-    <label for="project_code">Project Code:</label><br>
-    <input type="text" id="project_code" name="project_code" value="[% project_code %]"><br>
+
+
+
+
+    <label for="project_id">Select Project:</label>
+    <select id="project_id" name="project_id" class="form-select" required>
+        [% FOREACH project IN projects %]
+        <option value="[% project.id %]" [% IF current_project && current_project.id == project.id %]selected[% END %]>
+            [% project.name %]
+        </option>
+        [% FOREACH sub_project IN project.sub_projects %]
+        <option value="[% sub_project.id %]" [% IF current_project && current_project.id == sub_project.id %]selected[% END %]>
+            -- [% sub_project.name %]
+        </option>
+        [% END %]
+        [% END %]
+    </select>
 
     <label for="due_date">Due Date:</label><br>
     <input type="date" id="due_date" name="due_date" value="[% due_date %]"><br>

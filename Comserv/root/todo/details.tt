@@ -1,13 +1,22 @@
-[% PageVersion  = 'todo/details.tt,v 0.1 2023/12/07 Shanta Exp Shanta'; %]
+
+[% PageVersion  = 'todo/details.tt,v 0.02 2024/11/22 Shanta Exp Shanta'; %]
+[%# PageVersion  = 'todo/details.tt,v 0.1 2023/12/07 Shanta Exp Shanta'; %]
 [% IF debug_mode == 1 %]
-    <p>Error: [% error_msg %]</p>
+
     [% PageVersion %]
 [% END %]
 
 <h1>Record Details View.</h1>
 <!-- Button to return to the previous page -->
 <button type="button" onclick="window.history.back();">Return</button>
-    <p>Record ID: [% record.get_column('record_id') %]</p>
+<p>Record ID: [% record.get_column('record_id') %]</p>
+
+<!-- Display the accumulated time for the todo record -->
+<div>
+    <label for="accumulative_time_display">Accumulated Time:</label>
+    <span id="accumulative_time_display">[% accumulative_time %]</span>
+</div>
+
 <form action="/todo/modify/[% record.get_column('record_id') %]" method="post">
     <div>
         <label for="sitename">Site Name:</label>
@@ -89,14 +98,14 @@
 </form>
 
 <div>
-
-<form action="/log/log_form" method="POST" target="_blank">
-    <input type="hidden" name="record_id" value="[% record.get_column('record_id') %]">
-    <button type="submit">Add Log</button>
-</form>
-         <form action="/todo/details" method="POST">
-             <input type="hidden" name="record_id" value="[% record.get_column('record_id') %]">
-          <button type="submit">Details</button>
-        </form></div>
+    <form action="/log/log_form" method="POST" target="_blank">
+        <input type="hidden" name="record_id" value="[% record.get_column('record_id') %]">
+        <button type="submit">Add Log</button>
+    </form>
+    <form action="/todo/details" method="POST">
+        <input type="hidden" name="record_id" value="[% record.get_column('record_id') %]">
+        <button type="submit">Details</button>
+    </form>
+</div>
 <!-- Button to return to the previous page -->
 <button type="button" onclick="window.history.back();">Return</button>

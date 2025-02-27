@@ -12,7 +12,10 @@
     <span class="submenu-header"><a href="/admin" class="dropbtn">admin</a></span>
     <div class="submenu">
         <a href="/documentation">Documentation</a>
-        <a href="[% c.uri_for(c.controller('Log').action_for('log')) %]">Open Log</a>
+<!--<a href="[% c.uri_for(c.controller('Log').action_for('log')) %]">Open Log</a>-->
+<!-- Manually constructing the URL as a temporary workaround-->
+
+<a href="/log">Open Log</a>
         <a href="[% c.uri_for(c.controller('project').action_for('project')) %]">Projects</a>
 
     </div>
@@ -98,6 +101,8 @@
                     <a href="/css_form">CSS Settings</a>
                     <a href="/admin/users">Users</a>
                     <a href="/display_schema">Schema</a>
+            <a href="/mail/add_mail_config_form">Mail Configuration</a>
+
                 </div>
             </div>
             <div class="submenu-item">
@@ -142,12 +147,12 @@
                 <span class="submenu-header">Other Options</span>
                 <div class="submenu">
                     [% IF c.session.debug_mode == 1 %]
-                        <a href="[% c.session.return_url %]?&debug=0">Toggle Debug Mode OFF</a>
+                        <a href="[% c.session.return_url %]?debug=0">Toggle Debug Mode OFF</a>
                     [% ELSE %]
                         <a href="[% c.session.return_url %]?debug=1">Toggle Debug Mode ON</a>
                     [% END %]
             <a href="/debug" target="_blank">Debug</a>
-                   <a href="https://forager.com:2087" target="_blank">Sunfire WHM</a>
+                   <a href="https://computersystemconsulting.ca:10000" target="_blank">Sunfire WHM</a>
                 </div>
             </div>
         </div>

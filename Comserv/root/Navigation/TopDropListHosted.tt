@@ -11,8 +11,8 @@
                 <a href="/apply">Apply for Hosted Account</a>
                 <a href="/accounts">Hosted Accounts</a>
                 <a href="https://shamanbotanicals.ca" target="_blank">shamanbotanicals.ca </a>
-                <a href="https://skyefarm.com" target="_blank">skyefarm.com </a>
-                <a href="https://ve7tit.com" target="_blank">ve7tit.com   </a>
+                <a href="https://3d.usbm.ca" target="_blank">3d Printing </a>
+               <a href="https://3d.local:3000" target="_blank">local 3d Printing </a>                <a href="https://ve7tit.com" target="_blank">ve7tit.com   </a>
                 <a href="https://altpowerstore.com" target="_blank">altpowerstore.com</a>
 [% FOREACH link = c.stash.dbi.query("SELECT * FROM internal_links_tb
                                 WHERE  category = 'Hosted_link' AND (username_of_poster = '$username' OR share = 'public')

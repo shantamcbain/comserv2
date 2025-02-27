@@ -1,30 +1,58 @@
 [% PageVersion = 'pagetop.tt,v 0.021 2024/01/01 shanta Exp shanta ' %]
 [%# PageVersion = 'pagetop.tt,v 0.02 2023/08/30 shanta Exp shanta ' %]
+
 [% IF c.session.debug_mode == 1 %]
+<div class="debug">
     [% PageVersion %]
-    [%# "Debugging HostName: " _ HostName %]
     [% INCLUDE 'debug.tt' %]
-[% IF c.stash.debug_msg %]
-    [% FOREACH msg IN c.stash.debug_msg %]
+    [% IF c.stash.debug_msg %]
+        [% FOREACH msg IN c.stash.debug_msg %]
         <p class="debug">Debug: [% msg %]</p>
+        [% END %]
     [% END %]
+</div>
 [% END %]
 
-[% END %]
+[% IF c.session.roles && c.session.roles.size %]
+    [% FOREACH role IN c.session.roles %]
+        [% IF role == 'admin' %]
+            [% SET is_admin = 1 %]
+        [% END %]
+    [% END %]
+[% END %].
+[% SET roles = c.session.roles || [] %]
+
 <header>
-    <!-- Site Greeting -->
-<h1>Welcome to [% c.stash.ScriptDisplayName  %]</h1>
-<!-- Main Menu.pm -->    <nav>
+    <h1>
+        Welcome [% IF roles.grep('admin').size %]
+[% c.session.first_name %] [% c.session.last_name %] Administrator
+[% ELSIF roles.grep('user').size %]
+<p> [% c.session.first_name %] [% c.session.last_name %] User
+[% ELSE %]
+<p> Guest
+[% END %] to [% c.stash.ScriptDisplayName %]!
+    </h1>
+
+
+
+
+
+
+    <!-- Main Menu -->
+    <nav>
         <ul class="horizontal-menu">
             <li class="horizontal-dropdown">
-                <a href="[% c.session.return_url %]"class="dropbtn">Back</a>
+                <a href="[% c.session.return_url %]" class="dropbtn">Back</a>
             </li>
-            [% INCLUDE 'Navigation/TopDropListMain.tt' %]
-            [% INCLUDE 'Navigation/TopDropListLogin.tt' %]
-            [% INCLUDE 'Navigation/TopDropListGlobal.tt' %]
-            [% INCLUDE 'Navigation/TopDropListHosted.tt' %]
-            [% INCLUDE 'Navigation/TopDropListMember.tt' %]
-        [% IF c.session.roles == "admin" %]
+        [% INCLUDE 'Navigation/TopDropListMain.tt' %]
+        [% INCLUDE 'Navigation/TopDropListLogin.tt' %]
+        [% INCLUDE 'Navigation/TopDropListGlobal.tt' %]
+        [% INCLUDE 'Navigation/TopDropListHosted.tt' %]
+        [% INCLUDE 'Navigation/TopDropListMember.tt' %]
+
+        [% SET is_admin = c.session.roles.grep('admin').size > 0 %]
+
+        [% IF is_admin %]
             [% INCLUDE 'Navigation/admintopmenu.tt' %]
         [% END %]
 
@@ -32,9 +60,11 @@
         </ul>
     </nav>
 </header>
+
 [% IF error_msg %]
-    <p>Error: [% error_msg %]</p>
+<p class="error">Error: [% error_msg %]</p>
 [% END %]
+
 [% IF success_msg %]
-    <p>Error: [% success_msg %]</p>
+<p class="success">Success: [% success_msg %]</p>
 [% END %]

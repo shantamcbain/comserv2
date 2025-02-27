@@ -2,13 +2,32 @@
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
-<h1 id="overview_top"><a href="#top">Overview</a></h1>
-<nav>
+<h1 id="overview_top">Comserv Application Overview</h1>
 
-<a href="#main_features">Main Features</a> |
-<a href="#suggestions">Suggestions for Improvement and Expansion</a> |
-<a href="#instructions">Instructions for Developers</a>
-</nav>
+<p>The Comserv application is a comprehensive multi-tenant web platform designed to serve multiple domains and provide a wide range of functionalities for different user types. At its core, it's a modular system that enables:</p>
+
+<h2>Core Architecture</h2>
+<ul>
+    <li><strong>Multi-tenant Architecture:</strong> Supports multiple domains and sites through a single codebase</li>
+    <li><strong>Domain-specific Customization:</strong> Each domain can have its own:
+        <ul>
+            <li>Custom styling and branding</li>
+            <li>Specific feature sets</li>
+            <li>Unique user management</li>
+            <li>Independent data storage</li>
+        </ul>
+    </li>
+    <li><strong>Modular Design:</strong> Features are implemented as independent modules including:
+        <ul>
+            <li>ENCY (Encyclopedia of Natural Life)</li>
+            <li>BMaster (Beekeeping Management)</li>
+            <li>CSC (Computer System Consulting)</li>
+            <li>Project Management</li>
+            <li>User Management</li>
+            <li>File Management</li>
+        </ul>
+    </li>
+</ul>
 
 <h2 id="main_features">Main Features of the New Site:</h2>
 <nav>
@@ -35,10 +54,10 @@
     <li><h3 id="AI_integration"><a href="#main_features">AI Integration with the Site:</a></h3> Integrates the ability to search internal resources, external resources, and add information to the local system.</li>
     <li><h3 id="modular_design"><a href="#main_features">Modular Design:</a></h3> Ensures the site is built in a modular fashion for ease of maintenance and scalability.</li>
     <li><h3 id="todo_project_management_logs"><a href="#main_features">ToDo, Project Management, Logs:</a></h3> Incorporates tools for managing tasks, projects, and maintaining logs for better tracking and management.</li>
-    <li><h3 id="admin_functions"><a href="#main_features">Admin Functions:</a></h3> Provides capabilities to edit files, control CSS, update the application, and manage the schema.</li>
+    <li><h3 id="admin_functions"><a href="#main_features">Admin Functions:</a></h3> Provides capabilities to edit files, control Cascading Style Sheets, update the application, and manage the schema.</li>
     <li><h3 id="security"><a href="#main_features">Security:</a></h3> Implements robust security measures to protect data and user information.</li>
     <li><h3 id="documentation"><a href="#main_features">Documentation:</a></h3> Maintains comprehensive documentation to assist developers and users.</li>
-    <li><h3 id="search"><a href="#main_features">Search:</a></h3> Uses AI to build a comprehensive information base, improving search accuracy and relevance.</li>
+    <li><h3 id="search"><a href="#main_features">Search:</a></h3> Uses Artificial Intelligence to build a comprehensive information base, improving search accuracy and relevance.</li>
     <li><h3 id="reference_system"><a href="#main_features">Reference System of Documents:</a></h3> Offers a well-organized system for managing and referencing documents.</li>
     <li><h3 id="power_monitoring"><a href="#main_features">Power Monitoring System:</a></h3> Includes a system for monitoring power usage and efficiency.</li>
     <li><h3 id="web_based_email"><a href="#main_features">Web-Based Email:</a></h3> Provides a web-based email client for managing emails.</li>
@@ -54,7 +73,7 @@
 <p><a href="#main_features">Back to top of Main Features</a></p>
 <h2 id="suggestions"><a href="#overview_top">Suggestions for Improvement and Expansion</a></h2>
 <ul>
-    <li><strong>AI Integration Planning:</strong> Create a detailed plan for integrating AI into various modules of the application. This should include specific tasks, goals, and technologies to be used. Consider adding an AI.tt documentation file to outline this plan.</li>
+    <li><strong>AI Integration Planning:</strong> Create a detailed plan for integrating Artificial Intelligence into various modules of the application. This should include specific tasks, goals, and technologies to be used. Consider adding an AI.tt documentation file to outline this plan.</li>
     <li><strong>User Feedback Mechanism:</strong> Implement a system for collecting user feedback to continuously improve the user experience and functionality of the site.</li>
     <li><strong>Enhanced Security Measures:</strong> Regularly review and update security protocols to address new vulnerabilities and threats.</li>
     <li><strong>Performance Optimization:</strong> Optimize the application's performance to handle increasing amounts of data and user activity efficiently.</li>
@@ -76,5 +95,23 @@
 
 <p>We are committed to evolving the Comserv application to meet the needs of our users. Your contributions and adherence to these guidelines are crucial for our continued success.</p>
 
-<p><a href="#overview_top">Back to top</a></p>
-<p><a href="#top">Back to top of Documentation</a></p>
+<h2><a href="#overview_top">Back to top of Overview</a></h2>
+
+<h2>Key Technical Features</h2>
+<ul>
+    <li><strong>Database Integration:</strong> Uses MySQL with DBIx::Class for robust data management</li>
+    <li><strong>Authentication & Authorization:</strong> Role-based access control system</li>
+    <li><strong>Template System:</strong> Template Toolkit for flexible view rendering</li>
+    <li><strong>Logging System:</strong> Comprehensive logging for debugging and auditing</li>
+    <li><strong>API Integration:</strong> Support for external service integration</li>
+</ul>
+
+<h2>User Types and Access Levels</h2>
+<ul>
+    <li><strong>Administrators:</strong> Full system access and configuration capabilities</li>
+    <li><strong>Domain Managers:</strong> Management of specific domain settings and users</li>
+    <li><strong>Content Editors:</strong> Content creation and modification privileges</li>
+    <li><strong>Regular Users:</strong> Access to domain-specific features</li>
+    <li><strong>API Users:</strong> Programmatic access to specific functionalities</li>
+    <li><strong>Guests:</strong> Limited access to public content</li>
+</ul>

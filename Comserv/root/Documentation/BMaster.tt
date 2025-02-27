@@ -60,5 +60,7 @@
     <li><a href="/BMaster/education">/BMaster/education</a></li>
 </ul>
 [% INCLUDE 'Documentation/BMasterController.tt' %]
+<h3 id="Model"><a href="#top">Back to top</a> </h3>
 [% INCLUDE 'Documentation/BMaserModel.tt' %]
+<h3 id="Model"><a href="#top">Back to top</a> </h3>
 [% INCLUDE 'Documentation/Queens.tt' %]

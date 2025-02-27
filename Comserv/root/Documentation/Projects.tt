@@ -1,10 +1,45 @@
-[% PageVersion = 'Documentation/Projects.tt,v 0.01 2024/01/28 Shanta Exp shanta ' %]
-[% IF c.session.debug_mode == 1 %]
-    [% PageVersion %]
-    [%# "Debugging HostName: " _ HostName %]
-    [%# INCLUDE 'debug.tt' %]
-[% END %]
-<h1>Projects</h1>
-<p>
-    <!-- Add your content here -->
-</p>
+[% META title = 'Projects Documentation' %]
+[% PageVersion = 'Documentation/Projects.tt,v 0.02 2024/11/21 Shanta Exp shanta ' %]
+
+<h1 id="projects-top">Projects System Documentation</h1>
+
+<nav>
+    <a href="#overview">Overview</a> |
+    <a href="#controller">Controller</a> |
+    <a href="#model">Model</a> |
+    <a href="#templates">Templates</a> |
+    <a href="#workflow">Workflow</a>
+</nav>
+
+<h2 id="controller">Controller</h2>
+<p>The <code>Comserv::Controller::Project</code> module handles the routing and logic for project-related actions:</p>
+<ul>
+    <li><strong>Index:</strong> Redirects to the project list.</li>
+    <li><strong>Add Project:</strong> Prepares data for adding a new project, sorts projects alphabetically by name, and fetches all sites.</li>
+    <li><strong>Create Project:</strong> Processes form submissions to create new projects, handles errors, and redirects on success.</li>
+    <li><strong>Project List:</strong> Displays a list of projects.</li>
+    <li><strong>Project Details:</strong> Shows detailed information for a specific project and fetches associated todos.</li>
+    <li><strong>Edit Project:</strong> Prepares data for editing an existing project.</li>
+    <li><strong>Update Project:</strong> Updates project data based on form submissions.</li>
+</ul>
+
+<h2 id="model">Model</h2>
+<p>The <code>Comserv::Model::Project</code> module provides methods for interacting with the project data:</p>
+<ul>
+    <li><strong>Get Projects:</strong> Retrieves a list of active projects for a site.</li>
+    <li><strong>Get Project:</strong> Retrieves a specific project by ID.</li>
+</ul>
+
+<h2 id="templates">Templates</h2>
+<p>The following templates are used in the Projects system:</p>
+<ul>
+    <li><strong>todo/add_project.tt:</strong> Form for adding new projects.</li>
+    <li><strong>todo/project.tt:</strong> Displays the list of projects.</li>
+    <li><strong>todo/projectdetails.tt:</strong> Shows detailed information for a project.</li>
+    <li><strong>todo/editproject.tt:</strong> Form for editing existing projects.</li>
+</ul>
+
+<h2 id="workflow">Workflow</h2>
+<p>The typical workflow for managing projects involves navigating to the project list, selecting a project to view or edit, and using forms to add or update project information. The system ensures data integrity and user feedback through success and error messages.</p>
+
+<p><a href="#projects-top">Back to top</a></p>

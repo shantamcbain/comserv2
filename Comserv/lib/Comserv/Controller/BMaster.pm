@@ -3,11 +3,13 @@ use Moose;
 use namespace::autoclean;
 use DateTime;
 use DateTime::Event::Recurrence;
-use Comserv::Model::BMaster;
+use Comserv::Model::BMasterModel;
 use Comserv::Model::DBForager;
-use Sub::Util 'subname';
-use Data::Dumper;
-BEGIN { extends 'Comserv::Controller::Base'; }
+BEGIN { extends 'Catalyst::Controller'; }
+has 'logging' => (
+    is => 'ro',
+    default => sub { Comserv::Util::Logging->instance }
+);
 
 sub base :Chained('/') :PathPart('BMaster') :CaptureArgs(0) {
     my ($self, $c) = @_;
@@ -139,21 +141,8 @@ sub products :Chained('base') :PathPath('products') :Args(0) {
 sub yards :Chained('base') :PathPart('yards') :Args(0) {
     my ( $self, $c ) = @_;
 
-    # Get the site name from the session
-    my $site_name = $c->session->{SiteName};
-
-    # Get the yards for the site
-    my $yards = $c->model('BMaster')->get_yards_for_site($site_name);
-
-    # For each yard, get the pallets and for each pallet, get the hives
-    foreach my $yard (@$yards) {
-        my $pallets = $c->model('BMaster')->get_pallets_for_yard($yard->{id});
-        $yard->{pallets} = $pallets;
-        foreach my $pallet (@$pallets) {
-            my $hives = $c->model('BMaster')->get_hives_for_pallet($pallet->{id});
-            $pallet->{hives} = $hives;
-        }
-    }
+    # Get the yards
+    my $yards = $c->model('BMaster')->get_yards();
 
     # Set the TT template to use
     $c->stash->{template} = 'BMaster/yards.tt';
@@ -280,6 +269,7 @@ sub education :Chained('base') :PathPart('education') :Args(0){
     my ( $self, $c ) = @_;
     $c->stash->{template} = 'BMaster/education.tt';
 }
+
 
 __PACKAGE__->meta->make_immutable;
 

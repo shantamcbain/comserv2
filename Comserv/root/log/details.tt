@@ -40,12 +40,13 @@
             <option value="[% key %]" [% 'selected' IF key == log.priority %]>[% build_priority.$key %]</option>
         [% END %]
     </select><br>
-<label for="status">Status:</label><br>
-<select id="status" name="status">
-    [% FOREACH key IN build_status.keys.sort %]
-        <option value="[% key %]" [% 'selected' IF key == status %]>[% build_status.$key %]</option>
-     [% END %]
-</select><br>
+
+    <label for="status">Status:</label><br>
+    <select id="status" name="status">
+        [% FOREACH key IN build_status.keys.sort %]
+            <option value="[% key %]" [% 'selected' IF key == log.status %]>[% build_status.$key %]</option>
+        [% END %]
+    </select><br>
 
     <label for="comments">Comments:</label><br>
     <textarea id="comments" name="comments" rows="4" cols="50">[% log.comments %]</textarea><br>

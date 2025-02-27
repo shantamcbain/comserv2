@@ -1,0 +1,22 @@
+<h1>Schema Comparison</h1>
+
+<p>Current Schema Version: [% current_version %]</p>
+<p>Database Schema Version: [% db_version %]</p>
+
+[% IF changes.size > 0 %]
+    <h2>Changes Detected:</h2>
+    <ul>
+    [% FOREACH change IN changes %]
+        <li>[% change %]</li>
+    [% END %]
+    </ul>
+
+    <form action="[% c.uri_for('/admin/migrate_schema') %]" method="post">
+        <input type="hidden" name="confirm" value="1">
+        <input type="submit" value="Apply These Changes">
+    </form>
+[% ELSE %]
+    <p>No changes detected between the current schema and the database schema.</p>
+[% END %]
+
+<a href="[% c.uri_for('/admin') %]">Back to Admin Home</a>
