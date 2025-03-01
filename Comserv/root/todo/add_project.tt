@@ -12,12 +12,7 @@
 [% END %]
 
 <form method="POST" action="/project/create_project">
-    <label for="sitename">Site Name:</label><br>
-    <select id="sitename" name="sitename" required>
-        [% FOREACH site IN sites %]
-            <option value="[% site.name %]" [% IF site.id == form_data.sitename OR site.id == session.sitename %]selected[% END %]>[% site.name %]</option>
-        [% END %]
-    </select><br>
+  [% INCLUDE "todo/site_list.tt" %]<br>
     <!-- Add the project name input field -->
     <label for="name">Project Name:</label><br>
     <input type="text" id="name" name="name" value="[% form_data.name %]" required><br>
@@ -28,16 +23,17 @@
     <!-- Include the project list as options -->
     [% FOREACH project IN projects %]
         [% IF !project.parent_id %] <!-- Only list top-level projects -->
-            <option value="[% project.id %]" [% IF project.id == parent_id %]selected[% END %]>[% project.name %]</option>
+            <option value="[% project.id %]" [% IF project.id == form_data.parent_id %]selected[% END %]>[% project.name %]</option>
             <!-- Display the list of sub-projects -->
             [% IF project.sub_projects.size %]
                 [% FOREACH sub_project IN project.sub_projects %]
-                    <option value="[% sub_project.id %]" [% IF sub_project.id == parent_id %]selected[% END %]>--- [% sub_project.name %]</option>
+                    <option value="[% sub_project.id %]" [% IF sub_project.id == form_data.parent_id %]selected[% END %]>--- [% sub_project.name %]</option>
                 [% END %]
             [% END %]
         [% END %]
     [% END %]
 </select><br>
+
 
     <label for="description">Description:</label><br>
     <textarea id="description" name="description" required>[% form_data.description %]</textarea><br>
