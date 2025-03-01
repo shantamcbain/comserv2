@@ -192,7 +192,23 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
         'Fetched users to populate user_id dropdown'
     );
 
-    # Stash the data for the template
+    # Convert the resultset to an array of hashrefs for use in the template
+    my @projects = map {
+        {
+            id => $_->id,
+            name => $_->name,
+            sub_projects => [ map { { id => $_->id, name => $_->name } } $_->sub_projects->all ]
+        }
+    } #$project_rs->all;
+
+    # Fetch all users to populate the user_id dropdown
+    @users = $schema->resultset('User')->all;
+
+    # Log the list of user_ids
+    my @user_ids = map { $_->id } @users;
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'addtodo', 'User IDs: ' . join(', ', @user_ids));
+
+    # Add the projects, sitename, and user_id to the stash
     $c->stash(
         projects        => $projects,        # Parent projects with nested sub-projects
         current_project => $current_project, # Selected project for the form (if any)

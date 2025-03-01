@@ -38,11 +38,11 @@ __PACKAGE__->config(
     'Plugin::Log::Dispatch' => {
         dispatchers => [
             {
-                class => 'Log::Dispatch::File',
-                min_level => 'debug',
-                filename => 'logs/application.log',
-                mode => 'append',
-                newline => 1,
+                class     => 'Log::Dispatch::File',
+                min_level => 'info',
+                filename  => File::Spec->catfile($FindBin::Bin, '..', 'logs', 'application.log'),
+                mode      => 'append',
+                newline   => 1,
             },
         ],
     },

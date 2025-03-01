@@ -1,5 +1,5 @@
-package Comserv::Controller::Root;
 
+package Comserv::Controller::Root;
 use Moose;
 use namespace::autoclean;
 use Template;
@@ -18,6 +18,9 @@ __PACKAGE__->config(namespace => '');
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
 
+    # Log the start of the index action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Starting index action");
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Starting index action");
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "About to fetch SiteName from session");
     my $SiteName = $c->session->{SiteName};
@@ -26,11 +29,9 @@ sub index :Path :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Fetched SiteName from session: $SiteName");
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Fetched ControllerName from session: $ControllerName");
 
-    print "ControllerName in index: = $ControllerName\n";
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "ControllerName in index: = $ControllerName");
-
-    print "print SiteName in root index: = $SiteName\n";
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "SiteName in root index: = $SiteName");
+    # Log the fetched SiteName and ControllerName
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Fetched SiteName from session: $SiteName");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Fetched ControllerName from session: $ControllerName");
 
     if ($ControllerName) {
         if ($ControllerName =~ /\.tt$/) {
@@ -60,9 +61,8 @@ sub fetch_and_set {
     }
     elsif (defined $c->session->{SiteName}) {
         $c->stash->{SiteName} = $c->session->{SiteName};
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "SiteName found in session: " . $c->session->{SiteName});
-    }
-    else {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'fetch_and_set', "SiteName found in session: " . $c->session->{SiteName});
+    } else {
         my $domain = $c->req->base->host;
         $domain =~ s/:.*//;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Extracted domain: $domain");
@@ -93,41 +93,42 @@ sub fetch_and_set {
             $c->session->{SiteName} = 'none';
             $c->stash->{SiteName} = 'none';
             $c->session->{ControllerName} = 'Root';
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'fetch_and_set', "No site domain found, defaulting SiteName and ControllerName to 'none' and 'Root'");
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "No site domain found, defaulting SiteName and ControllerName to 'none' and 'Root'");
         }
     }
 
     return $value;
 }
+
 sub auto :Private {
     my ($self, $c) = @_;
+
+    # Log the start of the auto action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Starting auto action");
 
     my $SiteName = $c->session->{SiteName};
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "Session SiteName: " . ($SiteName // 'undefined'));
 
     if (!defined $SiteName || $SiteName eq 'none' || $SiteName eq 'root') {
+        $c->log->debug("SiteName is either undefined, 'none', or 'root'. Proceeding with domain extraction and site domain retrieval");
+
         my $domain = $c->req->base->host;
         $domain =~ s/:.*//;
-        $c->session->{Domain} = $domain;
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "Session Domain: $domain");
-
         my $site_domain = $c->model('Site')->get_site_domain($domain);
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "Site Domain: " . ($site_domain ? $site_domain->site_id : 'undefined'));
+        $c->log->debug(__PACKAGE__ . " . (split '::', __SUB__)[-1] . \" line \" . __LINE__ . \": site_domain in auto = $site_domain");
 
         if ($site_domain) {
             my $site_id = $site_domain->site_id;
             my $site = $c->model('Site')->get_site_details($site_id);
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "Site ID: $site_id");
 
             if ($site) {
                 $SiteName = $site->name;
                 $c->stash->{SiteName} = $SiteName;
                 $c->session->{SiteName} = $SiteName;
-                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "Site Name: $SiteName");
             }
         } else {
             $SiteName = $self->fetch_and_set($c, 'site');
+            $c->log->debug(__PACKAGE__ . " . (split '::', __SUB__)[-1] . \" line \" . __LINE__ . \": SiteName in auto = $SiteName");
+
             if (!defined $SiteName) {
                 $c->stash(template => 'index.tt');
                 $c->forward($c->view('TT'));
@@ -137,31 +138,39 @@ sub auto :Private {
     }
 
     $self->site_setup($c, $c->session->{SiteName});
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 'Entered auto action in Root.pm');
+    $c->log->debug('Entered auto action in Root.pm');
 
     my $schema = $c->model('DBEncy');
     $SiteName = $self->fetch_and_set($c, $schema, 'site');
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "Fetched SiteName: $SiteName");
 
     unless ($c->session->{group}) {
         $c->session->{group} = 'normal';
     }
 
-    unless (ref $c->session->{roles} eq 'ARRAY') {
-        $c->session->{roles} = [];
-    }
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "Session Roles: " . join(', ', @{$c->session->{roles}}));
-
-    # Check for debug parameter in the URL and toggle debug mode accordingly
-    if (defined $c->req->params->{debug}) {
-        if ($c->req->params->{debug} == 1) {
-            $c->session->{debug_mode} = 1;
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "Debug mode enabled");
-        } elsif ($c->req->params->{debug} == 0) {
-            $c->session->{debug_mode} = 0;
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "Debug mode disabled");
+    my $debug_param = $c->req->param('debug');
+    if (defined $debug_param) {
+        if ($c->session->{debug_mode} ne $debug_param) {
+            $c->session->{debug_mode} = $debug_param;
+            $c->stash->{debug_mode} = $debug_param;
         }
+    } elsif (defined $c->session->{debug_mode}) {
+        $c->stash->{debug_mode} = $c->session->{debug_mode};
     }
+
+    my $page = $c->req->param('page');
+    if (defined $page) {
+        if ($c->session->{page} ne $page) {
+            $c->session->{page} = $page;
+            $c->stash->{page} = $page;
+        }
+    } elsif (defined $c->session->{page}) {
+        $c->stash->{page} = $c->session->{page};
+    }
+
+    $c->stash->{HostName} = $c->request->base;
+    my @todos = $c->model('Todo')->get_top_todos($c, $SiteName);
+    my $todos = $c->session->{todos};
+    $c->stash(todos => $todos);
 
     if (ref($c) eq 'Catalyst::Context') {
         my @main_links = $c->model('DB')->get_links($c, 'Main');
@@ -182,17 +191,9 @@ sub auto :Private {
     return 1;
 }
 
-
-
-
-
-
-
-
 sub site_setup {
     my ($self, $c) = @_;
     my $SiteName = $c->session->{SiteName};
-
     unless (defined $SiteName) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "SiteName is not defined in the session");
         return;
@@ -201,13 +202,12 @@ sub site_setup {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "SiteName: $SiteName");
 
     my $site = $c->model('Site')->get_site_details_by_name($SiteName);
-
     unless (defined $site) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "No site found for SiteName: $SiteName");
         return;
     }
 
-    #$self->logging->log_with_details($c, 'info', __FILE__, __LINE__,  'site_setup', "Found site: " . Dumper($site));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,  'site_setup', "Found site: " . Dumper($site));
 
     my $css_view_name = $site->css_view_name || '/static/css/default.css';
     my $site_display_name = $site->site_display_name || 'none';
@@ -229,22 +229,18 @@ sub site_setup {
 
 sub debug :Path('/debug') {
     my ($self, $c) = @_;
-
     my $site_name = $c->stash->{SiteName};
     $c->stash(template => 'debug.tt');
     $c->forward($c->view('TT'));
 }
-# Subroutine to handle the /accounts route
+
 sub accounts :Path('/accounts') :Args(0) {
     my ($self, $c) = @_;
 
     # Log the access to the accounts page
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'accounts', "Accessing accounts page");
 
-    # Set the template to accounts.tt
     $c->stash(template => 'accounts.tt');
-
-    # Forward to the TT view for rendering
     $c->forward($c->view('TT'));
 }
 
@@ -264,5 +260,3 @@ sub end : ActionClass('RenderView') {}
 __PACKAGE__->meta->make_immutable;
 
 1;
-
-

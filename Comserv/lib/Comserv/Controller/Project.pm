@@ -12,13 +12,13 @@ has 'logging' => (
 );
 sub index :Path :Args(0) {
     my ( $self, $c ) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 'Starting index action');
+    $self->logging->log_with_details('info', __FILE__, __LINE__, 'index', 'Starting index action');
     $c->res->redirect($c->uri_for($self->action_for('project')));
 }
 
 sub add_project :Path('addproject') :Args(0) {
     my ( $self, $c ) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_project', 'Starting add_project action' );
+    $self->logging->log_with_details('info', 'info', __FILE__, __LINE__, 'add_project', 'Starting add_project action' );
     $c->session->{previous_url} = $c->req->referer;
 
     #my $project_model = $c->model('Project');
@@ -31,6 +31,17 @@ sub add_project :Path('addproject') :Args(0) {
 
     my $site_controller = $c->controller('Site');
     my $sites = $site_controller->fetch_available_sites($c);
+
+    my $site_model = $c->model('Site');
+    my $sites;
+
+    # Fetch sites based on the current site name
+    if (lc($c->session->{SiteName}) eq 'csc') {
+        $sites = $site_model->get_all_sites();
+    } else {
+        my $site = $site_model->get_site_details_by_name($c->session->{SiteName});
+        $sites = [$site] if $site;
+    }
 
     $c->stash->{sites} = $sites;
     $c->stash->{projects} = $projects;
@@ -110,7 +121,6 @@ sub project :Path('project') :Args(0) {
     $c->forward($c->view('TT'));
 }
 
-
 sub details :Path('details') :Args(0) {
     my ( $self, $c ) = @_;
 
@@ -135,6 +145,7 @@ sub details :Path('details') :Args(0) {
 
     # Get the DB schema and project model
     my $schema = $c->model('DBEncy');
+    my $project_id = $c->request->body_parameters->{project_id};
     my $project_model = $c->model('Project');
 
     # Fetch project by ID
