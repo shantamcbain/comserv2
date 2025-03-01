@@ -4,6 +4,7 @@ use namespace::autoclean;
 use DateTime;
 use Data::Dumper;
 use Comserv::Util::Logging;
+use Comserv::Controller::Site;
 BEGIN { extends 'Catalyst::Controller'; }
 has 'logging' => (
     is => 'ro',
@@ -20,29 +21,19 @@ sub add_project :Path('addproject') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_project', 'Starting add_project action' );
     $c->session->{previous_url} = $c->req->referer;
 
-    my $project_model = $c->model('Project');
-    my $projects = $project_model->get_projects($c->model('DBEncy'), $c->session->{SiteName});
+    #my $project_model = $c->model('Project');
+    #my $projects = $project_model->get_projects($c->model('DBEncy'), $c->session->{SiteName});
 
-    # Sort projects alphabetically by name
-    my @sorted_projects = sort { $a->{name} cmp $b->{name} } @$projects;
-    
-    Comserv::Util::Logging->instance->log_with_details($c, 'debug', __FILE__, __LINE__, 'add_project', Dumper(\@sorted_projects));
+    # Use the fetch_projects_with_subprojects method to get the projects
+    my $projects = $self->fetch_projects_with_subprojects($c);
+    my $site_model = $c->model('site');
+     # Use the fetch_available_sites method to get the sites
 
-    $c->stash->{projects} = \@sorted_projects;
-
-    my $site_model = $c->model('Site');
-    my $sites;
-
-    # Fetch sites based on the current site name
-    if (lc($c->session->{SiteName}) eq 'csc') {
-        $sites = $site_model->get_all_sites();
-    } else {
-        my $site = $site_model->get_site_details_by_name($c->session->{SiteName});
-        $sites = [$site] if $site;
-    }
+    my $site_controller = $c->controller('Site');
+    my $sites = $site_controller->fetch_available_sites($c);
 
     $c->stash->{sites} = $sites;
-
+    $c->stash->{projects} = $projects;
     $c->stash(
         template => 'todo/add_project.tt'
     );
@@ -63,6 +54,7 @@ sub create_project :Path('create_project') :Args(0) {
     $parent_id = undef if $parent_id eq '';
     my $date_time_posted = DateTime->now;
     my $record_id = $form_data->{record_id} || 0;
+$self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_project', Dumper($form_data));
 
     my $project = eval {
         $project_rs->create({
@@ -106,8 +98,8 @@ sub create_project :Path('create_project') :Args(0) {
 sub project :Path('project') :Args(0) {
     my ( $self, $c ) = @_;
 
-    my $project_model = $c->model('Project');
-    my $projects = $project_model->get_projects($c->model('DBEncy'), $c->session->{SiteName});
+    # Use the existing method to fetch projects with sub-projects
+    my $projects = $self->fetch_projects_with_subprojects($c);
 
     $c->stash->{projects} = $projects;
 
@@ -117,6 +109,7 @@ sub project :Path('project') :Args(0) {
 
     $c->forward($c->view('TT'));
 }
+
 
 sub details :Path('details') :Args(0) {
     my ( $self, $c ) = @_;
@@ -209,16 +202,12 @@ sub fetch_projects_with_subprojects :Private {
     my $schema = $c->model('DBEncy');
     my $SiteName = $c->session->{SiteName};
 
-    # Fetch only parent projects (projects without a parent_id)
+    # Fetch projects with recursive prefetch for sub-projects
     my $project_rs = $schema->resultset('Project')->search(
+        { 'me.sitename' => $SiteName, 'me.parent_id' => undef },
         {
-            'me.sitename' => $SiteName,      # Filter by site name
-            'me.parent_id' => undef          # Exclude sub-projects (parent_id IS NULL)
-        },
-        {
-            prefetch => 'sub_projects',      # Preload sub-projects
-            group_by => [ 'me.id' ],         # Avoid duplicate parent rows
-            order_by => [ 'me.name' ],       # Order by parent project name
+            prefetch => { sub_projects => { sub_projects => { sub_projects => 'sub_projects' } } },
+            order_by => { -asc => 'me.name' },
         }
     );
 
@@ -227,8 +216,27 @@ sub fetch_projects_with_subprojects :Private {
         {
             id           => $_->id,
             name         => $_->name,
+            parent_id    => $_->parent_id,
             sub_projects => [
-                map { { id => $_->id, name => $_->name } } $_->sub_projects->all
+                map {
+                    {
+                        id           => $_->id,
+                        name         => $_->name,
+                        parent_id    => $_->parent_id,
+                        sub_projects => [
+                            map {
+                                {
+                                    id           => $_->id,
+                                    name         => $_->name,
+                                    parent_id    => $_->parent_id,
+                                    sub_projects => [
+                                        map { { id => $_->id, name => $_->name, parent_id => $_->parent_id } } $_->sub_projects->all
+                                    ],
+                                }
+                            } $_->sub_projects->all
+                        ],
+                    }
+                } $_->sub_projects->all
             ],
         }
     } $project_rs->all;
@@ -242,18 +250,22 @@ sub fetch_projects_with_subprojects :Private {
     return \@projects;
 }
 
-
 sub editproject :Path('editproject') :Args(0) {
     my ( $self, $c ) = @_;
 
     my $project_id = $c->request->body_parameters->{project_id};
     my $project_model = $c->model('Project');
     my $project = $project_model->get_project($c->model('DBEncy'), $project_id);
-    my $projects = $project_model->get_projects($c->model('DBEncy'), $c->session->{SiteName});
+     # Use the fetch_available_sites method from the Site controller to get the sites
+    my $site_controller = $c->controller('Site');
+    my $sites = $site_controller->fetch_available_sites($c);
+
+    # Use the fetch_projects_with_subprojects method to get the projects
+    my $projects = $self->fetch_projects_with_subprojects($c);
 
     $c->stash->{projects} = $projects;
     $c->stash->{project} = $project;
-
+    $c->stash->{sites} = $sites;
     $c->stash(
         template => 'todo/editproject.tt'
     );

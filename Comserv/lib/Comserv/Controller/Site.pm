@@ -209,5 +209,29 @@ sub modify :Local {
         $c->res->redirect($c->uri_for($self->action_for('details'), [$site_id]));
     }
 }
+sub fetch_available_sites :Private {
+    my ($self, $c) = @_;
 
+    # Get the current site name from the session
+    my $current_site_name = $c->session->{SiteName};
+
+    # Get a DBIx::Class::Schema object
+    my $schema = $c->model('DBEncy');
+
+    # Create a new Comserv::Model::Site object
+    my $site_model = Comserv::Model::Site->new(schema => $schema);
+
+    # Determine which sites to fetch based on the current site name
+    my $sites;
+    if (lc($current_site_name) eq 'csc') {
+        # If the current site is 'csc', fetch all sites
+        $sites = $site_model->get_all_sites();
+    } else {
+        # Otherwise, fetch only the current site
+        my $site = $site_model->get_site_details_by_name($current_site_name);
+        $sites = [$site] if $site;
+    }
+
+    return $sites;
+}
 1;
