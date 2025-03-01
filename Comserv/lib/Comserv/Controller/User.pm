@@ -15,27 +15,48 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance }
 );
 
-sub begin :Private {
-    my ($self, $c) = @_;
-
-    # Allow access to public pages (like login or home)
-    return if $c->action->name eq 'login' || $c->action->name eq 'do_login';
+# perl
+sub begin : Private {
+    my ( $self, $c ) = @_;
+    warn "Entering Comserv::Controller::Admin::begin\n";
+    # Debug logging for begin action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "Starting begin action");
+    $c->stash->{debug_errors} //= []; # Ensure debug_errors is initialized
 
     # Check if the user is logged in
-    if (!$c->user_exists) {
-        $c->stash->{error_msg} = 'You must be logged in to access this section.';
-        $c->response->redirect($c->uri_for('/user/login')); # Redirect to login page
-        $c->detach;
+    if ( !$c->user_exists ) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "User not logged in, redirecting to home.");
+        $c->response->redirect($c->uri_for('/'));
+        return;
     }
 
-    # Optional: Restrict access to specific roles
-    if (!$c->check_any_user_role(qw(admin site_admin))) {
-        $c->stash->{error_msg} = 'You do not have the required permissions to access this section.';
-        $c->response->redirect($c->uri_for('/')); # Redirect to homepage or error page
-        $c->detach;
+    # Fetch the roles from the session
+    my $roles = $c->session->{roles};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "Roles: " . Dumper($roles));
+
+    # Check if roles is defined and is an array reference
+    if ( defined $roles && ref $roles eq 'ARRAY' ) {
+        # Log the roles being checked
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "Checking roles: " . join(", ", @$roles));
+
+        # Directly check for 'admin' role using grep
+        if ( grep { $_ eq 'admin' } @$roles ) {
+            # User is admin, proceed with accessing the admin area
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "Admin user detected, proceeding.");
+            return; # Important: Return to allow admin to proceed
+        } else {
+            # User is not admin, redirect to home
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "Non-admin user, redirecting to home. Roles found: " . join(", ", @$roles));
+            $c->response->redirect($c->uri_for('/'));
+            return;
+        }
+    } else {
+        # Log that roles are not defined or not an array
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "No roles defined or roles is not an array, redirecting to home.");
+        $c->response->redirect($c->uri_for('/'));
+        return;
     }
 }
-
 
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
