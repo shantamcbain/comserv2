@@ -21,7 +21,7 @@
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Starting index action");
 
         my $SiteName = $c->session->{SiteName};
-        my $ControllerName = $c->session->{ControllerName};
+        my $ControllerName = $c->session->{SiteName};
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Fetched SiteName from session: $SiteName");
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Fetched ControllerName from session: $ControllerName");
 
@@ -73,7 +73,7 @@ sub fetch_and_set {
                 $c->session->{SiteName} = $value;
                 $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "SiteName set to: $value");
 
-                $c->session->{SiteDisplayName} = $site->site_display_name;
+                # Set ControllerName based on the site's home_view
                 my $home_view = $site->home_view || 'Root';
                 $c->stash->{ControllerName} = $home_view;
                 $c->session->{ControllerName} = $home_view;
@@ -93,22 +93,31 @@ sub fetch_and_set {
 
 
 # perl
+
+# perl
+# perl
 sub auto :Private {
     my ($self, $c) = @_;
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Starting auto action");
 
+    # Toggle debug mode
+    if (defined $c->req->params->{debug}) {
+        $c->session->{debug_mode} = $c->session->{debug_mode} ? 0 : 1;
+    }
+    $c->stash->{debug_mode} = $c->session->{debug_mode};
+
     my $SiteName = $c->session->{SiteName};
 
     if (!defined $SiteName || $SiteName eq 'none' || $SiteName eq 'root') {
-        $c->log->debug("SiteName is either undefined, 'none', or 'root'. Proceeding with domain extraction and site domain retrieval");
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "SiteName is either undefined, 'none', or 'root'. Proceeding with domain extraction and site domain retrieval");
 
         my $domain = $c->req->uri->host;
         $domain =~ s/:.*//;  # Remove port if present
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Extracted domain: $domain");
 
         my $site_domain = $c->model('Site')->get_site_domain($c, $domain);
-        $c->log->debug(__PACKAGE__ . " . (split '::', __SUB__)[-1] . \" line \" . __LINE__ . \": site_domain in auto = " . Dumper($site_domain));
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "site_domain in auto = " . Dumper($site_domain));
 
         if ($site_domain) {
             my $site_id = $site_domain->site_id;
@@ -121,7 +130,7 @@ sub auto :Private {
             }
         } else {
             $SiteName = $self->fetch_and_set($c, 'site');
-            $c->log->debug(__PACKAGE__ . " . (split '::', __SUB__)[-1] . \" line \" . __LINE__ . \": SiteName in auto = $SiteName");
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "SiteName in auto = $SiteName");
 
             if (!defined $SiteName) {
                 $c->stash(template => 'index.tt');
@@ -131,8 +140,15 @@ sub auto :Private {
         }
     }
 
+    # Set ControllerName to be the same as SiteName
+    $c->session->{ControllerName} = $SiteName;
+    $c->stash->{ControllerName} = $SiteName;
+
     $self->site_setup($c, $c->session->{SiteName});
-    $c->log->debug('Entered auto action in Root.pm');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', 'Completed site setup, forwarding to index');
+
+    # Forward to index for final decision on controller or default homepage
+    $c->forward('index');
 
     return 1;
 }
@@ -148,17 +164,22 @@ sub site_setup {
         return;
     }
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Found site: " . Dumper($site));
+    #$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Found site: " . Dumper($site));
 
     my $css_view_name = $site->css_view_name || '/static/css/default.css';
     my $site_display_name = $site->site_display_name || 'none';
     my $mail_to_admin = $site->mail_to_admin || 'none';
     my $mail_replyto = $site->mail_replyto || 'helpdesk.computersystemconsulting.ca';
+    my $site_name = $site->name || 'none';
 
     $c->stash->{ScriptDisplayName} = $site_display_name;
     $c->stash->{css_view_name} = $css_view_name;
     $c->stash->{mail_to_admin} = $mail_to_admin;
     $c->stash->{mail_replyto} = $mail_replyto;
+    $c->stash->{SiteName} = $site_name;
+    $c->session->{SiteName} = $site_name;
+
+    # Do not override ControllerName here
 }
 
 
