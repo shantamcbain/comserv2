@@ -16,46 +16,39 @@ has 'logging' => (
 );
 
 # perl
-sub begin : Private {
-    my ( $self, $c ) = @_;
-    warn "Entering Comserv::Controller::Admin::begin\n";
-    # Debug logging for begin action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "Starting begin action");
-    $c->stash->{debug_errors} //= []; # Ensure debug_errors is initialized
+sub login :Path('/user/log in') :Args(0) {
+    my ($self, $c) = @_;
 
-    # Check if the user is logged in
-    if ( !$c->user_exists ) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "User not logged in, redirecting to home.");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', "Starting login action");
+
+    # Check if the user is already logged in
+    if ($c->user_exists) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', "User already logged in, redirecting to homepage");
         $c->response->redirect($c->uri_for('/'));
         return;
     }
 
-    # Fetch the roles from the session
-    my $roles = $c->session->{roles};
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "Roles: " . Dumper($roles));
+    # Process login form submission
+    if ($c->request->method eq 'POST') {
+        my $username = $c->request->params->{username};
+        my $password = $c->request->params->{password};
 
-    # Check if roles is defined and is an array reference
-    if ( defined $roles && ref $roles eq 'ARRAY' ) {
-        # Log the roles being checked
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "Checking roles: " . join(", ", @$roles));
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', "Received login attempt for username: $username");
 
-        # Directly check for 'admin' role using grep
-        if ( grep { $_ eq 'admin' } @$roles ) {
-            # User is admin, proceed with accessing the admin area
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "Admin user detected, proceeding.");
-            return; # Important: Return to allow admin to proceed
-        } else {
-            # User is not admin, redirect to home
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "Non-admin user, redirecting to home. Roles found: " . join(", ", @$roles));
+        # Attempt to authenticate the user
+        if ($c->authenticate({ username => $username, password => $password })) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', "Authentication successful for username: $username");
             $c->response->redirect($c->uri_for('/'));
             return;
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'login', "Authentication failed for username: $username");
+            $c->stash->{error_msg} = "Invalid username or password";
         }
-    } else {
-        # Log that roles are not defined or not an array
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "No roles defined or roles is not an array, redirecting to home.");
-        $c->response->redirect($c->uri_for('/'));
-        return;
     }
+
+    # Display the login form
+    $c->stash(template => 'user/login.tt');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', "Rendering login template");
 }
 
 sub index :Path :Args(0) {
