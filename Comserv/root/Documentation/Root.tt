@@ -1,4 +1,3 @@
-
 [% PageVersion = 'Documentation/Root.tt,v 0.018 2025/03/02 AI Update Exp AI_Assistant' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
@@ -17,6 +16,7 @@
     <a href="#rootfetch">fetch_and_set Method</a> |
     <a href="#rootsite_setup">site_setup Method</a> |
     <a href="#rootend">end Action</a> |
+    <a href="#rootsuggestions">Suggestions for Improvement</a> |
     <a href="#roottop">back to top</a>
 </nav>
 
@@ -130,9 +130,7 @@ if ($c->req->path eq '/' || $c->req->path eq '') {
 <h2 id="rootsuggestions">10. Suggestions for Improvement</h2>
 <p>To improve the readability and functionality of the `Root` controller, consider the following:</p>
 <ul>
-    <li><b>Refactor Domain Mapping:</b> Move domain mapping logic into a separate utility method to reduce complexity in `setup_site`.</li>
-    <li><b>Enhance Logging:</b> Add more granular logging for debugging, especially in the `auto` and `index` actions.</li>
-    <li><b>Improve Error Handling:</b> Add fallback mechanisms    <li><b>Improve Error Handling:</b> Add fallback mechanisms for missing or invalid `ControllerName` or `SiteName` values. For example, if `ControllerName` is not set, the application should gracefully fall back to a default controller or template instead of failing silently.</li>
+    <li><b>Improve Error Handling:</b> Add fallback mechanisms for missing or invalid `ControllerName` or `SiteName` values. For example, if `ControllerName` is not set, the application should gracefully fall back to a default controller or template instead of failing silently.</li>
     <li><b>Optimize Template Handling:</b> Use a centralized template resolver to avoid hardcoding template paths. This would make it easier to manage and update templates across the application.</li>
     <li><b>Centralize Configuration:</b> Move configuration settings (e.g., default template paths, fallback values) into a centralized configuration file or module. This would make it easier to maintain and update these settings.</li>
     <li><b>Add Unit Tests:</b> Write comprehensive unit tests for the `Root` controller, especially for edge cases like missing session data, invalid domains, or unexpected query parameters.</li>

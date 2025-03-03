@@ -1,103 +1,136 @@
 [% META title = 'Project Details' %]
+
+[% MACRO display_project_details(project, level) BLOCK %]
+    [% SET indent = '' %]
+    [% FOREACH i IN [1..level] %]
+        [% indent = indent _ '    ' %]
+    [% END %]
+
+    <div class="project-details" style="margin-left: [% level * 20 %]px;">
+        <h[% level + 1 %]>[% IF level > 0 %]Sub-Project: [% END %][% project.name %]</h[% level + 1 %]>
+
+        <ul>
+            <li>Description: [% project.description OR 'No description' %]</li>
+            <li>Start Date: [% project.start_date %]</li>
+            <li>End Date: [% project.end_date %]</li>
+            <li>Status: [% project.status %]</li>
+            <li>Project Code: [% project.project_code %]</li>
+            <li>Project Size: [% project.project_size %]</li>
+            <li>Estimated Man Hours: [% project.estimated_man_hours %]</li>
+            <li>Developer Name: [% project.developer_name %]</li>
+            <li>Client Name: [% project.client_name %]</li>
+        </ul>
+
+        [% IF project.todos.size %]
+        <h[% level + 2 %]>Todos for [% project.name %]</h[% level + 2 %]>
+        <table class="project-details-table">
+            <thead>
+                <tr>
+                    <th>Subject</th>
+                    <th>Description</th>
+                    <th>Start Date</th>
+                    <th>Due Date</th>
+                    <th>Status</th>
+                    <th>Priority</th>
+                    <th>Accumulated Time</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                [% FOREACH todo IN project.todos %]
+                <tr>
+                    <td>[% todo.subject %]</td>
+                    <td>[% todo.description OR 'No description' %]</td>
+                    <td>[% todo.start_date %]</td>
+                    <td>[% todo.due_date %]</td>
+                    <td>[% todo.status %]</td>
+                    <td>[% todo.priority %]</td>
+                    <td>[% todo.formatted_accumulated_time %]</td>
+                    <td>
+                        <form action="/todo/modify/[% todo.record_id %]" method="GET" style="display:inline;">
+                            <button type="submit">Edit Todo</button>
+                        </form>
+                    </td>
+                </tr>
+                [% END %]
+            </tbody>
+        </table>
+        [% END %]
+
+        <!-- Actions for this project level -->
+        <div class="project-actions">
+            <form action="/project/editproject" method="POST" style="display:inline;">
+                <input type="hidden" name="project_id" value="[% project.id %]">
+                <button type="submit">Edit [% IF level > 0 %]Sub-[% END %]Project</button>
+            </form>
+
+            <form action="/project/addproject" method="GET" style="display:inline;">
+                <input type="hidden" name="parent_id" value="[% project.id %]">
+                <button type="submit">Add Sub-Project</button>
+            </form>
+
+            <form action="/todo/addtodo" method="GET" style="display:inline;">
+                <input type="hidden" name="project_id" value="[% project.id %]">
+                <button type="submit">Add Todo</button>
+            </form>
+        </div>
+
+        [% IF project.sub_projects.size %]
+            [% FOREACH sub_project IN project.sub_projects %]
+                [% display_project_details(sub_project, level + 1) %]
+            [% END %]
+        [% END %]
+    </div>
+[% END %]
 [% PageVersion = 'todo/projectdetails.tt,v 0.01 2024/03/15 shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
-<h1>Project Details</h1>
+<div class="project-container">
+    <!-- Display the main project and all its sub-projects recursively -->
+    [% display_project_details(project, 0) %]
+</div>
 
-<!-- Display the project details -->
-<ul>
-    <li>Name: [% project.name %]</li>
-    <li>Description: [% project.description OR 'No description' %]</li>
-    <li>Start Date: [% project.start_date %]</li>
-    <li>End Date: [% project.end_date %]</li>
-    <li>Status: [% project.status %]</li>
-    <li>Parent ID: [% project.parent_id %]</li>
-    <li>Project Code: [% project.project_code %]</li>
-    <li>Project Size: [% project.project_size %]</li>
-    <li>Estimated Man Hours: [% project.estimated_man_hours %]</li>
-    <li>Developer Name: [% project.developer_name %]</li>
-    <li>Client Name: [% project.client_name %]</li>
-    <li>Site Name: [% project.sitename %]</li>
-    <li>Comments: [% project.comments %]</li>
-    <li>Username of Poster: [% project.username_of_poster %]</li>
-    <li>Parent ID: [% project.parent_id %]</li>
-    <li>Group of Poster: [% project.group_of_poster %]</li>
-    <li>Date Time Posted: [% project.date_time_posted %]</li>
-</ul>
-
-<h2>Todos for this Project</h2>
-<table class="project-details-table">
-    <thead>
-        <tr>
-            <th>Subject</th>
-            <th>Description</th>
-            <th>Start Date</th>
-            <th>Due Date</th>
-            <th>Status</th>
-            <th>Priority</th>
-            <th>Accumulated Time</th>
-            <th>Actions</th>
-        </tr>
-    </thead>
-    <tbody>
-        [% FOREACH todo IN todos %]
-        <tr>
-            <td>[% todo.subject %]</td>
-            <td>[% todo.description OR 'No description' %]</td>
-            <td>[% todo.start_date %]</td>
-            <td>[% todo.due_date %]</td>
-            <td>[% todo.status %]</td>
-            <td>[% todo.priority %]</td>
-            <td>[% todo.formatted_accumulated_time %]</td>
-            <td>
-                <!-- Button to edit the todo -->
-                <form action="/todo/modify/[% todo.record_id %]" method="GET" style="display:inline;">
-                    <button type="submit">Edit Todo</button>
-                </form>
-            </td>
-        </tr>
-        <tr>
-            <td colspan="8">
-                <strong>Log Entries:</strong>
-                <ul>
-                    [% FOREACH log IN todo.logs %]
-                    <li>
-                        Start: [% log.start_time %], End: [% log.end_time %], Time Spent: [% log.time_spent %]
-                        <!-- Button to edit the log entry -->
-                        <form action="/log/edit/[% log.id %]" method="GET" style="display:inline;">
-                            <button type="submit">Edit Log</button>
-                        </form>
-                    </li>
-                    [% END %]
-                </ul>
-            </td>
-        </tr>
-        [% END %]
-    </tbody>
-</table>
-
-<!-- Display total accumulated time for the project -->
-<h3>Total Accumulated Time for Project: [% total_accumulated_time %]</h3>
+<!-- Display total accumulated time for all projects -->
+<h3>Total Accumulated Time for All Projects: [% total_accumulated_time %]</h3>
 
 <!-- Button to go back to the project list -->
 <button type="button" onclick="window.location.href='/project';">Back to Projects</button>
 
-<!-- Form to edit the current project -->
-<form action="/project/editproject" method="POST">
-    <input type="hidden" name="project_id" value="[% project.id %]">
-    <button type="submit">Edit Project [% project.id %]</button>
-</form>
+<!-- Add some basic styling -->
+<style>
+.project-details {
+    border-left: 2px solid #ccc;
+    margin: 10px 0;
+    padding: 10px;
+}
 
-<!-- Button to add a sub-project for this project -->
-<form action="/project/addproject" method="GET">
-    <input type="hidden" name="parent_id" value="[% project.id %]">
-    <button type="submit">Add Sub-Project</button>
-</form>
+.project-actions {
+    margin: 10px 0;
+    padding: 10px;
+    background: #f5f5f5;
+    border-radius: 4px;
+}
 
-<!-- Button to add a new todo for this project -->
-<form action="/todo/addtodo" method="GET">
-    <input type="hidden" name="project_id" value="[% project.id %]">
-    <button type="submit">Add New Todo</button>
-</form>
+.project-actions form {
+    margin-right: 10px;
+}
+
+.project-details-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0;
+}
+
+.project-details-table th,
+.project-details-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+}
+
+.project-details-table th {
+    background-color: #f5f5f5;
+}
+</style>

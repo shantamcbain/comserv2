@@ -16,23 +16,12 @@
     </div>
     <div>
         <label for="project_id">Select Project:</label>
-        <select id="project_id" name="project_id" class="form-select" required>
-            [% FOREACH project IN projects %]
-            <option value="[% project.id %]" [% IF current_project && current_project.id == project.id %]selected[% END %]>
-                [% project.name %]
-            </option>
-            [% FOREACH sub_project IN project.sub_projects %]
-            <option value="[% sub_project.id %]" [% IF current_project && current_project.id == sub_project.id %]selected[% END %]>
-                -- [% sub_project.name %]
-            </option>
-            [% END %]
-            [% END %]
-        </select>
+          [% INCLUDE "todo/project_list.tt" projects=projects selected_project_id=current_project.id %]<br>
     </div>
 
     <div>
         <label for="manual_project_id">Manual Project ID:</label>
-        <input type="text" id="manual_project_id" name="manual_project_id" value="[% project_id OR '' %]">
+        <input type="text" id="manual_project_id" name="manual_project_id" value="[% project_id OR '' %]" placeholder="Only if project not in list">
     </div>
     <div>
         <label for="due_date">Due Date:</label>

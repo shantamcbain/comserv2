@@ -18,34 +18,56 @@ sub index :Path :Args(0) {
 
 sub add_project :Path('addproject') :Args(0) {
     my ( $self, $c ) = @_;
-    $self->logging->log_with_details('info', 'info', __FILE__, __LINE__, 'add_project', 'Starting add_project action' );
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_project', 'Starting add_project action' );
+
+    # Store the previous URL for redirect after form submission
     $c->session->{previous_url} = $c->req->referer;
 
-    #my $project_model = $c->model('Project');
-    #my $projects = $project_model->get_projects($c->model('DBEncy'), $c->session->{SiteName});
+    # Get parent_id from query parameters if it exists (for sub-projects)
+    my $parent_id = $c->request->query_parameters->{parent_id};
 
     # Use the fetch_projects_with_subprojects method to get the projects
     my $projects = $self->fetch_projects_with_subprojects($c);
-    my $site_model = $c->model('site');
-     # Use the fetch_available_sites method to get the sites
 
+    # Use the fetch_available_sites method from Site controller to get the sites
     my $site_controller = $c->controller('Site');
     my $sites = $site_controller->fetch_available_sites($c);
 
-    my $site_model = $c->model('Site');
-    my $sites;
+    # If this is a sub-project, get the parent project details
+    my $parent_project;
+    if ($parent_id) {
+        my $schema = $c->model('DBEncy');
+        $parent_project = $schema->resultset('Project')->find($parent_id);
+        if ($parent_project) {
+            # Pre-fill form data with parent project details
+            $c->stash->{form_data} = {
+                sitename => $parent_project->sitename,
+                parent_id => $parent_id,  # This will be used to pre-select in the dropdown
+                selected_parent => $parent_id,  # Additional field for template to identify selected parent
+                # Inherit other relevant fields from parent
+                project_code => $parent_project->project_code,
+                client_name => $parent_project->client_name,
+                developer_name => $parent_project->developer_name,
+            };
 
-    # Fetch sites based on the current site name
-    if (lc($c->session->{SiteName}) eq 'csc') {
-        $sites = $site_model->get_all_sites();
-    } else {
-        my $site = $site_model->get_site_details_by_name($c->session->{SiteName});
-        $sites = [$site] if $site;
+            # Log the parent project details for debugging
+            $self->logging->log_with_details(
+                $c, 'debug', __FILE__, __LINE__, 'add_project',
+                "Setting up sub-project for parent ID: $parent_id, Name: " . $parent_project->name
+            );
+        } else {
+            $self->logging->log_with_details(
+                $c, 'warn', __FILE__, __LINE__, 'add_project',
+                "Parent project not found for ID: $parent_id"
+            );
+        }
     }
 
-    $c->stash->{sites} = $sites;
-    $c->stash->{projects} = $projects;
+    # Set up the stash for the template
     $c->stash(
+        sites => $sites,
+        projects => $projects,
+        parent_project => $parent_project,
         template => 'todo/add_project.tt'
     );
 
@@ -55,21 +77,44 @@ sub add_project :Path('addproject') :Args(0) {
 
 sub create_project :Path('create_project') :Args(0) {
     my ( $self, $c ) = @_;
-    print Dumper($c->session);
+
+    # Get basic parameters
     my $form_data = $c->request->body_parameters;
     my $username_of_poster = $c->session->{username};
     my $schema = $c->model('DBEncy');
     my $project_rs = $schema->resultset('Project');
+
+    # Handle group_of_poster - ensure it's a scalar
     my $group_of_poster = $c->session->{roles};
+    if (ref $group_of_poster eq 'ARRAY') {
+        $group_of_poster = $group_of_poster->[0] || '';
+    }
+
+    # Handle parent_id - ensure it's a scalar
     my $parent_id = $form_data->{parent_id};
-    $parent_id = undef if $parent_id eq '';
+    if (ref $parent_id eq 'ARRAY') {
+        $parent_id = $parent_id->[0];
+    }
+    $parent_id = undef if !defined $parent_id || $parent_id eq '';
+
+    # Log the processed values
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_project',
+        "Processing request:\n" .
+        "Parent ID: " . (defined $parent_id ? $parent_id : 'none') . "\n" .
+        "Group: " . (defined $group_of_poster ? $group_of_poster : 'none'));
+
     my $date_time_posted = DateTime->now;
-    my $record_id = $form_data->{record_id} || 0;
-$self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_project', Dumper($form_data));
+    # For new projects, record_id should be the parent_id if it exists
+    my $record_id = $parent_id || 0;
+
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_project',
+        "Creating project with:\n" .
+        "Parent ID: " . ($parent_id || 'none') . "\n" .
+        "Record ID: $record_id\n" .
+        "Form data: " . Dumper($form_data));
 
     my $project = eval {
         $project_rs->create({
-            record_id => $record_id,
             sitename => $form_data->{sitename},
             name => $form_data->{name},
             description => $form_data->{description},
@@ -83,25 +128,41 @@ $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_projec
             client_name => $form_data->{client_name},
             comments => $form_data->{comments},
             username_of_poster => $username_of_poster,
-            parent_id => $parent_id,
+            parent_id => $parent_id,  # This is the correct field for parent-child relationship
             group_of_poster => $group_of_poster,
             date_time_posted => $date_time_posted->ymd . ' ' . $date_time_posted->hms,
         });
     };
     if ($@) {
+        # Log the error
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_project',
+            "Error creating project: $@\nForm data: " . Dumper($form_data));
+
+        # Get fresh lists for the form
+        my $site_controller = $c->controller('Site');
+        my $sites = $site_controller->fetch_available_sites($c);
+        my $projects = $self->fetch_projects_with_subprojects($c);
+
         # Ensure the correct template is set for error handling
         $c->stash(
             form_data => $form_data,
-            error_message => 'There was an error creating the project: ' . $@,
-            template => 'todo/add_project.tt'  # Ensure this template exists
+            sites => $sites,
+            projects => $projects,
+            error_message => 'There was an error creating the project. Please check all fields and try again.',
+            template => 'todo/add_project.tt'
         );
         $c->forward($c->view('TT'));
     } else {
-        # Redirect to the previous URL on success
-        $c->stash(
-            success_message => 'Project added successfully',
-        );
-        $c->res->redirect($c->session->{previous_url});
+        # Project was created successfully
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_project',
+            "Project created successfully with ID: " . $project->id);
+
+        # Add success message to flash
+        $c->flash->{success_message} = 'Project added successfully';
+
+        # Redirect to the project details page
+        $c->res->redirect($c->uri_for($self->action_for('details'),
+            { project_id => $project->id }));
     }
 }
 
@@ -132,9 +193,18 @@ sub details :Path('details') :Args(0) {
 
     if (!$project_id) {
         # Logging: Parameter missing
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'details', 'Missing project_id parameter in request.');
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'details', 'Missing parent_id or project_id parameter in request.');
+
+        # Check if this was meant to be a sub-project creation
+        my $parent_id = $c->request->query_parameters->{parent_id};
+        if ($parent_id) {
+            # Redirect back to add project form with parent_id
+            $c->response->redirect($c->uri_for($self->action_for('add_project'), { parent_id => $parent_id }));
+            return;
+        }
+
         $c->stash(
-            error_msg => 'Project ID is missing from the request.',
+            error_msg => 'Project ID is required to view project details. Please select a project from the list.',
             template => 'todo/projectdetails.tt'
         );
         $c->forward($c->view('TT'));
@@ -145,13 +215,16 @@ sub details :Path('details') :Args(0) {
 
     # Get the DB schema and project model
     my $schema = $c->model('DBEncy');
-    my $project_id = $c->request->body_parameters->{project_id};
     my $project_model = $c->model('Project');
+
+    # Log the project_id we're looking for
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'details',
+        "Looking for project with ID: $project_id");
 
     # Fetch project by ID
     my $project;
     eval {
-        $project = $project_model->get_project($schema, $project_id);
+        $project = $schema->resultset('Project')->find($project_id);
     };
     if ($@ || !$project) {
         # Logging: Error fetching project or project not found
@@ -187,11 +260,15 @@ sub details :Path('details') :Args(0) {
 
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'details', "Fetched " . scalar(@todos) . " todos for project ID: $project_id.");
 
-    # Add the project and todos to the stash
+    # Fetch sub-projects and their todos recursively
+    my $project_tree = $self->build_project_tree($c, $project);
+
+    # Add the project tree (including sub-projects and todos) to the stash
     $c->stash(
-        project => $project,
+        project => $project_tree,
         todos => \@todos,
-        template => 'todo/projectdetails.tt'
+        template => 'todo/projectdetails_enhanced_enhanced.tt',
+        project_details_css => '/static/css/project_details.css'
     );
 
     # Logging: End of details action
@@ -282,6 +359,44 @@ sub editproject :Path('editproject') :Args(0) {
     );
 
     $c->forward($c->view('TT'));
+}
+
+sub build_project_tree :Private {
+    my ($self, $c, $project) = @_;
+
+    # Get the schema
+    my $schema = $c->model('DBEncy');
+
+    # Create the base project hash with all its attributes
+    my $project_hash = {
+        map { $_ => $project->$_ } $project->result_source->columns
+    };
+
+    # Fetch todos for this project
+    my @todos = $schema->resultset('Todo')->search(
+        { project_id => $project->id },
+        { order_by => { -asc => 'start_date' } }
+    );
+    $project_hash->{todos} = \@todos;
+
+    # Fetch sub-projects
+    my @sub_projects = $schema->resultset('Project')->search(
+        { parent_id => $project->id },
+        { order_by => { -asc => 'name' } }
+    );
+
+    # If there are sub-projects, process them recursively
+    if (@sub_projects) {
+        $project_hash->{sub_projects} = [
+            map { $self->build_project_tree($c, $_) } @sub_projects
+        ];
+
+        # Log the number of sub-projects found
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'build_project_tree',
+            "Found " . scalar(@sub_projects) . " sub-projects for project ID: " . $project->id);
+    }
+
+    return $project_hash;
 }
 
 sub update_project :Local :Args(0)  {

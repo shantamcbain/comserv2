@@ -222,18 +222,29 @@ sub fetch_available_sites :Private {
     # Create a new Comserv::Model::Site object
     my $site_model = Comserv::Model::Site->new(schema => $schema);
 
+    # Determine which sites to fetch based on the current site name
+    my $sites;
+    if (lc($current_site_name) eq 'csc') {
+        # If the current site is 'csc', fetch all sites
+        $sites = $site_model->get_all_sites($c);
+    } else {
+        # Otherwise, fetch only the current site
+        my $site = $site_model->get_site_details_by_name($c, $current_site_name);
+        $sites = [$site] if $site;
+    }
 
+    return $sites;
+}
 
-# Add the following subroutine to `Comserv/lib/Comserv/Controller/Site.pm`
+# Add the following subroutine to handle domain management
 sub add_domain :Local {
     my ($self, $c) = @_;
 
-    # Fetch the list of sites
-    my $schema = $c->model('DBEncy');
-    my @sites = $schema->resultset('Site')->all;
+    # Get available sites using the fetch_available_sites method
+    my $sites = $self->fetch_available_sites($c);
 
     # Pass the list of sites to the template
-    $c->stash->{sites} = \@sites;  # Changed to \@sites to avoid unintended interpolation
+    $c->stash->{sites} = $sites;
 
     # Set the template to site/add_domain.tt
     $c->stash(template => 'site/add_domain.tt');
@@ -276,19 +287,5 @@ sub add_domain_post :Local {
         $c->stash(template => 'site/add_domain.tt');
         $c->forward('add_domain');
     };
-}
-
-    # Determine which sites to fetch based on the current site name
-    my $sites;
-    if (lc($current_site_name) eq 'csc') {
-        # If the current site is 'csc', fetch all sites
-        $sites = $site_model->get_all_sites();
-    } else {
-        # Otherwise, fetch only the current site
-        my $site = $site_model->get_site_details_by_name($current_site_name);
-        $sites = [$site] if $site;
-    }
-
-    return $sites;
 }
 1;
