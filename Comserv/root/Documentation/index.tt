@@ -1,0 +1,372 @@
+[% PageVersion = 'Documentation/index.tt,v 1.0 2025/03/03 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="documentation-index">
+    <h1>Documentation Center</h1>
+    
+    <p>Welcome to the Documentation Center. Here you can find all available documentation for the Comserv system.</p>
+    
+    <div class="documentation-list">
+        [% IF sorted_page_names.size > 0 %]
+            <h2>Available Documentation</h2>
+            <ul class="documentation-pages">
+                [% FOREACH page_name IN sorted_page_names %]
+                    [% page = structured_pages.$page_name %]
+                    <li class="documentation-page">
+                        <a href="[% page.url %]" class="documentation-link">
+                            [% page.title %]
+                        </a>
+                    </li>
+                [% END %]
+            </ul>
+        [% ELSE %]
+            <p class="no-documentation">No documentation pages found.</p>
+        [% END %]
+    </div>
+    
+    <div class="documentation-sections">
+        <h2>Documentation Sections</h2>
+        <div class="section-grid">
+            <div class="section-card">
+                <h3>User Guides</h3>
+                <ul>
+                    <li><a href="[% c.uri_for('/Documentation/getting_started') %]">Getting Started</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/user_manual') %]">User Manual</a></li>
+                </ul>
+            </div>
+            
+            <div class="section-card">
+                <h3>Administration</h3>
+                <ul>
+                    <li><a href="[% c.uri_for('/Documentation/admin') %]">Admin Module</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/theme_system') %]">Theme System</a></li>
+                </ul>
+            </div>
+            
+            <div class="section-card">
+                <h3>Technical Documentation</h3>
+                <ul>
+                    <li><a href="[% c.uri_for('/Documentation/system_overview') %]">System Overview</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/architecture') %]">Architecture</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <div class="documentation-resources">
+        <h2>Resources</h2>
+        <ul>
+            <li><a href="[% c.uri_for('/Documentation/completed_items.json') %]">Completed Items JSON</a> - List of completed development tasks</li>
+        </ul>
+    </div>
+
+    <div class="documentation-help">
+        <h2>Need Help?</h2>
+        <p>If you can't find the documentation you're looking for, please contact the system administrator.</p>
+    </div>
+</div>
+
+<style>
+    .documentation-index {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+    }
+    
+    .documentation-list {
+        margin: 20px 0;
+        padding: 15px;
+        background-color: #f5f5f5;
+        border-radius: 5px;
+    }
+    
+    .documentation-pages {
+        list-style-type: none;
+        padding: 0;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 15px;
+    }
+    
+    .documentation-page {
+        padding: 10px;
+        background-color: #fff;
+        border-radius: 3px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .documentation-link {
+        display: block;
+        color: #0066cc;
+        text-decoration: none;
+        font-weight: bold;
+    }
+    
+    .documentation-link:hover {
+        text-decoration: underline;
+    }
+    
+    .section-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 20px;
+        margin-top: 15px;
+    }
+    
+    .section-card {
+        background-color: #fff;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        padding: 15px;
+    }
+    
+    .section-card h3 {
+        color: #0066cc;
+        margin-top: 0;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 8px;
+    }
+    
+    .section-card ul {
+        list-style-type: none;
+        padding-left: 0;
+    }
+    
+    .section-card li {
+        margin-bottom: 8px;
+    }
+    
+    .section-card a {
+        color: #333;
+        text-decoration: none;
+    }
+    
+    .section-card a:hover {
+        color: #0066cc;
+        text-decoration: underline;
+    }
+    
+    .documentation-resources,
+    .documentation-help {
+        margin-top: 30px;
+        padding: 15px;
+        border-radius: 3px;
+    }
+
+    .documentation-resources {
+        background-color: #f6ffed;
+        border-left: 4px solid #52c41a;
+    }
+
+    .documentation-help {
+        background-color: #e6f7ff;
+        border-left: 4px solid #1890ff;
+    }
+
+    .documentation-resources ul {
+        list-style-type: none;
+        padding-left: 0;
+    }
+
+    .documentation-resources li {
+        margin-bottom: 8px;
+    }
+    
+    .no-documentation {
+        color: #999;
+        font-style: italic;
+    }
+    
+    h1 {
+        color: #333;
+        border-bottom: 2px solid #eee;
+        padding-bottom: 10px;
+    }
+    
+    h2 {
+        color: #0066cc;
+        margin-top: 25px;
+    }
+</style>[% PageVersion = 'Documentation/index.tt,v 1.0 2024/05/30 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Documentation Index' %]
+
+<div class="documentation-container">
+    <h1>Comserv Documentation</h1>
+    
+    <p>Welcome to the Comserv documentation. This section provides comprehensive information about the system, its features, and how to use them effectively.</p>
+    
+    <div class="documentation-grid">
+        <div class="documentation-card">
+            <h2>System Documentation</h2>
+            <ul>
+                <li><a href="/Documentation/system_overview">System Overview</a></li>
+                <li><a href="/Documentation/architecture">Architecture</a></li>
+                <li><a href="/Documentation/installation">Installation Guide</a></li>
+                <li><a href="/Documentation/configuration">Configuration</a></li>
+            </ul>
+        </div>
+        
+        <div class="documentation-card">
+            <h2>User Guides</h2>
+            <ul>
+                <li><a href="/Documentation/user_guide">User Guide</a></li>
+                <li><a href="/Documentation/admin_guide">Administrator Guide</a></li>
+                <li><a href="/Documentation/site_management">Site Management</a></li>
+                <li><a href="/Documentation/content_management">Content Management</a></li>
+            </ul>
+        </div>
+        
+        <div class="documentation-card">
+            <h2>Developer Documentation</h2>
+            <ul>
+                <li><a href="/Documentation/api_reference">API Reference</a></li>
+                <li><a href="/Documentation/database_schema">Database Schema</a></li>
+                <li><a href="/Documentation/coding_standards">Coding Standards</a></li>
+                <li><a href="/Documentation/theme_system">Theme System</a></li>
+            </ul>
+        </div>
+        
+        <div class="documentation-card">
+            <h2>Tutorials</h2>
+            <ul>
+                <li><a href="/Documentation/getting_started">Getting Started</a></li>
+                <li><a href="/Documentation/creating_sites">Creating Sites</a></li>
+                <li><a href="/Documentation/custom_themes">Creating Custom Themes</a></li>
+                <li><a href="/Documentation/extending">Extending Comserv</a></li>
+            </ul>
+        </div>
+    </div>
+    
+    <h2>Recent Updates</h2>
+    <ul class="recent-updates">
+        <li>
+            <span class="update-date">May 30, 2024</span>
+            <a href="/Documentation/theme_system">Theme System Documentation</a> - Comprehensive guide to the new theme system
+        </li>
+        <li>
+            <span class="update-date">May 28, 2024</span>
+            <a href="/Documentation/admin_guide">Administrator Guide</a> - Updated with new admin features
+        </li>
+        <li>
+            <span class="update-date">May 25, 2024</span>
+            <a href="/Documentation/database_schema">Database Schema</a> - Updated with new tables and relationships
+        </li>
+    </ul>
+
+    <h2>All Documentation Pages</h2>
+    <div class="all-documentation">
+        [% IF documentation_pages.size > 0 %]
+            <ul class="documentation-list">
+                [% FOREACH page IN documentation_pages.keys.sort %]
+                    <li><a href="/Documentation/[% page %]">[% page.replace('_', ' ').ucfirst %]</a></li>
+                [% END %]
+            </ul>
+        [% ELSE %]
+            <p>No additional documentation pages found.</p>
+        [% END %]
+    </div>
+
+    <h2>All Documentation Pages</h2>
+    <div class="all-documentation">
+        [% IF documentation_pages.size > 0 %]
+            <ul class="documentation-list">
+                [% FOREACH page IN documentation_pages.keys.sort %]
+                    <li><a href="/Documentation/[% page %]">[% page.replace('_', ' ').ucfirst %]</a></li>
+                [% END %]
+            </ul>
+        [% ELSE %]
+            <p>No additional documentation pages found.</p>
+        [% END %]
+    </div>
+</div>
+
+<style>
+    .documentation-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .documentation-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 20px;
+        margin: 30px 0;
+    }
+    
+    .documentation-card {
+        background-color: #f8f9fa;
+        border-radius: 5px;
+        padding: 20px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    
+    .documentation-card h2 {
+        margin-top: 0;
+        border-bottom: 1px solid #ddd;
+        padding-bottom: 10px;
+    }
+    
+    .documentation-card ul {
+        list-style-type: none;
+        padding-left: 0;
+    }
+    
+    .documentation-card li {
+        margin-bottom: 10px;
+    }
+    
+    .recent-updates {
+        list-style-type: none;
+        padding-left: 0;
+    }
+    
+    .recent-updates li {
+        margin-bottom: 15px;
+    }
+    
+    .update-date {
+        display: inline-block;
+        background-color: #e9ecef;
+        padding: 3px 8px;
+        border-radius: 3px;
+        margin-right: 10px;
+        font-size: 0.9em;
+    }
+
+    .all-documentation {
+        margin-top: 20px;
+    }
+
+    .documentation-list {
+        list-style-type: none;
+        padding: 0;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 10px;
+    }
+
+    .documentation-list li {
+        background-color: #f8f9fa;
+        padding: 10px 15px;
+        border-radius: 5px;
+        transition: background-color 0.2s;
+    }
+
+    .documentation-list li:hover {
+        background-color: #e9ecef;
+    }
+
+    .documentation-list a {
+        text-decoration: none;
+        color: #333;
+        display: block;
+    }
+</style>

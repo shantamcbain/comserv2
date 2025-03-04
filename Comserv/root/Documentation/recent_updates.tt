@@ -1,0 +1,105 @@
+[% PageVersion = 'Documentation/recent_updates.tt,v 1.0 2023/07/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="documentation-page">
+    <h1>Recent Updates</h1>
+    
+    <div class="section">
+        <h2>Documentation System (March 03, 2025)</h2>
+        <p>
+            The Documentation system has been completely overhauled with the following improvements:
+        </p>
+        <ul>
+            <li><strong>Automatic Route Generation</strong> - All documentation files are now automatically discovered and routed</li>
+            <li><strong>Improved Error Handling</strong> - Better handling of missing documentation pages</li>
+            <li><strong>Support for Multiple File Types</strong> - The system now handles various file types including JSON, HTML, and images</li>
+            <li><strong>Safe Naming System</strong> - Automatic handling of reserved names and invalid identifiers</li>
+            <li><strong>Structured Documentation Index</strong> - Better organization of documentation pages</li>
+        </ul>
+        <p>
+            These improvements make it easier to add and manage documentation pages without requiring code changes.
+        </p>
+    </div>
+    
+    <div class="section">
+        <h2>New Documentation Pages (March 03, 2025July July 10, 202310, 2023)</h2>
+        <p>
+            Several new documentation pages have been added:
+        </p>
+        <ul>
+            <li><a href="[% c.uri_for('/Documentation/document_management') %]">Document Management</a> - How the Documentation system works</li>
+            <li><a href="[% c.uri_for('/Documentation/getting_started') %]">Getting Started</a> - Guide for new users</li>
+            <li><a href="[% c.uri_for('/Documentation/user_manual') %]">User Manual</a> - Comprehensive user guide</li>
+            <li><a href="[% c.uri_for('/Documentation/system_overview') %]">System Overview</a> - Overview of the system architecture</li>
+            <li><a href="[% c.uri_for('/Documentation/architecture') %]">Architecture</a> - Detailed system architecture</li>
+            <li><a href="[% c.uri_for('/Documentation/theme_system') %]">Theme System</a> - How the theming system works</li>
+        </ul>
+    </div>
+    
+    <div class="section">
+        <h2>Bug Fixes (March 03, 2025</h2>
+        <p>
+            Several bugs have been fixed in the Documentation system:
+        </p>
+        <ul>
+            <li>Fixed issues with reserved names causing errors in route generation</li>
+            <li>Improved handling of file paths to prevent directory traversal</li>
+            <li>Fixed content type detection for various file types</li>
+            <li>Resolved issues with duplicate route declarations</li>
+        </ul>
+    </div>
+</div>
+
+<style>
+    .documentation-page {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+    }
+    
+    .section {
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .section:last-child {
+        border-bottom: none;
+    }
+    
+    h1 {
+        color: #333;
+        border-bottom: 2px solid #eee;
+        padding-bottom: 10px;
+    }
+    
+    h2 {
+        color: #0066cc;
+        margin-top: 20px;
+    }
+    
+    ul {
+        padding-left: 25px;
+    }
+    
+    li {
+        margin-bottom: 8px;
+    }
+    
+    strong {
+        color: #333;
+    }
+    
+    a {
+        color: #0066cc;
+        text-decoration: none;
+    }
+    
+    a:hover {
+        text-decoration: underline;
+    }
+</style>

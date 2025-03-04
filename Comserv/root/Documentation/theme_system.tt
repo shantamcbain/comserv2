@@ -1,0 +1,252 @@
+[% PageVersion = 'Documentation/theme_system.tt,v 1.0 2024/05/30 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Theme System Documentation' %]
+
+<div class="documentation-container">
+    <h1>Theme System Documentation</h1>
+    
+    <div class="toc">
+        <h2>Table of Contents</h2>
+        <ul>
+            <li><a href="#overview">Overview</a></li>
+            <li><a href="#goals">Goals</a></li>
+            <li><a href="#implementation">Implementation Plan</a></li>
+            <li><a href="#theme-structure">Theme Structure</a></li>
+            <li><a href="#custom-themes">Creating Custom Themes</a></li>
+            <li><a href="#admin-interface">Admin Interface</a></li>
+            <li><a href="#migration">Migration Guide</a></li>
+            <li><a href="#troubleshooting">Troubleshooting</a></li>
+        </ul>
+    </div>
+    
+    <section id="overview">
+        <h2>Overview</h2>
+        <p>The Comserv Theme System provides a flexible and maintainable approach to styling the application. It allows for site-specific themes, custom color schemes, and centralized style management while maintaining backward compatibility with existing CSS.</p>
+        
+        <p>This system replaces the previous approach of having separate CSS files for each site with a more structured theme-based approach that promotes consistency and reduces duplication.</p>
+    </section>
+    
+    <section id="goals">
+        <h2>Goals</h2>
+        <p>The primary goals of the theme system are:</p>
+        
+        <ul>
+            <li><strong>Consistency:</strong> Maintain a consistent look and feel across the application while allowing for site-specific customization.</li>
+            <li><strong>Flexibility:</strong> Enable easy creation and modification of themes without requiring code changes.</li>
+            <li><strong>Maintainability:</strong> Centralize style definitions to reduce duplication and make updates easier.</li>
+            <li><strong>User Control:</strong> Allow administrators to select and customize themes through the admin interface.</li>
+            <li><strong>Performance:</strong> Optimize CSS delivery and reduce page load times.</li>
+            <li><strong>Backward Compatibility:</strong> Ensure existing sites continue to work without requiring immediate changes.</li>
+        </ul>
+    </section>
+    
+    <section id="implementation">
+        <h2>Implementation Plan</h2>
+        <p>The theme system is being implemented in phases:</p>
+        
+        <ol>
+            <li><strong>Phase 1: Database Schema Updates</strong>
+                <ul>
+                    <li>Add 'theme' column to the sites table</li>
+                    <li>Create theme-related tables for storing custom theme settings</li>
+                </ul>
+            </li>
+            <li><strong>Phase 2: Core Theme Files</strong>
+                <ul>
+                    <li>Create base theme CSS with CSS variables for customization</li>
+                    <li>Develop default themes for common sites</li>
+                    <li>Update Header.tt to load the appropriate theme</li>
+                </ul>
+            </li>
+            <li><strong>Phase 3: Admin Interface</strong>
+                <ul>
+                    <li>Create theme management interface in the admin area</li>
+                    <li>Implement theme selection functionality</li>
+                    <li>Add custom theme creation tools</li>
+                </ul>
+            </li>
+            <li><strong>Phase 4: Migration and Documentation</strong>
+                <ul>
+                    <li>Migrate existing site-specific styles to the theme system</li>
+                    <li>Document the theme system for developers and administrators</li>
+                    <li>Provide migration guides for site owners</li>
+                </ul>
+            </li>
+        </ol>
+    </section>
+    
+    <section id="theme-structure">
+        <h2>Theme Structure</h2>
+        <p>Each theme consists of a CSS file located in the <code>/static/css/themes/</code> directory. The theme files use CSS variables (custom properties) to define colors, fonts, and other style elements that can be customized.</p>
+        
+        <h3>Base Theme</h3>
+        <p>The base theme (<code>default.css</code>) defines the core styles and variables used by all themes. It includes:</p>
+        
+        <pre>
+:root {
+  --primary-color: #3498db;
+  --secondary-color: #2c3e50;
+  --accent-color: #e74c3c;
+  --text-color: #333333;
+  --link-color: #2980b9;
+  --link-hover-color: #3498db;
+  --background-color: #ffffff;
+  --border-color: #dddddd;
+  --table-header-bg: #f2f2f2;
+  --warning-color: #f39c12;
+  --success-color: #27ae60;
+  
+  --button-bg: var(--primary-color);
+  --button-text: #ffffff;
+  --button-border: var(--primary-color);
+  --button-hover-bg: var(--secondary-color);
+}
+        </pre>
+        
+        <h3>Custom Themes</h3>
+        <p>Custom themes override these variables to create different visual styles without changing the underlying HTML structure.</p>
+    </section>
+    
+    <section id="custom-themes">
+        <h2>Creating Custom Themes</h2>
+        <p>Custom themes can be created in two ways:</p>
+        
+        <h3>1. Manual Creation</h3>
+        <p>Create a new CSS file in the <code>/static/css/themes/</code> directory that overrides the default variables:</p>
+        
+        <pre>
+/* custom_theme.css */
+:root {
+  --primary-color: #9b59b6;
+  --secondary-color: #34495e;
+  --accent-color: #f1c40f;
+  /* Override other variables as needed */
+}
+        </pre>
+        
+        <h3>2. Admin Interface</h3>
+        <p>Use the theme management interface in the admin area to create a custom theme by selecting colors and other options. The system will generate the CSS file automatically.</p>
+    </section>
+    
+    <section id="admin-interface">
+        <h2>Admin Interface</h2>
+        <p>The theme system includes an admin interface for managing themes, accessible at <code>/admin/theme</code>.</p>
+        
+        <h3>Features</h3>
+        <ul>
+            <li><strong>Theme Selection:</strong> Choose from available themes for each site</li>
+            <li><strong>Custom Theme Creation:</strong> Create custom themes with a color picker interface</li>
+            <li><strong>Theme Preview:</strong> Preview themes before applying them</li>
+            <li><strong>Database Management:</strong> Add the theme column to the database if it doesn't exist</li>
+        </ul>
+        
+        <h3>Access Requirements</h3>
+        <p>To access the theme management interface, users must:</p>
+        <ul>
+            <li>Be logged in</li>
+            <li>Have the 'admin' role</li>
+        </ul>
+    </section>
+    
+    <section id="migration">
+        <h2>Migration Guide</h2>
+        <p>To migrate an existing site to the theme system:</p>
+        
+        <ol>
+            <li>Ensure the 'theme' column exists in the sites table
+                <ul>
+                    <li>Use the admin interface at <code>/admin/add_theme_column</code> to add it if needed</li>
+                </ul>
+            </li>
+            <li>Create a theme file for your site
+                <ul>
+                    <li>Copy <code>default.css</code> to <code>your_site_name.css</code></li>
+                    <li>Modify the CSS variables to match your site's color scheme</li>
+                </ul>
+            </li>
+            <li>Set the theme for your site
+                <ul>
+                    <li>Use the admin interface at <code>/admin/theme</code> to select your theme</li>
+                    <li>Or update the database directly: <code>UPDATE sites SET theme = 'your_theme_name' WHERE name = 'YOUR_SITE_NAME';</code></li>
+                </ul>
+            </li>
+            <li>Test your site to ensure styles are applied correctly</li>
+        </ol>
+    </section>
+    
+    <section id="troubleshooting">
+        <h2>Troubleshooting</h2>
+        
+        <h3>Common Issues</h3>
+        <dl>
+            <dt>Theme not loading</dt>
+            <dd>
+                <ul>
+                    <li>Check that the theme file exists in <code>/static/css/themes/</code></li>
+                    <li>Verify that the site record has the correct theme name in the database</li>
+                    <li>Clear your browser cache</li>
+                </ul>
+            </dd>
+            
+            <dt>Database errors about missing theme column</dt>
+            <dd>
+                <ul>
+                    <li>Run the theme column migration script from <code>/admin/add_theme_column</code></li>
+                    <li>Or manually add the column: <code>ALTER TABLE sites ADD COLUMN theme VARCHAR(50) DEFAULT 'default';</code></li>
+                </ul>
+            </dd>
+            
+            <dt>Custom theme not applying correctly</dt>
+            <dd>
+                <ul>
+                    <li>Check that your CSS variables are correctly defined</li>
+                    <li>Ensure there are no syntax errors in your CSS file</li>
+                    <li>Verify that the theme is correctly assigned to your site</li>
+                </ul>
+            </dd>
+        </dl>
+    </section>
+</div>
+
+<style>
+    .documentation-container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .toc {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 30px;
+    }
+    
+    .toc ul {
+        list-style-type: none;
+        padding-left: 20px;
+    }
+    
+    section {
+        margin-bottom: 40px;
+    }
+    
+    pre {
+        background-color: #f5f5f5;
+        padding: 15px;
+        border-radius: 5px;
+        overflow-x: auto;
+    }
+    
+    dt {
+        font-weight: bold;
+        margin-top: 15px;
+    }
+    
+    dd {
+        margin-left: 20px;
+    }
+</style>

@@ -225,7 +225,20 @@ sub site_setup {
 
     sub documentation :Path('documentation') :Args(0) {
         my ( $self, $c ) = @_;
-        $c->stash(template => 'Documentation/Documentation.tt');
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'documentation', "Redirecting to Documentation controller");
+        $c->response->redirect($c->uri_for('/Documentation'));
+    }
+
+    # Route for Documentation with capital D
+    sub Documentation :Path('Documentation') :Args {
+        my ( $self, $c, @args ) = @_;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'Documentation', "Forwarding to Documentation controller with args: " . join(', ', @args));
+
+        if (@args) {
+            $c->detach('/documentation/view', [@args]);
+        } else {
+            $c->detach('/documentation/index');
+        }
     }
 
     sub end : ActionClass('RenderView') {}

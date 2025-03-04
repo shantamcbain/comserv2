@@ -37,7 +37,8 @@
     <li><a href="compare_schema">Compare Schemas</a></li>
     <li><a href="get_table_info">Get Table Information</a></li>
     <li><a href="migrate_schema">Migrate Schema</a></li>
+    <li><a href="[% c.uri_for('/Documentation') %]">Documentation Center</a></li>
 </ul>
-<p>For more information on how to use these features, please refer to our <a href="[% c.uri_for('/Documentation/Admin') %]">Admin Module Documentation</a>.</p>
+<p>For more information on how to use these features, please refer to our <a href="[% c.uri_for('/Documentation/admin') %]">Admin Module Documentation</a>.</p>
 
 <p>For more information or assistance, please contact us.</p>
