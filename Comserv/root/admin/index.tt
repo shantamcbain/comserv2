@@ -7,11 +7,15 @@
 
 <p>Welcome to the Admin Home Page. Here you can manage various aspects of the site, with a current focus on handling schema changes within the application.</p>
 
+
+
 <h2>Site Management</h2>
 
 <ul>
     <li><a href="edit_documentation">Edit Documentation</a></li>
     <li><a href="change_styles">Change Styles</a></li>
+    <li><a href="/admin/theme">Theme Management</a></li>
+    <li><a href="/admin/add_theme_column">Add Theme Column to Database</a></li>
     <li><a href="add_schema">Add Schema</a></li>
     <li><a href="get_table_info">Get Table Information</a></li>
     <li><a href="migrate_schema">Migrate Schema</a></li>

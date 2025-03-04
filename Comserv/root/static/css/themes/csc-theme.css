@@ -1,0 +1,32 @@
+/* CSC Theme */
+:root {
+  /* Colors */
+  --primary-color: #3366cc;
+  --secondary-color: #f0f0f0;
+  --accent-color: #ff6600;
+  --text-color: #333333;
+  --background-color: #ffffff;
+  --link-color: #3366cc;
+  --link-hover-color: #1a3366;
+  --border-color: #cccccc;
+  --table-header-bg: #e6e6e6;
+  --warning-color: #cc0000;
+  --success-color: #339933;
+  
+  /* Typography */
+  --header-font: Verdana, Helvetica, sans-serif;
+  --body-font: Verdana, Helvetica, sans-serif;
+  --font-size-base: 16px;
+  --font-size-small: 14px;
+  --font-size-large: 20px;
+  --font-size-xlarge: 24px;
+  
+  /* Components */
+  --button-bg: #3366cc;
+  --button-text: #ffffff;
+  --button-border: #1a3366;
+  --button-hover-bg: #1a3366;
+  --nav-bg: var(--primary-color);
+  --nav-text: #ffffff;
+  --nav-hover-bg: rgba(255, 255, 255, 0.2);
+}

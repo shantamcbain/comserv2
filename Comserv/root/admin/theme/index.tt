@@ -1,0 +1,150 @@
+[% META title = 'Theme Management' %]
+
+<h1>Theme Management</h1>
+
+[% IF message %]
+<div class="success">
+    [% message %]
+</div>
+[% END %]
+
+[% IF error %]
+<div class="warning">
+    [% error %]
+</div>
+[% END %]
+
+<h2>Current Site Theme</h2>
+
+<p>Current site: <strong>[% site.name %]</strong></p>
+<p>Current theme: <strong>[% site.theme || 'default' %]</strong></p>
+
+<form action="[% c.uri_for('/admin/theme/update_theme') %]" method="post">
+    <input type="hidden" name="site_id" value="[% site.id %]">
+    
+    <div class="form-group">
+        <label for="theme">Select Theme:</label>
+        <select name="theme" id="theme">
+            <option value="default" [% IF site.theme == 'default' %]selected[% END %]>Default</option>
+            <option value="usbm" [% IF site.theme == 'usbm' %]selected[% END %]>USBM</option>
+            <option value="csc" [% IF site.theme == 'csc' %]selected[% END %]>CSC</option>
+            [% IF site.theme.match('_custom$') %]
+            <option value="[% site.theme %]" selected>Custom ([% site.theme %])</option>
+            [% END %]
+        </select>
+    </div>
+    
+    <div class="form-group">
+        <button type="submit">Update Theme</button>
+    </div>
+</form>
+
+<h2>Create Custom Theme</h2>
+
+<form action="[% c.uri_for('/admin/theme/create_custom_theme') %]" method="post">
+    <input type="hidden" name="site_id" value="[% site.id %]">
+    
+    <div class="form-group">
+        <label for="primary_color">Primary Color:</label>
+        <input type="color" name="primary_color" id="primary_color" value="#ccffff">
+    </div>
+    
+    <div class="form-group">
+        <label for="secondary_color">Secondary Color:</label>
+        <input type="color" name="secondary_color" id="secondary_color" value="#f9f9f9">
+    </div>
+    
+    <div class="form-group">
+        <label for="accent_color">Accent Color:</label>
+        <input type="color" name="accent_color" id="accent_color" value="#FF9900">
+    </div>
+    
+    <div class="form-group">
+        <label for="text_color">Text Color:</label>
+        <input type="color" name="text_color" id="text_color" value="#000000">
+    </div>
+    
+    <div class="form-group">
+        <label for="link_color">Link Color:</label>
+        <input type="color" name="link_color" id="link_color" value="#0000FF">
+    </div>
+    
+    <div class="form-group">
+        <button type="submit">Create Custom Theme</button>
+    </div>
+</form>
+
+[% IF site.name == 'CSC' %]
+<h2>All Sites</h2>
+
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Site Name</th>
+            <th>Current Theme</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        [% FOREACH s IN sites %]
+        <tr>
+            <td>[% s.name %]</td>
+            <td>[% s.theme || 'default' %]</td>
+            <td>
+                <form action="[% c.uri_for('/admin/theme/update_theme') %]" method="post" style="display:inline;">
+                    <input type="hidden" name="site_id" value="[% s.id %]">
+                    <select name="theme">
+                        <option value="default" [% IF s.theme == 'default' %]selected[% END %]>Default</option>
+                        <option value="usbm" [% IF s.theme == 'usbm' %]selected[% END %]>USBM</option>
+                        <option value="csc" [% IF s.theme == 'csc' %]selected[% END %]>CSC</option>
+                        [% IF s.theme.match('_custom$') %]
+                        <option value="[% s.theme %]" selected>Custom ([% s.theme %])</option>
+                        [% END %]
+                    </select>
+                    <button type="submit">Update</button>
+                </form>
+            </td>
+        </tr>
+        [% END %]
+    </tbody>
+</table>
+[% END %]
+
+<h2>Theme Preview</h2>
+
+<div class="theme-preview">
+    <h3>Default Theme</h3>
+    <div style="
+        background-color: #ccffff;
+        padding: 10px;
+        border: 1px solid #cccccc;
+        margin-bottom: 10px;
+    ">
+        <p>This is how the default theme looks.</p>
+        <button>Sample Button</button>
+    </div>
+    
+    <h3>USBM Theme</h3>
+    <div style="
+        background-color: #009933;
+        color: #ffffff;
+        padding: 10px;
+        border: 1px solid #cccccc;
+        margin-bottom: 10px;
+    ">
+        <p>This is how the USBM theme looks.</p>
+        <button style="background-color: #FFCC66; color: #000000;">Sample Button</button>
+    </div>
+    
+    <h3>CSC Theme</h3>
+    <div style="
+        background-color: #3366cc;
+        color: #ffffff;
+        padding: 10px;
+        border: 1px solid #cccccc;
+        margin-bottom: 10px;
+    ">
+        <p>This is how the CSC theme looks.</p>
+        <button style="background-color: #3366cc; color: #ffffff; border: 1px solid #1a3366;">Sample Button</button>
+    </div>
+</div>

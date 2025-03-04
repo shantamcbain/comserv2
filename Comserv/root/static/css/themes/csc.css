@@ -1,0 +1,19 @@
+/* CSC Theme */
+:root {
+  --primary-color: #3366cc;
+  --secondary-color: #f0f0f0;
+  --accent-color: #ff6600;
+  --text-color: #333333;
+  --background-color: #ffffff;
+  --link-color: #3366cc;
+  --link-hover-color: #1a3366;
+  --border-color: #cccccc;
+  --table-header-bg: #e6e6e6;
+  --warning-color: #cc0000;
+  --success-color: #339933;
+  
+  --button-bg: #3366cc;
+  --button-text: #ffffff;
+  --button-border: #1a3366;
+  --button-hover-bg: #1a3366;
+}

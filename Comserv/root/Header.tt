@@ -29,13 +29,59 @@
         [% embed('CSCWHMCSInterface') %]
     [% END %]
 
+    <!-- Base CSS with variables -->
+    <link rel="stylesheet" type="text/css" href="/static/css/base.css">
 
+    <!-- Theme CSS - based on site name -->
+    [%
+        # Default theme
+        theme_name = 'default';
 
+        # Set theme based on site name
+        IF SiteName == 'USBM';
+            theme_name = 'usbm';
+        ELSIF SiteName == 'CSC';
+            theme_name = 'csc';
+        END;
 
-<link rel="stylesheet" type="text/css" href="[% c.stash.css_view_name %]">
-<link rel="stylesheet" type="text/css" href="[% c.stash.log_css %]">
-<link rel="stylesheet" type="text/css" href="[% c.stash.menu_css %]">
- <link rel="stylesheet" type="text/css" href="[% c.stash.todo_css %]">
+        # Check if site has a custom theme
+        TRY;
+            # First try to get the site with specific columns to avoid the theme column error
+            site = c.model('DBEncy').resultset('Site').find(
+                { name => SiteName },
+                { columns => [qw(id name description)] }
+            );
+
+            # Then try to get the theme separately, catching any errors
+            TRY;
+                # If the theme column exists, this will work
+                theme_record = c.model('DBEncy').resultset('Site').find(
+                    { name => SiteName },
+                    { columns => [qw(theme)] }
+                );
+
+                # If we got a theme, use it
+                IF theme_record && theme_record.theme;
+                    theme_name = theme_record.theme;
+                END;
+            CATCH;
+                # If there's an error with the theme column, just use the default theme
+                # This will happen if the theme column doesn't exist
+                c.log.error("Theme column doesn't exist. Using default theme.");
+            END;
+        CATCH;
+            # If there's an error getting the site, just use the default theme
+            c.log.error("Error getting site. Using default theme.");
+        END;
+    %]
+    <link rel="stylesheet" type="text/css" href="/static/css/themes/[% theme_name %].css">
+
+    <!-- Site-specific CSS (for backward compatibility) -->
+    <link rel="stylesheet" type="text/css" href="[% c.stash.css_view_name %]">
+    <link rel="stylesheet" type="text/css" href="[% c.stash.log_css %]">
+    <link rel="stylesheet" type="text/css" href="[% c.stash.menu_css %]">
+    <link rel="stylesheet" type="text/css" href="[% c.stash.todo_css %]">
+
     <script src="static/js/sub-menu.js"></script>
     <script language="javascript" type="text/javascript">
         function switchpage(select) {

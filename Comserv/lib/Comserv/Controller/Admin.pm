@@ -23,12 +23,21 @@ sub begin : Private {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "Starting begin action");
     $c->stash->{debug_errors} //= []; # Ensure debug_errors is initialized
 
+    # Add debug information to the stash
+    $c->stash->{debug_info} = {
+        user_exists => $c->user_exists ? 'Yes' : 'No',
+        session_id => $c->sessionid,
+        session_data => $c->session,
+        roles => $c->session->{roles},
+    };
+
     # Check if the user is logged in
-    if ( !$c->user_exists ) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "User not logged in, redirecting to home.");
-        $c->response->redirect($c->uri_for('/'));
-        return;
-    }
+#    if ( !$c->user_exists ) {
+#        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "User not logged in, redirecting to home.");
+#        $c->flash->{error} = 'You must be logged in to access the admin area.';
+#        $c->response->redirect($c->uri_for('/'));
+#        return;
+#    }
 
     # Fetch the roles from the session
     my $roles = $c->session->{roles};
@@ -47,12 +56,14 @@ sub begin : Private {
         } else {
             # User is not admin, redirect to home
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "Non-admin user, redirecting to home. Roles found: " . join(", ", @$roles));
+            $c->flash->{error} = 'You do not have permission to access the admin area. Required role: admin. Your roles: ' . join(", ", @$roles);
             $c->response->redirect($c->uri_for('/'));
             return;
         }
     } else {
         # Log that roles are not defined or not an array
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "No roles defined or roles is not an array, redirecting to home.");
+        $c->flash->{error} = 'You do not have permission to access the admin area. No roles defined or roles is not an array.';
         $c->response->redirect($c->uri_for('/'));
         return;
     }
@@ -290,61 +301,93 @@ sub edit_documentation :Path('admin/edit_documentation') :Args(0) {
     $c->forward($c->view('TT'));
 }
 
+# Add theme column to sites table
+sub add_theme_column :Path('/admin/add_theme_column') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Debug logging for add_theme_column action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_theme_column', "Starting add_theme_column action");
+
+    # Check if the user has the admin role
+    unless ($c->user_exists && grep { $_ eq 'admin' } @{$c->session->{roles}}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'add_theme_column', "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest'));
+        $c->flash->{error} = "You must be an admin to perform this action";
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    if ($c->request->method eq 'POST' && $c->request->params->{confirm}) {
+        # Path to the script
+        my $script_path = $c->path_to('script', 'add_theme_column.pl');
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_theme_column', "Executing script: $script_path");
+
+        # Execute the script
+        my $output = qx{perl $script_path 2>&1};
+        my $exit_code = $? >> 8;
+
+        if ($exit_code == 0) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_theme_column', "Theme column added successfully. Output: $output");
+            $c->flash->{message} = "Theme column added successfully to sites table. Output: $output";
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_theme_column', "Error adding theme column: $output");
+            $c->flash->{error} = "Error adding theme column: $output";
+        }
+
+        $c->response->redirect($c->uri_for('/admin'));
+        return;
+    }
+
+    # Display confirmation page
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_theme_column', "Displaying confirmation page");
+    $c->stash(
+        template => 'admin/add_theme_column.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
+# Add theme column to sites table
+sub add_theme_column :Path('/admin/add_theme_column') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Debug logging for add_theme_column action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_theme_column', "Starting add_theme_column action");
+
+    # Check if the user has the admin role
+    unless ($c->user_exists && grep { $_ eq 'admin' } @{$c->session->{roles}}) {
+        $c->flash->{error} = "You must be an admin to perform this action";
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    if ($c->request->method eq 'POST' && $c->request->params->{confirm}) {
+        # Path to the script
+        my $script_path = $c->path_to('script', 'add_theme_column.pl');
+
+        # Execute the script
+        my $output = qx{perl $script_path 2>&1};
+        my $exit_code = $? >> 8;
+
+        if ($exit_code == 0) {
+            $c->flash->{message} = "Theme column added successfully to sites table. Output: $output";
+        } else {
+            $c->flash->{error} = "Error adding theme column: $output";
+        }
+
+        $c->response->redirect($c->uri_for('/admin'));
+        return;
+    }
+
+    # Display confirmation page
+    $c->stash(
+        template => 'admin/add_theme_column.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
 # Get table information
 # perl
 sub view_log :Path('/admin/view_log') :Args(0) {
     my ($self, $c) = @_;
-
-    # Ensure only admin users can access this route
-    unless ($c->user_exists && grep { $_ eq 'admin' } @{$c->session->{roles}}) {
-        $c->response->redirect($c->uri_for('/')); # Redirect non-admin users
-        return;
-    }
-
-    # Debug logging for view_log action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view_log', "Starting view_log action");
-
-    # Path to the application log file
-    my $log_file = $c->path_to('logs', 'application.log');
-
-    # Check if the log file exists
-    unless (-e $log_file) {
-        $c->stash(
-            error_msg => "Log file not found: $log_file",
-            template  => 'admin/view_log.tt',
-        );
-        $c->forward($c->view('TT'));
-        return;
-    }
-
-    # Read the log file
-    my $log_content;
-    {
-        local $/; # Enable slurp mode
-        open my $fh, '<', $log_file or die "Cannot open log file: $!";
-        $log_content = <$fh>;
-        close $fh;
-    }
-
-    # Pass the log content to the template
-    $c->stash(
-        log_content => $log_content,
-        template    => 'admin/view_log.tt',
-    );
-
-    $c->forward($c->view('TT'));
-}
-
-# Route to view the application log
-# perl
-sub view_log :Path('/admin/view_log') :Args(0) {
-    my ($self, $c) = @_;
-
-    # Ensure only admin users can access this route
-    unless ($c->user_exists && grep { $_ eq 'admin' } @{$c->session->{roles}}) {
-        $c->response->redirect($c->uri_for('/')); # Redirect non-admin users
-        return;
-    }
 
     # Debug logging for view_log action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view_log', "Starting view_log action");

@@ -1,0 +1,24 @@
+/* USBM Theme */
+:root {
+  --primary-color: #009933;
+  --secondary-color: #FFCC66;
+  --accent-color: #FF9900;
+  --text-color: #000000;
+  --background-color: #ffffff;
+  --link-color: #000000;
+  --link-hover-color: #333333;
+  --border-color: #cccccc;
+  --table-header-bg: #FFCC66;
+  --warning-color: #ff0000;
+  --success-color: #009900;
+  
+  --button-bg: #FFCC66;
+  --button-text: #000000;
+  --button-border: #FF9900;
+  --button-hover-bg: #FF9900;
+}
+
+/* Custom background */
+body {
+  background-color: var(--primary-color);
+}

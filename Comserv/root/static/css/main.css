@@ -1,0 +1,31 @@
+/* Main CSS file that imports all components */
+
+/* Base styles */
+@import url('base/variables.css');
+@import url('base/reset.css');
+
+/* Layout */
+@import url('layouts/layout.css');
+
+/* Components */
+@import url('components/navigation.css');
+@import url('components/buttons.css');
+@import url('components/forms.css');
+@import url('components/tables.css');
+
+/* Note: Theme CSS will be loaded separately based on site selection *//* Main CSS file that imports all components */
+
+/* Base styles */
+@import url('base/variables.css');
+@import url('base/reset.css');
+
+/* Layout */
+@import url('layouts/layout.css');
+
+/* Components */
+@import url('components/navigation.css');
+@import url('components/buttons.css');
+@import url('components/forms.css');
+@import url('components/tables.css');
+
+/* Note: Theme CSS will be loaded separately based on site selection */

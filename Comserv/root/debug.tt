@@ -15,7 +15,16 @@ Debug Errors
 [% ELSE %]
     <p>No debug errors.</p>
 [% END %]
-
+[% IF debug_info %]
+<div style="background-color: #f8f9fa; padding: 15px; margin-bottom: 20px; border: 1px solid #ddd;">
+    <h3>Debug Information</h3>
+    <p><strong>User Exists:</strong> [% debug_info.user_exists %]</p>
+    <p><strong>Session ID:</strong> [% debug_info.session_id %]</p>
+    <p><strong>Roles:</strong> [% IF debug_info.roles %][% debug_info.roles.join(', ') %][% ELSE %]None[% END %]</p>
+    <h4>Session Data:</h4>
+    <pre>[% USE Dumper; Dumper.dump(debug_info.session_data) %]</pre>
+</div>
+[% END %]
 <h2>Stash Information</h2>
 <ul>
     <!-- Iterate over each key in the stash and display its value -->

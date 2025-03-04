@@ -1,0 +1,118 @@
+/* Base CSS with variables */
+:root {
+  /* Default theme variables */
+  --primary-color: #ccffff;
+  --secondary-color: #f9f9f9;
+  --accent-color: #FF9900;
+  --text-color: #000000;
+  --background-color: #ffffff;
+  --link-color: #0000FF;
+  --link-hover-color: #000099;
+  --border-color: #cccccc;
+  --table-header-bg: #f2f2f2;
+  --warning-color: #ff0000;
+  --success-color: #009900;
+  
+  /* Typography */
+  --header-font: Verdana, Helvetica, sans-serif;
+  --body-font: Verdana, Helvetica, sans-serif;
+  --font-size-base: 16px;
+  --font-size-small: 14px;
+  --font-size-large: 20px;
+  --font-size-xlarge: 24px;
+  
+  /* Components */
+  --button-bg: #f2f2f2;
+  --button-text: #000000;
+  --button-border: #cccccc;
+  --button-hover-bg: #e0e0e0;
+  --nav-bg: var(--primary-color);
+  --nav-text: var(--text-color);
+  --nav-hover-bg: rgba(0, 0, 0, 0.1);
+}
+
+/* Base styles using variables */
+body {
+  font-family: var(--body-font);
+  font-size: var(--font-size-base);
+  color: var(--text-color);
+  background-color: var(--background-color);
+}
+
+a {
+  color: var(--link-color);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--link-hover-color);
+  text-decoration: underline;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--header-font);
+  color: var(--text-color);
+}
+
+/* Table styles */
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th, td {
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  text-align: left;
+}
+
+th {
+  background-color: var(--table-header-bg);
+  font-weight: bold;
+}
+
+/* Button styles */
+button, 
+.button,
+input[type="submit"],
+input[type="button"] {
+  padding: 5px 10px;
+  background-color: var(--button-bg);
+  color: var(--button-text);
+  border: 1px solid var(--button-border);
+  cursor: pointer;
+}
+
+button:hover, 
+.button:hover,
+input[type="submit"]:hover,
+input[type="button"]:hover {
+  background-color: var(--button-hover-bg);
+}
+
+/* Form styles */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+textarea,
+select {
+  padding: 5px;
+  border: 1px solid var(--border-color);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Message styles */
+.warning {
+  color: var(--warning-color);
+  padding: 10px;
+  border: 1px dashed var(--warning-color);
+  margin-bottom: 10px;
+}
+
+.success {
+  color: var(--success-color);
+  padding: 10px;
+  border: 1px solid var(--success-color);
+  margin-bottom: 10px;
+}

@@ -1,0 +1,24 @@
+/* Default Theme */
+:root {
+  --primary-color: #ccffff;
+  --secondary-color: #f9f9f9;
+  --accent-color: #FF9900;
+  --text-color: #000000;
+  --background-color: #ffffff;
+  --link-color: #0000FF;
+  --link-hover-color: #000099;
+  --border-color: #cccccc;
+  --table-header-bg: #f2f2f2;
+  --warning-color: #ff0000;
+  --success-color: #009900;
+  
+  --button-bg: #f2f2f2;
+  --button-text: #000000;
+  --button-border: #cccccc;
+  --button-hover-bg: #e0e0e0;
+}
+
+/* Custom background image */
+body {
+  background-image: url("/static/images/BMaster/honey2.jpg");
+}

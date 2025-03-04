@@ -1,0 +1,37 @@
+/* USBM Theme */
+:root {
+  /* Colors */
+  --primary-color: #009933;
+  --secondary-color: #FFCC66;
+  --accent-color: #FF9900;
+  --text-color: #000000;
+  --background-color: #ffffff;
+  --link-color: #000000;
+  --link-hover-color: #333333;
+  --border-color: #cccccc;
+  --table-header-bg: #FFCC66;
+  --warning-color: #ff0000;
+  --success-color: #009900;
+  
+  /* Typography */
+  --header-font: Verdana, Helvetica, sans-serif;
+  --body-font: Verdana, Helvetica, sans-serif;
+  --font-size-base: 16px;
+  --font-size-small: 14px;
+  --font-size-large: 20px;
+  --font-size-xlarge: 24px;
+  
+  /* Components */
+  --button-bg: #FFCC66;
+  --button-text: #000000;
+  --button-border: #FF9900;
+  --button-hover-bg: #FF9900;
+  --nav-bg: var(--primary-color);
+  --nav-text: #ffffff;
+  --nav-hover-bg: rgba(255, 255, 255, 0.2);
+}
+
+/* Custom background */
+body {
+  background-color: var(--primary-color);
+}
