@@ -10,17 +10,31 @@
     
     <div class="documentation-list">
         [% IF sorted_page_names.size > 0 %]
-            <h2>Available Documentation</h2>
-            <ul class="documentation-pages">
-                [% FOREACH page_name IN sorted_page_names %]
-                    [% page = structured_pages.$page_name %]
-                    <li class="documentation-page">
-                        <a href="[% page.url %]" class="documentation-link">
-                            [% page.title %]
-                        </a>
-                    </li>
-                [% END %]
-            </ul>
+            <h2>Available Documentation <button id="toggle-available-docs" class="toggle-button">Show/Hide</button></h2>
+            <div id="available-docs-container" class="collapsible-content">
+                <ul class="documentation-pages">
+                    [% FOREACH page_name IN sorted_page_names %]
+                        [% page = structured_pages.$page_name %]
+                        <li class="documentation-page">
+                            <a href="[% page.url %]" class="documentation-link">
+                                [% page.title %]
+                            </a>
+                        </li>
+                    [% END %]
+                </ul>
+            </div>
+            <script>
+                document.getElementById('toggle-available-docs').addEventListener('click', function() {
+                    var container = document.getElementById('available-docs-container');
+                    if (container.style.display === 'none') {
+                        container.style.display = 'block';
+                        this.textContent = 'Hide';
+                    } else {
+                        container.style.display = 'none';
+                        this.textContent = 'Show';
+                    }
+                });
+            </script>
         [% ELSE %]
             <p class="no-documentation">No documentation pages found.</p>
         [% END %]
@@ -50,6 +64,7 @@
                 <ul>
                     <li><a href="[% c.uri_for('/Documentation/system_overview') %]">System Overview</a></li>
                     <li><a href="[% c.uri_for('/Documentation/architecture') %]">Architecture</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/documentation_workflow') %]"><strong>Documentation Workflow</strong></a> <span class="new-badge">New!</span></li>
                 </ul>
             </div>
         </div>
@@ -244,21 +259,37 @@
         </div>
     </div>
     
-    <h2>Recent Updates</h2>
-    <ul class="recent-updates">
-        <li>
-            <span class="update-date">May 30, 2024</span>
-            <a href="/Documentation/theme_system">Theme System Documentation</a> - Comprehensive guide to the new theme system
-        </li>
-        <li>
-            <span class="update-date">May 28, 2024</span>
-            <a href="/Documentation/admin_guide">Administrator Guide</a> - Updated with new admin features
-        </li>
-        <li>
-            <span class="update-date">May 25, 2024</span>
-            <a href="/Documentation/database_schema">Database Schema</a> - Updated with new tables and relationships
-        </li>
-    </ul>
+    <h2>Recent Updates <button id="toggle-updates" class="toggle-button">Show/Hide</button></h2>
+    <div id="recent-updates-container" class="collapsible-content">
+        [% IF completed_items.size > 0 %]
+            <ul class="recent-updates">
+                [% FOREACH item IN completed_items %]
+                    <li>
+                        <span class="update-date">[% item.date_created %]</span>
+                        <span class="update-item">[% item.item %]</span>
+                        [% IF item.commit %]
+                            <span class="update-commit">Commit: [% item.commit %]</span>
+                        [% END %]
+                    </li>
+                [% END %]
+            </ul>
+        [% ELSE %]
+            <p>No recent updates found.</p>
+        [% END %]
+    </div>
+
+    <script>
+        document.getElementById('toggle-updates').addEventListener('click', function() {
+            var container = document.getElementById('recent-updates-container');
+            if (container.style.display === 'none') {
+                container.style.display = 'block';
+                this.textContent = 'Hide';
+            } else {
+                container.style.display = 'none';
+                this.textContent = 'Show';
+            }
+        });
+    </script>
 
     <h2>All Documentation Pages</h2>
     <div class="all-documentation">
@@ -330,8 +361,12 @@
     
     .recent-updates li {
         margin-bottom: 15px;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 5px;
+        border-left: 4px solid #4CAF50;
     }
-    
+
     .update-date {
         display: inline-block;
         background-color: #e9ecef;
@@ -339,6 +374,54 @@
         border-radius: 3px;
         margin-right: 10px;
         font-size: 0.9em;
+        font-weight: bold;
+    }
+
+    .update-item {
+        display: block;
+        margin: 5px 0;
+        font-size: 1.1em;
+    }
+
+    .update-commit {
+        display: block;
+        font-family: monospace;
+        background-color: #f1f1f1;
+        padding: 5px;
+        margin-top: 5px;
+        border-radius: 3px;
+        font-size: 0.9em;
+    }
+
+    .toggle-button {
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        padding: 5px 10px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 14px;
+        margin-left: 10px;
+        cursor: pointer;
+        border-radius: 4px;
+    }
+
+    .collapsible-content {
+        max-height: 500px;
+        overflow-y: auto;
+        transition: max-height 0.3s ease-out;
+    }
+
+    .new-badge {
+        background-color: #ff5722;
+        color: white;
+        font-size: 0.7em;
+        padding: 2px 5px;
+        border-radius: 3px;
+        margin-left: 5px;
+        font-weight: bold;
+        vertical-align: middle;
     }
 
     .all-documentation {

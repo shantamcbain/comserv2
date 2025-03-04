@@ -187,37 +187,49 @@ sub log_form :Path('/log/log_form') :Args() {
     my ($self, $c) = @_;
     my $schema = $c->model('DBEncy');
 
-    my $record_id = $c->request->body_parameters->{record_id};
+    my $todo_record_id = $c->request->body_parameters->{todo_record_id};
 
-    my $log = Comserv::Model::Log->new(record_id => $record_id);
+    my $log = Comserv::Model::Log->new(record_id => $todo_record_id);
     my $todo = Comserv::Model::Todo->new();
-    my $todo_record = $todo->fetch_todo_record($c, $record_id);
+    my $todo_record = $todo->fetch_todo_record($c, $todo_record_id);
 
     # Get the current time
     my $current_time = DateTime->now->strftime('%H:%M:%S');
+
+    # Fetch project data from the Project Controller
+    my $project_controller = $c->controller('Project');
+    my $projects = $project_controller->fetch_projects_with_subprojects($c);
+
+    # Create form_data for project_list.tt
+    my $form_data = {};
+
+    # Set parent_id in form_data if todo_record has a project_id
+    if ($todo_record && $todo_record->project_id) {
+        $form_data->{parent_id} = $todo_record->project_id;
+        $self->logging->log_with_details(
+            $c, 'info', __FILE__, __LINE__, 'log_form',
+            "Located project ID for form_data: " . $todo_record->project_id
+        );
+    }
 
     # Add the priority, status, and record_id to the stash
     $c->stash(
         build_priority => $self->priority,
         build_status   => $self->status,
-        priority       => $todo_record->priority,
-        status         => $todo_record->status,
-        project_code   => $todo_record->project_id,
-        todo_record    => $todo_record->record_id,
-        start_date     => $todo_record->start_date,
-        site_name      => $todo_record->sitename,
-        due_date       => $todo_record->due_date,
-        abstract       => $todo_record->subject,
-        details        => $todo_record->description,
-        comments       => $todo_record->comments,
+        priority       => $todo_record ? $todo_record->priority : '',
+        status         => $todo_record ? $todo_record->status : '',
+        project_id     => $todo_record ? $todo_record->project_id : '',
+        todo_record_id => $todo_record ? $todo_record->record_id : $todo_record_id,
+        start_date     => $todo_record ? $todo_record->start_date : '',
+        site_name      => $todo_record ? $todo_record->sitename : $c->session->{SiteName},
+        due_date       => $todo_record ? $todo_record->due_date : '',
+        abstract       => $todo_record ? $todo_record->subject : '',
+        details        => $todo_record ? $todo_record->description : '',
+        comments       => $todo_record ? $todo_record->comments : '',
         end_time       => $current_time, # Set end_time to current time
+        projects       => $projects,     # Add projects for selection
+        form_data      => $form_data,    # Add form_data for project_list.tt
     );
-
-    # Check if record_id is provided
-    if (defined $log->record_id) {
-        $c->stash(record_id => $log->record_id);
-        $c->stash(todo_record_id => $log->record_id); # Add this line
-    }
 
     # Render the form
     $c->stash->{template} = 'log/log_form.tt';
@@ -248,16 +260,34 @@ sub create_log :Path('/log/create_log') :Args() {
         # Set an error message
         $c->stash(error_msg => 'abstract cannot be empty');
 
+        # Fetch project data from the Project Controller
+        my $project_controller = $c->controller('Project');
+        my $projects = $project_controller->fetch_projects_with_subprojects($c);
+
+        # Get the parent_id from the form (used by project_list.tt)
+        my $parent_id = $c->request->body_parameters->{parent_id};
+
+        # Create form_data for project_list.tt
+        my $form_data = {
+            parent_id => $parent_id
+        };
+
         # Stash the form data
         $c->stash(
             todo_record_id => $c->request->body_parameters->{todo_record_id},
             owner          => $c->request->body_parameters->{owner} || 'none',
             sitename       => $c->session->{SiteName},
             start_date     => $start_date,
-            project_code   => $c->request->body_parameters->{project_code},
             due_date       => $c->request->body_parameters->{due_date},
             abstract       => $subject,
-            # Add other necessary fields here
+            details        => $c->request->body_parameters->{details},
+            comments       => $c->request->body_parameters->{comments},
+            projects       => $projects,
+            form_data      => $form_data, # Add form_data for project_list.tt
+            build_priority => $self->priority,
+            build_status   => $self->status,
+            priority       => $c->request->body_parameters->{priority},
+            status         => $c->request->body_parameters->{status},
         );
 
         # Render the form again
@@ -284,12 +314,16 @@ sub create_log :Path('/log/create_log') :Args() {
     my $time_diff = sprintf("%02d:%02d:%02d", $hours, $minutes, $seconds);
 
     my $current_date = DateTime->now->ymd;
+
+    # Get the project_id from the form (parent_id from project_list.tt)
+    my $parent_id = $c->request->body_parameters->{parent_id};
+
     my $logEntry = $rs->create({
         todo_record_id  => $c->request->body_parameters->{todo_record_id},
         owner           => $owner,
         sitename        => $c->session->{SiteName},
         start_date      => $start_date || $current_date,
-        project_code    => $c->request->body_parameters->{project_code},
+        project_code    => $parent_id, # Use parent_id from project_list.tt
         due_date        => $c->request->body_parameters->{due_date},
         abstract        => $subject,
         details         => $c->request->body_parameters->{details},
@@ -313,6 +347,8 @@ sub create_log :Path('/log/create_log') :Args() {
     $redirect_url .= "?record_id=" . $logEntry->id if $logEntry->id;
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_log', "Redirecting to: $redirect_url");
     $c->flash->{success_msg} = 'Log entry created successfully';
+
+    # Redirect back to the todo details page
     $c->response->redirect($c->uri_for('/todo/details', { record_id => $logEntry->todo_record_id }));
 }
 

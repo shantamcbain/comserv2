@@ -7,6 +7,42 @@
 <!-- Include the new CSS file -->
 <link rel="stylesheet" type="text/css" href="/static/css/week_view.css">
 
+<style>
+    .action-buttons-cell {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .action-button {
+        padding: 5px 10px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+        width: 100%;
+    }
+
+    .log-button {
+        background-color: #4CAF50;
+        color: white;
+    }
+
+    .details-button {
+        background-color: #2196F3;
+        color: white;
+    }
+
+    .edit-button {
+        background-color: #FF9800;
+        color: white;
+    }
+
+    .action-button:hover {
+        opacity: 0.9;
+    }
+</style>
+
 <h1>ToDo List</h1>
 <h2>[% date_today %]</h2>
 
@@ -73,14 +109,26 @@
       <td>[% task.get_column('status') %]</td>
       <td>[% task.get_column('comments') %]</td>
       <td>[% task.get_column('accumulative_time') %]</td>
-      <td>
+      <td class="action-buttons-cell">
         <form action="/log/log_form" method="POST" target="_blank">
-          <input type="hidden" name="record_id" value="[% task.get_column('record_id') %]">
-          <button type="submit">Add Log</button>
+          <input type="hidden" name="todo_record_id" value="[% task.get_column('record_id') %]">
+          <input type="hidden" name="site_name" value="[% task.get_column('sitename') %]">
+          <input type="hidden" name="start_date" value="[% task.get_column('start_date') %]">
+          <input type="hidden" name="due_date" value="[% task.get_column('due_date') %]">
+          <input type="hidden" name="abstract" value="[% task.get_column('subject') %]">
+          <input type="hidden" name="details" value="[% task.get_column('description') %]">
+          <input type="hidden" name="priority" value="[% task.get_column('priority') %]">
+          <input type="hidden" name="status" value="[% task.get_column('status') %]">
+          <input type="hidden" name="comments" value="[% task.get_column('comments') %]">
+          <button type="submit" class="action-button log-button">Add Log</button>
         </form>
         <form action="/todo/details" method="POST">
-          <input type="hidden" name="record_id" class="[% IF day.todos.$i.due_date < day.date %]overdue[% ELSE %]todo-button[% END %]" value="[% task.get_column('record_id') %]">
-          <button type="submit">Details</button>
+          <input type="hidden" name="record_id" value="[% task.get_column('record_id') %]">
+          <button type="submit" class="action-button details-button">Details</button>
+        </form>
+        <form action="/todo/edit/[% task.get_column('record_id') %]" method="POST">
+          <input type="hidden" name="record_id" value="[% task.get_column('record_id') %]">
+          <button type="submit" class="action-button edit-button">Edit</button>
         </form>
       </td>
     </tr>

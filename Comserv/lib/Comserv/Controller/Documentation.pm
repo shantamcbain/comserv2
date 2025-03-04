@@ -129,11 +129,38 @@ sub index :Path :Args(0) {
         };
     }
 
-    # Add pages to stash
+    # Load the completed items JSON file
+    my $json_file = $c->path_to('root', 'Documentation', 'completed_items.json');
+    my $completed_items = [];
+
+    if (-e $json_file) {
+        # Read the JSON file
+        eval {
+            open my $fh, '<:encoding(UTF-8)', $json_file or die "Cannot open $json_file: $!";
+            my $json_content = do { local $/; <$fh> };
+            close $fh;
+
+            # Parse the JSON content
+            require JSON;
+            my $data = JSON::decode_json($json_content);
+
+            # Sort items by date_created in descending order (newest first)
+            $completed_items = [
+                sort { $b->{date_created} cmp $a->{date_created} }
+                @{$data->{completed_items}}
+            ];
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index', "Error loading completed items JSON: $@");
+        }
+    }
+
+    # Add pages and completed items to stash
     $c->stash(
         documentation_pages => $pages,
         structured_pages => $structured_pages,
         sorted_page_names => \@sorted_pages,
+        completed_items => $completed_items,
         template => 'Documentation/index.tt'
     );
 

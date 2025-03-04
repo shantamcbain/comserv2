@@ -24,9 +24,9 @@ window.onload = function() {
 [% END %]
 <form action="/log/create_log" method="POST">
 
-    <label for="record_id">Todo Record ID:</label><br>
+    <label for="todo_record_id">Todo Record ID:</label><br>
     <input type="hidden" id="todo_record_id" name="todo_record_id" value="[% todo_record_id %]">
-    <input type="text" id="todo_record_id" name="todo_record_id" value="[% todo_record_id %]">
+    <input type="text" id="todo_record_id_display" name="todo_record_id_display" value="[% todo_record_id %]" readonly>
 
     <a href="[% c.uri_for('/todo/addtodo') %]"> Add Todo</a><br>
 
@@ -40,19 +40,15 @@ window.onload = function() {
 
 
 
-    <label for="project_id">Select Project:</label>
-    <select id="project_id" name="project_id" class="form-select" required>
-        [% FOREACH project IN projects %]
-        <option value="[% project.id %]" [% IF current_project && current_project.id == project.id %]selected[% END %]>
-            [% project.name %]
-        </option>
-        [% FOREACH sub_project IN project.sub_projects %]
-        <option value="[% sub_project.id %]" [% IF current_project && current_project.id == sub_project.id %]selected[% END %]>
-            -- [% sub_project.name %]
-        </option>
-        [% END %]
-        [% END %]
-    </select>
+[% # Set up form_data for project_list.tt %]
+[% SET form_data = {} %]
+[% IF current_project %]
+    [% SET form_data.parent_id = current_project.id %]
+[% ELSIF project_id %]
+    [% SET form_data.parent_id = project_id %]
+[% END %]
+
+[% INCLUDE "todo/project_list.tt" %]
 
     <label for="due_date">Due Date:</label><br>
     <input type="date" id="due_date" name="due_date" value="[% due_date %]"><br>
