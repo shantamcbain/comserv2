@@ -124,12 +124,6 @@ __PACKAGE__->add_columns(
         data_type => 'varchar',
         size => 255,
     },
-    theme => {
-        data_type => 'varchar',
-        size => 50,
-        is_nullable => 1,
-        default_value => 'default',
-    },
 );
 __PACKAGE__->set_primary_key('id');
 __PACKAGE__->has_many(user_sites => 'Comserv::Model::Schema::Ency::Result::UserSite', 'site_id');

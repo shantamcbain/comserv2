@@ -37,41 +37,46 @@
         # Default theme
         theme_name = 'default';
 
-        # Set theme based on site name
+        # Set theme based on site name (fallback method)
         IF SiteName == 'USBM';
             theme_name = 'usbm';
         ELSIF SiteName == 'CSC';
             theme_name = 'csc';
         END;
 
-        # Check if site has a custom theme
+        # Try to get theme from site record if the theme column exists
+        # This is wrapped in a TRY block so it won't fail if the theme column doesn't exist
         TRY;
-            # First try to get the site with specific columns to avoid the theme column error
+            # Use a safe method to check for the theme
+            USE Dumper;
+
+            # First check if the site exists at all
             site = c.model('DBEncy').resultset('Site').find(
                 { name => SiteName },
                 { columns => [qw(id name description)] }
             );
 
-            # Then try to get the theme separately, catching any errors
-            TRY;
-                # If the theme column exists, this will work
-                theme_record = c.model('DBEncy').resultset('Site').find(
-                    { name => SiteName },
-                    { columns => [qw(theme)] }
-                );
+            IF site;
+                # Now try to access the theme attribute safely
+                TRY;
+                    # Try to get the theme using a direct SQL query to avoid DBIC errors
+                    dbh = c.model('DBEncy').schema.storage.dbh;
+                    sth = dbh.prepare("SELECT theme FROM sites WHERE name = ?");
+                    sth.execute(SiteName);
+                    row = sth.fetchrow_arrayref;
 
-                # If we got a theme, use it
-                IF theme_record && theme_record.theme;
-                    theme_name = theme_record.theme;
+                    IF row && row.0;
+                        theme_name = row.0;
+                        c.log.info("Using database theme: " _ theme_name);
+                    END;
+                CATCH;
+                    # If there's an error, just use the name-based theme
+                    c.log.info("Theme column not available, using name-based theme: " _ theme_name);
                 END;
-            CATCH;
-                # If there's an error with the theme column, just use the default theme
-                # This will happen if the theme column doesn't exist
-                c.log.error("Theme column doesn't exist. Using default theme.");
             END;
         CATCH;
-            # If there's an error getting the site, just use the default theme
-            c.log.error("Error getting site. Using default theme.");
+            # If there's any error, just use the name-based theme
+            c.log.error("Error accessing site data, using name-based theme: " _ theme_name);
         END;
     %]
     <link rel="stylesheet" type="text/css" href="/static/css/themes/[% theme_name %].css">

@@ -1,44 +1,204 @@
-[% PageVersion = 'admin/index.tt,v 0.02 2024/05/30 shanta Exp shanta ' %]
+[% PageVersion = 'admin/index.tt,v 0.03 2024/05/30 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
-<h1>Admin Home Page</h1>
+<div class="admin-dashboard">
+    <h1>Admin Dashboard</h1>
 
-<p>Welcome to the Admin Home Page. Here you can manage various aspects of the site, with a current focus on handling schema changes within the application.</p>
+    <p>Welcome to the Admin Dashboard. From here, you can manage all aspects of your Comserv application.</p>
 
+    <div class="admin-section">
+        <h2>Theme Management</h2>
+        <div class="admin-card">
+            <h3>Theme System</h3>
+            <p>Manage the appearance of your sites with our new theme system.</p>
+            <div class="admin-actions">
+                <a href="[% c.uri_for('/themeadmin') %]" class="admin-button primary">Theme Management</a>
+                <a href="[% c.uri_for('/Documentation/theme_system') %]" class="admin-button">Theme Documentation</a>
+                <a href="[% c.uri_for('/testroute') %]" class="admin-button">Test Route</a>
+                <a href="[% c.uri_for('/themeadmin/test') %]" class="admin-button">ThemeAdmin Test</a>
+                <a href="[% c.uri_for('/themeadmin/simple') %]" class="admin-button">ThemeAdmin Simple</a>
+            </div>
+            <div class="admin-steps">
+                <p><strong>Implementation Steps:</strong></p>
+                <ol>
+                    <li>1. Create and manage themes</li>
+                    <li>2. Create theme tables <a href="/admin/run_script?script=create_theme_tables_only.pl" class="small-button">Run Script</a></li>
+                    <li>3. Add theme column <a href="/admin/add_theme_column" class="small-button">Run Script</a></li>
+                </ol>
+            </div>
+        </div>
+    </div>
 
+    <div class="admin-section">
+        <h2>Content Management</h2>
+        <div class="admin-cards">
+            <div class="admin-card">
+                <h3>Documentation</h3>
+                <p>Manage system documentation.</p>
+                <a href="edit_documentation" class="admin-button">Edit Documentation</a>
+            </div>
 
-<h2>Site Management</h2>
+            <div class="admin-card">
+                <h3>Appearance</h3>
+                <p>Manage site appearance.</p>
+                <a href="change_styles" class="admin-button">Change Styles</a>
+            </div>
+        </div>
+    </div>
 
-<ul>
-    <li><a href="edit_documentation">Edit Documentation</a></li>
-    <li><a href="change_styles">Change Styles</a></li>
-    <li><a href="/admin/theme">Theme Management</a></li>
-    <li><a href="/admin/add_theme_column">Add Theme Column to Database</a></li>
-    <li><a href="add_schema">Add Schema</a></li>
-    <li><a href="get_table_info">Get Table Information</a></li>
-    <li><a href="migrate_schema">Migrate Schema</a></li>
-    <li><a href="update_software">Update Software</a></li>
-    <li><a href="change_roles">Change User Roles</a></li>
-    <li><a href="log">Access Logging</a></li>
-</ul>
+    <div class="admin-section">
+        <h2>Database Management</h2>
+        <div class="admin-cards">
+            <div class="admin-card">
+                <h3>Schema Manager</h3>
+                <p>Comprehensive database schema management.</p>
+                <a href="/admin/schema_manager" class="admin-button">Manage Schema</a>
+            </div>
 
+            <div class="admin-card">
+                <h3>Schema Operations</h3>
+                <p>Perform specific schema operations.</p>
+                <ul class="admin-links">
+                    <li><a href="add_schema">Add New Schema</a></li>
+                    <li><a href="compare_schema">Compare Schemas</a></li>
+                    <li><a href="get_table_info">Get Table Information</a></li>
+                    <li><a href="migrate_schema">Migrate Schema</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
 
+    <div class="admin-section">
+        <h2>System Management</h2>
+        <div class="admin-cards">
+            <div class="admin-card">
+                <h3>User Management</h3>
+                <p>Manage user roles and permissions.</p>
+                <a href="change_roles" class="admin-button">Change User Roles</a>
+            </div>
 
-<h2>Database Schema Management</h2>
+            <div class="admin-card">
+                <h3>System Maintenance</h3>
+                <p>Maintain and update the system.</p>
+                <ul class="admin-links">
+                    <li><a href="update_software">Update Software</a></li>
+                    <li><a href="log">Access Logging</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
 
-<p>Our current focus is on managing database schema changes from within the application. You can add new schemas, compare schemas, get information about existing tables, and update the database as needed.</p>
+    <div class="admin-section">
+        <h2>Help & Resources</h2>
+        <div class="admin-cards">
+            <div class="admin-card">
+                <h3>Documentation</h3>
+                <p>Access comprehensive documentation.</p>
+                <a href="[% c.uri_for('/Documentation') %]" class="admin-button">Documentation Center</a>
+                <a href="[% c.uri_for('/Documentation/admin') %]" class="admin-button">Admin Documentation</a>
+            </div>
+        </div>
+    </div>
+</div>
 
-<ul>
-    <li><a href="/admin/schema_manager">Manage Schema</a></li>
+<style>
+    .admin-dashboard {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
 
-    <li><a href="add_schema">Add New Schema</a></li>
-    <li><a href="compare_schema">Compare Schemas</a></li>
-    <li><a href="get_table_info">Get Table Information</a></li>
-    <li><a href="migrate_schema">Migrate Schema</a></li>
-    <li><a href="[% c.uri_for('/Documentation') %]">Documentation Center</a></li>
-</ul>
-<p>For more information on how to use these features, please refer to our <a href="[% c.uri_for('/Documentation/admin') %]">Admin Module Documentation</a>.</p>
+    .admin-section {
+        margin-bottom: 30px;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 20px;
+    }
 
-<p>For more information or assistance, please contact us.</p>
+    .admin-section h2 {
+        color: var(--primary-color);
+        border-bottom: 2px solid var(--accent-color);
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+    }
+
+    .admin-cards {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+    }
+
+    .admin-card {
+        background-color: #f9f9f9;
+        border: 1px solid var(--border-color);
+        border-radius: 5px;
+        padding: 20px;
+        flex: 1;
+        min-width: 300px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .admin-card h3 {
+        color: var(--secondary-color);
+        margin-top: 0;
+    }
+
+    .admin-button {
+        display: inline-block;
+        padding: 8px 16px;
+        background-color: var(--button-bg);
+        color: var(--button-text);
+        text-decoration: none;
+        border-radius: 4px;
+        margin-right: 10px;
+        margin-bottom: 10px;
+        border: 1px solid var(--button-border);
+    }
+
+    .admin-button:hover {
+        background-color: var(--button-hover-bg);
+    }
+
+    .admin-button.primary {
+        background-color: var(--primary-color);
+        color: white;
+        font-weight: bold;
+    }
+
+    .admin-links {
+        list-style-type: none;
+        padding-left: 0;
+    }
+
+    .admin-links li {
+        margin-bottom: 8px;
+    }
+
+    .admin-actions {
+        margin: 15px 0;
+    }
+
+    .admin-steps {
+        background-color: #f0f0f0;
+        padding: 10px 15px;
+        border-radius: 4px;
+        margin-top: 15px;
+    }
+
+    .admin-steps ol {
+        margin-top: 5px;
+        padding-left: 25px;
+    }
+
+    .small-button {
+        font-size: 0.8em;
+        padding: 2px 6px;
+        background-color: var(--button-bg);
+        color: var(--button-text);
+        text-decoration: none;
+        border-radius: 3px;
+        margin-left: 5px;
+        border: 1px solid var(--button-border);
+    }
+</style>

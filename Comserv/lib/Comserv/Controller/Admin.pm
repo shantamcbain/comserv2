@@ -12,9 +12,6 @@ has 'logging' => (
 );
 
 # Authentication check at the beginning of each request
-# Authentication check at the beginning of each request
-
-# perl
 
 sub begin : Private {
     my ( $self, $c ) = @_;
@@ -129,8 +126,7 @@ sub schema_manager :Path('/admin/schema_manager') :Args(0) {
     my $tables;
     eval {
         # Corrected line to pass the selected database to list_tables
-$tables = $c->model('DBSchemaManager')->list_tables($c, $selected_db);
-
+        $tables = $c->model('DBSchemaManager')->list_tables($c, $selected_db);
     };
     if ($@) {
         # Log the table retrieval error
@@ -220,10 +216,6 @@ EOF
     close $fh;
 }
 
-
-
-
-
 # Compare schema versions
 sub compare_schema :Path('compare_schema') :Args(0) {
     my ($self, $c) = @_;
@@ -301,36 +293,55 @@ sub edit_documentation :Path('admin/edit_documentation') :Args(0) {
     $c->forward($c->view('TT'));
 }
 
-# Add theme column to sites table
-sub add_theme_column :Path('/admin/add_theme_column') :Args(0) {
+# Run a script from the script directory
+sub run_script :Path('/admin/run_script') :Args(0) {
     my ($self, $c) = @_;
 
-    # Debug logging for add_theme_column action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_theme_column', "Starting add_theme_column action");
+    # Debug logging for run_script action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'run_script', "Starting run_script action");
 
     # Check if the user has the admin role
     unless ($c->user_exists && grep { $_ eq 'admin' } @{$c->session->{roles}}) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'add_theme_column', "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest'));
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'run_script', "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest'));
         $c->flash->{error} = "You must be an admin to perform this action";
         $c->response->redirect($c->uri_for('/'));
         return;
     }
 
-    if ($c->request->method eq 'POST' && $c->request->params->{confirm}) {
-        # Path to the script
-        my $script_path = $c->path_to('script', 'add_theme_column.pl');
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_theme_column', "Executing script: $script_path");
+    # Get the script name from the request parameters
+    my $script_name = $c->request->params->{script};
 
+    # Validate the script name
+    unless ($script_name && $script_name =~ /^[\w\-\.]+\.pl$/) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'run_script', "Invalid script name: " . ($script_name || 'undefined'));
+        $c->flash->{error} = "Invalid script name";
+        $c->response->redirect($c->uri_for('/admin'));
+        return;
+    }
+
+    # Path to the script
+    my $script_path = $c->path_to('script', $script_name);
+
+    # Check if the script exists
+    unless (-e $script_path) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'run_script', "Script not found: $script_path");
+        $c->flash->{error} = "Script not found: $script_name";
+        $c->response->redirect($c->uri_for('/admin'));
+        return;
+    }
+
+    if ($c->request->method eq 'POST' && $c->request->params->{confirm}) {
         # Execute the script
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'run_script', "Executing script: $script_path");
         my $output = qx{perl $script_path 2>&1};
         my $exit_code = $? >> 8;
 
         if ($exit_code == 0) {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_theme_column', "Theme column added successfully. Output: $output");
-            $c->flash->{message} = "Theme column added successfully to sites table. Output: $output";
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'run_script', "Script executed successfully. Output: $output");
+            $c->flash->{message} = "Script executed successfully. Output: $output";
         } else {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_theme_column', "Error adding theme column: $output");
-            $c->flash->{error} = "Error adding theme column: $output";
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'run_script', "Error executing script: $output");
+            $c->flash->{error} = "Error executing script: $output";
         }
 
         $c->response->redirect($c->uri_for('/admin'));
@@ -338,54 +349,15 @@ sub add_theme_column :Path('/admin/add_theme_column') :Args(0) {
     }
 
     # Display confirmation page
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_theme_column', "Displaying confirmation page");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'run_script', "Displaying confirmation page for script: $script_name");
     $c->stash(
-        template => 'admin/add_theme_column.tt',
-    );
-    $c->forward($c->view('TT'));
-}
-
-# Add theme column to sites table
-sub add_theme_column :Path('/admin/add_theme_column') :Args(0) {
-    my ($self, $c) = @_;
-
-    # Debug logging for add_theme_column action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_theme_column', "Starting add_theme_column action");
-
-    # Check if the user has the admin role
-    unless ($c->user_exists && grep { $_ eq 'admin' } @{$c->session->{roles}}) {
-        $c->flash->{error} = "You must be an admin to perform this action";
-        $c->response->redirect($c->uri_for('/'));
-        return;
-    }
-
-    if ($c->request->method eq 'POST' && $c->request->params->{confirm}) {
-        # Path to the script
-        my $script_path = $c->path_to('script', 'add_theme_column.pl');
-
-        # Execute the script
-        my $output = qx{perl $script_path 2>&1};
-        my $exit_code = $? >> 8;
-
-        if ($exit_code == 0) {
-            $c->flash->{message} = "Theme column added successfully to sites table. Output: $output";
-        } else {
-            $c->flash->{error} = "Error adding theme column: $output";
-        }
-
-        $c->response->redirect($c->uri_for('/admin'));
-        return;
-    }
-
-    # Display confirmation page
-    $c->stash(
-        template => 'admin/add_theme_column.tt',
+        script_name => $script_name,
+        template => 'admin/run_script.tt',
     );
     $c->forward($c->view('TT'));
 }
 
 # Get table information
-# perl
 sub view_log :Path('/admin/view_log') :Args(0) {
     my ($self, $c) = @_;
 

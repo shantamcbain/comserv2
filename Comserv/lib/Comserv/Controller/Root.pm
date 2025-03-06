@@ -28,6 +28,7 @@ sub index :Path('/') :Args(0) {
     my ($self, $c) = @_;
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Starting index action");
+    $c->stash->{forwarder} = '/'; # Set a default forward path
 
     # Get ControllerName from the session
     my $ControllerName = $c->session->{ControllerName} || undef; # Default to undef if not set
@@ -233,6 +234,7 @@ sub auto :Private {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Starting auto action");
 
     # Track application start
+    $c->stash->{forwarder} = $c->req->path; # Store current path as potential redirect target
     $self->track_application_start($c);
 
     # Log the request path

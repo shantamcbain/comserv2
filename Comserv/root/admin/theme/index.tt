@@ -19,7 +19,7 @@
 <p>Current site: <strong>[% site.name %]</strong></p>
 <p>Current theme: <strong>[% site.theme || 'default' %]</strong></p>
 
-<form action="[% c.uri_for('/admin/theme/update_theme') %]" method="post">
+<form action="[% c.uri_for('/themeadmin/update_theme') %]" method="post">
     <input type="hidden" name="site_id" value="[% site.id %]">
     
     <div class="form-group">
@@ -41,7 +41,7 @@
 
 <h2>Create Custom Theme</h2>
 
-<form action="[% c.uri_for('/admin/theme/create_custom_theme') %]" method="post">
+<form action="[% c.uri_for('/themeadmin/create_custom_theme') %]" method="post">
     <input type="hidden" name="site_id" value="[% site.id %]">
     
     <div class="form-group">
@@ -91,7 +91,7 @@
             <td>[% s.name %]</td>
             <td>[% s.theme || 'default' %]</td>
             <td>
-                <form action="[% c.uri_for('/admin/theme/update_theme') %]" method="post" style="display:inline;">
+                <form action="[% c.uri_for('/themeadmin/update_theme') %]" method="post" style="display:inline;">
                     <input type="hidden" name="site_id" value="[% s.id %]">
                     <select name="theme">
                         <option value="default" [% IF s.theme == 'default' %]selected[% END %]>Default</option>

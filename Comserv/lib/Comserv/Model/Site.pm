@@ -35,7 +35,7 @@ sub get_all_sites {
         # If there's an error about the theme column
         if ($_ =~ /Unknown column 'me\.theme'/) {
             # Log the error
-            $c->log->error("Theme column doesn't exist in sites table. Please run the add_theme_column.pl script.");
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_all_sites', "Theme column doesn't exist in sites table. Please run the add_theme_column.pl script.");
 
             # Get sites without theme column
             my $site_rs = $self->schema->resultset('Site');
@@ -95,7 +95,7 @@ sub add_site {
         # If there's an error about the theme column
         if ($_ =~ /Unknown column 'me\.theme'/) {
             # Log the error
-            $c->log->error("Theme column doesn't exist in sites table. Please run the add_theme_column.pl script.");
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_site', "Theme column doesn't exist in sites table. Please run the add_theme_column.pl script.");
 
             # Create site without theme column
             my $filtered_details = {%$site_details};
@@ -140,7 +140,7 @@ sub delete_site {
         # If there's an error about the theme column
         if ($_ =~ /Unknown column 'me\.theme'/) {
             # Log the error
-            $c->log->error("Theme column doesn't exist in sites table. Please run the add_theme_column.pl script.");
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'delete_site', "Theme column doesn't exist in sites table. Please run the add_theme_column.pl script.");
 
             # Get site without theme column
             my $site_rs = $self->schema->resultset('Site');
@@ -185,7 +185,7 @@ sub get_site_details_by_name {
         # If there's an error about the theme column
         if ($_ =~ /Unknown column 'me\.theme'/) {
             # Log the error
-            $c->log->error("Theme column doesn't exist in sites table. Please run the add_theme_column.pl script.");
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_site_details_by_name', "Theme column doesn't exist in sites table. Please run the add_theme_column.pl script.");
 
             # Get site without theme column
             my $site_rs = $self->schema->resultset('Site');
@@ -227,7 +227,7 @@ sub get_site_details {
         # If there's an error about the theme column
         if ($_ =~ /Unknown column 'me\.theme'/) {
             # Log the error
-            $c->log->error("Theme column doesn't exist in sites table. Please run the add_theme_column.pl script.");
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_site_details', "Theme column doesn't exist in sites table. Please run the add_theme_column.pl script.");
 
             # Get site without theme column
             my $site_rs = $self->schema->resultset('Site');

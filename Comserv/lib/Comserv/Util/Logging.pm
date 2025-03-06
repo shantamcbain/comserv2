@@ -1,5 +1,16 @@
 package Comserv::Util::Logging;
 
+# IMPORTANT: Always use this logging system throughout the application.
+# Do NOT create new logging methods or use direct print statements.
+# The preferred logging format is:
+#   $self->logging->log_with_details($c, 'level', __FILE__, __LINE__, 'method_name', "Message");
+# Where level can be: 'info', 'debug', 'warn', 'error', etc.
+# This ensures consistent logging with file, line number, and method context.
+#
+# NOTE: This logging system has been updated to prevent recursion issues.
+# It no longer calls Catalyst's logging methods directly, but instead logs to a file
+# and adds messages to the debug_errors array in the stash.
+
 use strict;
 use warnings;
 use namespace::autoclean;
@@ -93,12 +104,12 @@ sub log_with_details {
     my $timestamp = _get_timestamp();
     my $log_message = sprintf("[%s] [%s:%d] %s - %s", $timestamp, $file, $line, ($subroutine // 'unknown'), $message);
 
-    # Log to file
+    # Log to file - this is our primary logging mechanism
     log_to_file($log_message, undef, $level);
 
-    # Log to Catalyst if available
-    if ($c && ref($c) && $c->can('log')) {
-        $c->log->$level($log_message); # Use the provided log level
+    # Add to debug_errors in stash if Catalyst context is available
+    # But avoid calling $c->log methods to prevent recursion
+    if ($c && ref($c) && ref($c->stash) eq 'HASH') {
         my $debug_errors = $c->stash->{debug_errors} ||= [];
         push @$debug_errors, $log_message;
     }
@@ -115,13 +126,14 @@ sub log_error {
     my $timestamp = _get_timestamp();
     my $log_message = sprintf("[%s] [ERROR] - %s:%d - %s", $timestamp, $file, $line, $error_message);
 
-    # Log to file
+    # Log to file - this is our primary logging mechanism
     log_to_file($log_message, undef, 'ERROR');
 
-    # Log to Catalyst if available
-    if ($c && ref($c) eq 'Catalyst' && $c->can('log')) {
-        $c->log->error($log_message);
-        push @{$c->stash->{debug_errors}}, $log_message;
+    # Add to debug_errors in stash if Catalyst context is available
+    # But avoid calling $c->log methods to prevent recursion
+    if ($c && ref($c) && ref($c->stash) eq 'HASH') {
+        my $debug_errors = $c->stash->{debug_errors} ||= [];
+        push @$debug_errors, $log_message;
     }
 
     return $log_message;
@@ -147,18 +159,13 @@ sub log_to_file {
     close $file;
 }
 
-# Log a message to Catalyst's logging system
+# DEPRECATED: Don't use this method directly - use log_with_details instead
+# This method is kept for backward compatibility
 sub log_to_catalyst {
     my ($message, $c) = @_;
-    if ($c && ref($c) && $c->can('log')) {
-        my $stream = $c->log->stream();
-        if (defined $stream) {
-            _print_log("Logging to Catalyst stream: $stream\n");
-            $stream->{$message} if defined $message; # Ensure $message is defined
-        } else {
-            _print_log("No logging stream available.\n");
-        }
-    }
+    # Simply log to file to avoid recursion with Catalyst's logging system
+    _print_log("CATALYST LOG: $message");
+    log_to_file("CATALYST LOG: $message");
 }
 
 1; # Ensure the module returns true

@@ -187,11 +187,12 @@ sub log_form :Path('/log/log_form') :Args() {
     my ($self, $c) = @_;
     my $schema = $c->model('DBEncy');
 
-    my $todo_record_id = $c->request->body_parameters->{todo_record_id};
+    my $todo_record_id = $c->request->parameters->{todo_record_id} || '';
 
-    my $log = Comserv::Model::Log->new(record_id => $todo_record_id);
+    # Ensure record_id is never undefined
+    my $log = Comserv::Model::Log->new(record_id => $todo_record_id || '');
     my $todo = Comserv::Model::Todo->new();
-    my $todo_record = $todo->fetch_todo_record($c, $todo_record_id);
+    my $todo_record = $todo_record_id ? $todo->fetch_todo_record($c, $todo_record_id) : undef;
 
     # Get the current time
     my $current_time = DateTime->now->strftime('%H:%M:%S');
@@ -200,7 +201,11 @@ sub log_form :Path('/log/log_form') :Args() {
     my $project_controller = $c->controller('Project');
     my $projects = $project_controller->fetch_projects_with_subprojects($c);
 
-    # Create form_data for project_list.tt
+    # Fetch available sites from the Site Controller
+    my $site_controller = $c->controller('Site');
+    my $sites = $site_controller->fetch_available_sites($c);
+
+    # Create form_data for project_list.tt and site_list.tt
     my $form_data = {};
 
     # Set parent_id in form_data if todo_record has a project_id
@@ -228,7 +233,8 @@ sub log_form :Path('/log/log_form') :Args() {
         comments       => $todo_record ? $todo_record->comments : '',
         end_time       => $current_time, # Set end_time to current time
         projects       => $projects,     # Add projects for selection
-        form_data      => $form_data,    # Add form_data for project_list.tt
+        sites          => $sites,        # Add sites for selection
+        form_data      => $form_data,    # Add form_data for project_list.tt and site_list.tt
     );
 
     # Render the form
@@ -264,12 +270,17 @@ sub create_log :Path('/log/create_log') :Args() {
         my $project_controller = $c->controller('Project');
         my $projects = $project_controller->fetch_projects_with_subprojects($c);
 
+        # Fetch available sites from the Site Controller
+        my $site_controller = $c->controller('Site');
+        my $sites = $site_controller->fetch_available_sites($c);
+
         # Get the parent_id from the form (used by project_list.tt)
         my $parent_id = $c->request->body_parameters->{parent_id};
 
-        # Create form_data for project_list.tt
+        # Create form_data for project_list.tt and site_list.tt
         my $form_data = {
-            parent_id => $parent_id
+            parent_id => $parent_id,
+            sitename => $c->request->body_parameters->{sitename}
         };
 
         # Stash the form data
@@ -283,7 +294,8 @@ sub create_log :Path('/log/create_log') :Args() {
             details        => $c->request->body_parameters->{details},
             comments       => $c->request->body_parameters->{comments},
             projects       => $projects,
-            form_data      => $form_data, # Add form_data for project_list.tt
+            sites          => $sites,
+            form_data      => $form_data, # Add form_data for project_list.tt and site_list.tt
             build_priority => $self->priority,
             build_status   => $self->status,
             priority       => $c->request->body_parameters->{priority},
@@ -318,10 +330,35 @@ sub create_log :Path('/log/create_log') :Args() {
     # Get the project_id from the form (parent_id from project_list.tt)
     my $parent_id = $c->request->body_parameters->{parent_id};
 
+    # Get the site name from the form
+    my $sitename;
+    my $site_id = $c->request->body_parameters->{sitename};
+    if ($site_id) {
+        # If a site ID is provided, fetch the site name
+        eval {
+            # Explicitly select only the columns we need
+            my $site = $c->model('DBEncy')->resultset('Site')->find(
+                { id => $site_id },
+                { columns => ['id', 'name'] }
+            );
+            $sitename = $site ? $site->name : $c->session->{SiteName};
+        };
+
+        # If there's an error, log and use session site name
+        if ($@) {
+            $self->logging->log_with_details ($c, 'error', __FILE__, __LINE__, 'create_log', "Error fetching site: $@");
+            $c->log->error("Error fetching site: $@");
+            $sitename = $c->session->{SiteName};
+        }
+    } else {
+        # If no site ID is provided, use the session site name
+        $sitename = $c->session->{SiteName};
+    }
+
     my $logEntry = $rs->create({
         todo_record_id  => $c->request->body_parameters->{todo_record_id},
         owner           => $owner,
-        sitename        => $c->session->{SiteName},
+        sitename        => $sitename,
         start_date      => $start_date || $current_date,
         project_code    => $parent_id, # Use parent_id from project_list.tt
         due_date        => $c->request->body_parameters->{due_date},

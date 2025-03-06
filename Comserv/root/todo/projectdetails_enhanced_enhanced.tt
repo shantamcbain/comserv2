@@ -69,7 +69,15 @@
                                 <td>[% todo.formatted_accumulated_time %]</td>
                                 <td>
                                     <form action="/todo/modify/[% todo.record_id %]" method="GET" style="display:inline;">
-                                        <button type="submit" class="action-button">Edit</button>
+                                        <button type="submit" class="action-button edit">Edit</button>
+                                    </form>
+                                    <form action="/todo/details" method="GET" style="display:inline;">
+                                        <input type="hidden" name="record_id" value="[% todo.record_id %]">
+                                        <button type="submit" class="action-button view">Details</button>
+                                    </form>
+                                    <form action="/log/log_form" method="GET" style="display:inline;">
+                                        <input type="hidden" name="todo_record_id" value="[% todo.record_id %]">
+                                        <button type="submit" class="action-button add">Add Log</button>
                                     </form>
                                 </td>
                             </tr>
@@ -318,6 +326,18 @@ document.addEventListener('DOMContentLoaded', function() {
     text-align: left;
 }
 
+/* Style for the actions column */
+.project-details-table td:last-child {
+    min-width: 200px;
+}
+
+/* Add spacing between buttons */
+.project-details-table form {
+    margin-right: 5px;
+    margin-bottom: 5px;
+    display: inline-block;
+}
+
 .project-details-table th {
     background-color: #f5f5f5;
     position: sticky;
@@ -401,6 +421,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .action-button.add {
     background-color: #2ecc71;
+    color: white;
+}
+
+.action-button.view {
+    background-color: #9b59b6;
     color: white;
 }
 

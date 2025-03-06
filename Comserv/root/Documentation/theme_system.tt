@@ -45,37 +45,54 @@
     
     <section id="implementation">
         <h2>Implementation Plan</h2>
-        <p>The theme system is being implemented in phases:</p>
-        
+        <p>The theme system is being implemented in a progressive manner to ensure backward compatibility and minimize disruption:</p>
+
         <ol>
-            <li><strong>Phase 1: Database Schema Updates</strong>
+            <li><strong>Phase 1: Fallback Theme Selection</strong>
                 <ul>
-                    <li>Add 'theme' column to the sites table</li>
-                    <li>Create theme-related tables for storing custom theme settings</li>
+                    <li>Modify Header.tt to use fallback methods for theme selection</li>
+                    <li>Implement name-based theme selection (e.g., 'csc' for CSC site)</li>
+                    <li>Ensure the system works without requiring database changes</li>
                 </ul>
             </li>
-            <li><strong>Phase 2: Core Theme Files</strong>
+            <li><strong>Phase 2: Theme Administration</strong>
                 <ul>
-                    <li>Create base theme CSS with CSS variables for customization</li>
-                    <li>Develop default themes for common sites</li>
-                    <li>Update Header.tt to load the appropriate theme</li>
+                    <li>Update ThemeAdmin controller to work without requiring the theme column</li>
+                    <li>Implement file-based theme preference storage (theme_mappings.txt)</li>
+                    <li>Add appropriate feedback for administrators about theme system status</li>
                 </ul>
             </li>
-            <li><strong>Phase 3: Admin Interface</strong>
+            <li><strong>Phase 3: Theme Tables Creation</strong>
                 <ul>
-                    <li>Create theme management interface in the admin area</li>
-                    <li>Implement theme selection functionality</li>
-                    <li>Add custom theme creation tools</li>
+                    <li>Create theme-related tables without modifying existing schema</li>
+                    <li>Run the create_theme_tables_only.pl script</li>
+                    <li>Populate tables with default themes (default, csc, usbm)</li>
                 </ul>
             </li>
-            <li><strong>Phase 4: Migration and Documentation</strong>
+            <li><strong>Phase 4: Testing</strong>
                 <ul>
-                    <li>Migrate existing site-specific styles to the theme system</li>
-                    <li>Document the theme system for developers and administrators</li>
-                    <li>Provide migration guides for site owners</li>
+                    <li>Test theme creation and application with the file-based approach</li>
+                    <li>Verify that themes are correctly applied to sites</li>
+                    <li>Ensure backward compatibility with existing CSS files</li>
+                </ul>
+            </li>
+            <li><strong>Phase 5: Database Migration</strong>
+                <ul>
+                    <li>Add the theme column to the sites table</li>
+                    <li>Run the add_theme_column.pl script</li>
+                    <li>System will automatically start using the database column</li>
+                </ul>
+            </li>
+            <li><strong>Phase 6: Theme Migration</strong>
+                <ul>
+                    <li>Migrate theme preferences from file to database</li>
+                    <li>Run the migrate_to_themes.pl script</li>
+                    <li>Complete the transition to the database-driven theme system</li>
                 </ul>
             </li>
         </ol>
+
+        <p>This progressive approach allows for incremental implementation and testing, ensuring that each phase works correctly before proceeding to the next. The system will continue to function with the existing CSS configuration until fully migrated to the database-driven version.</p>
     </section>
     
     <section id="theme-structure">

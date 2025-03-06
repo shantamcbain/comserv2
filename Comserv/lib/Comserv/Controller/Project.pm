@@ -267,8 +267,7 @@ sub details :Path('details') :Args(0) {
     $c->stash(
         project => $project_tree,
         todos => \@todos,
-        template => 'todo/projectdetails_enhanced_enhanced.tt',
-        project_details_css => '/static/css/project_details.css'
+        template => 'todo/projectdetails.tt'
     );
 
     # Logging: End of details action
@@ -290,16 +289,18 @@ sub fetch_projects_with_subprojects :Private {
     my $schema = $c->model('DBEncy');
     my $SiteName = $c->session->{SiteName};
 
-    # Fetch projects with recursive prefetch for sub-projects
+    # Fetch projects with limited recursive prefetch for sub-projects
+    # Reduced from 4 levels to 3 levels to prevent deep recursion
     my $project_rs = $schema->resultset('Project')->search(
         { 'me.sitename' => $SiteName, 'me.parent_id' => undef },
         {
-            prefetch => { sub_projects => { sub_projects => { sub_projects => 'sub_projects' } } },
+            prefetch => { sub_projects => { sub_projects => 'sub_projects' } },
             order_by => { -asc => 'me.name' },
         }
     );
 
     # Convert the resultset into a structured array of hashrefs
+    # Reduced from 4 levels to 3 levels to match the prefetch depth
     my @projects = map {
         {
             id           => $_->id,
@@ -317,9 +318,7 @@ sub fetch_projects_with_subprojects :Private {
                                     id           => $_->id,
                                     name         => $_->name,
                                     parent_id    => $_->parent_id,
-                                    sub_projects => [
-                                        map { { id => $_->id, name => $_->name, parent_id => $_->parent_id } } $_->sub_projects->all
-                                    ],
+                                    # No further sub_projects level to prevent deep recursion
                                 }
                             } $_->sub_projects->all
                         ],
@@ -362,7 +361,13 @@ sub editproject :Path('editproject') :Args(0) {
 }
 
 sub build_project_tree :Private {
-    my ($self, $c, $project) = @_;
+    my ($self, $c, $project, $depth) = @_;
+
+    # Set default depth or increment current depth
+    $depth = defined($depth) ? $depth + 1 : 0;
+
+    # Maximum recursion depth - adjust as needed
+    my $max_depth = 5;
 
     # Get the schema
     my $schema = $c->model('DBEncy');
@@ -379,21 +384,33 @@ sub build_project_tree :Private {
     );
     $project_hash->{todos} = \@todos;
 
-    # Fetch sub-projects
-    my @sub_projects = $schema->resultset('Project')->search(
-        { parent_id => $project->id },
-        { order_by => { -asc => 'name' } }
-    );
+    # Only fetch sub-projects if we haven't reached the maximum depth
+    if ($depth < $max_depth) {
+        # Fetch sub-projects
+        my @sub_projects = $schema->resultset('Project')->search(
+            { parent_id => $project->id },
+            { order_by => { -asc => 'name' } }
+        );
 
-    # If there are sub-projects, process them recursively
-    if (@sub_projects) {
-        $project_hash->{sub_projects} = [
-            map { $self->build_project_tree($c, $_) } @sub_projects
-        ];
+        # If there are sub-projects, process them recursively
+        if (@sub_projects) {
+            $project_hash->{sub_projects} = [
+                map { $self->build_project_tree($c, $_, $depth) } @sub_projects
+            ];
 
-        # Log the number of sub-projects found
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'build_project_tree',
-            "Found " . scalar(@sub_projects) . " sub-projects for project ID: " . $project->id);
+            # Log the number of sub-projects found
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'build_project_tree',
+                "Found " . scalar(@sub_projects) . " sub-projects for project ID: " . $project->id . " at depth $depth");
+        }
+    } else {
+        # Log that we've reached the maximum depth
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'build_project_tree',
+            "Reached maximum depth ($max_depth) for project ID: " . $project->id);
+
+        # Add a flag to indicate there might be more sub-projects
+        if ($schema->resultset('Project')->search({ parent_id => $project->id })->count > 0) {
+            $project_hash->{has_more_sub_projects} = 1;
+        }
     }
 
     return $project_hash;

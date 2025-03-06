@@ -30,8 +30,7 @@ window.onload = function() {
 
     <a href="[% c.uri_for('/todo/addtodo') %]"> Add Todo</a><br>
 
-    <label for="sitename">Site Name:</label><br>
-    <input type="text" id="sitename" name="sitename" value="[% site_name %]" readonly><br>
+    [% INCLUDE "todo/site_list.tt" %]<br>
 
     <label for="start_date">Start Date:</label><br>
     <input type="date" id="start_date" name="start_date" value="[% start_date %]"><br>

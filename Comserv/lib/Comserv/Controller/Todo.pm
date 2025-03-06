@@ -33,7 +33,7 @@ sub begin :Private {
 
         # Redirect to login
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "Redirecting to login page due to missing or invalid roles.");
-        $c->res->redirect($c->uri_for('/login'));
+        $c->res->redirect($c->uri_for('/user/login'));
         $c->detach;
     }
 
