@@ -4,6 +4,11 @@ use namespace::autoclean;
 use Data::Dumper;
 use DBIx::Class::Migration;
 use Comserv::Util::Logging;
+use File::Path qw(make_path);
+use File::Spec;
+use File::Copy;
+use POSIX qw(strftime);
+use Fcntl qw(:flock O_WRONLY O_APPEND O_CREAT);
 BEGIN { extends 'Catalyst::Controller'; }
 
 has 'logging' => (
@@ -364,8 +369,88 @@ sub view_log :Path('/admin/view_log') :Args(0) {
     # Debug logging for view_log action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view_log', "Starting view_log action");
 
-    # Path to the application log file
-    my $log_file = $c->path_to('logs', 'application.log');
+    # Check if we need to rotate the log
+    if ($c->request->params->{rotate} && $c->request->params->{rotate} eq '1') {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view_log', "Manual log rotation requested");
+
+        # Get the actual log file path
+        my $log_file;
+        if (defined $Comserv::Util::Logging::LOG_FILE) {
+            $log_file = $Comserv::Util::Logging::LOG_FILE;
+        } else {
+            $log_file = $c->path_to('logs', 'application.log');
+        }
+
+        # Check if the log file exists and is very large
+        if (-e $log_file) {
+            my $file_size = -s $log_file;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view_log', "Log file size: $file_size bytes");
+
+            # Create archive directory if it doesn't exist
+            my ($volume, $directories, $filename) = File::Spec->splitpath($log_file);
+            my $archive_dir = File::Spec->catdir($directories, 'archive');
+            unless (-d $archive_dir) {
+                eval { make_path($archive_dir) };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'view_log', "Failed to create archive directory: $@");
+                    $c->flash->{error_msg} = "Failed to create archive directory: $@";
+                    $c->response->redirect($c->uri_for('/admin/view_log'));
+                    return;
+                }
+            }
+
+            # Generate timestamped filename for the archive
+            my $timestamp = strftime("%Y%m%d_%H%M%S", localtime);
+            my $archived_log = File::Spec->catfile($archive_dir, "${filename}_${timestamp}");
+
+            # Try to copy the log file to the archive
+            eval {
+                # Close the log file handle if it's open
+                if (defined $Comserv::Util::Logging::LOG_FH) {
+                    close $Comserv::Util::Logging::LOG_FH;
+                }
+
+                # Copy the log file to the archive
+                File::Copy::copy($log_file, $archived_log);
+
+                # Truncate the original log file
+                open my $fh, '>', $log_file or die "Cannot open log file for truncation: $!";
+                print $fh "Log file truncated at " . scalar(localtime) . "\n";
+                close $fh;
+
+                # Reopen the log file for appending
+                if (defined $Comserv::Util::Logging::LOG_FILE) {
+                    sysopen($Comserv::Util::Logging::LOG_FH, $Comserv::Util::Logging::LOG_FILE, O_WRONLY | O_APPEND | O_CREAT, 0644)
+                        or die "Cannot reopen log file after rotation: $!";
+                }
+
+                $c->flash->{success_msg} = "Log rotated successfully. Archived to: $archived_log";
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'view_log', "Error rotating log: $@");
+                $c->flash->{error_msg} = "Error rotating log: $@";
+            }
+        } else {
+            $c->flash->{error_msg} = "Log file not found: $log_file";
+        }
+
+        # Redirect to avoid resubmission on refresh
+        $c->response->redirect($c->uri_for('/admin/view_log'));
+        return;
+    }
+
+    # Get the actual log file path from the Logging module
+    my $log_file;
+
+    # First try to get it from the global variable in Logging.pm
+    if (defined $Comserv::Util::Logging::LOG_FILE) {
+        $log_file = $Comserv::Util::Logging::LOG_FILE;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view_log', "Using log file from Logging module: $log_file");
+    } else {
+        # Fall back to the default path
+        $log_file = $c->path_to('logs', 'application.log');
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view_log', "Using default log file path: $log_file");
+    }
 
     # Check if the log file exists
     unless (-e $log_file) {
@@ -374,6 +459,176 @@ sub view_log :Path('/admin/view_log') :Args(0) {
             template  => 'admin/view_log.tt',
         );
         $c->forward($c->view('TT'));
+        return;
+    }
+
+    # Get log file size
+    my $log_size_kb = Comserv::Util::Logging->get_log_file_size($log_file);
+
+    # Get list of archived logs
+    my ($volume, $directories, $filename) = File::Spec->splitpath($log_file);
+    my $archive_dir = File::Spec->catdir($directories, 'archive');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view_log', "Archive directory: $archive_dir");
+    my @archived_logs = ();
+
+    if (-d $archive_dir) {
+        opendir(my $dh, $archive_dir) or do {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'view_log', "Cannot open archive directory: $!");
+        };
+
+        if ($dh) {
+            # Get the base filename without path
+            my $base_filename = (File::Spec->splitpath($log_file))[2];
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view_log', "Base filename: $base_filename");
+
+            @archived_logs = map {
+                my $full_path = File::Spec->catfile($archive_dir, $_);
+                {
+                    name => $_,
+                    size => sprintf("%.2f KB", (-s $full_path) / 1024),
+                    date => scalar localtime((stat($full_path))[9]),
+                    is_chunk => ($_ =~ /_chunk\d+$/) ? 1 : 0
+                }
+            } grep { /^${base_filename}_\d{8}_\d{6}(_chunk\d+)?$/ } readdir($dh);
+            closedir($dh);
+
+            # Group chunks together by timestamp
+            my %log_groups;
+            foreach my $log (@archived_logs) {
+                my $timestamp;
+                if ($log->{name} =~ /^${base_filename}_(\d{8}_\d{6})(?:_chunk\d+)?$/) {
+                    $timestamp = $1;
+                } else {
+                    # Fallback for unexpected filenames
+                    $timestamp = $log->{name};
+                }
+
+                push @{$log_groups{$timestamp}}, $log;
+            }
+
+            # Sort timestamps in descending order (newest first)
+            my @sorted_timestamps = sort { $b cmp $a } keys %log_groups;
+
+            # Flatten the groups back into a list, with chunks grouped together
+            @archived_logs = ();
+            foreach my $timestamp (@sorted_timestamps) {
+                # Sort chunks within each timestamp group
+                my @sorted_logs = sort {
+                    # Extract chunk numbers for sorting
+                    my ($a_chunk) = ($a->{name} =~ /_chunk(\d+)$/);
+                    my ($b_chunk) = ($b->{name} =~ /_chunk(\d+)$/);
+
+                    # Non-chunks come first, then sort by chunk number
+                    if (!defined $a_chunk && defined $b_chunk) {
+                        return -1;
+                    } elsif (defined $a_chunk && !defined $b_chunk) {
+                        return 1;
+                    } elsif (defined $a_chunk && defined $b_chunk) {
+                        return $a_chunk <=> $b_chunk;
+                    } else {
+                        return $a->{name} cmp $b->{name};
+                    }
+                } @{$log_groups{$timestamp}};
+
+                push @archived_logs, @sorted_logs;
+            }
+        }
+    }
+
+    # Read the log file (limit to last 1000 lines for performance)
+    my $log_content;
+    my @last_lines;
+
+    # Check if the file is too large to read into memory
+    my $file_size = -s $log_file;
+    if ($file_size > 10 * 1024 * 1024) { # If larger than 10MB
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view_log', "Log file is too large ($file_size bytes), reading only the last 1000 lines");
+
+        # Use tail-like approach to get the last 1000 lines
+        my @tail_lines;
+        my $line_count = 0;
+        my $buffer_size = 4096;
+        my $pos = $file_size;
+
+        open my $fh, '<', $log_file or die "Cannot open log file: $!";
+
+        while ($line_count < 1000 && $pos > 0) {
+            my $read_size = ($pos > $buffer_size) ? $buffer_size : $pos;
+            $pos -= $read_size;
+
+            seek($fh, $pos, 0);
+            my $buffer;
+            read($fh, $buffer, $read_size);
+
+            my @buffer_lines = split(/\n/, $buffer);
+            $line_count += scalar(@buffer_lines);
+
+            unshift @tail_lines, @buffer_lines;
+        }
+
+        close $fh;
+
+        # Take only the last 1000 lines
+        if (@tail_lines > 1000) {
+            @last_lines = @tail_lines[-1000 .. -1];
+        } else {
+            @last_lines = @tail_lines;
+        }
+
+        $log_content = join("\n", @last_lines);
+    } else {
+        # For smaller files, read the whole file
+        open my $fh, '<', $log_file or die "Cannot open log file: $!";
+        my @lines = <$fh>;
+        close $fh;
+
+        # Get the last 1000 lines (or all if fewer)
+        my $start_index = @lines > 1000 ? @lines - 1000 : 0;
+        @last_lines = @lines[$start_index .. $#lines];
+        $log_content = join('', @last_lines);
+    }
+
+    # Pass the log content and metadata to the template
+    $c->stash(
+        log_content   => $log_content,
+        log_size      => $log_size_kb,
+        max_log_size  => sprintf("%.2f", 500), # 500 KB max size (hardcoded to match Logging.pm)
+        archived_logs => \@archived_logs,
+        template      => 'admin/view_log.tt',
+    );
+
+    $c->forward($c->view('TT'));
+}
+
+sub view_archived_log :Path('/admin/view_archived_log') :Args(1) {
+    my ($self, $c, $log_name) = @_;
+
+    # Validate log name to prevent directory traversal
+    unless ($log_name =~ /^application\.log_\d{8}_\d{6}$/) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'view_archived_log', "Invalid log name: $log_name");
+        $c->flash->{error_msg} = "Invalid log name";
+        $c->response->redirect($c->uri_for('/admin/view_log'));
+        return;
+    }
+
+    # Get the actual log file path from the Logging module
+    my $main_log_file;
+
+    if (defined $Comserv::Util::Logging::LOG_FILE) {
+        $main_log_file = $Comserv::Util::Logging::LOG_FILE;
+    } else {
+        $main_log_file = $c->path_to('logs', 'application.log');
+    }
+
+    my ($volume, $directories, $filename) = File::Spec->splitpath($main_log_file);
+    my $archive_dir = File::Spec->catdir($directories, 'archive');
+    my $log_file = File::Spec->catfile($archive_dir, $log_name);
+
+    # Check if the log file exists
+    unless (-e $log_file && -f $log_file) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'view_archived_log', "Archived log not found: $log_file");
+        $c->flash->{error_msg} = "Archived log not found";
+        $c->response->redirect($c->uri_for('/admin/view_log'));
         return;
     }
 
@@ -386,10 +641,15 @@ sub view_log :Path('/admin/view_log') :Args(0) {
         close $fh;
     }
 
+    # Get log file size
+    my $log_size_kb = sprintf("%.2f", (-s $log_file) / 1024);
+
     # Pass the log content to the template
     $c->stash(
         log_content => $log_content,
-        template    => 'admin/view_log.tt',
+        log_name    => $log_name,
+        log_size    => $log_size_kb,
+        template    => 'admin/view_archived_log.tt',
     );
 
     $c->forward($c->view('TT'));

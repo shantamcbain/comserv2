@@ -84,6 +84,7 @@
                 <p>Maintain and update the system.</p>
                 <ul class="admin-links">
                     <li><a href="update_software">Update Software</a></li>
+                    <li><a href="[% c.uri_for('/admin/view_log') %]">Log Management</a></li>
                     <li><a href="log">Access Logging</a></li>
                 </ul>
             </div>
