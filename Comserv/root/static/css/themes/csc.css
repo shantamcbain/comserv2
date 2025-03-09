@@ -1,19 +1,65 @@
-/* CSC Theme */
+/* CSC Theme - Computer System Consulting */
 :root {
-  --primary-color: #3366cc;
-  --secondary-color: #f0f0f0;
-  --accent-color: #ff6600;
+  --primary-color: #0066cc;    /* CSC Blue */
+  --secondary-color: #4A4A4A;  /* Dark gray */
+  --accent-color: #ff9900;     /* Orange accent */
   --text-color: #333333;
   --background-color: #ffffff;
-  --link-color: #3366cc;
-  --link-hover-color: #1a3366;
-  --border-color: #cccccc;
-  --table-header-bg: #e6e6e6;
-  --warning-color: #cc0000;
-  --success-color: #339933;
-  
-  --button-bg: #3366cc;
+  --link-color: #0066cc;       /* CSC Blue */
+  --link-hover-color: #004d99; /* Darker blue */
+  --border-color: #dddddd;
+  --table-header-bg: #e6f2ff;  /* Light blue */
+  --warning-color: #ff4444;
+  --success-color: #4CAF50;
+
+  /* Typography */
+  --header-font: 'Arial', sans-serif;
+  --body-font: 'Arial', sans-serif;
+  --font-size-base: 16px;
+  --font-size-small: 14px;
+  --font-size-large: 18px;
+  --font-size-xlarge: 22px;
+
+  /* Components */
+  --button-bg: #0066cc;
   --button-text: #ffffff;
-  --button-border: #1a3366;
-  --button-hover-bg: #1a3366;
+  --button-border: #004d99;
+  --button-hover-bg: #004d99;
+  --nav-bg: var(--primary-color);
+  --nav-text: #ffffff;
+  --nav-hover-bg: rgba(0, 0, 0, 0.1);
+}
+
+body, body.theme-csc {
+  background-color: var(--background-color);
+  color: var(--text-color);
+  font-family: var(--body-font);
+  font-size: var(--font-size-base);
+}
+
+a {
+  color: var(--link-color);
+}
+
+a:hover {
+  color: var(--link-hover-color);
+}
+
+button,
+.button,
+input[type="submit"] {
+  background-color: var(--button-bg);
+  color: var(--button-text);
+  border: 1px solid var(--button-border);
+}
+
+button:hover,
+.button:hover,
+input[type="submit"]:hover {
+  background-color: var(--button-hover-bg);
+}
+
+nav {
+  background-color: var(--primary-color);
+  color: var(--nav-text);
 }

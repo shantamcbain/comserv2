@@ -116,3 +116,19 @@ select {
   border: 1px solid var(--success-color);
   margin-bottom: 10px;
 }
+
+/* Theme Preview Styles */
+.theme-preview-box.default {
+    background-color: var(--primary-color);
+    color: var(--text-color);
+}
+
+.theme-preview-box.usbm {
+    background-color: #009933;
+    color: #ffffff;
+}
+
+.theme-preview-box.apis {
+    background-color: #3366cc;
+    color: #ffffff;
+}

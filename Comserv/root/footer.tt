@@ -1,5 +1,6 @@
 [% PageVersion	= 'footer.tt,v 0.01 2023/08/30 shanta Exp shanta '	%]
 [% IF c.session.debug_mode == 1 %]
  <br>[%	PageVersion %] </br>
+ <br><a href="[% c.uri_for('/reset_session') %]">Reset Session</a></br>
 [% END %]
 <script type="text/javascript" async="async" defer="defer" data-cfasync="false" src="https://mylivechat.com/chatinline.aspx?hccid=98668549"></script>

@@ -24,7 +24,8 @@ use POSIX qw(strftime); # For timestamp formatting
 my $LOG_FH; # Global file handle for logging
 my $LOG_FILE; # Global log file path
 
-my $MAX_LOG_SIZE = 500 * 1024; # 500 KB max log size for easier AI analysis and browser viewing
+my $MAX_LOG_SIZE = 100 * 1024; # 100 KB max size for easier AI analysis
+my $ROTATION_THRESHOLD = 80 * 1024; # Rotate at 80 KB to prevent exceeding max size
 my $MAX_LOG_FILES = 20; # Maximum number of archived log files to keep
 
 # Internal subroutine to print log messages to STDERR and the log file
@@ -242,6 +243,15 @@ sub log_to_file {
     $file_path //= $LOG_FILE || File::Spec->catfile($FindBin::Bin, '..', 'logs', 'application.log');
     $level    //= 'INFO';
 
+    # Check file size before writing to ensure we don't exceed max size
+    if ($file_path eq $LOG_FILE && -e $file_path) {
+        my $file_size = -s $file_path;
+        if ($file_size >= $ROTATION_THRESHOLD) {
+            _print_log("Pre-emptive log rotation triggered: $file_size bytes >= $ROTATION_THRESHOLD bytes");
+            rotate_log();
+        }
+    }
+
     # Declare $file with 'my' to fix the scoping issue
     my $file;
     unless (open $file, '>>', $file_path) {
@@ -254,16 +264,6 @@ sub log_to_file {
     flock($file, LOCK_UN);
 
     close $file;
-
-    # Check if we need to rotate the log after writing
-    if ($file_path eq $LOG_FILE) {
-        # Check file size directly here to ensure rotation happens
-        my $file_size = -s $LOG_FILE;
-        if ($file_size >= $MAX_LOG_SIZE) {
-            _print_log("Log file size check in log_to_file: $file_size bytes >= $MAX_LOG_SIZE bytes, rotating log");
-            rotate_log();
-        }
-    }
 }
 
 # DEPRECATED: Don't use this method directly - use log_with_details instead

@@ -1,24 +1,56 @@
-/* Default Theme */
+/* Default Theme - Using base.css variables */
 :root {
-  --primary-color: #ccffff;
-  --secondary-color: #f9f9f9;
-  --accent-color: #FF9900;
-  --text-color: #000000;
+  --primary-color: #3498db;
+  --secondary-color: #2c3e50;
+  --accent-color: #e74c3c;
+  --text-color: #333333;
   --background-color: #ffffff;
-  --link-color: #0000FF;
-  --link-hover-color: #000099;
-  --border-color: #cccccc;
+  --link-color: #3498db;
+  --link-hover-color: #2980b9;
+  --border-color: #dddddd;
   --table-header-bg: #f2f2f2;
-  --warning-color: #ff0000;
-  --success-color: #009900;
-  
-  --button-bg: #f2f2f2;
-  --button-text: #000000;
-  --button-border: #cccccc;
-  --button-hover-bg: #e0e0e0;
+  --warning-color: #f39c12;
+  --success-color: #27ae60;
+
+  --button-bg: #3498db;
+  --button-text: #ffffff;
+  --button-border: #2980b9;
+  --button-hover-bg: #2980b9;
 }
 
-/* Custom background image */
-body {
-  background-image: url("/static/images/BMaster/honey2.jpg");
+/* Default styles for all sites */
+body, body.theme-default {
+  font-family: Arial, sans-serif;
+  font-size: 16px;
+  color: var(--text-color);
+  background-color: var(--background-color);
+  margin: 0;
+  padding: 0;
+}
+
+a {
+  color: var(--link-color);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--link-hover-color);
+  text-decoration: underline;
+}
+
+button,
+.button,
+input[type="submit"] {
+  background-color: var(--button-bg);
+  color: var(--button-text);
+  border: 1px solid var(--button-border);
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+button:hover,
+.button:hover,
+input[type="submit"]:hover {
+  background-color: var(--button-hover-bg);
 }

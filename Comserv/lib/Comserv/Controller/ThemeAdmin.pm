@@ -30,12 +30,12 @@ sub simple :Path('/themeadmin/simple') :Args(0) {
     my $site = {
         id => 1,
         name => $site_name,
-        theme => lc($site_name) eq 'csc' ? 'csc' :
+        theme => lc($site_name) eq 'apis' ? 'apis' :
                  lc($site_name) eq 'usbm' ? 'usbm' : 'default'
     };
 
     # Create a simple list of available themes
-    my @available_themes = qw(default csc usbm);
+    my @available_themes = qw(default apis usbm);
 
     # Pass data to template
     $c->stash->{site} = $site;
@@ -208,8 +208,8 @@ sub index :Path('/themeadmin') :Args(0) {
         if ($site->{theme} eq 'default') {
             if (lc($site_name) eq 'usbm') {
                 $site->{theme} = 'usbm';
-            } elsif (lc($site_name) eq 'csc') {
-                $site->{theme} = 'csc';
+            } elsif (lc($site_name) eq 'apis') {
+                $site->{theme} = 'apis';
             }
         }
 
@@ -222,7 +222,7 @@ sub index :Path('/themeadmin') :Args(0) {
 
     # Get all sites for admin
     my @sites;
-    if (lc($site_name) eq 'csc') {
+    if (lc($site_name) eq 'apis') {
         try {
             if ($theme_column_exists) {
                 @sites = $c->model('DBEncy')->resultset('Site')->all;
@@ -262,8 +262,8 @@ sub index :Path('/themeadmin') :Args(0) {
                         my $name = lc($s->name);
                         if ($name eq 'usbm') {
                             $s->{theme} = 'usbm';
-                        } elsif ($name eq 'csc') {
-                            $s->{theme} = 'csc';
+                        } elsif ($name eq 'apis') {
+                            $s->{theme} = 'apis';
                         }
                     }
                 }
@@ -291,7 +291,7 @@ sub index :Path('/themeadmin') :Args(0) {
         closedir($dh);
     } catch {
         $c->log->error("Error getting available themes: $_");
-        @available_themes = qw(default csc usbm);
+        @available_themes = qw(default apis usbm);
     };
 
     # Pass data to template
@@ -361,6 +361,7 @@ sub update_theme :Local {
 
                     # Remove any existing mapping for this site
                     $theme_info =~ s/^$site_name:.*\n//mg;
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_theme', "Removed existing mapping for $site_name");
                 }
 
                 # Add the new mapping
@@ -368,6 +369,7 @@ sub update_theme :Local {
 
                 # Write the updated mappings
                 write_file($theme_info_file, $theme_info);
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_theme', "Wrote new mapping to theme_mappings.txt");
 
                 $c->flash->{message} = "Theme preference saved for $site_name. The theme will be applied when the database is updated.";
             }

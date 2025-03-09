@@ -1,24 +1,53 @@
-/* USBM Theme */
+/* USBM Theme - Using base.css variables */
 :root {
   --primary-color: #009933;
-  --secondary-color: #FFCC66;
-  --accent-color: #FF9900;
-  --text-color: #000000;
+  --secondary-color: #f0f0f0;
+  --accent-color: #FFCC66;
+  --text-color: #333333;
   --background-color: #ffffff;
-  --link-color: #000000;
-  --link-hover-color: #333333;
+  --link-color: #009933;
+  --link-hover-color: #006622;
   --border-color: #cccccc;
-  --table-header-bg: #FFCC66;
-  --warning-color: #ff0000;
-  --success-color: #009900;
-  
-  --button-bg: #FFCC66;
-  --button-text: #000000;
-  --button-border: #FF9900;
-  --button-hover-bg: #FF9900;
+  --table-header-bg: #e6e6e6;
+  --warning-color: #cc0000;
+  --success-color: #339933;
+
+  --button-bg: #009933;
+  --button-text: #ffffff;
+  --button-border: #006622;
+  --button-hover-bg: #006622;
 }
 
-/* Custom background */
-body {
+body, body.theme-usbm {
   background-color: var(--primary-color);
+  color: var(--text-color);
+  font-family: Arial, sans-serif;
+  font-size: 16px;
+}
+
+a {
+  color: var(--link-color);
+}
+
+a:hover {
+  color: var(--link-hover-color);
+}
+
+button,
+.button,
+input[type="submit"] {
+  background-color: var(--button-bg);
+  color: var(--button-text);
+  border: 1px solid var(--button-border);
+}
+
+button:hover,
+.button:hover,
+input[type="submit"]:hover {
+  background-color: var(--button-hover-bg);
+}
+
+nav {
+  background-color: var(--primary-color);
+  color: #ffffff;
 }

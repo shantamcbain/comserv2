@@ -67,16 +67,93 @@ sub get_all_sites {
 }
 
 sub get_site_domain {
-    my ($self,  $c, $domain) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_site_domain', "Domain: $domain");
+    my ($self, $c, $domain) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_site_domain', "Looking up domain: $domain");
+
+    # Initialize debug_errors array if it doesn't exist
+    $c->stash->{debug_errors} //= [];
+
     try {
+        # First check if the sitedomain table exists
+        my $dbh = $self->schema->storage->dbh;
+        my $sth = $dbh->table_info('', 'ency', 'sitedomain', 'TABLE');
+        my $table_exists = $sth->fetchrow_arrayref;
+
+        unless ($table_exists) {
+            my $error_msg = "CRITICAL ERROR: sitedomain table does not exist in database";
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_site_domain', $error_msg);
+            push @{$c->stash->{debug_errors}}, $error_msg;
+
+            # Set specific error message for the user
+            $c->stash->{domain_error} = {
+                type => 'schema_missing',
+                message => "The sitedomain table is missing from the database. Please run the database schema update script.",
+                domain => $domain,
+                technical_details => "Table 'sitedomain' does not exist in the database schema."
+            };
+
+            return undef;
+        }
+
+        # Look up the domain in the sitedomain table
         my $result = $self->schema->resultset('SiteDomain')->find({ domain => $domain });
-        return $result;
-    } catch {
-        if ($_ =~ /Table 'ency\.sitedomain' doesn't exist/) {
-            Catalyst::Exception->throw("Schema update required");
+
+        if ($result) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_site_domain',
+                "Domain found: $domain (site_id: " . $result->site_id . ")");
+            return $result;
         } else {
-            die $_;
+            my $error_msg = "DOMAIN ERROR: Domain '$domain' not found in sitedomain table";
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_site_domain', $error_msg);
+            push @{$c->stash->{debug_errors}}, $error_msg;
+
+            # Set specific error message for the user
+            $c->stash->{domain_error} = {
+                type => 'domain_missing',
+                message => "The domain '$domain' is not configured in the system.",
+                domain => $domain,
+                technical_details => "Domain '$domain' not found in sitedomain table. Add it using the Site Administration interface.",
+                action_required => "Please add this domain to the sitedomain table and associate it with the appropriate site."
+            };
+
+            # Set SiteName to 'none' directly
+            $c->session->{SiteName} = 'none';
+            $c->stash->{SiteName} = 'none';
+
+            return undef;
+        }
+    } catch {
+        my $error = $_;
+        if ($error =~ /Table 'ency\.sitedomain' doesn't exist/) {
+            my $error_msg = "SCHEMA ERROR: Table 'ency.sitedomain' doesn't exist. Schema update required.";
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_site_domain', $error_msg);
+            push @{$c->stash->{debug_errors}}, $error_msg;
+
+            # Set specific error message for the user
+            $c->stash->{domain_error} = {
+                type => 'schema_error',
+                message => "The database schema is outdated and missing required tables.",
+                domain => $domain,
+                technical_details => "Table 'ency.sitedomain' doesn't exist. Schema update required.",
+                action_required => "Please run the database schema update script."
+            };
+
+            return undef;
+        } else {
+            my $error_msg = "DATABASE ERROR: Failed to query sitedomain table: $error";
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_site_domain', $error_msg);
+            push @{$c->stash->{debug_errors}}, $error_msg;
+
+            # Set specific error message for the user
+            $c->stash->{domain_error} = {
+                type => 'database_error',
+                message => "A database error occurred while looking up the domain.",
+                domain => $domain,
+                technical_details => "Error: $error",
+                action_required => "Please check the database connection and configuration."
+            };
+
+            die $error;
         }
     };
 }

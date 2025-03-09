@@ -39,6 +39,7 @@
             <li><strong>Maintainability:</strong> Centralize style definitions to reduce duplication and make updates easier.</li>
             <li><strong>User Control:</strong> Allow administrators to select and customize themes through the admin interface.</li>
             <li><strong>Performance:</strong> Optimize CSS delivery and reduce page load times.</li>
+            <li><strong>Progressive Implementation:</strong> Enable gradual adoption without requiring immediate database changes.</li>
             <li><strong>Backward Compatibility:</strong> Ensure existing sites continue to work without requiring immediate changes.</li>
         </ul>
     </section>
@@ -51,7 +52,8 @@
             <li><strong>Phase 1: Fallback Theme Selection</strong>
                 <ul>
                     <li>Modify Header.tt to use fallback methods for theme selection</li>
-                    <li>Implement name-based theme selection (e.g., 'csc' for CSC site)</li>
+                    <li>Implement name-based theme selection (e.g., 'apis' for Apis site)</li>
+                    <li>Set up file-based theme preference storage in theme_mappings.txt</li>
                     <li>Ensure the system works without requiring database changes</li>
                 </ul>
             </li>
@@ -59,6 +61,7 @@
                 <ul>
                     <li>Update ThemeAdmin controller to work without requiring the theme column</li>
                     <li>Implement file-based theme preference storage (theme_mappings.txt)</li>
+                    <li>Add theme preview functionality in the admin interface</li>
                     <li>Add appropriate feedback for administrators about theme system status</li>
                 </ul>
             </li>
@@ -66,7 +69,7 @@
                 <ul>
                     <li>Create theme-related tables without modifying existing schema</li>
                     <li>Run the create_theme_tables_only.pl script</li>
-                    <li>Populate tables with default themes (default, csc, usbm)</li>
+                    <li>Populate tables with default themes (default, apis, usbm)</li>
                 </ul>
             </li>
             <li><strong>Phase 4: Testing</strong>
@@ -102,6 +105,19 @@
         <h3>Base Theme</h3>
         <p>The base theme (<code>default.css</code>) defines the core styles and variables used by all themes. It includes:</p>
         
+        <h3>Theme File Organization</h3>
+        <p>Theme files are organized in the following structure:</p>
+        <pre>
+/static/css/themes/
+├── default.css          # Base theme with core variables
+├── apis.css             # Apis-specific theme
+├── usbm.css            # USBM-specific theme
+└── custom/             # Directory for custom themes
+    ├── site1_custom.css
+    └── site2_custom.css
+        </pre>
+        <p>This organization ensures clear separation between default themes and custom themes.</p>
+
         <pre>
 :root {
   --primary-color: #3498db;
@@ -202,6 +218,8 @@
             <dt>Theme not loading</dt>
             <dd>
                 <ul>
+                    <li>Check theme_mappings.txt if database column is not yet available</li>
+                    <li>Verify file permissions on theme files and directories</li>
                     <li>Check that the theme file exists in <code>/static/css/themes/</code></li>
                     <li>Verify that the site record has the correct theme name in the database</li>
                     <li>Clear your browser cache</li>

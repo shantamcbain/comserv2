@@ -1,0 +1,80 @@
+/* Apis Theme - Beekeeping Theme */
+:root {
+  /* Honey and bee-inspired colors */
+  --primary-color: #FFB900;    /* Honey gold */
+  --secondary-color: #4A4A4A;  /* Dark gray */
+  --accent-color: #FFA500;     /* Orange */
+  --text-color: #2C2C2C;
+  --background-color: #FFF8E1; /* Light honey background */
+  --link-color: #B88A00;       /* Darker honey gold */
+  --link-hover-color: #996E00; /* Even darker honey gold */
+  --border-color: #E6E6E6;
+  --table-header-bg: #FFF3D4;  /* Light honey */
+  --warning-color: #FF4444;
+  --success-color: #4CAF50;
+
+  /* Typography */
+  --header-font: 'Georgia', serif;
+  --body-font: 'Verdana', sans-serif;
+  --font-size-base: 16px;
+  --font-size-small: 14px;
+  --font-size-large: 18px;
+  --font-size-xlarge: 22px;
+
+  /* Components */
+  --button-bg: #FFB900;
+  --button-text: #ffffff;
+  --button-border: #B88A00;
+  --button-hover-bg: #B88A00;
+  --nav-bg: var(--primary-color);
+  --nav-text: #2C2C2C;
+  --nav-hover-bg: rgba(0, 0, 0, 0.1);
+}
+
+body, body.theme-apis {
+  font-family: var(--body-font);
+  font-size: var(--font-size-base);
+  color: var(--text-color);
+  background-color: var(--background-color);
+  /* Optional honeycomb pattern background */
+  background-image: linear-gradient(30deg, #FFF8E1 12%, transparent 12.5%, transparent 87%, #FFF8E1 87.5%, #FFF8E1),
+                    linear-gradient(150deg, #FFF8E1 12%, transparent 12.5%, transparent 87%, #FFF8E1 87.5%, #FFF8E1),
+                    linear-gradient(30deg, #FFF8E1 12%, transparent 12.5%, transparent 87%, #FFF8E1 87.5%, #FFF8E1),
+                    linear-gradient(150deg, #FFF8E1 12%, transparent 12.5%, transparent 87%, #FFF8E1 87.5%, #FFF8E1),
+                    linear-gradient(60deg, #FFE8B8 25%, transparent 25.5%, transparent 75%, #FFE8B8 75%, #FFE8B8),
+                    linear-gradient(60deg, #FFE8B8 25%, transparent 25.5%, transparent 75%, #FFE8B8 75%, #FFE8B8);
+  background-size: 40px 70px;
+  background-position: 0 0, 0 0, 20px 35px, 20px 35px, 0 0, 20px 35px;
+}
+
+a {
+  color: var(--link-color);
+}
+
+a:hover {
+  color: var(--link-hover-color);
+}
+
+button,
+.button,
+input[type="submit"] {
+  background-color: var(--button-bg);
+  color: var(--button-text);
+  border: 1px solid var(--button-border);
+}
+
+button:hover,
+.button:hover,
+input[type="submit"]:hover {
+  background-color: var(--button-hover-bg);
+}
+
+nav {
+  background-color: var(--primary-color);
+}
+
+/* Add more styles as needed to match the original apis.css */
+
+/************************************************************
+*                   Project Details Table Style             *
+************************************************************/

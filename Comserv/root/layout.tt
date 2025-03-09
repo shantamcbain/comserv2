@@ -7,7 +7,7 @@
      [%	PageVersion %]
     [% END %]
         [% INCLUDE 'Header.tt' %]
-    <body>
+    <body class="theme-[% c.stash.theme_name || 'default' %]">
         [% INCLUDE 'pagetop.tt' %]
     [%# INCLUDE 'home.tt' %]
         [% content %]

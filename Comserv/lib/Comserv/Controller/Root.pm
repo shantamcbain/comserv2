@@ -34,10 +34,31 @@ sub index :Path('/') :Args(0) {
     my $ControllerName = $c->session->{ControllerName} || undef; # Default to undef if not set
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Fetched ControllerName from session: " . ($ControllerName // 'undefined'));
 
-    if ($ControllerName) {
-        # Forward to the controller's index action
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Forwarding to $ControllerName controller's index action");
-        $c->detach($ControllerName, 'index');
+    if ($ControllerName && $ControllerName ne 'Root') {
+        # Check if the controller exists before attempting to detach
+        my $controller_exists = 0;
+        eval {
+            # Try to get the controller object
+            my $controller = $c->controller($ControllerName);
+            $controller_exists = 1 if $controller;
+        };
+
+        if ($controller_exists) {
+            # Forward to the controller's index action
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Forwarding to $ControllerName controller's index action");
+            $c->detach($ControllerName, 'index');
+        } else {
+            # Log the error and fall back to Root's index template
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
+                "Controller '$ControllerName' not found or not loaded. Falling back to Root's index template.");
+
+            # Set a flash message for debugging
+            $c->flash->{error_msg} = "Controller '$ControllerName' not found. Please try again or contact the administrator.";
+
+            # Default to Root's index template
+            $c->stash(template => 'index.tt');
+            $c->forward($c->view('TT'));
+        }
     } else {
         # Default to Root's index template
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Defaulting to Root's index template");
@@ -89,9 +110,25 @@ sub fetch_and_set {
 
                 # Set ControllerName based on the site's home_view
                 my $home_view = $site->home_view || 'Root';  # Ensure this is domain-specific
-                $c->stash->{ControllerName} = $home_view;
-                $c->session->{ControllerName} = $home_view;
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "ControllerName set to: $home_view");
+
+                # Verify the controller exists before setting it
+                my $controller_exists = 0;
+                eval {
+                    my $controller = $c->controller($home_view);
+                    $controller_exists = 1 if $controller;
+                };
+
+                if ($controller_exists) {
+                    $c->stash->{ControllerName} = $home_view;
+                    $c->session->{ControllerName} = $home_view;
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "ControllerName set to: $home_view");
+                } else {
+                    # If controller doesn't exist, fall back to Root
+                    $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'fetch_and_set',
+                        "Controller '$home_view' not found or not loaded. Falling back to 'Root'.");
+                    $c->stash->{ControllerName} = 'Root';
+                    $c->session->{ControllerName} = 'Root';
+                }
             }
         } else {
             $c->session->{SiteName} = 'none';
@@ -249,6 +286,25 @@ sub auto :Private {
     # Call the index action only for the root path
     if ($path eq '/' || $path eq '') {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Calling index action for root path");
+
+        # Check if we have a ControllerName in the session that might cause issues
+        my $ControllerName = $c->session->{ControllerName} || '';
+        if ($ControllerName && $ControllerName ne 'Root') {
+            # Verify the controller exists before proceeding
+            my $controller_exists = 0;
+            eval {
+                my $controller = $c->controller($ControllerName);
+                $controller_exists = 1 if $controller;
+            };
+
+            if (!$controller_exists) {
+                $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'auto',
+                    "Controller '$ControllerName' not found or not loaded. Setting ControllerName to 'Root'.");
+                $c->session->{ControllerName} = 'Root';
+                $c->stash->{ControllerName} = 'Root';
+            }
+        }
+
         $self->index($c);
     }
 
@@ -265,24 +321,69 @@ sub setup_debug_mode {
         $c->stash->{debug_mode} = $c->session->{debug_mode};
     }
 
+# Simple email sending method
+sub send_email {
+    my ($self, $c, $params) = @_;
+
+    # Log the email attempt
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
+        "Attempting to send email to: " . $params->{to} . " with subject: " . $params->{subject});
+
+    # Use Email::Simple and Email::Sender::Simple for basic email functionality
+    eval {
+        require Email::Simple;
+        require Email::Sender::Simple;
+        Email::Sender::Simple->import(qw(sendmail));
+
+        my $email = Email::Simple->create(
+            header => [
+                To      => $params->{to},
+                From    => $params->{from} || 'noreply@computersystemconsulting.ca',
+                Subject => $params->{subject},
+            ],
+            body => $params->{body},
+        );
+
+        sendmail($email);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
+            "Email sent successfully to: " . $params->{to});
+        return 1;
+    };
+
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email',
+            "Failed to send email: $@");
+        return 0;
+    }
+}
+
 sub setup_site {
     my ($self, $c) = @_;
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site', "Starting setup_site action");
 
+    # Initialize debug_errors array if it doesn't exist
+    $c->stash->{debug_errors} //= [];
+
     my $SiteName = $c->session->{SiteName};
+
+    # Get the current domain
+    my $domain = $c->req->uri->host;
+    $domain =~ s/:.*//;  # Remove port if present
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site', "Extracted domain: $domain");
+
+    # Store domain in session for debugging
+    $c->session->{Domain} = $domain;
 
     if (!defined $SiteName || $SiteName eq 'none' || $SiteName eq 'root') {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site', "SiteName is either undefined, 'none', or 'root'. Proceeding with domain extraction and site domain retrieval");
 
-        my $domain = $c->req->uri->host;
-        $domain =~ s/:.*//;  # Remove port if present
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site', "Extracted domain: $domain");
-
+        # Get the domain from the sitedomain table
         my $site_domain = $c->model('Site')->get_site_domain($c, $domain);
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site', "site_domain in setup_site = " . Dumper($site_domain));
 
         if ($site_domain) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site', "Found site domain for $domain");
+
             my $site_id = $site_domain->site_id;
             my $site = $c->model('Site')->get_site_details($c, $site_id);
 
@@ -292,20 +393,158 @@ sub setup_site {
                 $c->session->{SiteName} = $SiteName;
 
                 # Set ControllerName based on the site's home_view
-                my $home_view = $site->name || 'Root';  # Ensure this is domain-specific
-                $c->stash->{ControllerName} = $home_view;
-                $c->session->{ControllerName} = $home_view;
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site', "ControllerName set to: $home_view");
-            }
-        } else {
-            $SiteName = $self->fetch_and_set($c, 'site');
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site', "SiteName in setup_site = $SiteName");
+                my $home_view = $site->home_view || $site->name || 'Root';  # Use home_view if available
 
-            if (!defined $SiteName) {
-                $c->stash(template => 'index.tt');
-                $c->forward($c->view('TT'));
-                return 0;
+                # Verify the controller exists before setting it
+                my $controller_exists = 0;
+                eval {
+                    my $controller = $c->controller($home_view);
+                    $controller_exists = 1 if $controller;
+                };
+
+                if ($controller_exists) {
+                    $c->stash->{ControllerName} = $home_view;
+                    $c->session->{ControllerName} = $home_view;
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site', "ControllerName set to: $home_view");
+                } else {
+                    # If controller doesn't exist, fall back to Root
+                    $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'setup_site',
+                        "Controller '$home_view' not found or not loaded. Falling back to 'Root'.");
+                    $c->stash->{ControllerName} = 'Root';
+                    $c->session->{ControllerName} = 'Root';
+                }
             }
+        } elsif ($c->stash->{domain_error}) {
+            # We have a specific domain error from the get_site_domain method
+            my $domain_error = $c->stash->{domain_error};
+            my $error_type = $domain_error->{type};
+            my $error_msg = $domain_error->{message};
+            my $technical_details = $domain_error->{technical_details};
+            my $action_required = $domain_error->{action_required} || "Please contact the system administrator.";
+
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'setup_site',
+                "DOMAIN ERROR ($error_type): $error_msg - $technical_details");
+
+            # Set default site for error handling
+            $SiteName = 'CSC'; # Default to CSC
+            $c->stash->{SiteName} = $SiteName;
+            $c->session->{SiteName} = $SiteName;
+
+            # Force Root controller to show error page
+            $c->stash->{ControllerName} = 'Root';
+            $c->session->{ControllerName} = 'Root';
+
+            # Set up site basics to get admin email
+            $self->site_setup($c, $SiteName);
+
+            # Set flash error message to ensure it's displayed
+            $c->flash->{error_msg} = "Domain Error: $error_msg";
+
+            # Send email notification to admin
+            if (my $mail_to_admin = $c->stash->{mail_to_admin}) {
+                my $email_params = {
+                    to      => $mail_to_admin,
+                    from    => $mail_to_admin,
+                    subject => "URGENT: Comserv Domain Configuration Required",
+                    body    => "Domain Error: $error_msg\n\n" .
+                               "Domain: $domain\n" .
+                               "Error Type: $error_type\n\n" .
+                               "ACTION REQUIRED: $action_required\n\n" .
+                               "Technical Details: $technical_details\n\n" .
+                               "Time: " . scalar(localtime) . "\n" .
+                               "IP Address: " . ($c->req->address || 'unknown') . "\n" .
+                               "User Agent: " . ($c->req->user_agent || 'unknown') . "\n\n" .
+                               "This is a configuration error that needs to be fixed for proper site operation."
+                };
+
+                if ($self->send_email($c, $email_params)) {
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site',
+                        "Sent admin notification email about domain error: $error_type for $domain");
+                } else {
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'setup_site',
+                        "Failed to send admin email notification about domain error: $error_type for $domain");
+                }
+            }
+
+            # Display error page with clear message about the domain configuration issue
+            $c->stash->{template} = 'error.tt';
+            $c->stash->{error_title} = "Domain Configuration Error";
+            $c->stash->{error_msg} = $error_msg;
+            $c->stash->{admin_msg} = "The administrator has been notified of this issue.";
+            $c->stash->{technical_details} = $technical_details;
+            $c->stash->{action_required} = $action_required;
+
+            # Add debug message that will be displayed to admins
+            $c->stash->{debug_msg} = "Domain Error ($error_type): $technical_details";
+
+            # Forward to the error template and stop processing
+            $c->forward($c->view('TT'));
+            $c->detach(); # Ensure we stop processing here and show the error page
+        } else {
+            # Generic error case (should not happen with our improved error handling)
+            my $error_msg = "DOMAIN ERROR: '$domain' not found in sitedomain table";
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'setup_site', $error_msg);
+
+            # Add to debug_errors if not already there
+            unless (grep { $_ eq $error_msg } @{$c->stash->{debug_errors}}) {
+                push @{$c->stash->{debug_errors}}, $error_msg;
+            }
+
+            # Set default site for error handling
+            $SiteName = 'CSC'; # Default to CSC
+            $c->stash->{SiteName} = $SiteName;
+            $c->session->{SiteName} = $SiteName;
+
+            # Force Root controller to show error page
+            $c->stash->{ControllerName} = 'Root';
+            $c->session->{ControllerName} = 'Root';
+
+            # Set up site basics to get admin email
+            $self->site_setup($c, $SiteName);
+
+            # Send email notification to admin
+            if (my $mail_to_admin = $c->stash->{mail_to_admin}) {
+                my $email_params = {
+                    to      => $mail_to_admin,
+                    from    => $mail_to_admin,
+                    subject => "URGENT: Comserv Domain Configuration Required",
+                    body    => "Domain Error: Domain not found in sitedomain table\n\n" .
+                               "Domain: $domain\n" .
+                               "Error Type: domain_missing\n\n" .
+                               "ACTION REQUIRED: Please add this domain to the sitedomain table and associate it with the appropriate site.\n\n" .
+                               "Technical Details: The domain '$domain' needs to be added to the sitedomain table.\n\n" .
+                               "Time: " . scalar(localtime) . "\n" .
+                               "IP Address: " . ($c->req->address || 'unknown') . "\n" .
+                               "User Agent: " . ($c->req->user_agent || 'unknown') . "\n\n" .
+                               "This is a configuration error that needs to be fixed for proper site operation."
+                };
+
+                if ($self->send_email($c, $email_params)) {
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site',
+                        "Sent admin notification email about domain error for $domain");
+                } else {
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'setup_site',
+                        "Failed to send admin email notification about domain error for $domain");
+                }
+            }
+
+            # Display error page with clear message about the domain configuration issue
+            $c->stash->{template} = 'error.tt';
+            $c->stash->{error_title} = "Domain Configuration Error";
+            $c->stash->{error_msg} = "This domain ($domain) is not properly configured in the system.";
+            $c->stash->{admin_msg} = "The administrator has been notified of this issue.";
+            $c->stash->{technical_details} = "The domain '$domain' needs to be added to the sitedomain table.";
+            $c->stash->{action_required} = "Please add this domain to the sitedomain table and associate it with the appropriate site.";
+
+            # Add debug message that will be displayed to admins
+            $c->stash->{debug_msg} = "Domain '$domain' not found in sitedomain table. Please add it using the Site Administration interface.";
+
+            # Set flash error message to ensure it's displayed
+            $c->flash->{error_msg} = "Domain Error: This domain ($domain) is not properly configured in the system.";
+
+            # Forward to the error template and stop processing
+            $c->forward($c->view('TT'));
+            $c->detach(); # Ensure we stop processing here and show the error page
         }
     }
 
@@ -317,17 +556,82 @@ sub site_setup {
         my ($self, $c, $SiteName) = @_;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "SiteName: $SiteName");
 
+        # Get the current domain for HostName
+        my $domain = $c->req->uri->host;
+        $domain =~ s/:.*//;  # Remove port if present
+
+        # Set a default HostName based on the current domain
+        my $protocol = $c->req->secure ? 'https' : 'http';
+        my $default_hostname = "$protocol://$domain";
+        $c->stash->{HostName} = $default_hostname;
+        $c->session->{Domain} = $domain;
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Set default HostName: $default_hostname");
+
         my $site = $c->model('Site')->get_site_details_by_name($c, $SiteName);
         unless (defined $site) {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'site_setup', "No site found for SiteName: $SiteName");
+
+            # Set default values for critical variables
+            $c->stash->{ScriptDisplayName} = 'Site';
+            $c->stash->{css_view_name} = '/static/css/default.css';
+            $c->stash->{mail_to_admin} = 'admin@computersystemconsulting.ca';
+            $c->stash->{mail_replyto} = 'helpdesk.computersystemconsulting.ca';
+
+            # Add debug information
+            push @{$c->stash->{debug_errors}}, "ERROR: No site found for SiteName: $SiteName";
+            $c->stash->{debug_msg} = "Using default site settings because no site was found for '$SiteName'";
+
             return;
         }
 
         my $css_view_name = $site->css_view_name || '/static/css/default.css';
-        my $site_display_name = $site->site_display_name || 'none';
-        my $mail_to_admin = $site->mail_to_admin || 'none';
+        my $site_display_name = $site->site_display_name || $SiteName;
+        my $mail_to_admin = $site->mail_to_admin || 'admin@computersystemconsulting.ca';
         my $mail_replyto = $site->mail_replyto || 'helpdesk.computersystemconsulting.ca';
-        my $site_name = $site->name || 'none';
+        my $site_name = $site->name || $SiteName;
+
+        # If site has a document_root_url, use it for HostName
+        if ($site->document_root_url && $site->document_root_url ne '') {
+            $c->stash->{HostName} = $site->document_root_url;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
+                "Set HostName from document_root_url: " . $site->document_root_url);
+        }
+
+        # Try to get theme from site record
+        my $theme_name = 'default';
+        eval {
+            # Check if the theme column exists
+            my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+            my $sth = $dbh->prepare("SHOW COLUMNS FROM sites LIKE 'theme'");
+            $sth->execute();
+            my $theme_column_exists = $sth->fetchrow_arrayref;
+
+            if ($theme_column_exists) {
+                # Get the theme value
+                $sth = $dbh->prepare("SELECT theme FROM sites WHERE name = ?");
+                $sth->execute($SiteName);
+                my $row = $sth->fetchrow_arrayref;
+
+                if ($row && $row->[0]) {
+                    $theme_name = $row->[0];
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
+                        "Found theme in database: $theme_name for site: $SiteName");
+                }
+            } else {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
+                    "Theme column does not exist in sites table");
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'site_setup',
+                "Error checking theme: $@");
+        }
+
+        # Set theme in stash for Header.tt to use
+        $c->stash->{theme_name} = $theme_name;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
+            "Set theme_name in stash: $theme_name");
 
         $c->stash->{ScriptDisplayName} = $site_display_name;
         $c->stash->{css_view_name} = $css_view_name;
@@ -335,7 +639,9 @@ sub site_setup {
         $c->stash->{mail_replyto} = $mail_replyto;
         $c->stash->{SiteName} = $site_name;
         $c->session->{SiteName} = $site_name;
-   $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Completed site_setup action");
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
+            "Completed site_setup action with HostName: " . $c->stash->{HostName});
     }
 
     sub debug :Path('/debug') {
@@ -377,6 +683,80 @@ sub site_setup {
         } else {
             $c->detach('/documentation/index');
         }
+    }
+
+    # Session reset endpoint - accessible via /reset_session
+    sub reset_session :Global {
+        my ( $self, $c ) = @_;
+
+        # Log the session reset request
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reset_session',
+            "Session reset requested. Session ID: " . $c->sessionid);
+
+        # Store the current SiteName for debugging
+        my $old_site_name = $c->session->{SiteName} || 'none';
+
+        # Clear the entire session
+        $c->delete_session("User requested session reset");
+
+        # Create a new session
+        $c->session->{reset_time} = time();
+        $c->session->{debug_mode} = 1; # Enable debug mode by default after reset
+
+        # Log the new session
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reset_session',
+            "New session created. Session ID: " . $c->sessionid . ", Old SiteName: " . $old_site_name);
+
+        # Redirect to home page
+        $c->response->redirect($c->uri_for('/'));
+    }
+
+    # Simple email sending method
+    sub send_email {
+        my ($self, $c, $params) = @_;
+
+        # Extract parameters
+        my $to = $params->{to} || return 0;
+        my $from = $params->{from} || $to;  # Default to the 'to' address if 'from' is not provided
+        my $subject = $params->{subject} || 'Comserv Notification';
+        my $body = $params->{body} || 'No message body provided';
+
+        # Log the email attempt
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
+            "Attempting to send email to: $to, Subject: $subject");
+
+        # Use the Mail::Sendmail module which should be available
+        eval {
+            require Mail::Sendmail;
+
+            my %mail = (
+                To      => $to,
+                From    => $from,
+                Subject => $subject,
+                Message => $body
+            );
+
+            # Send the email
+            my $result = Mail::Sendmail::sendmail(%mail);
+
+            if ($result) {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
+                    "Email sent successfully to: $to");
+                return 1;
+            } else {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email',
+                    "Failed to send email to: $to, Error: $Mail::Sendmail::error");
+                return 0;
+            }
+        };
+
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email',
+                "Exception while sending email: $@");
+            return 0;
+        }
+
+        return 0;  # Default to failure
     }
 
     sub end : ActionClass('RenderView') {}

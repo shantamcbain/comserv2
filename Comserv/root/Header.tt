@@ -7,11 +7,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="REVISIT-AFTER" content="7 days">
     <meta name="ROBOTS" content="index all, follow all">
-    [%# HostName = 'https://computersystemconsulting.ca' %]
     <meta charset="utf-8">
+    [% # Make sure HostName is defined, use a default if not %]
+    [% UNLESS HostName %]
+        [% HostName = "http://" _ c.req.uri.host %]
+        [% IF c.session.debug_mode == 1 %]
+            <!-- Warning: HostName was not defined, using default: [% HostName %] -->
+        [% END %]
+    [% END %]
     <title>[% HostName _ ': ' _ ScriptDisplayName _ ': ' _ page_title %]</title>
-    [% HostName = "http://computersystemconsulting.ca" %]
-      <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="REVISIT-AFTER" content="7 days">
     <meta name="ROBOTS" content="index all, follow all">
     [% IF keywords %]
@@ -24,7 +29,7 @@
     [% ELSE %]
         <meta name="description" content="[% http_header_description %]">
     [% END %]
-<link rel="shortcut icon" href="[% favicon | uri('imagesfavicon.ico') %]">
+    <link rel="shortcut icon" href="[% favicon | uri('imagesfavicon.ico') %]">
     [% IF SiteName == "CSC" %]
         [% embed('CSCWHMCSInterface') %]
     [% END %]
@@ -37,49 +42,43 @@
         # Default theme
         theme_name = 'default';
 
-        # Set theme based on site name (fallback method)
-        IF SiteName == 'USBM';
-            theme_name = 'usbm';
-        ELSIF SiteName == 'CSC';
-            theme_name = 'csc';
+        # Set theme based on site name (lowercase)
+        site_name_lower = SiteName | lower;
+
+        # Check if we have a CSS file for this site
+        IF site_name_lower == 'csc' || site_name_lower == 'apis' || site_name_lower == 'usbm';
+            theme_name = site_name_lower;
         END;
 
-        # Try to get theme from site record if the theme column exists
-        # This is wrapped in a TRY block so it won't fail if the theme column doesn't exist
-        TRY;
-            # Use a safe method to check for the theme
-            USE Dumper;
-
-            # First check if the site exists at all
-            site = c.model('DBEncy').resultset('Site').find(
-                { name => SiteName },
-                { columns => [qw(id name description)] }
-            );
-
-            IF site;
-                # Now try to access the theme attribute safely
-                TRY;
-                    # Try to get the theme using a direct SQL query to avoid DBIC errors
-                    dbh = c.model('DBEncy').schema.storage.dbh;
-                    sth = dbh.prepare("SELECT theme FROM sites WHERE name = ?");
-                    sth.execute(SiteName);
-                    row = sth.fetchrow_arrayref;
-
-                    IF row && row.0;
-                        theme_name = row.0;
-                        c.log.info("Using database theme: " _ theme_name);
-                    END;
-                CATCH;
-                    # If there's an error, just use the name-based theme
-                    c.log.info("Theme column not available, using name-based theme: " _ theme_name);
-                END;
-            END;
-        CATCH;
-            # If there's any error, just use the name-based theme
-            c.log.error("Error accessing site data, using name-based theme: " _ theme_name);
+        # Check if theme is already set in stash (from controller)
+        IF c.stash.theme_name;
+            theme_name = c.stash.theme_name;
         END;
+
+        # Log the theme selection
+        IF c.session.debug_mode == 1;
+            c.log.info("Selected theme: " _ theme_name _ " for site: " _ SiteName);
+        END;
+
+        # Store the theme name in the stash for use in other templates
+        c.stash.theme_name = theme_name;
     %]
+    <!-- Theme CSS: [% theme_name %] -->
     <link rel="stylesheet" type="text/css" href="/static/css/themes/[% theme_name %].css">
+
+    <!-- Theme overrides to ensure proper application -->
+    <link rel="stylesheet" type="text/css" href="/static/css/theme-overrides.css">
+
+    <!-- Add theme class to body -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            document.body.classList.add('theme-[% theme_name %]');
+        });
+    </script>
+
+    [% IF c.session.debug_mode == 1 %]
+    <!-- Debug: Site name is [% SiteName %] -->
+    [% END %]
 
     <!-- Site-specific CSS (for backward compatibility) -->
     <link rel="stylesheet" type="text/css" href="[% c.stash.css_view_name %]">
@@ -97,8 +96,8 @@
                         window.location.href = select.options[index].value;
                         break;
                     }
-           }
+                }
             }
         }
     </script>
- </head>
+</head>
