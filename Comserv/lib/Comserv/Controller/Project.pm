@@ -75,47 +75,39 @@ sub add_project :Path('addproject') :Args(0) {
 }
 
 
-sub create_project :Path('create_project') :Args(0) {
-    my ( $self, $c ) = @_;
+sub  create_project :Local :Args(0) {
+    my ($self, $c) = @_;
 
-    # Get basic parameters
     my $form_data = $c->request->body_parameters;
-    my $username_of_poster = $c->session->{username};
     my $schema = $c->model('DBEncy');
     my $project_rs = $schema->resultset('Project');
+    my $date_time_posted = DateTime->now;
 
-    # Handle group_of_poster - ensure it's a scalar
-    my $group_of_poster = $c->session->{roles};
-    if (ref $group_of_poster eq 'ARRAY') {
-        $group_of_poster = $group_of_poster->[0] || '';
+    # Get username safely
+    my $username = '';
+    if ($c->user_exists) {
+        $username = $c->user->username;
+    } elsif ($c->session->{username}) {
+        $username = $c->session->{username};
+    } else {
+        $username = 'anonymous';
     }
 
-    # Handle parent_id - ensure it's a scalar
+    # Handle parent_id properly
     my $parent_id = $form_data->{parent_id};
     if (ref $parent_id eq 'ARRAY') {
         $parent_id = $parent_id->[0];
     }
-    $parent_id = undef if !defined $parent_id || $parent_id eq '';
-
-    # Log the processed values
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_project',
-        "Processing request:\n" .
-        "Parent ID: " . (defined $parent_id ? $parent_id : 'none') . "\n" .
-        "Group: " . (defined $group_of_poster ? $group_of_poster : 'none'));
-
-    my $date_time_posted = DateTime->now;
-    # For new projects, record_id should be the parent_id if it exists
-    my $record_id = $parent_id || 0;
+    if (!$parent_id || $parent_id eq '') {
+        $parent_id = undef;
+    }
 
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_project',
-        "Creating project with:\n" .
-        "Parent ID: " . ($parent_id || 'none') . "\n" .
-        "Record ID: $record_id\n" .
-        "Form data: " . Dumper($form_data));
+        "Parent ID: " . (defined $parent_id ? $parent_id : 'undef'));
 
     my $project = eval {
         $project_rs->create({
-            sitename => $form_data->{sitename},
+            sitename => $c->session->{SiteName},
             name => $form_data->{name},
             description => $form_data->{description},
             start_date => $form_data->{start_date},
@@ -127,43 +119,42 @@ sub create_project :Path('create_project') :Args(0) {
             developer_name => $form_data->{developer_name},
             client_name => $form_data->{client_name},
             comments => $form_data->{comments},
-            username_of_poster => $username_of_poster,
-            parent_id => $parent_id,  # This is the correct field for parent-child relationship
-            group_of_poster => $group_of_poster,
+            username_of_poster => $username,
+            parent_id => $parent_id,
+            group_of_poster => $c->session->{roles}->[0],
             date_time_posted => $date_time_posted->ymd . ' ' . $date_time_posted->hms,
+            record_id => 0  # Set to 0 instead of undef
         });
     };
-    if ($@) {
-        # Log the error
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_project',
-            "Error creating project: $@\nForm data: " . Dumper($form_data));
 
-        # Get fresh lists for the form
+    if ($@) {
+        my $error_msg = $@;
+        $error_msg =~ s/\s+at\s+.*//s;
+
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_project',
+            "Database error creating project: $error_msg");
+
         my $site_controller = $c->controller('Site');
         my $sites = $site_controller->fetch_available_sites($c);
         my $projects = $self->fetch_projects_with_subprojects($c);
 
-        # Ensure the correct template is set for error handling
         $c->stash(
             form_data => $form_data,
             sites => $sites,
             projects => $projects,
-            error_message => 'There was an error creating the project. Please check all fields and try again.',
+            error_message => "Failed to create project: $error_msg",
             template => 'todo/add_project.tt'
         );
+
         $c->forward($c->view('TT'));
-    } else {
-        # Project was created successfully
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_project',
-            "Project created successfully with ID: " . $project->id);
-
-        # Add success message to flash
-        $c->flash->{success_message} = 'Project added successfully';
-
-        # Redirect to the project details page
-        $c->res->redirect($c->uri_for($self->action_for('details'),
-            { project_id => $project->id }));
+        return;
     }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_project',
+        "Project created with ID: " . $project->id);
+
+    $c->flash->{success_message} = 'Project added successfully';
+    $c->res->redirect($c->uri_for($self->action_for('project')));
 }
 
 

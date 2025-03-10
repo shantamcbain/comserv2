@@ -1,3 +1,4 @@
+
 [% META title = 'Project Details' %]
 
 [% MACRO display_project_details(project, level) BLOCK %]
