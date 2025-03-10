@@ -1,0 +1,101 @@
+[% META title = 'Theme Editor' %]
+
+<h1>Theme Editor</h1>
+
+[% IF message %]
+<div class="success">
+    [% message %]
+</div>
+[% END %]
+
+[% IF error %]
+<div class="warning">
+    [% error %]
+</div>
+[% END %]
+
+<div class="theme-editor-container">
+    <h2>Available Themes</h2>
+    
+    <div class="themes-grid">
+        [% FOREACH theme_name IN theme_names.sort %]
+        <div class="theme-card">
+            <h3>[% themes.$theme_name.name %]</h3>
+            <p>[% themes.$theme_name.description %]</p>
+            
+            <div class="theme-preview" style="
+                background-color: [% themes.$theme_name.variables.item('background-color') || '#ffffff' %];
+                color: [% themes.$theme_name.variables.item('text-color') || '#000000' %];
+                border: 1px solid [% themes.$theme_name.variables.item('border-color') || '#cccccc' %];
+                padding: 10px;
+            ">
+                <div class="preview-header" style="
+                    background-color: [% themes.$theme_name.variables.item('primary-color') || '#3366cc' %];
+                    color: [% themes.$theme_name.variables.item('nav-text') || '#ffffff' %];
+                    padding: 5px;
+                ">Header</div>
+                
+                <div class="preview-content" style="padding: 10px;">
+                    <p>Sample text in <span style="color: [% themes.$theme_name.variables.item('link-color') || '#0000ff' %];">theme colors</span>.</p>
+                    
+                    <button style="
+                        background-color: [% themes.$theme_name.variables.item('button-bg') || '#3366cc' %];
+                        color: [% themes.$theme_name.variables.item('button-text') || '#ffffff' %];
+                        border: 1px solid [% themes.$theme_name.variables.item('button-border') || '#cccccc' %];
+                        padding: 5px 10px;
+                    ">Button</button>
+                </div>
+            </div>
+            
+            <div class="theme-actions">
+                <a href="[% c.uri_for('/themeeditor/edit', theme_name) %]" class="button">Edit Theme</a>
+                <a href="[% c.uri_for('/themeeditor/wysiwyg', theme_name) %]" class="button button-primary">WYSIWYG Editor</a>
+            </div>
+        </div>
+        [% END %]
+    </div>
+</div>
+
+<style>
+    .themes-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 20px;
+        margin-top: 20px;
+    }
+    
+    .theme-card {
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        padding: 15px;
+        background-color: #f9f9f9;
+    }
+    
+    .theme-preview {
+        border-radius: 3px;
+        margin: 10px 0;
+        overflow: hidden;
+    }
+    
+    .theme-actions {
+        margin-top: 15px;
+        display: flex;
+        gap: 10px;
+    }
+    
+    .button {
+        display: inline-block;
+        padding: 8px 12px;
+        background-color: #f0f0f0;
+        color: #333;
+        text-decoration: none;
+        border-radius: 3px;
+        border: 1px solid #ddd;
+    }
+    
+    .button-primary {
+        background-color: #3366cc;
+        color: white;
+        border-color: #2255bb;
+    }
+</style>

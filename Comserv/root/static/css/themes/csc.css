@@ -1,40 +1,38 @@
-/* CSC Theme - Computer System Consulting */
+/* Theme: CSC Theme */
+/* Description: Computer System Consulting theme */
+
 :root {
-  --primary-color: #0066cc;    /* CSC Blue */
-  --secondary-color: #4A4A4A;  /* Dark gray */
-  --accent-color: #ff9900;     /* Orange accent */
-  --text-color: #333333;
-  --background-color: #ffffff;
-  --link-color: #0066cc;       /* CSC Blue */
-  --link-hover-color: #004d99; /* Darker blue */
-  --border-color: #dddddd;
-  --table-header-bg: #e6f2ff;  /* Light blue */
-  --warning-color: #ff4444;
-  --success-color: #4CAF50;
-
-  /* Typography */
-  --header-font: 'Arial', sans-serif;
-  --body-font: 'Arial', sans-serif;
-  --font-size-base: 16px;
+  --accent-color: #FF9900;
+  --background-color: #ccffff;
+  --body-font: Verdana, Helvetica, sans-serif;
+  --border-color: #cccccc;
+  --button-bg: #f2f2f2;
+  --button-border: #cccccc;
+  --button-hover-bg: #e0e0e0;
+  --button-text: black;
+  --font-size-base: 20px;
+  --font-size-large: 20px;
   --font-size-small: 14px;
-  --font-size-large: 18px;
-  --font-size-xlarge: 22px;
-
-  /* Components */
-  --button-bg: #0066cc;
-  --button-text: #ffffff;
-  --button-border: #004d99;
-  --button-hover-bg: #004d99;
-  --nav-bg: var(--primary-color);
-  --nav-text: #ffffff;
+  --font-size-xlarge: 24px;
+  --header-font: Verdana, Helvetica, sans-serif;
+  --link-color: black;
+  --link-hover-color: black;
+  --nav-bg: #ccffff;
   --nav-hover-bg: rgba(0, 0, 0, 0.1);
+  --nav-text: black;
+  --primary-color: #ccffff;
+  --secondary-color: #f9f9f9;
+  --success-color: #009900;
+  --table-header-bg: #f2f2f2;
+  --text-color: black;
+  --warning-color: red;
 }
 
 body, body.theme-csc {
-  background-color: var(--background-color);
-  color: var(--text-color);
   font-family: var(--body-font);
   font-size: var(--font-size-base);
+  color: var(--text-color);
+  background-color: var(--background-color);
 }
 
 a {
@@ -60,6 +58,58 @@ input[type="submit"]:hover {
 }
 
 nav {
-  background-color: var(--primary-color);
+  background-color: var(--nav-bg);
   color: var(--nav-text);
 }
+
+/* Legacy Elements */
+.body, body {
+  background-color: #ccffff;
+  color: black;
+  font-family: Verdana, Helvetica, sans-serif;
+  font-size: 20px;
+}
+
+.dropbtn, dropbtn {
+  color: black;
+}
+
+.dropdown-content, dropdown-content {
+  background-color: #f9f9f9;
+}
+
+.dropdown-content a, dropdown-content a {
+  color: black;
+}
+
+.nav, nav {
+  background-color: #ccffff;
+}
+
+.project-details-table, project-details-table {
+  border-collapse: collapse;
+  margin-bottom: 20px;
+  width: 100%;
+}
+
+.project-details-table th, project-details-table th {
+  background-color: #f2f2f2;
+  font-weight: bold;
+}
+
+.project-details-table tr:hover, project-details-table tr:hover {
+  background-color: #e0e0e0;
+}
+
+.project-details-table tr:nth-child(even), project-details-table tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+.submenu, submenu {
+  background-color: #f9f9f9;
+}
+
+.submenu a, submenu a {
+  color: black;
+}
+

@@ -9,7 +9,7 @@ use File::Path qw(make_path);
 BEGIN { extends 'Catalyst::Controller'; }
 
 # Theme management page
-sub index :Path('/log') :Args(0) {
+sub index :Path('/admin/theme') :Args(0) {
     my ($self, $c) = @_;
 
     # Check if the user is logged in

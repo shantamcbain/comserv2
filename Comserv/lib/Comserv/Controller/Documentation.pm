@@ -23,11 +23,10 @@ has 'documentation_pages' => (
 sub BUILD {
     my ($self) = @_;
 
-    # List of reserved names that should not be used as page names
-    my %reserved_names = map { $_ => 1 } qw(
-        Calendar sessionplan Schema Model Controller View
-        UNIVERSAL CORE GLOB STDIN STDOUT STDERR ARGV ENV INC SIG
-    );
+    # Log the start of BUILD
+    my $file = __FILE__;
+    my $line = __LINE__;
+    Comserv::Util::Logging::log_to_file("[$file:$line] Starting BUILD method for Documentation controller", undef, 'INFO');
 
     # Scan the Documentation directory for all files
     my $doc_dir = "root/Documentation";
@@ -43,49 +42,24 @@ sub BUILD {
                     my $path = $File::Find::name;
                     $path =~ s/^root\///; # Remove 'root/' prefix
 
+                    # Create a safe key for the documentation_pages hash
+                    my $key;
+
                     # Handle .tt files
                     if ($file =~ /\.tt$/) {
-                        my $basename_no_ext = basename($file, '.tt');
-
-                        # Skip reserved names and ensure valid Perl identifier
-                        if (!$reserved_names{$basename_no_ext} &&
-                            $basename_no_ext =~ /^[a-zA-Z_][a-zA-Z0-9_]*$/) {
-                            $self->documentation_pages->{$basename_no_ext} = $path;
-                        } else {
-                            # Use a safe prefix for problematic names
-                            my $safe_name = "doc_" . $basename_no_ext;
-                            $safe_name =~ s/[^a-zA-Z0-9_]/_/g; # Replace invalid chars
-                            $self->documentation_pages->{$safe_name} = $path;
-                        }
+                        $key = basename($file, '.tt');
                     } else {
-                        # Handle other file types (json, etc.)
+                        # Handle other file types (json, md, etc.)
                         my ($name, $ext) = split(/\./, $basename, 2);
                         if ($ext) {
-                            my $page_name = "${name}_${ext}";
-
-                            # Skip reserved names and ensure valid Perl identifier
-                            if (!$reserved_names{$page_name} &&
-                                $page_name =~ /^[a-zA-Z_][a-zA-Z0-9_]*$/) {
-                                $self->documentation_pages->{$page_name} = $path;
-                            } else {
-                                # Use a safe prefix for problematic names
-                                my $safe_name = "doc_" . $page_name;
-                                $safe_name =~ s/[^a-zA-Z0-9_]/_/g; # Replace invalid chars
-                                $self->documentation_pages->{$safe_name} = $path;
-                            }
+                            $key = "${name}_${ext}";
                         } else {
-                            # Skip reserved names and ensure valid Perl identifier
-                            if (!$reserved_names{$basename} &&
-                                $basename =~ /^[a-zA-Z_][a-zA-Z0-9_]*$/) {
-                                $self->documentation_pages->{$basename} = $path;
-                            } else {
-                                # Use a safe prefix for problematic names
-                                my $safe_name = "doc_" . $basename;
-                                $safe_name =~ s/[^a-zA-Z0-9_]/_/g; # Replace invalid chars
-                                $self->documentation_pages->{$safe_name} = $path;
-                            }
+                            $key = $basename;
                         }
                     }
+
+                    # Store the path with the key
+                    $self->documentation_pages->{$key} = $path;
                 },
                 no_chdir => 1,
             },
@@ -94,8 +68,8 @@ sub BUILD {
     }
 
     # Log the discovered documentation pages without context object
-    my $file = __FILE__;
-    my $line = __LINE__;
+    $file = __FILE__;
+    $line = __LINE__;
     my $message = "Found " . scalar(keys %{$self->documentation_pages}) . " documentation pages";
 
     # Use log_to_file directly since we don't have a context object in BUILD
@@ -120,7 +94,9 @@ sub index :Path :Args(0) {
     foreach my $page_name (@sorted_pages) {
         my $path = $pages->{$page_name};
         my $title = $self->_format_title($page_name);
-        my $url = $c->uri_for($self->action_for($page_name) || $self->action_for('view'), [$page_name]);
+
+        # Always use the view action with the page name as parameter
+        my $url = $c->uri_for($self->action_for('view'), [$page_name]);
 
         $structured_pages->{$page_name} = {
             title => $title,
@@ -244,91 +220,53 @@ sub view :Path :Args(1) {
     $c->forward($c->view('TT'));
 }
 
-# Auto-generated routes for all documentation files
+# Auto method for all documentation requests
 sub auto :Private {
     my ($self, $c) = @_;
 
     # Get the current action
     my $action = $c->action->name;
 
-    # If this is a documentation page request
-    if ($action ne 'index' && $action ne 'view' && exists $self->documentation_pages->{$action}) {
-        # Log the action
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, $action, "Accessing documentation page via auto-route: $action");
+    # Get the path from the request
+    my $path = $c->req->path;
 
-        # Set the template
-        $c->stash(
-            template => $self->documentation_pages->{$action}
-        );
-        $c->forward($c->view('TT'));
+    # If the path starts with 'documentation/' and isn't a known action
+    if ($path =~ m{^documentation/(.+)$} &&
+        $action ne 'index' &&
+        $action ne 'view' &&
+        !$c->controller('Documentation')->action_for($action)) {
+
+        my $page = $1;
+
+        # Log the action
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto',
+            "Redirecting documentation request to view action: $page");
+
+        # Forward to the view action with the page name
+        $c->forward('view', [$page]);
         return 0; # Skip further processing
     }
 
     return 1; # Continue processing
 }
 
-# Generate dynamic routes for all documentation files
+# IMPORTANT: We're completely disabling dynamic route registration
+# to avoid the "Can't locate object method 'attributes'" errors
 sub register_actions {
     my ($self, $app) = @_;
 
-    # Call the parent method first
+    # Call the parent method first to register the explicitly defined actions
     $self->next::method($app);
 
-    # List of reserved names that should not be used as page names
-    my %reserved_names = map { $_ => 1 } qw(
-        Calendar sessionplan Schema Model Controller View
-        UNIVERSAL CORE GLOB STDIN STDOUT STDERR ARGV ENV INC SIG
+    # Log that we're skipping dynamic route registration
+    Comserv::Util::Logging::log_to_file(
+        "Skipping dynamic route registration for documentation pages to avoid package conflicts",
+        undef, 'INFO'
     );
 
-    # Get all documentation pages
-    my $pages = $self->documentation_pages;
-
-    # For each documentation page, create a route
-    foreach my $page_name (keys %$pages) {
-        # Skip if we already have an explicit route for this page
-        next if $self->can($page_name);
-
-        # Skip if the page name is not a valid Perl identifier or is a reserved name
-        next unless $page_name =~ /^[a-zA-Z_][a-zA-Z0-9_]*$/;
-        next if $reserved_names{$page_name};
-
-        # Skip if the page name is a package that already exists
-        eval "package $page_name; 1;";
-        next if $@;
-
-        # Create a method for this page
-        my $method_body = sub {
-            my ($self, $c) = @_;
-
-            # Log the action
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, $page_name,
-                "Accessing documentation page: $page_name");
-
-            # Set the template
-            $c->stash(
-                template => $pages->{$page_name}
-            );
-            $c->forward($c->view('TT'));
-        };
-
-        # Add the method to the class
-        my $fully_qualified_name = __PACKAGE__ . "::$page_name";
-        no strict 'refs';
-        *{$fully_qualified_name} = $method_body;
-
-        # Add the attributes
-        eval {
-            $app->dispatcher->register($self, $page_name,
-                attributes => { Path => [$page_name], Args => [0] });
-        };
-        if ($@) {
-            # Log the error but continue with other pages
-            Comserv::Util::Logging::log_to_file(
-                "Failed to register route for page '$page_name': $@",
-                undef, 'ERROR'
-            );
-        }
-    }
+    # We're intentionally NOT registering dynamic routes for documentation pages
+    # This prevents the "Can't locate object method 'attributes'" errors
+    # Instead, we'll handle all documentation page requests through the 'view' action
 }
 
 # Theme system documentation
@@ -340,6 +278,39 @@ sub theme_system :Path('theme_system') :Args(0) {
 
     # Set the template
     $c->stash(template => 'Documentation/theme_system.tt');
+    $c->forward($c->view('TT'));
+}
+
+# Theme system implementation documentation
+sub theme_system_implementation :Path('theme_system_implementation') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Log the action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'theme_system_implementation',
+        "Accessing theme system implementation documentation");
+
+    # Check if the markdown file exists
+    my $md_file = $c->path_to('root', 'Documentation', 'theme_system_implementation.md');
+
+    if (-e $md_file) {
+        # Read the markdown file
+        open my $fh, '<:encoding(UTF-8)', $md_file or die "Cannot open $md_file: $!";
+        my $content = do { local $/; <$fh> };
+        close $fh;
+
+        # Pass the content to the template
+        $c->stash(
+            markdown_content => $content,
+            template => 'Documentation/markdown_viewer.tt'
+        );
+    } else {
+        # If the file doesn't exist, show an error
+        $c->stash(
+            error_msg => "Documentation file 'theme_system_implementation.md' not found",
+            template => 'Documentation/error.tt'
+        );
+    }
+
     $c->forward($c->view('TT'));
 }
 
@@ -455,4 +426,5 @@ sub database_schema :Path('database_schema') :Args(0) {
 }
 
 __PACKAGE__->meta->make_immutable;
+
 1;

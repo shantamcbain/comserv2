@@ -1,4 +1,53 @@
-[% PageVersion = 'Documentation/error.tt,v 0.01 2024/05/30 shanta Exp shanta ' %]
+[% META title = 'Documentation Error' %]
+
+<div class="documentation-container">
+    <div class="documentation-header">
+        <h1>Documentation Error</h1>
+        <a href="[% c.uri_for('/documentation') %]" class="back-link">← Back to Documentation Index</a>
+    </div>
+    
+    <div class="error-message">
+        <h2>Error</h2>
+        <p>[% error_msg %]</p>
+    </div>
+</div>
+
+<style>
+    .documentation-container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .documentation-header {
+        margin-bottom: 20px;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 10px;
+    }
+    
+    .back-link {
+        display: inline-block;
+        margin-top: 10px;
+        color: #0066cc;
+        text-decoration: none;
+    }
+    
+    .back-link:hover {
+        text-decoration: underline;
+    }
+    
+    .error-message {
+        background-color: #fff3cd;
+        border-left: 4px solid #ffc107;
+        padding: 15px;
+        margin-top: 20px;
+    }
+    
+    .error-message h2 {
+        margin-top: 0;
+        color: #856404;
+    }
+</style>[% PageVersion = 'Documentation/error.tt,v 0.01 2024/05/30 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]

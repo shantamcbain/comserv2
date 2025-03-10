@@ -7,12 +7,20 @@ use File::Slurp;
 use File::Path qw(make_path);
 use Data::Dumper;
 use Comserv::Util::Logging;
+use Comserv::Util::ThemeManager;
 
 BEGIN { extends 'Catalyst::Controller'; }
+
+__PACKAGE__->config(namespace => 'themeadmin');
 
 has 'logging' => (
     is => 'ro',
     default => sub { Comserv::Util::Logging->instance }
+);
+
+has 'theme_manager' => (
+    is => 'ro',
+    default => sub { Comserv::Util::ThemeManager->new }
 );
 
 # Simple index method that uses the same template as the main index
@@ -80,11 +88,10 @@ HTML
 }
 
 # Theme management page
-sub index :Path('/themeadmin') :Args(0) {
+sub index :Path :Args(0) {
     my ($self, $c) = @_;
 
     # Debug message at the very beginning of the method
-    warn "***** THEMEADMIN INDEX METHOD CALLED *****";
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "***** THEMEADMIN INDEX METHOD CALLED *****");
 
     # Add debug information
@@ -95,20 +102,7 @@ sub index :Path('/themeadmin') :Args(0) {
         roles => $c->session->{roles},
     };
 
-    # Log that we've entered the ThemeAdmin index method
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "***** ENTERED THEMEADMIN INDEX METHOD *****");
-
-    # Print the current path to the log
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Current path: " . $c->req->path);
-
-    # Print the current user info to the log
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "User exists: " . ($c->user_exists ? 'Yes' : 'No'));
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Session ID: " . $c->sessionid);
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Session data: " . Dumper($c->session));
-
     # Check if the user is logged in
-    # We're using session data instead of $c->user_exists because the latter is returning false
-    # even though the session contains user information
     if (!$c->user_exists && !$c->session->{user_id}) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "User not logged in, redirecting to login page");
         $c->flash->{error} = 'You must be logged in to access this page';
@@ -116,21 +110,8 @@ sub index :Path('/themeadmin') :Args(0) {
         return;
     }
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "User is logged in according to session data, proceeding");
-
     # Check if the user has the admin role
     my $roles = $c->session->{roles};
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "User roles: " . Dumper($roles));
-
-    # Log detailed information about the roles check
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Roles defined: " . (defined $roles ? 'Yes' : 'No'));
-    if (defined $roles) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Roles is an array: " . (ref $roles eq 'ARRAY' ? 'Yes' : 'No'));
-        if (ref $roles eq 'ARRAY') {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Roles array contains 'admin': " . (grep { $_ eq 'admin' } @$roles ? 'Yes' : 'No'));
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Roles array: " . join(', ', @$roles));
-        }
-    }
 
     # IMPORTANT: Roles check is completely disabled for testing
     # This should be re-enabled after testing is complete
@@ -141,17 +122,12 @@ sub index :Path('/themeadmin') :Args(0) {
         return;
     }
 
-    # Log that we're proceeding even if the user doesn't have the admin role
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Proceeding with ThemeAdmin index (bypassing role check for testing)");
-
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "User has admin role, proceeding with ThemeAdmin index");
-
     # Get current site
     my $site_name = $c->session->{SiteName};
     my $site;
     my $theme_column_exists = 0;
 
-    # Check if the theme column exists
+    # Check if the theme column exists in the database
     try {
         my $dbh = $c->model('DBEncy')->schema->storage->dbh;
         my $sth = $dbh->prepare("SHOW COLUMNS FROM sites LIKE 'theme'");
@@ -162,7 +138,7 @@ sub index :Path('/themeadmin') :Args(0) {
         $theme_column_exists = 0;
     };
 
-    # Try to get the site
+    # Try to get the site from the database
     try {
         if ($theme_column_exists) {
             # If theme column exists, get the site with all columns
@@ -185,40 +161,11 @@ sub index :Path('/themeadmin') :Args(0) {
         $site = { id => 0, name => $site_name, description => 'Error getting site details' };
     };
 
-    # If we have a site but no theme column, check for a theme mapping file
-    if ($site && !$theme_column_exists) {
-        # Add a default theme property
-        $site->{theme} = 'default';
+    # Get the theme for this site from our JSON-based theme manager
+    my $theme_name = $self->theme_manager->get_site_theme($c, $site_name);
 
-        # Check if there's a theme mapping for this site
-        my $theme_info_file = $c->path_to('root', 'static', 'css', 'themes', 'theme_mappings.txt');
-        if (-e $theme_info_file) {
-            try {
-                my $theme_info = read_file($theme_info_file);
-                if ($theme_info =~ /^$site_name:\s*(\S+)/m) {
-                    $site->{theme} = $1;
-                    $c->log->info("Found theme mapping for $site_name: " . $site->{theme});
-                }
-            } catch {
-                $c->log->error("Error reading theme mappings file: $_");
-            };
-        }
-
-        # Set theme based on site name if no mapping found
-        if ($site->{theme} eq 'default') {
-            if (lc($site_name) eq 'usbm') {
-                $site->{theme} = 'usbm';
-            } elsif (lc($site_name) eq 'apis') {
-                $site->{theme} = 'apis';
-            }
-        }
-
-        # Add message about theme column
-        $c->stash->{info_msg} = "The theme system is currently using file-based themes. Database integration will be available after running the add_theme_column.pl script.";
-    }
-
-    # If site doesn't have a theme, set to default
-    $site->{theme} = $site->{theme} || 'default';
+    # Add the theme to the site object
+    $site->{theme} = $theme_name;
 
     # Get all sites for admin
     my @sites;
@@ -238,35 +185,10 @@ sub index :Path('/themeadmin') :Args(0) {
                 );
             }
 
-            # If we don't have the theme column, add theme property to each site
-            if (!$theme_column_exists) {
-                foreach my $s (@sites) {
-                    $s->{theme} = 'default';
-
-                    # Check if there's a theme mapping for this site
-                    my $theme_info_file = $c->path_to('root', 'static', 'css', 'themes', 'theme_mappings.txt');
-                    if (-e $theme_info_file) {
-                        try {
-                            my $theme_info = read_file($theme_info_file);
-                            my $site_name = $s->name;
-                            if ($theme_info =~ /^$site_name:\s*(\S+)/m) {
-                                $s->{theme} = $1;
-                            }
-                        } catch {
-                            $c->log->error("Error reading theme mappings file: $_");
-                        };
-                    }
-
-                    # Set theme based on site name if no mapping found
-                    if ($s->{theme} eq 'default') {
-                        my $name = lc($s->name);
-                        if ($name eq 'usbm') {
-                            $s->{theme} = 'usbm';
-                        } elsif ($name eq 'apis') {
-                            $s->{theme} = 'apis';
-                        }
-                    }
-                }
+            # Add theme property to each site from our JSON-based theme manager
+            foreach my $s (@sites) {
+                my $site_theme = $self->theme_manager->get_site_theme($c, $s->name);
+                $s->{theme} = $site_theme;
             }
         } catch {
             $c->log->error("Error getting all sites: $_");
@@ -276,30 +198,37 @@ sub index :Path('/themeadmin') :Args(0) {
         @sites = ($site);
     }
 
-    # Get available themes
-    my @available_themes;
-    try {
-        my $theme_dir = $c->path_to('root', 'static', 'css', 'themes');
-        opendir(my $dh, $theme_dir) or die "Cannot open directory: $!";
-        while (my $file = readdir($dh)) {
-            next if $file =~ /^\./;  # Skip hidden files
-            next unless $file =~ /\.css$/;  # Only include CSS files
-            my $theme_name = $file;
-            $theme_name =~ s/\.css$//;  # Remove .css extension
-            push @available_themes, $theme_name;
+    # Get available themes from our JSON-based theme manager
+    my $themes = $self->theme_manager->get_all_themes($c);
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Available themes from JSON: " . Dumper($themes));
+
+    # Make sure we have all the predefined themes
+    my @available_themes = sort keys %$themes;
+
+    # Ensure we have the basic themes
+    my @basic_themes = qw(default csc apis usbm);
+    foreach my $basic_theme (@basic_themes) {
+        if (!grep { $_ eq $basic_theme } @available_themes) {
+            push @available_themes, $basic_theme;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Added missing basic theme: $basic_theme");
         }
-        closedir($dh);
-    } catch {
-        $c->log->error("Error getting available themes: $_");
-        @available_themes = qw(default apis usbm);
-    };
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Final available themes array: " . join(", ", @available_themes));
 
     # Pass data to template
     $c->stash->{site} = $site;
     $c->stash->{sites} = \@sites;
     $c->stash->{available_themes} = \@available_themes;
     $c->stash->{theme_column_exists} = $theme_column_exists;
-    $c->stash->{template} = 'admin/theme/index.tt';
+    $c->stash->{themes} = $themes;
+    $c->stash->{template} = 'admin/theme/index.tt';  # This is the template path
+    $c->stash->{using_json_themes} = 1;
+    $c->stash->{info_msg} = "The theme system is using JSON-based theme definitions. Database integration will be available in a future update.";
+
+    # Log the template path
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+        "Template path: " . $c->stash->{template});
 
     # Log that we're rendering the template
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "***** RENDERING TEMPLATE: admin/theme/index.tt *****");
@@ -309,7 +238,7 @@ sub index :Path('/themeadmin') :Args(0) {
 }
 
 # Update theme
-sub update_theme :Local {
+sub update_theme :Path('update_theme') :Args(0) {
     my ($self, $c) = @_;
 
     # Check if the user is logged in
@@ -338,45 +267,42 @@ sub update_theme :Local {
         $site = $c->model('DBEncy')->resultset('Site')->find($site_id);
         my $site_name = $site->name;
 
-        # Try to update site theme in database if the column exists
+        # Check if the theme column exists in the database
+        my $theme_column_exists = 0;
         try {
-            # First check if the theme column exists
             my $dbh = $c->model('DBEncy')->schema->storage->dbh;
             my $sth = $dbh->prepare("SHOW COLUMNS FROM sites LIKE 'theme'");
             $sth->execute();
-            my $column_exists = $sth->fetchrow_array();
-
-            if ($column_exists) {
-                # If the column exists, update it
-                $site->update({ theme => $theme });
-                $c->flash->{message} = "Theme updated to $theme for site $site_name";
-            } else {
-                # If the column doesn't exist, just create a file with instructions
-                my $theme_info_file = $c->path_to('root', 'static', 'css', 'themes', 'theme_mappings.txt');
-                my $theme_info = "";
-
-                # Read existing mappings if the file exists
-                if (-e $theme_info_file) {
-                    $theme_info = read_file($theme_info_file);
-
-                    # Remove any existing mapping for this site
-                    $theme_info =~ s/^$site_name:.*\n//mg;
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_theme', "Removed existing mapping for $site_name");
-                }
-
-                # Add the new mapping
-                $theme_info .= "$site_name: $theme\n";
-
-                # Write the updated mappings
-                write_file($theme_info_file, $theme_info);
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_theme', "Wrote new mapping to theme_mappings.txt");
-
-                $c->flash->{message} = "Theme preference saved for $site_name. The theme will be applied when the database is updated.";
-            }
+            $theme_column_exists = $sth->fetchrow_array() ? 1 : 0;
         } catch {
-            $c->log->error("Error checking or updating theme: $_");
-            $c->flash->{error} = "Error updating theme: $_";
+            $c->log->error("Error checking if theme column exists: $_");
+            $theme_column_exists = 0;
         };
+
+        # Log the theme update attempt
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_theme',
+            "Attempting to update theme for site $site_name to $theme");
+
+        # Update the theme using our JSON-based theme manager
+        my $result = $self->theme_manager->set_site_theme($c, $site_name, $theme);
+
+        if ($result) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_theme',
+                "Successfully updated theme for site $site_name to $theme");
+            $c->flash->{message} = "Theme updated to $theme for site $site_name";
+
+            # If the theme column exists in the database, also update it
+            if ($theme_column_exists) {
+                try {
+                    $site->update({ theme => $theme });
+                    $c->flash->{message} .= " (database updated)";
+                } catch {
+                    $c->log->error("Error updating theme in database: $_");
+                };
+            }
+        } else {
+            $c->flash->{error} = "Error updating theme for site $site_name";
+        }
     } catch {
         $c->flash->{error} = "Error finding site: $_";
     };
@@ -386,7 +312,7 @@ sub update_theme :Local {
 }
 
 # Create custom theme
-sub create_custom_theme :Local {
+sub create_custom_theme :Path('create_custom_theme') :Args(0) {
     my ($self, $c) = @_;
 
     # Check if the user is logged in
@@ -425,75 +351,68 @@ sub create_custom_theme :Local {
         return;
     };
 
-    # Create custom theme CSS
-    my $theme_css = "/* Custom Theme for $site_name */\n";
-    $theme_css .= ":root {\n";
-    $theme_css .= "  --primary-color: $primary_color;\n";
-    $theme_css .= "  --secondary-color: $secondary_color;\n";
-    $theme_css .= "  --accent-color: $accent_color;\n";
-    $theme_css .= "  --text-color: $text_color;\n";
-    $theme_css .= "  --link-color: $link_color;\n";
-    $theme_css .= "  --link-hover-color: $link_color;\n";
-    $theme_css .= "  --background-color: #ffffff;\n";
-    $theme_css .= "  --border-color: $secondary_color;\n";
-    $theme_css .= "  --table-header-bg: $secondary_color;\n";
-    $theme_css .= "  --warning-color: #ff0000;\n";
-    $theme_css .= "  --success-color: #009900;\n";
-    $theme_css .= "  \n";
-    $theme_css .= "  --button-bg: $primary_color;\n";
-    $theme_css .= "  --button-text: $text_color;\n";
-    $theme_css .= "  --button-border: $accent_color;\n";
-    $theme_css .= "  --button-hover-bg: $accent_color;\n";
-    $theme_css .= "}\n";
+    # Create theme data structure
+    my $theme_data = {
+        name => "$site_name Custom Theme",
+        description => "Custom theme for $site_name",
+        variables => {
+            "primary-color" => $primary_color,
+            "secondary-color" => $secondary_color,
+            "accent-color" => $accent_color,
+            "text-color" => $text_color,
+            "background-color" => "#ffffff",
+            "link-color" => $link_color,
+            "link-hover-color" => $link_color,
+            "border-color" => $secondary_color,
+            "table-header-bg" => $secondary_color,
+            "warning-color" => "#ff0000",
+            "success-color" => "#009900",
+            "button-bg" => $primary_color,
+            "button-text" => $text_color,
+            "button-border" => $accent_color,
+            "button-hover-bg" => $accent_color,
+            "nav-bg" => $primary_color,
+            "nav-text" => $text_color,
+            "nav-hover-bg" => "rgba(0, 0, 0, 0.1)"
+        }
+    };
 
-    # Create theme directory if it doesn't exist
-    my $theme_dir = $c->path_to('root', 'static', 'css', 'themes');
-    make_path($theme_dir) unless -d $theme_dir;
+    # Generate theme name
+    my $theme_name = lc($site_name) . '_custom';
 
-    # Write custom theme file
-    my $theme_file = lc($site_name) . '_custom.css';
-    my $theme_path = $c->path_to('root', 'static', 'css', 'themes', $theme_file);
+    # Create the theme using our JSON-based theme manager
+    my $result = $self->theme_manager->create_theme($c, $theme_name, $theme_data);
 
-    try {
-        write_file($theme_path, $theme_css);
+    if ($result) {
+        # Set the site to use this theme
+        $self->theme_manager->set_site_theme($c, $site_name, $theme_name);
 
-        # Try to update site theme in database if the column exists
+        $c->flash->{message} = "Custom theme created successfully for $site_name and applied to the site.";
+
+        # Check if the theme column exists in the database
+        my $theme_column_exists = 0;
         try {
-            # First check if the theme column exists
             my $dbh = $c->model('DBEncy')->schema->storage->dbh;
             my $sth = $dbh->prepare("SHOW COLUMNS FROM sites LIKE 'theme'");
             $sth->execute();
-            my $column_exists = $sth->fetchrow_array();
-
-            if ($column_exists) {
-                # If the column exists, update it
-                $site->update({ theme => lc($site_name) . '_custom' });
-                $c->flash->{message} = "Custom theme created successfully for $site_name and applied to the site.";
-            } else {
-                # If the column doesn't exist, just create a file with instructions
-                my $theme_info_file = $c->path_to('root', 'static', 'css', 'themes', 'theme_mappings.txt');
-                my $theme_info = "";
-
-                # Read existing mappings if the file exists
-                if (-e $theme_info_file) {
-                    $theme_info = read_file($theme_info_file);
-                }
-
-                # Add the new mapping
-                $theme_info .= "$site_name: " . lc($site_name) . "_custom\n";
-
-                # Write the updated mappings
-                write_file($theme_info_file, $theme_info);
-
-                $c->flash->{message} = "Custom theme CSS created successfully for $site_name. The theme will be applied when the database is updated.";
-            }
+            $theme_column_exists = $sth->fetchrow_array() ? 1 : 0;
         } catch {
-            $c->log->error("Error checking or updating theme: $_");
-            $c->flash->{message} = "Custom theme CSS created, but there was an error updating the database. The theme will be available at /static/css/themes/$theme_file";
+            $c->log->error("Error checking if theme column exists: $_");
+            $theme_column_exists = 0;
         };
-    } catch {
-        $c->flash->{error} = "Error creating custom theme: $_";
-    };
+
+        # If the theme column exists in the database, also update it
+        if ($theme_column_exists) {
+            try {
+                $site->update({ theme => $theme_name });
+                $c->flash->{message} .= " (database updated)";
+            } catch {
+                $c->log->error("Error updating theme in database: $_");
+            };
+        }
+    } else {
+        $c->flash->{error} = "Error creating custom theme for $site_name";
+    }
 
     # Redirect back to theme index
     $c->response->redirect($c->uri_for($self->action_for('index')));

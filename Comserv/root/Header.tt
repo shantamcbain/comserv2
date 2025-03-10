@@ -37,31 +37,31 @@
     <!-- Base CSS with variables -->
     <link rel="stylesheet" type="text/css" href="/static/css/base.css">
 
-    <!-- Theme CSS - based on site name -->
+    <!-- Theme CSS - using JSON-based theme system -->
     [%
+        # The theme_name should be set in the stash by the Root controller's set_theme method
+        # But we'll add a fallback just in case
+
         # Default theme
-        theme_name = 'default';
+        IF !theme_name;
+            theme_name = 'default';
 
-        # Set theme based on site name (lowercase)
-        site_name_lower = SiteName | lower;
+            # Set theme based on site name (lowercase)
+            site_name_lower = SiteName | lower;
 
-        # Check if we have a CSS file for this site
-        IF site_name_lower == 'csc' || site_name_lower == 'apis' || site_name_lower == 'usbm';
-            theme_name = site_name_lower;
-        END;
-
-        # Check if theme is already set in stash (from controller)
-        IF c.stash.theme_name;
-            theme_name = c.stash.theme_name;
+            # Check if we have a CSS file for this site
+            IF site_name_lower == 'csc' || site_name_lower == 'apis' || site_name_lower == 'usbm';
+                theme_name = site_name_lower;
+            END;
         END;
 
         # Log the theme selection
         IF c.session.debug_mode == 1;
             c.log.info("Selected theme: " _ theme_name _ " for site: " _ SiteName);
+            IF available_themes;
+                c.log.info("Available themes: " _ available_themes.join(", "));
+            END;
         END;
-
-        # Store the theme name in the stash for use in other templates
-        c.stash.theme_name = theme_name;
     %]
     <!-- Theme CSS: [% theme_name %] -->
     <link rel="stylesheet" type="text/css" href="/static/css/themes/[% theme_name %].css">

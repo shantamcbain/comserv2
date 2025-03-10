@@ -1,0 +1,477 @@
+[% META title = 'WYSIWYG Theme Editor' %]
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>[% template.title %] - [% site_name %]</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Include site's standard CSS -->
+    <link rel="stylesheet" href="/static/css/base.css">
+    <link rel="stylesheet" href="/static/css/themes/[% theme_name %].css" id="theme-css">
+    
+    <!-- Editor-specific styles -->
+    <style>
+        /* Reset some styles for the editor */
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        /* Control panel styles */
+        .theme-control-panel {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 320px;
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+            transition: transform 0.3s ease;
+        }
+        
+        .theme-control-panel.collapsed {
+            transform: translateX(calc(100% - 40px));
+        }
+        
+        .panel-header {
+            background-color: #f0f0f0;
+            padding: 10px 15px;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .panel-header h2 {
+            margin: 0;
+            font-size: 16px;
+        }
+        
+        .panel-toggle {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 20px;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .panel-content {
+            padding: 15px;
+        }
+        
+        .control-section {
+            margin-bottom: 20px;
+        }
+        
+        .control-section h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 14px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+        
+        .control-group {
+            margin-bottom: 10px;
+        }
+        
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .color-control {
+            display: flex;
+            align-items: center;
+        }
+        
+        .color-control input[type="color"] {
+            width: 30px;
+            height: 30px;
+            border: 1px solid #ddd;
+            padding: 0;
+            margin-right: 10px;
+        }
+        
+        .color-control input[type="text"] {
+            flex: 1;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        
+        .select-control select {
+            width: 100%;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        
+        .panel-actions {
+            padding: 10px 15px;
+            border-top: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .panel-actions button {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            background-color: #f0f0f0;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .panel-actions button.save-button {
+            background-color: #3366cc;
+            color: white;
+            border-color: #2255bb;
+        }
+        
+        /* Preview frame styles */
+        .preview-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+        }
+        
+        .preview-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .theme-control-panel {
+                width: 280px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Theme Control Panel -->
+    <div class="theme-control-panel" id="controlPanel">
+        <div class="panel-header">
+            <h2>Theme Editor: [% theme.name %]</h2>
+            <button class="panel-toggle" id="panelToggle">◀</button>
+        </div>
+        
+        <div class="panel-content">
+            <div class="control-section">
+                <h3>Colors</h3>
+                
+                <div class="control-group">
+                    <label for="primary-color">Primary Color:</label>
+                    <div class="color-control">
+                        <input type="color" id="primary-color" value="[% theme.variables.item('primary-color').match('^#') ? theme.variables.item('primary-color') : '#3366cc' %]">
+                        <input type="text" id="primary-color-text" value="[% theme.variables.item('primary-color') %]">
+                    </div>
+                </div>
+                
+                <div class="control-group">
+                    <label for="secondary-color">Secondary Color:</label>
+                    <div class="color-control">
+                        <input type="color" id="secondary-color" value="[% theme.variables.item('secondary-color').match('^#') ? theme.variables.item('secondary-color') : '#f0f0f0' %]">
+                        <input type="text" id="secondary-color-text" value="[% theme.variables.item('secondary-color') %]">
+                    </div>
+                </div>
+                
+                <div class="control-group">
+                    <label for="text-color">Text Color:</label>
+                    <div class="color-control">
+                        <input type="color" id="text-color" value="[% theme.variables.item('text-color').match('^#') ? theme.variables.item('text-color') : '#000000' %]">
+                        <input type="text" id="text-color-text" value="[% theme.variables.item('text-color') %]">
+                    </div>
+                </div>
+                
+                <div class="control-group">
+                    <label for="link-color">Link Color:</label>
+                    <div class="color-control">
+                        <input type="color" id="link-color" value="[% theme.variables.item('link-color').match('^#') ? theme.variables.item('link-color') : '#0000ff' %]">
+                        <input type="text" id="link-color-text" value="[% theme.variables.item('link-color') %]">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="control-section">
+                <h3>Typography</h3>
+                
+                <div class="control-group">
+                    <label for="body-font">Body Font:</label>
+                    <div class="select-control">
+                        <select id="body-font">
+                            <option value="Arial, sans-serif" [% IF theme.variables.item('body-font') == 'Arial, sans-serif' %]selected[% END %]>Arial</option>
+                            <option value="'Helvetica Neue', Helvetica, Arial, sans-serif" [% IF theme.variables.item('body-font') == "'Helvetica Neue', Helvetica, Arial, sans-serif" %]selected[% END %]>Helvetica</option>
+                            <option value="'Times New Roman', Times, serif" [% IF theme.variables.item('body-font') == "'Times New Roman', Times, serif" %]selected[% END %]>Times New Roman</option>
+                            <option value="Georgia, serif" [% IF theme.variables.item('body-font') == "Georgia, serif" %]selected[% END %]>Georgia</option>
+                            <option value="'Courier New', Courier, monospace" [% IF theme.variables.item('body-font') == "'Courier New', Courier, monospace" %]selected[% END %]>Courier New</option>
+                            <option value="Verdana, Geneva, sans-serif" [% IF theme.variables.item('body-font') == "Verdana, Geneva, sans-serif" %]selected[% END %]>Verdana</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="control-group">
+                    <label for="font-size-base">Base Font Size:</label>
+                    <div class="select-control">
+                        <select id="font-size-base">
+                            <option value="12px" [% IF theme.variables.item('font-size-base') == '12px' %]selected[% END %]>Small (12px)</option>
+                            <option value="14px" [% IF theme.variables.item('font-size-base') == '14px' %]selected[% END %]>Medium (14px)</option>
+                            <option value="16px" [% IF theme.variables.item('font-size-base') == '16px' %]selected[% END %]>Large (16px)</option>
+                            <option value="18px" [% IF theme.variables.item('font-size-base') == '18px' %]selected[% END %]>Extra Large (18px)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="control-section">
+                <h3>Buttons</h3>
+                
+                <div class="control-group">
+                    <label for="button-bg">Button Background:</label>
+                    <div class="color-control">
+                        <input type="color" id="button-bg" value="[% theme.variables.item('button-bg').match('^#') ? theme.variables.item('button-bg') : '#3366cc' %]">
+                        <input type="text" id="button-bg-text" value="[% theme.variables.item('button-bg') %]">
+                    </div>
+                </div>
+                
+                <div class="control-group">
+                    <label for="button-text">Button Text:</label>
+                    <div class="color-control">
+                        <input type="color" id="button-text" value="[% theme.variables.item('button-text').match('^#') ? theme.variables.item('button-text') : '#ffffff' %]">
+                        <input type="text" id="button-text-text" value="[% theme.variables.item('button-text') %]">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="control-section">
+                <h3>Navigation</h3>
+                
+                <div class="control-group">
+                    <label for="nav-bg">Menu Background:</label>
+                    <div class="color-control">
+                        <input type="color" id="nav-bg" value="[% theme.variables.item('nav-bg').match('^#') ? theme.variables.item('nav-bg') : '#3366cc' %]">
+                        <input type="text" id="nav-bg-text" value="[% theme.variables.item('nav-bg') %]">
+                    </div>
+                </div>
+                
+                <div class="control-group">
+                    <label for="nav-text">Menu Text:</label>
+                    <div class="color-control">
+                        <input type="color" id="nav-text" value="[% theme.variables.item('nav-text').match('^#') ? theme.variables.item('nav-text') : '#ffffff' %]">
+                        <input type="text" id="nav-text-text" value="[% theme.variables.item('nav-text') %]">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="panel-actions">
+            <button id="resetButton">Reset Changes</button>
+            <button id="saveButton" class="save-button">Save Theme</button>
+        </div>
+    </div>
+    
+    <!-- Preview Container -->
+    <div class="preview-container">
+        <iframe src="/[% site_name %]" class="preview-frame" id="previewFrame"></iframe>
+    </div>
+    
+    <!-- JavaScript for the WYSIWYG editor -->
+    <script>
+        // DOM elements
+        const controlPanel = document.getElementById('controlPanel');
+        const panelToggle = document.getElementById('panelToggle');
+        const previewFrame = document.getElementById('previewFrame');
+        const saveButton = document.getElementById('saveButton');
+        const resetButton = document.getElementById('resetButton');
+        
+        // Theme variables and their corresponding input elements
+        const themeControls = {
+            'primary-color': { color: document.getElementById('primary-color'), text: document.getElementById('primary-color-text') },
+            'secondary-color': { color: document.getElementById('secondary-color'), text: document.getElementById('secondary-color-text') },
+            'text-color': { color: document.getElementById('text-color'), text: document.getElementById('text-color-text') },
+            'link-color': { color: document.getElementById('link-color'), text: document.getElementById('link-color-text') },
+            'button-bg': { color: document.getElementById('button-bg'), text: document.getElementById('button-bg-text') },
+            'button-text': { color: document.getElementById('button-text'), text: document.getElementById('button-text-text') },
+            'nav-bg': { color: document.getElementById('nav-bg'), text: document.getElementById('nav-bg-text') },
+            'nav-text': { color: document.getElementById('nav-text'), text: document.getElementById('nav-text-text') },
+            'body-font': { select: document.getElementById('body-font') },
+            'font-size-base': { select: document.getElementById('font-size-base') }
+        };
+        
+        // Original theme values for reset functionality
+        const originalValues = {};
+        
+        // Store original values
+        for (const [varName, controls] of Object.entries(themeControls)) {
+            if (controls.color && controls.text) {
+                originalValues[varName] = controls.text.value;
+            } else if (controls.select) {
+                originalValues[varName] = controls.select.value;
+            }
+        }
+        
+        // Toggle control panel
+        panelToggle.addEventListener('click', () => {
+            controlPanel.classList.toggle('collapsed');
+            panelToggle.textContent = controlPanel.classList.contains('collapsed') ? '▶' : '◀';
+        });
+        
+        // Update color text input when color picker changes
+        for (const [varName, controls] of Object.entries(themeControls)) {
+            if (controls.color && controls.text) {
+                controls.color.addEventListener('input', () => {
+                    controls.text.value = controls.color.value;
+                    updatePreviewCSS(varName, controls.color.value);
+                });
+                
+                controls.text.addEventListener('input', () => {
+                    // Only update color picker if the text is a valid hex color
+                    if (/^#[0-9A-F]{6}$/i.test(controls.text.value)) {
+                        controls.color.value = controls.text.value;
+                    }
+                    updatePreviewCSS(varName, controls.text.value);
+                });
+            } else if (controls.select) {
+                controls.select.addEventListener('change', () => {
+                    updatePreviewCSS(varName, controls.select.value);
+                });
+            }
+        }
+        
+        // Reset button functionality
+        resetButton.addEventListener('click', () => {
+            for (const [varName, controls] of Object.entries(themeControls)) {
+                if (controls.color && controls.text) {
+                    controls.text.value = originalValues[varName];
+                    if (/^#[0-9A-F]{6}$/i.test(originalValues[varName])) {
+                        controls.color.value = originalValues[varName];
+                    }
+                    updatePreviewCSS(varName, originalValues[varName]);
+                } else if (controls.select) {
+                    controls.select.value = originalValues[varName];
+                    updatePreviewCSS(varName, originalValues[varName]);
+                }
+            }
+        });
+        
+        // Save button functionality
+        saveButton.addEventListener('click', () => {
+            const themeData = {
+                theme_name: '[% theme_name %]',
+                variables: {}
+            };
+            
+            // Collect all theme variables
+            for (const [varName, controls] of Object.entries(themeControls)) {
+                if (controls.color && controls.text) {
+                    themeData.variables[varName] = controls.text.value;
+                } else if (controls.select) {
+                    themeData.variables[varName] = controls.select.value;
+                }
+            }
+            
+            // Send update request
+            fetch('/themeeditor/update_theme', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    theme_name: themeData.theme_name,
+                    theme_display_name: '[% theme.name %]',
+                    theme_description: '[% theme.description %]',
+                    ...Object.fromEntries(
+                        Object.entries(themeData.variables).map(([key, value]) => [`var_${key}`, value])
+                    )
+                })
+            })
+            .then(response => {
+                if (response.ok) {
+                    alert('Theme saved successfully!');
+                    // Update original values after save
+                    for (const [varName, value] of Object.entries(themeData.variables)) {
+                        originalValues[varName] = value;
+                    }
+                } else {
+                    alert('Error saving theme. Please try again.');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error saving theme. Please try again.');
+            });
+        });
+        
+        // Function to update CSS in the preview iframe
+        function updatePreviewCSS(varName, value) {
+            // Wait for iframe to load
+            if (previewFrame.contentDocument) {
+                const styleElement = previewFrame.contentDocument.getElementById('theme-live-css') || 
+                                    createStyleElement(previewFrame.contentDocument);
+                
+                // Update the CSS variable
+                const cssRules = styleElement.sheet.cssRules;
+                let rootRule = null;
+                
+                // Find the :root rule
+                for (let i = 0; i < cssRules.length; i++) {
+                    if (cssRules[i].selectorText === ':root') {
+                        rootRule = cssRules[i];
+                        break;
+                    }
+                }
+                
+                // If :root rule exists, update it; otherwise create it
+                if (rootRule) {
+                    rootRule.style.setProperty(`--${varName}`, value);
+                } else {
+                    styleElement.sheet.insertRule(`:root { --${varName}: ${value}; }`, 0);
+                }
+            }
+        }
+        
+        // Create a style element for live CSS updates
+        function createStyleElement(doc) {
+            const styleElement = doc.createElement('style');
+            styleElement.id = 'theme-live-css';
+            styleElement.textContent = ':root {}';
+            doc.head.appendChild(styleElement);
+            return styleElement;
+        }
+        
+        // Initialize the preview when iframe loads
+        previewFrame.addEventListener('load', () => {
+            // Create the style element in the iframe
+            createStyleElement(previewFrame.contentDocument);
+            
+            // Apply all current values
+            for (const [varName, controls] of Object.entries(themeControls)) {
+                if (controls.color && controls.text) {
+                    updatePreviewCSS(varName, controls.text.value);
+                } else if (controls.select) {
+                    updatePreviewCSS(varName, controls.select.value);
+                }
+            }
+        });
+    </script>
+</body>
+</html>

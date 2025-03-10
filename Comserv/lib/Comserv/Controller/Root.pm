@@ -1,28 +1,40 @@
-# perl
-    package Comserv::Controller::Root;
-    use Moose;
-    use namespace::autoclean;
-    use Template;
-    use Data::Dumper;
-    use DateTime;
-    use JSON;
-    use Comserv::Util::Logging;
+package Comserv::Controller::Root;
+use Moose;
+use namespace::autoclean;
+use Template;
+use Data::Dumper;
+use DateTime;
+use JSON;
+use Comserv::Util::Logging;
+use Comserv::Util::ThemeManager;
 
-    has 'logging' => (
-        is => 'ro',
-        default => sub { Comserv::Util::Logging->instance }
-    );
+has 'logging' => (
+    is => 'ro',
+    default => sub { Comserv::Util::Logging->instance }
+);
 
-    # Flag to track if application start has been recorded
-    has '_application_start_tracked' => (
-        is => 'rw',
-        isa => 'Bool',
-        default => 0
-    );
+has 'theme_manager' => (
+    is => 'ro',
+    default => sub { Comserv::Util::ThemeManager->new }
+);
 
-    BEGIN { extends 'Catalyst::Controller' }
+# Flag to track if application start has been recorded
+has '_application_start_tracked' => (
+    is => 'rw',
+    isa => 'Bool',
+    default => 0
+);
 
-    __PACKAGE__->config(namespace => '');
+# Flag to track if theme CSS files have been generated
+has '_theme_css_generated' => (
+    is => 'rw',
+    isa => 'Bool',
+    default => 0
+);
+
+BEGIN { extends 'Catalyst::Controller' }
+
+__PACKAGE__->config(namespace => '');
 
 sub index :Path('/') :Args(0) {
     my ($self, $c) = @_;
@@ -71,8 +83,31 @@ sub index :Path('/') :Args(0) {
 }
 
 
-# perl
-# perl
+sub set_theme {
+    my ($self, $c) = @_;
+
+    # Get the site name
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'set_theme', "Setting theme for site: $site_name");
+
+    # Get all available themes
+    my $all_themes = $self->theme_manager->get_all_themes($c);
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'set_theme',
+        "Available themes: " . join(", ", sort keys %$all_themes));
+
+    # Get the theme for this site from our JSON-based theme manager
+    my $theme_name = $self->theme_manager->get_site_theme($c, $site_name);
+
+    # Add the theme name to the stash
+    $c->stash->{theme_name} = $theme_name;
+
+    # Add all available themes to the stash
+    $c->stash->{available_themes} = [sort keys %$all_themes];
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'set_theme', "Set theme for site $site_name to $theme_name");
+}
+
 sub fetch_and_set {
     my ($self, $c, $param) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Starting fetch_and_set action");
@@ -278,9 +313,18 @@ sub auto :Private {
     my $path = $c->req->path;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Request path: '$path'");
 
+    # Generate theme CSS files if they don't exist
+    # We only need to do this once per application start
+    if (!$self->_theme_css_generated) {
+        $self->theme_manager->generate_all_theme_css($c);
+        $self->_theme_css_generated(1);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Generated all theme CSS files");
+    }
+
     # Perform general setup tasks
     $self->setup_debug_mode($c);
     $self->setup_site($c);
+    $self->set_theme($c);
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Completed general setup tasks");
 
     # Call the index action only for the root path
@@ -313,15 +357,14 @@ sub auto :Private {
 }
 
 sub setup_debug_mode {
-        my ($self, $c) = @_;
+    my ($self, $c) = @_;
 
-        if (defined $c->req->params->{debug}) {
-            $c->session->{debug_mode} = $c->session->{debug_mode} ? 0 : 1;
-        }
-        $c->stash->{debug_mode} = $c->session->{debug_mode};
+    if (defined $c->req->params->{debug}) {
+        $c->session->{debug_mode} = $c->session->{debug_mode} ? 0 : 1;
     }
+    $c->stash->{debug_mode} = $c->session->{debug_mode};
+}
 
-# Simple email sending method
 sub send_email {
     my ($self, $c, $params) = @_;
 
@@ -553,214 +596,228 @@ sub setup_site {
 }
 
 sub site_setup {
-        my ($self, $c, $SiteName) = @_;
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "SiteName: $SiteName");
+    my ($self, $c, $SiteName) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "SiteName: $SiteName");
 
-        # Get the current domain for HostName
-        my $domain = $c->req->uri->host;
-        $domain =~ s/:.*//;  # Remove port if present
+    # Get the current domain for HostName
+    my $domain = $c->req->uri->host;
+    $domain =~ s/:.*//;  # Remove port if present
 
-        # Set a default HostName based on the current domain
-        my $protocol = $c->req->secure ? 'https' : 'http';
-        my $default_hostname = "$protocol://$domain";
-        $c->stash->{HostName} = $default_hostname;
-        $c->session->{Domain} = $domain;
+    # Set a default HostName based on the current domain
+    my $protocol = $c->req->secure ? 'https' : 'http';
+    my $default_hostname = "$protocol://$domain";
+    $c->stash->{HostName} = $default_hostname;
+    $c->session->{Domain} = $domain;
 
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Set default HostName: $default_hostname");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Set default HostName: $default_hostname");
 
-        my $site = $c->model('Site')->get_site_details_by_name($c, $SiteName);
-        unless (defined $site) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'site_setup', "No site found for SiteName: $SiteName");
+    my $site = $c->model('Site')->get_site_details_by_name($c, $SiteName);
+    unless (defined $site) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'site_setup', "No site found for SiteName: $site eName");
 
-            # Set default values for critical variables
-            $c->stash->{ScriptDisplayName} = 'Site';
-            $c->stash->{css_view_name} = '/static/css/default.css';
-            $c->stash->{mail_to_admin} = 'admin@computersystemconsulting.ca';
-            $c->stash->{mail_replyto} = 'helpdesk.computersystemconsulting.ca';
+        # Set default values for critical variables
+        $c->stash->{ScriptDisplayName} = 'Site';
+        $c->stash->{css_view_name} = '/static/css/default.css';
+        $c->stash->{mail_to_admin} = 'admin@computersystemconsulting.ca';
+        $c->stash->{mail_replyto} = 'helpdesk.computersystemconsulting.ca';
 
-            # Add debug information
-            push @{$c->stash->{debug_errors}}, "ERROR: No site found for SiteName: $SiteName";
-            $c->stash->{debug_msg} = "Using default site settings because no site was found for '$SiteName'";
+        # Add debug information
+        push @{$c->stash->{debug_errors}}, "ERROR: No site found for SiteName: $SiteName";
+        $c->stash->{debug_msg} = "Using default site settings because no site was found for '$SiteName'";
 
-            return;
-        }
+        return;
+    }
 
-        my $css_view_name = $site->css_view_name || '/static/css/default.css';
-        my $site_display_name = $site->site_display_name || $SiteName;
-        my $mail_to_admin = $site->mail_to_admin || 'admin@computersystemconsulting.ca';
-        my $mail_replyto = $site->mail_replyto || 'helpdesk.computersystemconsulting.ca';
-        my $site_name = $site->name || $SiteName;
+    my $css_view_name = $site->css_view_name || '/static/css/default.css';
+    my $site_display_name = $site->site_display_name || $SiteName;
+    my $mail_to_admin = $site->mail_to_admin || 'admin@computersystemconsulting.ca';
+    my $mail_replyto = $site->mail_replyto || 'helpdesk.computersystemconsulting.ca';
+    my $site_name = $site->name || $SiteName;
 
-        # If site has a document_root_url, use it for HostName
-        if ($site->document_root_url && $site->document_root_url ne '') {
-            $c->stash->{HostName} = $site->document_root_url;
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
-                "Set HostName from document_root_url: " . $site->document_root_url);
-        }
+    # If site has a document_root_url, use it for HostName
+    if ($site->document_root_url && $site->document_root_url ne '') {
+        $c->stash->{HostName} = $site->document_root_url;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
+            "Set HostName from document_root_url: " . $site->document_root_url);
+    }
 
-        # Try to get theme from site record
-        my $theme_name = 'default';
-        eval {
-            # Check if the theme column exists
-            my $dbh = $c->model('DBEncy')->schema->storage->dbh;
-            my $sth = $dbh->prepare("SHOW COLUMNS FROM sites LIKE 'theme'");
-            $sth->execute();
-            my $theme_column_exists = $sth->fetchrow_arrayref;
+    # Try to get theme from site record
+    my $theme_name = 'default';
+    eval {
+        # Check if the theme column exists
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        my $sth = $dbh->prepare("SHOW COLUMNS FROM sites LIKE 'theme'");
+        $sth->execute();
+        my $theme_column_exists = $sth->fetchrow_arrayref;
 
-            if ($theme_column_exists) {
-                # Get the theme value
-                $sth = $dbh->prepare("SELECT theme FROM sites WHERE name = ?");
-                $sth->execute($SiteName);
-                my $row = $sth->fetchrow_arrayref;
+        if ($theme_column_exists) {
+            # Get the theme value
+            $sth = $dbh->prepare("SELECT theme FROM sites WHERE name = ?");
+            $sth->execute($SiteName);
+            my $row = $sth->fetchrow_arrayref;
 
-                if ($row && $row->[0]) {
-                    $theme_name = $row->[0];
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
-                        "Found theme in database: $theme_name for site: $SiteName");
-                }
-            } else {
+            if ($row && $row->[0]) {
+                $theme_name = $row->[0];
                 $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
-                    "Theme column does not exist in sites table");
+                    "Found theme in database: $theme_name for site: $SiteName");
             }
-        };
-        if ($@) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'site_setup',
-                "Error checking theme: $@");
-        }
-
-        # Set theme in stash for Header.tt to use
-        $c->stash->{theme_name} = $theme_name;
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
-            "Set theme_name in stash: $theme_name");
-
-        $c->stash->{ScriptDisplayName} = $site_display_name;
-        $c->stash->{css_view_name} = $css_view_name;
-        $c->stash->{mail_to_admin} = $mail_to_admin;
-        $c->stash->{mail_replyto} = $mail_replyto;
-        $c->stash->{SiteName} = $site_name;
-        $c->session->{SiteName} = $site_name;
-
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
-            "Completed site_setup action with HostName: " . $c->stash->{HostName});
-    }
-
-    sub debug :Path('/debug') {
-        my ($self, $c) = @_;
-        my $site_name = $c->stash->{SiteName};
-        $c->stash(template => 'debug.tt');
-        $c->forward($c->view('TT'));
-   $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Completed site_setup action");
-    }
-
-    sub accounts :Path('/accounts') :Args(0) {
-        my ($self, $c) = @_;
-
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'accounts', "Accessing accounts page");
-
-        $c->stash(template => 'accounts.tt');
-        $c->forward($c->view('TT'));
-    }
-
-    sub default :Path {
-        my ( $self, $c ) = @_;
-        $c->response->body( 'Page not found' );
-        $c->response->status(404);
-    }
-
-    sub documentation :Path('documentation') :Args(0) {
-        my ( $self, $c ) = @_;
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'documentation', "Redirecting to Documentation controller");
-        $c->response->redirect($c->uri_for('/Documentation'));
-    }
-
-    # Route for Documentation with capital D
-    sub Documentation :Path('Documentation') :Args {
-        my ( $self, $c, @args ) = @_;
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'Documentation', "Forwarding to Documentation controller with args: " . join(', ', @args));
-
-        if (@args) {
-            $c->detach('/documentation/view', [@args]);
         } else {
-            $c->detach('/documentation/index');
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
+                "Theme column does not exist in sites table");
         }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'site_setup',
+            "Error checking theme: $@");
     }
 
-    # Session reset endpoint - accessible via /reset_session
-    sub reset_session :Global {
-        my ( $self, $c ) = @_;
+    # Set theme in stash for Header.tt to use
+    $c->stash->{theme_name} = $theme_name;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
+        "Set theme_name in stash: $theme_name");
 
-        # Log the session reset request
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reset_session',
-            "Session reset requested. Session ID: " . $c->sessionid);
+    $c->stash->{ScriptDisplayName} = $site_display_name;
+    $c->stash->{css_view_name} = $css_view_name;
+    $c->stash->{mail_to_admin} = $mail_to_admin;
+    $c->stash->{mail_replyto} = $mail_replyto;
+    $c->stash->{SiteName} = $site_name;
+    $c->session->{SiteName} = $site_name;
 
-        # Store the current SiteName for debugging
-        my $old_site_name = $c->session->{SiteName} || 'none';
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
+        "Completed site_setup action with HostName: " . $c->stash->{HostName});
+}
 
-        # Clear the entire session
-        $c->delete_session("User requested session reset");
+sub debug :Path('/debug') {
+    my ($self, $c) = @_;
+    my $site_name = $c->stash->{SiteName};
+    $c->stash(template => 'debug.tt');
+    $c->forward($c->view('TT'));
+   $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Completed site_setup action");
+}
 
-        # Create a new session
-        $c->session->{reset_time} = time();
-        $c->session->{debug_mode} = 1; # Enable debug mode by default after reset
+sub accounts :Path('/accounts') :Args(0) {
+    my ($self, $c) = @_;
 
-        # Log the new session
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reset_session',
-            "New session created. Session ID: " . $c->sessionid . ", Old SiteName: " . $old_site_name);
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'accounts', "Accessing accounts page");
 
-        # Redirect to home page
-        $c->response->redirect($c->uri_for('/'));
+    $c->stash(template => 'accounts.tt');
+    $c->forward($c->view('TT'));
+}
+
+sub default :Path {
+    my ( $self, $c ) = @_;
+
+    # Log the 404 error
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'default',
+        "404 Not Found: " . $c->req->uri->path);
+
+    # Set up the 404 page
+    $c->stash(
+        template => 'error.tt',
+        error_title => '404 - Page Not Found',
+        error_msg => 'The page you requested could not be found.',
+        requested_path => $c->req->uri->path,
+        status_code => 404
+    );
+
+    # Set the HTTP status code
+    $c->response->status(404);
+
+    # Render the error template
+    $c->forward($c->view('TT'));
+}
+
+sub documentation :Path('documentation') :Args(0) {
+    my ( $self, $c ) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'documentation', "Redirecting to Documentation controller");
+    $c->response->redirect($c->uri_for('/Documentation'));
+}
+
+sub Documentation :Path('Documentation') :Args {
+    my ( $self, $c, @args ) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'Documentation', "Forwarding to Documentation controller with args: " . join(', ', @args));
+
+    if (@args) {
+        $c->detach('/documentation/view', [@args]);
+    } else {
+        $c->detach('/documentation/index');
     }
+}
 
-    # Simple email sending method
-    sub send_email {
-        my ($self, $c, $params) = @_;
+sub reset_session :Global {
+    my ( $self, $c ) = @_;
 
-        # Extract parameters
-        my $to = $params->{to} || return 0;
-        my $from = $params->{from} || $to;  # Default to the 'to' address if 'from' is not provided
-        my $subject = $params->{subject} || 'Comserv Notification';
-        my $body = $params->{body} || 'No message body provided';
+    # Log the session reset request
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reset_session',
+        "Session reset requested. Session ID: " . $c->sessionid);
 
-        # Log the email attempt
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
-            "Attempting to send email to: $to, Subject: $subject");
+    # Store the current SiteName for debugging
+    my $old_site_name = $c->session->{SiteName} || 'none';
 
-        # Use the Mail::Sendmail module which should be available
-        eval {
-            require Mail::Sendmail;
+    # Clear the entire session
+    $c->delete_session("User requested session reset");
 
-            my %mail = (
-                To      => $to,
-                From    => $from,
-                Subject => $subject,
-                Message => $body
-            );
+    # Create a new session
+    $c->session->{reset_time} = time();
+    $c->session->{debug_mode} = 1; # Enable debug mode by default after reset
 
-            # Send the email
-            my $result = Mail::Sendmail::sendmail(%mail);
+    # Log the new session
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reset_session',
+        "New session created. Session ID: " . $c->sessionid . ", Old SiteName: " . $old_site_name);
 
-            if ($result) {
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
-                    "Email sent successfully to: $to");
-                return 1;
-            } else {
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email',
-                    "Failed to send email to: $to, Error: $Mail::Sendmail::error");
-                return 0;
-            }
-        };
+    # Redirect to home page
+    $c->response->redirect($c->uri_for('/'));
+}
 
-        if ($@) {
+sub send_email {
+    my ($self, $c, $params) = @_;
+
+    # Extract parameters
+    my $to = $params->{to} || return 0;
+    my $from = $params->{from} || $to;  # Default to the 'to' address if 'from' is not provided
+    my $subject = $params->{subject} || 'Comserv Notification';
+    my $body = $params->{body} || 'No message body provided';
+
+    # Log the email attempt
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
+        "Attempting to send email to: $to, Subject: $subject");
+
+    # Use the Mail::Sendmail module which should be available
+    eval {
+        require Mail::Sendmail;
+
+        my %mail = (
+            To      => $to,
+            From    => $from,
+            Subject => $subject,
+            Message => $body
+        );
+
+        # Send the email
+        my $result = Mail::Sendmail::sendmail(%mail);
+
+        if ($result) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
+                "Email sent successfully to: $to");
+            return 1;
+        } else {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email',
-                "Exception while sending email: $@");
+                "Failed to send email to: $to, Error: $Mail::Sendmail::error");
             return 0;
         }
+    };
 
-        return 0;  # Default to failure
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email',
+            "Exception while sending email: $@");
+        return 0;
     }
 
-    sub end : ActionClass('RenderView') {}
+    return 0;  # Default to failure
+}
 
-    __PACKAGE__->meta->make_immutable;
+sub end : ActionClass('RenderView') {}
 
-    1;
+__PACKAGE__->meta->make_immutable;
+
+1;

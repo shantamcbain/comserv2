@@ -2,6 +2,12 @@
 
 <h1>Theme Management</h1>
 
+<div class="admin-actions">
+    <a href="[% c.uri_for('/themeeditor') %]" class="button">Advanced Theme Editor</a>
+    <!-- Direct link for testing -->
+    <a href="/themeeditor" class="button" style="margin-left: 10px;">Direct Theme Editor Link</a>
+</div>
+
 [% IF message %]
 <div class="success">
     [% message %]
@@ -256,10 +262,37 @@
             </div>
         </div>
         [% END %]
+
+        <!-- Debugging information -->
+        <div class="debug-info" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc; background-color: #f9f9f9;">
+            <h3>Debug Information</h3>
+            <p>Available themes: [% available_themes.join(", ") %]</p>
+            <p>Current theme: [% site.theme %]</p>
+            <p>Using JSON themes: [% using_json_themes %]</p>
+        </div>
     </div>
 </div>
 
 <style>
+    .admin-actions {
+        margin-bottom: 20px;
+    }
+
+    .admin-actions .button {
+        display: inline-block;
+        padding: 8px 16px;
+        background-color: #4CAF50;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+        border: none;
+        cursor: pointer;
+    }
+
+    .admin-actions .button:hover {
+        background-color: #45a049;
+    }
+
     /* Preview styles for each theme - Exactly matching the theme CSS files */
     #preview-default {
         background-color: #ffffff;
@@ -275,16 +308,16 @@
     }
 
     #preview-csc {
-        background-color: #ffffff;
-        color: #333333;
+        background-color: #ccffff;
+        color: black;
     }
     #preview-csc button {
-        background-color: #0066cc;
-        color: #ffffff;
-        border: 1px solid #004d99;
+        background-color: #f2f2f2;
+        color: black;
+        border: 1px solid #cccccc;
     }
     #preview-csc a {
-        color: #0066cc;
+        color: black;
     }
 
     #preview-apis {

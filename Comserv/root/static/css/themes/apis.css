@@ -1,34 +1,37 @@
-/* Apis Theme - Beekeeping Theme */
+/* Theme: APIS Theme */
+/* Description: Beekeeping theme with honeycomb pattern */
+
 :root {
-  /* Honey and bee-inspired colors */
-  --primary-color: #FFB900;    /* Honey gold */
-  --secondary-color: #4A4A4A;  /* Dark gray */
-  --accent-color: #FFA500;     /* Orange */
-  --text-color: #2C2C2C;
-  --background-color: #FFF8E1; /* Light honey background */
-  --link-color: #B88A00;       /* Darker honey gold */
-  --link-hover-color: #996E00; /* Even darker honey gold */
-  --border-color: #E6E6E6;
-  --table-header-bg: #FFF3D4;  /* Light honey */
-  --warning-color: #FF4444;
-  --success-color: #4CAF50;
-
-  /* Typography */
-  --header-font: 'Georgia', serif;
-  --body-font: 'Verdana', sans-serif;
+  --accent-color: #FF9900;
+  --background-color: #f9f06b;
+  --body-font: Arial, sans-serif;
+  --border-color: #e5a50a;
+  --button-bg: #e5a50a;
+  --button-border: #ffa348;
+  --button-hover-bg: #d49509;
+  --button-text: #000000;
   --font-size-base: 16px;
-  --font-size-small: 14px;
-  --font-size-large: 18px;
-  --font-size-xlarge: 22px;
-
-  /* Components */
-  --button-bg: #FFB900;
-  --button-text: #ffffff;
-  --button-border: #B88A00;
-  --button-hover-bg: #B88A00;
-  --nav-bg: var(--primary-color);
-  --nav-text: #2C2C2C;
-  --nav-hover-bg: rgba(0, 0, 0, 0.1);
+  --font-size-large: 24px;
+  --font-size-small: 15px;
+  --font-size-xlarge: 28px;
+  --header-color: #000000;
+  --header-font: Arial, sans-serif;
+  --link-color: #f9f06b;
+  --link-decoration: none;
+  --link-hover-color: #f8e45c;
+  --nav-bg: #ff9900;
+  --nav-hover-bg: #f6d32d;
+  --nav-text: #000000;
+  --primary-color: #ccffff;
+  --secondary-color: #4A4A4A;
+  --site-name-color: #000000;
+  --site-name-font: Arial, sans-serif;
+  --site-name-size: 24px;
+  --site-name-weight: normal;
+  --success-color: #4CAF50;
+  --table-header-bg: #f2f2f2;
+  --text-color: #000000;
+  --warning-color: red;
 }
 
 body, body.theme-apis {
@@ -36,15 +39,7 @@ body, body.theme-apis {
   font-size: var(--font-size-base);
   color: var(--text-color);
   background-color: var(--background-color);
-  /* Optional honeycomb pattern background */
-  background-image: linear-gradient(30deg, #FFF8E1 12%, transparent 12.5%, transparent 87%, #FFF8E1 87.5%, #FFF8E1),
-                    linear-gradient(150deg, #FFF8E1 12%, transparent 12.5%, transparent 87%, #FFF8E1 87.5%, #FFF8E1),
-                    linear-gradient(30deg, #FFF8E1 12%, transparent 12.5%, transparent 87%, #FFF8E1 87.5%, #FFF8E1),
-                    linear-gradient(150deg, #FFF8E1 12%, transparent 12.5%, transparent 87%, #FFF8E1 87.5%, #FFF8E1),
-                    linear-gradient(60deg, #FFE8B8 25%, transparent 25.5%, transparent 75%, #FFE8B8 75%, #FFE8B8),
-                    linear-gradient(60deg, #FFE8B8 25%, transparent 25.5%, transparent 75%, #FFE8B8 75%, #FFE8B8);
-  background-size: 40px 70px;
-  background-position: 0 0, 0 0, 20px 35px, 20px 35px, 0 0, 20px 35px;
+  background-image: url(../images/BMaster/honey2.jpg);
 }
 
 a {
@@ -70,11 +65,28 @@ input[type="submit"]:hover {
 }
 
 nav {
-  background-color: var(--primary-color);
+  background-color: var(--nav-bg);
+  color: var(--nav-text);
 }
 
-/* Add more styles as needed to match the original apis.css */
+/* Legacy Elements */
+.dropdown-content, dropdown-content {
+  background-color: #f9f9f9;
+}
 
-/************************************************************
-*                   Project Details Table Style             *
-************************************************************/
+.dropdown-content a, dropdown-content a {
+  color: black;
+}
+
+.nav, nav {
+  background-color: #ccffff;
+}
+
+.submenu, submenu {
+  background-color: #f9f9f9;
+}
+
+.submenu a, submenu a {
+  color: black;
+}
+
