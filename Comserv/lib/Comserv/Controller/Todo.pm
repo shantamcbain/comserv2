@@ -1,3 +1,4 @@
+
 package Comserv::Controller::Todo;
 use Moose;
 use namespace::autoclean;
@@ -9,6 +10,51 @@ has 'logging' => (
     is => 'ro',
     default => sub { Comserv::Util::Logging->instance }
 );
+# Apply restrictions to the entire controller
+# Apply restrictions to the entire controller
+sub begin :Private {
+    my ($self, $c) = @_;
+
+    # Log the path the user is accessing
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "User accessing path: " . $c->req->uri);
+
+    # Fetch the user's roles from the session
+    my $roles = $c->session->{roles} || [];
+
+    # Ensure roles are an array reference
+    if (ref $roles ne 'ARRAY') {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'begin', "Invalid or undefined roles in session for user: " . ($c->session->{username} || 'Guest'));
+
+        # Stash the current path so it can be used for redirection after login
+        $c->stash->{template} = $c->req->uri;
+
+        # Set error message for session problems
+        $c->stash->{error_msg} = "Session expired or invalid. Please log in again.";
+
+        # Redirect to login
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "Redirecting to login page due to missing or invalid roles.");
+        $c->res->redirect($c->uri_for('/login'));
+        $c->detach;
+    }
+
+    # Check if the user has the 'admin' role
+    unless (grep { $_ eq 'admin' } @$roles) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'begin', "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest'));
+
+        # Stash the current path for potential use
+        $c->stash->{redirect_to} = $c->req->uri;
+
+        # Redirect unauthorized users to the home page with an error message
+        $c->stash->{error_msg} = "Unauthorized access. You do not have permission to view this page.";
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "Redirecting unauthorized user to the home page.");
+        $c->res->redirect($c->uri_for('/'));
+        $c->detach;
+    }
+
+    # If we get here, the user is authorized
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "User authorized to access Todo: " . ($c->session->{username} || 'Guest'));
+}
+
 sub index :Path(/todo) :Args(0) {
     my ( $self, $c ) = @_;
 
@@ -20,6 +66,21 @@ sub index :Path(/todo) :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 'Fetched todos for the, todo page');
     $c->forward($c->view('TT'));
 }
+sub auto :Private {
+    my ($self, $c) = @_;
+
+    # Check if the user is logged in and is an admin
+      unless (defined $c->session->{username} && grep { $_ eq 'admin' } @{$c->session->{roles}}) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto', "Unauthorized access attempt to Todo controller");
+        $c->response->redirect($c->uri_for('/'));
+        return 0;
+    }
+
+ $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "User authorized to access Todo controller");
+    return 1;
+}
+
+# You
 sub todo :Path('/todo') :Args(0) {
     my ( $self, $c ) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'todo', 'Fetching todos for the todo page');

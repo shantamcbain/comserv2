@@ -12,12 +12,13 @@ has 'logging' => (
 );
 
 # Authentication check at the beginning of each request
+# Authentication check at the beginning of each request
 sub begin : Private {
     my ( $self, $c ) = @_;
+
     # Debug logging for begin action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "Starting begin action");
-
-    $c->stash->{debug_errors} //= [];  # Ensure debug_errors is initialized
+    $c->stash->{debug_errors} //= []; # Ensure debug_errors is initialized
 
     # Check if the user is logged in
     if ( !$c->user_exists ) {
@@ -25,12 +26,16 @@ sub begin : Private {
     } else {
         # Fetch the roles from the session
         my $roles = $c->session->{roles};
-
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "Roles: " . Dumper($roles));
 
         # Check if roles is defined and is an array reference
         if ( defined $roles && ref $roles eq 'ARRAY' ) {
-            if ( !grep { $_ eq 'admin' } @$roles ) {
+            # Only proceed if the user is an admin
+            if ( grep { $_ eq 'admin' } @$roles ) {
+                # User is admin, proceed with accessing the todo table
+                # Add your logic here to access the todo table if needed
+            } else {
+                # User is not admin, redirect to index
                 $self->index($c);
             }
         } else {
@@ -38,6 +43,7 @@ sub begin : Private {
         }
     }
 }
+
 
 # Main admin page
 sub index :Path :Args(0) {

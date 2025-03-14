@@ -246,6 +246,7 @@ sub log_form :Path('/log/log_form') :Args(0) {
     );
 }
 
+
 sub create_log :Path('/log/create_log'):Args() {
     my ( $self, $c ) = @_;
 
@@ -259,136 +260,123 @@ sub create_log :Path('/log/create_log'):Args() {
 
     # Check if record_id is provided and valid
     my $record_id = $c->request->body_parameters->{todo_record_id};
-
-    # Enhanced validation for record_id
+    if (ref $record_id eq 'ARRAY') {
+        $record_id = $record_id->[0];  # Take the first element if it's an array
+    }
     unless ($record_id) {
-        $self->logging->log_with_details(
-            $c, 
-            'error', 
-            __FILE__, 
-            __LINE__, 
-            'create_log', 
-            'Todo record ID is missing or invalid.'
+        my $error_msg = 'Todo record ID is missing or invalid.';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_log', $error_msg);
+        $c->stash(
+            error_msg => $error_msg,
+            template => 'log/log_form.tt',
+            form_data => $c->request->body_parameters  # Pass the submitted data back to the form
         );
-        $c->stash(error_msg => 'Invalid Todo Record. Please select a valid Todo.');
-        $c->stash(template => 'log/log_form.tt');
         return;
     }
 
     # Validate that the todo record exists
     my $todo = $schema->resultset('Todo')->find($record_id);
     unless ($todo) {
-        $self->logging->log_with_details(
-            $c, 
-            'error', 
-            __FILE__, 
-            __LINE__, 
-            'create_log', "Todo record with ID $record_id not found."
+        my $error_msg = "Todo record with ID $record_id not found.";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_log', $error_msg);
+        $c->stash(
+            error_msg => $error_msg,
+            template => 'log/log_form.tt',
+            form_data => $c->request->body_parameters  # Pass the submitted data back to the form
         );
-        $c->stash(error_msg => "Todo record not found. Please select a valid Todo.");
-        $c->stash(template => 'log/log_form.tt');
         return;
     }
 
     # Retrieve input parameters
     my $start_date = $c->request->body_parameters->{start_date} // '';
     my $owner = $c->request->body_parameters->{owner} || 'none';
-
-    # Check if start_date is empty
-    if ($start_date eq '') {
-        $start_date = undef;  # Set start_date to NULL if it's empty
-    }
+    $start_date = undef if $start_date eq '';
 
     # Retrieve subject from form data
     my $subject = $c->request->body_parameters->{abstract};
-
-    # Check if subject is empty or undefined
     if (!defined $subject || $subject =~ /^\s*$/) {
-        # Log the validation failure
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_log', "Abstract is missing or empty.");
-
-        # Redirect back to log_form with an error message
+        my $error_msg = 'Abstract is required.';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_log', $error_msg);
         $c->stash(
-            todo_record_id => $c->request->body_parameters->{todo_record_id},
-            owner => $c->request->body_parameters->{owner}||'none',
-            sitename => $c->session->{SiteName},
-            start_date => $start_date,
-            project_code => $c->request->body_parameters->{project_code},
-            due_date => $c->request->body_parameters->{due_date},
-            abstract => $subject,
-            # Add other necessary fields here
+            error_msg => $error_msg,
+            template => 'log/log_form.tt',
+            form_data => $c->request->body_parameters  # Pass the submitted data back to the form
         );
-
-        # Render the form again
-        $c->stash->{template} = 'log/log_form.tt';
         return;
     }
 
     # Retrieve start_time and end_time from form data
     my $start_time = $c->request->body_parameters->{start_time};
     my $end_time = $c->request->body_parameters->{end_time};
-
-    # Set end_time to a default value if it's an empty string or undefined
     $end_time = '00:00:00' if !defined $end_time || $end_time eq '';
 
     # Calculate time difference
     my ($start_hour, $start_min) = split(':', $start_time);
     my ($end_hour, $end_min) = defined $end_time ? split(':', $end_time) : (0, 0);
     my $time_diff_in_minutes = ($end_hour - $start_hour) * 60 + ($end_min - $start_min);
-
-    # Convert time difference in minutes to 'HH:MM:SS' format
     my $hours = int($time_diff_in_minutes / 60);
     my $minutes = $time_diff_in_minutes % 60;
-    my $seconds = 0;  # Assuming there are no seconds in the time difference
+    my $seconds = 0;
     my $time_diff = sprintf("%02d:%02d:%02d", $hours, $minutes, $seconds);
 
     # Default to current date if no start_date is provided
     my $current_date = DateTime->now(time_zone => 'local')->ymd;
-    my $logEntry = $rs->create({
-        todo_record_id => $record_id,
-        owner => $owner,
-        sitename => $c->session->{SiteName},
-        start_date => $start_date || $current_date,
-        project_code => $c->request->body_parameters->{project_code},
-        due_date => $c->request->body_parameters->{due_date},
-        abstract => $subject,
-        details => $c->request->body_parameters->{details},
-        start_time => $start_time,
-        end_time => $end_time,  # Use default value if not provided
-        time => $time_diff,
-        group_of_poster => $c->session->{roles},
-        status => $c->request->body_parameters->{status},
-        priority => $c->request->body_parameters->{priority},
-        last_mod_by => $c->session->{username},
-        last_mod_date => DateTime->now->ymd,
-        comments => $c->request->body_parameters->{comments} // ''
-    });
 
-    # Error handling during log creation
-    if ($@ || !$logEntry)
- {
-        $self->logging->log_with_details(
-            $c, 'error', __FILE__, __LINE__, 'create_log',
-            "Failed to create log entry. Error: $@"
+    # Retrieve project_id from form data
+    my $project_id = $c->request->body_parameters->{project_id};  # Ensure project_id is passed correctly
+    unless (defined $project_id) {
+        my $error_msg = 'Project ID is required.';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_log', $error_msg);
+        $c->stash(
+            error_msg => $error_msg,
+            template => 'log/log_form.tt',
+            form_data => $c->request->body_parameters  # Pass the submitted data back to the form
         );
-
-        $c->stash(error_msg => 'Error creating log entry, please try again.');
-        $c->response->redirect($c->uri_for('/', { record_id =>
- $record_id }));
         return;
     }
 
-    # Log the success event
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_log', "Log entry created successfully: ID " . $logEntry->id);
+    # Error handling during log creation
+    eval {
+        my $logEntry = $rs->create({
+            todo_record_id => $record_id,
+            owner => $owner,
+            sitename => $c->session->{SiteName},
+            start_date => $start_date || $current_date,
+            project_code => $project_id,  # Ensure project_id is passed correctly
+            due_date => $c->request->body_parameters->{due_date},
+            abstract => $subject,
+            details => $c->request->body_parameters->{details},
+            start_time => $start_time,
+            end_time => $end_time,
+            time => $time_diff,
+            group_of_poster => $c->session->{roles},
+            status => $c->request->body_parameters->{status},
+            priority => $c->request->body_parameters->{priority},
+            last_mod_by => $c->session->{username},
+            last_mod_date => DateTime->now->ymd,
+            comments => $c->request->body_parameters->{comments} // ''
+        });
 
-    # Redirect to the referring page and retain necessary parameters
-    my $redirect_url = $referer;
-    $redirect_url .= "?record_id=" . $logEntry->id if $logEntry->id;
+        # Log the success event
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_log', "Log entry created successfully: ID " . $logEntry->id);
 
-    # Log the redirection URL
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_log', "Redirecting to: $redirect_url");
-$c->flash->{success_msg} = 'Log entry created successfully';
-$c->response->redirect($c->uri_for('/todo/details', { record_id => $logEntry->todo_record_id }));
+        # Redirect to the referring page and retain necessary parameters
+        my $redirect_url = $referer;
+        $redirect_url .= "?record_id=" . $logEntry->id if $logEntry->id;
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_log', "Redirecting to: $redirect_url");
+        $c->flash->{success_msg} = 'Log entry created successfully';
+        $c->response->redirect($c->uri_for('/todo/details', { record_id => $logEntry->todo_record_id }));
+    };
+    if ($@) {
+        my $error_msg = "Failed to create log entry. Error: $@";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_log', $error_msg);
+        $c->stash(
+            error_msg => $error_msg,
+            template => 'log/log_form.tt',
+            form_data => $c->request->body_parameters  # Pass the submitted data back to the form
+        );
+        return;
+    }
 }
 
 __PACKAGE__->meta->make_immutable;

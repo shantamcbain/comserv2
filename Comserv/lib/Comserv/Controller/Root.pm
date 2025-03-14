@@ -20,13 +20,12 @@ sub index :Path :Args(0) {
 
     # Log entry into index action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Starting index action");
-    
+
     # Get SiteName from session
     my $SiteName = $c->session->{SiteName};
-    
+
     # Get ControllerName from session
     my $ControllerName = $c->session->{SiteName};
-
     $self->logging->log_with_details($c,  'info', __FILE__, __LINE__, 'index', "Site setup called");
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Fetched SiteName from session: $SiteName");
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Fetched ControllerName from session: $ControllerName");
@@ -104,8 +103,6 @@ sub fetch_and_set {
 
     return $value;
 }
-
-
 sub auto :Private {
     my ($self, $c) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Starting auto action");
@@ -119,9 +116,10 @@ sub auto :Private {
         return 0;
     }
 
-    
+
 
     my $SiteName = $c->session->{SiteName};
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "Session SiteName: " . ($SiteName // 'undefined'));
 
     if (!defined $SiteName || $SiteName eq 'none' || $SiteName eq 'root') {
 
@@ -131,23 +129,24 @@ sub auto :Private {
         $domain =~ s/:.*//;
         # Store the domain in the session
         $c->session->{Domain} = $domain;
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "Session Domain: $domain");
 
         my $site_domain = $c->model('Site')->get_site_domain($domain);
-
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "site_domain in auto = $site_domain");
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "Site Domain: " . ($site_domain ? $site_domain->site_id : 'undefined'));
 
         if ($site_domain) {
             my $site_id = $site_domain->site_id;
             my $site = $c->model('Site')->get_site_details($site_id);
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "Site ID: $site_id");
 
             if ($site) {
                 $SiteName = $site->name;
                 $c->stash->{SiteName} = $SiteName;
                 $c->session->{SiteName} = $SiteName;
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "Site Name: $SiteName");
             }
         } else {
             $SiteName = $self->fetch_and_set($c, 'site');
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "SiteName in auto = $SiteName");
             if (!defined $SiteName) {
                 $c->stash(template => 'index.tt');
                 $c->forward($c->view('TT'));
@@ -157,43 +156,31 @@ sub auto :Private {
     }
 
     $self->site_setup($c, $c->session->{SiteName});
-
-    $c->log->debug('Entered auto action in Root.pm');
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 'Entered auto action in Root.pm');
 
     my $schema = $c->model('DBEncy');
-    #print "Schema: $schema\n";
-
     $SiteName = $self->fetch_and_set($c, $schema, 'site');
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "Fetched SiteName: $SiteName");
 
     unless ($c->session->{group}) {
         $c->session->{group} = 'normal';
     }
 
-    my $debug_param = $c->req->param('debug');
-    if (defined $debug_param) {
-        if ($c->session->{debug_mode} ne $debug_param) {
-            $c->session->{debug_mode} = $debug_param;
-            $c->stash->{debug_mode} = $debug_param;
-        }
-    } elsif (defined $c->session->{debug_mode}) {
-        $c->stash->{debug_mode} = $c->session->{debug_mode};
-
+    unless (ref $c->session->{roles} eq 'ARRAY') {
+        $c->session->{roles} = [];
     }
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "Session Roles: " . join(', ', @{$c->session->{roles}}));
 
-    my $page = $c->req->param('page');
-    if (defined $page) {
-        if ($c->session->{page} ne $page) {
-            $c->session->{page} = $page;
-            $c->stash->{page} = $page;
+    # Check for debug parameter in the URL and toggle debug mode accordingly
+    if (defined $c->req->params->{debug}) {
+        if ($c->req->params->{debug} == 1) {
+            $c->session->{debug_mode} = 1;
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "Debug mode enabled");
+        } elsif ($c->req->params->{debug} == 0) {
+            $c->session->{debug_mode} = 0;
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "Debug mode disabled");
         }
-    } elsif (defined $c->session->{page}) {
-        $c->stash->{page} = $c->session->{page};
     }
-
-    $c->stash->{HostName} = $c->request->base;
-    my @todos = $c->model('Todo')->get_top_todos($c, $SiteName);
-    my $todos = $c->session->{todos};
-    $c->stash(todos => $todos);
 
     if (ref($c) eq 'Catalyst::Context') {
         my @main_links = $c->model('DB')->get_links($c, 'Main');
@@ -286,19 +273,10 @@ sub documentation :Path('documentation') :Args(0) {
     $c->stash(template => 'Documentation/Documentation.tt');
 }
 
-# Remote database management
-sub remotedb :Path('remotedb') :Args(0) {
-    my ($self, $c) = @_;
-
-    # Log the access to the remote database management page
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'remotedb', "Accessing remote database management");
-
-    # Forward to the RemoteDB controller's index action
-    $c->forward('/remotedb/index');
-}
-
 sub end : ActionClass('RenderView') {}
 
 __PACKAGE__->meta->make_immutable;
 
 1;
+
+

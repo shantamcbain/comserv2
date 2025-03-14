@@ -18,6 +18,16 @@ sub index :Path('/ENCY') :Args(0) {
     # The index action will display the 'index.tt' template
     $c->stash(template => 'ENCY/index.tt');
 }
+# Add this subroutine to handle the '/ENCY/add_herb' path
+sub add_herb :Path('/ENCY/add_herb') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Log the entry into the add_herb method
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_herb', 'Entered add_herb method');
+
+    # Set the template for adding a new herb
+    $c->stash(template => 'ENCY/add_herb_form.tt');
+}
 
 sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
     my ($self, $c) = @_;

@@ -11,6 +11,37 @@ use POSIX qw(strftime);
 
 my $LOG_FH;
 my $LOG_FILE;
+use FindBin;
+use File::Path qw(make_path);
+
+# Declare $LOG_FH at the package level
+our $LOG_FH;
+
+# Define the log file path
+my $log_file = "$FindBin::Bin/logs/application.log";
+print "Logging to $log_file\n";
+
+# Ensure the logs directory exists
+my $log_dir = "$FindBin::Bin/logs";
+unless (-d $log_dir) {
+    eval { make_path($log_dir) };
+    if ($@) {
+        warn "Failed to create log directory $log_dir: $@";
+        $log_file = '/tmp/comserv_app.log'; # Fallback to a temporary location
+    }
+}
+
+# Open the log file
+open $LOG_FH, '>>', $log_file or do {
+    warn "Can't open $log_file: $!";
+    $log_file = '/tmp/comserv_app.log'; # Fallback to a temporary location
+    open $LOG_FH, '>>', $log_file or warn "Fallback log failed: $!";
+};
+
+select((select($LOG_FH), $| = 1)[0]); # Autoflush
+
+
+
 
 sub new {
     my ($class) = @_;
@@ -24,29 +55,6 @@ sub instance {
     return $instance;
 }
 
-my $INITIALIZED = 0;
-
-sub init {
-    my ($class) = @_;
-
-    return if $INITIALIZED;
-
-    my $base_dir = $ENV{'COMSERV_LOG_DIR'} // File::Spec->catdir($FindBin::Bin, '..');
-    my $log_dir  = File::Spec->catdir($base_dir, "logs");
-    $LOG_FILE = File::Spec->catfile($log_dir, "application.log");
-
-    unless (-d $log_dir) {
-        make_path($log_dir) or die "Failed to create log directory $log_dir: $@\n";
-    }
-
-    sysopen($LOG_FH, $LOG_FILE, O_WRONLY | O_APPEND | O_CREAT, 0644)
-        or die "Can't open log file $LOG_FILE: $!";
-
-    select((select($LOG_FH), $| = 1)[0]);
-
-    $INITIALIZED = 1;
-}
-
 sub log_with_details {
     my ($self, $c, $level, $file, $line, $subroutine, $message) = @_;
 
@@ -56,11 +64,16 @@ sub log_with_details {
     }
 
     $message //= 'No message provided';
-    $level   //= 'INFO';
+    my $log_message = sprintf("[%s:%d] %s - %s", $file, $line, $subroutine // 'unknown', $message);
+    print $LOG_FH "$log_message\n"; # Always log to file
 
-    my $timestamp = strftime("%Y-%m-%d %H:%M:%S", localtime);
-    my $log_message = sprintf("[%s] [%s:%d] %s - %s", $timestamp, $file, $line, ($subroutine // 'unknown'), $message);
-
+    if ($c && ref($c) && $c->can('stash')) {
+        $c->log->debug($log_message) if $c->can('log');
+        my $debug_errors = $c->stash->{debug_errors} ||= [];
+        push @$debug_errors, $log_message;
+    } else {
+        print $LOG_FH "No context: $log_message\n";
+    }
     log_to_file($log_message, undef, $level);
 
     if ($c && ref($c) && ref($c->stash) eq 'HASH') {
@@ -111,6 +124,7 @@ sub log_to_file {
         warn "Failed to open file: $file_path\n";
         return;
     }
+
 
     flock($file, LOCK_EX);
     print $file "$level: $message\n";
