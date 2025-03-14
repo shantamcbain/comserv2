@@ -2,6 +2,11 @@
 
 BEGIN {
     $ENV{CATALYST_SCRIPT_GEN} = 40;
+
+    # Add the lib directory to @INC
+    use FindBin;
+    use lib "$FindBin::Bin/../lib";
+    use lib "$FindBin::Bin/..";
 }
 
 use Catalyst::ScriptRunner;

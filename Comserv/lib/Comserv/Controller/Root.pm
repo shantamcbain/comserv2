@@ -111,11 +111,14 @@ sub auto :Private {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Starting auto action");
     # Check if setup is needed
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Checking if setup is needed");
-    unless (-f $c->path_to('db_config.json')) {
-        $c->response->redirect($c->uri_for('/setup'))
-            unless $c->action->private_path =~ /^\/setup/;
+
+    # Check if setup is needed
+    if ($c->req->param('setup')) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Setup mode detected");
+        $c->response->redirect($c->uri_for('/setup'));
         return 0;
     }
+
     
 
     my $SiteName = $c->session->{SiteName};
@@ -281,6 +284,17 @@ sub default :Path {
 sub documentation :Path('documentation') :Args(0) {
     my ( $self, $c ) = @_;
     $c->stash(template => 'Documentation/Documentation.tt');
+}
+
+# Remote database management
+sub remotedb :Path('remotedb') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Log the access to the remote database management page
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'remotedb', "Accessing remote database management");
+
+    # Forward to the RemoteDB controller's index action
+    $c->forward('/remotedb/index');
 }
 
 sub end : ActionClass('RenderView') {}
