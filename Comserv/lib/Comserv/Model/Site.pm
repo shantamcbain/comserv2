@@ -3,20 +3,18 @@ use Moose;
 use namespace::autoclean;
 use Try::Tiny;
 use Comserv::Util::Logging;
-
 extends 'Catalyst::Model';
+
 has 'logging' => (
     is => 'ro',
     default => sub { Comserv::Util::Logging->instance }
 );
-has 'logging' => (
-    is      => 'ro',
-    default => sub { Comserv::Util::Logging->instance }
-);
+
 has 'schema' => (
     is => 'ro',
     required => 1,
 );
+
 sub COMPONENT {
     my ($class, $app, $args) = @_;
 
@@ -58,7 +56,7 @@ sub add_site {
 }
 
 sub update_site {
-    my ($self, $c,$site_id, $new_site_details) = @_;
+    my ($self, $c,$site_id, $new_site_details) =  @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_site', "Updating site with ID $site_id: " . join(", ", map { "$_: $new_site_details->{$_}" } keys %$new_site_details));
     my $site_rs = $self->schema->resultset('Site');
     my $site = $site_rs->find($site_id);
@@ -67,7 +65,7 @@ sub update_site {
 }
 
 sub delete_site {
-    my ($self, $c,$site_id) = @_;
+    my ($self, $c, $site_id) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete_site', "Deleting site with ID $site_id");
     my $site_rs = $self->schema->resultset('Site');
     my $site = $site_rs->find($site_id);
@@ -84,37 +82,22 @@ sub get_site_details_by_name {
     my $site = $site_rs->find({ name => $site_name });
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_site_details_by_name', "Site found: " . ($site ? $site->id : 'None'));
     return $site;
-sub get_site_domain {
+}
+
+# Renamed to avoid duplicate method
+sub get_site_domain_by_name {
     my ($self, $c, $domain_name) = @_;
 
-    # Log the attempt to retrieve the domain
-    $self->logging->log_with_details(
-        $c,
-        'info',
-        __FILE__,
-        __LINE__,
-        'get_site_domain',
-        "Attempting to fetch site domain record for domain: '$domain_name'."
-    );
-
-    # Attempt to ensure the database connection
-    eval {
-        $self->schema->storage->ensure_connected;
-    };
-    if ($@) {
-        # Log database connection failure
+    # Check if domain_name is defined
+    unless (defined $domain_name && $domain_name ne '') {
         $self->logging->log_with_details(
             $c,
             'error',
             __FILE__,
             __LINE__,
             'get_site_domain',
-            "Database connection failed: $@"
+            "Domain name not provided"
         );
-
-        # Forward to the 'database_setup' action for rendering the setup template
-        $c->forward('/admin/database_setup'); # Use the full action path
-        $c->detach; # Stop further processing
         return;
     }
 
@@ -158,7 +141,9 @@ sub get_site_domain {
 }
 
 
-sub get_site_domain {
+
+# Renamed to avoid duplicate method
+sub get_site_domain_with_error_handling {
     my ($self, $c, $domain_name) = @_;
 
     # Log the attempt to fetch the site domain
@@ -171,40 +156,57 @@ sub get_site_domain {
         "Fetching site domain record for domain name: '$domain_name'."
     );
 
-    # Ensure database connection
-    my $is_connected = eval {
-        $self->schema->storage->ensure_connected;
-        1;
+    # Try to ensure database connection with better error handling
+    my $is_connected = 0;
+    my $connection_error = '';
+
+    eval {
+        $is_connected = $self->schema->storage->ensure_connected;
+        $is_connected = 1 if $is_connected; # normalize to 1 if successful
     };
 
-    if (!$is_connected) {
-        # Log database connection failure
+    if ($@) {
+        $connection_error = $@;
+    }
+
+    # If connection failed, log and return null
+    unless ($is_connected) {
+        # Log database connection failure with detailed error
         $self->logging->log_with_details(
             $c,
             'error',
             __FILE__,
             __LINE__,
             'get_site_domain',
-            "Database connection failed: $@"
+            "Database connection failed: " . ($connection_error || "Unknown error")
         );
 
-        # Forward to /admin/database_setup
-        $c->forward('/admin/database_setup');
-            $c->forward($c->view('TT'));
-        $c->detach; # Ensure processing halts here
-        return;     # Safeguard against continuing further
+        # Add a message to the stash for the user
+        if ($c && ref($c) eq 'Catalyst::Context') {
+            $c->stash->{db_connection_error} = 1;
+            $c->stash->{error_message} = "Could not connect to the database. Please check your database configuration.";
+        }
+
+        return;
     }
 
-    # Query the SiteDomain table
+    # Query the SiteDomain table with better error handling
     my $site_domain;
+    my $query_error = '';
+
     eval {
         my $site_domain_rs = $self->schema->resultset('SiteDomain');
         $site_domain = $site_domain_rs->find({ domain => $domain_name });
     };
 
-    if ($@ || !$site_domain) {
+    if ($@) {
+        $query_error = $@;
+    }
+
+    # If query failed or no domain found, log and return null
+    if ($query_error || !$site_domain) {
         # Log query failure or missing domain
-        my $error_message = $@ ? $@ : "Domain '$domain_name' not found in SiteDomain table.";
+        my $error_message = $query_error || "Domain '$domain_name' not found in SiteDomain table.";
         $self->logging->log_with_details(
             $c,
             'error',
@@ -214,10 +216,13 @@ sub get_site_domain {
             "Failed to fetch site domain: $error_message"
         );
 
-        # Forward to /admin/database_setup
-        $c->forward('/admin/database_setup');
-        $c->detach; # Ensure no further processing happens
-        return;     # Safeguard
+        # Add a message to the stash if domain not found
+        if ($c && ref($c) eq 'Catalyst::Context' && !$query_error) {
+            $c->stash->{domain_not_found} = 1;
+            $c->stash->{domain_name} = $domain_name;
+        }
+
+        return;
     }
 
     # Log success and return the site domain object
@@ -232,14 +237,145 @@ sub get_site_domain {
 
     return $site_domain;
 }
+
 sub get_site_details {
-    my ($self, $c,$site_id) = @_;
+    my ($self, $site_id, $c) = @_;
+
+    # Check if site_id is defined
+    unless (defined $site_id && $site_id ne '') {
+        if ($c) {
+            $self->logging->log_with_details(
+                $c,
+                'error',
+                __FILE__,
+                __LINE__,
+                'get_site_details',
+                "Site ID not provided"
+            );
+        }
+        return $self->get_default_site();
+    }
+
+    # Try to get site details with error handling
+    my $site;
+    eval {
+        my $site_rs = $self->schema->resultset('Site');
+        $site = $site_rs->find({ id => $site_id });
+    };
+
+    # If there was an error or no site found, return default site
+    if ($@ || !$site) {
+        if ($c) {
+            $self->logging->log_with_details(
+                $c,
+                'error',
+                __FILE__,
+                __LINE__,
+                'get_site_details',
+                "Failed to get site details for ID $site_id: " . ($@ || "Site not found")
+            );
+        }
+        return $self->get_default_site();
+    }
+
+    # Log success
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_site_details', "Site ID: $site_id");
-    my $site_rs = $self->schema->resultset('Site');
-    my $site = $site_rs->find({ id => $site_id });
+
     return $site;
 }
 
+# Renamed to avoid duplicate method
+sub get_site_details_by_name_with_error_handling {
+    my ($self, $c, $site_name) = @_;
+
+    # Log the attempt
+    if ($c) {
+        $self->logging->log_with_details(
+            $c,
+            'info',
+            __FILE__,
+            __LINE__,
+            'get_site_details_by_name_with_error_handling',
+            "Site name: $site_name"
+        );
+    }
+
+    # Return default values if no site name provided
+    unless (defined $site_name && $site_name ne '') {
+        return $self->get_default_site();
+    }
+
+    # Try to find the site by name
+    my $site;
+    eval {
+        my $site_rs = $self->schema->resultset('Site');
+        $site = $site_rs->find({ name => $site_name });
+    };
+
+    # If there was an error or no site found, return default site
+    if ($@ || !$site) {
+        if ($c) {
+            $self->logging->log_with_details(
+                $c,
+                'error',
+                __FILE__,
+                __LINE__,
+                'get_site_details_by_name_with_error_handling',
+                "Failed to get site details for name $site_name: " . ($@ || "Site not found")
+            );
+        }
+        return $self->get_default_site();
+    }
+
+    # Log success
+    if ($c) {
+        $self->logging->log_with_details(
+            $c,
+            'info',
+            __FILE__,
+            __LINE__,
+            'get_site_details_by_name_with_error_handling',
+            "Site found: " . $site->id
+        );
+    }
+
+    return $site;
+}
+
+# Create a default site object when database connection fails
+sub get_default_site {
+    my ($self) = @_;
+
+    # Create a simple object with default values
+    my $default_site = {
+        name => 'default',
+        site_display_name => 'Default Site',
+        css_view_name => '/static/css/default.css',
+        mail_to_admin => 'admin@example.com',
+        mail_replyto => 'helpdesk.computersystemconsulting.ca',
+        home_view => 'Root'
+    };
+
+    # Convert the hashref to an object with accessor methods
+    return bless $default_site, 'Comserv::Model::Site::DefaultSite';
+}
+
+# Package for default site object
+package Comserv::Model::Site::DefaultSite;
+
+# Simple accessor method for all fields
+sub AUTOLOAD {
+    my $self = shift;
+    our $AUTOLOAD;
+    my $method = $AUTOLOAD;
+    $method =~ s/.*:://;
+    return $self->{$method} if exists $self->{$method};
+    return undef;
+}
+
+sub DESTROY { }
+
+package Comserv::Model::Site;
 __PACKAGE__->meta->make_immutable;
 
 1;

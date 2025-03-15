@@ -24,18 +24,30 @@ has 'connections' => (
     default => sub { {} },
 );
 
+use FindBin;
+use File::Spec;
+
 # Initialize remote database connections from config
 sub BUILD {
     my ($self) = @_;
-    
+
     # Load the database configuration
     my $config;
     try {
+        my $config_file = File::Spec->catfile($FindBin::Bin, '..', 'db_config.json');
         local $/;
-        open my $fh, "<", "db_config.json" or die "Could not open db_config.json: $!";
+        open my $fh, "<", $config_file or die "Could not open $config_file: $!";
         my $json_text = <$fh>;
         close $fh;
         $config = decode_json($json_text);
+
+        # Print the configuration for debugging
+        print "RemoteDB Configuration loaded from: $config_file\n";
+        if ($config->{remote_connections}) {
+            print "Found remote connections: " . join(", ", keys %{$config->{remote_connections}}) . "\n";
+        } else {
+            print "No remote connections found in configuration\n";
+        }
     } catch {
         warn "Failed to load database configuration: $_";
         return;

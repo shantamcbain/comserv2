@@ -6,28 +6,50 @@
 <div class="debug">
     [% PageVersion %]
     [% INCLUDE 'debug.tt' %]
-
-</div>
-[% END %]
-
-[% IF c.stash.debug_msg %]
+    [% IF c.stash.debug_msg %]
         [% FOREACH msg IN c.stash.debug_msg %]
         <p class="debug">Debug: [% msg %]</p>
         [% END %]
     [% END %]
+</div>
+[% END %]
+
+[% # Initialize roles if not defined
+   SET c.session.roles = [] UNLESS c.session.roles.defined;
+   SET roles = c.session.roles;
+   SET is_admin = 0;
+%]
+
+[% IF roles && roles.size %]
+    [% FOREACH role IN roles %]
+        [% IF role == 'admin' %]
+            [% SET is_admin = 1 %]
+        [% END %]
+    [% END %]
+[% END %]
 
 
 [% SET roles = c.session.roles || [] %]
 
 <header>
     <h1>
-        Welcome [% IF roles.grep('admin').size %]
-[% c.session.first_name %] [% c.session.last_name %] Administrator
-[% ELSIF roles.grep('user').size %]
-<p> [% c.session.first_name %] [% c.session.last_name %] User
-[% ELSE %]
-<p> Guest
-[% END %] to [% c.stash.ScriptDisplayName %]!
+        Welcome
+        [% IF roles.grep('admin').size %]
+            [% IF c.session.first_name.defined && c.session.last_name.defined %]
+                [% c.session.first_name %] [% c.session.last_name %] (Administrator)
+            [% ELSE %]
+                Administrator
+            [% END %]
+        [% ELSIF roles.grep('user').size %]
+            [% IF c.session.first_name.defined && c.session.last_name.defined %]
+                [% c.session.first_name %] [% c.session.last_name %] (User)
+            [% ELSE %]
+                User
+            [% END %]
+        [% ELSE %]
+            Guest
+        [% END %]
+        to [% c.stash.ScriptDisplayName || 'Default Site' %]!
     </h1>
 
 
@@ -39,21 +61,54 @@
     <nav>
         <ul class="horizontal-menu">
             <li class="horizontal-dropdown">
-                <a href="[% c.session.return_url %]" class="dropbtn">Back</a>
+                <a href="[% c.session.return_url || c.uri_for('/') %]" class="dropbtn">Back</a>
             </li>
-        [% INCLUDE 'Navigation/TopDropListMain.tt' %]
-        [% INCLUDE 'Navigation/TopDropListLogin.tt' %]
-        [% INCLUDE 'Navigation/TopDropListGlobal.tt' %]
-        [% INCLUDE 'Navigation/TopDropListHosted.tt' %]
-        [% INCLUDE 'Navigation/TopDropListMember.tt' %]
 
-        [% SET is_admin = c.session.roles.grep('admin').size > 0 %]
+            [% # Include navigation menus with error handling
+               TRY %]
+                [% INCLUDE 'Navigation/TopDropListMain.tt' %]
+            [% CATCH %]
+                <!-- Error including TopDropListMain.tt: [% error.info %] -->
+            [% END %]
 
-        [% IF is_admin %]
-            [% INCLUDE 'Navigation/admintopmenu.tt' %]
-        [% END %]
+            [% TRY %]
+                [% INCLUDE 'Navigation/TopDropListLogin.tt' %]
+            [% CATCH %]
+                <!-- Error including TopDropListLogin.tt: [% error.info %] -->
+            [% END %]
 
-        [% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]
+            [% TRY %]
+                [% INCLUDE 'Navigation/TopDropListGlobal.tt' %]
+            [% CATCH %]
+                <!-- Error including TopDropListGlobal.tt: [% error.info %] -->
+            [% END %]
+
+            [% TRY %]
+                [% INCLUDE 'Navigation/TopDropListHosted.tt' %]
+            [% CATCH %]
+                <!-- Error including TopDropListHosted.tt: [% error.info %] -->
+            [% END %]
+
+            [% TRY %]
+                [% INCLUDE 'Navigation/TopDropListMember.tt' %]
+            [% CATCH %]
+                <!-- Error including TopDropListMember.tt: [% error.info %] -->
+            [% END %]
+
+            [% # Include admin menu if user is an admin
+               IF is_admin %]
+                [% TRY %]
+                    [% INCLUDE 'Navigation/admintopmenu.tt' %]
+                [% CATCH %]
+                    <!-- Error including admintopmenu.tt: [% error.info %] -->
+                [% END %]
+            [% END %]
+
+            [% TRY %]
+                [% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]
+            [% CATCH %]
+                <!-- Error including TopDropListHelpDesk.tt: [% error.info %] -->
+            [% END %]
         </ul>
     </nav>
 </header>
@@ -64,17 +119,4 @@
 
 [% IF success_msg %]
 <p class="success">Success: [% success_msg %]</p>
-[% END %]
-    [% IF c.stash.success_msg %]
-        [% FOREACH msg IN c.stash.success_msg %]
-        <p class="debug">Debug: [% msg %]</p>
-        [% END %]
-    [% END %]
-
-[% IF c.session.roles && c.session.roles.size %]
-    [% FOREACH role IN c.session.roles %]
-        [% IF role == 'admin' %]
-            [% SET is_admin = 1 %]
-        [% END %]
-    [% END %]
 [% END %]

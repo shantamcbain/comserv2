@@ -7,22 +7,35 @@ use Socket;
 use JSON;
 use Data::Dumper;
 
+use FindBin;
+use File::Spec;
+
+my $config_file = File::Spec->catfile($FindBin::Bin, '..', 'db_config.json');
 my $json_text;
 {
     local $/; # Enable 'slurp' mode
-    open my $fh, "<", "db_config.json" or die "Could not open db_config.json: $!";
+    open my $fh, "<", $config_file or die "Could not open $config_file: $!";
     $json_text = <$fh>;
     close $fh;
 }
 my $config = decode_json($json_text);
 
+# Print the configuration for debugging
+print "DBEncy Configuration:\n";
+print "Host: $config->{shanta_ency}->{host}\n";
+print "Database: $config->{shanta_ency}->{database}\n";
+print "Username: $config->{shanta_ency}->{username}\n";
+
 # Set the schema_class and connect_info attributes
 __PACKAGE__->config(
     schema_class => 'Comserv::Model::Schema::Ency',
     connect_info => {
-        dsn => "dbi:mysql:dbname=$config->{shanta_ency}->{database};host=$config->{shanta_ency}->{host};port=$config->{shanta_ency}->{port}",
+        dsn => "dbi:$config->{shanta_ency}->{db_type}:dbname=$config->{shanta_ency}->{database};host=$config->{shanta_ency}->{host};port=$config->{shanta_ency}->{port}",
         user => $config->{shanta_ency}->{username},
         password => $config->{shanta_ency}->{password},
+        mysql_enable_utf8 => 1,
+        on_connect_do => ["SET NAMES 'utf8'", "SET CHARACTER SET 'utf8'"],
+        quote_char => '`',
     }
 );
 sub list_tables {

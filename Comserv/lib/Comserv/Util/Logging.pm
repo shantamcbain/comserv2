@@ -6,83 +6,60 @@ use namespace::autoclean;
 use File::Spec;
 use FindBin;
 use File::Path qw(make_path);
-use Fcntl qw(:flock O_WRONLY O_APPEND O_CREAT);
+use Fcntl qw(:flock LOCK_EX LOCK_UN O_WRONLY O_APPEND O_CREAT);
 use POSIX qw(strftime);
 
-my $LOG_FH;
-my $LOG_FILE;
-use FindBin;
-use File::Path qw(make_path);
-use File::Spec;
-use Fcntl qw(:flock O_WRONLY O_APPEND O_CREAT);
-use POSIX qw(strftime); # For timestamp formatting
-
-my $LOG_FH; # Global file handle for logging
-
-# Internal subroutine to print log messages to STDERR and the log file
-sub _print_log {
-    my ($msg) = @_;
-    print STDERR "$msg\n";
-    if (defined $LOG_FH) {
-        flock($LOG_FH, LOCK_EX);
-        print $LOG_FH "$msg\n";
-        flock($LOG_FH, LOCK_UN);
-    }
-}
-
-# Helper function to generate a timestamp
-sub _get_timestamp {
-    return strftime("%Y-%m-%d %H:%M:%S", localtime);
-}
+# Declare package variables
+our $LOG_FH;
+our $LOG_FILE;
 
 # Initialize the logging system
 sub init {
     my ($class) = @_;
 
-    # Determine the base directory for logs
-    my $base_dir = $ENV{'COMSERV_LOG_DIR'} // File::Spec->catdir($FindBin::Bin, '..');
-    _print_log("Base directory: $base_dir");
+    # Define the log file path
+    $LOG_FILE = "$FindBin::Bin/../logs/application.log";
+    print "Initializing logging to $LOG_FILE\n";
 
-    my $log_dir  = File::Spec->catdir($base_dir, "logs");
-    my $log_file = File::Spec->catfile($log_dir, "application.log");
-    _print_log("Log directory: $log_dir");
-    _print_log("Log file: $log_file");
-
-    # Create the log directory if it doesn't exist
+    # Ensure the logs directory exists
+    my $log_dir = "$FindBin::Bin/../logs";
     unless (-d $log_dir) {
         eval { make_path($log_dir) };
         if ($@) {
-            _print_log("[ERROR] Failed to create log directory $log_dir: $@");
-            die "Failed to create log directory $log_dir: $@\n";
+            warn "Failed to create log directory $log_dir: $@";
+            $LOG_FILE = '/tmp/comserv_app.log'; # Fallback to a temporary location
         }
-        _print_log("Log directory created: $log_dir");
-    } else {
-        _print_log("Log directory exists: $log_dir");
     }
 
-    # Open the log file for appending
-    unless (sysopen($LOG_FH, $log_file, O_WRONLY | O_APPEND | O_CREAT, 0644)) {
-        my $error_message = "Can't open log file $log_file: $!";
-        _print_log("[ERROR] $error_message");
-        die $error_message;
+    # Open the log file
+    open($LOG_FH, '>>', $LOG_FILE) or do {
+        warn "Can't open $LOG_FILE: $!";
+        $LOG_FILE = '/tmp/comserv_app.log'; # Fallback to a temporary location
+        open($LOG_FH, '>>', $LOG_FILE) or warn "Fallback log failed: $!";
+    };
+
+    # Set autoflush
+    if (defined $LOG_FH) {
+        my $old_fh = select($LOG_FH);
+        $| = 1;
+        select($old_fh);
+
+        # Log initialization
+        my $timestamp = strftime("%Y-%m-%d %H:%M:%S", localtime);
+        print $LOG_FH "[$timestamp] Logging system initialized\n";
     }
 
-    # Ensure the file handle is auto-flushed
-    select((select($LOG_FH), $| = 1)[0]);
-    _print_log("Log file opened: $log_file");
-
-    # Write a test entry to ensure the log file is created
-    print $LOG_FH "Test log entry\n";
-    _print_log("Wrote test log entry to file");
-
-    # Log initialization message
-    log_with_details(undef, 'INFO', __FILE__, __LINE__, 'init', "Logging system initialized");
+    return 1;
 }
 
-# Constructor for creating a new instance
+# Initialize on load
+__PACKAGE__->init();
+
+# Constructor
 sub new {
     my ($class) = @_;
-    return bless {}, $class;
+    my $self = bless {}, $class;
+    return $self;
 }
 
 # Singleton-like instance method
@@ -91,133 +68,100 @@ sub instance {
     return $class->new();
 }
 
-# Log a message with detailed context (file, line, subroutine, etc.)
+# Log a message with detailed context
 sub log_with_details {
     my ($self, $c, $level, $file, $line, $subroutine, $message) = @_;
-    $message //= 'No message provided';
-    $level   //= 'INFO';
 
-    # Format the log message with a timestamp
-    my $timestamp = _get_timestamp();
-    my $log_message = sprintf("[%s] [%s:%d] %s - %s", $timestamp, $file, $line, ($subroutine // 'unknown'), $message);
+    # Default values
+    $level //= 'INFO';
+    $message //= 'No message provided';
+
+    # Format the log message
+    my $formatted_message = sprintf("[%s:%d] %s - %s",
+                                   $file || 'unknown',
+                                   $line || 0,
+                                   $subroutine || 'unknown',
+                                   $message);
 
     # Log to file
-    log_to_file($log_message, undef, $level);
+    _write_to_log($formatted_message, $level);
 
-    # Log to Catalyst if available
-    if ($c && ref($c) && $c->can('log')) {
-        $c->log->$level($log_message); # Use the provided log level
-        my $debug_errors = $c->stash->{debug_errors} ||= [];
-        push @$debug_errors, $log_message;
+    # Log to Catalyst context if available
+    if ($c && ref($c)) {
+        if ($c->can('log') && $c->log->can($level)) {
+            $c->log->$level($formatted_message);
+        }
+
+        if ($c->can('stash') && ref($c->stash) eq 'HASH') {
+            my $debug_errors = $c->stash->{debug_errors} ||= [];
+            push @$debug_errors, $formatted_message;
+        }
     }
 
-    return $log_message;
-    log_to_file($log_message, undef, $level);
-
-    if ($c && ref($c) && ref($c->stash) eq 'HASH') {
-        my $debug_errors = $c->stash->{debug_errors} ||= [];
-        push @$debug_errors, $log_message;
-    }
-
-    return $log_message;
+    return $formatted_message;
 }
 
-# Log an error message with context
+# Log an error message
 sub log_error {
     my ($self, $c, $file, $line, $error_message) = @_;
+
+    # Default values
     $error_message //= 'No error message provided';
 
-    # Format the error message with a timestamp
-    my $timestamp = _get_timestamp();
-    my $log_message = sprintf("[%s] [ERROR] - %s:%d - %s", $timestamp, $file, $line, $error_message);
-    unless (defined $LOG_FILE) {
-        warn "Logging system not initialized. Initializing now.";
-        __PACKAGE__->init();
-    }
-
-    $error_message //= 'No error message provided';
-
-    my $timestamp = strftime("%Y-%m-%d %H:%M:%S", localtime);
-    my $log_message = sprintf("[%s] [ERROR] - %s:%d - %s", $timestamp, $file, $line, $error_message);
-
-    log_to_file($log_message, undef, 'ERROR');
+    # Format the error message
+    my $formatted_message = sprintf("[ERROR] %s:%d - %s",
+                                   $file || 'unknown',
+                                   $line || 0,
+                                   $error_message);
 
     # Log to file
-    log_to_file($log_message, undef, 'ERROR');
+    _write_to_log($formatted_message, 'ERROR');
 
-    # Log to Catalyst if available
-    if ($c && ref($c) eq 'Catalyst' && $c->can('log')) {
-        $c->log->error($log_message);
-        push @{$c->stash->{debug_errors}}, $log_message;
-    }
-
-    return $log_message;
-}
-
-# Log a message to a file (defaults to the global log file)
-sub log_to_file {
-    my ($message, $file_path, $level) = @_;
-    $file_path //= File::Spec->catfile($FindBin::Bin, '..', 'logs', 'application.log');
-    $level    //= 'INFO';
-
-    # Declare $file with 'my' to fix the scoping issue
-    my $file;
-    unless (open $file, '>>', $file_path) {
-        _print_log("Failed to open file: $file_path\n");
-        return;
-    }
-
-    flock($file, LOCK_EX);
-    print $file "$level: $message\n";
-    flock($file, LOCK_UN);
-
-    close $file;
-}
-
-# Log a message to Catalyst's logging system
-sub log_to_catalyst {
-    my ($message, $c) = @_;
-    if ($c && ref($c) && $c->can('log')) {
-        my $stream = $c->log->stream();
-        if (defined $stream) {
-            _print_log("Logging to Catalyst stream: $stream\n");
-            $stream->{$message} if defined $message; # Ensure $message is defined
-        } else {
-            _print_log("No logging stream available.\n");
+    # Log to Catalyst context if available
+    if ($c && ref($c)) {
+        if ($c->can('log') && $c->log->can('error')) {
+            $c->log->error($formatted_message);
         }
-    if ($c && ref($c) && ref($c->stash) eq 'HASH') {
-        my $debug_errors = $c->stash->{debug_errors} ||= [];
-        push @$debug_errors, $log_message;
+
+        if ($c->can('stash') && ref($c->stash) eq 'HASH') {
+            my $debug_errors = $c->stash->{debug_errors} ||= [];
+            push @$debug_errors, $formatted_message;
+        }
     }
 
-    return $log_message;
+    return $formatted_message;
 }
 
-sub log_to_file {
-    my ($message, $file_path, $level) = @_;
+# Internal function to write to the log file
+sub _write_to_log {
+    my ($message, $level) = @_;
 
-    # Initialize logging if not already done
-    unless (defined $LOG_FILE) {
+    # Default level
+    $level //= 'INFO';
+
+    # Make sure logging is initialized
+    unless (defined $LOG_FILE && defined $LOG_FH) {
         warn "Logging system not initialized. Initializing now.";
         __PACKAGE__->init();
     }
 
-    $file_path //= $LOG_FILE;
-    $level    //= 'INFO';
+    # Return if we still don't have a file handle
+    return unless defined $LOG_FH;
 
-    my $file;
-    unless (open $file, '>>', $file_path) {
-        warn "Failed to open file: $file_path\n";
-        return;
+    # Add timestamp
+    my $timestamp = strftime("%Y-%m-%d %H:%M:%S", localtime);
+    my $log_entry = "[$timestamp] [$level] $message\n";
+
+    # Write to log file with locking
+    eval {
+        flock($LOG_FH, LOCK_EX);
+        print $LOG_FH $log_entry;
+        flock($LOG_FH, LOCK_UN);
+    };
+
+    if ($@) {
+        warn "Error writing to log: $@";
     }
-
-
-    flock($file, LOCK_EX);
-    print $file "$level: $message\n";
-    flock($file, LOCK_UN);
-
-    close $file;
 }
 
-1; # Ensure the module returns true
 1;
