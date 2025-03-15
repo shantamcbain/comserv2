@@ -1,8 +1,8 @@
 
-[% PageVersion  = 'todo/details.tt,v 0.2 2024/11/22 Shanta Exp Shanta'; %]
-[% PageVersion  = 'todo/details.tt,v 0.1 2023/12/07 Shanta Exp Shanta'; %]
+[% PageVersion  = 'todo/details.tt,v 0.02 2024/11/22 Shanta Exp Shanta'; %]
+[%# PageVersion  = 'todo/details.tt,v 0.1 2023/12/07 Shanta Exp Shanta'; %]
 [% IF debug_mode == 1 %]
-    <p>Error: [% error_msg %]</p>
+
     [% PageVersion %]
 [% END %]
 

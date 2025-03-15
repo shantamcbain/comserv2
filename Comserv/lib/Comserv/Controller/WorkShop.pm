@@ -52,9 +52,11 @@ sub addworkshop :Local {
     my $params = $c->request->parameters;
 
     # Validate the form data
-    if (!validate_form_data($params)) {
-        $c->stash->{error_msg} = 'Invalid form data';
-        $c->stash->{form_data} = $params;  # Add the form data to the stash
+    my ($is_valid, $errors) = validate_form_data($params);
+    if (!$is_valid) {
+        # If validation fails, return to the form with errors
+        $c->stash->{error_msg} = 'Invalid form data: ' . join(', ', map { "$_: $errors->{$_}" } keys %$errors);
+        $c->stash->{form_data} = $params; # Add the form data to the stash
         $c->stash->{template} = 'WorkShops/addworkshop.tt';
         return;
     }
@@ -66,7 +68,7 @@ sub addworkshop :Local {
     my $rs = $schema->resultset('WorkShop');
 
     # Get the start_time from the form data
-    my $start_time_str = $c->request->body_parameters->{time};
+    my $start_time_str = $params->{time};
 
     # Create a DateTime::Format::Strptime object for parsing the time strings
     my $strp = DateTime::Format::Strptime->new(
@@ -81,116 +83,31 @@ sub addworkshop :Local {
     my $workshop;
     eval {
         $workshop = $rs->create({
-            sitename => $params->{sitename},
-            title => $params->{title},
-            description => $params->{description},
-            date => $params->{dateOfWorkshop},
-            location => $params->{location},
-            instructor => $params->{instructor},
+            sitename         => $params->{sitename},
+            title            => $params->{title},
+            description      => $params->{description},
+            date             => $params->{dateOfWorkshop},
+            location         => $params->{location},
+            instructor       => $params->{instructor},
             max_participants => $params->{maxMinAttendees},
-            share => $params->{share},
-            end_time => $params->{end_time},
-            time => $time,
+            share            => $params->{share},
+            end_time         => $params->{end_time},
+            time             => $time,
         });
     };
+
     if ($@) {
+        # If creation fails, return to the form with an error message
         $c->stash->{error_msg} = 'Failed to create workshop: ' . $@;
-        $c->stash->{form_data} = $params;  # Add the form data to the stash
+        $c->stash->{form_data} = $params; # Add the form data to the stash
         $c->stash->{template} = 'WorkShops/addworkshop.tt';
         return;
     }
 
-    # Redirect the user to the index action
+    # Redirect the user to the index action on success
     $c->response->redirect($c->uri_for($self->action_for('index')));
 }
-sub details :Local {
-    my ( $self, $c ) = @_;
 
-    # Get the ID from the POST parameters
-    my $id = $c->request->body_parameters->{id};
-
-    # Get a DBIx::Class::Schema object
-    my $schema = $c->model('DBEncy');
-
-    # Get a DBIx::Class::ResultSet object for the 'WorkShop' table
-    my $rs = $schema->resultset('WorkShop');
-
-    # Try to find the workshop by its ID
-    my $workshop;
-    eval {
-        $workshop = $rs->find($id);
-    };
-    # Assuming $workshop->date is a DateTime object
-my $formatted_date = $workshop->date->strftime('%Y-%m-%d');
-    if ($@) {
-        $c->stash->{error_msg} = 'Failed to find workshop: ' . $@;
-        $c->stash->{template} = 'WorkShops/details.tt';
-
-        return;
-    }
-
-    # Pass the workshop to the view
-    $c->stash(
-        workshop => $workshop,
-        formatted_date => $formatted_date,
-        template => 'WorkShops/details.tt',
-    );
-}
-use DateTime::Format::Strptime;
-
-sub edit :Local :Args(1) {
-    my ($self, $c, $id) = @_;
-
-    # Define the input validation rules
-    my $validator = Data::FormValidator->check(
-        $c->request->body_parameters,
-        {
-            required => [qw(date)],
-            optional => [qw(other_form_fields)],
-            filters  => ['trim'],
-            constraint_methods => {
-                date => qr/^\d{4}-\d{2}-\d{2}$/,
-            },
-        }
-    );
-
-    # Find the workshop in the database
-    my $workshop = $c->model('DBEncy::Workshop')->find($id);
-
-    if ($c->request->method eq 'POST') {
-        # Check if the input is valid
-        if ($validator->has_invalid || $validator->has_missing) {
-            # Invalid or missing input
-            $c->stash->{error_msg} = 'Invalid input: ' . join(', ', $validator->invalid, $validator->missing);
-            $c->stash->{form_data} = $c->request->body_parameters;  # Add the form data to the stash
-            $c->stash->{template} = 'WorkShops/edit.tt';
-            return;
-        }
-
-        # Try to update the workshop record with the form data
-        eval {
-            $workshop->update($c->request->body_parameters);
-        };
-
-        if ($@) {
-            # An error occurred during the update
-            $c->stash->{error_msg} = 'Failed to update workshop: ' . $@;
-            $c->stash(workshop => $workshop);
-            $c->stash->{form_data} = $c->request->body_parameters;  # Add the form data to the stash
-            $c->stash->{template} = 'WorkShops/edit.tt';
-            return;
-        }
-
-        # Redirect to the workshop details page
-        $c->res->redirect($c->uri_for($self->action_for('details'), [$id]));
-    } else {
-        # Pass the workshop data to the template
-        $c->stash(workshop => $workshop);
-
-        # Specify the template to use
-        $c->stash->{template} = 'WorkShops/edit.tt';
-    }
-}
 sub validate_form_data {
     my ($params) = @_;
 
@@ -216,11 +133,13 @@ sub validate_form_data {
     if (!defined $params->{dateOfWorkshop} || $params->{dateOfWorkshop} !~ /^\d{4}-\d{2}-\d{2}$/) {
         $errors{dateOfWorkshop} = 'Invalid date';
     }
+
     # Check if time is a valid time
     if (!defined $params->{time} || $params->{time} !~ /^\d{2}:\d{2}$/) {
         $errors{time} = 'Invalid time';
     }
-   # Add more checks for the other fields...
+
+    # Add more checks for the other fields...
 
     # If there are any errors, return 0 and the errors hash
     if (%errors) {
@@ -230,6 +149,99 @@ sub validate_form_data {
     # If there are no errors, return 1
     return 1;
 }
+
+sub details :Path('/workshop/details') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Retrieve the ID from query parameters
+    my $id = $c->request->params->{id};
+
+    # Get a DBIx::Class::Schema object
+    my $schema = $c->model('DBEncy');
+
+    # Get a DBIx::Class::ResultSet object for the 'WorkShop' table
+    my $rs = $schema->resultset('WorkShop');
+
+    # Try to find the workshop by its ID
+    my $workshop;
+    eval {
+        $workshop = $rs->find($id);
+    };
+
+    if ($@ || !$workshop) {
+        $c->stash->{error_msg} = 'Failed to find workshop: ' . ($@ || 'Workshop not found');
+        $c->stash->{template} = 'WorkShops/error.tt'; # Ensure you have an error template
+        return;
+    }
+
+    # Assuming $workshop->date is a DateTime object
+    my $formatted_date = $workshop->date->strftime('%Y-%m-%d');
+
+    # Pass the workshop to the view
+    $c->stash(
+        workshop => $workshop,
+        formatted_date => $formatted_date,
+        template => 'WorkShops/details.tt',
+    );
+}
+
+
+use DateTime::Format::Strptime;
+
+sub edit :Path('/workshop/edit') :Args(1) {
+    my ($self, $c, $id) = @_;
+
+    # Find the workshop in the database
+    my $workshop = $c->model('DBEncy::WorkShop')->find($id);
+
+    # For GET requests, display the edit form
+    if ($c->request->method eq 'GET') {
+        if (!$workshop) {
+            $c->stash->{error_msg} = 'Workshop not found';
+            $c->stash->{template} = 'WorkShops/error.tt'; # Ensure you have an error template
+            return;
+        }
+
+        # Format the date to 'YYYY-MM-DD'
+        my $formatted_date = $workshop->date->strftime('%Y-%m-%d');
+
+        $c->stash(
+            workshop => $workshop,
+            formatted_date => $formatted_date,
+            template => 'WorkShops/edit.tt'
+        );
+        return;
+    }
+
+    # Handle POST request for updates
+    if ($c->request->method eq 'POST') {
+        my $params = $c->request->body_parameters;
+        eval {
+            $workshop->update({
+                title            => $params->{title},
+                description      => $params->{description},
+                date             => $params->{date},
+                time             => $params->{time},
+                end_time         => $params->{end_time},
+                location         => $params->{location},
+                instructor       => $params->{instructor},
+                max_participants => $params->{max_participants},
+                share            => $params->{share},
+            });
+        };
+
+        if ($@) {
+            $c->stash->{error_msg} = 'Failed to update workshop: ' . $@;
+        } else {
+            $c->flash->{success_msg} = 'Workshop updated successfully.';
+            $c->res->redirect($c->uri_for($self->action_for('index')));
+            return;
+        }
+    }
+}
+
+
+
 
 __PACKAGE__->meta->make_immutable;
 

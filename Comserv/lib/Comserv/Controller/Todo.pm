@@ -1,3 +1,4 @@
+
 package Comserv::Controller::Todo;
 use Moose;
 use namespace::autoclean;
@@ -9,6 +10,51 @@ has 'logging' => (
     is => 'ro',
     default => sub { Comserv::Util::Logging->instance }
 );
+# Apply restrictions to the entire controller
+# Apply restrictions to the entire controller
+sub begin :Private {
+    my ($self, $c) = @_;
+
+    # Log the path the user is accessing
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "User accessing path: " . $c->req->uri);
+
+    # Fetch the user's roles from the session
+    my $roles = $c->session->{roles} || [];
+
+    # Ensure roles are an array reference
+    if (ref $roles ne 'ARRAY') {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'begin', "Invalid or undefined roles in session for user: " . ($c->session->{username} || 'Guest'));
+
+        # Stash the current path so it can be used for redirection after login
+        $c->stash->{template} = $c->req->uri;
+
+        # Set error message for session problems
+        $c->stash->{error_msg} = "Session expired or invalid. Please log in again.";
+
+        # Redirect to login
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "Redirecting to login page due to missing or invalid roles.");
+        $c->res->redirect($c->uri_for('/login'));
+        $c->detach;
+    }
+
+    # Check if the user has the 'admin' role
+    unless (grep { $_ eq 'admin' } @$roles) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'begin', "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest'));
+
+        # Stash the current path for potential use
+        $c->stash->{redirect_to} = $c->req->uri;
+
+        # Redirect unauthorized users to the home page with an error message
+        $c->stash->{error_msg} = "Unauthorized access. You do not have permission to view this page.";
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "Redirecting unauthorized user to the home page.");
+        $c->res->redirect($c->uri_for('/'));
+        $c->detach;
+    }
+
+    # If we get here, the user is authorized
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "User authorized to access Todo: " . ($c->session->{username} || 'Guest'));
+}
+
 sub index :Path(/todo) :Args(0) {
     my ( $self, $c ) = @_;
 
@@ -20,6 +66,21 @@ sub index :Path(/todo) :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 'Fetched todos for the, todo page');
     $c->forward($c->view('TT'));
 }
+sub auto :Private {
+    my ($self, $c) = @_;
+
+    # Check if the user is logged in and is an admin
+      unless (defined $c->session->{username} && grep { $_ eq 'admin' } @{$c->session->{roles}}) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto', "Unauthorized access attempt to Todo controller");
+        $c->response->redirect($c->uri_for('/'));
+        return 0;
+    }
+
+ $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "User authorized to access Todo controller");
+    return 1;
+}
+
+# You
 sub todo :Path('/todo') :Args(0) {
     my ( $self, $c ) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'todo', 'Fetching todos for the todo page');
@@ -89,21 +150,46 @@ sub details :Path('/todo/details') :Args {
 
 
 sub addtodo :Path('/todo/addtodo') :Args(0) {
-    my ( $self, $c ) = @_;
+    my ($self, $c) = @_;
 
-    # Get a DBIx::Class::Schema object
-    my $schema = $c->model('DBEncy');
+    # Logging the start of the addtodo method
+    $self->logging->log_with_details(
+        $c, 'info', __FILE__, __LINE__, 'addtodo', 'Initiating addtodo subroutine'
+    );
 
-    # Get the SiteName from the session
-    my $SiteName = $c->session->{SiteName};
+    # Fetch project data from the Project Controller
+    my $project_controller = $c->controller('Project');
+    my $projects = $project_controller->fetch_projects_with_subprojects($c);
 
-    # Fetch projects and their sub-projects
-    my $project_rs = $schema->resultset('Project')->search(
-        { 'me.sitename' => $SiteName }, # Filter by site name
-        {
-            prefetch => 'sub_projects', # Prefetch sub-projects
-            order_by => ['me.name'] # Order by project name
+    # Fetch the project_id from query parameters (if any)
+    my $project_id = $c->request->query_parameters->{project_id};
+    my $current_project;
+
+    # Attempt to locate the current project based on project_id
+    if ($project_id) {
+        my $schema = $c->model('DBEncy');
+        $current_project = $schema->resultset('Project')->find($project_id);
+        if ($current_project) {
+            $self->logging->log_with_details(
+                $c, 'info', __FILE__, __LINE__, 'addtodo',
+                "Located current project with ID: $project_id (" . $current_project->name . ")"
+            );
+        } else {
+            $self->logging->log_with_details(
+                $c, 'warn', __FILE__, __LINE__, 'addtodo',
+                "Invalid project ID passed in query: $project_id"
+            );
         }
+    }
+
+    # Fetch all users to populate the user drop-down
+    my $schema = $c->model('DBEncy');
+    my @users = $schema->resultset('User')->search({}, { order_by => 'id' });
+
+    # Log a message confirming users were fetched
+    $self->logging->log_with_details(
+        $c, 'info', __FILE__, __LINE__, 'addtodo',
+        'Fetched users to populate user_id dropdown'
     );
 
     # Convert the resultset to an array of hashrefs for use in the template
@@ -116,26 +202,25 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
     } $project_rs->all;
 
     # Fetch all users to populate the user_id dropdown
-    my @users = $schema->resultset('User')->all;
+    @users = $schema->resultset('User')->all;
 
     # Log the list of user_ids
     my @user_ids = map { $_->id } @users;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'addtodo', 'User IDs: ' . join(', ', @user_ids));
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'addtodo', 'User IDs: ' . join(', ', @user_ids));
 
     # Add the projects, sitename, and user_id to the stash
     $c->stash(
-        projects => \@projects,
-        sitename => $SiteName,
-        users => \@users, # Pass users to the stash
-        user_id => $c->session->{user_id}, # Pass user_id to the stash
-        template => 'todo/addtodo.tt',
+        projects        => $projects,        # Parent projects with nested sub-projects
+        current_project => $current_project, # Selected project for the form (if any)
+        users           => \@users,          # List of users to populate dropdown
+        template        => 'todo/addtodo.tt' # Template for rendering
     );
 
-    $c->forward($c->view('TT'));
+    # Log the end of the addtodo subroutine
+    $self->logging->log_with_details(
+        $c, 'info', __FILE__, __LINE__, 'addtodo', 'Completed addtodo subroutine'
+    );
 }
-
-
-
 
 sub debug :Local {
     my ($self, $c) = @_;
@@ -152,25 +237,131 @@ sub debug :Local {
 
     $c->response->body("Debugging information has been logged");
 }
-sub modify :Local :Args(1) {
-    my ($self, $c) = @_;
-    # Retrieve the todo ID from the URL
-    my $todo_id = $c->request->arguments->[0];
-    # Get a DBIx::Class::Schema object
+sub modify :Path('/todo/modify') :Args(1) {
+    my ( $self, $c, $record_id ) = @_;
+
+    # Log the entry into the modify action
+    $self->logging->log_with_details(
+        $c,
+        'info',
+        __FILE__,
+        __LINE__,
+        'modify',
+        "Entered modify action for record_id: " . ( $record_id || 'undefined' )
+    );
+
+    # Error handling for record_id
+    unless ($record_id) {
+        $self->logging->log_with_details(
+            $c,
+            'error',
+            __FILE__,
+            __LINE__,
+            'modify.record_id',
+            'Record ID is missing in the URL.'
+        );
+        $c->stash(
+            error_msg => 'Record ID is required but was not provided.',
+            form_data => $c->request->params, # Preserve form values
+            template  => 'todo/details.tt',    # Re-render the form
+        );
+        return; # Return to allow the user to fix the error
+    }
+
+    # Initialize the schema to fetch data
     my $schema = $c->model('DBEncy');
-    # Get a DBIx::Class::ResultSet object for the 'Todo' table
-    my $todo_rs = $schema->resultset('Todo');
-    # Find the todo in the database
-    my $todo = $todo_rs->find($todo_id);
 
-    if ($todo) {
-        # The todo was found, so retrieve the form data
-        my $form_data = $c->request->body_parameters;
-        # Ensure all required fields have valid values
-        my $status = $form_data->{status} // 'NEW'; # Ensure status is captured
+    # Fetch the todo item with the given record_id
+    my $todo = $schema->resultset('Todo')->find($record_id);
 
-        # Update the todo record with the new data
+    if (!$todo) {
+        $self->logging->log_with_details(
+            $c,
+            'error',
+            __FILE__,
+            __LINE__,
+            'modify.record_not_found',
+            "Todo item not found for record ID: $record_id."
+        );
+        $c->stash(
+            error_msg => "No todo item found for record ID: $record_id.",
+            form_data => $c->request->params, # Preserve form values
+            template  => 'todo/details.tt',    # Re-render the form
+        );
+        return;
+    }
+
+    # Retrieve form data from the user's request
+    my $form_data = $c->request->params;
+
+    # Log form data for debugging
+    $self->logging->log_with_details(
+        $c,
+        'debug',
+        __FILE__,
+        __LINE__,
+        'modify.form_data',
+        "Form data received: " . join(", ", map { "$_: $form_data->{$_}" } keys %$form_data)
+    );
+
+    # Validate mandatory fields (example: "sitename" is required)
+    unless ($form_data->{sitename}) {
+        $self->logging->log_with_details(
+            $c,
+            'warn',
+            __FILE__,
+            __LINE__,
+            'modify.validation',
+            'Sitename is required but missing in the form data.'
+        );
+        $c->stash(
+            error_msg => 'Sitename is required. Please provide it.',
+            form_data => $form_data,          # Preserve form values
+            record    => $todo,              # Pass the current todo item
+            template  => 'todo/details.tt',   # Re-render the form
+        );
+        return; # Early exit to allow the user to fix the error
+    }
+
+    # Declare and initialize variables with form data or defaults
+    my $parent_todo = $form_data->{parent_todo} || $todo->parent_todo || '';
+    my $accumulative_time = $form_data->{accumulative_time} || 0;
+
+    # Log the start of the update process
+    $self->logging->log_with_details(
+        $c,
+        'info',
+        __FILE__,
+        __LINE__,
+        'modify.update',
+        "Updating todo item with record ID: $record_id."
+    );
+
+    # Attempt to update the todo record
+    eval {
         $todo->update({
+            sitename             => $form_data->{sitename},
+            start_date           => $form_data->{start_date},
+            parent_todo          => $parent_todo,
+            due_date             => $form_data->{due_date} || DateTime->now->add(days => 7)->ymd,
+            subject              => $form_data->{subject},
+            description          => $form_data->{description},
+            estimated_man_hours  => $form_data->{estimated_man_hours},
+            comments             => $form_data->{comments},
+            accumulative_time    => $accumulative_time,
+            reporter             => $form_data->{reporter},
+            company_code         => $form_data->{company_code},
+            owner                => $form_data->{owner},
+            developer            => $form_data->{developer},
+            username_of_poster   => $c->session->{username},
+            status               => $form_data->{status},
+            priority             => $form_data->{priority},
+            share                => $form_data->{share} || 0,
+            last_mod_by          => $c->session->{username} || 'system',
+            last_mod_date        => DateTime->now->ymd,
+            user_id              => $form_data->{user_id} || 1,
+            project_id           => $form_data->{project_id},
+            date_time_posted     => $form_data->{date_time_posted},
             sitename => $form_data->{sitename},
             start_date => $form_data->{start_date},
             parent_todo => $parent_todo, # Ensure this is set
@@ -194,6 +385,24 @@ sub modify :Local :Args(1) {
             project_id => $form_data->{project_id},
             date_time_posted => $form_data->{date_time_posted},
         });
+    };
+    if ($@) {
+        $self->logging->log_with_details(
+            $c,
+            'error',
+            __FILE__,
+            __LINE__,
+            'modify.update_failure',
+            "Failed to update todo item for record ID: $record_id. Error: $@"
+        );
+        $c->stash(
+            error_msg => "An error occurred while updating the record: $@",
+            form_data => $form_data,          # Preserve form values
+            record    => $todo,              # Pass the current todo item
+            template  => 'todo/details.tt',   # Re-render the form
+        );
+        return; # Early exit on database error
+    }
 
         # Redirect the user back to the page they came from
         my $referer = $c->request->referer || $c->uri_for($self->action_for('list_todos'));
@@ -202,6 +411,22 @@ sub modify :Local :Args(1) {
         # The todo was not found, so display an error message
         $c->response->body('Todo not found');
     }
+    # Log the successful update
+    $self->logging->log_with_details(
+        $c,
+        'info',
+        __FILE__,
+        __LINE__,
+        'modify.success',
+        "Todo item successfully updated for record ID: $record_id."
+    );
+
+    # Handle successful update
+    $c->stash(
+        success_msg => "Todo item with ID $record_id has been successfully updated.",
+        record      => $todo,             # Provide updated data
+        template    => 'todo/details.tt',  # Redirect back to the form for review
+    );
 }
 
 

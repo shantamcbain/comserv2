@@ -1,0 +1,13 @@
+[% PageVersion = 'admin/SchemaManager.tt,v 0.01 2025/03/01 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+    <h1>Application Log</h1>
+
+    [% IF error_msg %]
+        <div class="alert alert-danger">
+            [% error_msg %]
+        </div>
+    [% ELSE %]
+        <pre>[% log_content %]</pre>
+    [% END %]

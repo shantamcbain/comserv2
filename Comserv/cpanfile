@@ -5,6 +5,9 @@ requires 'Catalyst::Plugin::AutoCRUD';
 requires 'DBIx::Class::Schema::Loader';
 requires 'Socket';
 requires 'Sys::Hostname';
+requires 'Term::Menus';
+
+
 requires 'MooseX::MarkAsMethods';
 requires 'DBD::mysql';
 requires 'Catalyst::Runtime' => '5.90130';
@@ -59,6 +62,7 @@ requires 'DateTime::Format::ISO8601';
 # File handling
 requires 'File::Find';
 requires 'File::Basename';
+requires 'File::Slurp';
 
 # Cryptography and Security
 requires 'Digest::SHA';
@@ -83,3 +87,5 @@ requires 'Test::Pod::Coverage';
 requires 'Test::WWW::Mechanize::Catalyst';
 requires 'Catalyst::ScriptRunner';
 requires 'Log::Log4perl';
+requires 'Catalyst::ScriptRunner';
+requires 'local::lib';

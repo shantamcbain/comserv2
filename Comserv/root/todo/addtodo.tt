@@ -1,24 +1,28 @@
-[% PageVersion = 'addtodo.tt,v 0.02 2023/11/28shanta Exp shanta ' %]
+[% PageVersion = 'addtodo.tt,v 0.03 2025/02/04shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
- [% PageVersion %]
+    Version: [% PageVersion %]
 [% END %]
+
+<h1>Add a New To-do Item</h1>
+
+<form action="/todo/create" method="post">
 <form action="/todo/create" method="post" onsubmit="updateManualProjectId(document.getElementById('parent_id').value);">
 
     <div>
         <label for="sitename">Site Name:</label>
-        <input type="text" id="sitename" name="sitename" value="[% sitename OR '' %]">
+        <input type="text" id="sitename" name="sitename" value="[% SiteName OR 'Site Name' %]" readonly>
     </div>
-
     <div>
         <label for="start_date">Start Date:</label>
         <input type="date" id="start_date" name="start_date" value="[% start_date OR '' %]">
     </div>
-
     <div>
         <label for="parent_id">Parent Project:</label><br>
         <select id="parent_id" name="parent_id" onchange="updateManualProjectId(this.value);">
             <option value="0">None</option>
             <!-- Include the project list as options -->
+        <label for="project_id">Select Project:</label>
+        <select id="project_id" name="project_id" class="form-select" required>
             [% FOREACH project IN projects %]
                 [% IF !project.parent_id %]
                     <option value="[% project.id %]" [% IF project.id == project_id %]selected[% END %]>[% project.name %]</option>
@@ -28,75 +32,73 @@
                         [% END %]
                     [% END %]
                 [% END %]
+            <option value="[% project.id %]" [% IF current_project && current_project.id == project.id %]selected[% END %]>
+                [% project.name %]
+            </option>
+            [% FOREACH sub_project IN project.sub_projects %]
+            <option value="[% sub_project.id %]" [% IF current_project && current_project.id == sub_project.id %]selected[% END %]>
+                -- [% sub_project.name %]
+            </option>
             [% END %]
-        </select><br>
+            [% END %]
+        </select>
     </div>
 
     <div>
         <label for="manual_project_id">Manual Project ID:</label>
         <input type="text" id="manual_project_id" name="manual_project_id" value="[% project_id OR '0' %]" readonly>
     </div>
-
     <div>
         <label for="due_date">Due Date:</label>
         <input type="date" id="due_date" name="due_date" value="[% todo.due_date OR '' %]">
     </div>
-
     <div>
         <label for="subject">Subject:</label>
         <input type="text" id="subject" name="subject" value="[% todo.subject OR '' %]">
     </div>
-
     <div>
         <label for="description">Description:</label>
         <textarea id="description" name="description">[% todo.description OR '' %]</textarea>
     </div>
-
     <div>
         <label for="estimated_man_hours">Estimated Man Hours:</label>
         <select id="estimated_man_hours" name="estimated_man_hours">
-            [% FOREACH hour IN [1..100] %]
-                <option value="[% hour %]" [% IF hour == todo.estimated_man_hours %]selected[% END %]>[% hour %]</option>
-            [% END %]
+        [% FOREACH hour IN [1..24] %]
+        <option value="[% hour %]" [% IF hour == todo.estimated_man_hours %]selected[% END %]>[% hour %]</option>
+        [% END %]
         </select>
     </div>
-
     <div>
         <label for="accumulative_time">Accumulative Time:</label>
         <input type="number" id="accumulative_time" name="accumulative_time" value="[% todo.accumulative_time OR '' %]">
     </div>
-
     <div>
         <label for="status">Status:</label>
-        <select id="status" name="status">
+        <select id="status" name="status" class="form-select">
             <option value="1" [% IF todo.status == 'NEW' %]selected[% END %]>NEW</option>
             <option value="2" [% IF todo.status == 'IN PROGRESS' %]selected[% END %]>IN PROGRESS</option>
             <option value="3" [% IF todo.status == 'DONE' %]selected[% END %]>DONE</option>
         </select>
     </div>
-
     <div>
         <label for="priority">Priority:</label>
-        <select id="priority" name="priority">
-            [% FOREACH priority IN [1..10] %]
-                <option value="[% priority %]" [% IF priority == todo.priority %]selected[% END %]>[% priority %]</option>
-            [% END %]
+        <select id="priority" name="priority" class="form-select">
+        [% FOREACH priority IN [1..10] %]
+        <option value="[% priority %]" [% IF priority == todo.priority %]selected[% END %]>[% priority %]</option>
+        [% END %]
         </select>
     </div>
-
     <div>
         <label for="share">Share:</label>
-        <select id="share" name="share">
+        <select id="share" name="share" class="form-select">
             <option value="0" [% IF todo.share == 'public' %]selected[% END %]>Public</option>
             <option value="1" [% IF todo.share == 'private' %]selected[% END %]>Private</option>
         </select>
     </div>
-
     <div>
         <label for="last_mod_by">Last Modified By:</label>
         <input type="text" id="last_mod_by" name="last_mod_by" value="[% todo.last_mod_by OR '' %]">
     </div>
-
     <div>
         <label for="last_mod_date">Last Modified Date:</label>
         <input type="date" id="last_mod_date" name="last_mod_date" value="[% todo.last_mod_date OR '' %]">
@@ -113,7 +115,15 @@
     </div>
 
     <div>
-        <input type="submit" value="Submit">
+        <label for="user_id">User ID:</label>
+        <select id="user_id" name="user_id" class="form-select">
+        [% FOREACH user IN users %]
+        <option value="[% user.id %]" [% IF user.id == user_id %]selected[% END %]>[% user.username %]</option>
+        [% END %]
+        </select>
+    </div>
+    <div>
+        <input type="submit" value="Add Todo" class="btn btn-primary">
     </div>
 </form>
 

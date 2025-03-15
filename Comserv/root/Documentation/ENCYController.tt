@@ -1,6 +1,6 @@
 [% PageVersion = 'Documentation/ENCY.tt,v 0.03 2025/01/19 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
-[% END %]
+
     [% PageVersion %]
 [% END %]
 

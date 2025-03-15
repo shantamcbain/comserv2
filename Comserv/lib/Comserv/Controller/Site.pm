@@ -5,6 +5,7 @@ use namespace::autoclean;
 use Comserv::Util::Logging;
 BEGIN { extends 'Catalyst::Controller'; }
 # In your controller or script file
+use Try::Tiny;
 use Comserv::Model::Site;
 has 'logging' => (
     is => 'ro',
@@ -214,5 +215,85 @@ sub modify :Local {
         $c->res->redirect($c->uri_for($self->action_for('details'), [$site_id]));
     }
 }
+sub fetch_available_sites :Private {
+    my ($self, $c) = @_;
 
+    # Get the current site name from the session
+    my $current_site_name = $c->session->{SiteName};
+
+    # Get a DBIx::Class::Schema object
+    my $schema = $c->model('DBEncy');
+
+    # Create a new Comserv::Model::Site object
+    my $site_model = Comserv::Model::Site->new(schema => $schema);
+
+
+
+# Add the following subroutine to `Comserv/lib/Comserv/Controller/Site.pm`
+sub add_domain :Local {
+    my ($self, $c) = @_;
+
+    # Fetch the list of sites
+    my $schema = $c->model('DBEncy');
+    my @sites = $schema->resultset('Site')->all;
+
+    # Pass the list of sites to the template
+    $c->stash->{sites} = \@sites;  # Changed to \@sites to avoid unintended interpolation
+
+    # Set the template to site/add_domain.tt
+    $c->stash(template => 'site/add_domain.tt');
+}
+
+sub add_domain_post :Local {
+    my ($self, $c) = @_;
+
+    # Get the site_id and domain from the form parameters
+    my $site_id = $c->request->parameters->{site_id};
+    my $domain = $c->request->parameters->{domain};
+
+    # Store the received parameters in the stash
+    $c->stash->{received_params} = { site_id => $site_id, domain => $domain };
+
+    # Initialize an array to accumulate errors
+    my @errors;
+
+    # Validate input
+    push @errors, 'Site ID is required.' unless $site_id;
+    push @errors, 'Domain is required.' unless $domain;
+
+    if (@errors) {
+        $c->stash->{error_msgs} = \@errors;
+        $c->forward('add_domain');
+        return;
+    }
+
+    # Insert the new domain into the SiteDomain table
+    try {
+        $c->model('DBEncy::SiteDomain')->create({
+            site_id => $site_id,
+            domain => $domain,
+        });
+        $c->flash->{success_msg} = 'Domain added successfully';
+        $c->res->redirect($c->uri_for('/site/details', { id => $site_id }));
+    } catch {
+        push @errors, "Failed to add domain: $_";
+        $c->stash->{error_msgs} = \@errors;
+        $c->stash(template => 'site/add_domain.tt');
+        $c->forward('add_domain');
+    };
+}
+
+    # Determine which sites to fetch based on the current site name
+    my $sites;
+    if (lc($current_site_name) eq 'csc') {
+        # If the current site is 'csc', fetch all sites
+        $sites = $site_model->get_all_sites();
+    } else {
+        # Otherwise, fetch only the current site
+        my $site = $site_model->get_site_details_by_name($current_site_name);
+        $sites = [$site] if $site;
+    }
+
+    return $sites;
+}
 1;

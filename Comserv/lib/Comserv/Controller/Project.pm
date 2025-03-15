@@ -4,6 +4,7 @@ use namespace::autoclean;
 use DateTime;
 use Data::Dumper;
 use Comserv::Util::Logging;
+use Comserv::Controller::Site;
 use Comserv::Util::SiteHelper;
 use List::Util 'sum';
 BEGIN { extends 'Catalyst::Controller'; }
@@ -30,7 +31,8 @@ sub add_project :Path('addproject') :Args(0) {
     
     Comserv::Util::Logging->instance->log_with_details($c, 'debug', __FILE__, __LINE__, 'add_project', Dumper(\@sorted_projects));
 
-    $c->stash->{projects} = \@sorted_projects;
+    my $site_controller = $c->controller('Site');
+    my $sites = $site_controller->fetch_available_sites($c);
 
     my $site_model = $c->model('Site');
     my $sites;
@@ -44,7 +46,7 @@ sub add_project :Path('addproject') :Args(0) {
     }
 
     $c->stash->{sites} = $sites;
-
+    $c->stash->{projects} = $projects;
     $c->stash(
         template => 'todo/add_project.tt'
     );
@@ -65,6 +67,7 @@ sub create_project :Path('create_project') :Args(0) {
     $parent_id = undef if $parent_id eq '';
     my $date_time_posted = DateTime->now;
     my $record_id = $form_data->{record_id} || 0;
+$self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_project', Dumper($form_data));
 
     my $project = eval {
         $project_rs->create({
@@ -122,16 +125,69 @@ sub project :Path('project') :Args(0) {
 
 sub details :Path('details') :Args(0) {
     my ( $self, $c ) = @_;
+
+    # Logging: Start of the details action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'details', 'Starting details action.');
+
+    # Retrieve project_id from body or query parameters
+    my $project_id = $c->request->body_parameters->{project_id} || $c->request->query_parameters->{project_id};
+
+    if (!$project_id) {
+        # Logging: Parameter missing
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'details', 'Missing project_id parameter in request.');
+        $c->stash(
+            error_msg => 'Project ID is missing from the request.',
+            template => 'todo/projectdetails.tt'
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'details', "Received project_id: $project_id.");
+
+    # Get the DB schema and project model
     my $schema = $c->model('DBEncy');
     my $project_id = $c->request->body_parameters->{project_id};
     my $project_model = $c->model('Project');
-    my $project = $project_model->get_project($schema, $project_id);
+
+    # Fetch project by ID
+    my $project;
+    eval {
+        $project = $project_model->get_project($schema, $project_id);
+    };
+    if ($@ || !$project) {
+        # Logging: Error fetching project or project not found
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'details', "Failed to fetch project for ID: $project_id. Error: $@");
+        $c->stash(
+            error_msg => "Project with ID $project_id not found.",
+            template => 'todo/projectdetails.tt'
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'details', "Successfully fetched project for ID: $project_id.");
 
     # Fetch todos associated with the project
-    my @todos = $schema->resultset('Todo')->search(
-        { project_id => $project_id },
-        { order_by => { -asc => 'start_date' } }
-    );
+    my @todos;
+    eval {
+        @todos = $schema->resultset('Todo')->search(
+            { project_id => $project_id },
+            { order_by => { -asc => 'start_date' } }
+        );
+    };
+    if ($@) {
+        # Logging: Error fetching todos
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'details', "Error fetching todos for project ID: $project_id. Error: $@");
+        $c->stash(
+            error_msg => "Failed to fetch todos for project with ID $project_id.",
+            template => 'todo/projectdetails.tt'
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'details', "Fetched " . scalar(@todos) . " todos for project ID: $project_id.");
 
     # Add the project and todos to the stash
     $c->stash(
@@ -140,10 +196,72 @@ sub details :Path('details') :Args(0) {
         template => 'todo/projectdetails.tt'
     );
 
+    # Logging: End of details action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'details', "Finished details action for project ID: $project_id.");
+
     $c->forward($c->view('TT'));
 }
 
+sub fetch_projects_with_subprojects :Private {
+    my ($self, $c) = @_;
 
+    # Log the start of the project-fetching subroutine
+    $self->logging->log_with_details(
+        $c, 'info', __FILE__, __LINE__, 'fetch_projects_with_subprojects',
+        'Fetching parent projects with sub-projects'
+    );
+
+    # Get the schema and SiteName
+    my $schema = $c->model('DBEncy');
+    my $SiteName = $c->session->{SiteName};
+
+    # Fetch projects with recursive prefetch for sub-projects
+    my $project_rs = $schema->resultset('Project')->search(
+        { 'me.sitename' => $SiteName, 'me.parent_id' => undef },
+        {
+            prefetch => { sub_projects => { sub_projects => { sub_projects => 'sub_projects' } } },
+            order_by => { -asc => 'me.name' },
+        }
+    );
+
+    # Convert the resultset into a structured array of hashrefs
+    my @projects = map {
+        {
+            id           => $_->id,
+            name         => $_->name,
+            parent_id    => $_->parent_id,
+            sub_projects => [
+                map {
+                    {
+                        id           => $_->id,
+                        name         => $_->name,
+                        parent_id    => $_->parent_id,
+                        sub_projects => [
+                            map {
+                                {
+                                    id           => $_->id,
+                                    name         => $_->name,
+                                    parent_id    => $_->parent_id,
+                                    sub_projects => [
+                                        map { { id => $_->id, name => $_->name, parent_id => $_->parent_id } } $_->sub_projects->all
+                                    ],
+                                }
+                            } $_->sub_projects->all
+                        ],
+                    }
+                } $_->sub_projects->all
+            ],
+        }
+    } $project_rs->all;
+
+    # Log the successful preparation of the project data structure
+    $self->logging->log_with_details(
+        $c, 'info', __FILE__, __LINE__, 'fetch_projects_with_subprojects',
+        'Successfully prepared project data structure'
+    );
+
+    return \@projects;
+}
 
 sub editproject :Path('editproject') :Args(0) {
     my ( $self, $c ) = @_;
@@ -151,11 +269,16 @@ sub editproject :Path('editproject') :Args(0) {
     my $project_id = $c->request->body_parameters->{project_id};
     my $project_model = $c->model('Project');
     my $project = $project_model->get_project($c->model('DBEncy'), $project_id);
-    my $projects = $project_model->get_projects($c->model('DBEncy'), $c->session->{SiteName});
+     # Use the fetch_available_sites method from the Site controller to get the sites
+    my $site_controller = $c->controller('Site');
+    my $sites = $site_controller->fetch_available_sites($c);
+
+    # Use the fetch_projects_with_subprojects method to get the projects
+    my $projects = $self->fetch_projects_with_subprojects($c);
 
     $c->stash->{projects} = $projects;
     $c->stash->{project} = $project;
-
+    $c->stash->{sites} = $sites;
     $c->stash(
         template => 'todo/editproject.tt'
     );

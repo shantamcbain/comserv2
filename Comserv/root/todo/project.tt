@@ -19,35 +19,35 @@
 [% IF message %]
 [% END %]
     <p>[% message %]</p>
-
-<!-- Display the list of all existing projects -->
-<ul>
-    [% FOREACH project IN projects %]
-        [% IF project.parent_id == '' %] <!-- Check if the project has no parent -->
-            <li>
-                [% project.name %] - [% project.description OR 'No description' %]
-                 <form action="/project/details"  method="POST">
+<!-- Recursive macro to display projects and sub-projects -->
+[% MACRO display_projects(projects, level) BLOCK %]
+    <ul>
+    [% FOREACH project IN projects.sort('name') %] <!-- Sort projects by name -->
+        <li>
+            [% project.name %]
+            <!-- Details Button -->
+            <form action="/project/details" method="POST" style="display:inline;">
+                <input type="hidden" name="project_id" value="[% project.id %]">
+                <button type="submit">Details</button>
+            </form>
+            <!-- Edit Button (Visible only to admin users) -->
+            [% IF c.session.roles.grep('admin').size %]
+                <form action="/project/editproject" method="POST" style="display:inline;">
                     <input type="hidden" name="project_id" value="[% project.id %]">
-                    <button type="submit">Details</button> [%# project.id %]
+                    <button type="submit">Edit</button>
                 </form>
-                    <input type="hidden" name="project_id" value="[% project.id %]">
-                </form>
-                <!-- Display the list of sub-projects -->
-                <ul>
-                    [% FOREACH sub_project IN project.sub_projects %]
-                        <li>
-                            [% sub_project.name %] - [% sub_project.description OR 'No description' %]
-                             <form action="/project/details" method="POST">
-                    <input type="hidden" name="project_id" value="[% sub_project.id %]">
-                    <button type="submit">Details</button> [%# sub_project.id %]
-                </form>
-                        </li>
-                    [% END %]
-                </ul>
-            </li>
-        [% END %]
+            [% END %]
+            [% IF project.sub_projects.size && level < 4 %]
+                [% display_projects(project.sub_projects, level + 1) %]
+            [% END %]
+        </li>
     [% END %]
-</ul>
+    </ul>
+[% END %]
+
+<!-- Start displaying projects -->
+[% display_projects(projects, 1) %]
+
 
 <!-- Button to add a new project -->
 <button type="button" onclick="window.location.href='/project/addproject';">Add Project</button>

@@ -9,14 +9,15 @@ use Catalyst::Plugin::AutoCRUD;
 use Comserv::Util::Logging;
 
 BEGIN { extends 'Catalyst::Controller'; }
+BEGIN {extends 'Catalyst::Controller';}
 
 has 'record_id' => (is => 'rw', isa => 'Str');
 has 'priority' => (is => 'rw', isa => 'HashRef');
 has 'status' => (is => 'rw', isa => 'HashRef');
 
 has 'logging' => (
-    is => 'ro',
-    default => sub { Comserv::Util::Logging->instance }
+    is      => 'ro',
+    default => sub {Comserv::Util::Logging->instance}
 );
 sub _build_logging {
     return Comserv::Util::Logging->instance;
@@ -30,7 +31,7 @@ sub begin :Private {
 
 sub BUILD {
     my $self = shift;
-    $self->priority({ map { $_ => $_ } (1..10) });
+    $self->priority({ map {$_ => $_} (1 .. 10) });
     $self->status({
         1 => 'NEW',
         2 => 'IN PROGRESS',
@@ -62,11 +63,11 @@ sub index :Path('/log') :Args(0) {
     # Debug: Print all logs
     #$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Fetched logs: " . Dumper([$rs->all]));
 
-    $c->stash->{debug_errors} //= [];  # Ensure debug_errors is initialized
+    $c->stash->{debug_errors} //= []; # Ensure debug_errors is initialized
     # Pass the logs and status to the template
     $c->stash(
-        logs => [$rs->all],
-        status => $status,  # Pass the current status to the template
+        logs     => [ $rs->all ],
+        status   => $status, # Pass the current status to the template
         template => 'log/index.tt'
     );
 }
@@ -78,11 +79,15 @@ sub details :Path('/log/details') :Args(0) {
     my $log = $c->model('DBEncy')->resultset('Log')->find($record_id);
 
     if ($log) {
+        # Get the current local time
+        my $current_time = DateTime->now(time_zone => 'local')->strftime('%H:%M');
+
+        # Pass the log entry and dropdown data to the template
         $c->stash(
-            log => $log,
+            log            => $log,
             build_priority => $self->priority,
             build_status   => $self->status,
-            end_time       => $current_time,  # Set end_time to current local time
+            end_time       => $current_time, # Use $current_time here
             template       => 'log/details.tt'
         );
     } else {
@@ -91,7 +96,7 @@ sub details :Path('/log/details') :Args(0) {
     $c->forward($c->view('TT'));
 }
 sub update :Path('/log/update') :Args(0) {
-    my ( $self, $c ) = @_;
+    my ($self, $c) = @_;
 
     # Get the record_id from the form data
     my $record_id = $c->request->body_parameters->{record_id};
@@ -137,7 +142,8 @@ sub update :Path('/log/update') :Args(0) {
 
         # Update the end_time_str to the current time
         $end_time_str = $end_time->strftime('%H:%M');
-    } else {
+    }
+    else {
         # If not 'DONE', use the provided end_time_str and do not calculate time
         $end_time = $strp->parse_datetime($end_time_str);
         $time = $c->request->body_parameters->{time}; # Use existing time value
@@ -145,25 +151,26 @@ sub update :Path('/log/update') :Args(0) {
 
     # Get the new values from the form data
     my $new_values = {
-        sitename => $c->request->body_parameters->{sitename},
-        start_date => $c->request->body_parameters->{start_date},
-        project_code => $c->request->body_parameters->{project_code},
-        due_date => $c->request->body_parameters->{due_date},
-        abstract => $c->request->body_parameters->{abstract},
-        details => $c->request->body_parameters->{details},
-        start_time => $start_time_str,
-        end_time => $end_time_str,
-        time => $time,
+        sitename        => $c->request->body_parameters->{sitename},
+        start_date      => $c->request->body_parameters->{start_date},
+        project_code    => $c->request->body_parameters->{project_code},
+        due_date        => $c->request->body_parameters->{due_date},
+        abstract        => $c->request->body_parameters->{abstract},
+        details         => $c->request->body_parameters->{details},
+        start_time      => $start_time_str,
+        end_time        => $end_time_str,
+        time            => $time,
         group_of_poster => $c->session->{roles},
-        status => $status,
-        priority => $c->request->body_parameters->{priority},
-        comments => $c->request->body_parameters->{comments},
+        status          => $status,
+        priority        => $c->request->body_parameters->{priority},
+        comments        => $c->request->body_parameters->{comments},
     };
 
     # Validate the new values
     # This is a placeholder for your validation logic
     # You should replace this with your actual validation logic
-    if (0) { # replace with your validation condition
+    if (0) {
+        # replace with your validation condition
         $c->response->body('Invalid data.');
         return;
     }
@@ -174,13 +181,13 @@ sub update :Path('/log/update') :Args(0) {
     # Call the modify method on the Log model instance
     $log_model->modify($log, $new_values);
 
-    # Redirect to the log details page
+    # Redirect to the log details page after successful update
     $c->response->redirect($c->uri_for("/log", { record_id => $record_id }));
 }
 
 # This method will only display the form
-sub log_form :Path('/log/log_form'):Args() {
-    my ( $self, $c) = @_;
+sub log_form :Path('/log/log_form') :Args() {
+    my ($self, $c) = @_;
     my $schema = $c->model('DBEncy');
 
     my $record_id = $c->request->body_parameters->{record_id};
@@ -196,31 +203,31 @@ sub log_form :Path('/log/log_form'):Args() {
     $c->stash(
         build_priority => $self->priority,
         build_status   => $self->status,
-        priority => $todo_record->priority,
-        status   => $todo_record->status,
+        priority       => $todo_record->priority,
+        status         => $todo_record->status,
         project_code   => $todo_record->project_id,
-        todo_record => $todo_record->record_id,
-        start_date  => $todo_record->start_date,
-        site_name   => $todo_record->sitename,
-        due_date    => $todo_record->due_date,
-        abstract    => $todo_record->subject,
-        details     => $todo_record->description,
-        comments    => $todo_record->comments,
-        end_time    => $current_time,  # Set end_time to current time
+        todo_record    => $todo_record->record_id,
+        start_date     => $todo_record->start_date,
+        site_name      => $todo_record->sitename,
+        due_date       => $todo_record->due_date,
+        abstract       => $todo_record->subject,
+        details        => $todo_record->description,
+        comments       => $todo_record->comments,
+        end_time       => $current_time, # Set end_time to current time
     );
 
     # Check if record_id is provided
     if (defined $log->record_id) {
         $c->stash(record_id => $log->record_id);
-        $c->stash(todo_record_id => $log->record_id);  # Add this line
+        $c->stash(todo_record_id => $log->record_id); # Add this line
     }
 
     # Render the form
     $c->stash->{template} = 'log/log_form.tt';
 }
 
-sub create_log :Path('/log/create_log'):Args() {
-    my ( $self, $c) = @_;
+sub create_log :Path('/log/create_log') :Args() {
+    my ($self, $c) = @_;
 
     # Create new log entry
     my $schema = $c->model('DBEncy');
@@ -233,7 +240,7 @@ sub create_log :Path('/log/create_log'):Args() {
 
     # Check if start_date is empty
     if ($start_date eq '') {
-        $start_date = undef;  # Set start_date to NULL if it's empty
+        $start_date = undef; # Set start_date to NULL if it's empty
     }
 
     # Retrieve subject from form data
@@ -247,12 +254,12 @@ sub create_log :Path('/log/create_log'):Args() {
         # Stash the form data
         $c->stash(
             todo_record_id => $c->request->body_parameters->{todo_record_id},
-            owner => $c->request->body_parameters->{owner}||'none',
-            sitename => $c->session->{SiteName},
-            start_date => $start_date,
-            project_code => $c->request->body_parameters->{project_code},
-            due_date => $c->request->body_parameters->{due_date},
-            abstract => $subject,
+            owner          => $c->request->body_parameters->{owner} || 'none',
+            sitename       => $c->session->{SiteName},
+            start_date     => $start_date,
+            project_code   => $c->request->body_parameters->{project_code},
+            due_date       => $c->request->body_parameters->{due_date},
+            abstract       => $subject,
             # Add other necessary fields here
         );
 
@@ -276,36 +283,40 @@ sub create_log :Path('/log/create_log'):Args() {
     # Convert time difference in minutes to 'HH:MM:SS' format
     my $hours = int($time_diff_in_minutes / 60);
     my $minutes = $time_diff_in_minutes % 60;
-    my $seconds = 0;  # Assuming there are no seconds in the time difference
+    my $seconds = 0; # Assuming there are no seconds in the time difference
     my $time_diff = sprintf("%02d:%02d:%02d", $hours, $minutes, $seconds);
 
     my $current_date = DateTime->now->ymd;
     my $logEntry = $rs->create({
-        todo_record_id => $c->request->body_parameters->{todo_record_id},
-        owner => $owner,
-        sitename => $c->session->{SiteName},
-        start_date => $start_date || $current_date,
-        project_code => $c->request->body_parameters->{project_code},
-        due_date => $c->request->body_parameters->{due_date},
-        abstract => $subject,
-        details => $c->request->body_parameters->{details},
-        start_time => $start_time,
-        end_time => $end_time,  # Use default value if not provided
-        time => $time_diff,
+        todo_record_id  => $c->request->body_parameters->{todo_record_id},
+        owner           => $owner,
+        sitename        => $c->session->{SiteName},
+        start_date      => $start_date || $current_date,
+        project_code    => $c->request->body_parameters->{project_code},
+        due_date        => $c->request->body_parameters->{due_date},
+        abstract        => $subject,
+        details         => $c->request->body_parameters->{details},
+        start_time      => $start_time,
+        end_time        => $end_time, # Use default value if not provided
+        time            => $time_diff,
         group_of_poster => $c->session->{roles},
-        status => $c->request->body_parameters->{status},
-        priority => $c->request->body_parameters->{priority},
-        last_mod_by => $c->session->{username},
-        last_mod_date => DateTime->now->ymd,
-        comments => $c->request->body_parameters->{comments}
+        status          => $c->request->body_parameters->{status},
+        priority        => $c->request->body_parameters->{priority},
+        last_mod_by     => $c->session->{username},
+        last_mod_date   => DateTime->now->ymd,
+        comments        => $c->request->body_parameters->{comments}
     });
 
-    if ($logEntry) {
-        $self->logging->log_with_details($c, 'info',__FILE__, __LINE__, 'create_log', "Created new log entry: " . Dumper($logEntry));
-        $c->response->redirect($c->uri_for('/'));
-    } else {
-        $c->response->body('Error creating log entry.');
-    }
+    # Log the success event
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_log', "Log entry created successfully: ID " . $logEntry->id);
+
+    # Redirect to the referring page and retain necessary parameters
+    my $referer = $c->request->referer || '/';
+    my $redirect_url = $referer;
+    $redirect_url .= "?record_id=" . $logEntry->id if $logEntry->id;
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_log', "Redirecting to: $redirect_url");
+    $c->flash->{success_msg} = 'Log entry created successfully';
+    $c->response->redirect($c->uri_for('/todo/details', { record_id => $logEntry->todo_record_id }));
 }
 
 __PACKAGE__->meta->make_immutable;

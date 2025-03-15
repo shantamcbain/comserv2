@@ -18,6 +18,11 @@
     <label for="sitename">Site Name:</label><br>
        [% INCLUDE 'site_selection.tt' %]
 
+
+<form method="POST" action="/project/create_project">
+   [% INCLUDE "todo/site_list.tt" %]<br>
+    <button type="button" onclick="openAddSiteForm()">Add Site</button><br>
+
     <label for="name">Project Name:</label><br>
     <input type="text" id="name" name="name" value="[% project.name %]" required><br>
 
@@ -30,6 +35,9 @@
 </select><br>
 
 
+    <label for="parent_id">Parent Project:</label>
+
+    [% INCLUDE "todo/project_list.tt" projects=projects selected_project_id=project.parent_id %]<br>
     <label for="description">Description:</label><br>
     <textarea id="description" name="description" required>[% project.description %]</textarea><br>
 
@@ -45,7 +53,8 @@
         <option value="Public" [% IF project.status == 'Public' %]selected[% END %]>Public</option>
         <option value="In-Process" [% IF project.status == 'In-Process' %]selected[% END %]>In-Process</option>
         <option value="Testing" [% IF project.status == 'Testing' %]selected[% END %]>Testing</option>
-        <option value="Delivered" [% IF fproject.status == 'Delivered' %]selected[% END %]>Delivered</option>
+        <!-- Fixed typo in variable name -->
+        <option value="Delivered" [% IF project.status == 'Delivered' %]selected[% END %]>Delivered</option>
     </select><br>
 
     <label for="project_code">Project Code:</label><br>

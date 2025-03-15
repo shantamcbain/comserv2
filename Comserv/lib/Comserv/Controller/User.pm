@@ -7,12 +7,49 @@ use Email::Sender::Simple qw(sendmail);
 use Email::Simple;
 use Email::Simple::Creator;
 use Email::Sender::Transport::SMTP;
-BEGIN { extends 'Catalyst::Controller'; }
-sub base :Chained('/') :PathPart('user') :CaptureArgs(0) {
-    my ( $self, $c ) = @_;
-    # This will capture /user in the URL
-}
 
+BEGIN { extends 'Catalyst::Controller'; }
+# Apply restrictions to the entire controller
+has 'logging' => (
+    is => 'ro',
+    default => sub { Comserv::Util::Logging->instance }
+);
+
+# perl
+sub login :Path('/user/log in') :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', "Starting login action");
+
+    # Check if the user is already logged in
+    if ($c->user_exists) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', "User already logged in, redirecting to homepage");
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    # Process login form submission
+    if ($c->request->method eq 'POST') {
+        my $username = $c->request->params->{username};
+        my $password = $c->request->params->{password};
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', "Received login attempt for username: $username");
+
+        # Attempt to authenticate the user
+        if ($c->authenticate({ username => $username, password => $password })) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', "Authentication successful for username: $username");
+            $c->response->redirect($c->uri_for('/'));
+            return;
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'login', "Authentication failed for username: $username");
+            $c->stash->{error_msg} = "Invalid username or password";
+        }
+    }
+
+    # Display the login form
+    $c->stash(template => 'user/login.tt');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', "Rendering login template");
+}
 
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
@@ -32,64 +69,100 @@ sub index :Path :Args(0) {
 }
 sub login :Local {
     my ($self, $c) = @_;
-   # Store the referrer URL and form data in the session
-    $c->session->{referer} = $c->req->header('referer');
-    $c->session->{form_data} = $c->req->body_params;
+
+    # Store the referer URL if it hasn't been stored already
+    my $referer = $c->req->referer || $c->uri_for('/');
+    if (!$c->session->{referer}) {
+        $c->session->{referer} = $referer;
+    }
 
     # Display the login form
     $c->stash(template => 'user/login.tt');
     $c->forward($c->view('TT'));
-
 }
-sub do_login :Local {
+sub do_login : Local {
     my ($self, $c) = @_;
 
-    # Retrieve the username and password from the form data
-    my $username = $c->request->params->{username};
-    my $password = $c->request->params->{password};
-
-    # Get a DBIx::Class::Schema object
-    my $schema = $c->model('DBEncy');
-
-    # Get a DBIx::Class::ResultSet object
-    my $rs = $schema->resultset('User');
-
-    # Find the user in the database
-    my $user = $rs->find({ username => $username });
-
-    if ($user) {
-        # Hash the submitted password
-        my $hashed_password = $self->hash_password($password);
-
-        # Compare the hashed password with the one stored in the database
-        if ($hashed_password eq $user->password) {
-            # The passwords match, so the login is successful
-            # Store the user's roles in the session
-            $c->session->{roles} = $user->roles;
-            $c->session->{username} = $user->username;
-            $c->session->{first_name} = $user->first_name;
-            $c->session->{last_name} = $user->last_name;
-            $c->session->{email} = $user->email;
-
-# Store the user object in the session
-
-$c->set_authenticated(Comserv::Model::User->new(_user => $user));
-            # Retrieve the referrer URL and form data from the session
-            my $referer = $c->session->{referer};
-            my $form_data = $c->session->{form_data};
-
-            # Redirect to the previous page
-            $c->res->redirect($referer);
-        } else {
-            # The passwords don't match, so the login is unsuccessful
-            $c->stash(template => 'user/login.tt', error => 'Invalid username or password');
-            $c->forward($c->view('TT'));
-        }
-    } else {
-        # The user was not found in the database
-        $c->stash(template => 'user/login.tt', error => 'Invalid username or password');
-        $c->forward($c->view('TT'));
+    # Check if logging is available
+    if (not $self->logging || not $self->logging->can('log_with_details')) {
+        print STDERR "ERROR: Logging object or method `log_with_details` is missing in User controller\n";
     }
+
+    # Start login process
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login', 'Login process initiated.');
+
+    # Get user input
+    my $username = $c->req->params->{username} || '';
+    my $password = $c->req->params->{password} || '';
+
+    $self->logging->log_with_details(
+        $c, 'info', __FILE__, __LINE__, 'do_login',
+        "Attempting login for username: $username"
+    );
+
+    # Get redirect path
+    my $redirect_path = $c->stash->{forwarder} || '/';
+    $self->logging->log_with_details(
+        $c, 'debug', __FILE__, __LINE__, 'do_login',
+        "Redirect path resolved to: $redirect_path"
+    );
+
+    # Find user in database
+    my $user = $c->model('DBEncy::User')->find({ username => $username });
+    unless ($user) {
+        $self->logging->log_with_details(
+            $c, 'warn', __FILE__, __LINE__, 'do_login',
+            "Login failed: Username '$username' not found."
+        );
+
+        $c->stash->{error_msg} = 'Invalid username or password.';
+        $c->detach('/login');
+    }
+
+    # Verify password
+    if ($self->hash_password($password) ne $user->password) {
+        $self->logging->log_with_details(
+            $c, 'warn', __FILE__, __LINE__, 'do_login',
+            "Login failed: Password mismatch for username '$username'."
+        );
+
+        $c->stash->{error_msg} = 'Invalid username or password.';
+        $c->detach('/login');
+    }
+
+    # Success
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login', "User '$username' successfully authenticated.");
+
+    # Set session
+    $c->session->{username} = $user->username;
+    $c->session->{user_id}  = $user->id;
+    $c->session->{first_name} = $user->first_name;
+    $c->session->{last_name}  = $user->last_name;
+    $c->session->{email}    = $user->email;
+
+    # Fetch user role(s)
+    my $roles = $user->roles;
+
+    # Check if the roles field contains a single role (string) and wrap it into an array
+    if (defined $roles && !ref $roles) {
+        $roles = [ $roles ];  # Convert single role to array.
+    }
+
+    # Default to ['user'] only if roles are undefined or invalid
+    if (!defined $roles || ref $roles ne 'ARRAY') {
+        $self->logging->log_with_details(
+            $c, 'warn', __FILE__, __LINE__, 'do_login',
+            "User '$username' has invalid or missing roles. Defaulting to ['user']."
+        );
+        $roles = ['user'];
+    }
+
+    # Assign roles to session
+    $c->session->{roles} = $roles;
+
+    # Redirect after successful login
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login', "Redirecting user '$username' to: $redirect_path");
+    $c->res->redirect($redirect_path);
 }
 sub hash_password {
     my ($self, $password) = @_;

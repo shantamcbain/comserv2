@@ -11,6 +11,36 @@ has 'logging' => (
 
 sub get_top_todos {
     my ($self, $c, $SiteName) = @_;
+
+    # Refactor line 16 to handle roles safely
+    my $roles = $c->session->{roles} || [];
+
+    # Validate that roles are an array reference
+    if (ref $roles ne 'ARRAY') {
+        # Log the error
+        $c->log->error("Expected roles to be an ARRAY but got: " . ref($roles) || 'undef');
+
+        # Set an error message and return gracefully
+        $c->stash->{error_msg} = "Invalid roles format in session. Please log in again.";
+        $c->res->redirect($c->uri_for('/login'));
+        $c->detach;
+    }
+
+    # Safely dereference roles
+    my @roles = @$roles;
+
+    # Log the roles being used (debugging information)
+    $c->log->debug("Roles available for Todo: " . join(', ', @roles));
+
+    # Example: Check if user is an admin
+    if (grep { $_ eq 'admin' } @roles) {
+        $c->log->debug("User has admin privilege.");
+        # Allow some admin-specific logic
+    } else {
+        $c->log->debug("User does not have admin privilege.");
+        # Handle non-admin logic
+    }
+
     $SiteName = $c->session->{'SiteName'};
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_top_todos', "Site name: $SiteName");
 
@@ -28,8 +58,6 @@ sub get_top_todos {
     );
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_top_todos','Visited the todo page');
-    #$self->logging->log_with_details($c, __FILE__, __LINE__, "Number of todos fetched: " . scalar(@todos));
-
     $c->session(todos => \@todos);
 
     return \@todos;
@@ -37,6 +65,13 @@ sub get_top_todos {
 
 sub get_todos_for_date {
     my ($self, $c, $date) = @_;
+
+    # Check if the user has the 'admin' role
+    unless (grep { $_ eq 'admin' } @{$c->session->{roles}}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_todos_for_date', 'Unauthorized access attempt by non-admin user');
+        return []; # Return an empty list if the user is not an admin
+    }
+
     my $SiteName = $c->session->{SiteName};
 
     # Get a DBIx::Class::Schema object
@@ -53,6 +88,7 @@ sub get_todos_for_date {
 
     return \@todos;
 }
+
 
 sub fetch_todo_record {
     my ($self, $c, $record_id) = @_;
