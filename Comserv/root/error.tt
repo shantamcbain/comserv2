@@ -1,0 +1,5 @@
+
+    <h1>Error</h1>
+    <p>[% error_msg %]</p>
+    <a href="[% c.uri_for('/') %]">Return to Home</a>
+

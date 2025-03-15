@@ -1,25 +1,22 @@
-[% PageVersion = 'pagetop.tt,v 0.021 2024/01/01 shanta Exp shanta ' %]
+
+[% PageVersion = 'pagetop.tt,v 0.022 2025/02/27 shanta Exp shanta ' %]
 [%# PageVersion = 'pagetop.tt,v 0.02 2023/08/30 shanta Exp shanta ' %]
 
 [% IF c.session.debug_mode == 1 %]
 <div class="debug">
     [% PageVersion %]
     [% INCLUDE 'debug.tt' %]
-    [% IF c.stash.debug_msg %]
+
+</div>
+[% END %]
+
+[% IF c.stash.debug_msg %]
         [% FOREACH msg IN c.stash.debug_msg %]
         <p class="debug">Debug: [% msg %]</p>
         [% END %]
     [% END %]
-</div>
-[% END %]
 
-[% IF c.session.roles && c.session.roles.size %]
-    [% FOREACH role IN c.session.roles %]
-        [% IF role == 'admin' %]
-            [% SET is_admin = 1 %]
-        [% END %]
-    [% END %]
-[% END %].
+
 [% SET roles = c.session.roles || [] %]
 
 <header>
@@ -67,4 +64,17 @@
 
 [% IF success_msg %]
 <p class="success">Success: [% success_msg %]</p>
+[% END %]
+    [% IF c.stash.success_msg %]
+        [% FOREACH msg IN c.stash.success_msg %]
+        <p class="debug">Debug: [% msg %]</p>
+        [% END %]
+    [% END %]
+
+[% IF c.session.roles && c.session.roles.size %]
+    [% FOREACH role IN c.session.roles %]
+        [% IF role == 'admin' %]
+            [% SET is_admin = 1 %]
+        [% END %]
+    [% END %]
 [% END %]

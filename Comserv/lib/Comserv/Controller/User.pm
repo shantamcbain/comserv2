@@ -15,27 +15,41 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance }
 );
 
-sub begin :Private {
+# perl
+sub login :Path('/user/log in') :Args(0) {
     my ($self, $c) = @_;
 
-    # Allow access to public pages (like login or home)
-    return if $c->action->name eq 'login' || $c->action->name eq 'do_login';
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', "Starting login action");
 
-    # Check if the user is logged in
-    if (!$c->user_exists) {
-        $c->stash->{error_msg} = 'You must be logged in to access this section.';
-        $c->response->redirect($c->uri_for('/user/login')); # Redirect to login page
-        $c->detach;
+    # Check if the user is already logged in
+    if ($c->user_exists) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', "User already logged in, redirecting to homepage");
+        $c->response->redirect($c->uri_for('/'));
+        return;
     }
 
-    # Optional: Restrict access to specific roles
-    if (!$c->check_any_user_role(qw(admin site_admin))) {
-        $c->stash->{error_msg} = 'You do not have the required permissions to access this section.';
-        $c->response->redirect($c->uri_for('/')); # Redirect to homepage or error page
-        $c->detach;
+    # Process login form submission
+    if ($c->request->method eq 'POST') {
+        my $username = $c->request->params->{username};
+        my $password = $c->request->params->{password};
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', "Received login attempt for username: $username");
+
+        # Attempt to authenticate the user
+        if ($c->authenticate({ username => $username, password => $password })) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', "Authentication successful for username: $username");
+            $c->response->redirect($c->uri_for('/'));
+            return;
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'login', "Authentication failed for username: $username");
+            $c->stash->{error_msg} = "Invalid username or password";
+        }
     }
+
+    # Display the login form
+    $c->stash(template => 'user/login.tt');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', "Rendering login template");
 }
-
 
 sub index :Path :Args(0) {
     my ($self, $c) = @_;

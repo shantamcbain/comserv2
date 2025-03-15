@@ -54,7 +54,7 @@ __PACKAGE__->config(
             {
                 class => 'Log::Dispatch::File',
                 min_level => 'debug',
-                filename => 'logs/application.log',
+                filename => '/logs/application.log',
                 mode => 'append',
                 newline => 1,
             },

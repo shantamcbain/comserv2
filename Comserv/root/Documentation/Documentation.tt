@@ -1,6 +1,6 @@
+[% PageVersion = 'Documentation/ComservDocumentation.tt,v 0.03 2024/05/31 Shanta Exp shanta ' %]
 [% PageVersion = 'Documentation/Documentation.tt,v 0.03 2024/11/22 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
-[% PageVersion -%]
 [% END %]
 
 <!--
@@ -19,6 +19,8 @@ Please ensure that all navigation links within each sub-document are unique. Thi
 
 <nav>
     <a href="#overview">Overview</a> |
+    <a href="#installation">Installation</a> |
+    <a href="#login">Login</a> |
     <a href="#admin_module">Admin Module</a> |
     <a href="#dbi">DBI</a> |
     <a href="#bmaster">BMaster</a> |
@@ -26,7 +28,6 @@ Please ensure that all navigation links within each sub-document are unique. Thi
     <a href="#ENCY">The Encyclopedia of Biological Life</a> |
     <a href="#files">Files</a> |
     <a href="#git">Git</a> |
-    <a href="#installation">Installation</a> |
     <a href="#calendar">Calendar</a> |
     <a href="#login">Login</a> |
     <a href="#logging">Logging</a> |
@@ -38,8 +39,12 @@ Please ensure that all navigation links within each sub-document are unique. Thi
     <a href="#sites">Sites</a> |
     <a href="#starman-setup">Starman Setup</a> |
     <a href="#todo">Todo</a> |
-    <a href="#workshop-management">Workshop Management</a>  |
+    <a href="#workshop-management">Workshop Management</a> |
     <a href="#ve7tit">Ve7tit Application</a> |
+    <a href="#AI">AI Integration Plan</a> |
+    <a href="#API">API System</a> |
+    <a href="#instruction">Instructions for Developers</a> |
+    <a href="#ai_assistants">AI Assistants</a>
     <a href="#AI">AI Integration Plan</a> |
     <a href="#session-plan">Session Plan</a> |
     <a href="#user-management">User Management</a> |
@@ -53,13 +58,9 @@ Please ensure that all navigation links within each sub-document are unique. Thi
 <h3 id="admin_module"><a href="#top">Back to top of Documentation</a></h3>
 
 [% INCLUDE 'Documentation/Admin.tt' %]
-
-<h3 id="AI"><a href="#top">Back to top of Documentation</a></h3>
-
 [% INCLUDE 'Documentation/AI.tt' %]
-
+[% INCLUDE 'Documentation/Calendar.tt' %]
 <h3 id="dbi"><a href="#top">Back to top of Documentation</a></h3>
-
 [% INCLUDE 'Documentation/DBIDocument.tt' %]
 
 <h3 id="bmaster"><a href="#top">Back to top of Documentation</a></h3>
@@ -73,6 +74,7 @@ Please ensure that all navigation links within each sub-document are unique. Thi
 <h3 id="document-management"><a href="#top">Back to top of Documentation</a></h3>
 
 [% INCLUDE 'Documentation/DocumentManagement.tt' %]
+<h3 id="ENCY"></h3>
 
 <h3 id="ENCY"><a href="#top">Back to top of Documentation</a></h3>
 
@@ -81,6 +83,7 @@ Please ensure that all navigation links within each sub-document are unique. Thi
 <h3 id="files"><a href="#top">Back to top of Documentation</a></h3>
 
 [% INCLUDE 'Documentation/Files.tt' %]
+<h3 id="git"></h3>
 
 <h3 id="guidelines"><a href="#top">Back to top of Documentation</a></h3>
 
@@ -91,15 +94,15 @@ Please ensure that all navigation links within each sub-document are unique. Thi
 [% INCLUDE 'Documentation/Git.tt' %]
 
 <h3 id="installation"><a href="#top">Back to top of Documentation</a></h3>
-
 [% INCLUDE 'Documentation/Installation.tt' %]
 
 <h3 id="login"><a href="#top">Back to top of Documentation</a></h3>
-
 [% INCLUDE 'Documentation/Login.tt' %]
 
-<h3 id="logging"><a href="#top">Back to top of Documentation</a></h3>
+<h3 id="projects"><a href="#top">Back to top of Documentation</a></h3>
+[% INCLUDE 'Documentation/Projects.tt' %]
 
+<h3 id="logging"><a href="#top">Back to top of Documentation</a></h3>
 [% INCLUDE 'Documentation/Logging.tt' %]
 
 <h3 id="mail"><a href="#top">Back to top of Documentation</a></h3>
@@ -122,16 +125,10 @@ Please ensure that all navigation links within each sub-document are unique. Thi
 
 [% INCLUDE 'Documentation/Schema.tt' %]
 
-<h3 id="user-management"><a href="#top">Back to top of Documentation</a></h3>
-
-[% INCLUDE 'Documentation/User.tt' %]
-
 <h3 id="sites"><a href="#top">Back to top of Documentation</a></h3>
-
 [% INCLUDE 'Documentation/Sites.tt' %]
 
 <h3 id="starman-setup"><a href="#top">Back to top of Documentation</a></h3>
-
 [% INCLUDE 'Documentation/Starman.tt' %]
 
 <h3 id="todo"><a href="#top">Back to top of Documentation</a></h3>
@@ -154,10 +151,13 @@ Please ensure that all navigation links within each sub-document are unique. Thi
 <p>Welcome to the Comserv Application Documentation. Here are some guidelines and best practices to keep in mind while working with this project:</p>
 <ul>
     <li><strong>Naming Conventions:</strong> Follow the existing naming conventions for consistency. If you encounter any deviations, normalize them to maintain uniformity.</li>
+    <li><strong>Documentation:</strong> Keep the documentation up to date with any changes you make to the codebase. Include detailed describes the purpose and functionality of each module, class, or function.</li>
+    <li><strong>Placeholder Code:</strong> Avoid using placeholder code as it can introduce hard-to-find errors and create confusion for AI assistants. This helps to avoid confusion and makes the review and debugging process more efficient.</li>
     <li><strong>Code Quality:</strong> Ensure that all code is well-documented and adheres to the project's coding standards. Use meaningful variable and function names to enhance readability and maintainability.</li>
     <li><strong>Error Handling:</strong> Implement robust error handling in all subroutines to ensure the application behaves predictably under unexpected conditions.</li>
     <li><strong>To-Do List:</strong> If you identify any issues or potential improvements in the code, add them to the 'Todo' section of this documentation.</li>
     <li><strong>Code Reviews:</strong> Submit your code for review by peers to catch potential issues early and ensure adherence to best practices.</li>
+    <li><strong>AI Assistants:</strong> When working with AI assistants like GitHub Copilot, Gork, or GPT-4, provide clear and detailed instructions to get the most out of them. Remember that AI assistants can't understand context that isn't explicitly provided.</li>
 </ul>
 
 <p>We are committed to evolving the Comserv application to meet the needs of our users. Please contribute by keeping this documentation up to date and following the guidelines provided.</p>
