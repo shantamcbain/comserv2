@@ -39,20 +39,22 @@
 
     <!-- Theme CSS - using JSON-based theme system -->
     [%
-        # The theme_name should be set in the stash by the Root controller's set_theme method
+        # The theme_name should be set in the stash by the ThemeManager
         # But we'll add a fallback just in case
 
-        # Default theme
-        IF !theme_name;
+        # First check if we have a site-specific theme in the session
+        site_key = "theme_" _ SiteName.lower;
+
+        IF c.session.$site_key;
+            theme_name = c.session.$site_key;
+        ELSIF c.stash.theme_name;
+            theme_name = c.stash.theme_name;
+        ELSIF c.session.theme_name;
+            theme_name = c.session.theme_name;
+        ELSIF site && site.theme;
+            theme_name = site.theme;
+        ELSE;
             theme_name = 'default';
-
-            # Set theme based on site name (lowercase)
-            site_name_lower = SiteName | lower;
-
-            # Check if we have a CSS file for this site
-            IF site_name_lower == 'csc' || site_name_lower == 'apis' || site_name_lower == 'usbm';
-                theme_name = site_name_lower;
-            END;
         END;
 
         # Log the theme selection
@@ -80,13 +82,18 @@
     <!-- Debug: Site name is [% SiteName %] -->
     [% END %]
 
-    <!-- Site-specific CSS (for backward compatibility) -->
-    <link rel="stylesheet" type="text/css" href="[% c.stash.css_view_name %]">
-    <link rel="stylesheet" type="text/css" href="[% c.stash.log_css %]">
-    <link rel="stylesheet" type="text/css" href="[% c.stash.menu_css %]">
-    <link rel="stylesheet" type="text/css" href="[% c.stash.todo_css %]">
+    <!-- Menu CSS (part of theme system) -->
+    <link rel="stylesheet" type="text/css" href="/static/css/menu-theme.css">
 
-    <script src="static/js/sub-menu.js"></script>
+    <!-- Debug: Using theme system only, removed old CSS references -->
+    [% IF c.session.debug_mode == 1 %]
+    <!-- Removed old CSS references: css_view_name, log_css, menu_css, todo_css -->
+    [% END %]
+
+    <!-- jQuery for enhanced menu functionality -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="/static/js/sub-menu.js"></script>
+    <script src="/static/js/menu.js"></script>
     <script language="javascript" type="text/javascript">
         function switchpage(select) {
             var index;

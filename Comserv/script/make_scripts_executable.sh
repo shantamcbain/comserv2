@@ -1,4 +1,7 @@
 #!/bin/bash
-chmod +x /comserv/Comserv/script/generate_theme_css.pl
-chmod +x /comserv/Comserv/script/add_theme_column.pl
-echo "Made theme scripts executable"
+
+# Make all scripts in the script directory executable
+chmod +x /comserv/Comserv/script/*.pl
+chmod +x /comserv/Comserv/script/*.sh
+
+echo "All scripts are now executable."

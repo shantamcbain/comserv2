@@ -1,90 +1,57 @@
 /* Theme overrides to ensure proper application of theme styles */
 
-/* USBM Theme */
-body.theme-usbm {
-  background-color: var(--primary-color) !important;
+/* General theme overrides that apply to all themes */
+body[class*="theme-"] {
+  /* Allow each theme to control its own background */
 }
 
-body.theme-usbm a {
+/* Link styles (excluding menu links) */
+body[class*="theme-"] a:not(.dropbtn):not(.dropdown-content a):not(.submenu a) {
   color: var(--link-color) !important;
 }
 
-body.theme-usbm a:hover {
+body[class*="theme-"] a:not(.dropbtn):not(.dropdown-content a):not(.submenu a):hover {
   color: var(--link-hover-color) !important;
 }
 
-body.theme-usbm button,
-body.theme-usbm .button,
-body.theme-usbm input[type="submit"] {
+/* Button styles */
+body[class*="theme-"] button,
+body[class*="theme-"] .button,
+body[class*="theme-"] input[type="submit"],
+body[class*="theme-"] input[type="button"] {
   background-color: var(--button-bg) !important;
   color: var(--button-text) !important;
-  border-color: var(--button-border) !important;
+  border: 1px solid var(--button-border) !important;
 }
 
-body.theme-usbm button:hover,
-body.theme-usbm .button:hover,
-body.theme-usbm input[type="submit"]:hover {
+body[class*="theme-"] button:hover,
+body[class*="theme-"] .button:hover,
+body[class*="theme-"] input[type="submit"]:hover,
+body[class*="theme-"] input[type="button"]:hover {
   background-color: var(--button-hover-bg) !important;
 }
 
-/* CSC Theme */
-body.theme-csc {
-  background-color: var(--background-color) !important;
+/* Menu styles */
+body[class*="theme-"] nav {
+  background-color: var(--nav-bg) !important;
 }
 
-body.theme-csc a {
-  color: var(--link-color) !important;
+body[class*="theme-"] .dropbtn {
+  color: var(--nav-text) !important;
 }
 
-body.theme-csc a:hover {
-  color: var(--link-hover-color) !important;
+body[class*="theme-"] .dropdown-content {
+  background-color: var(--dropdown-bg, var(--secondary-color)) !important;
 }
 
-body.theme-csc button,
-body.theme-csc .button,
-body.theme-csc input[type="submit"] {
-  background-color: var(--button-bg) !important;
-  color: var(--button-text) !important;
-  border-color: var(--button-border) !important;
+body[class*="theme-"] .dropdown-content a {
+  color: var(--nav-link-color) !important;
 }
 
-body.theme-csc button:hover,
-body.theme-csc .button:hover,
-body.theme-csc input[type="submit"]:hover {
-  background-color: var(--button-hover-bg) !important;
+body[class*="theme-"] .submenu {
+  background-color: var(--dropdown-bg, var(--secondary-color)) !important;
 }
 
-/* APIS Theme */
-body.theme-apis {
-  background-color: var(--background-color) !important;
-  background-image: linear-gradient(30deg, #FFF8E1 12%, transparent 12.5%, transparent 87%, #FFF8E1 87.5%, #FFF8E1),
-                    linear-gradient(150deg, #FFF8E1 12%, transparent 12.5%, transparent 87%, #FFF8E1 87.5%, #FFF8E1),
-                    linear-gradient(30deg, #FFF8E1 12%, transparent 12.5%, transparent 87%, #FFF8E1 87.5%, #FFF8E1),
-                    linear-gradient(150deg, #FFF8E1 12%, transparent 12.5%, transparent 87%, #FFF8E1 87.5%, #FFF8E1),
-                    linear-gradient(60deg, #FFE8B8 25%, transparent 25.5%, transparent 75%, #FFE8B8 75%, #FFE8B8),
-                    linear-gradient(60deg, #FFE8B8 25%, transparent 25.5%, transparent 75%, #FFE8B8 75%, #FFE8B8) !important;
-  background-size: 40px 70px !important;
-  background-position: 0 0, 0 0, 20px 35px, 20px 35px, 0 0, 20px 35px !important;
-}
-
-body.theme-apis a {
-  color: var(--link-color) !important;
-}
-
-body.theme-apis a:hover {
-  color: var(--link-hover-color) !important;
-}
-
-body.theme-apis button,
-body.theme-apis .button,
-body.theme-apis input[type="submit"] {
-  background-color: var(--button-bg) !important;
-  color: var(--button-text) !important;
-  border-color: var(--button-border) !important;
-}
-
-body.theme-apis button:hover,
-body.theme-apis .button:hover,
-body.theme-apis input[type="submit"]:hover {
-  background-color: var(--button-hover-bg) !important;
+body[class*="theme-"] .submenu a {
+  color: var(--nav-link-color) !important;
 }

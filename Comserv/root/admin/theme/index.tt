@@ -1,461 +1,118 @@
-[% META title = 'Theme Management' %]
+[% META title = 'Themes' %]
 
-<h1>Theme Management</h1>
+<div class="container">
+    <h1>Theme Management</h1>
 
-<div class="admin-actions">
-    <a href="[% c.uri_for('/themeeditor') %]" class="button">Advanced Theme Editor</a>
-    <!-- Direct link for testing -->
-    <a href="/themeeditor" class="button" style="margin-left: 10px;">Direct Theme Editor Link</a>
-</div>
+    [% IF c.flash.message %]
+        <div class="alert alert-success">[% c.flash.message %]</div>
+    [% END %]
 
-[% IF message %]
-<div class="success">
-    [% message %]
-</div>
-[% END %]
+    [% IF c.flash.error %]
+        <div class="alert alert-danger">[% c.flash.error %]</div>
+    [% END %]
 
-[% IF error %]
-<div class="warning">
-    [% error %]
-</div>
-[% END %]
+    [% IF info_msg %]
+        <div class="alert alert-info">[% info_msg %]</div>
+    [% END %]
 
-<h2>Current Site Theme</h2>
-
-<p>Current site: <strong>[% site.name %]</strong></p>
-<p>Current theme: <strong>[% site.theme || 'default' %]</strong></p>
-
-<form action="[% c.uri_for('/themeadmin/update_theme') %]" method="post">
-    <input type="hidden" name="site_id" value="[% site.id %]">
-
-    <div class="form-group">
-        <label for="theme">Select Theme:</label>
-        <select name="theme" id="theme" onchange="updateLivePreview(this.value)">
-            [% FOREACH theme IN available_themes.sort %]
-            <option value="[% theme %]" [% IF site.theme == theme %]selected[% END %]>[% theme.ucfirst %]</option>
-            [% END %]
-            [% IF site.theme && !available_themes.grep('^' _ site.theme _ '$').size %]
-            <option value="[% site.theme %]" selected>Custom ([% site.theme %])</option>
-            [% END %]
-        </select>
-    </div>
-
-    <div class="form-group">
-        <button type="submit">Update Theme</button>
-    </div>
-</form>
-
-<div class="live-preview">
-    <h3>Live Preview</h3>
-    <div class="theme-preview-box" id="live-preview">
-        <h4>Selected Theme Preview</h4>
-        <p>This shows how your selected theme will look when applied to the site.</p>
-        <div class="preview-controls">
-            <button class="preview-button">Sample Button</button>
-            <a href="#" class="preview-link">Sample Link</a>
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h3 class="card-title mb-0">Current Theme Settings</h3>
         </div>
-    </div>
-</div>
-
-<script>
-    // Initialize the live preview with the currently selected theme
-    document.addEventListener('DOMContentLoaded', function() {
-        var select = document.getElementById('theme');
-        updateLivePreview(select.value);
-    });
-
-    function updateLivePreview(themeName) {
-        var livePreview = document.getElementById('live-preview');
-        var selectedPreview = document.getElementById('preview-' + themeName);
-
-        if (selectedPreview) {
-            // Copy styles from the selected theme preview
-            livePreview.style.backgroundColor = getComputedStyle(selectedPreview).backgroundColor;
-            livePreview.style.color = getComputedStyle(selectedPreview).color;
-            livePreview.style.backgroundImage = getComputedStyle(selectedPreview).backgroundImage;
-            livePreview.style.backgroundSize = getComputedStyle(selectedPreview).backgroundSize;
-            livePreview.style.backgroundPosition = getComputedStyle(selectedPreview).backgroundPosition;
-
-            // Update button and link styles
-            var liveButton = livePreview.querySelector('.preview-button');
-            var selectedButton = selectedPreview.querySelector('.preview-button');
-            if (liveButton && selectedButton) {
-                liveButton.style.backgroundColor = getComputedStyle(selectedButton).backgroundColor;
-                liveButton.style.color = getComputedStyle(selectedButton).color;
-                liveButton.style.borderColor = getComputedStyle(selectedButton).borderColor;
-            }
-
-            var liveLink = livePreview.querySelector('.preview-link');
-            var selectedLink = selectedPreview.querySelector('.preview-link');
-            if (liveLink && selectedLink) {
-                liveLink.style.color = getComputedStyle(selectedLink).color;
-                liveLink.style.textDecoration = getComputedStyle(selectedLink).textDecoration;
-            }
-        }
-
-        // Update the preview text
-        var themeDescription = '';
-        if (themeName === 'default') {
-            themeDescription = 'Default Theme';
-        } else if (themeName === 'csc') {
-            themeDescription = 'CSC Blue Theme';
-        } else if (themeName === 'apis') {
-            themeDescription = 'Apis Honeycomb Theme';
-        } else if (themeName === 'usbm') {
-            themeDescription = 'USBM Green Theme';
-        } else {
-            themeDescription = 'Custom Theme';
-        }
-
-        livePreview.querySelector('h4').textContent = themeDescription + ' Preview';
-    }
-</script>
-
-<h2>Create Custom Theme</h2>
-
-<div class="custom-theme-container">
-    <div class="custom-theme-form">
-        <form action="[% c.uri_for('/themeadmin/create_custom_theme') %]" method="post">
-            <input type="hidden" name="site_id" value="[% site.id %]">
-
-            <div class="form-group">
-                <label for="primary_color">Primary Color:</label>
-                <input type="color" name="primary_color" id="primary_color" value="#ccffff" onchange="updateCustomPreview()">
-            </div>
-
-            <div class="form-group">
-                <label for="secondary_color">Secondary Color:</label>
-                <input type="color" name="secondary_color" id="secondary_color" value="#f9f9f9" onchange="updateCustomPreview()">
-            </div>
-
-            <div class="form-group">
-                <label for="accent_color">Accent Color:</label>
-                <input type="color" name="accent_color" id="accent_color" value="#FF9900" onchange="updateCustomPreview()">
-            </div>
-
-            <div class="form-group">
-                <label for="text_color">Text Color:</label>
-                <input type="color" name="text_color" id="text_color" value="#000000" onchange="updateCustomPreview()">
-            </div>
-
-            <div class="form-group">
-                <label for="link_color">Link Color:</label>
-                <input type="color" name="link_color" id="link_color" value="#0000FF" onchange="updateCustomPreview()">
-            </div>
-
-            <div class="form-group">
-                <button type="submit">Create Custom Theme</button>
-            </div>
-        </form>
-    </div>
-
-    <div class="custom-theme-preview">
-        <h3>Custom Theme Preview</h3>
-        <div class="theme-preview-box" id="custom-preview">
-            <h4>Your Custom Theme</h4>
-            <p>This is how your custom theme will look when applied to the site.</p>
-            <div class="preview-controls">
-                <button class="preview-button">Sample Button</button>
-                <a href="#" class="preview-link">Sample Link</a>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-    // Initialize the custom preview with the default values
-    document.addEventListener('DOMContentLoaded', function() {
-        updateCustomPreview();
-    });
-
-    function updateCustomPreview() {
-        var primaryColor = document.getElementById('primary_color').value;
-        var secondaryColor = document.getElementById('secondary_color').value;
-        var accentColor = document.getElementById('accent_color').value;
-        var textColor = document.getElementById('text_color').value;
-        var linkColor = document.getElementById('link_color').value;
-
-        var customPreview = document.getElementById('custom-preview');
-        var previewButton = customPreview.querySelector('.preview-button');
-        var previewLink = customPreview.querySelector('.preview-link');
-
-        // Create a custom style element if it doesn't exist
-        var customStyleId = 'custom-theme-preview-style';
-        var customStyle = document.getElementById(customStyleId);
-        if (!customStyle) {
-            customStyle = document.createElement('style');
-            customStyle.id = customStyleId;
-            document.head.appendChild(customStyle);
-        }
-
-        // Define custom CSS variables
-        var css = `
-            #custom-preview {
-                background-color: ${primaryColor} !important;
-                color: ${textColor} !important;
-            }
-            #custom-preview button {
-                background-color: ${accentColor} !important;
-                color: ${textColor} !important;
-                border: 1px solid ${secondaryColor} !important;
-            }
-            #custom-preview a {
-                color: ${linkColor} !important;
-            }
-        `;
-
-        // Apply the custom styles
-        customStyle.innerHTML = css;
-    }
-</script>
-
-[% IF site.name == 'CSC' %]
-<h2>All Sites</h2>
-
-<table class="data-table">
-    <thead>
-        <tr>
-            <th>Site Name</th>
-            <th>Current Theme</th>
-            <th>Actions</th>
-        </tr>
-    </thead>
-    <tbody>
-        [% FOREACH s IN sites %]
-        <tr>
-            <td>[% s.name %]</td>
-            <td>[% s.theme || 'default' %]</td>
-            <td>
-                <form action="[% c.uri_for('/themeadmin/update_theme') %]" method="post" style="display:inline;">
-                    <input type="hidden" name="site_id" value="[% s.id %]">
-                    <select name="theme">
-                        [% FOREACH theme IN available_themes.sort %]
-                        <option value="[% theme %]" [% IF s.theme == theme %]selected[% END %]>[% theme.ucfirst %]</option>
-                        [% END %]
-                        [% IF s.theme && !available_themes.grep('^' _ s.theme _ '$').size %]
-                        <option value="[% s.theme %]" selected>Custom ([% s.theme %])</option>
-                        [% END %]
-                    </select>
-                    <button type="submit">Update</button>
-                </form>
-            </td>
-        </tr>
-        [% END %]
-    </tbody>
-</table>
-[% END %]
-
-<h2>Theme Preview</h2>
-
-<div class="theme-preview">
-    <div class="theme-preview-grid">
-        [% FOREACH theme IN available_themes.sort %]
-        <div class="theme-preview-container">
-            <h3>[% theme.ucfirst %] Theme</h3>
-            <div class="theme-preview-box" id="preview-[% theme %]">
-                <h4>Theme: [% theme.ucfirst %]</h4>
-                <p>This is how the [% theme %] theme looks. It includes text styling, buttons, and links.</p>
-                <div class="preview-controls">
-                    <button class="preview-button">Sample Button</button>
-                    <a href="#" class="preview-link">Sample Link</a>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h4>Active Theme: [% theme_name %]</h4>
+                    <p>Site: [% site.name %]</p>
+                    
+                    <form action="[% c.uri_for('/themeadmin/update_theme') %]" method="POST" class="mt-3">
+                        <input type="hidden" name="site_id" value="[% site.id %]">
+                        <div class="form-group">
+                            <label for="theme">Select Theme:</label>
+                            <select name="theme" id="theme" class="form-control">
+                                [% FOREACH theme IN available_themes %]
+                                <option value="[% theme %]" [% IF theme == theme_name %]selected[% END %]>
+                                    [% theme | ucfirst %]
+                                </option>
+                                [% END %]
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary mt-3">Update Theme</button>
+                    </form>
+                </div>
+                <div class="col-md-6">
+                    <div class="theme-preview p-3 border rounded">
+                        <h5>Theme Preview</h5>
+                        <div class="preview-box" style="background-color: var(--primary-color);">
+                            <p style="color: var(--text-color);">Sample Text</p>
+                            <a href="#" style="color: var(--link-color);">Sample Link</a>
+                            <button class="btn" style="background-color: var(--button-bg); color: var(--button-text);">
+                                Sample Button
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-        [% END %]
+    </div>
 
-        <!-- Debugging information -->
-        <div class="debug-info" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc; background-color: #f9f9f9;">
-            <h3>Debug Information</h3>
-            <p>Available themes: [% available_themes.join(", ") %]</p>
-            <p>Current theme: [% site.theme %]</p>
-            <p>Using JSON themes: [% using_json_themes %]</p>
+    <div class="card">
+        <div class="card-header bg-secondary text-white">
+            <h3 class="card-title mb-0">Available Themes</h3>
+        </div>
+        <div class="card-body">
+            <table class="table table-striped table-hover">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th>Preview</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                [% FOREACH theme_name IN available_themes %]
+                <tr>
+                    <td>[% theme_name | ucfirst %]</td>
+                    <td>[% themes.$theme_name.description || "Standard theme" %]</td>
+                    <td>
+                        <div class="theme-swatch" style="background-color: var(--primary-color);"></div>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-primary preview-theme" data-theme="[% theme_name %]">
+                            Preview
+                        </button>
+                        <a href="[% c.uri_for('/themeadmin/wysiwyg_editor', theme_name) %]" class="btn btn-sm btn-info">
+                            Visual Editor
+                        </a>
+                        <a href="[% c.uri_for('/themeadmin/edit_theme_css', theme_name) %]" class="btn btn-sm btn-secondary">
+                            Advanced CSS
+                        </a>
+                    </td>
+                </tr>
+                [% END %]
+            </tbody>
+            </table>
         </div>
     </div>
 </div>
 
 <style>
-    .admin-actions {
-        margin-bottom: 20px;
-    }
+.theme-swatch {
+    width: 30px;
+    height: 30px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
 
-    .admin-actions .button {
-        display: inline-block;
-        padding: 8px 16px;
-        background-color: #4CAF50;
-        color: white;
-        text-decoration: none;
-        border-radius: 4px;
-        border: none;
-        cursor: pointer;
-    }
+.theme-preview {
+    min-height: 200px;
+    background-color: #f8f9fa;
+}
 
-    .admin-actions .button:hover {
-        background-color: #45a049;
-    }
-
-    /* Preview styles for each theme - Exactly matching the theme CSS files */
-    #preview-default {
-        background-color: #ffffff;
-        color: #000000;
-    }
-    #preview-default button {
-        background-color: #f2f2f2;
-        color: #000000;
-        border: 1px solid #cccccc;
-    }
-    #preview-default a {
-        color: #0000FF;
-    }
-
-    #preview-csc {
-        background-color: #ccffff;
-        color: black;
-    }
-    #preview-csc button {
-        background-color: #f2f2f2;
-        color: black;
-        border: 1px solid #cccccc;
-    }
-    #preview-csc a {
-        color: black;
-    }
-
-    #preview-apis {
-        background-color: #FFF8E1;
-        color: #2C2C2C;
-        background-image: linear-gradient(30deg, #FFF8E1 12%, transparent 12.5%, transparent 87%, #FFF8E1 87.5%, #FFF8E1),
-                        linear-gradient(150deg, #FFF8E1 12%, transparent 12.5%, transparent 87%, #FFF8E1 87.5%, #FFF8E1),
-                        linear-gradient(30deg, #FFF8E1 12%, transparent 12.5%, transparent 87%, #FFF8E1 87.5%, #FFF8E1),
-                        linear-gradient(150deg, #FFF8E1 12%, transparent 12.5%, transparent 87%, #FFF8E1 87.5%, #FFF8E1),
-                        linear-gradient(60deg, #FFE8B8 25%, transparent 25.5%, transparent 75%, #FFE8B8 75%, #FFE8B8),
-                        linear-gradient(60deg, #FFE8B8 25%, transparent 25.5%, transparent 75%, #FFE8B8 75%, #FFE8B8);
-        background-size: 40px 70px;
-        background-position: 0 0, 0 0, 20px 35px, 20px 35px, 0 0, 20px 35px;
-    }
-    #preview-apis button {
-        background-color: #FFB900;
-        color: #ffffff;
-        border: 1px solid #B88A00;
-    }
-    #preview-apis a {
-        color: #B88A00;
-    }
-
-    #preview-usbm {
-        background-color: #009933;
-        color: #333333;
-    }
-    #preview-usbm button {
-        background-color: #009933;
-        color: #ffffff;
-        border: 1px solid #006622;
-    }
-    #preview-usbm a {
-        color: #009933;
-    }
-</style>
-
-<style>
-    .theme-preview-grid {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 20px;
-        margin-bottom: 30px;
-    }
-
-    .theme-preview-container {
-        flex: 1;
-        min-width: 300px;
-        max-width: 45%;
-    }
-
-    .theme-preview-box {
-        padding: 15px;
-        border: 1px solid #cccccc;
-        margin-bottom: 20px;
-        border-radius: 5px;
-        height: 250px;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-    }
-
-    .preview-controls {
-        display: flex;
-        gap: 10px;
-        margin: 15px 0;
-    }
-
-    .preview-button {
-        padding: 8px 16px;
-        border-radius: 4px;
-        cursor: pointer;
-    }
-
-    .preview-link {
-        display: inline-block;
-        padding: 8px 0;
-    }
-
-    .preview-info {
-        margin-top: 10px;
-        font-size: 0.9em;
-        border-top: 1px dashed rgba(0,0,0,0.1);
-        padding-top: 10px;
-    }
-
-    .live-preview {
-        margin: 30px 0;
-        border: 2px solid #3498db;
-        padding: 20px;
-        border-radius: 8px;
-        background-color: rgba(52, 152, 219, 0.05);
-    }
-
-    .live-preview h3 {
-        margin-top: 0;
-        color: #3498db;
-    }
-
-    #live-preview {
-        width: 100%;
-        max-width: 600px;
-        margin: 0 auto;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    }
-
-    .custom-theme-container {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 30px;
-        margin-bottom: 30px;
-    }
-
-    .custom-theme-form {
-        flex: 1;
-        min-width: 300px;
-    }
-
-    .custom-theme-preview {
-        flex: 1;
-        min-width: 300px;
-    }
-
-    .form-group {
-        margin-bottom: 15px;
-    }
-
-    .form-group label {
-        display: block;
-        margin-bottom: 5px;
-        font-weight: bold;
-    }
-
-    .form-group input[type="color"] {
-        width: 100%;
-        height: 40px;
-        cursor: pointer;
-    }
-
-    /* Theme-specific styles are now in theme-previews.css */
+.preview-box {
+    padding: 15px;
+    border-radius: 4px;
+    margin-top: 10px;
+}
 </style>

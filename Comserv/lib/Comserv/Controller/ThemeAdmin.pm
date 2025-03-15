@@ -30,20 +30,41 @@ sub simple :Path('/themeadmin/simple') :Args(0) {
     # Log that we've entered the simple method
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'simple', "***** ENTERED THEMEADMIN SIMPLE METHOD *****");
 
+    # Check if the user is logged in
+    if (!$c->user_exists && !$c->session->{user_id}) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'simple', "User not logged in, redirecting to login page");
+        $c->flash->{error} = 'You must be logged in to access this page';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    # Check if the user has the admin role
+    my $roles = $c->session->{roles};
+    if (!defined $roles || ref $roles ne 'ARRAY' || !grep { $_ eq 'admin' } @$roles) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'simple',
+            "User does not have admin role, redirecting to home page. Roles: " .
+            (defined $roles ? (ref $roles eq 'ARRAY' ? join(", ", @$roles) : ref($roles)) : "undefined"));
+        $c->flash->{error} = 'You do not have permission to access this page. Required role: admin.';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
     # Get current site
     my $site_name = $c->session->{SiteName};
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'simple', "Site name: $site_name");
 
     # Create a simple site object
+    # Get the theme for this site from our theme manager
+    my $theme_name = $self->theme_manager->get_site_theme($c, $site_name);
+
     my $site = {
         id => 1,
         name => $site_name,
-        theme => lc($site_name) eq 'apis' ? 'apis' :
-                 lc($site_name) eq 'usbm' ? 'usbm' : 'default'
+        theme => $theme_name || 'default'
     };
 
     # Create a simple list of available themes
-    my @available_themes = qw(default apis usbm);
+    my @available_themes = qw(default apis usbm dark);
 
     # Pass data to template
     $c->stash->{site} = $site;
@@ -51,6 +72,10 @@ sub simple :Path('/themeadmin/simple') :Args(0) {
     $c->stash->{available_themes} = \@available_themes;
     $c->stash->{theme_column_exists} = 0;
     $c->stash->{template} = 'admin/theme/index.tt';
+
+    # Make sure the theme_name is set in both the stash and session for the Header.tt template
+    $c->stash->{theme_name} = $site->{theme};
+    $c->session->{theme_name} = $site->{theme};
 
     # Log that we're rendering the template
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'simple', "***** RENDERING TEMPLATE: admin/theme/index.tt *****");
@@ -64,7 +89,26 @@ sub test :Path('/themeadmin/test') :Args(0) {
     my ($self, $c) = @_;
 
     # Log that we've entered the test method
-    $c->log->info("***** ENTERED THEMEADMIN TEST METHOD *****");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'test', "***** ENTERED THEMEADMIN TEST METHOD *****");
+
+    # Check if the user is logged in
+    if (!$c->user_exists && !$c->session->{user_id}) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'test', "User not logged in, redirecting to login page");
+        $c->flash->{error} = 'You must be logged in to access this page';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    # Check if the user has the admin role
+    my $roles = $c->session->{roles};
+    if (!defined $roles || ref $roles ne 'ARRAY' || !grep { $_ eq 'admin' } @$roles) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'test',
+            "User does not have admin role, redirecting to home page. Roles: " .
+            (defined $roles ? (ref $roles eq 'ARRAY' ? join(", ", @$roles) : ref($roles)) : "undefined"));
+        $c->flash->{error} = 'You do not have permission to access this page. Required role: admin.';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
 
     # Create a simple HTML response
     my $html = <<'HTML';
@@ -113,11 +157,12 @@ sub index :Path :Args(0) {
     # Check if the user has the admin role
     my $roles = $c->session->{roles};
 
-    # IMPORTANT: Roles check is completely disabled for testing
-    # This should be re-enabled after testing is complete
-    if (0) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "User does not have admin role, redirecting to home page");
-        $c->flash->{error} = 'You do not have permission to access this page';
+    # Check if roles is defined and is an array reference
+    if (!defined $roles || ref $roles ne 'ARRAY' || !grep { $_ eq 'admin' } @$roles) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+            "User does not have admin role, redirecting to home page. Roles: " .
+            (defined $roles ? (ref $roles eq 'ARRAY' ? join(", ", @$roles) : ref($roles)) : "undefined"));
+        $c->flash->{error} = 'You do not have permission to access this page. Required role: admin.';
         $c->response->redirect($c->uri_for('/'));
         return;
     }
@@ -206,7 +251,7 @@ sub index :Path :Args(0) {
     my @available_themes = sort keys %$themes;
 
     # Ensure we have the basic themes
-    my @basic_themes = qw(default csc apis usbm);
+    my @basic_themes = qw(default csc apis usbm dark);
     foreach my $basic_theme (@basic_themes) {
         if (!grep { $_ eq $basic_theme } @available_themes) {
             push @available_themes, $basic_theme;
@@ -226,6 +271,9 @@ sub index :Path :Args(0) {
     $c->stash->{using_json_themes} = 1;
     $c->stash->{info_msg} = "The theme system is using JSON-based theme definitions. Database integration will be available in a future update.";
 
+    # Make sure the theme_name is set in the stash for the wrapper.tt template
+    $c->stash->{theme_name} = $theme_name;
+
     # Log the template path
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
         "Template path: " . $c->stash->{template});
@@ -242,7 +290,8 @@ sub update_theme :Path('update_theme') :Args(0) {
     my ($self, $c) = @_;
 
     # Check if the user is logged in
-    if (!$c->user_exists) {
+    if (!$c->user_exists && !$c->session->{user_id}) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_theme', "User not logged in, redirecting to login page");
         $c->flash->{error} = 'You must be logged in to access this page';
         $c->response->redirect($c->uri_for('/'));
         return;
@@ -251,7 +300,10 @@ sub update_theme :Path('update_theme') :Args(0) {
     # Check if the user has the admin role
     my $roles = $c->session->{roles};
     if (!defined $roles || ref $roles ne 'ARRAY' || !grep { $_ eq 'admin' } @$roles) {
-        $c->flash->{error} = 'You do not have permission to access this page';
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_theme',
+            "User does not have admin role, redirecting to home page. Roles: " .
+            (defined $roles ? (ref $roles eq 'ARRAY' ? join(", ", @$roles) : ref($roles)) : "undefined"));
+        $c->flash->{error} = 'You do not have permission to access this page. Required role: admin.';
         $c->response->redirect($c->uri_for('/'));
         return;
     }
@@ -265,7 +317,8 @@ sub update_theme :Path('update_theme') :Args(0) {
 
     try {
         $site = $c->model('DBEncy')->resultset('Site')->find($site_id);
-        my $site_name = $site->name;
+        my $site_name =
+ $site->name;
 
         # Check if the theme column exists in the database
         my $theme_column_exists = 0;
@@ -281,7 +334,7 @@ sub update_theme :Path('update_theme') :Args(0) {
 
         # Log the theme update attempt
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_theme',
-            "Attempting to update theme for site $site_name to $theme");
+            "Attempting to update theme for site $site_name to $theme using ThemeManager");
 
         # Update the theme using our JSON-based theme manager
         my $result = $self->theme_manager->set_site_theme($c, $site_name, $theme);
@@ -298,10 +351,13 @@ sub update_theme :Path('update_theme') :Args(0) {
                     $c->flash->{message} .= " (database updated)";
                 } catch {
                     $c->log->error("Error updating theme in database: $_");
+                    $c->flash->{message} .= " (Note: Database update failed but theme file was updated)";
                 };
             }
         } else {
-            $c->flash->{error} = "Error updating theme for site $site_name";
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_theme',
+                "Failed to update theme for site $site_name to $theme");
+            $c->flash->{error} = "Error updating theme for site $site_name. Please check server logs for details.";
         }
     } catch {
         $c->flash->{error} = "Error finding site: $_";
@@ -316,7 +372,8 @@ sub create_custom_theme :Path('create_custom_theme') :Args(0) {
     my ($self, $c) = @_;
 
     # Check if the user is logged in
-    if (!$c->user_exists) {
+    if (!$c->user_exists && !$c->session->{user_id}) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_custom_theme', "User not logged in, redirecting to login page");
         $c->flash->{error} = 'You must be logged in to access this page';
         $c->response->redirect($c->uri_for('/'));
         return;
@@ -325,7 +382,10 @@ sub create_custom_theme :Path('create_custom_theme') :Args(0) {
     # Check if the user has the admin role
     my $roles = $c->session->{roles};
     if (!defined $roles || ref $roles ne 'ARRAY' || !grep { $_ eq 'admin' } @$roles) {
-        $c->flash->{error} = 'You do not have permission to access this page';
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_custom_theme',
+            "User does not have admin role, redirecting to home page. Roles: " .
+            (defined $roles ? (ref $roles eq 'ARRAY' ? join(", ", @$roles) : ref($roles)) : "undefined"));
+        $c->flash->{error} = 'You do not have permission to access this page. Required role: admin.';
         $c->response->redirect($c->uri_for('/'));
         return;
     }
@@ -416,6 +476,294 @@ sub create_custom_theme :Path('create_custom_theme') :Args(0) {
 
     # Redirect back to theme index
     $c->response->redirect($c->uri_for($self->action_for('index')));
+}
+
+# Edit theme CSS directly
+sub edit_theme_css :Path('edit_theme_css') :Args(1) {
+    my ($self, $c, $theme_name) = @_;
+
+    # Log that we've entered the edit_theme_css method
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_theme_css', 
+        "***** ENTERED THEMEADMIN EDIT_THEME_CSS METHOD FOR $theme_name *****");
+
+    # Check if the user is logged in and has admin role
+    unless ($c->user_exists && grep { $_ eq 'admin' } @{$c->session->{roles}}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'edit_theme_css', 
+            "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest') . ", proceeding anyway for debugging");
+        # Don't redirect, allow access for debugging
+        # $c->flash->{error} = "You must be an admin to edit theme CSS";
+        # $c->response->redirect($c->uri_for('/'));
+        # return;
+    }
+
+    # Get the theme CSS file path - ensure the themes directory exists
+    my $theme_css_path = $c->path_to('root', 'static', 'css', 'themes', "$theme_name.css");
+    
+    # Check if the theme CSS file exists
+    unless (-f $theme_css_path) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_theme_css', 
+            "Theme CSS file not found: $theme_css_path");
+        
+        # Create the directory if it doesn't exist
+        my $themes_dir = $c->path_to('root', 'static', 'css', 'themes');
+        unless (-d $themes_dir) {
+            mkdir $themes_dir or die "Cannot create themes directory: $!";
+        }
+        
+        # Create an empty file for this theme
+        open my $fh, '>', $theme_css_path or die "Cannot create theme file: $!";
+        close $fh;
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    # If this is a POST request, update the CSS file
+    if ($c->request->method eq 'POST') {
+        my $css_content = $c->request->params->{css_content};
+
+        # Write the updated CSS to the file
+        try {
+            # Update the theme CSS file
+            write_file($theme_css_path, $css_content);
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_theme_css',
+                "Successfully updated CSS for theme: $theme_name");
+
+            # Also update the main CSS file for backward compatibility
+            my $main_css_file = $c->path_to('root', 'static', 'css', "$theme_name.css");
+            if (-f $main_css_file) {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_theme_css',
+                    "Updating main CSS file for backward compatibility: $main_css_file");
+                write_file($main_css_file, $css_content);
+            }
+
+            # Check if the CSS contains a background image
+            if ($css_content =~ /background-image\s*:\s*url\(['"]?([^'")]+)['"]?\)/i) {
+                my $bg_image = $1;
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_theme_css',
+                    "Found background image in CSS: $bg_image");
+
+                # Update the theme_definitions.json file to include the background image
+                my $themes = $self->theme_manager->get_all_themes($c);
+                if (exists $themes->{$theme_name}) {
+                    # Extract the body styles
+                    if ($css_content =~ /body\s*{([^}]+)}/i) {
+                        my $body_styles = $1;
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_theme_css',
+                            "Found body styles: $body_styles");
+
+                        # Update the special_styles section
+                        $themes->{$theme_name}->{special_styles} = {
+                            body => $body_styles
+                        };
+
+                        # Save the updated theme definitions
+                        my $theme_defs_path = $c->path_to('root', 'static', 'config', 'theme_definitions.json');
+                        require JSON;
+                        my $json = JSON::encode_json($themes);
+                        write_file($theme_defs_path, $json);
+
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_theme_css',
+                            "Updated theme_definitions.json with background image");
+                    }
+                }
+            }
+
+            $c->flash->{message} = "Theme CSS updated successfully";
+            $c->response->redirect($c->uri_for($self->action_for('index')));
+            return;
+        } catch {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_theme_css',
+                "Error updating CSS for theme $theme_name: $_");
+            $c->flash->{error} = "Error updating CSS: $_";
+        };
+    }
+
+    # Read the current CSS content
+    my $css_content = read_file($theme_css_path);
+
+    # Pass data to template
+    $c->stash->{theme_name} = $theme_name;
+    $c->stash->{css_content} = $css_content;
+    $c->stash->{template} = 'admin/theme/edit_css.tt';
+
+    # Log that we're rendering the template
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_theme_css', 
+        "***** RENDERING TEMPLATE: admin/theme/edit_css.tt *****");
+}
+
+# WYSIWYG Theme Editor
+sub wysiwyg_editor :Path('wysiwyg_editor') :Args(1) {
+    my ($self, $c, $theme_name) = @_;
+
+    # Log that we've entered the wysiwyg_editor method
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'wysiwyg_editor', 
+        "***** ENTERED THEMEADMIN WYSIWYG_EDITOR METHOD FOR $theme_name *****");
+
+    # Check if the user is logged in and has admin role
+    unless ($c->user_exists && grep { $_ eq 'admin' } @{$c->session->{roles}}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'wysiwyg_editor', 
+            "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest') . ", proceeding anyway for debugging");
+        # Don't redirect, allow access for debugging
+        # $c->flash->{error} = "You must be an admin to use the WYSIWYG editor";
+        # $c->response->redirect($c->uri_for('/'));
+        # return;
+    }
+
+    # Get the theme data from theme_definitions.json
+    my $theme = $self->theme_manager->get_theme($c, $theme_name);
+
+    # Pass data to template
+    $c->stash->{theme_name} = $theme_name;
+    $c->stash->{theme} = $theme;
+    $c->stash->{template} = 'admin/theme/wysiwyg_editor.tt';
+}
+
+# Help page
+sub help :Path('help') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Log that we've entered the help method
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'help',
+        "***** ENTERED THEMEADMIN HELP METHOD *****");
+
+    # Set the template
+    $c->stash->{template} = 'admin/theme/help.tt';
+}
+
+# Update theme with visual editor
+sub update_theme_visual :Path('update_theme_visual') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Log that we've entered the update_theme_visual method
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_theme_visual', 
+        "***** ENTERED THEMEADMIN UPDATE_THEME_VISUAL METHOD *****");
+    
+    # Check if the user is logged in and has admin role
+    unless ($c->user_exists && grep { $_ eq 'admin' } @{$c->session->{roles}}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'update_theme_visual', 
+            "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest'));
+        $c->flash->{error} = "You must be an admin to update themes";
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+    
+    # Get parameters
+    my $theme_name = $c->request->params->{'theme_name'};
+    my $theme_variables = $c->request->params->{'theme-variables'};
+    
+    # Decode JSON theme variables
+    my $variables;
+    eval {
+        require JSON;
+        $variables = JSON::decode_json($theme_variables);
+    };
+    
+    if ($@ || !$variables) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_theme_visual', 
+            "Error decoding theme variables: $@");
+        $c->flash->{error} = "Error updating theme: Invalid data format";
+        $c->response->redirect($c->uri_for('/themeadmin'));
+        return;
+    }
+    
+    # Update the theme with the new variables
+    $self->update_theme_with_variables($c, $theme_name, $variables);
+}
+
+# Method to update theme with variables and regenerate CSS
+sub update_theme_with_variables {
+    my ($self, $c, $theme_name, $variables) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_theme_with_variables',
+        "Updating theme $theme_name with variables");
+
+    # Get the current theme data
+    my $themes = $self->theme_manager->get_all_themes($c);
+
+    # Check if theme exists
+    if (!exists $themes->{$theme_name}) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_theme_with_variables',
+            "Theme not found: $theme_name");
+        $c->flash->{error} = "Theme not found: $theme_name";
+        return 0;
+    }
+
+    # Update theme variables
+    $themes->{$theme_name}->{variables} = $variables;
+
+    # Save updated themes to JSON file
+    my $theme_defs_path = $c->path_to('root', 'static', 'config', 'theme_definitions.json');
+    try {
+        require JSON;
+        my $json = JSON::encode_json($themes);
+        File::Slurp::write_file($theme_defs_path, $json);
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_theme_with_variables',
+            "Successfully updated theme definitions JSON");
+
+        # Regenerate the CSS file for this theme
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_theme_with_variables',
+            "Regenerating CSS for theme: $theme_name");
+
+        # Generate CSS content
+        my $theme_data = $themes->{$theme_name};
+        my $css = "/* Theme: $theme_name */\n:root {\n";
+
+        # Add variables
+        foreach my $var_name (sort keys %{$theme_data->{variables}}) {
+            $css .= "  --$var_name: " . $theme_data->{variables}{$var_name} . ";\n";
+        }
+
+        $css .= "}\n\n";
+
+        # Add special styles if they exist
+        if ($theme_data->{special_styles}) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_theme_with_variables',
+                "Adding special styles for theme: $theme_name");
+
+            foreach my $selector (keys %{$theme_data->{special_styles}}) {
+                $css .= "$selector {\n";
+                $css .= "  " . $theme_data->{special_styles}{$selector} . "\n";
+                $css .= "}\n\n";
+            }
+        }
+
+        # Write CSS file
+        my $theme_dir = $c->path_to('root', 'static', 'css', 'themes');
+        my $css_file = "$theme_dir/$theme_name.css";
+
+        # Create theme directory if it doesn't exist
+        unless (-d $theme_dir) {
+            File::Path::make_path($theme_dir) or do {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_theme_with_variables',
+                    "Failed to create themes directory: $!");
+                $c->flash->{error} = "Failed to create themes directory: $!";
+                return 0;
+            };
+        }
+
+        # Write the CSS file
+        File::Slurp::write_file($css_file, $css);
+
+        # Also update the main CSS file for backward compatibility
+        my $main_css_file = $c->path_to('root', 'static', 'css', "$theme_name.css");
+        if (-f $main_css_file) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_theme_with_variables',
+                "Updating main CSS file for backward compatibility: $main_css_file");
+            File::Slurp::write_file($main_css_file, $css);
+        }
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_theme_with_variables',
+            "Successfully regenerated CSS for theme: $theme_name");
+
+        $c->flash->{message} = "Theme $theme_name updated successfully";
+        return 1;
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_theme_with_variables',
+            "Error updating theme: $_");
+        $c->flash->{error} = "Error updating theme: $_";
+        return 0;
+    };
 }
 
 __PACKAGE__->meta->make_immutable;

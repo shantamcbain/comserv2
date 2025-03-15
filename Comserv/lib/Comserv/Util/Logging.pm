@@ -42,7 +42,7 @@ sub _print_log {
 # Log rotation method
 sub rotate_log {
     my ($class) = @_;
-    return unless $LOG_FILE && -e $LOG_FILE;
+    return unless defined $LOG_FILE && -e $LOG_FILE;
 
     my $file_size = -s $LOG_FILE;
     _print_log("Current log file size: $file_size bytes, max size: $MAX_LOG_SIZE bytes");
@@ -244,7 +244,7 @@ sub log_to_file {
     $level    //= 'INFO';
 
     # Check file size before writing to ensure we don't exceed max size
-    if ($file_path eq $LOG_FILE && -e $file_path) {
+    if (defined $LOG_FILE && $file_path eq $LOG_FILE && -e $file_path) {
         my $file_size = -s $file_path;
         if ($file_size >= $ROTATION_THRESHOLD) {
             _print_log("Pre-emptive log rotation triggered: $file_size bytes >= $ROTATION_THRESHOLD bytes");
@@ -279,7 +279,7 @@ sub log_to_catalyst {
 # This can be called from admin interfaces
 sub force_log_rotation {
     my ($class) = @_;
-    return unless $LOG_FILE && -e $LOG_FILE;
+    return unless defined $LOG_FILE && -e $LOG_FILE;
 
     my $file_size = -s $LOG_FILE;
     _print_log("Manual log rotation requested. Current log file size: $file_size bytes");
@@ -376,7 +376,7 @@ sub get_log_file_size {
     my $file_path = $custom_path || $LOG_FILE;
 
     # If we still don't have a path or the file doesn't exist, return 0
-    return 0 unless $file_path && -e $file_path;
+    return 0 unless defined $file_path && -e $file_path;
 
     my $size_bytes = -s $file_path;
     return sprintf("%.2f", $size_bytes / 1024); # Return size in KB

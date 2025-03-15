@@ -1,0 +1,57 @@
+[% META title = 'Edit Theme CSS' %]
+
+<div class="container">
+    <h1>Edit Theme CSS: [% theme_name %]</h1>
+
+    <div class="alert alert-info">
+        <strong>Tip:</strong> To add a background image, include <code>background-image: url('../images/BMaster/honey2.jpg');</code> in the body section.
+        <a href="[% c.uri_for('/themeadmin/help') %]" class="btn btn-sm btn-info float-end">View Help</a>
+    </div>
+
+    [% IF c.flash.message %]
+        <div class="alert alert-success">[% c.flash.message %]</div>
+    [% END %]
+
+    [% IF c.flash.error %]
+        <div class="alert alert-danger">[% c.flash.error %]</div>
+    [% END %]
+
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h3 class="card-title mb-0">CSS Editor</h3>
+        </div>
+        <div class="card-body">
+            <form action="[% c.uri_for('/themeadmin/edit_theme_css', theme_name) %]" method="POST">
+                <div class="form-group">
+                    <textarea name="css_content" id="css_content" class="form-control" rows="20" style="font-family: monospace;">[% css_content %]</textarea>
+                </div>
+                <div class="mt-3">
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                    <a href="[% c.uri_for('/themeadmin') %]" class="btn btn-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header bg-info text-white">
+            <h3 class="card-title mb-0">CSS Variables Reference</h3>
+        </div>
+        <div class="card-body">
+            <p>Use these CSS variables in your theme:</p>
+            <ul>
+                <li><code>--primary-color</code>: Main background color</li>
+                <li><code>--secondary-color</code>: Secondary background color</li>
+                <li><code>--accent-color</code>: Accent color for highlights</li>
+                <li><code>--text-color</code>: Main text color</li>
+                <li><code>--link-color</code>: Color for links</li>
+                <li><code>--link-hover-color</code>: Color for links on hover</li>
+                <li><code>--background-color</code>: Page background color</li>
+                <li><code>--border-color</code>: Color for borders</li>
+                <li><code>--table-header-bg</code>: Background color for table headers</li>
+                <li><code>--warning-color</code>: Color for warnings</li>
+                <li><code>--success-color</code>: Color for success messages</li>
+            </ul>
+        </div>
+    </div>
+</div>

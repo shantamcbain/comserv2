@@ -1,64 +1,15 @@
-/* Theme: Default Theme */
-/* Description: The default system theme */
-
+/* Theme: default */
 :root {
   --accent-color: #FF9900;
   --background-color: #ffffff;
-  --body-font: Verdana, Helvetica, sans-serif;
-  --border-color: #cccccc;
-  --button-bg: #f2f2f2;
-  --button-border: #cccccc;
-  --button-hover-bg: #e0e0e0;
-  --button-text: #000000;
-  --font-size-base: 16px;
-  --font-size-large: 20px;
-  --font-size-small: 14px;
-  --font-size-xlarge: 24px;
-  --header-font: Verdana, Helvetica, sans-serif;
+  --border-color: #dddddd;
   --link-color: #0000FF;
   --link-hover-color: #000099;
-  --nav-bg: #ccffff;
-  --nav-hover-bg: rgba(0, 0, 0, 0.1);
-  --nav-text: #000000;
-  --primary-color: #ccffff;
+  --primary-color: #ffffff;
   --secondary-color: #f9f9f9;
-  --success-color: #009900;
+  --success-color: #27ae60;
   --table-header-bg: #f2f2f2;
   --text-color: #000000;
-  --warning-color: #ff0000;
-}
-
-body, body.theme-default {
-  font-family: var(--body-font);
-  font-size: var(--font-size-base);
-  color: var(--text-color);
-  background-color: var(--background-color);
-}
-
-a {
-  color: var(--link-color);
-}
-
-a:hover {
-  color: var(--link-hover-color);
-}
-
-button,
-.button,
-input[type="submit"] {
-  background-color: var(--button-bg);
-  color: var(--button-text);
-  border: 1px solid var(--button-border);
-}
-
-button:hover,
-.button:hover,
-input[type="submit"]:hover {
-  background-color: var(--button-hover-bg);
-}
-
-nav {
-  background-color: var(--nav-bg);
-  color: var(--nav-text);
+  --warning-color: #f39c12;
 }
 

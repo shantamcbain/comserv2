@@ -269,7 +269,6 @@ sub details :Path('details') :Args(0) {
 
 sub fetch_projects_with_subprojects :Private {
     my ($self, $c) = @_;
-
     # Log the start of the project-fetching subroutine
     $self->logging->log_with_details(
         $c, 'info', __FILE__, __LINE__, 'fetch_projects_with_subprojects',

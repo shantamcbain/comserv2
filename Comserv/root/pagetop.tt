@@ -57,7 +57,8 @@
         </ul>
     </nav>
 </header>
-
+[% IF error_msg %]<div class="alert error">[% error_msg %]</div>[% END %]
+[% IF success_msg %]<div class="alert success">[% success_msg %]</div>[% END %]
 [% IF error_msg %]
 <p class="error">Error: [% error_msg %]</p>
 [% END %]

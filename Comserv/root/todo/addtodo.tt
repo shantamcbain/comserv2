@@ -1,7 +1,45 @@
-[% PageVersion = 'addtodo.tt,v 0.03 2025/02/04shanta Exp shanta ' %]
+[% PageVersion = 'addtodo.tt,v 0.04 2024/11/23 shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
     Version: [% PageVersion %]
 [% END %]
+
+<style>
+    /* Form styling */
+    form div {
+        margin-bottom: 15px;
+    }
+
+    label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+    }
+
+    input[type="text"],
+    input[type="date"],
+    input[type="number"],
+    select {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+    }
+
+    input[type="submit"] {
+        background-color: #4CAF50;
+        color: white;
+        padding: 10px 15px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+    }
+
+    input[type="submit"]:hover {
+        background-color: #45a049;
+    }
+</style>
 
 <h1>Add a New To-do Item</h1>
 

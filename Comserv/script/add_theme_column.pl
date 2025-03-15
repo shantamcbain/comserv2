@@ -5,62 +5,23 @@ use warnings;
 use FindBin;
 use lib "$FindBin::Bin/../lib";
 use Comserv::Schema;
-use DBI;
-use Config::JSON;
-
-# Load the configuration
-my $config_file = "$FindBin::Bin/../comserv.json";
-my $config = Config::JSON->new($config_file);
-
-# Get database connection details from config
-my $dsn = $config->get('Model::DBEncy/connect_info/0');
-my $user = $config->get('Model::DBEncy/connect_info/1');
-my $pass = $config->get('Model::DBEncy/connect_info/2');
-
-# Connect to the database
-my $dbh = DBI->connect($dsn, $user, $pass, { RaiseError => 1, PrintError => 0 });
-
-# Check if the theme column already exists
-my $sth = $dbh->prepare("SHOW COLUMNS FROM sites LIKE 'theme'");
-$sth->execute();
-my $column_exists = $sth->fetchrow_array();
-
-if ($column_exists) {
-    print "The 'theme' column already exists in the 'sites' table.\n";
-} else {
-    # Add the theme column to the sites table
-    $dbh->do("ALTER TABLE sites ADD COLUMN theme VARCHAR(50) DEFAULT 'default'");
-    print "Added 'theme' column to the 'sites' table with default value 'default'.\n";
-}
-
-# Close the database connection
-$dbh->disconnect();
-
-print "Script completed successfully.\n";#!/usr/bin/env perl
-
-use strict;
-use warnings;
-use FindBin;
-use lib "$FindBin::Bin/../lib";
+use Try::Tiny;
 use DBI;
 use Config::General;
-use Try::Tiny;
 
 # Load configuration
 my $config_file = "$FindBin::Bin/../comserv.conf";
 my %config = Config::General->new($config_file)->getall;
+my $db_config = $config{'Model::DBEncy'};
 
-# Database connection details
-my $db_name = $config{Model}{DBEncy}{schema_class} || 'ency';
-my $db_user = $config{Model}{DBEncy}{connect_info}{user} || 'root';
-my $db_pass = $config{Model}{DBEncy}{connect_info}{password} || '';
-my $db_host = $config{Model}{DBEncy}{connect_info}{host} || 'localhost';
+# Connect to database
+my $dsn = $db_config->{connect_info}->{dsn};
+my $user = $db_config->{connect_info}->{user};
+my $password = $db_config->{connect_info}->{password};
 
-# Connect to the database
-my $dsn = "DBI:mysql:database=$db_name;host=$db_host";
-my $dbh = DBI->connect($dsn, $db_user, $db_pass, { RaiseError => 1, PrintError => 0 });
+my $dbh = DBI->connect($dsn, $user, $password);
 
-print "Connected to database: $db_name\n";
+print "Checking if theme column exists in sites table...\n";
 
 # Check if the theme column already exists
 my $sth = $dbh->prepare("SHOW COLUMNS FROM sites LIKE 'theme'");
@@ -68,19 +29,63 @@ $sth->execute();
 my $column_exists = $sth->fetchrow_array();
 
 if ($column_exists) {
-    print "The 'theme' column already exists in the 'sites' table.\n";
+    print "Theme column already exists in sites table.\n";
 } else {
-    # Add the theme column to the sites table
-    print "Adding 'theme' column to 'sites' table...\n";
-    
+    print "Adding theme column to sites table...\n";
+
+    # Add the theme column
     try {
         $dbh->do("ALTER TABLE sites ADD COLUMN theme VARCHAR(50) DEFAULT 'default'");
-        print "Successfully added 'theme' column to 'sites' table.\n";
+        print "Theme column added successfully.\n";
     } catch {
-        die "Error adding column: $_\n";
+        die "Error adding theme column: $_\n";
     };
 }
 
-# Disconnect from the database
-$dbh->disconnect();
-print "Database migration completed.\n";
+# Initialize themes for existing sites
+print "Initializing themes for existing sites...\n";
+
+# Read theme mappings from JSON file
+my $json_path = "$FindBin::Bin/../root/static/config/theme_mappings.json";
+my $theme_mappings = {};
+
+if (-f $json_path) {
+    require JSON;
+    my $json_text = do {
+        open my $fh, '<', $json_path or die "Cannot open $json_path: $!";
+        local $/;
+        <$fh>;
+    };
+    $theme_mappings = JSON::decode_json($json_text);
+}
+
+# Get all sites
+my $sites_sth = $dbh->prepare("SELECT id, name FROM sites");
+$sites_sth->execute();
+
+while (my ($id, $name) = $sites_sth->fetchrow_array()) {
+    # Determine theme based on site name
+    my $theme = 'default';
+
+    # Check if site exists in JSON mappings
+    if ($theme_mappings && $theme_mappings->{sites} && $theme_mappings->{sites}{uc($name)}) {
+        $theme = $theme_mappings->{sites}{uc($name)};
+    } else {
+        # Default mappings based on site name
+        if (lc($name) eq 'usbm') {
+            $theme = 'usbm';
+        } elsif (lc($name) eq 'csc') {
+            $theme = 'csc';
+        } elsif (lc($name) eq 'apis') {
+            $theme = 'apis';
+        }
+    }
+
+    # Update the site's theme
+    my $update_sth = $dbh->prepare("UPDATE sites SET theme = ? WHERE id = ?");
+    $update_sth->execute($theme, $id);
+
+    print "Set theme for site '$name' to '$theme'\n";
+}
+
+print "Theme initialization complete.\n";

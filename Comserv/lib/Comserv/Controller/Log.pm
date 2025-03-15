@@ -146,6 +146,22 @@ sub update :Path('/log/update') :Args(0) {
         $time = $c->request->body_parameters->{time}; # Use existing time value
     }
 
+    # Convert roles array to string if it's an array reference
+    my $group_of_poster = 'default';
+    if (defined $c->session->{roles}) {
+        if (ref $c->session->{roles} eq 'ARRAY') {
+            $group_of_poster = join(',', @{$c->session->{roles}});
+        } else {
+            $group_of_poster = $c->session->{roles};
+        }
+    }
+
+    # Log the group_of_poster value for debugging
+    $self->logging->log_with_details(
+        $c, 'debug', __FILE__, __LINE__, 'update',
+        "Setting group_of_poster to: $group_of_poster"
+    );
+
     # Get the new values from the form data
     my $new_values = {
         sitename        => $c->request->body_parameters->{sitename},
@@ -157,7 +173,7 @@ sub update :Path('/log/update') :Args(0) {
         start_time      => $start_time_str,
         end_time        => $end_time_str,
         time            => $time,
-        group_of_poster => $c->session->{roles},
+        group_of_poster => $group_of_poster, # Use the converted string value
         status          => $status,
         priority        => $c->request->body_parameters->{priority},
         comments        => $c->request->body_parameters->{comments},
@@ -355,6 +371,22 @@ sub create_log :Path('/log/create_log') :Args() {
         $sitename = $c->session->{SiteName};
     }
 
+    # Convert roles array to string if it's an array reference
+    my $group_of_poster = 'default';
+    if (defined $c->session->{roles}) {
+        if (ref $c->session->{roles} eq 'ARRAY') {
+            $group_of_poster = join(',', @{$c->session->{roles}});
+        } else {
+            $group_of_poster = $c->session->{roles};
+        }
+    }
+
+    # Log the group_of_poster value for debugging
+    $self->logging->log_with_details(
+        $c, 'debug', __FILE__, __LINE__, 'create_log',
+        "Setting group_of_poster to: $group_of_poster"
+    );
+
     my $logEntry = $rs->create({
         todo_record_id  => $c->request->body_parameters->{todo_record_id},
         owner           => $owner,
@@ -367,7 +399,7 @@ sub create_log :Path('/log/create_log') :Args() {
         start_time      => $start_time,
         end_time        => $end_time, # Use default value if not provided
         time            => $time_diff,
-        group_of_poster => $c->session->{roles},
+        group_of_poster => $group_of_poster, # Use the converted string value
         status          => $c->request->body_parameters->{status},
         priority        => $c->request->body_parameters->{priority},
         last_mod_by     => $c->session->{username},

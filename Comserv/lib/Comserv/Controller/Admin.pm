@@ -22,7 +22,7 @@ sub begin : Private {
     my ( $self, $c ) = @_;
     warn "Entering Comserv::Controller::Admin::begin\n";
     # Debug logging for begin action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "Starting begin action");
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "Starting begin action");
     $c->stash->{debug_errors} //= []; # Ensure debug_errors is initialized
 
     # Add debug information to the stash
@@ -34,40 +34,40 @@ sub begin : Private {
     };
 
     # Check if the user is logged in
-#    if ( !$c->user_exists ) {
-#        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "User not logged in, redirecting to home.");
-#        $c->flash->{error} = 'You must be logged in to access the admin area.';
-#        $c->response->redirect($c->uri_for('/'));
-#        return;
-#    }
+    if (!$c->user_exists && !$c->session->{user_id}) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "User not logged in, redirecting to home.");
+        $c->flash->{error} = 'You must be logged in to access the admin area.';
+        $c->response->redirect($c->uri_for('/'));
+        return 0; # Important: Return 0 to stop the request chain
+    }
 
     # Fetch the roles from the session
     my $roles = $c->session->{roles};
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "Roles: " . Dumper($roles));
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "Roles: " . Dumper($roles));
 
     # Check if roles is defined and is an array reference
     if ( defined $roles && ref $roles eq 'ARRAY' ) {
         # Log the roles being checked
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "Checking roles: " . join(", ", @$roles));
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "Checking roles: " . join(", ", @$roles));
 
         # Directly check for 'admin' role using grep
         if ( grep { $_ eq 'admin' } @$roles ) {
             # User is admin, proceed with accessing the admin area
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "Admin user detected, proceeding.");
-            return; # Important: Return to allow admin to proceed
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "Admin user detected, proceeding.");
+            return 1; # Important: Return 1 to allow admin to proceed
         } else {
             # User is not admin, redirect to home
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "Non-admin user, redirecting to home. Roles found: " . join(", ", @$roles));
             $c->flash->{error} = 'You do not have permission to access the admin area. Required role: admin. Your roles: ' . join(", ", @$roles);
             $c->response->redirect($c->uri_for('/'));
-            return;
+            return 0; # Important: Return 0 to stop the request chain
         }
     } else {
         # Log that roles are not defined or not an array
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "No roles defined or roles is not an array, redirecting to home.");
         $c->flash->{error} = 'You do not have permission to access the admin area. No roles defined or roles is not an array.';
         $c->response->redirect($c->uri_for('/'));
-        return;
+        return 0; # Important: Return 0 to stop the request chain
     }
 }
 

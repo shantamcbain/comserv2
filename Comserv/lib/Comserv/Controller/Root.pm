@@ -8,6 +8,13 @@ use JSON;
 use Comserv::Util::Logging;
 use Comserv::Util::ThemeManager;
 
+# Configure static file serving
+__PACKAGE__->config(
+    'Plugin::Static::Simple' => {
+        dirs => ['static'],
+        include_path => [qw( root )],
+    });
+
 has 'logging' => (
     is => 'ro',
     default => sub { Comserv::Util::Logging->instance }
@@ -17,6 +24,12 @@ has 'theme_manager' => (
     is => 'ro',
     default => sub { Comserv::Util::ThemeManager->new }
 );
+
+# Add user_exists method
+sub user_exists {
+    my ($self, $c) = @_;
+    return ($c->session->{username} && $c->session->{user_id}) ? 1 : 0;
+}
 
 # Flag to track if application start has been recorded
 has '_application_start_tracked' => (
@@ -39,7 +52,7 @@ __PACKAGE__->config(namespace => '');
 sub index :Path('/') :Args(0) {
     my ($self, $c) = @_;
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Starting index action");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Starting index action. User exists: " . ($self->user_exists($c) ? 'Yes' : 'No'));
     $c->stash->{forwarder} = '/'; # Set a default forward path
 
     # Get ControllerName from the session
@@ -96,8 +109,15 @@ sub set_theme {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'set_theme',
         "Available themes: " . join(", ", sort keys %$all_themes));
 
-    # Get the theme for this site from our JSON-based theme manager
+    # Get the theme for this site from our theme manager
     my $theme_name = $self->theme_manager->get_site_theme($c, $site_name);
+
+    # Make sure the theme exists
+    if (!exists $all_themes->{$theme_name}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'set_theme',
+            "Theme '$theme_name' not found in available themes, defaulting to 'default'");
+        $theme_name = 'default';
+    }
 
     # Add the theme name to the stash
     $c->stash->{theme_name} = $theme_name;
@@ -105,7 +125,8 @@ sub set_theme {
     # Add all available themes to the stash
     $c->stash->{available_themes} = [sort keys %$all_themes];
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'set_theme', "Set theme for site $site_name to $theme_name");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'set_theme',
+        "Set theme for site $site_name to $theme_name");
 }
 
 sub fetch_and_set {
@@ -613,7 +634,7 @@ sub site_setup {
 
     my $site = $c->model('Site')->get_site_details_by_name($c, $SiteName);
     unless (defined $site) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'site_setup', "No site found for SiteName: $site eName");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'site_setup', "No site found for SiteName: $SiteName");
 
         # Set default values for critical variables
         $c->stash->{ScriptDisplayName} = 'Site';
@@ -641,35 +662,8 @@ sub site_setup {
             "Set HostName from document_root_url: " . $site->document_root_url);
     }
 
-    # Try to get theme from site record
-    my $theme_name = 'default';
-    eval {
-        # Check if the theme column exists
-        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
-        my $sth = $dbh->prepare("SHOW COLUMNS FROM sites LIKE 'theme'");
-        $sth->execute();
-        my $theme_column_exists = $sth->fetchrow_arrayref;
-
-        if ($theme_column_exists) {
-            # Get the theme value
-            $sth = $dbh->prepare("SELECT theme FROM sites WHERE name = ?");
-            $sth->execute($SiteName);
-            my $row = $sth->fetchrow_arrayref;
-
-            if ($row && $row->[0]) {
-                $theme_name = $row->[0];
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
-                    "Found theme in database: $theme_name for site: $SiteName");
-            }
-        } else {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
-                "Theme column does not exist in sites table");
-        }
-    };
-    if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'site_setup',
-            "Error checking theme: $@");
-    }
+    # Get theme from ThemeManager
+    my $theme_name = $self->theme_manager->get_site_theme($c, $SiteName);
 
     # Set theme in stash for Header.tt to use
     $c->stash->{theme_name} = $theme_name;

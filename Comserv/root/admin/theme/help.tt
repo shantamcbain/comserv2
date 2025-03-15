@@ -1,0 +1,76 @@
+[% META title = 'Theme Editor Help' %]
+
+<div class="container">
+    <h1>Theme Editor Help</h1>
+    
+    <div class="alert alert-info">
+        <p>This guide will help you understand how to use the theme editor to customize your site's appearance.</p>
+    </div>
+    
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h3 class="card-title mb-0">Understanding the Theme System</h3>
+        </div>
+        <div class="card-body">
+            <p>The theme system has two main components:</p>
+            <ol>
+                <li>The <strong>Visual Editor</strong> - For changing colors and basic styles</li>
+                <li>The <strong>CSS Editor</strong> - For advanced customization including background images</li>
+            </ol>
+            <p>When you make changes in either editor, they are automatically saved to both:</p>
+            <ul>
+                <li>The theme definition file (for the visual editor)</li>
+                <li>The CSS file (for the browser to use)</li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h3 class="card-title mb-0">Adding a Background Image</h3>
+        </div>
+        <div class="card-body">
+            <p>To add a background image to your theme:</p>
+            <ol>
+                <li>Go to <a href="[% c.uri_for('/themeadmin/edit_theme_css', 'apis') %]">CSS Editor</a></li>
+                <li>Add or modify the <code>body</code> section to include a background image:</li>
+            </ol>
+            <pre class="bg-light p-3">body {
+  background-image: url('../images/BMaster/honey2.jpg');
+  font-family: Verdana, Helvetica, sans-serif;
+  font-size: 20px;
+  color: black;
+}</pre>
+            <p>The system will automatically detect the background image and update all necessary files.</p>
+            <div class="alert alert-warning">
+                <strong>Note:</strong> Make sure your image path is correct. Images should be placed in the <code>/static/images/</code> directory.
+            </div>
+        </div>
+    </div>
+    
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h3 class="card-title mb-0">Troubleshooting</h3>
+        </div>
+        <div class="card-body">
+            <h4>If your changes aren't showing up:</h4>
+            <ol>
+                <li>Clear your browser cache (Ctrl+F5 or Cmd+Shift+R)</li>
+                <li>Check that you're viewing the correct site/theme</li>
+                <li>Try editing the CSS file directly to ensure your changes are saved</li>
+                <li>Check the browser's developer tools (F12) to see which CSS files are being loaded</li>
+            </ol>
+            
+            <h4>Common Issues:</h4>
+            <ul>
+                <li><strong>Background image not showing:</strong> Make sure the path to the image is correct</li>
+                <li><strong>Changes not saving:</strong> Ensure you have admin permissions</li>
+                <li><strong>Visual editor not showing all options:</strong> Use the CSS editor for advanced customization</li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="text-center mb-4">
+        <a href="[% c.uri_for('/themeadmin') %]" class="btn btn-primary">Return to Theme Manager</a>
+    </div>
+</div>

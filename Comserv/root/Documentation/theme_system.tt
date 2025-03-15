@@ -53,44 +53,30 @@
                 <ul>
                     <li>Modify Header.tt to use fallback methods for theme selection</li>
                     <li>Implement name-based theme selection (e.g., 'apis' for Apis site)</li>
-                    <li>Set up file-based theme preference storage in theme_mappings.txt</li>
+                    <li>Set up file-based theme preference storage in theme_mappings.json</li>
                     <li>Ensure the system works without requiring database changes</li>
                 </ul>
             </li>
             <li><strong>Phase 2: Theme Administration</strong>
                 <ul>
-                    <li>Update ThemeAdmin controller to work without requiring the theme column</li>
-                    <li>Implement file-based theme preference storage (theme_mappings.txt)</li>
+                    <li>Create ThemeAdmin controller to work without requiring the theme column</li>
+                    <li>Implement file-based theme preference storage (theme_mappings.json)</li>
                     <li>Add theme preview functionality in the admin interface</li>
                     <li>Add appropriate feedback for administrators about theme system status</li>
                 </ul>
             </li>
-            <li><strong>Phase 3: Theme Tables Creation</strong>
-                <ul>
-                    <li>Create theme-related tables without modifying existing schema</li>
-                    <li>Run the create_theme_tables_only.pl script</li>
-                    <li>Populate tables with default themes (default, apis, usbm)</li>
-                </ul>
-            </li>
-            <li><strong>Phase 4: Testing</strong>
-                <ul>
-                    <li>Test theme creation and application with the file-based approach</li>
-                    <li>Verify that themes are correctly applied to sites</li>
-                    <li>Ensure backward compatibility with existing CSS files</li>
-                </ul>
-            </li>
-            <li><strong>Phase 5: Database Migration</strong>
+            <li><strong>Phase 3: Database Migration</strong>
                 <ul>
                     <li>Add the theme column to the sites table</li>
                     <li>Run the add_theme_column.pl script</li>
                     <li>System will automatically start using the database column</li>
                 </ul>
             </li>
-            <li><strong>Phase 6: Theme Migration</strong>
+            <li><strong>Phase 4: Testing</strong>
                 <ul>
-                    <li>Migrate theme preferences from file to database</li>
-                    <li>Run the migrate_to_themes.pl script</li>
-                    <li>Complete the transition to the database-driven theme system</li>
+                    <li>Test theme creation and application with both file-based and database approaches</li>
+                    <li>Verify that themes are correctly applied to sites</li>
+                    <li>Ensure backward compatibility with existing CSS files</li>
                 </ul>
             </li>
         </ol>
@@ -105,27 +91,14 @@
         <h3>Base Theme</h3>
         <p>The base theme (<code>default.css</code>) defines the core styles and variables used by all themes. It includes:</p>
         
-        <h3>Theme File Organization</h3>
-        <p>Theme files are organized in the following structure:</p>
-        <pre>
-/static/css/themes/
-├── default.css          # Base theme with core variables
-├── apis.css             # Apis-specific theme
-├── usbm.css            # USBM-specific theme
-└── custom/             # Directory for custom themes
-    ├── site1_custom.css
-    └── site2_custom.css
-        </pre>
-        <p>This organization ensures clear separation between default themes and custom themes.</p>
-
         <pre>
 :root {
-  --primary-color: #3498db;
-  --secondary-color: #2c3e50;
-  --accent-color: #e74c3c;
-  --text-color: #333333;
-  --link-color: #2980b9;
-  --link-hover-color: #3498db;
+  --primary-color: #ffffff;
+  --secondary-color: #f9f9f9;
+  --accent-color: #FF9900;
+  --text-color: #000000;
+  --link-color: #0000FF;
+  --link-hover-color: #000099;
   --background-color: #ffffff;
   --border-color: #dddddd;
   --table-header-bg: #f2f2f2;
@@ -141,6 +114,17 @@
         
         <h3>Custom Themes</h3>
         <p>Custom themes override these variables to create different visual styles without changing the underlying HTML structure.</p>
+        
+        <h3>Theme File Organization</h3>
+        <p>Theme files are organized in the following structure:</p>
+        <pre>
+/static/css/themes/
+├── default.css          # Base theme with core variables
+├── apis.css             # Apis-specific theme
+├── usbm.css             # USBM-specific theme
+├── csc.css              # CSC-specific theme
+└── site_name_custom.css # Custom themes for specific sites
+        </pre>
     </section>
     
     <section id="custom-themes">
@@ -191,7 +175,7 @@
         <ol>
             <li>Ensure the 'theme' column exists in the sites table
                 <ul>
-                    <li>Use the admin interface at <code>/admin/add_theme_column</code> to add it if needed</li>
+                    <li>Run the <code>add_theme_column.pl</code> script to add it if needed</li>
                 </ul>
             </li>
             <li>Create a theme file for your site
@@ -218,7 +202,7 @@
             <dt>Theme not loading</dt>
             <dd>
                 <ul>
-                    <li>Check theme_mappings.txt if database column is not yet available</li>
+                    <li>Check theme_mappings.json if database column is not yet available</li>
                     <li>Verify file permissions on theme files and directories</li>
                     <li>Check that the theme file exists in <code>/static/css/themes/</code></li>
                     <li>Verify that the site record has the correct theme name in the database</li>
@@ -229,7 +213,7 @@
             <dt>Database errors about missing theme column</dt>
             <dd>
                 <ul>
-                    <li>Run the theme column migration script from <code>/admin/add_theme_column</code></li>
+                    <li>Run the <code>add_theme_column.pl</code> script</li>
                     <li>Or manually add the column: <code>ALTER TABLE sites ADD COLUMN theme VARCHAR(50) DEFAULT 'default';</code></li>
                 </ul>
             </dd>

@@ -1,6 +1,8 @@
 package Comserv::Model::Theme;
 
 use strict;
+use JSON;
+use File::Slurp;
 use warnings;
 use Moose;
 use namespace::autoclean;
@@ -11,6 +13,45 @@ has 'schema' => (
     is => 'ro',
     required => 1,
 );
+
+# Add method to read theme mappings from JSON
+sub get_theme_from_json {
+    my ($self, $c, $site_name) = @_;
+    
+    my $json_path = $c->path_to('root', 'static', 'config', 'theme_mappings.json');
+    
+    return 'default' unless -f $json_path;
+    
+    my $json_text = read_file($json_path);
+    my $theme_map = decode_json($json_text);
+    
+    # Normalize site name for lookup
+    $site_name = uc($site_name || 'DEFAULT');
+    
+    # Check if site exists in mapping, otherwise return default
+    my $theme = $theme_map->{sites}{$site_name} || 
+                $theme_map->{sites}{'DEFAULT'} || 
+                'default';
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+        'get_theme_from_json', "Selected theme for $site_name: $theme");
+    
+    return $theme;
+}
+
+# Enhanced theme validation method
+sub validate_theme {
+    my ($self, $theme_name) = @_;
+    
+    # List of valid themes
+    my @valid_themes = qw(default csc usbm apis);
+    
+    if (grep { $_ eq lc($theme_name) } @valid_themes) {
+        return $theme_name;
+    } else {
+        return 'default';
+    }
+}
 
 has 'logging' => (
     is => 'ro',
@@ -85,10 +126,10 @@ sub get_site_theme {
     
     try {
         my $site_theme = $self->schema->resultset('SiteTheme')->find({ site_id => $site_id });
-        return $site_theme ? $site_theme->theme_id : 1; # Default to theme ID 1 if not found
+        return $site_theme ? $site_theme->theme_id : $self->validate_theme($self->get_theme_from_json($c, $c->model('Site')->get_site_by_id($c, $site_id)->name)); # Default to theme from JSON mapping if not found
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_site_theme', "Error fetching theme for site $site_id: $_");
-        return 1; # Default to theme ID 1 on error
+        return $self->validate_theme($self->get_theme_from_json($c, $c->model('Site')->get_site_by_id($c, $site_id)->name)); # Default to theme from JSON mapping on error
     };
 }
 
