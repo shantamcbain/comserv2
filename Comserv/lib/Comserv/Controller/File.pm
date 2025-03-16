@@ -71,7 +71,10 @@ sub list_files :Local {
 
     # Return the file info as a JSON object
     $c->stash->{files} = \@file_info;
-    $c->forward('View::JSON');
+    # Temporarily commented out until Catalyst::View::JSON is installed
+    # $c->forward('View::JSON');
+    $c->stash(template => 'file/file_list.tt');
+    $c->forward('View::TT');
 }
 sub files :Local {
     my ($self, $c) = @_;

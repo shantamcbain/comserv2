@@ -1,12 +1,11 @@
 requires 'Moose';
 requires 'namespace::autoclean';
 requires 'JSON::MaybeXS';
-requires 'Catalyst::Plugin::AutoCRUD';
+requires 'Catalyst::ScriptRunner';  # Ensure ScriptRunner is explicitly required
 requires 'DBIx::Class::Schema::Loader';
 requires 'Socket';
 requires 'Sys::Hostname';
 requires 'Term::Menus';
-
 
 requires 'MooseX::MarkAsMethods';
 requires 'DBD::mysql';
@@ -53,7 +52,9 @@ requires 'Catalyst::Plugin::Log::Dispatch';
 requires 'Log::Dispatch::Config';
 requires 'Catalyst::View::TT';
 requires 'Catalyst::Authentication::Store::DBIx::Class';
-# DateTime related
+# Add these lines to cpanfile
+requires 'Catalyst::View::JSON';  # Required for AutoCRUD JSON view
+requires 'JSON::MaybeXS';        # JSON backend# DateTime related
 requires 'DateTime';
 requires 'DateTime::Event::Recurrence';
 requires 'DateTime::Format::Strptime';
@@ -87,5 +88,4 @@ requires 'Test::Pod::Coverage';
 requires 'Test::WWW::Mechanize::Catalyst';
 requires 'Catalyst::ScriptRunner';
 requires 'Log::Log4perl';
-requires 'Catalyst::ScriptRunner';
 requires 'local::lib';

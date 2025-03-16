@@ -2,7 +2,7 @@ package Comserv::Model::DBForager;
 
 use strict;
 
-use JSON;  # Add this line-*`
+use JSON;  # Add this line
 use base 'Catalyst::Model::DBIC::Schema';
 
 use FindBin;
@@ -21,7 +21,7 @@ my $config = decode_json($json_text);
 
 # Print the configuration for debugging
 print "DBForager Configuration:\n";
-print "Host: $config->{shanta_forager}->{host}\n";
+print "Host: $config->{shanta_forager}->{host} (should be localhost)\n";
 print "Database: $config->{shanta_forager}->{database}\n";
 print "Username: $config->{shanta_forager}->{username}\n";
 

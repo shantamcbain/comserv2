@@ -22,7 +22,7 @@ my $config = decode_json($json_text);
 
 # Print the configuration for debugging
 print "DBEncy Configuration:\n";
-print "Host: $config->{shanta_ency}->{host}\n";
+print "Host: $config->{shanta_ency}->{host} (should be localhost)\n";
 print "Database: $config->{shanta_ency}->{database}\n";
 print "Username: $config->{shanta_ency}->{username}\n";
 

@@ -346,68 +346,25 @@ sub view_log :Path('/admin/view_log') :Args(0) {
     $c->forward($c->view('TT'));
 }
 
-# Route to view the application log
-# perl
-sub view_log :Path('/admin/view_log') :Args(0) {
-    my ($self, $c) = @_;
 
-    # Ensure only admin users can access this route
-    unless ($c->user_exists && grep { $_ eq 'admin' } @{$c->session->{roles}}) {
-        $c->response->redirect($c->uri_for('/')); # Redirect non-admin users
-        return;
-    }
 
-    # Debug logging for view_log action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view_log', "Starting view_log action");
-
-    # Path to the application log file
-    my $log_file = $c->path_to('logs', 'application.log');
-
-    # Check if the log file exists
-    unless (-e $log_file) {
-        $c->stash(
-            error_msg => "Log file not found: $log_file",
-            template  => 'admin/view_log.tt',
-        );
-        $c->forward($c->view('TT'));
-        return;
-    }
-
-    # Read the log file
-    my $log_content;
-    {
-        local $/; # Enable slurp mode
-        open my $fh, '<', $log_file or die "Cannot open log file: $!";
-        $log_content = <$fh>;
-        close $fh;
-    }
-
-    # Pass the log content to the template
-    $c->stash(
-        log_content => $log_content,
-        template    => 'admin/view_log.tt',
-    );
-
-    $c->forward($c->view('TT'));
-}
-
-# Add AutoCRUD actions
-sub autocrud_list :Local :Args(1) {
+# Custom table listing and editing actions
+sub table_list :Local :Args(1) {
     my ($self, $c, $table) = @_;
     $c->stash(
-        template => 'admin/autocrud_list.tt',
+        template => 'admin/table_list.tt',
         table => $table,
         records => $c->model('DBEncy')->resultset($table)->all
     );
 }
 
-sub autocrud_edit :Local :Args(2) {
+sub table_edit :Local :Args(2) {
     my ($self, $c, $table, $id) = @_;
     my $record = $id eq 'new' ? undef :
         $c->model('DBEncy')->resultset($table)->find($id);
 
     $c->stash(
-        template => 'admin/autocrud_edit.tt',
+        template => 'admin/table_edit.tt',
         table => $table,
         record => $record
     );

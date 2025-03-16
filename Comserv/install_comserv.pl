@@ -66,8 +66,6 @@ sub install_perl_version {
 }
 
 # Step 3: Install dependencies from cpanfile
-
-# Step 3: Install dependencies from cpanfile
 sub install_dependencies {
     say "[INFO] Installing dependencies from cpanfile...";
     my $install_result = system("cpanm --installdeps .");

@@ -5,11 +5,9 @@ use DateTime;
 use DateTime::TimeZone;
 use DateTime::Format::Strptime;
 use Data::Dumper;
-use Catalyst::Plugin::AutoCRUD;
 use Comserv::Util::Logging;
 
 BEGIN { extends 'Catalyst::Controller'; }
-BEGIN {extends 'Catalyst::Controller';}
 
 has 'record_id' => (is => 'rw', isa => 'Str');
 has 'priority' => (is => 'rw', isa => 'HashRef');

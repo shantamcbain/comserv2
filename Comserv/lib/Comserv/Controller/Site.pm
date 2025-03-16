@@ -127,38 +127,7 @@ sub details :Local {
 }
 
 # Add the new method to handle adding a domain
-sub add_domain :Local {
-    my ($self, $c) = @_;
 
-    # Get the site_id from the request parameters
-    my $site_id = $c->request->parameters->{site_id};
-
-    # Get the new_domain from the request parameters
-    my $new_domain = $c->request->parameters->{new_domain};
-
-    # Check if the new_domain is defined and not empty
-    if (defined $new_domain && $new_domain ne '') {
-        # Create a new record in the SiteDomain table
-        my $site_domain = $c->model('DBEncy::SiteDomain')->create({
-            site_id => $site_id,
-            domain => $new_domain,
-        });
-
-        # Fetch the newly created site domain
-        my $new_domain_record = $c->model('Site')->get_site_domain($new_domain);
-
-        # Pass the new domain to the template
-        $c->stash->{new_domain} = $new_domain_record;
-
-        # Redirect the user back to the site details page
-        # Pass the site ID to ensure the correct details page is loaded
-        $c->res->redirect($c->uri_for($self->action_for('details'), { id => $site_id }));
-    } else {
-        # Handle the error case where the domain is not provided
-        $c->flash->{error} = 'Domain cannot be empty';
-        $c->res->redirect($c->uri_for($self->action_for('details'), { id => $site_id }));
-    }
-}
 
 sub get_site_domain {
     my ($self, $domain) = @_;
@@ -227,9 +196,20 @@ sub fetch_available_sites :Private {
     # Create a new Comserv::Model::Site object
     my $site_model = Comserv::Model::Site->new(schema => $schema);
 
+    # Determine which sites to fetch based on the current site name
+    my $sites;
+    if (lc($current_site_name) eq 'csc') {
+        # If the current site is 'csc', fetch all sites
+        $sites = $site_model->get_all_sites();
+    } else {
+        # Otherwise, fetch only the current site
+        my $site = $site_model->get_site_details_by_name($current_site_name);
+        $sites = [$site] if $site;
+    }
 
+    return $sites;
+}
 
-# Add the following subroutine to `Comserv/lib/Comserv/Controller/Site.pm`
 sub add_domain :Local {
     my ($self, $c) = @_;
 
@@ -283,17 +263,4 @@ sub add_domain_post :Local {
     };
 }
 
-    # Determine which sites to fetch based on the current site name
-    my $sites;
-    if (lc($current_site_name) eq 'csc') {
-        # If the current site is 'csc', fetch all sites
-        $sites = $site_model->get_all_sites();
-    } else {
-        # Otherwise, fetch only the current site
-        my $site = $site_model->get_site_details_by_name($current_site_name);
-        $sites = [$site] if $site;
-    }
-
-    return $sites;
-}
 1;

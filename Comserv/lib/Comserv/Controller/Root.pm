@@ -47,9 +47,8 @@ sub index :Path('/') :Args(0) {
         # Default to Root's index template
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Defaulting to Root's index template");
         $c->stash(template => 'index.tt');
-
-    $c->forward($c->view('TT'));
-}
+        $c->forward($c->view('TT'));
+    }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Completed index action");
     return 1; # Allow the request to proceed
@@ -156,13 +155,13 @@ sub auto :Private {
 }
 
 sub setup_debug_mode {
-        my ($self, $c) = @_;
+    my ($self, $c) = @_;
 
-        if (defined $c->req->params->{debug}) {
-            $c->session->{debug_mode} = $c->session->{debug_mode} ? 0 : 1;
-        }
-        $c->stash->{debug_mode} = $c->session->{debug_mode};
+    if (defined $c->req->params->{debug}) {
+        $c->session->{debug_mode} = $c->session->{debug_mode} ? 0 : 1;
     }
+    $c->stash->{debug_mode} = $c->session->{debug_mode};
+}
 
 sub setup_site {
     my ($self, $c) = @_;
@@ -175,17 +174,15 @@ sub setup_site {
     if (!defined $SiteName || $SiteName eq 'none' || $SiteName eq 'root') {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site', "SiteName is either undefined, 'none', or 'root'. Proceeding with domain extraction and site domain retrieval");
 
-        my $domain = $c->req->uri->host;
+        # Extract domain from request URI
+        my $domain = $c->req->base->host;
         $domain =~ s/:.*//;  # Remove port if present
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site', "Extracted domain: $domain");
-
-        my $domain = $c->req->base->host;
-        $domain =~ s/:.*//;
         # Store the domain in the session
         $c->session->{Domain} = $domain;
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "Session Domain: $domain");
 
-        my $site_domain = $c->model('Site')->get_site_domain($domain);
+        my $site_domain = $c->model('Site')->get_site_domain($c, $domain);
 
         # Log the result
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto',
@@ -220,7 +217,7 @@ sub setup_site {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "SiteName in auto = $SiteName");
     }
 
-    $self->site_setup($c, $c->session->{SiteName});
+    $self->site_setup($c);
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site', 'Completed site setup');
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 'Entered auto action in Root.pm');
 
@@ -348,22 +345,21 @@ sub site_setup {
             $c->stash->{css_view_name} = '/static/css/default.css';
             $c->stash->{mail_to_admin} = 'admin@example.com';
             $c->stash->{mail_replyto} = 'helpdesk.computersystemconsulting.ca';
+            return;
+        }
+    }
 
-    unless (defined $site) {
+    # At this point, we should have a valid site
+    if (!defined $site) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "No site found for SiteName: $SiteName");
         return;
     }
 
-        my $css_view_name = $site->css_view_name || '/static/css/default.css';
-        my $site_display_name = $site->site_display_name || 'none';
-        my $mail_to_admin = $site->mail_to_admin || 'none';
-        my $mail_replyto = $site->mail_replyto || 'helpdesk.computersystemconsulting.ca';
-        my $site_name = $site->name || 'none';
     # Log success
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
         "Successfully retrieved site details for: " . $site->name);
 
-    # Set stash values from site
+    # Extract site properties with defaults
     my $css_view_name = $site->css_view_name || '/static/css/default.css';
     my $site_display_name = $site->site_display_name || 'Default Site';
     my $mail_to_admin = $site->mail_to_admin || 'admin@example.com';
