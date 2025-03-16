@@ -1,3 +1,4 @@
+
 [% META title = 'Project Success' %]
 [% PageVersion = 'todo/project.tt,v 0.01 2023/11/28 shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
@@ -20,6 +21,7 @@
 [% END %]
     <p>[% message %]</p>
 <!-- Recursive macro to display projects and sub-projects -->
+
 [% MACRO display_projects(projects, level) BLOCK %]
     <ul>
     [% FOREACH project IN projects.sort('name') %] <!-- Sort projects by name -->

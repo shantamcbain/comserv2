@@ -1,4 +1,3 @@
-
 package Comserv::Controller::Todo;
 use Moose;
 use namespace::autoclean;
@@ -10,7 +9,7 @@ has 'logging' => (
     is => 'ro',
     default => sub { Comserv::Util::Logging->instance }
 );
-# Apply restrictions to the entire controller
+
 # Apply restrictions to the entire controller
 sub begin :Private {
     my ($self, $c) = @_;
@@ -33,7 +32,7 @@ sub begin :Private {
 
         # Redirect to login
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "Redirecting to login page due to missing or invalid roles.");
-        $c->res->redirect($c->uri_for('/login'));
+        $c->res->redirect($c->uri_for('/user/login'));
         $c->detach;
     }
 
@@ -70,13 +69,13 @@ sub auto :Private {
     my ($self, $c) = @_;
 
     # Check if the user is logged in and is an admin
-      unless (defined $c->session->{username} && grep { $_ eq 'admin' } @{$c->session->{roles}}) {
+    unless (defined $c->session->{username} && grep { $_ eq 'admin' } @{$c->session->{roles}}) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto', "Unauthorized access attempt to Todo controller");
         $c->response->redirect($c->uri_for('/'));
         return 0;
     }
 
- $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "User authorized to access Todo controller");
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "User authorized to access Todo controller");
     return 1;
 }
 
@@ -96,15 +95,14 @@ sub todo :Path('/todo') :Args(0) {
             sitename => $c->session->{SiteName},  # filter by site
             status => { '!=' => 3 }  # status not equal to 3
         },
-{ order_by => { -asc => ['priority', 'start_date'] } } # order by start_date
+        { order_by => { -asc => ['priority', 'start_date'] } } # order by start_date
     );
 
     # Add the todos to the stash
-   $c->stash(
+    $c->stash(
         todos => \@todos,
         sitename => $c->session->{SiteName},
         template => 'todo/todo.tt',
-
     );
 
     $c->forward($c->view('TT'));
@@ -147,7 +145,6 @@ sub details :Path('/todo/details') :Args {
         $c->response->body('Todo not found');
     }
 }
-
 
 sub addtodo :Path('/todo/addtodo') :Args(0) {
     my ($self, $c) = @_;
@@ -192,23 +189,7 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
         'Fetched users to populate user_id dropdown'
     );
 
-    # Convert the resultset to an array of hashrefs for use in the template
-    my @projects = map {
-        {
-            id => $_->id,
-            name => $_->name,
-            sub_projects => [ map { { id => $_->id, name => $_->name } } $_->sub_projects->all ]
-        }
-    } #$project_rs->all;
-
-    # Fetch all users to populate the user_id dropdown
-    @users = $schema->resultset('User')->all;
-
-    # Log the list of user_ids
-    my @user_ids = map { $_->id } @users;
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'addtodo', 'User IDs: ' . join(', ', @user_ids));
-
-    # Add the projects, sitename, and user_id to the stash
+    # Add the projects, sitename, and users to the stash
     $c->stash(
         projects        => $projects,        # Parent projects with nested sub-projects
         current_project => $current_project, # Selected project for the form (if any)
@@ -400,9 +381,6 @@ sub modify :Path('/todo/modify') :Args(1) {
     );
 }
 
-
-
-
 sub create :Local {
     my ( $self, $c ) = @_;
 
@@ -495,11 +473,6 @@ sub create :Local {
     $c->response->redirect($c->uri_for($self->action_for('index')));
 }
 
-
-
-
-
-
 sub day :Path('/todo/day') :Args {
     my ( $self, $c, $date_arg ) = @_;
 
@@ -512,10 +485,10 @@ sub day :Path('/todo/day') :Args {
     } else {
         $date = DateTime->now->ymd;  # Use today's date if $date_arg is not defined
     }
-# Calculate the previous and next dates
-my $dt = DateTime::Format::ISO8601->parse_datetime($date);
-my $previous_date = $dt->clone->subtract(days => 1)->strftime('%Y-%m-%d');
-my $next_date = $dt->clone->add(days => 1)->strftime('%Y-%m-%d');
+    # Calculate the previous and next dates
+    my $dt = DateTime::Format::ISO8601->parse_datetime($date);
+    my $previous_date = $dt->clone->subtract(days => 1)->strftime('%Y-%m-%d');
+    my $next_date = $dt->clone->add(days => 1)->strftime('%Y-%m-%d');
 
     # Get the Todo model
     my $todo_model = $c->model('Todo');

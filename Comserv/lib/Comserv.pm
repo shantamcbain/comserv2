@@ -4,6 +4,12 @@
                 use namespace::autoclean;
                 use Config::JSON;
                 use FindBin '$Bin';
+                use Comserv::Util::Logging;
+
+                # Initialize the logging system
+                BEGIN {
+                    Comserv::Util::Logging->init();
+                }
 
                 use Catalyst::Runtime 5.80;
                 use Catalyst qw/
@@ -78,6 +84,9 @@ __PACKAGE__->config(
                     'Plugin::Session' => {
                         storage => '/tmp/session_data',
                         expires => 3600,
+                    },
+                    'Model::ThemeConfig' => {
+                        # Theme configuration model
                     },
                 );
 

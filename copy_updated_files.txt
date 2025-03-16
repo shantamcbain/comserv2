@@ -1,0 +1,20 @@
+To update the files in your project, you need to copy the following files from the repository to your project directory:
+
+1. Copy the updated Root.pm file:
+   cp /comserv/Comserv/lib/Comserv/Controller/Root.pm /home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Root.pm
+
+2. Copy the updated Site.pm file:
+   cp /comserv/Comserv/lib/Comserv/Model/Site.pm /home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Site.pm
+
+3. Copy the updated ThemeTest.pm file:
+   cp /comserv/Comserv/lib/Comserv/Controller/ThemeTest.pm /home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/ThemeTest.pm
+
+4. Copy the updated ThemeAdmin.pm file:
+   cp /comserv/Comserv/lib/Comserv/Controller/ThemeAdmin.pm /home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/ThemeAdmin.pm
+
+5. Copy the updated ThemeEditor.pm file:
+   cp /comserv/Comserv/lib/Comserv/Controller/ThemeEditor.pm /home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/ThemeEditor.pm
+
+These commands will copy the updated files to your project directory, replacing the old versions that were using ThemeManager with new versions that use ThemeConfig directly.
+
+After copying these files, your application should no longer try to load the ThemeManager.pm file.

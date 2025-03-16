@@ -1,4 +1,3 @@
-
 package Comserv::Controller::Site;
 use Moose;
 use namespace::autoclean;
@@ -33,10 +32,10 @@ sub index :Path :Args(0) {
     my $sites;
     if (lc($current_site_name) eq 'csc') {
         # If the current site is 'csc', fetch all sites
-        $sites = $site_model->get_all_sites();
+        $sites = $site_model->get_all_sites($c);
     } else {
         # Otherwise, fetch only the current site
-        my $site = $site_model->get_site_details_by_name($current_site_name);
+        my $site = $site_model->get_site_details_by_name($c, $current_site_name);
         $sites = [$site] if $site;
     }
 
@@ -96,14 +95,21 @@ sub details :Local {
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
 
-    # Get the Site resultset
-    my $site_rs = $schema->resultset('Site');
+    # Create a new Comserv::Model::Site object
+    my $site_model = Comserv::Model::Site->new(schema => $schema);
 
-    # Get the site
-    my $site = $site_rs->find($site_id);
+    # Get the site using the Site model to handle theme column issues
+    my $site = $site_model->get_site_details($c, $site_id);
 
     # Fetch rows from the SiteDomain table related to a specific site
-    my @site_domains = $c->model('DBEncy::SiteDomain')->search({ site_id => $site_id });
+    my @site_domains;
+    eval {
+        @site_domains = $c->model('DBEncy::SiteDomain')->search({ site_id => $site_id });
+    };
+    if ($@) {
+        $c->log->error("Error fetching site domains: $@");
+        @site_domains = ();
+    }
 
     # Pass the site and domains to the template
     $c->stash->{site} = $site;
@@ -111,10 +117,23 @@ sub details :Local {
 
     # If domain is defined in the form parameters, insert a new row into the SiteDomain table
     if (my $domain = $c->request->parameters->{domain}) {
-        $c->model('DBEncy::SiteDomain')->create({
-            site_id => $site_id,
-            domain => $domain,
-        });
+        eval {
+            $c->model('DBEncy::SiteDomain')->create({
+                site_id => $site_id,
+                domain => $domain,
+            });
+        };
+        if ($@) {
+            $c->log->error("Error creating site domain: $@");
+            $c->flash->{error_msg} = "Error adding domain: $@";
+        }
+    }
+
+    # Add a message about the theme column if needed
+    if (!$site || !$site->can('theme') || !defined $site->theme) {
+        $c->flash->{error_msg} = "The theme feature requires a database update. Please run the add_theme_column.pl script.";
+        # Add a default theme property
+        $site->{theme} = 'default' if $site;
     }
 
     # Set the template to site/details.tt
@@ -140,7 +159,7 @@ sub add_domain :Local {
         });
 
         # Fetch the newly created site domain
-        my $new_domain_record = $c->model('Site')->get_site_domain($new_domain);
+        my $new_domain_record = $c->model('Site')->get_site_domain($c, $new_domain);
 
         # Pass the new domain to the template
         $c->stash->{new_domain} = $new_domain_record;
@@ -168,8 +187,23 @@ sub get_site_details {
 sub delete_domain :Local {
     my ($self, $c) = @_;
     my $domain_id = $c->request->parameters->{domain_id};
-    $c->model('DBEncy::SiteDomain')->find($domain_id)->delete;
-    $c->res->redirect($c->uri_for($self->action_for('details'), [$c->request->parameters->{site_id}]));
+    my $site_id = $c->request->parameters->{site_id};
+
+    eval {
+        my $domain = $c->model('DBEncy::SiteDomain')->find($domain_id);
+        if ($domain) {
+            $domain->delete;
+            $c->flash->{success_msg} = "Domain deleted successfully.";
+        } else {
+            $c->flash->{error_msg} = "Domain not found.";
+        }
+    };
+    if ($@) {
+        $c->log->error("Error deleting domain: $@");
+        $c->flash->{error_msg} = "Error deleting domain: $@";
+    }
+
+    $c->res->redirect($c->uri_for($self->action_for('details'), { id => $site_id }));
 }
 
 sub modify :Local {
@@ -180,7 +214,8 @@ sub modify :Local {
 
     # Get the new site details from the request body
     my $new_site_details = $c->request->body_parameters;
-  # Check for empty strings in integer fields and set them to 0
+
+    # Check for empty strings in integer fields and set them to 0
     for my $field (qw(affiliate pid app_logo_width app_logo_height)) {
         if (exists $new_site_details->{$field} && $new_site_details->{$field} eq '') {
             $new_site_details->{$field} = 0;
@@ -190,24 +225,103 @@ sub modify :Local {
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
 
-    # Get the Site resultset
-    my $site_rs = $schema->resultset('Site');
+    # Create a new Comserv::Model::Site object
+    my $site_model = Comserv::Model::Site->new(schema => $schema);
 
-    # Find the site
-    my $site = $site_rs->find($site_id);
+    # Handle the theme column issue
+    my $site;
+    eval {
+        # Get the Site resultset
+        my $site_rs = $schema->resultset('Site');
 
-    # Check if the site exists
-    if ($site) {
-        # Update the site
-        $site->update($new_site_details);
+        # Find the site
+        $site = $site_rs->find($site_id);
 
-        # Redirect to the details page for the site
-           $c->flash->{error} = 'You made the change.';
-    $c->res->redirect($c->uri_for($self->action_for('index')));
-    } else {
-        # Redirect to the details page with an error message
-        $c->flash->{error} = 'Site not found';
-        $c->res->redirect($c->uri_for($self->action_for('details'), [$site_id]));
+        # Check if the site exists
+        if ($site) {
+            # If theme is in the new_site_details but the column doesn't exist, remove it
+            if (exists $new_site_details->{theme}) {
+                # Try to update with theme
+                eval {
+                    $site->update($new_site_details);
+                };
+
+                # If there's an error about the theme column
+                if ($@ && $@ =~ /Unknown column 'me\.theme'/) {
+                    # Log the error
+                    $c->log->error("Theme column doesn't exist in sites table. Please run the add_theme_column.pl script.");
+
+                    # Remove theme from the details
+                    my $filtered_details = {%$new_site_details};
+                    delete $filtered_details->{theme};
+
+                    # Update without theme
+                    $site->update($filtered_details);
+
+                    # Add a message to the flash
+                    $c->flash->{error_msg} = "The theme feature requires a database update. Please run the add_theme_column.pl script.";
+                }
+            } else {
+                # Update without theme
+                $site->update($new_site_details);
+            }
+
+            # Redirect to the details page for the site
+            $c->flash->{success_msg} = 'Site updated successfully.';
+            $c->res->redirect($c->uri_for($self->action_for('index')));
+        } else {
+            # Redirect to the details page with an error message
+            $c->flash->{error_msg} = 'Site not found';
+            $c->res->redirect($c->uri_for($self->action_for('details'), { id => $site_id }));
+        }
+    };
+
+    # If there's an error
+    if ($@) {
+        # If there's an error about the theme column
+        if ($@ =~ /Unknown column 'me\.theme'/) {
+            # Log the error
+            $c->log->error("Theme column doesn't exist in sites table. Please run the add_theme_column.pl script.");
+
+            # Get site without theme column
+            my $site_rs = $schema->resultset('Site');
+            $site = $site_rs->find(
+                { id => $site_id },
+                { columns => [qw(id name description affiliate pid auth_table home_view app_logo app_logo_alt
+                                app_logo_width app_logo_height css_view_name mail_from mail_to mail_to_discussion
+                                mail_to_admin mail_to_user mail_to_client mail_replyto site_display_name
+                                document_root_url link_target http_header_params image_root_url
+                                global_datafiles_directory templates_cache_directory app_datafiles_directory
+                                datasource_type cal_table http_header_description http_header_keywords)] }
+            );
+
+            # If site exists, update it without theme
+            if ($site) {
+                # Remove theme from the details
+                my $filtered_details = {%$new_site_details};
+                delete $filtered_details->{theme};
+
+                # Update without theme
+                $site->update($filtered_details);
+
+                # Add a default theme property
+                $site->{theme} = 'default';
+
+                # Add a message to the flash
+                $c->flash->{error_msg} = "The theme feature requires a database update. Please run the add_theme_column.pl script.";
+                $c->flash->{success_msg} = 'Site updated successfully (without theme).';
+                $c->res->redirect($c->uri_for($self->action_for('index')));
+            } else {
+                # Redirect to the details page with an error message
+                $c->flash->{error_msg} = 'Site not found';
+                $c->res->redirect($c->uri_for($self->action_for('details'), { id => $site_id }));
+            }
+        } else {
+            # For other errors, log and redirect with error message
+            $c->log->error("Error updating site: $@");
+            $c->flash->{error_msg} = "Error updating site: $@";
+            $c->res->redirect($c->uri_for($self->action_for('details'), { id => $site_id }));
+        }
     }
 }
 sub fetch_available_sites :Private {
@@ -222,21 +336,18 @@ sub fetch_available_sites :Private {
     # Create a new Comserv::Model::Site object
     my $site_model = Comserv::Model::Site->new(schema => $schema);
 
+    # Determine which sites to fetch based on the current site name
+    my $sites;
+    if (lc($current_site_name) eq 'csc') {
+        # If the current site is 'csc', fetch all sites
+        $sites = $site_model->get_all_sites($c);
+    } else {
+        # Otherwise, fetch only the current site
+        my $site = $site_model->get_site_details_by_name($c, $current_site_name);
+        $sites = [$site] if $site;
+    }
 
-
-# Add the following subroutine to `Comserv/lib/Comserv/Controller/Site.pm`
-sub add_domain :Local {
-    my ($self, $c) = @_;
-
-    # Fetch the list of sites
-    my $schema = $c->model('DBEncy');
-    my @sites = $schema->resultset('Site')->all;
-
-    # Pass the list of sites to the template
-    $c->stash->{sites} = \@sites;  # Changed to \@sites to avoid unintended interpolation
-
-    # Set the template to site/add_domain.tt
-    $c->stash(template => 'site/add_domain.tt');
+    return $sites;
 }
 
 sub add_domain_post :Local {
@@ -276,19 +387,5 @@ sub add_domain_post :Local {
         $c->stash(template => 'site/add_domain.tt');
         $c->forward('add_domain');
     };
-}
-
-    # Determine which sites to fetch based on the current site name
-    my $sites;
-    if (lc($current_site_name) eq 'csc') {
-        # If the current site is 'csc', fetch all sites
-        $sites = $site_model->get_all_sites();
-    } else {
-        # Otherwise, fetch only the current site
-        my $site = $site_model->get_site_details_by_name($current_site_name);
-        $sites = [$site] if $site;
-    }
-
-    return $sites;
 }
 1;

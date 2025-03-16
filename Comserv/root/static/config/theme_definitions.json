@@ -1,0 +1,108 @@
+{
+  "default": {
+    "name": "Default Theme",
+    "description": "The default application theme",
+    "variables": {
+      "primary-color": "#ffffff",
+      "secondary-color": "#f9f9f9",
+      "accent-color": "#FF9900",
+      "text-color": "#000000",
+      "link-color": "#0000FF",
+      "link-hover-color": "#000099",
+      "background-color": "#ffffff",
+      "border-color": "#dddddd",
+      "table-header-bg": "#f2f2f2",
+      "warning-color": "#f39c12",
+      "success-color": "#27ae60"
+    }
+  },
+  "dark": {
+    "name": "Dark Theme",
+    "description": "A dark theme for reduced eye strain",
+    "variables": {
+      "primary-color": "#1a1a1a",
+      "secondary-color": "#2c2c2c",
+      "accent-color": "#6200ee",
+      "text-color": "#e0e0e0",
+      "link-color": "#bb86fc",
+      "link-hover-color": "#3700b3",
+      "background-color": "#121212",
+      "border-color": "#333333",
+      "table-header-bg": "#2c2c2c",
+      "warning-color": "#ff9800",
+      "success-color": "#4caf50"
+    }
+  },
+  "csc": {
+    "name": "CSC Theme",
+    "description": "Computer Systems Consulting theme",
+    "variables": {
+      "primary-color": "#ccffff",
+      "secondary-color": "#e6ffff",
+      "accent-color": "#FF9900",
+      "text-color": "#000000",
+      "link-color": "#0000FF",
+      "link-hover-color": "#000099",
+      "background-color": "#ffffff",
+      "border-color": "#99cccc",
+      "table-header-bg": "#ccffff",
+      "warning-color": "#f39c12",
+      "success-color": "#27ae60",
+      "nav-bg": "#ccffff",
+      "nav-text": "#000000",
+      "nav-link-color": "#000000",
+      "header-bg": "#ccffff",
+      "footer-bg": "#ccffff",
+      "footer-text-color": "#000000"
+    }
+  },
+  "apis": {
+    "name": "APIS Theme",
+    "description": "APIS Honeycomb theme",
+    "variables": {
+      "primary-color": "#FFF8E1",
+      "secondary-color": "#FFE8B8",
+      "accent-color": "#FFB900",
+      "text-color": "#2C2C2C",
+      "link-color": "#B88A00",
+      "link-hover-color": "#805F00",
+      "background-color": "#FFF8E1",
+      "border-color": "#FFD54F",
+      "table-header-bg": "#FFE082",
+      "warning-color": "#f39c12",
+      "success-color": "#27ae60",
+      "nav-bg": "#FFE082",
+      "nav-text": "#2C2C2C",
+      "nav-link-color": "#2C2C2C",
+      "header-bg": "#FFE082",
+      "footer-bg": "#FFE082",
+      "footer-text-color": "#2C2C2C"
+    },
+    "special_styles": {
+      "body": "background-image: linear-gradient(30deg, #FFF8E1 12%, transparent 12.5%, transparent 87%, #FFF8E1 87.5%, #FFF8E1), linear-gradient(150deg, #FFF8E1 12%, transparent 12.5%, transparent 87%, #FFF8E1 87.5%, #FFF8E1), linear-gradient(30deg, #FFF8E1 12%, transparent 12.5%, transparent 87%, #FFF8E1 87.5%, #FFF8E1), linear-gradient(150deg, #FFF8E1 12%, transparent 12.5%, transparent 87%, #FFF8E1 87.5%, #FFF8E1), linear-gradient(60deg, #FFE8B8 25%, transparent 25.5%, transparent 75%, #FFE8B8 75%, #FFE8B8), linear-gradient(60deg, #FFE8B8 25%, transparent 25.5%, transparent 75%, #FFE8B8 75%, #FFE8B8); background-size: 40px 70px; background-position: 0 0, 0 0, 20px 35px, 20px 35px, 0 0, 20px 35px;"
+    }
+  },
+  "usbm": {
+    "name": "USBM Theme",
+    "description": "USBM Green theme",
+    "variables": {
+      "primary-color": "#009933",
+      "secondary-color": "#00cc44",
+      "accent-color": "#006622",
+      "text-color": "#333333",
+      "link-color": "#006622",
+      "link-hover-color": "#004d1a",
+      "background-color": "#ffffff",
+      "border-color": "#00cc44",
+      "table-header-bg": "#00cc44",
+      "warning-color": "#f39c12",
+      "success-color": "#27ae60",
+      "nav-bg": "#009933",
+      "nav-text": "#ffffff",
+      "nav-link-color": "#ffffff",
+      "header-bg": "#009933",
+      "footer-bg": "#009933",
+      "footer-text-color": "#ffffff"
+    }
+  }
+}

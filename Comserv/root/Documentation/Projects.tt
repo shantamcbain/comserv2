@@ -1,88 +1,80 @@
 [% META title = 'Projects Documentation' %]
-[% PageVersion = 'Documentation/Projects.tt,v 0.03 2025/02/28 Shanta Exp shanta ' %]
+    [% PageVersion = 'Documentation/Projects.tt,v 0.04 2025/03/15 Shanta Exp shanta ' %]
 
-<h1 id="projects-top">Projects System Documentation</h1>
+    <h1 id="projects-top">Projects System Documentation</h1>
 
-<nav>
-    <a href="#projects-overview">Projects Overview</a> |
-    <a href="#projects-controller">Projects Controller</a> |
-    <a href="#projects-model">Projects Model</a> |
-    <a href="#projects-templates">Projects Templates</a> |
-    <a href="#projects-workflow">Projects Workflow</a>
-    <a href="#projects-usage">Projects Usage</a>
-</nav>
+    <nav>
+        <a href="#projects-overview">Projects Overview</a> |
+        <a href="#projects-controller">Projects Controller</a> |
+        <a href="#projects-model">Projects Model</a> |
+        <a href="#projects-templates">Projects Templates</a> |
+        <a href="#projects-workflow">Projects Workflow</a> |
+        <a href="#projects-usage">Projects Usage</a>
+    </nav>
 
-<h2 id="projects-overview">Projects Overview</h2>
-<p>The Projects system is designed to manage and organize projects within the application. It provides functionality for creating, updating, and viewing project details, ensuring efficient project management and data integrity.</p>
-<p><a href="#projects-top">Back to top</a></p>
-<h2 id="projects-controller">Projects Controller</h2>
-<p>The <code>Comserv::Controller::Project</code> module handles the routing and logic for project-related actions:</p>
-<ul>
-    <li><strong>Index:</strong> Redirects to the project list.</li>
-    <li><strong>Add Project:</strong> Prepares data for adding a new project, sorts projects alphabetically by name, and fetches all sites.</li>
-    <li><strong>Create Project:</strong> Processes form submissions to create new projects, handles errors, and redirects on success.</li>
-    <li><strong>Project List:</strong> Displays a list of projects.</li>
-    <li><strong>Project Details:</strong> Shows detailed information for a specific project and fetches associated todos.</li>
-    <li><strong>Edit Project:</strong> Prepares data for editing an existing project.</li>
-    <li><strong>Update Project:</strong> Updates project data based on form submissions.</li>
-</ul>
-<p><a href="#projects-top">Back to top</a></p>
-<h2 id="projects-model">Projects Model</h2>
-<p>The <code>Comserv::Model::Project</code> module provides methods for interacting with the project data:</p>
-<ul>
-    <li><strong>Get Projects:</strong> Retrieves a list of active projects for a site.</li>
-    <li><strong>Get Project:</strong> Retrieves a specific project by ID.</li>
-</ul>
-<p><a href="#projects-top">Back to top</a></p>
-<h2 id="projects-templates">Projects Templates</h2>
-<p>The following templates are used in the Projects system:</p>
-<ul>
-    <li><strong>todo/add_project.tt:</strong> Form for adding new projects.</li>
-    <li><strong>todo/project.tt:</strong> Displays the list of projects.</li>
-    <li><strong>todo/projectdetails.tt:</strong> Shows detailed information for a project.</li>
-    <li><strong>todo/editproject.tt:</strong> Form for editing existing projects.</li>
-</ul>
+    <h2 id="projects-overview">Projects Overview</h2>
+    <p>The Projects system manages hierarchical project structures with support for parent-child relationships. Each project can have multiple sub-projects, and the system maintains data integrity through proper handling of user permissions and data validation.</p>
 
-<h2 id="projects-workflow">Projects Workflow</h2>
-<p>The typical workflow for managing projects involves navigating to the project list, selecting a project to view or edit, and using forms to add or update project information. The system ensures data integrity and user feedback through success and error messages.</p>
-<p><a href="#projects-top">Back to top</a></p>
-<h2 id="projects-usage">How to Use the Projects Module</h2>
+    <h2 id="projects-controller">Projects Controller</h2>
+    <p>Key features in <code>Comserv::Controller::Project</code>:</p>
+    <ul>
+        <li><strong>Project Creation:</strong> Handles form submissions with proper validation for:
+            <ul>
+                <li>Parent-child relationships (parent_id)</li>
+                <li>User authentication and username tracking</li>
+                <li>Required fields and data type validation</li>
+            </ul>
+        </li>
+        <li><strong>Project Hierarchy:</strong> Manages up to 4 levels of sub-projects</li>
+        <li><strong>Project Listing:</strong> Displays projects in a hierarchical structure, sorted by name</li>
+        <li><strong>Error Handling:</strong> Provides detailed error messages and logging</li>
+    </ul>
 
-<p>The Projects module provides a comprehensive system for managing projects and sub-projects. Below are the steps to add, edit, and manage projects:</p>
+    <h2 id="projects-model">Projects Model</h2>
+    <p>The database schema includes these key fields:</p>
+    <ul>
+        <li>id (Primary Key)</li>
+        <li>name (Project name)</li>
+        <li>parent_id (Optional, for sub-projects)</li>
+        <li>sitename (Associated site)</li>
+        <li>status (Project status)</li>
+        <li>username_of_poster (Creator/owner)</li>
+        <li>Various metadata fields (dates, descriptions, etc.)</li>
+    </ul>
 
-<h3>Adding a New Project</h3>
-<ol>
-    <li>Navigate to the "Add Project" page by selecting the "Add Project" option from the Projects menu.</li>
-    <li>Fill out the form with the necessary details:
-        <ul>
-            <li><strong>Site Name:</strong> Select the site associated with the project.</li>
-            <li><strong>Project Name:</strong> Enter a unique name for the project.</li>
-            <li><strong>Description:</strong> Provide a brief description of the project.</li>
-            <li><strong>Start Date and End Date:</strong> Specify the project timeline.</li>
-            <li><strong>Status:</strong> Choose the current status of the project (e.g., Requested, In-Process).</li>
-            <li><strong>Project Code:</strong> Enter a code to identify the project.</li>
-            <li><strong>Additional Details:</strong> Fill in other fields such as Project Size, Estimated Man Hours, Developer Name, and Client Name.</li>
-        </ul>
-    </li>
-    <li>Click "Add Project" to save the new project.</li>
-</ol>
-<p><a href="#projects-top">Back to top</a></p>
-<h3>Editing an Existing Project</h3>
-<ol>
-    <li>Go to the "Project List" and select the project you wish to edit.</li>
-    <li>Click on the "Edit Project" button to open the edit form.</li>
-    <li>Update the project details as needed and click "Update Project" to save changes.</li>
-</ol>
-<p><a href="#projects-top">Back to top</a></p>
-<h3>Managing Sub-Projects</h3>
-<ol>
-    <li>To add a sub-project, navigate to the "Project Details" page of the parent project.</li>
-    <li>Click on "Add Sub-Project" and fill out the form with the sub-project details.</li>
-    <li>Sub-projects can be managed similarly to main projects, with options to edit and update their details.</li>
-</ol>
+    <h2 id="projects-templates">Projects Templates</h2>
+    <p>Current template structure:</p>
+    <ul>
+        <li><strong>todo/project.tt:</strong> Main project listing with hierarchical display</li>
+        <li><strong>todo/add_project.tt:</strong> Project creation form</li>
+        <li><strong>todo/editproject.tt:</strong> Project editing interface</li>
+        <li><strong>todo/projectdetails.tt:</strong> Detailed project view</li>
+    </ul>
 
-<p>For more detailed instructions, refer to the specific sections on the <a href="#projects-controller">Projects Controller</a> and <a href="#projects-model">Projects Model</a>.</p>
+    <h2 id="projects-workflow">Projects Workflow</h2>
+    <ol>
+        <li><strong>Project Creation:</strong>
+            <ul>
+                <li>User fills out project form</li>
+                <li>System validates input and handles parent-child relationships</li>
+                <li>Project is created with proper user and site association</li>
+            </ul>
+        </li>
+        <li><strong>Project Management:</strong>
+            <ul>
+                <li>Projects can be viewed in hierarchical list</li>
+                <li>Admin users can edit project details</li>
+                <li>Sub-projects are managed within parent context</li>
+            </ul>
+        </li>
+    </ol>
 
+    <h2 id="projects-usage">System Requirements and Limitations</h2>
+    <ul>
+        <li>User must be authenticated for project creation</li>
+        <li>Admin privileges required for editing projects</li>
+        <li>Maximum of 4 levels in project hierarchy</li>
+        <li>Project names must be unique within a site</li>
+    </ul>
 
-
-<p><a href="#projects-top">Back to top</a></p>
+    <p><a href="#projects-top">Back to top</a></p>

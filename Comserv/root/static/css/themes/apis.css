@@ -1,0 +1,26 @@
+body {
+  background-image: url('../../images/BMaster/honey2.jpg');
+  
+}
+
+/* Theme: apis */
+:root {
+  --accent-color: #FFB900;
+  --background-color: #FFF8E1;
+  --border-color: #FFD54F;
+  --footer-bg: #FFE082;
+  --footer-text-color: #2C2C2C;
+  --header-bg: #FFE082;
+  --link-color: #B88A00;
+  --link-hover-color: #805F00;
+  --nav-bg: #FFE082;
+  --nav-link-color: #2C2C2C;
+  --nav-text: #2C2C2C;
+  --primary-color: #FFF8E1;
+  --secondary-color: #FFE8B8;
+  --success-color: #27ae60;
+  --table-header-bg: #FFE082;
+  --text-color: #2C2C2C;
+  --warning-color: #f39c12;
+}
+

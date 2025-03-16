@@ -1,0 +1,80 @@
+/* Button styles */
+button, 
+.button,
+input[type="submit"],
+input[type="button"] {
+  display: inline-block;
+  padding: var(--spacing-small) var(--spacing-medium);
+  background-color: var(--button-bg);
+  color: var(--button-text);
+  border: 1px solid var(--button-border);
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: var(--body-font);
+  font-size: var(--font-size-base);
+  text-align: center;
+  text-decoration: none;
+  transition: background-color 0.3s ease;
+}
+
+button:hover, 
+.button:hover,
+input[type="submit"]:hover,
+input[type="button"]:hover {
+  background-color: var(--button-hover-bg);
+}
+
+/* Primary button */
+.button-primary {
+  background-color: var(--primary-color);
+  color: var(--text-color);
+  border-color: var(--primary-color);
+}
+
+.button-primary:hover {
+  background-color: color-mix(in srgb, var(--primary-color) 80%, black);
+}
+
+/* Secondary button */
+.button-secondary {
+  background-color: var(--secondary-color);
+  color: var(--text-color);
+  border-color: var(--secondary-color);
+}
+
+.button-secondary:hover {
+  background-color: color-mix(in srgb, var(--secondary-color) 80%, black);
+}
+
+/* Warning button */
+.button-warning {
+  background-color: var(--warning-color);
+  color: white;
+  border-color: var(--warning-color);
+}
+
+.button-warning:hover {
+  background-color: color-mix(in srgb, var(--warning-color) 80%, black);
+}
+
+/* Success button */
+.button-success {
+  background-color: var(--success-color);
+  color: white;
+  border-color: var(--success-color);
+}
+
+.button-success:hover {
+  background-color: color-mix(in srgb, var(--success-color) 80%, black);
+}
+
+/* Button groups */
+.button-group {
+  display: flex;
+  gap: var(--spacing-small);
+}
+
+/* Inline form buttons */
+form[style*="display:inline"] button {
+  margin-left: var(--spacing-small);
+}
