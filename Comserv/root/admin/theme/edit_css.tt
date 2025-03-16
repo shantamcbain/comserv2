@@ -1,57 +1,89 @@
 [% META title = 'Edit Theme CSS' %]
 
-<div class="container">
-    <h1>Edit Theme CSS: [% theme_name %]</h1>
+                    <div class="container">
+                        <h1>Edit Theme CSS: [% theme_name %]</h1>
 
-    <div class="alert alert-info">
-        <strong>Tip:</strong> To add a background image, include <code>background-image: url('../images/BMaster/honey2.jpg');</code> in the body section.
-        <a href="[% c.uri_for('/themeadmin/help') %]" class="btn btn-sm btn-info float-end">View Help</a>
+                        <div class="alert alert-info">
+                            <strong>Tip:</strong> To add a background image, include <code>background-image: url('../images/BMaster/honey2.jpg');</code> in the body section.
+                            <a href="[% c.uri_for('/themeadmin/help') %]" class="btn btn-sm btn-info float-end">View Help</a>
+                        </div>
+
+                        [% IF c.flash.message %]
+                            <div class="alert alert-success">[% c.flash.message %]</div>
+                        [% END %]
+
+                        [% IF c.flash.error %]
+                            <div class="alert alert-danger">[% c.flash.error %]</div>
+                        [% END %]
+
+                        <div class="card mb-4">
+                            <div class="card-header bg-primary text-white">
+                                <h3 class="card-title mb-0">CSS Editor</h3>
+                            </div>
+                            <div class="card-body">
+                                <form action="[% c.uri_for('/themeadmin/edit_theme_css', theme_name) %]" method="POST">
+                                    <div class="form-group">
+                                        <textarea name="css_content" id="css_content" class="form-control" rows="20" style="font-family: monospace;">[% css_content %]</textarea>
+                                    </div>
+                                    <div class="mt-3">
+                                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                                        <a href="[% c.uri_for('/themeadmin') %]" class="btn btn-secondary">Cancel</a>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+<div class="card mb-4">
+    <div class="card-header bg-info text-white">
+        <h3 class="card-title mb-0">CSS Variables for [% theme_name %] Theme</h3>
     </div>
+    <div class="card-body">
+        <p>Use these CSS variables in your theme by referencing them as <code>var(--variable-name)</code>:</p>
 
-    [% IF c.flash.message %]
-        <div class="alert alert-success">[% c.flash.message %]</div>
-    [% END %]
+        [% IF css_variables.defined && css_variables.keys.size > 0 && !css_variables.error.defined %]
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Variable Name</th>
+                            <th>Value</th>
+                            <th>Preview</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        [% FOREACH key IN css_variables.keys.sort %]
+                            <tr>
+                                <td><code>--[% key %]</code></td>
+                                <td><code>[% css_variables.${key} %]</code></td>
+                                <td>
+                                    [% IF css_variables.${key}.match('^#') || css_variables.${key}.match('rgb') || css_variables.${key}.match('hsl') || css_variables.${key}.match('rgba') %]
+                                        <div style="width: 30px; height: 30px; background-color: [% css_variables.${key} %]; border: 1px solid #ccc;"></div>
+                                    [% ELSIF key.match('color') %]
+                                        <div style="width: 30px; height: 30px; background-color: [% css_variables.${key} %]; border: 1px solid #ccc;"></div>
+                                    [% ELSIF key.match('font') || key.match('size') %]
+                                        <span style="font: [% css_variables.${key} %]">Aa</span>
+                                    [% ELSE %]
+                                        <span class="text-muted">-</span>
+                                    [% END %]
+                                </td>
+                            </tr>
+                        [% END %]
+                    </tbody>
+                </table>
+            </div>
 
-    [% IF c.flash.error %]
-        <div class="alert alert-danger">[% c.flash.error %]</div>
-    [% END %]
-
-    <div class="card mb-4">
-        <div class="card-header bg-primary text-white">
-            <h3 class="card-title mb-0">CSS Editor</h3>
-        </div>
-        <div class="card-body">
-            <form action="[% c.uri_for('/themeadmin/edit_theme_css', theme_name) %]" method="POST">
-                <div class="form-group">
-                    <textarea name="css_content" id="css_content" class="form-control" rows="20" style="font-family: monospace;">[% css_content %]</textarea>
-                </div>
-                <div class="mt-3">
-                    <button type="submit" class="btn btn-primary">Save Changes</button>
-                    <a href="[% c.uri_for('/themeadmin') %]" class="btn btn-secondary">Cancel</a>
-                </div>
-            </form>
-        </div>
+            <div class="alert alert-info mt-3">
+                <strong>Tip:</strong> To use these variables in your CSS, write: <code>property: var(--variable-name);</code><br>
+                Example: <code>color: var(--text-color);</code>
+            </div>
+        [% ELSIF css_variables.error.defined %]
+            <div class="alert alert-danger">
+                <strong>Error:</strong> [% css_variables.error %]
+            </div>
+        [% ELSE %]
+            <div class="alert alert-warning">
+                No CSS variables found for this theme. Variables should be defined in the theme_definitions.json file.
+            </div>
+        [% END %]
     </div>
-
-    <div class="card">
-        <div class="card-header bg-info text-white">
-            <h3 class="card-title mb-0">CSS Variables Reference</h3>
-        </div>
-        <div class="card-body">
-            <p>Use these CSS variables in your theme:</p>
-            <ul>
-                <li><code>--primary-color</code>: Main background color</li>
-                <li><code>--secondary-color</code>: Secondary background color</li>
-                <li><code>--accent-color</code>: Accent color for highlights</li>
-                <li><code>--text-color</code>: Main text color</li>
-                <li><code>--link-color</code>: Color for links</li>
-                <li><code>--link-hover-color</code>: Color for links on hover</li>
-                <li><code>--background-color</code>: Page background color</li>
-                <li><code>--border-color</code>: Color for borders</li>
-                <li><code>--table-header-bg</code>: Background color for table headers</li>
-                <li><code>--warning-color</code>: Color for warnings</li>
-                <li><code>--success-color</code>: Color for success messages</li>
-            </ul>
-        </div>
-    </div>
-</div>
+</div>                    </div>

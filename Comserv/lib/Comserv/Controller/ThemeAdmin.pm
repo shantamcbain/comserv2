@@ -8,6 +8,7 @@ use File::Path qw(make_path);
 use Data::Dumper;
 use Comserv::Util::Logging;
 use Comserv::Util::ThemeManager;
+use JSON qw(encode_json decode_json);
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -479,115 +480,57 @@ sub create_custom_theme :Path('create_custom_theme') :Args(0) {
 }
 
 # Edit theme CSS directly
+
 sub edit_theme_css :Path('edit_theme_css') :Args(1) {
     my ($self, $c, $theme_name) = @_;
 
-    # Log that we've entered the edit_theme_css method
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_theme_css', 
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_theme_css',
         "***** ENTERED THEMEADMIN EDIT_THEME_CSS METHOD FOR $theme_name *****");
 
-    # Check if the user is logged in and has admin role
     unless ($c->user_exists && grep { $_ eq 'admin' } @{$c->session->{roles}}) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'edit_theme_css', 
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'edit_theme_css',
             "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest') . ", proceeding anyway for debugging");
-        # Don't redirect, allow access for debugging
-        # $c->flash->{error} = "You must be an admin to edit theme CSS";
-        # $c->response->redirect($c->uri_for('/'));
-        # return;
     }
 
-    # Get the theme CSS file path - ensure the themes directory exists
-    my $theme_css_path = $c->path_to('root', 'static', 'css', 'themes', "$theme_name.css");
-    
-    # Check if the theme CSS file exists
-    unless (-f $theme_css_path) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_theme_css', 
-            "Theme CSS file not found: $theme_css_path");
-        
-        # Create the directory if it doesn't exist
-        my $themes_dir = $c->path_to('root', 'static', 'css', 'themes');
-        unless (-d $themes_dir) {
-            mkdir $themes_dir or die "Cannot create themes directory: $!";
-        }
-        
-        # Create an empty file for this theme
-        open my $fh, '>', $theme_css_path or die "Cannot create theme file: $!";
-        close $fh;
-        $c->response->redirect($c->uri_for($self->action_for('index')));
-        return;
-    }
+    my $css_file = $c->path_to('root', 'static', 'css', "$theme_name.css");
+    my $json_file = $c->path_to('root', 'static', 'css', 'themes', 'theme_definitions.json');
 
-    # If this is a POST request, update the CSS file
-    if ($c->request->method eq 'POST') {
-        my $css_content = $c->request->params->{css_content};
-
-        # Write the updated CSS to the file
+    if ($c->req->method eq 'POST') {
+        my $css_content = $c->req->params->{css_content};
         try {
-            # Update the theme CSS file
-            write_file($theme_css_path, $css_content);
+            write_file($css_file, $css_content);
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_theme_css',
-                "Successfully updated CSS for theme: $theme_name");
-
-            # Also update the main CSS file for backward compatibility
-            my $main_css_file = $c->path_to('root', 'static', 'css', "$theme_name.css");
-            if (-f $main_css_file) {
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_theme_css',
-                    "Updating main CSS file for backward compatibility: $main_css_file");
-                write_file($main_css_file, $css_content);
-            }
-
-            # Check if the CSS contains a background image
-            if ($css_content =~ /background-image\s*:\s*url\(['"]?([^'")]+)['"]?\)/i) {
-                my $bg_image = $1;
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_theme_css',
-                    "Found background image in CSS: $bg_image");
-
-                # Update the theme_definitions.json file to include the background image
-                my $themes = $self->theme_manager->get_all_themes($c);
-                if (exists $themes->{$theme_name}) {
-                    # Extract the body styles
-                    if ($css_content =~ /body\s*{([^}]+)}/i) {
-                        my $body_styles = $1;
-                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_theme_css',
-                            "Found body styles: $body_styles");
-
-                        # Update the special_styles section
-                        $themes->{$theme_name}->{special_styles} = {
-                            body => $body_styles
-                        };
-
-                        # Save the updated theme definitions
-                        my $theme_defs_path = $c->path_to('root', 'static', 'config', 'theme_definitions.json');
-                        require JSON;
-                        my $json = JSON::encode_json($themes);
-                        write_file($theme_defs_path, $json);
-
-                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_theme_css',
-                            "Updated theme_definitions.json with background image");
-                    }
-                }
-            }
-
-            $c->flash->{message} = "Theme CSS updated successfully";
-            $c->response->redirect($c->uri_for($self->action_for('index')));
-            return;
+                "CSS file updated successfully for theme: $theme_name");
+            $c->flash->{success} = 'CSS file updated successfully';
         } catch {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_theme_css',
-                "Error updating CSS for theme $theme_name: $_");
-            $c->flash->{error} = "Error updating CSS: $_";
+            $c->flash->{error} = "Error saving CSS: $_";
         };
     }
 
-    # Read the current CSS content
-    my $css_content = read_file($theme_css_path);
+    my $css_content = -f $css_file ? read_file($css_file) : '';
 
-    # Pass data to template
-    $c->stash->{theme_name} = $theme_name;
-    $c->stash->{css_content} = $css_content;
-    $c->stash->{template} = 'admin/theme/edit_css.tt';
+    my $css_variables = {};
+    try {
+        my $json_text = read_file($json_file);
+        my $theme_definitions = decode_json($json_text);
+        $css_variables = $theme_definitions->{$theme_name}->{variables} || {};
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_theme_css',
+            "Error reading JSON file: $_");
+        $css_variables = { error => 'Error reading JSON file' };
+    };
 
-    # Log that we're rendering the template
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_theme_css', 
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'edit_theme_css',
+        "CSS Variables: " . encode_json($css_variables));
+
+    $c->stash(
+        template => 'admin/theme/edit_css.tt',
+        css_content => $css_content,
+        theme_name => $theme_name,
+        css_variables => $css_variables
+    );
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_theme_css',
         "***** RENDERING TEMPLATE: admin/theme/edit_css.tt *****");
 }
 

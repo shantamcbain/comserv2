@@ -53,6 +53,12 @@ sub _get_theme_definitions_path {
     return $c->path_to('root', 'static', 'config', 'theme_definitions.json');
 }
 
+# Public accessor for the theme definitions file path
+sub json_file {
+    my ($self, $c) = @_;
+    return $self->_get_theme_definitions_path($c);
+}
+
 # Load theme mappings
 sub _load_theme_mappings {
     my ($self, $c) = @_;

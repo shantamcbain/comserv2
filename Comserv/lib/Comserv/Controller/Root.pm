@@ -698,12 +698,35 @@ sub accounts :Path('/accounts') :Args(0) {
     $c->forward($c->view('TT'));
 }
 
+# Special route for hosting
+
+
 sub default :Path {
     my ( $self, $c ) = @_;
 
-    # Log the 404 error
+    # Log the 404 error with detailed information
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'default',
         "404 Not Found: " . $c->req->uri->path);
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'default',
+        "Request method: " . $c->req->method);
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'default',
+        "Controller: " . __PACKAGE__);
+
+    # Log the available controllers and their namespaces
+    my @controllers = sort keys %{$c->dispatcher->_controller_by_path};
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'default',
+        "Available controllers: " . join(", ", @controllers));
+
+    # Log the available actions for this path
+    my $path = $c->req->uri->path;
+    my $actions = $c->dispatcher->get_actions_for_path($path);
+    if ($actions && @$actions) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'default',
+            "Actions for path $path: " . join(", ", map { $_->reverse } @$actions));
+    } else {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'default',
+            "No actions found for path $path");
+    }
 
     # Set up the 404 page
     $c->stash(
@@ -763,52 +786,6 @@ sub reset_session :Global {
     $c->response->redirect($c->uri_for('/'));
 }
 
-sub send_email {
-    my ($self, $c, $params) = @_;
-
-    # Extract parameters
-    my $to = $params->{to} || return 0;
-    my $from = $params->{from} || $to;  # Default to the 'to' address if 'from' is not provided
-    my $subject = $params->{subject} || 'Comserv Notification';
-    my $body = $params->{body} || 'No message body provided';
-
-    # Log the email attempt
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
-        "Attempting to send email to: $to, Subject: $subject");
-
-    # Use the Mail::Sendmail module which should be available
-    eval {
-        require Mail::Sendmail;
-
-        my %mail = (
-            To      => $to,
-            From    => $from,
-            Subject => $subject,
-            Message => $body
-        );
-
-        # Send the email
-        my $result = Mail::Sendmail::sendmail(%mail);
-
-        if ($result) {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
-                "Email sent successfully to: $to");
-            return 1;
-        } else {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email',
-                "Failed to send email to: $to, Error: $Mail::Sendmail::error");
-            return 0;
-        }
-    };
-
-    if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email',
-            "Exception while sending email: $@");
-        return 0;
-    }
-
-    return 0;  # Default to failure
-}
 
 sub end : ActionClass('RenderView') {}
 

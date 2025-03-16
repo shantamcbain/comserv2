@@ -24,12 +24,12 @@
 <p>We are in the need of Perl programmers and graphic designers. Be sure to check the jobs link in the top links.
 <p> Services provided: Click The product link in the main links group.
 <ul>
-<li><a href='http://www.computersystemconsulting.ca/Hosting.php'>Website hosting</a> </li>
+<li><a href='/hosting'>Website hosting</a></li>
 <li> <a href='http://www.computersystemconsulting.ca/domains'>Register your domain with us.</a></li>
 <li> Check out our <a href='http://demo.computersystemconsulting.ca' target='_blank'>Demo</a> </li>
 <li>
 <h1>Join our VOIP services</h1>
-<p> <a href='http://computersystemconsulting.ca:5000/voip' name='Contact' target='_blank' title=' '>Learn more</a>
+<p> <a href='/voip'>Learn more</a>
 <li>We now offer over 1000 new communities to our phone options. Get one from your target community.</li>
 </li>
 </ul>

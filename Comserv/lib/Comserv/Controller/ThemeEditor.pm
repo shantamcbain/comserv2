@@ -280,9 +280,19 @@ sub edit_theme :Path('edit_theme') :Args(0) {
     # Get site themes for the site-theme mappings section
     my $site_themes = {};
     try {
-        my $json_content = read_file($self->theme_manager->json_file);
-        my $data = decode_json($json_content);
-        $site_themes = $data->{site_themes} || {};
+        my $json_file = $self->theme_manager->json_file($c);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_theme', "Reading theme definitions from: $json_file");
+
+        if (-f $json_file) {
+            my $json_content = read_file($json_file);
+            my $data = decode_json($json_content);
+            $site_themes = $data->{site_themes} || {};
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_theme',
+                "Found " . scalar(keys %$site_themes) . " site-theme mappings");
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_theme',
+                "Theme definitions file not found: $json_file");
+        }
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_theme', "Error reading theme definitions: $_");
     };
