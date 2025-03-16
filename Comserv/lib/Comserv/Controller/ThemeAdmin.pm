@@ -7,7 +7,6 @@ use File::Slurp;
 use File::Path qw(make_path);
 use Data::Dumper;
 use Comserv::Util::Logging;
-use Comserv::Util::ThemeManager;
 use JSON qw(encode_json decode_json);
 
 BEGIN { extends 'Catalyst::Controller'; }
@@ -17,11 +16,6 @@ __PACKAGE__->config(namespace => 'themeadmin');
 has 'logging' => (
     is => 'ro',
     default => sub { Comserv::Util::Logging->instance }
-);
-
-has 'theme_manager' => (
-    is => 'ro',
-    default => sub { Comserv::Util::ThemeManager->new }
 );
 
 # Simple index method that uses the same template as the main index
@@ -55,8 +49,8 @@ sub simple :Path('/themeadmin/simple') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'simple', "Site name: $site_name");
 
     # Create a simple site object
-    # Get the theme for this site from our theme manager
-    my $theme_name = $self->theme_manager->get_site_theme($c, $site_name);
+    # Get the theme for this site from our theme config
+    my $theme_name = $c->model('ThemeConfig')->get_site_theme($c, $site_name);
 
     my $site = {
         id => 1,
@@ -207,8 +201,8 @@ sub index :Path :Args(0) {
         $site = { id => 0, name => $site_name, description => 'Error getting site details' };
     };
 
-    # Get the theme for this site from our JSON-based theme manager
-    my $theme_name = $self->theme_manager->get_site_theme($c, $site_name);
+    # Get the theme for this site from our JSON-based theme config
+    my $theme_name = $c->model('ThemeConfig')->get_site_theme($c, $site_name);
 
     # Add the theme to the site object
     $site->{theme} = $theme_name;
@@ -233,7 +227,7 @@ sub index :Path :Args(0) {
 
             # Add theme property to each site from our JSON-based theme manager
             foreach my $s (@sites) {
-                my $site_theme = $self->theme_manager->get_site_theme($c, $s->name);
+                my $site_theme = $c->model('ThemeConfig')->get_site_theme($c, $s->name);
                 $s->{theme} = $site_theme;
             }
         } catch {
@@ -244,8 +238,8 @@ sub index :Path :Args(0) {
         @sites = ($site);
     }
 
-    # Get available themes from our JSON-based theme manager
-    my $themes = $self->theme_manager->get_all_themes($c);
+    # Get available themes from our JSON-based theme config
+    my $themes = $c->model('ThemeConfig')->get_all_themes($c);
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Available themes from JSON: " . Dumper($themes));
 
     # Make sure we have all the predefined themes
@@ -335,10 +329,10 @@ sub update_theme :Path('update_theme') :Args(0) {
 
         # Log the theme update attempt
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_theme',
-            "Attempting to update theme for site $site_name to $theme using ThemeManager");
+            "Attempting to update theme for site $site_name to $theme using ThemeConfig");
 
-        # Update the theme using our JSON-based theme manager
-        my $result = $self->theme_manager->set_site_theme($c, $site_name, $theme);
+        # Update the theme using our JSON-based theme config
+        my $result = $c->model('ThemeConfig')->set_site_theme($c, $site_name, $theme);
 
         if ($result) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_theme',

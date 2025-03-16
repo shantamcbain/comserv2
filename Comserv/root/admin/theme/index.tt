@@ -1,4 +1,4 @@
-[% META title = 'Themes' %]
+[% META title = 'Theme Management' %]
 
 <div class="container">
     <h1>Theme Management</h1>
@@ -24,8 +24,8 @@
                 <div class="col-md-6">
                     <h4>Active Theme: [% theme_name %]</h4>
                     <p>Site: [% site.name %]</p>
-                    
-                    <form action="[% c.uri_for('/themeadmin/update_theme') %]" method="POST" class="mt-3">
+
+                    <form action="[% c.uri_for('/admin/theme/update') %]" method="POST" class="mt-3">
                         <input type="hidden" name="site_id" value="[% site.id %]">
                         <div class="form-group">
                             <label for="theme">Select Theme:</label>
@@ -56,6 +56,54 @@
         </div>
     </div>
 
+    <div class="card mb-4">
+        <div class="card-header bg-success text-white">
+            <h3 class="card-title mb-0">Create Custom Theme</h3>
+        </div>
+        <div class="card-body">
+            <form action="[% c.uri_for('/admin/theme/create_custom') %]" method="POST">
+                <input type="hidden" name="site_id" value="[% site.id %]">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="primary_color">Primary Color:</label>
+                            <input type="color" name="primary_color" id="primary_color" class="form-control" value="#ccffff">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="secondary_color">Secondary Color:</label>
+                            <input type="color" name="secondary_color" id="secondary_color" class="form-control" value="#e6ffff">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="accent_color">Accent Color:</label>
+                            <input type="color" name="accent_color" id="accent_color" class="form-control" value="#FF9900">
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="text_color">Text Color:</label>
+                            <input type="color" name="text_color" id="text_color" class="form-control" value="#000000">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="link_color">Link Color:</label>
+                            <input type="color" name="link_color" id="link_color" class="form-control" value="#0000FF">
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <button type="submit" class="btn btn-success">Create Custom Theme</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div class="card">
         <div class="card-header bg-secondary text-white">
             <h3 class="card-title mb-0">Available Themes</h3>
@@ -76,17 +124,11 @@
                     <td>[% theme_name | ucfirst %]</td>
                     <td>[% themes.$theme_name.description || "Standard theme" %]</td>
                     <td>
-                        <div class="theme-swatch" style="background-color: var(--primary-color);"></div>
+                        <div class="theme-swatch" style="background-color: [% themes.$theme_name.variables.item('primary-color') || '#ccffff' %];"></div>
                     </td>
                     <td>
-                        <button class="btn btn-sm btn-primary preview-theme" data-theme="[% theme_name %]">
-                            Preview
-                        </button>
-                        <a href="[% c.uri_for('/themeadmin/wysiwyg_editor', theme_name) %]" class="btn btn-sm btn-info">
-                            Visual Editor
-                        </a>
-                        <a href="[% c.uri_for('/themeadmin/edit_theme_css', theme_name) %]" class="btn btn-sm btn-secondary">
-                            Advanced CSS
+                        <a href="[% c.uri_for('/admin/theme/edit', theme_name) %]" class="btn btn-sm btn-secondary">
+                            Edit CSS
                         </a>
                     </td>
                 </tr>

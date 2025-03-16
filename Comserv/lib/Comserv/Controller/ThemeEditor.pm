@@ -8,7 +8,6 @@ use File::Path qw(make_path);
 use Data::Dumper;
 use JSON;
 use Comserv::Util::Logging;
-use Comserv::Util::ThemeManager;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -27,11 +26,6 @@ sub COMPONENT {
 has 'logging' => (
     is => 'ro',
     default => sub { Comserv::Util::Logging->instance }
-);
-
-has 'theme_manager' => (
-    is => 'ro',
-    default => sub { Comserv::Util::ThemeManager->new }
 );
 
 # Main WYSIWYG theme editor page
@@ -62,7 +56,7 @@ sub index :Path :Args(0) {
     }
 
     # Get all available themes
-    my $themes = $self->theme_manager->get_all_themes($c);
+    my $themes = $c->model('ThemeConfig')->get_all_themes($c);
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Available themes from JSON: " . Dumper($themes));
 
     # Get list of theme names
@@ -93,7 +87,7 @@ sub edit :Path('edit') :Args(1) {
     }
 
     # Get the theme
-    my $theme = $self->theme_manager->get_theme($c, $theme_name);
+    my $theme = $c->model('ThemeConfig')->get_theme($c, $theme_name);
 
     if (!$theme) {
         $c->flash->{error} = "Theme '$theme_name' not found";
@@ -130,7 +124,7 @@ sub wysiwyg :Path('wysiwyg') :Args(1) {
     }
 
     # Get the theme
-    my $theme = $self->theme_manager->get_theme($c, $theme_name);
+    my $theme = $c->model('ThemeConfig')->get_theme($c, $theme_name);
 
     if (!$theme) {
         $c->flash->{error} = "Theme '$theme_name' not found";
@@ -172,7 +166,7 @@ sub update_theme :Path('update_theme') :Args(0) {
     my $theme_description = $c->request->params->{theme_description};
 
     # Get the theme
-    my $theme = $self->theme_manager->get_theme($c, $theme_name);
+    my $theme = $c->model('ThemeConfig')->get_theme($c, $theme_name);
 
     if (!$theme) {
         $c->flash->{error} = "Theme '$theme_name' not found";
@@ -223,7 +217,7 @@ sub update_theme :Path('update_theme') :Args(0) {
     }
 
     # Save the updated theme
-    my $result = $self->theme_manager->update_theme($c, $theme_name, $theme);
+    my $result = $c->model('ThemeConfig')->update_theme($c, $theme_name, $theme);
 
     if ($result) {
         $c->flash->{message} = "Theme '$theme_display_name' updated successfully";
@@ -260,7 +254,7 @@ sub edit_theme :Path('edit_theme') :Args(0) {
     }
 
     # Get the theme
-    my $theme = $self->theme_manager->get_theme($c, $theme_name);
+    my $theme = $c->model('ThemeConfig')->get_theme($c, $theme_name);
 
     if (!$theme) {
         $c->flash->{error} = "Theme '$theme_name' not found";
@@ -280,7 +274,7 @@ sub edit_theme :Path('edit_theme') :Args(0) {
     # Get site themes for the site-theme mappings section
     my $site_themes = {};
     try {
-        my $json_file = $self->theme_manager->json_file($c);
+        my $json_file = $c->model('ThemeConfig')->get_theme_definitions_path($c);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_theme', "Reading theme definitions from: $json_file");
 
         if (-f $json_file) {
@@ -323,7 +317,7 @@ sub apply_changes :Path('apply_changes') :Args(0) {
     my $variable_value = $c->request->params->{variable_value};
 
     # Get the theme
-    my $theme = $self->theme_manager->get_theme($c, $theme_name);
+    my $theme = $c->model('ThemeConfig')->get_theme($c, $theme_name);
 
     if (!$theme) {
         $c->response->body('{"success": false, "error": "Theme not found"}');
@@ -335,7 +329,7 @@ sub apply_changes :Path('apply_changes') :Args(0) {
     $theme->{variables}->{$variable_name} = $variable_value;
 
     # Generate CSS for the updated theme (but don't save it yet)
-    my $css = $self->theme_manager->generate_theme_css($c, $theme);
+    my $css = $c->model('ThemeConfig')->generate_theme_css($c, $theme);
 
     # Return success response with the CSS
     $c->response->body('{"success": true, "css": ' . $c->json_encode($css) . '}');

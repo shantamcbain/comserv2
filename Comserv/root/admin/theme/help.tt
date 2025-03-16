@@ -32,7 +32,7 @@
         <div class="card-body">
             <p>To add a background image to your theme:</p>
             <ol>
-                <li>Go to <a href="[% c.uri_for('/themeadmin/edit_theme_css', 'apis') %]">CSS Editor</a></li>
+                <li>Go to <a href="[% c.uri_for('/admin/theme/edit', 'apis') %]">CSS Editor</a></li>
                 <li>Add or modify the <code>body</code> section to include a background image:</li>
             </ol>
             <pre class="bg-light p-3">body {
@@ -71,6 +71,6 @@
     </div>
     
     <div class="text-center mb-4">
-        <a href="[% c.uri_for('/themeadmin') %]" class="btn btn-primary">Return to Theme Manager</a>
+        <a href="[% c.uri_for('/admin/theme') %]" class="btn btn-primary">Return to Theme Manager</a>
     </div>
 </div>

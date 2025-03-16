@@ -64,6 +64,9 @@
                         storage => '/tmp/session_data',
                         expires => 3600,
                     },
+                    'Model::ThemeConfig' => {
+                        # Theme configuration model
+                    },
                 );
 
                 sub psgi_app {

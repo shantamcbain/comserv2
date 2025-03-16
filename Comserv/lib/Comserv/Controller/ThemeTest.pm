@@ -7,7 +7,6 @@ use File::Slurp;
 use File::Path qw(make_path);
 use Data::Dumper;
 use Comserv::Util::Logging;
-use Comserv::Util::ThemeManager;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -16,11 +15,6 @@ __PACKAGE__->config(namespace => 'themetest');
 has 'logging' => (
     is => 'ro',
     default => sub { Comserv::Util::Logging->instance }
-);
-
-has 'theme_manager' => (
-    is => 'ro',
-    default => sub { Comserv::Util::ThemeManager->new }
 );
 
 # Simple test page that doesn't require authentication
@@ -98,7 +92,7 @@ sub edit_css :Path('edit_css') :Args(1) {
                     "Found background image in CSS: $bg_image");
                 
                 # Update the theme_definitions.json file to include the background image
-                my $themes = $self->theme_manager->get_all_themes($c);
+                my $themes = $c->model('ThemeConfig')->get_all_themes($c);
                 if (exists $themes->{$theme_name}) {
                     # Extract the body styles
                     if ($css_content =~ /body\s*{([^}]+)}/i) {

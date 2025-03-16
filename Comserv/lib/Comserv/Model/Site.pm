@@ -6,7 +6,6 @@ use Try::Tiny;
 use Comserv::Util::Logging;
 use JSON;
 use File::Slurp;
-use Comserv::Util::ThemeManager;
 
 extends 'Catalyst::Model';
 has 'logging' => (
@@ -16,10 +15,6 @@ has 'logging' => (
 has 'schema' => (
     is => 'ro',
     required => 1,
-);
-has 'theme_manager' => (
-    is => 'ro',
-    default => sub { Comserv::Util::ThemeManager->new }
 );
 
 sub COMPONENT {
@@ -58,7 +53,7 @@ sub get_all_sites {
 
             # Add a default theme property to each site
             foreach my $site (@sites) {
-                $site->{theme} = $self->theme_manager->get_site_theme($c, $site->{name});
+                $site->{theme} = $c->model('ThemeConfig')->get_site_theme($c, $site->{name});
             }
 
             # Add a message to the flash
@@ -189,7 +184,7 @@ sub add_site {
             $new_site = $site_rs->create($filtered_details);
 
             # Add a default theme property
-            $new_site->{theme} = $self->theme_manager->get_site_theme($c, $new_site->{name});
+            $new_site->{theme} = $c->model('ThemeConfig')->get_site_theme($c, $new_site->{name});
 
             # Add a message to the flash
             $c->flash->{error_msg} = "The theme feature requires a database update. <a href='/admin/add_theme_column'>Click here to add the theme column</a>.";
@@ -242,7 +237,7 @@ sub delete_site {
             $site->delete if $site;
 
             # Add a default theme property
-            $site->{theme} = $self->theme_manager->get_site_theme($c, $site->{name}) if $site;
+            $site->{theme} = $c->model('ThemeConfig')->get_site_theme($c, $site->{name}) if $site;
 
             # Add a message to the flash
             $c->flash->{error_msg} = "The theme feature requires a database update. <a href='/admin/add_theme_column'>Click here to add the theme column</a>.";
@@ -284,7 +279,7 @@ sub get_site_details_by_name {
             );
 
             # Add a default theme property
-            $site->{theme} = $self->theme_manager->get_site_theme($c, $site_name) if $site;
+            $site->{theme} = $c->model('ThemeConfig')->get_site_theme($c, $site_name) if $site;
 
             # Add a message to the flash
             $c->flash->{error_msg} = "The theme feature requires a database update. Please run the add_theme_column.pl script.";
@@ -326,7 +321,7 @@ sub get_site_details {
             );
 
             # Add a default theme property
-            $site->{theme} = $self->theme_manager->get_site_theme($c, $site->{name}) if $site;
+            $site->{theme} = $c->model('ThemeConfig')->get_site_theme($c, $site->{name}) if $site;
 
             # Add a message to the flash
             $c->flash->{error_msg} = "The theme feature requires a database update. Please run the add_theme_column.pl script.";

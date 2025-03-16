@@ -1,4 +1,4 @@
-package Comserv::Util::ThemeManager;
+package Comserv::Model::ThemeConfig;
 
 use Moose;
 use namespace::autoclean;
@@ -7,94 +7,125 @@ use File::Slurp;
 use Try::Tiny;
 use Comserv::Util::Logging;
 
+extends 'Catalyst::Model';
+
 has 'logging' => (
     is      => 'ro',
     default => sub {Comserv::Util::Logging->instance}
 );
 
+# File paths for theme configuration
+sub get_theme_definitions_path {
+    my ($self, $c) = @_;
+    return $c->path_to('root', 'static', 'config', 'theme_definitions.json');
+}
+
+sub get_theme_mappings_path {
+    my ($self, $c) = @_;
+    return $c->path_to('root', 'static', 'config', 'theme_mappings.json');
+}
+
+sub get_theme_css_directory {
+    my ($self, $c) = @_;
+    return $c->path_to('root', 'static', 'css', 'themes');
+}
+
+# Load theme definitions
+sub get_theme_definitions {
+    my ($self, $c) = @_;
+
+    my $file = $self->get_theme_definitions_path($c);
+    return {} unless -f $file;
+
+    try {
+        my $json = read_file($file);
+        return decode_json($json);
+    }
+    catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_theme_definitions', "Error loading theme definitions: $_");
+        return {};
+    };
+}
+
+# Get all available themes
+sub get_all_themes {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_all_themes', "Getting all available themes");
+    return $self->get_theme_definitions($c);
+}
+
+# Get a specific theme
+sub get_theme {
+    my ($self, $c, $theme_name) = @_;
+
+    my $themes = $self->get_theme_definitions($c);
+
+    if (exists $themes->{$theme_name}) {
+        return $themes->{$theme_name};
+    }
+    else {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_theme', "Theme not found: $theme_name, returning default");
+        return $themes->{default} || { name => "Default", variables => {} };
+    }
+}
+
 # Validate theme name
 sub validate_theme {
-    my ($self, $theme_name, $c) = @_;
+    my ($self, $c, $theme_name) = @_;
 
-    # List of valid themes
-    my @valid_themes = qw(default csc usbm apis dark);
+    # Get all valid themes from theme definitions
+    my $themes = $self->get_theme_definitions($c);
+    my @valid_themes = keys %$themes;
 
     # Convert theme name to lowercase for comparison
     $theme_name = lc($theme_name || '');
 
     # Return the theme name if valid, otherwise return 'default'
-    my $valid_theme = (grep {$_ eq $theme_name} @valid_themes) ? $theme_name : 'default';
+    my $valid_theme = (grep {lc($_) eq $theme_name} @valid_themes) ? $theme_name : 'default';
 
-    if ($c) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'validate_theme',
-            "Validated theme: $valid_theme (from: " . ($theme_name || 'undefined') . ")");
-    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'validate_theme',
+        "Validated theme: $valid_theme (from: " . ($theme_name || 'undefined') . ")");
 
     return $valid_theme;
 }
 
-# Singleton pattern
-my $instance;
-sub instance {
-    my $class = shift;
-    $instance ||= $class->new(@_);
-    return $instance;
-}
-
-# Get theme mappings file path
-sub _get_theme_mappings_path {
-    my ($self, $c) = @_;
-    return $c->path_to('root', 'static', 'config', 'theme_mappings.json');
-}
-
-# Get theme definitions file path
-sub _get_theme_definitions_path {
-    my ($self, $c) = @_;
-    return $c->path_to('root', 'static', 'config', 'theme_definitions.json');
-}
-
-# Public accessor for the theme definitions file path
-sub json_file {
-    my ($self, $c) = @_;
-    return $self->_get_theme_definitions_path($c);
-}
-
 # Load theme mappings
-sub _load_theme_mappings {
+sub load_theme_mappings {
     my ($self, $c) = @_;
-    my $file = $self->_get_theme_mappings_path($c);
+    my $file = $self->get_theme_mappings_path($c);
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_load_theme_mappings', "Loading theme mappings from: $file");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'load_theme_mappings', "Loading theme mappings from: $file");
 
     unless (-f $file) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_load_theme_mappings', "Theme mappings file does not exist: $file");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'load_theme_mappings', "Theme mappings file does not exist: $file");
         return {};
     }
 
     try {
         my $json = read_file($file);
         my $mappings = decode_json($json);
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_load_theme_mappings',
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'load_theme_mappings',
             "Loaded theme mappings: " . join(", ", map { "$_ => $mappings->{sites}{$_}" } keys %{$mappings->{sites}}));
         return $mappings;
     }
     catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_load_theme_mappings', "Error loading theme mappings: $_");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'load_theme_mappings', "Error loading theme mappings: $_");
         return {};
     };
 }
 
 # Save theme mappings
-sub _save_theme_mappings {
+sub save_theme_mappings {
     my ($self, $c, $mappings) = @_;
-    my $file = $self->_get_theme_mappings_path($c);
+    my $file = $self->get_theme_mappings_path($c);
 
     try {
         write_file($file, encode_json($mappings));
         return 1;
     }
     catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_save_theme_mappings', "Error saving theme mappings: $_");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'save_theme_mappings', "Error saving theme mappings: $_");
         return 0;
     };
 }
@@ -122,7 +153,7 @@ sub get_site_theme {
     }
 
     # Load the theme mappings
-    my $mappings = $self->_load_theme_mappings($c);
+    my $mappings = $self->load_theme_mappings($c);
 
     # Log the available mappings for debugging
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_site_theme',
@@ -148,7 +179,7 @@ sub get_site_theme {
     }
 
     # Validate the theme
-    $theme = $self->validate_theme($theme);
+    $theme = $self->validate_theme($c, $theme);
 
     # Log the selected theme
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_site_theme',
@@ -170,10 +201,10 @@ sub set_site_theme {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'set_site_theme',
         "Setting theme for site $site_name to $theme_name");
 
-    my $mappings = $self->_load_theme_mappings($c);
+    my $mappings = $self->load_theme_mappings($c);
 
-    # Always use the simple validate_theme method
-    my $validated_theme = $self->validate_theme($theme_name, $c);
+    # Validate the theme
+    my $validated_theme = $self->validate_theme($c, $theme_name);
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'set_site_theme',
         "Validated theme: $validated_theme");
 
@@ -205,7 +236,7 @@ sub set_site_theme {
     # Also store in general key for backward compatibility
     $c->session->{theme_name} = $validated_theme;
 
-    my $result = $self->_save_theme_mappings($c, $mappings);
+    my $result = $self->save_theme_mappings($c, $mappings);
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'set_site_theme',
         "Theme mapping saved: " . ($result ? "Success" : "Failed") .
         " for site $site_name with theme $validated_theme");
@@ -220,7 +251,7 @@ sub remove_site_theme {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'remove_site_theme',
         "Removing theme for site $site_name");
 
-    my $mappings = $self->_load_theme_mappings($c);
+    my $mappings = $self->load_theme_mappings($c);
 
     # Check if the site exists in the mappings (case-insensitive)
     my $existing_site_key = undef;
@@ -251,54 +282,12 @@ sub remove_site_theme {
             "No mapping found for site: $site_name");
     }
 
-    my $result = $self->_save_theme_mappings($c, $mappings);
+    my $result = $self->save_theme_mappings($c, $mappings);
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'remove_site_theme',
         "Theme mapping removed: " . ($result ? "Success" : "Failed") .
         " for site $site_name");
 
     return $result;
-}
-
-# Get theme definitions
-sub get_theme_definitions {
-    my ($self, $c) = @_;
-
-    my $file = $self->_get_theme_definitions_path($c);
-    return {} unless -f $file;
-
-    try {
-        my $json = read_file($file);
-        return decode_json($json);
-    }
-    catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_theme_definitions', "Error loading theme definitions: $_");
-        return {};
-    };
-}
-
-# Get all available themes
-sub get_all_themes {
-    my ($self, $c) = @_;
-
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_all_themes', "Getting all available themes");
-
-    # Get themes from theme_definitions.json
-    return $self->get_theme_definitions($c);
-}
-
-# Get a specific theme
-sub get_theme {
-    my ($self, $c, $theme_name) = @_;
-
-    my $themes = $self->get_theme_definitions($c);
-
-    if (exists $themes->{$theme_name}) {
-        return $themes->{$theme_name};
-    }
-    else {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_theme', "Theme not found: $theme_name, returning default");
-        return $themes->{default} || { name => "Default", variables => {} };
-    }
 }
 
 # Generate CSS for all themes
@@ -311,7 +300,7 @@ sub generate_all_theme_css {
     my $themes = $self->get_theme_definitions($c);
 
     # Create themes directory if it doesn't exist
-    my $theme_dir = $c->path_to('root', 'static', 'css', 'themes');
+    my $theme_dir = $self->get_theme_css_directory($c);
     my $css_dir = $c->path_to('root', 'static', 'css');
 
     unless (-d $theme_dir) {
@@ -375,13 +364,47 @@ sub create_theme {
     my $themes = $self->get_theme_definitions($c);
     $themes->{$theme_name} = $theme_data;
 
-    my $file = $self->_get_theme_definitions_path($c);
+    my $file = $self->get_theme_definitions_path($c);
     try {
         write_file($file, encode_json($themes));
         return 1;
     }
     catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_theme', "Error creating theme: $_");
+        return 0;
+    };
+}
+
+# Update existing theme
+sub update_theme {
+    my ($self, $c, $theme_name, $theme_data) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_theme',
+        "Updating theme: $theme_name");
+
+    my $themes = $self->get_theme_definitions($c);
+
+    # Check if the theme exists
+    if (!exists $themes->{$theme_name}) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_theme',
+            "Theme not found: $theme_name");
+        return 0;
+    }
+
+    # Update the theme
+    $themes->{$theme_name} = $theme_data;
+
+    # Save the updated themes
+    my $file = $self->get_theme_definitions_path($c);
+    try {
+        write_file($file, encode_json($themes));
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_theme',
+            "Theme updated successfully: $theme_name");
+        return 1;
+    }
+    catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_theme',
+            "Error updating theme: $_");
         return 0;
     };
 }

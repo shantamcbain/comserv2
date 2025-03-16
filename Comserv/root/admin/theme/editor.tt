@@ -27,7 +27,7 @@
             <button style="background-color: [% themes.$theme_name.variables.item('button-bg') %]; color: [% themes.$theme_name.variables.item('button-text') %]; border: 1px solid [% themes.$theme_name.variables.item('button-border') %];">Sample Button</button>
         </div>
         <div class="theme-actions">
-            <a href="[% c.uri_for('/themeeditor/edit_theme', { theme_name = theme_name }) %]" class="button">Edit Theme</a>
+            <a href="[% c.uri_for('/admin/theme/edit', theme_name) %]" class="button">Edit Theme</a>
         </div>
     </div>
     [% END %]

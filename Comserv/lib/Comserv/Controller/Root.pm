@@ -6,7 +6,6 @@ use Data::Dumper;
 use DateTime;
 use JSON;
 use Comserv::Util::Logging;
-use Comserv::Util::ThemeManager;
 
 # Configure static file serving
 __PACKAGE__->config(
@@ -18,11 +17,6 @@ __PACKAGE__->config(
 has 'logging' => (
     is => 'ro',
     default => sub { Comserv::Util::Logging->instance }
-);
-
-has 'theme_manager' => (
-    is => 'ro',
-    default => sub { Comserv::Util::ThemeManager->new }
 );
 
 # Add user_exists method
@@ -105,12 +99,12 @@ sub set_theme {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'set_theme', "Setting theme for site: $site_name");
 
     # Get all available themes
-    my $all_themes = $self->theme_manager->get_all_themes($c);
+    my $all_themes = $c->model('ThemeConfig')->get_all_themes($c);
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'set_theme',
         "Available themes: " . join(", ", sort keys %$all_themes));
 
-    # Get the theme for this site from our theme manager
-    my $theme_name = $self->theme_manager->get_site_theme($c, $site_name);
+    # Get the theme for this site from our theme config
+    my $theme_name = $c->model('ThemeConfig')->get_site_theme($c, $site_name);
 
     # Make sure the theme exists
     if (!exists $all_themes->{$theme_name}) {
@@ -337,7 +331,7 @@ sub auto :Private {
     # Generate theme CSS files if they don't exist
     # We only need to do this once per application start
     if (!$self->_theme_css_generated) {
-        $self->theme_manager->generate_all_theme_css($c);
+        $c->model('ThemeConfig')->generate_all_theme_css($c);
         $self->_theme_css_generated(1);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Generated all theme CSS files");
     }
@@ -662,8 +656,8 @@ sub site_setup {
             "Set HostName from document_root_url: " . $site->document_root_url);
     }
 
-    # Get theme from ThemeManager
-    my $theme_name = $self->theme_manager->get_site_theme($c, $SiteName);
+    # Get theme from ThemeConfig
+    my $theme_name = $c->model('ThemeConfig')->get_site_theme($c, $SiteName);
 
     # Set theme in stash for Header.tt to use
     $c->stash->{theme_name} = $theme_name;
