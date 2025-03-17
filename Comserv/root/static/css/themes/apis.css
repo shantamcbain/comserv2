@@ -1,12 +1,7 @@
-body {
-  background-image: url('../../images/BMaster/honey2.jpg');
-  
-}
-
 /* Theme: apis */
 :root {
   --accent-color: #FFB900;
-  --background-color: #FFF8E1;
+  --background-color: #FFE082;
   --border-color: #FFD54F;
   --footer-bg: #FFE082;
   --footer-text-color: #2C2C2C;
@@ -22,5 +17,10 @@ body {
   --table-header-bg: #FFE082;
   --text-color: #2C2C2C;
   --warning-color: #f39c12;
+}
+
+body {
+  background-image: url('../../images/BMaster/honey2.jpg');
+
 }
 
