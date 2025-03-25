@@ -707,7 +707,13 @@ sub default :Path {
         "Controller: " . __PACKAGE__);
 
     # Log the available controllers and their namespaces
-    my @controllers = sort keys %{$c->dispatcher->_controller_by_path};
+    # Using a safer approach to get controller names
+    my @controllers = ();
+    foreach my $component (sort keys %{$c->components}) {
+        if ($component =~ /^Comserv::Controller::(.+)$/) {
+            push @controllers, $1;
+        }
+    }
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'default',
         "Available controllers: " . join(", ", @controllers));
 
