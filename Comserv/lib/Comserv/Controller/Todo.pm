@@ -79,29 +79,109 @@ sub auto :Private {
     return 1;
 }
 
-# You
+# Main todo action with filtering capabilities
 sub todo :Path('/todo') :Args(0) {
     my ( $self, $c ) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'todo', 'Fetching todos for the todo page');
+
+    # Get filter parameters from query string
+    my $filter_type = $c->request->query_parameters->{filter} || 'all';
+    my $search_term = $c->request->query_parameters->{search} || '';
+    my $project_id = $c->request->query_parameters->{project_id} || '';
+    my $status_filter = $c->request->query_parameters->{status} || '';
+
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
 
     # Get a DBIx::Class::ResultSet object
     my $rs = $schema->resultset('Todo');
 
-    # Fetch todos for the site, ordered by start_date
+    # Build the search conditions
+    my $search_conditions = {
+        sitename => $c->session->{SiteName},  # filter by site
+    };
+
+    # Only show non-completed todos by default (unless explicitly filtering for completed)
+    if ($status_filter eq 'completed') {
+        $search_conditions->{status} = 3;  # completed status
+    } elsif ($status_filter eq 'in_progress') {
+        $search_conditions->{status} = 2;  # in progress status
+    } elsif ($status_filter eq 'new') {
+        $search_conditions->{status} = 1;  # new status
+    } elsif ($status_filter ne 'all') {
+        $search_conditions->{status} = { '!=' => 3 };  # exclude completed todos
+    }
+
+    # Add project filter if specified
+    if ($project_id) {
+        $search_conditions->{project_id} = $project_id;
+    }
+
+    # Add search term filter if specified
+    if ($search_term) {
+        $search_conditions->{'-or'} = [
+            { subject => { 'like', "%$search_term%" } },
+            { description => { 'like', "%$search_term%" } },
+            { comments => { 'like', "%$search_term%" } }
+        ];
+    }
+
+    # Apply date filters
+    my $now = DateTime->now;
+    my $today = $now->ymd;
+
+    if ($filter_type eq 'day' || $filter_type eq 'today') {
+        # Today's todos
+        $search_conditions->{start_date} = { '<=' => $today };
+        $search_conditions->{'-or'} = [
+            { due_date => { '>=' => $today } },
+            { status => { '!=' => 3 } }  # Not completed
+        ];
+    } elsif ($filter_type eq 'week') {
+        # This week's todos
+        my $start_of_week = $now->clone->subtract(days => $now->day_of_week - 1)->ymd;
+        my $end_of_week = $now->clone->add(days => 7 - $now->day_of_week)->ymd;
+
+        $search_conditions->{'-and'} = [
+            { start_date => { '<=' => $end_of_week } },
+            { '-or' => [
+                { due_date => { '>=' => $start_of_week } },
+                { status => { '!=' => 3 } }  # Not completed
+            ]}
+        ];
+    } elsif ($filter_type eq 'month') {
+        # This month's todos
+        my $start_of_month = $now->clone->set_day(1)->ymd;
+        my $end_of_month = $now->clone->set_day($now->month_length)->ymd;
+
+        $search_conditions->{'-and'} = [
+            { start_date => { '<=' => $end_of_month } },
+            { '-or' => [
+                { due_date => { '>=' => $start_of_month } },
+                { status => { '!=' => 3 } }  # Not completed
+            ]}
+        ];
+    }
+
+    # Fetch todos with the applied filters
     my @todos = $rs->search(
-        {
-            sitename => $c->session->{SiteName},  # filter by site
-            status => { '!=' => 3 }  # status not equal to 3
-        },
-        { order_by => { -asc => ['priority', 'start_date'] } } # order by start_date
+        $search_conditions,
+        { order_by => { -asc => ['priority', 'start_date'] } }
     );
 
-    # Add the todos to the stash
+    # Fetch all projects for the filter dropdown
+    my $project_controller = $c->controller('Project');
+    my $projects = $project_controller->fetch_projects_with_subprojects($c);
+
+    # Add the todos and filter info to the stash
     $c->stash(
         todos => \@todos,
         sitename => $c->session->{SiteName},
+        filter_type => $filter_type,
+        search_term => $search_term,
+        project_id => $project_id,
+        status_filter => $status_filter,
+        projects => $projects,
         template => 'todo/todo.tt',
     );
 
@@ -217,6 +297,79 @@ sub debug :Local {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'debug', "DateTime plugin is " . ($is_installed ? "" : "not ") . "installed");
 
     $c->response->body("Debugging information has been logged");
+}
+
+sub edit :Path('/todo/edit') :Args(1) {
+    my ($self, $c, $record_id) = @_;
+
+    # Log the entry into the edit action
+    $self->logging->log_with_details(
+        $c, 'info', __FILE__, __LINE__, 'edit',
+        "Entered edit action for record_id: " . ($record_id || 'undefined')
+    );
+
+    # Error handling for record_id
+    unless ($record_id) {
+        $self->logging->log_with_details(
+            $c, 'error', __FILE__, __LINE__, 'edit.record_id',
+            'Record ID is missing in the URL.'
+        );
+        $c->stash(
+            error_msg => 'Record ID is required but was not provided.',
+            template  => 'todo/todo.tt',
+        );
+        return;
+    }
+
+    # Initialize the schema to fetch data
+    my $schema = $c->model('DBEncy');
+
+    # Fetch the todo item with the given record_id
+    my $todo = $schema->resultset('Todo')->find($record_id);
+
+    if (!$todo) {
+        $self->logging->log_with_details(
+            $c, 'error', __FILE__, __LINE__, 'edit.record_not_found',
+            "Todo item not found for record ID: $record_id."
+        );
+        $c->stash(
+            error_msg => "No todo item found for record ID: $record_id.",
+            template  => 'todo/todo.tt',
+        );
+        return;
+    }
+
+    # Fetch project data from the Project Controller
+    my $project_controller = $c->controller('Project');
+    my $projects = $project_controller->fetch_projects_with_subprojects($c);
+
+    # Fetch all users to populate the user drop-down
+    my @users = $schema->resultset('User')->search({}, { order_by => 'id' });
+
+    # Calculate accumulative_time using the Log model
+    my $log_model = $c->model('Log');
+    my $accumulative_time_in_seconds = $log_model->calculate_accumulative_time($c, $record_id);
+
+    # Convert accumulative_time from seconds to hours and minutes
+    my $hours = int($accumulative_time_in_seconds / 3600);
+    my $minutes = int(($accumulative_time_in_seconds % 3600) / 60);
+
+    # Format the total time as 'HH:MM'
+    my $accumulative_time = sprintf("%02d:%02d", $hours, $minutes);
+
+    # Add the todo, projects, and users to the stash
+    $c->stash(
+        record           => $todo,
+        projects         => $projects,
+        users            => \@users,
+        accumulative_time => $accumulative_time,
+        template         => 'todo/edit.tt'
+    );
+
+    $self->logging->log_with_details(
+        $c, 'info', __FILE__, __LINE__, 'edit',
+        "Successfully loaded edit form for record ID: $record_id"
+    );
 }
 sub modify :Path('/todo/modify') :Args(1) {
     my ( $self, $c, $record_id ) = @_;
@@ -527,6 +680,10 @@ sub week :Path('/todo/week') :Args {
     my $start_of_week = $dt->clone->subtract(days => $dt->day_of_week - 1)->strftime('%Y-%m-%d');
     my $end_of_week = $dt->clone->add(days => 7 - $dt->day_of_week)->strftime('%Y-%m-%d');
 
+    # Calculate previous and next week dates
+    my $prev_week_date = $dt->clone->subtract(days => 7)->strftime('%Y-%m-%d');
+    my $next_week_date = $dt->clone->add(days => 7)->strftime('%Y-%m-%d');
+
     # Fetch todos for the site within the week, ordered by start_date
     my $todos = $todo_model->get_top_todos($c, $c->session->{SiteName});
 
@@ -539,7 +696,81 @@ sub week :Path('/todo/week') :Args {
         sitename => $c->session->{SiteName},
         start_of_week => $start_of_week,
         end_of_week => $end_of_week,
+        prev_week_date => $prev_week_date,
+        next_week_date => $next_week_date,
         template => 'todo/week.tt',
+    );
+
+    $c->forward($c->view('TT'));
+}
+
+sub month :Path('/todo/month') :Args {
+    my ($self, $c, $date) = @_;
+
+    # Get the Todo model
+    my $todo_model = $c->model('Todo');
+
+    # If no date is provided, use the current date
+    if (!defined $date) {
+        $date = DateTime->now->ymd;
+    }
+
+    # Parse the date
+    my $dt = DateTime::Format::ISO8601->parse_datetime($date);
+
+    # Calculate the start and end of the month
+    my $start_of_month = $dt->clone->set_day(1)->strftime('%Y-%m-%d');
+    my $end_of_month = $dt->clone->set_day($dt->month_length)->strftime('%Y-%m-%d');
+
+    # Calculate previous and next month dates
+    my $prev_month_date = $dt->clone->subtract(months => 1)->set_day(1)->strftime('%Y-%m-%d');
+    my $next_month_date = $dt->clone->add(months => 1)->set_day(1)->strftime('%Y-%m-%d');
+
+    # Fetch todos for the site
+    my $todos = $todo_model->get_top_todos($c, $c->session->{SiteName});
+
+    # Filter todos for the given month and status not equal to 3
+    my @filtered_todos = grep { $_->start_date ge $start_of_month && $_->start_date le $end_of_month && $_->status ne '3' } @$todos;
+
+    # Organize todos by day of month
+    my %todos_by_day;
+    foreach my $todo (@filtered_todos) {
+        my $todo_date = DateTime::Format::ISO8601->parse_datetime($todo->start_date);
+        my $day = $todo_date->day;
+        push @{$todos_by_day{$day}}, $todo;
+    }
+
+    # Create a calendar structure
+    my @calendar;
+    my $first_day = DateTime->new(year => $dt->year, month => $dt->month, day => 1);
+    my $day_of_week = $first_day->day_of_week % 7; # 0 for Sunday, 6 for Saturday
+
+    # Add empty cells for days before the first day of the month
+    for (my $i = 0; $i < $day_of_week; $i++) {
+        push @calendar, { day => '', todos => [] };
+    }
+
+    # Add cells for each day of the month
+    for (my $day = 1; $day <= $dt->month_length; $day++) {
+        push @calendar, {
+            day => $day,
+            date => sprintf("%04d-%02d-%02d", $dt->year, $dt->month, $day),
+            todos => $todos_by_day{$day} || []
+        };
+    }
+
+    # Add the todos and calendar to the stash
+    $c->stash(
+        todos => \@filtered_todos,
+        calendar => \@calendar,
+        sitename => $c->session->{SiteName},
+        month_name => $dt->month_name,
+        year => $dt->year,
+        start_of_month => $start_of_month,
+        end_of_month => $end_of_month,
+        prev_month_date => $prev_month_date,
+        next_month_date => $next_month_date,
+        template => 'todo/month.tt',
     );
 
     $c->forward($c->view('TT'));
