@@ -75,6 +75,9 @@ requires 'Email::Sender::Simple';
 requires 'JSON';
 requires 'URI::Escape';
 requires 'Data::FormValidator';
+requires 'LWP::UserAgent';
+requires 'HTTP::Request';
+requires 'Try::Tiny';
 
 # Development and testing
 requires 'Term::ReadPassword';
