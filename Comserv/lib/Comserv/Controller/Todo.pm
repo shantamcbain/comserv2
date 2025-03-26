@@ -170,8 +170,18 @@ sub todo :Path('/todo') :Args(0) {
     );
 
     # Fetch all projects for the filter dropdown
-    my $project_controller = $c->controller('Project');
-    my $projects = $project_controller->fetch_projects_with_subprojects($c);
+    my $projects = [];
+    eval {
+        my $project_controller = $c->controller('Project');
+        if ($project_controller) {
+            $projects = $project_controller->fetch_projects_with_subprojects($c) || [];
+        }
+    };
+
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'todo',
+            "Error fetching projects: $@");
+    }
 
     # Add the todos and filter info to the stash
     $c->stash(

@@ -150,14 +150,16 @@
                 <label for="project_id">Project:</label>
                 <select id="project_id" name="project_id">
                     <option value="">All Projects</option>
-                    [% FOREACH project IN projects %]
-                        <option value="[% project.id %]" [% IF project_id == project.id %]selected[% END %]>[% project.name %]</option>
-                        [% IF project.sub_projects.size > 0 %]
-                            [% FOREACH sub_project IN project.sub_projects %]
-                                <option value="[% sub_project.id %]" [% IF project_id == sub_project.id %]selected[% END %]>&nbsp;&nbsp;- [% sub_project.name %]</option>
-                                [% IF sub_project.sub_projects.size > 0 %]
-                                    [% FOREACH sub_sub_project IN sub_project.sub_projects %]
-                                        <option value="[% sub_sub_project.id %]" [% IF project_id == sub_sub_project.id %]selected[% END %]>&nbsp;&nbsp;&nbsp;&nbsp;-- [% sub_sub_project.name %]</option>
+                    [% IF projects && projects.size > 0 %]
+                        [% FOREACH project IN projects %]
+                            <option value="[% project.id %]" [% IF project_id == project.id %]selected[% END %]>[% project.name %]</option>
+                            [% IF project.sub_projects && project.sub_projects.size > 0 %]
+                                [% FOREACH sub_project IN project.sub_projects %]
+                                    <option value="[% sub_project.id %]" [% IF project_id == sub_project.id %]selected[% END %]>&nbsp;&nbsp;- [% sub_project.name %]</option>
+                                    [% IF sub_project.sub_projects && sub_project.sub_projects.size > 0 %]
+                                        [% FOREACH sub_sub_project IN sub_project.sub_projects %]
+                                            <option value="[% sub_sub_project.id %]" [% IF project_id == sub_sub_project.id %]selected[% END %]>&nbsp;&nbsp;&nbsp;&nbsp;-- [% sub_sub_project.name %]</option>
+                                        [% END %]
                                     [% END %]
                                 [% END %]
                             [% END %]

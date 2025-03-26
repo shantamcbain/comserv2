@@ -2,9 +2,6 @@ Edit Project
 
 <form method="POST" action="/project/update_project">
     <input type="hidden" id="project_id" name="project_id" value="[% project.id %]">
-
-
-<form method="POST" action="/project/create_project">
    [% INCLUDE "todo/site_list.tt" %]<br>
     <button type="button" onclick="openAddSiteForm()">Add Site</button><br>
 

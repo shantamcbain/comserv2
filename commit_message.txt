@@ -1,0 +1,25 @@
+Fix project edit functionality and parent project updates
+
+This commit fixes two issues with the project editing functionality:
+
+1. Fixed the "Project with ID ARRAY(...) not found" error when clicking the Edit button
+   - Changed form to direct link with query parameter in projectdetails.tt
+   - Added handling for array references in update_project method
+
+2. Fixed parent project changes not being saved
+   - Changed dropdown name from project_id to parent_id in project_list.tt
+   - Added parent_id to the update operation in Project.pm
+   - Added proper handling for empty parent_id values
+
+Additional improvements:
+- Added success message display after project updates
+- Improved error handling and logging
+- Enhanced user experience with better feedback
+- Added comprehensive documentation
+
+Files modified:
+- Comserv/root/todo/projectdetails.tt
+- Comserv/root/todo/project_list.tt
+- Comserv/lib/Comserv/Controller/Project.pm
+- Comserv/root/Documentation/fix_project_edit_button.md
+- Added Comserv/root/Documentation/changelog/2024-06-project-edit-fix.md
