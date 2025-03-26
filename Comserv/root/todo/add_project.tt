@@ -20,7 +20,7 @@
     <label for="name">Project Name:</label><br>
     <input type="text" id="name" name="name" value="[% form_data.name %]" required><br>
 
-[% INCLUDE "todo/project_list.tt" %]<br>
+[% INCLUDE "todo/project_list.tt" projects=projects selected_project_id=form_data.parent_id %]<br>
 
     <label for="description">Description:</label><br>
     <textarea id="description" name="description" required>[% form_data.description %]</textarea><br>
