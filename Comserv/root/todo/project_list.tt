@@ -15,8 +15,7 @@
 [% END %]
 
 
-<label for="parent_id">Parent Project:</label><br>
-<select id="parent_id" name="parent_id">
-    <option value="" [% IF !form_data.parent_id %]selected[% END %]>None</option>
-    [% display_project_options(projects, form_data.parent_id, 0) %]
+<select id="project_id" name="project_id">
+    <option value="" [% IF !selected_project_id %]selected[% END %]>None</option>
+    [% display_project_options(projects, selected_project_id, 0) %]
 </select>
