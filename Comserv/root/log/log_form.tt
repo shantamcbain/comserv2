@@ -39,15 +39,15 @@ window.onload = function() {
 
 
 
-[% # Set up form_data for project_list.tt %]
-[% SET form_data = {} %]
+[% # Set up selected_project_id for project_list.tt %]
+[% SET selected_project_id = '' %]
 [% IF current_project %]
-    [% SET form_data.parent_id = current_project.id %]
+    [% SET selected_project_id = current_project.id %]
 [% ELSIF project_id %]
-    [% SET form_data.parent_id = project_id %]
+    [% SET selected_project_id = project_id %]
 [% END %]
 
-[% INCLUDE "todo/project_list.tt" %]
+[% INCLUDE "todo/project_list.tt" projects=projects selected_project_id=selected_project_id %]
 
     <label for="due_date">Due Date:</label><br>
     <input type="date" id="due_date" name="due_date" value="[% due_date %]"><br>

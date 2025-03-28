@@ -1,0 +1,190 @@
+[% META title = 'Create New Virtual Machine' %]
+
+<div class="container">
+    <h1>Create New Virtual Machine</h1>
+    
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h2>VM Configuration</h2>
+                </div>
+                <div class="card-body">
+                    [% IF error_msg %]
+                    <div class="alert alert-danger">
+                        [% error_msg %]
+                    </div>
+                    [% END %]
+                    
+                    <form method="post" action="[% c.uri_for('/proxmox/create_vm') %]" class="needs-validation" novalidate>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h3>VM Template</h3>
+                                <div class="form-group mb-3">
+                                    <label for="template_id">Select Template:</label>
+                                    <select id="template_id" name="template_id" class="form-control" required>
+                                        <option value="">-- Select a Template --</option>
+                                        [% FOREACH template IN templates %]
+                                        <option value="[% template.id %]" data-file="[% template.file %]">[% template.name %]</option>
+                                        [% END %]
+                                    </select>
+                                    <input type="hidden" id="template_file" name="template_file" value="">
+                                    <div class="invalid-feedback">
+                                        Please select a template.
+                                    </div>
+                                </div>
+                                
+                                <h3>Hardware Configuration</h3>
+                                <div class="form-group mb-3">
+                                    <label for="cpu">CPU Cores:</label>
+                                    <select id="cpu" name="cpu" class="form-control" required>
+                                        [% FOREACH cpu IN cpu_options %]
+                                        <option value="[% cpu %]">[% cpu %] CPU Core[% IF cpu > 1 %]s[% END %]</option>
+                                        [% END %]
+                                    </select>
+                                    <div class="invalid-feedback">
+                                        Please select CPU cores.
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group mb-3">
+                                    <label for="memory">Memory:</label>
+                                    <select id="memory" name="memory" class="form-control" required>
+                                        [% FOREACH mem IN memory_options %]
+                                        <option value="[% mem.value %]">[% mem.label %]</option>
+                                        [% END %]
+                                    </select>
+                                    <div class="invalid-feedback">
+                                        Please select memory size.
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group mb-3">
+                                    <label for="disk_size">Disk Size:</label>
+                                    <select id="disk_size" name="disk_size" class="form-control" required>
+                                        [% FOREACH disk IN disk_options %]
+                                        <option value="[% disk.value %]">[% disk.label %]</option>
+                                        [% END %]
+                                    </select>
+                                    <div class="invalid-feedback">
+                                        Please select disk size.
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <h3>VM Identity</h3>
+                                <div class="form-group mb-3">
+                                    <label for="hostname">Hostname:</label>
+                                    <input type="text" id="hostname" name="hostname" class="form-control" required 
+                                           value="[% form_data.hostname | html %]" placeholder="e.g., webserver">
+                                    <div class="invalid-feedback">
+                                        Please enter a hostname.
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group mb-3">
+                                    <label for="domain">Domain:</label>
+                                    <input type="text" id="domain" name="domain" class="form-control" required 
+                                           value="[% form_data.domain | html %]" placeholder="e.g., example.com">
+                                    <div class="invalid-feedback">
+                                        Please enter a domain.
+                                    </div>
+                                </div>
+                                
+                                <h3>User Credentials</h3>
+                                <div class="form-group mb-3">
+                                    <label for="username">Username:</label>
+                                    <input type="text" id="username" name="username" class="form-control" required 
+                                           value="[% form_data.username | html %]" placeholder="e.g., admin">
+                                    <div class="invalid-feedback">
+                                        Please enter a username.
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group mb-3">
+                                    <label for="password">Password:</label>
+                                    <input type="password" id="password" name="password" class="form-control" required>
+                                    <div class="invalid-feedback">
+                                        Please enter a password.
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group mb-3">
+                                    <label for="confirm_password">Confirm Password:</label>
+                                    <input type="password" id="confirm_password" name="confirm_password" class="form-control" required>
+                                    <div class="invalid-feedback">
+                                        Please confirm your password.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group mt-4">
+                            <button type="submit" class="btn btn-primary">Create VM</button>
+                            <a href="[% c.uri_for('/proxmox') %]" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Form validation
+(function() {
+    'use strict';
+    window.addEventListener('load', function() {
+        // Fetch all the forms we want to apply custom Bootstrap validation styles to
+        var forms = document.getElementsByClassName('needs-validation');
+        // Loop over them and prevent submission
+        var validation = Array.prototype.filter.call(forms, function(form) {
+            form.addEventListener('submit', function(event) {
+                if (form.checkValidity() === false) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                } else {
+                    // Check if passwords match
+                    var password = document.getElementById('password');
+                    var confirm = document.getElementById('confirm_password');
+                    
+                    if (password.value !== confirm.value) {
+                        confirm.setCustomValidity('Passwords do not match');
+                        event.preventDefault();
+                        event.stopPropagation();
+                    } else {
+                        confirm.setCustomValidity('');
+                    }
+                }
+                form.classList.add('was-validated');
+            }, false);
+        });
+        
+        // Set template file when template is selected
+        document.getElementById('template_id').addEventListener('change', function() {
+            var select = this;
+            var option = select.options[select.selectedIndex];
+            var fileInput = document.getElementById('template_file');
+            
+            if (option && option.dataset.file) {
+                fileInput.value = option.dataset.file;
+            } else {
+                fileInput.value = '';
+            }
+        });
+        
+        // Password confirmation validation
+        document.getElementById('confirm_password').addEventListener('input', function() {
+            var password = document.getElementById('password');
+            var confirm = document.getElementById('confirm_password');
+            
+            if (password.value !== confirm.value) {
+                confirm.setCustomValidity('Passwords do not match');
+            } else {
+                confirm.setCustomValidity('');
+            }
+        });
+    }, false);
+})();
+</script>

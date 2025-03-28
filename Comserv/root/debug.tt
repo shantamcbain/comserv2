@@ -4,8 +4,8 @@
 
 Debug Errors
 
-[% IF c.stash.debug_errors %]
-    <h2>Debugging Information</h2>
+[% IF c.stash.debug_errors && c.stash.debug_errors.size > 0 %]
+    <h2>Debug Errors</h2>
     <ul>
         <!-- Iterate over each error and display it in a list item -->
         [% FOREACH error IN c.stash.debug_errors %]
@@ -14,6 +14,18 @@ Debug Errors
     </ul>
 [% ELSE %]
     <p>No debug errors.</p>
+[% END %]
+
+[% IF c.stash.debug_msg && c.stash.debug_msg.size > 0 %]
+    <h2>Debug Messages</h2>
+    <ul>
+        <!-- Iterate over each debug message and display it in a list item -->
+        [% FOREACH msg IN c.stash.debug_msg %]
+            <li>[% msg | html %]</li>
+        [% END %]
+    </ul>
+[% ELSE %]
+    <p>No debug messages.</p>
 [% END %]
 [% IF debug_info %]
 <div style="background-color: #f8f9fa; padding: 15px; margin-bottom: 20px; border: 1px solid #ddd;">

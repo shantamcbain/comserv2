@@ -955,20 +955,20 @@ sub default :Path {
         "Controller: " . __PACKAGE__);
 
     # Log the available controllers and their namespaces
-    my @controllers = sort keys %{$c->dispatcher->_controller_by_path};
+    # Using a safer approach to get controller names
+    my @controllers = ();
+    foreach my $component (sort keys %{$c->components}) {
+        if ($component =~ /^Comserv::Controller::(.+)$/) {
+            push @controllers, $1;
+        }
+    }
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'default',
         "Available controllers: " . join(", ", @controllers));
 
-    # Log the available actions for this path
+    # Log the requested path
     my $path = $c->req->uri->path;
-    my $actions = $c->dispatcher->get_actions_for_path($path);
-    if ($actions && @$actions) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'default',
-            "Actions for path $path: " . join(", ", map { $_->reverse } @$actions));
-    } else {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'default',
-            "No actions found for path $path");
-    }
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'default',
+        "Requested path: $path (not found)");
 
     # Set up the 404 page
     $c->stash(
@@ -994,6 +994,18 @@ sub documentation :Path('documentation') :Args(0) {
     my ( $self, $c ) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'documentation', "Redirecting to Documentation controller");
     $c->response->redirect($c->uri_for('/Documentation'));
+}
+
+sub proxmox_servers :Path('proxmox_servers') :Args(0) {
+    my ( $self, $c ) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'proxmox_servers', "Forwarding to ProxmoxServers controller");
+    $c->forward('Comserv::Controller::ProxmoxServers', 'index');
+}
+
+sub proxmox :Path('proxmox') :Args(0) {
+    my ( $self, $c ) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'proxmox', "Forwarding to Proxmox controller");
+    $c->forward('Comserv::Controller::Proxmox', 'index');
 }
 
 sub Documentation :Path('Documentation') :Args {

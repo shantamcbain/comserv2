@@ -343,8 +343,8 @@ sub create_log :Path('/log/create_log') :Args() {
 
     my $current_date = DateTime->now->ymd;
 
-    # Get the project_id from the form (parent_id from project_list.tt)
-    my $parent_id = $c->request->body_parameters->{parent_id};
+    # Get the project_id from the form
+    my $project_id = $c->request->body_parameters->{project_id} || '0'; # Default to '0' if not provided
 
     # Get the site name from the form
     my $sitename;
@@ -392,7 +392,7 @@ sub create_log :Path('/log/create_log') :Args() {
         owner           => $owner,
         sitename        => $sitename,
         start_date      => $start_date || $current_date,
-        project_code    => $parent_id, # Use parent_id from project_list.tt
+        project_code    => $project_id, # Use project_id from project_list.tt
         due_date        => $c->request->body_parameters->{due_date},
         abstract        => $subject,
         details         => $c->request->body_parameters->{details},

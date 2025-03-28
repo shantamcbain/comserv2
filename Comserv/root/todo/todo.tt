@@ -46,10 +46,159 @@
 <h1>ToDo List</h1>
 <h2>[% date_today %]</h2>
 
+<style>
+    .filter-container {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
 
-<form action="/todo/addtodo" method="post">
-    <button type="submit">Add New Record</button>
-</form>
+    .filter-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 10px;
+    }
+
+    .filter-group {
+        flex: 1;
+        min-width: 200px;
+    }
+
+    .filter-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+    }
+
+    .filter-group select,
+    .filter-group input[type="text"] {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+
+    .filter-buttons {
+        display: flex;
+        gap: 10px;
+        margin-top: 10px;
+    }
+
+    .filter-buttons button {
+        padding: 8px 15px;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .filter-buttons button:hover {
+        background-color: #45a049;
+    }
+
+    .filter-buttons .reset-button {
+        background-color: #f44336;
+    }
+
+    .filter-buttons .reset-button:hover {
+        background-color: #d32f2f;
+    }
+
+    .view-buttons {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 15px;
+    }
+
+    .view-buttons a {
+        padding: 8px 15px;
+        background-color: #2196F3;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+        text-align: center;
+    }
+
+    .view-buttons a:hover {
+        background-color: #0b7dda;
+    }
+
+    .view-buttons a.active {
+        background-color: #0b7dda;
+        font-weight: bold;
+    }
+</style>
+
+<div class="filter-container">
+    <form action="/todo" method="get">
+        <div class="filter-row">
+            <div class="filter-group">
+                <label for="filter">Time Filter:</label>
+                <select id="filter" name="filter">
+                    <option value="all" [% IF filter_type == 'all' %]selected[% END %]>All Todos</option>
+                    <option value="day" [% IF filter_type == 'day' %]selected[% END %]>Today's Todos</option>
+                    <option value="week" [% IF filter_type == 'week' %]selected[% END %]>This Week's Todos</option>
+                    <option value="month" [% IF filter_type == 'month' %]selected[% END %]>This Month's Todos</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="project_id">Project:</label>
+                <select id="project_id" name="project_id">
+                    <option value="">All Projects</option>
+                    [% IF projects && projects.size > 0 %]
+                        [% FOREACH project IN projects %]
+                            <option value="[% project.id %]" [% IF project_id == project.id %]selected[% END %]>[% project.name %]</option>
+                            [% IF project.sub_projects && project.sub_projects.size > 0 %]
+                                [% FOREACH sub_project IN project.sub_projects %]
+                                    <option value="[% sub_project.id %]" [% IF project_id == sub_project.id %]selected[% END %]>&nbsp;&nbsp;- [% sub_project.name %]</option>
+                                    [% IF sub_project.sub_projects && sub_project.sub_projects.size > 0 %]
+                                        [% FOREACH sub_sub_project IN sub_project.sub_projects %]
+                                            <option value="[% sub_sub_project.id %]" [% IF project_id == sub_sub_project.id %]selected[% END %]>&nbsp;&nbsp;&nbsp;&nbsp;-- [% sub_sub_project.name %]</option>
+                                        [% END %]
+                                    [% END %]
+                                [% END %]
+                            [% END %]
+                        [% END %]
+                    [% END %]
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="status">Status:</label>
+                <select id="status" name="status">
+                    <option value="" [% IF status_filter == '' %]selected[% END %]>Active Todos</option>
+                    <option value="all" [% IF status_filter == 'all' %]selected[% END %]>All Statuses</option>
+                    <option value="new" [% IF status_filter == 'new' %]selected[% END %]>New</option>
+                    <option value="in_progress" [% IF status_filter == 'in_progress' %]selected[% END %]>In Progress</option>
+                    <option value="completed" [% IF status_filter == 'completed' %]selected[% END %]>Completed</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="search">Search:</label>
+                <input type="text" id="search" name="search" placeholder="Search in subject, description, comments..." value="[% search_term %]">
+            </div>
+        </div>
+
+        <div class="filter-buttons">
+            <button type="submit">Apply Filters</button>
+            <button type="button" class="reset-button" onclick="window.location.href='/todo'">Reset Filters</button>
+        </div>
+    </form>
+</div>
+
+<div class="view-buttons">
+    <a href="/todo" class="[% IF !filter_type || filter_type == 'all' %]active[% END %]">List View</a>
+    <a href="/todo/day">Day View</a>
+    <a href="/todo/week">Week View</a>
+    <a href="/todo/month">Month View</a>
+    <a href="/todo/addtodo" style="margin-left: auto;">Add New Todo</a>
+</div>
 <table class="week-view-table">
   <tr>
     <th>Sitename</th>

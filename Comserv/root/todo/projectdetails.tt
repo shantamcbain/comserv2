@@ -1,6 +1,18 @@
 
 [% META title = 'Project Details' %]
 
+[% IF success_message %]
+<div class="success-message">
+    [% success_message %]
+</div>
+[% END %]
+
+[% IF error_msg %]
+<div class="error-message">
+    [% error_msg %]
+</div>
+[% END %]
+
 [% MACRO display_project_details(project, level) BLOCK %]
     [% SET indent = '' %]
     [% FOREACH i IN [1..level] %]
@@ -22,7 +34,7 @@
             <li>Client Name: [% project.client_name %]</li>
         </ul>
 
-        [% IF project.todos.size %]
+        [% IF project.todos && project.todos.size > 0 %]
         <h[% level + 2 %]>Todos for [% project.name %]</h[% level + 2 %]>
         <table class="project-details-table">
             <thead>
@@ -44,18 +56,28 @@
                     <td>[% todo.description OR 'No description' %]</td>
                     <td>[% todo.start_date %]</td>
                     <td>[% todo.due_date %]</td>
-                    <td>[% todo.status %]</td>
-                    <td>[% todo.priority %]</td>
-                    <td>[% todo.formatted_accumulated_time %]</td>
                     <td>
-                        <form action="/todo/modify/[% todo.record_id %]" method="GET" style="display:inline;">
+                        [% IF todo.status == 1 %]
+                            New
+                        [% ELSIF todo.status == 2 %]
+                            In Progress
+                        [% ELSIF todo.status == 3 %]
+                            Completed
+                        [% ELSE %]
+                            [% todo.status %]
+                        [% END %]
+                    </td>
+                    <td>[% todo.priority %]</td>
+                    <td>[% todo.formatted_accumulated_time || '0h 0m' %]</td>
+                    <td>
+                        <form action="/todo/edit/[% todo.record_id %]" method="GET" style="display:inline;">
                             <button type="submit" class="action-button edit">Edit</button>
                         </form>
-                        <form action="/todo/details" method="GET" style="display:inline;">
+                        <form action="/todo/details" method="POST" style="display:inline;">
                             <input type="hidden" name="record_id" value="[% todo.record_id %]">
                             <button type="submit" class="action-button view">Details</button>
                         </form>
-                        <form action="/log/log_form" method="GET" style="display:inline;">
+                        <form action="/log/log_form" method="POST" style="display:inline;">
                             <input type="hidden" name="todo_record_id" value="[% todo.record_id %]">
                             <button type="submit" class="action-button add">Add Log</button>
                         </form>
@@ -64,14 +86,15 @@
                 [% END %]
             </tbody>
         </table>
+        [% ELSE %]
+        <p>No todos found for this project. <a href="/todo/addtodo?project_id=[% project.id %]">Add a todo</a></p>
         [% END %]
 
         <!-- Actions for this project level -->
         <div class="project-actions">
-            <form action="/project/editproject" method="POST" style="display:inline;">
-                <input type="hidden" name="project_id" value="[% project.id %]">
-                <button type="submit">Edit [% IF level > 0 %]Sub-[% END %]Project</button>
-            </form>
+            <a href="/project/editproject?project_id=[% project.id %]" class="button">
+                <button type="button">Edit [% IF level > 0 %]Sub-[% END %]Project</button>
+            </a>
 
             <form action="/project/addproject" method="GET" style="display:inline;">
                 <input type="hidden" name="parent_id" value="[% project.id %]">
@@ -84,10 +107,12 @@
             </form>
         </div>
 
-        [% IF project.sub_projects.size %]
+        [% IF project.sub_projects && project.sub_projects.size > 0 %]
             [% FOREACH sub_project IN project.sub_projects %]
                 [% display_project_details(sub_project, level + 1) %]
             [% END %]
+        [% ELSIF level == 0 %]
+            <p>No sub-projects found. <a href="/project/addproject?parent_id=[% project.id %]">Add a sub-project</a></p>
         [% END %]
     </div>
 [% END %]
@@ -170,6 +195,11 @@
 
 .project-actions form {
     margin: 0;
+}
+
+.project-actions a.button {
+    text-decoration: none;
+    display: inline-block;
 }
 
 .project-actions button {
@@ -300,5 +330,26 @@ button[onclick="window.location.href='/project';"]:hover {
     background-color: var(--link-hover-color, #000099);
     transform: translateY(-2px);
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+/* Success and error messages */
+.success-message, .error-message {
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 4px;
+    font-weight: bold;
+    text-align: center;
+}
+
+.success-message {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.error-message {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
 }
 </style>
