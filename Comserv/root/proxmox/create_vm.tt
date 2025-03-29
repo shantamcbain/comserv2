@@ -1,4 +1,329 @@
-[% META title = 'Create New Virtual Machine' %]
+[% META title = 'Create Virtual Machine' %]
+
+<div class="container">
+    <h1>Create a New Virtual Machine</h1>
+
+    [% IF error_msg %]
+    <div class="error-message">
+        [% error_msg %]
+    </div>
+    [% END %]
+
+
+
+    [% IF success_msg %]
+    <div class="success-message">
+        [% success_msg %]
+    </div>
+    [% END %]
+    
+    [% IF debug_msg && debug_msg.size %]
+    <div class="debug-info">
+        <h3>Debug Information</h3>
+        <pre>[% FOREACH msg IN debug_msg %][% msg %]
+[% END %]</pre>
+    </div>
+    [% END %]
+
+    [% UNLESS auth_error %]
+    <form method="POST" action="[% c.uri_for('/proxmox/create_vm_action') %]" class="vm-creation-form">
+        <div class="form-section">
+            <h2>Basic Information</h2>
+            
+            <div class="form-group">
+                <label for="hostname">Hostname:</label>
+                <input type="text" id="hostname" name="hostname" required 
+                       placeholder="e.g., mailserver-vm" value="[% form_data.hostname %]">
+                <span class="help-text">Name for your virtual machine</span>
+            </div>
+            
+            <div class="form-group">
+                <label for="description">Description:</label>
+                <textarea id="description" name="description" rows="3" 
+                          placeholder="Purpose of this VM">[% form_data.description %]</textarea>
+                <span class="help-text">Optional description of the VM's purpose</span>
+            </div>
+        </div>
+        
+        <div class="form-section">
+            <h2>System Resources</h2>
+            
+            <div class="form-group">
+                <label for="cpu">CPU Cores:</label>
+                <select id="cpu" name="cpu">
+                    <option value="1" [% IF form_data.cpu == 1 %]selected[% END %]>1 Core</option>
+                    <option value="2" [% IF form_data.cpu == 2 || !form_data.cpu %]selected[% END %]>2 Cores</option>
+                    <option value="4" [% IF form_data.cpu == 4 %]selected[% END %]>4 Cores</option>
+                    <option value="6" [% IF form_data.cpu == 6 %]selected[% END %]>6 Cores</option>
+                    <option value="8" [% IF form_data.cpu == 8 %]selected[% END %]>8 Cores</option>
+                </select>
+                <span class="help-text">Number of virtual CPU cores</span>
+            </div>
+            
+            <div class="form-group">
+                <label for="memory">Memory (MB):</label>
+                <select id="memory" name="memory">
+                    <option value="1024" [% IF form_data.memory == 1024 %]selected[% END %]>1 GB</option>
+                    <option value="2048" [% IF form_data.memory == 2048 || !form_data.memory %]selected[% END %]>2 GB</option>
+                    <option value="4096" [% IF form_data.memory == 4096 %]selected[% END %]>4 GB</option>
+                    <option value="8192" [% IF form_data.memory == 8192 %]selected[% END %]>8 GB</option>
+                    <option value="16384" [% IF form_data.memory == 16384 %]selected[% END %]>16 GB</option>
+                </select>
+                <span class="help-text">Amount of RAM in megabytes</span>
+            </div>
+            
+            <div class="form-group">
+                <label for="disk_size">Disk Size (GB):</label>
+                <select id="disk_size" name="disk_size">
+                    <option value="10" [% IF form_data.disk_size == 10 %]selected[% END %]>10 GB</option>
+                    <option value="20" [% IF form_data.disk_size == 20 || !form_data.disk_size %]selected[% END %]>20 GB</option>
+                    <option value="40" [% IF form_data.disk_size == 40 %]selected[% END %]>40 GB</option>
+                    <option value="80" [% IF form_data.disk_size == 80 %]selected[% END %]>80 GB</option>
+                    <option value="160" [% IF form_data.disk_size == 160 %]selected[% END %]>160 GB</option>
+                </select>
+                <span class="help-text">Size of the primary disk</span>
+            </div>
+        </div>
+        
+        <div class="form-section">
+            <h2>Operating System</h2>
+            
+            <div class="form-group">
+                <label for="template">OS Template:</label>
+                <select id="template" name="template" required>
+                    <option value="">-- Select a template --</option>
+                    [% FOREACH template IN templates %]
+                    <option value="[% template.id %]" [% IF form_data.template == template.id %]selected[% END %]>
+                        [% template.name %]
+                    </option>
+                    [% END %]
+                </select>
+                <span class="help-text">Operating system template to use</span>
+            </div>
+        </div>
+        
+        <div class="form-section">
+            <h2>Network Configuration</h2>
+            
+            <div class="form-group">
+                <label for="network_type">Network Type:</label>
+                <select id="network_type" name="network_type" onchange="toggleNetworkFields()">
+                    <option value="dhcp" [% IF form_data.network_type == 'dhcp' || !form_data.network_type %]selected[% END %]>DHCP (Automatic IP)</option>
+                    <option value="static" [% IF form_data.network_type == 'static' %]selected[% END %]>Static IP</option>
+                </select>
+                <span class="help-text">How the VM will get its IP address</span>
+            </div>
+            
+            <div id="static_ip_fields" style="display: none;">
+                <div class="form-group">
+                    <label for="ip_address">IP Address:</label>
+                    <input type="text" id="ip_address" name="ip_address" 
+                           placeholder="e.g., 192.168.1.100" value="[% form_data.ip_address %]">
+                    <span class="help-text">Static IP address for the VM</span>
+                </div>
+                
+                <div class="form-group">
+                    <label for="subnet_mask">Subnet Mask:</label>
+                    <input type="text" id="subnet_mask" name="subnet_mask" 
+                           placeholder="e.g., 255.255.255.0" value="[% form_data.subnet_mask || '255.255.255.0' %]">
+                    <span class="help-text">Network subnet mask</span>
+                </div>
+                
+                <div class="form-group">
+                    <label for="gateway">Gateway:</label>
+                    <input type="text" id="gateway" name="gateway" 
+                           placeholder="e.g., 192.168.1.1" value="[% form_data.gateway %]">
+                    <span class="help-text">Network gateway address</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-section">
+            <h2>Additional Options</h2>
+            
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="start_after_creation" name="start_after_creation" value="1" 
+                       [% IF form_data.start_after_creation %]checked[% END %]>
+                <label for="start_after_creation">Start VM after creation</label>
+            </div>
+            
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="enable_qemu_agent" name="enable_qemu_agent" value="1" 
+                       [% IF form_data.enable_qemu_agent || !defined(form_data.enable_qemu_agent) %]checked[% END %]>
+                <label for="enable_qemu_agent">Enable QEMU Guest Agent</label>
+            </div>
+            
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="start_on_boot" name="start_on_boot" value="1" 
+                       [% IF form_data.start_on_boot || !defined(form_data.start_on_boot) %]checked[% END %]>
+                <label for="start_on_boot">Start on boot</label>
+            </div>
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="btn-primary">Create Virtual Machine</button>
+            <button type="button" class="btn-secondary" onclick="window.location.href='[% c.uri_for('/proxmox') %]'">Cancel</button>
+        </div>
+    </form>
+    [% END %]
+</div>
+
+<style>
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: Arial, sans-serif;
+}
+
+h1 {
+    color: #333;
+    margin-bottom: 30px;
+    text-align: center;
+}
+
+.form-section {
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.form-section h2 {
+    margin-top: 0;
+    font-size: 1.2em;
+    color: #555;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+.help-text {
+    display: block;
+    font-size: 0.8em;
+    color: #777;
+    margin-top: 5px;
+}
+
+.checkbox-group {
+    display: flex;
+    align-items: center;
+}
+
+.checkbox-group input {
+    margin-right: 10px;
+}
+
+.checkbox-group label {
+    margin-bottom: 0;
+}
+
+.form-actions {
+    text-align: center;
+    margin-top: 30px;
+}
+
+button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1em;
+    margin: 0 10px;
+}
+
+.btn-primary {
+    background-color: #4CAF50;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #45a049;
+}
+
+.btn-secondary {
+    background-color: #f1f1f1;
+    color: #333;
+}
+
+.btn-secondary:hover {
+    background-color: #ddd;
+}
+
+.error-message, .success-message {
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 4px;
+    font-weight: bold;
+}
+
+.error-message {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.success-message {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.debug-info {
+    background-color: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 15px;
+    margin-bottom: 20px;
+    overflow-x: auto;
+}
+
+.debug-info pre {
+    margin: 0;
+    white-space: pre-wrap;
+    font-family: monospace;
+}
+</style>
+
+<script>
+function toggleNetworkFields() {
+    var networkType = document.getElementById('network_type').value;
+    var staticFields = document.getElementById('static_ip_fields');
+    
+    if (networkType === 'static') {
+        staticFields.style.display = 'block';
+    } else {
+        staticFields.style.display = 'none';
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    toggleNetworkFields();
+});
+</script>[% META title = 'Create New Virtual Machine' %]
 
 <div class="container">
     <h1>Create New Virtual Machine</h1>

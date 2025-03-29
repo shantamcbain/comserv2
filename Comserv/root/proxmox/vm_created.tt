@@ -1,108 +1,135 @@
-[% META title = 'VM Created Successfully' %]
+[% META title = 'VM Creation Started' %]
 
 <div class="container">
-    <div class="row">
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-header bg-success text-white">
-                    <h2>Virtual Machine Created Successfully</h2>
-                </div>
-                <div class="card-body">
-                    <div class="alert alert-success">
-                        <p>Your virtual machine has been created and is now starting up. It may take a few minutes to complete the initialization process.</p>
-                    </div>
-                    
-                    <h3>VM Details</h3>
-                    <table class="table table-bordered">
-                        <tr>
-                            <th>VM ID:</th>
-                            <td>[% vmid %]</td>
-                        </tr>
-                        <tr>
-                            <th>Hostname:</th>
-                            <td>[% hostname %]</td>
-                        </tr>
-                        <tr>
-                            <th>Domain:</th>
-                            <td>[% domain %]</td>
-                        </tr>
-                        <tr>
-                            <th>Full Domain Name:</th>
-                            <td>[% hostname %].[% domain %]</td>
-                        </tr>
-                    </table>
-                    
-                    <h3>Next Steps</h3>
-                    <p>Once the VM is fully initialized, you can access it using the following methods:</p>
-                    <ul>
-                        <li>SSH: <code>ssh username@[% hostname %].[% domain %]</code></li>
-                        <li>Web Interface (if applicable): <code>http://[% hostname %].[% domain %]</code></li>
-                    </ul>
-                    
-                    <div class="mt-4">
-                        <a href="[% c.uri_for('/proxmox') %]" class="btn btn-primary">Return to Proxmox Dashboard</a>
-                        <a href="[% c.uri_for('/proxmox/create') %]" class="btn btn-secondary">Create Another VM</a>
-                    </div>
-                    
-                    <div class="mt-4" id="status-container">
-                        <h3>VM Status</h3>
-                        <div class="alert alert-info">
-                            <p>Loading VM status...</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <div class="success-panel">
+        <h1>Virtual Machine Creation Started</h1>
+        
+        <div class="success-message">
+            [% success_msg %]
         </div>
+        
+        <div class="vm-details">
+            <h2>VM Details</h2>
+            <table>
+                <tr>
+                    <th>VM ID:</th>
+                    <td>[% vm_id %]</td>
+                </tr>
+                <tr>
+                    <th>Task ID:</th>
+                    <td>[% task_id %]</td>
+                </tr>
+            </table>
+        </div>
+        
+        <div class="next-steps">
+            <h2>Next Steps</h2>
+            <p>Your virtual machine is being created. This process may take several minutes to complete.</p>
+            <p>You can:</p>
+            <ul>
+                <li><a href="[% c.uri_for('/proxmox/vm_status', vm_id) %]">Check VM Status</a></li>
+                <li><a href="[% c.uri_for('/proxmox') %]">Return to Proxmox Dashboard</a></li>
+                <li><a href="[% c.uri_for('/proxmox/create') %]">Create Another VM</a></li>
+            </ul>
+        </div>
+        
+        [% IF debug_msg && debug_msg.size %]
+        <div class="debug-info">
+            <h3>Debug Information</h3>
+            <pre>[% FOREACH msg IN debug_msg %][% msg %]
+[% END %]</pre>
+        </div>
+        [% END %]
     </div>
 </div>
 
-<script>
-// Poll for VM status
-(function() {
-    const vmid = '[% vmid %]';
-    const statusContainer = document.getElementById('status-container');
-    
-    function updateStatus() {
-        fetch('[% c.uri_for("/proxmox/status/") %]' + vmid)
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    let status = data.status;
-                    let statusHtml = '<h3>VM Status</h3>';
-                    statusHtml += '<table class="table table-bordered">';
-                    statusHtml += '<tr><th>Status:</th><td>' + status.status + '</td></tr>';
-                    statusHtml += '<tr><th>CPU Usage:</th><td>' + (status.cpu || 0).toFixed(2) + '%</td></tr>';
-                    statusHtml += '<tr><th>Memory Usage:</th><td>' + (status.mem || 0) + ' / ' + (status.maxmem || 0) + ' MB</td></tr>';
-                    statusHtml += '<tr><th>Uptime:</th><td>' + formatUptime(status.uptime || 0) + '</td></tr>';
-                    statusHtml += '</table>';
-                    
-                    statusContainer.innerHTML = statusHtml;
-                } else {
-                    statusContainer.innerHTML = '<h3>VM Status</h3><div class="alert alert-warning">Unable to fetch VM status: ' + (data.error || 'Unknown error') + '</div>';
-                }
-            })
-            .catch(error => {
-                statusContainer.innerHTML = '<h3>VM Status</h3><div class="alert alert-danger">Error fetching VM status: ' + error.message + '</div>';
-            });
-    }
-    
-    function formatUptime(seconds) {
-        if (seconds < 60) {
-            return seconds + ' seconds';
-        }
-        
-        let minutes = Math.floor(seconds / 60);
-        if (minutes < 60) {
-            return minutes + ' minutes, ' + (seconds % 60) + ' seconds';
-        }
-        
-        let hours = Math.floor(minutes / 60);
-        minutes = minutes % 60;
-        return hours + ' hours, ' + minutes + ' minutes';
-    }
-    
-    // Update status immediately and then every 30 seconds
-    updateStatus();
-    setInterval(updateStatus, 30000);
-})();
-</script>
+<style>
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: Arial, sans-serif;
+}
+
+.success-panel {
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 30px;
+}
+
+h1 {
+    color: #333;
+    margin-bottom: 30px;
+    text-align: center;
+}
+
+h2 {
+    color: #555;
+    margin-top: 30px;
+    margin-bottom: 15px;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 10px;
+}
+
+.success-message {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 4px;
+    font-weight: bold;
+    text-align: center;
+}
+
+.vm-details table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+}
+
+.vm-details th, .vm-details td {
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.vm-details th {
+    width: 30%;
+    font-weight: bold;
+}
+
+.next-steps ul {
+    margin-top: 15px;
+    padding-left: 20px;
+}
+
+.next-steps li {
+    margin-bottom: 10px;
+}
+
+.next-steps a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+.next-steps a:hover {
+    text-decoration: underline;
+}
+
+.debug-info {
+    background-color: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 15px;
+    margin-top: 30px;
+    overflow-x: auto;
+}
+
+.debug-info pre {
+    margin: 0;
+    white-space: pre-wrap;
+    font-family: monospace;
+}
+</style>

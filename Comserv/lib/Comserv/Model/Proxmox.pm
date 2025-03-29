@@ -9,6 +9,7 @@ use Data::Dumper;
 use File::Basename;
 use Try::Tiny;
 
+
 =head1 NAME
 
 Comserv::Model::Proxmox - Proxmox VE API Model
@@ -131,6 +132,32 @@ sub _add_debug_msg {
     push @{$self->{debug_log}}, $msg;
 }
 
+# Helper method to convert subnet mask to CIDR notation
+sub _subnet_to_cidr {
+    my ($self, $subnet_mask) = @_;
+
+    # Default to /24 if no subnet mask provided
+    return 24 unless $subnet_mask;
+
+    # Common subnet masks
+    my %subnet_to_cidr = (
+        '255.255.255.0' => 24,
+        '255.255.0.0' => 16,
+        '255.0.0.0' => 8,
+        '255.255.255.128' => 25,
+        '255.255.255.192' => 26,
+        '255.255.255.224' => 27,
+        '255.255.255.240' => 28,
+        '255.255.255.248' => 29,
+        '255.255.255.252' => 30,
+        '255.255.255.254' => 31,
+        '255.255.255.255' => 32,
+    );
+
+    # Return the CIDR value if found, otherwise default to /24
+    return $subnet_to_cidr{$subnet_mask} || 24;
+}
+
 sub authenticate_with_token {
     my ($self, $token_user, $token_value) = @_;
 
@@ -144,8 +171,8 @@ sub authenticate_with_token {
     $self->_add_debug_msg("Token user: $token_user");
 
     # Format: PVEAPIToken=USER@REALM!TOKENID=UUID
-    # Note: Do NOT usaround the token value - the API doesn't expect them
-    my $auth_header = "PVEAPIToken=$token_user=$token_value";- the API doesn't expect them
+    # Note: Do NOT use quotes around the token value - the API doesn't expect them
+    my $auth_header = "PVEAPIToken=$token_user=$token_value";
 
     # Log the exact header we're using
     $self->_add_debug_msg("Using auth header: $auth_header");
@@ -367,12 +394,19 @@ Create a new virtual machine
 
 sub create_vm {
     my ($self, $params) = @_;
-    
+
     $self->_check_token();
-    
+
     # Get next available VM ID
     my $vmid = $self->get_next_vmid();
-    
+
+    # Add debug message
+    $self->_add_debug_msg("Creating VM with ID: $vmid");
+    $self->_add_debug_msg("Hostname: " . ($params->{hostname} || 'undefined'));
+    $self->_add_debug_msg("CPU: " . ($params->{cpu} || '1') . " cores");
+    $self->_add_debug_msg("Memory: " . ($params->{memory} || '2048') . " MB");
+    $self->_add_debug_msg("Disk size: " . ($params->{disk_size} || '20') . " GB");
+
     # Prepare VM creation parameters
     my $vm_params = {
         vmid => $vmid,
@@ -380,18 +414,130 @@ sub create_vm {
         cores => $params->{cpu} || 1,
         memory => $params->{memory} || 2048,
         ostype => 'l26', # Linux 2.6/3.x/4.x Kernel
-        net0 => 'virtio,bridge=vmbr0',
-        cdrom => $params->{template_url}, # Use the URL directly
         scsihw => 'virtio-scsi-pci',
-        scsi0 => "local-lvm:$params->{disk_size},format=raw",
-        description => "Created via Comserv Proxmox API on " . scalar(localtime),
+        scsi0 => "local-lvm:" . ($params->{disk_size} || 20) . ",format=raw",
+        description => $params->{description} || "Created via Comserv Proxmox API on " . scalar(localtime),
     };
-    
+
+    # Add network configuration
+    if ($params->{network_type} && $params->{network_type} eq 'static' &&
+        $params->{ip_config} && $params->{ip_config}->{ip_address} &&
+        $params->{ip_config}->{subnet_mask} && $params->{ip_config}->{gateway}) {
+
+        # Convert subnet mask to CIDR notation
+        my $cidr = $self->_subnet_to_cidr($params->{ip_config}->{subnet_mask});
+        my $ip_with_cidr = $params->{ip_config}->{ip_address} . '/' . $cidr;
+        my $gateway = $params->{ip_config}->{gateway};
+
+        $vm_params->{net0} = "virtio,bridge=vmbr0,ip=$ip_with_cidr,gw=$gateway";
+        $self->_add_debug_msg("Using static IP: $ip_with_cidr, Gateway: $gateway");
+    } else {
+        $vm_params->{net0} = 'virtio,bridge=vmbr0';
+        $self->_add_debug_msg("Using DHCP for network configuration");
+    }
+
+    # Add template URL if provided
+    if ($params->{template_url}) {
+        $vm_params->{cdrom} = $params->{template_url};
+        $self->_add_debug_msg("Using template URL: $params->{template_url}");
+    }
+
+    # Add additional options
+    if ($params->{enable_qemu_agent}) {
+        $vm_params->{agent} = 1;
+        $self->_add_debug_msg("QEMU Guest Agent enabled");
+    }
+
+    if ($params->{start_on_boot}) {
+        $vm_params->{onboot} = 1;
+        $self->_add_debug_msg("Start on boot enabled");
+    }
+
     # Build query string
     my $query = join('&', map { "$_=" . $vm_params->{$_} } keys %$vm_params);
-    
+    $self->_add_debug_msg("Query string: $query");
+
     # Create VM
     my $url = "$self->{api_url_base}/nodes/$self->{node}/qemu";
+    $self->_add_debug_msg("API URL: $url");
+
+    my $req = HTTP::Request->new(POST => $url);
+
+    # Use API token if available, otherwise use cookie authentication
+    if ($self->{api_token}) {
+        $req->header('Authorization' => $self->{api_token});
+        $self->_add_debug_msg("Using API token authentication");
+    } else {
+        $req->header('Cookie' => "PVEAuthCookie=$self->{token}");
+        $req->header('CSRFPreventionToken' => $self->{csrf_token});
+        $self->_add_debug_msg("Using cookie authentication");
+    }
+    $req->content_type('application/x-www-form-urlencoded');
+    $req->content($query);
+
+    $self->_add_debug_msg("Sending request to Proxmox API");
+    my $res = $self->{ua}->request($req);
+
+    if ($res->is_success) {
+        my $data = decode_json($res->content);
+        $self->_add_debug_msg("VM creation successful. Task ID: " . $data->{data});
+
+        # Start VM if requested
+        if ($params->{start_after_creation}) {
+            $self->_add_debug_msg("Starting VM after creation");
+            $self->start_vm($vmid);
+        }
+
+        return {
+            success => 1,
+            vmid => $vmid,
+            task_id => $data->{data},
+        };
+    } else {
+        $self->_add_debug_msg("VM creation failed: " . $res->status_line);
+        $self->_add_debug_msg("Response content: " . $res->content);
+
+        return {
+            success => 0,
+            error => $res->status_line,
+            content => $res->content,
+        };
+    }
+}
+
+# Helper method to convert subnet mask to CIDR notation
+sub _subnet_to_cidr {
+    my ($self, $subnet_mask) = @_;
+
+    # Default to /24 if no subnet mask provided
+    return 24 unless $subnet_mask;
+
+    # Common subnet masks
+    my %subnet_to_cidr = (
+        '255.255.255.0' => 24,
+        '255.255.0.0' => 16,
+        '255.0.0.0' => 8,
+        '255.255.255.128' => 25,
+        '255.255.255.192' => 26,
+        '255.255.255.224' => 27,
+        '255.255.255.240' => 28,
+        '255.255.255.248' => 29,
+        '255.255.255.252' => 30,
+        '255.255.255.254' => 31,
+        '255.255.255.255' => 32,
+    );
+
+    # Return the CIDR value if found, otherwise default to /24
+    return $subnet_to_cidr{$subnet_mask} || 24;
+}
+
+# Method to start a VM
+sub start_vm {
+    my ($self, $vmid) = @_;
+
+    $self->_check_token();
+
+    my $url = "$self->{api_url_base}/nodes/$self->{node}/qemu/$vmid/status/start";
     my $req = HTTP::Request->new(POST => $url);
 
     # Use API token if available, otherwise use cookie authentication
@@ -402,15 +548,13 @@ sub create_vm {
         $req->header('CSRFPreventionToken' => $self->{csrf_token});
     }
     $req->content_type('application/x-www-form-urlencoded');
-    $req->content($query);
-    
+
     my $res = $self->{ua}->request($req);
-    
+
     if ($res->is_success) {
         my $data = decode_json($res->content);
         return {
             success => 1,
-            vmid => $vmid,
             task_id => $data->{data},
         };
     } else {

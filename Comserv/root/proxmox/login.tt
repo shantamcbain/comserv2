@@ -1,0 +1,190 @@
+[% META title = 'Proxmox Login' %]
+
+<div class="container">
+    <div class="login-panel">
+        <h1>Proxmox VE Login</h1>
+        
+        [% IF error_msg %]
+        <div class="error-message">
+            [% error_msg %]
+        </div>
+        [% END %]
+        
+        <form method="POST" action="[% c.uri_for('/proxmox/login_action') %]" class="login-form">
+            <div class="form-group">
+                <label for="token_user">API Token ID:</label>
+                <input type="text" id="token_user" name="token_user" required 
+                       placeholder="e.g., root@pam!mytoken">
+                <span class="help-text">Format: username@realm!tokenid</span>
+            </div>
+            
+            <div class="form-group">
+                <label for="token_value">API Token Secret:</label>
+                <input type="password" id="token_value" name="token_value" required>
+                <span class="help-text">The secret value for your API token</span>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn-primary">Login</button>
+                <button type="button" class="btn-secondary" onclick="window.location.href='[% c.uri_for('/') %]'">Cancel</button>
+            </div>
+        </form>
+        
+        <div class="help-section">
+            <h2>How to Create a Proxmox API Token</h2>
+            <ol>
+                <li>Log in to the Proxmox web interface</li>
+                <li>Go to Datacenter → Permissions → API Tokens</li>
+                <li>Click "Add" to create a new token</li>
+                <li>Select a user, enter a token ID, and decide whether to grant privilege separation</li>
+                <li>Click "Create" and save both the token ID and secret value</li>
+            </ol>
+            <p class="warning">Note: The token secret will only be shown once during creation!</p>
+        </div>
+        
+        [% IF debug_info %]
+        <div class="debug-info">
+            <h3>Debug Information</h3>
+            <pre>[% debug_info | json %]</pre>
+        </div>
+        [% END %]
+    </div>
+</div>
+
+<style>
+.container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: Arial, sans-serif;
+}
+
+.login-panel {
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 30px;
+}
+
+h1 {
+    color: #333;
+    margin-bottom: 30px;
+    text-align: center;
+}
+
+h2 {
+    color: #555;
+    margin-top: 30px;
+    margin-bottom: 15px;
+    font-size: 1.2em;
+}
+
+.login-form {
+    margin-bottom: 30px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+.help-text {
+    display: block;
+    font-size: 0.8em;
+    color: #777;
+    margin-top: 5px;
+}
+
+.form-actions {
+    text-align: center;
+    margin-top: 30px;
+}
+
+button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1em;
+    margin: 0 10px;
+}
+
+.btn-primary {
+    background-color: #4CAF50;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #45a049;
+}
+
+.btn-secondary {
+    background-color: #f1f1f1;
+    color: #333;
+}
+
+.btn-secondary:hover {
+    background-color: #ddd;
+}
+
+.error-message {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 4px;
+}
+
+.help-section {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #ddd;
+}
+
+.help-section ol {
+    margin-left: 20px;
+    margin-bottom: 20px;
+}
+
+.help-section li {
+    margin-bottom: 10px;
+}
+
+.warning {
+    color: #856404;
+    background-color: #fff3cd;
+    border: 1px solid #ffeeba;
+    padding: 10px;
+    border-radius: 4px;
+    margin-top: 15px;
+}
+
+.debug-info {
+    margin-top: 30px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    overflow-x: auto;
+}
+
+.debug-info pre {
+    margin: 0;
+    white-space: pre-wrap;
+    font-family: monospace;
+}
+</style>

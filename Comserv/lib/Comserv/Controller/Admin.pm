@@ -166,6 +166,146 @@ sub schema_manager :Path('/admin/schema_manager') :Args(0) {
     $c->forward($c->view('TT'));
 }
 
+=head2 manage_users
+
+Admin interface to manage users
+
+=cut
+
+sub manage_users :Path('/admin/users') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Log the beginning of the manage_users action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'manage_users', "Starting manage_users action");
+
+    # Get all users from the database
+    my @users = $c->model('DBEncy::User')->search({}, {
+        order_by => { -asc => 'username' }
+    });
+
+    # Pass data to the stash for rendering the template
+    $c->stash(
+        users => \@users,
+        template => 'admin/manage_users.tt',
+    );
+
+    $c->forward($c->view('TT'));
+}
+
+=head2 add_user
+
+Admin interface to add a new user
+
+=cut
+
+sub add_user :Path('/admin/add_user') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Log the beginning of the add_user action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_user', "Starting add_user action");
+
+    # If this is a form submission, process it
+    if ($c->req->method eq 'POST') {
+        # Retrieve the form data
+        my $username = $c->req->params->{username};
+        my $password = $c->req->params->{password};
+        my $password_confirm = $c->req->params->{password_confirm};
+        my $first_name = $c->req->params->{first_name};
+        my $last_name = $c->req->params->{last_name};
+        my $email = $c->req->params->{email};
+        my $roles = $c->req->params->{roles} || 'user';
+        my $active = $c->req->params->{active} ? 1 : 0;
+
+        # Log the user creation attempt
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_user',
+            "User creation attempt for username: $username with roles: $roles");
+
+        # Ensure all required fields are filled
+        unless ($username && $password && $password_confirm && $first_name && $last_name) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'add_user',
+                "Missing required fields for user creation");
+
+            $c->stash(
+                error_msg => 'All fields are required to create a user',
+                template => 'admin/add_user.tt',
+            );
+            $c->forward($c->view('TT'));
+            return;
+        }
+
+        # Check if the passwords match
+        if ($password ne $password_confirm) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'add_user',
+                "Passwords do not match for user creation");
+
+            $c->stash(
+                error_msg => 'Passwords do not match',
+                template => 'admin/add_user.tt',
+            );
+            $c->forward($c->view('TT'));
+            return;
+        }
+
+        # Check if the username already exists
+        my $existing_user = $c->model('DBEncy::User')->find({ username => $username });
+        if ($existing_user) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'add_user',
+                "Username already exists: $username");
+
+            $c->stash(
+                error_msg => 'Username already exists. Please choose another.',
+                template => 'admin/add_user.tt',
+            );
+            $c->forward($c->view('TT'));
+            return;
+        }
+
+        # Hash the password
+        my $hashed_password = Comserv::Controller::User->hash_password($password);
+
+        # Create the new user
+        eval {
+            $c->model('DBEncy::User')->create({
+                username => $username,
+                password => $hashed_password,
+                first_name => $first_name,
+                last_name => $last_name,
+                email => $email,
+                roles => $roles,
+                active => $active,
+                created_at => \'NOW()',
+            });
+
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_user',
+                "User created successfully: $username with roles: $roles");
+
+            # Set success message and redirect to user management
+            $c->flash->{success_msg} = "User '$username' created successfully.";
+            $c->response->redirect($c->uri_for('/admin/users'));
+            return;
+        };
+
+        if ($@) {
+            # Handle database errors
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_user',
+                "Error creating user: $@");
+
+            $c->stash(
+                error_msg => "Error creating user: $@",
+                template => 'admin/add_user.tt',
+            );
+            $c->forward($c->view('TT'));
+            return;
+        }
+    }
+
+    # Display the add user form
+    $c->stash(
+        template => 'admin/add_user.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
 sub map_table_to_result :Path('/Admin/map_table_to_result') :Args(0) {
     my ($self, $c) = @_;
 
