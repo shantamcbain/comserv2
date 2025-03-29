@@ -158,6 +158,23 @@ sub fetch_and_set {
         my $domain = $c->req->uri->host;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Extracted domain: $domain");
 
+        # Add debug information to stash
+        $c->stash->{debug_info} ||= [];
+        push @{$c->stash->{debug_info}}, "Attempting to look up domain: $domain";
+
+        # Get all available domains for debugging
+        my @all_domains;
+        eval {
+            @all_domains = $c->model('DBEncy::SiteDomain')->all();
+            push @{$c->stash->{debug_info}}, "Found " . scalar(@all_domains) . " domains in database";
+            foreach my $d (@all_domains) {
+                push @{$c->stash->{debug_info}}, "Available domain: " . $d->domain . " (ID: " . $d->id . ", Site ID: " . $d->site_id . ")";
+            }
+        };
+        if ($@) {
+            push @{$c->stash->{debug_info}}, "Error fetching all domains: $@";
+        }
+
         my $site_domain = $c->model('Site')->get_site_domain($c, $domain);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site domain retrieved: " . Dumper($site_domain));
 
@@ -208,7 +225,17 @@ sub fetch_and_set {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set',
                 "SiteName set to default: $value");
             $c->session->{ControllerName} = 'Root';
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "No site domain found, defaulting SiteName and ControllerName to 'none' and 'Root'");
+            $c->stash->{ControllerName} = 'Root';
+
+            # Set theme to default
+            $c->stash->{theme_name} = 'default';
+            $c->session->{theme_name} = 'default';
+
+            # Clear any site-specific theme settings
+            delete $c->session->{"theme_$value"};
+
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set',
+                "No site domain found, defaulting SiteName to 'default', ControllerName to 'Root', and theme to 'default'");
         }
     }
 
@@ -489,8 +516,8 @@ sub setup_site {
     # Store domain in session for debugging
     $c->session->{Domain} = $domain;
 
-    if (!defined $SiteName || $SiteName eq 'none' || $SiteName eq 'root') {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site', "SiteName is either undefined, 'none', or 'root'. Proceeding with domain extraction and site domain retrieval");
+    if (!defined $SiteName || $SiteName eq 'none' || $SiteName eq 'root' || $SiteName eq 'default') {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site', "SiteName is either undefined, 'none', 'root', or 'default'. Proceeding with domain extraction and site domain retrieval");
 
         # Get the domain from the sitedomain table
         my $site_domain = $c->model('Site')->get_site_domain($c, $domain);
@@ -503,7 +530,7 @@ sub setup_site {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site', "Found site domain for $domain");
 
             my $site_id = $site_domain->site_id;
-            my $site = $c->model('Site')->get_site_details($site_id, $c);
+            my $site = $c->model('Site')->get_site_details($c, $site_id);
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "Site ID: $site_id");
 
             if ($site) {
@@ -545,16 +572,30 @@ sub setup_site {
                 "DOMAIN ERROR ($error_type): $error_msg - $technical_details");
 
             # Set default site for error handling
-            $SiteName = 'CSC'; # Default to CSC
+            $SiteName = 'default'; # Use 'default' instead of CSC
             $c->stash->{SiteName} = $SiteName;
             $c->session->{SiteName} = $SiteName;
+
+            # Set theme to default
+            $c->stash->{theme_name} = 'default';
+            $c->session->{theme_name} = 'default';
+
+            # Clear any site-specific theme settings
+            delete $c->session->{"theme_$SiteName"};
+
+            # Set default values for critical variables
+            $c->stash->{ScriptDisplayName} = 'Site';
+            $c->stash->{css_view_name} = '/static/css/default.css';
+            $c->stash->{mail_to_admin} = 'admin@computersystemconsulting.ca';
+            $c->stash->{mail_replyto} = 'helpdesk.computersystemconsulting.ca';
+            $c->stash->{cmenu_css} = '/static/css/menu.css';
 
             # Force Root controller to show error page
             $c->stash->{ControllerName} = 'Root';
             $c->session->{ControllerName} = 'Root';
 
-            # Set up site basics to get admin email
-            $self->site_setup($c, $SiteName);
+            # Skip site_setup since we've already set all the necessary values
+            # $self->site_setup($c, $SiteName);
 
             # Set flash error message to ensure it's displayed
             $c->flash->{error_msg} = "Domain Error: $error_msg";
@@ -634,8 +675,27 @@ sub setup_site {
                 $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
                     "Domain not found: " . ($c->stash->{domain_name} || "Unknown domain"));
 
-                # Set a default site name
-                $SiteName = 'default';
+                # Try to get CSC site directly
+                my $csc_site = $c->model('Site')->get_site_details_by_name($c, 'CSC');
+
+                # If not found by name, try by ID (assuming CSC has ID 1)
+                if (!$csc_site) {
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto',
+                        "CSC not found by name, trying by ID 1");
+                    $csc_site = $c->model('Site')->get_site_details($c, 1);
+                }
+
+                if ($csc_site) {
+                    $SiteName = $csc_site->name;
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto',
+                        "Using CSC site: $SiteName");
+                } else {
+                    # If CSC site not found, use default
+                    $SiteName = 'default';
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
+                        "CSC site not found, using default");
+                }
+
                 $c->stash->{SiteName} = $SiteName;
                 $c->session->{SiteName} = $SiteName;
             } else {
@@ -643,13 +703,37 @@ sub setup_site {
                 $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
                     "Could not retrieve site domain for $domain. Using default site.");
 
-                # Set a default site name
+                # When domain lookup fails, use 'default' as SiteName and 'Root' as controller
                 $SiteName = 'default';
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto',
+                    "Domain lookup failed, using 'default' as SiteName and 'Root' as controller");
+
                 $c->stash->{SiteName} = $SiteName;
                 $c->session->{SiteName} = $SiteName;
 
-                # Try to fetch and set the site name
-                $SiteName = $self->fetch_and_set($c, 'site');
+                # Set controller to Root
+                $c->stash->{ControllerName} = 'Root';
+                $c->session->{ControllerName} = 'Root';
+
+                # Set theme to default
+                $c->stash->{theme_name} = 'default';
+                $c->session->{theme_name} = 'default';
+
+                # Clear any site-specific theme settings
+                delete $c->session->{"theme_$SiteName"};
+
+                # Set default values for critical variables
+                $c->stash->{ScriptDisplayName} = 'Site';
+                $c->stash->{css_view_name} = '/static/css/default.css';
+                $c->stash->{mail_to_admin} = 'admin@computersystemconsulting.ca';
+                $c->stash->{mail_replyto} = 'helpdesk.computersystemconsulting.ca';
+                $c->stash->{cmenu_css} = '/static/css/menu.css';
+
+                $c->stash->{SiteName} = $SiteName;
+                $c->session->{SiteName} = $SiteName;
+
+                # Skip fetch_and_set since we've already set all the necessary values
+                # $SiteName = $self->fetch_and_set($c, 'site');
                 $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site', "SiteName in setup_site = $SiteName");
             # Generic error case (should not happen with our improved error handling)
             my $error_msg = "DOMAIN ERROR: '$domain' not found in sitedomain table";
@@ -661,16 +745,30 @@ sub setup_site {
             }
 
             # Set default site for error handling
-            $SiteName = 'CSC'; # Default to CSC
+            $SiteName = 'default'; # Use 'default' instead of CSC
             $c->stash->{SiteName} = $SiteName;
             $c->session->{SiteName} = $SiteName;
+
+            # Set theme to default
+            $c->stash->{theme_name} = 'default';
+            $c->session->{theme_name} = 'default';
+
+            # Clear any site-specific theme settings
+            delete $c->session->{"theme_$SiteName"};
+
+            # Set default values for critical variables
+            $c->stash->{ScriptDisplayName} = 'Site';
+            $c->stash->{css_view_name} = '/static/css/default.css';
+            $c->stash->{mail_to_admin} = 'admin@computersystemconsulting.ca';
+            $c->stash->{mail_replyto} = 'helpdesk.computersystemconsulting.ca';
+            $c->stash->{cmenu_css} = '/static/css/menu.css';
 
             # Force Root controller to show error page
             $c->stash->{ControllerName} = 'Root';
             $c->session->{ControllerName} = 'Root';
 
-            # Set up site basics to get admin email
-            $self->site_setup($c, $SiteName);
+            # Skip site_setup since we've already set all the necessary values
+            # $self->site_setup($c, $SiteName);
 
             # Send email notification to admin
             if (my $mail_to_admin = $c->stash->{mail_to_admin}) {
@@ -732,6 +830,7 @@ sub setup_site {
 
     my $schema = $c->model('DBEncy');
     #print "Schema: $schema\n";
+    my $SiteName = $c->session->{SiteName} || $c->stash->{SiteName} || 'default';
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "Fetched SiteName: $SiteName");
 
     unless ($c->session->{group}) {
@@ -812,13 +911,28 @@ sub setup_site {
 
 sub site_setup {
     my ($self, $c, $SiteName) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "SiteName: $SiteName");
-    my ($self, $c) = @_;
-    my $SiteName = $c->session->{SiteName};
 
-    # Log the start of site_setup
+    # If SiteName wasn't passed as a parameter, get it from the session
+    # Always ensure SiteName has a default value
+    $SiteName = $SiteName || $c->session->{SiteName} || 'default';
+
+    # Store SiteName in session and stash for consistency
+    $c->session->{SiteName} = $SiteName;
+    $c->stash->{SiteName} = $SiteName;
+
+    # If SiteName is 'default', set controller to Root and theme to default
+    if ($SiteName eq 'default') {
+        $c->stash->{ControllerName} = 'Root';
+        $c->session->{ControllerName} = 'Root';
+        $c->stash->{theme_name} = 'default';
+        $c->session->{theme_name} = 'default';
+        delete $c->session->{"theme_$SiteName"};
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
+            "SiteName is 'default', setting controller to Root and theme to default");
+    }
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
-        "Starting site_setup with SiteName: " . (defined $SiteName ? $SiteName : 'undefined'));
+        "Starting site_setup with SiteName: $SiteName");
 
     # Get the current domain for HostName
     my $domain = $c->req->uri->host;
@@ -830,33 +944,101 @@ sub site_setup {
     $c->stash->{HostName} = $default_hostname;
     $c->session->{Domain} = $domain;
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Set default HostName: $default_hostname");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
+        "Set default HostName: $default_hostname");
 
-    my $site = $c->model('Site')->get_site_details_by_name($c, $SiteName);
+    # Skip site lookup if SiteName is 'default'
+    my $site;
+    if ($SiteName ne 'default') {
+        # Try to get site details by name (case-insensitive)
+        $site = $c->model('Site')->get_site_details_by_name($c, $SiteName);
+
+        # If site not found, try some common variations of the site name
+        unless (defined $site) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
+                "Trying common variations of site name: $SiteName");
+
+            # Try uppercase version
+            $site = $c->model('Site')->get_site_details_by_name($c, uc($SiteName));
+
+            # Try lowercase version
+            if (!$site) {
+                $site = $c->model('Site')->get_site_details_by_name($c, lc($SiteName));
+            }
+
+            # Try capitalized version (first letter uppercase, rest lowercase)
+            if (!$site) {
+                my $capitalized = ucfirst(lc($SiteName));
+                $site = $c->model('Site')->get_site_details_by_name($c, $capitalized);
+            }
+        }
+    } else {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
+            "SiteName is 'default', skipping site lookup");
+    }
+
+    # If still not found, try to use CSC as a fallback, or use default values
     unless (defined $site) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'site_setup', "No site found for SiteName: $SiteName");
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'site_setup',
+            "No site found for SiteName: $SiteName");
 
-        # Set default values for critical variables
-        $c->stash->{ScriptDisplayName} = 'Site';
-        $c->stash->{css_view_name} = '/static/css/default.css';
-        $c->stash->{mail_to_admin} = 'admin@computersystemconsulting.ca';
-        $c->stash->{mail_replyto} = 'helpdesk.computersystemconsulting.ca';
+        # If SiteName is 'default', use default values and don't try to use CSC
+        if ($SiteName eq 'default') {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
+                "SiteName is 'default', using default values");
+
+            # Set controller to Root
+            $c->stash->{ControllerName} = 'Root';
+            $c->session->{ControllerName} = 'Root';
+
+            # Set theme to default
+            $c->stash->{theme_name} = 'default';
+            $c->session->{theme_name} = 'default';
+
+            # Clear any site-specific theme settings
+            delete $c->session->{"theme_$SiteName"};
+
+            # Set default values for critical variables
+            $c->stash->{ScriptDisplayName} = 'Site';
+            $c->stash->{css_view_name} = '/static/css/default.css';
+            $c->stash->{mail_to_admin} = 'admin@computersystemconsulting.ca';
+            $c->stash->{mail_replyto} = 'helpdesk.computersystemconsulting.ca';
+            $c->stash->{cmenu_css} = '/static/css/menu.css';
+
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
+                "Using default values for site settings and default theme");
+
+            # Return early to skip the rest of the method
+            return;
+        }
+
+        # If still no site found, use default values
+        if (!$site) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'site_setup',
+                "No site found for SiteName: $SiteName and no fallback available");
+
+            # Add debug message
+            $c->stash->{debug_info} ||= [];
+            push @{$c->stash->{debug_info}}, "Using default site settings because no site was found for '$SiteName'";
+
+            # Set default values for critical variables
+            $c->stash->{ScriptDisplayName} = 'Site';
+            $c->stash->{css_view_name} = '/static/css/default.css';
+            $c->stash->{mail_to_admin} = 'admin@computersystemconsulting.ca';
+            $c->stash->{mail_replyto} = 'helpdesk.computersystemconsulting.ca';
+        }
 
         # Add debug information
-        push @{$c->stash->{debug_errors}}, "ERROR: No site found for SiteName: $SiteName";
-        $c->stash->{debug_msg} = "Using default site settings because no site was found for '$SiteName'";
+        push @{$c->stash->{debug_errors}}, "Debug 0: Using default site settings because no site was found for '$SiteName'";
 
         return;
     }
 
-        my $css_view_name = $site->css_view_name || '/static/css/default.css';
-        my $site_display_name = $site->site_display_name || 'none';
-        my $mail_to_admin = $site->mail_to_admin || 'none';
-        my $mail_replyto = $site->mail_replyto || 'helpdesk.computersystemconsulting.ca';
-        my $site_name = $site->name || 'none';
     # Log success
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
         "Successfully retrieved site details for: " . $site->name);
+
+    # Define variables only once
     my $css_view_name = $site->css_view_name || '/static/css/default.css';
     my $site_display_name = $site->site_display_name || $SiteName;
     my $mail_to_admin = $site->mail_to_admin || 'admin@computersystemconsulting.ca';
@@ -878,28 +1060,7 @@ sub site_setup {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
         "Set theme_name in stash: $theme_name");
 
-    # Set stash values from site
-    my $css_view_name = $site->css_view_name || '/static/css/default.css';
-    my $site_display_name = $site->site_display_name || 'Default Site';
-    my $mail_to_admin = $site->mail_to_admin || 'admin@example.com';
-    my $mail_replyto = $site->mail_replyto || 'helpdesk.computersystemconsulting.ca';
-
     # Set the stash values
-    $c->stash->{ScriptDisplayName} = $site_display_name;
-    $c->stash->{css_view_name} = $css_view_name;
-    $c->stash->{mail_to_admin} = $mail_to_admin;
-    $c->stash->{mail_replyto} = $mail_replyto;
-
-    # Log completion
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Completed site_setup action");
-
-    $c->stash(
-        default_css => $c->uri_for($css_view_name),
-        menu_css => $c->uri_for('/static/css/menu.css'),
-        log_css => $c->uri_for('/static/css/log.css'),
-        todo_css => $c->uri_for('/static/css/todo.css'),
-    );
-}
     $c->stash->{ScriptDisplayName} = $site_display_name;
     $c->stash->{css_view_name} = $css_view_name;
     $c->stash->{mail_to_admin} = $mail_to_admin;
@@ -907,23 +1068,65 @@ sub site_setup {
     $c->stash->{SiteName} = $site_name;
     $c->session->{SiteName} = $site_name;
 
+    # Set CSS paths in stash
+    $c->stash(
+        default_css => $c->uri_for($css_view_name),
+        menu_css => $c->uri_for('/static/css/menu.css'),
+        log_css => $c->uri_for('/static/css/log.css'),
+        todo_css => $c->uri_for('/static/css/todo.css'),
+    );
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
         "Completed site_setup action with HostName: " . $c->stash->{HostName});
 }
 
 sub debug :Path('/debug') {
     my ($self, $c) = @_;
-    my $site_name = $c->stash->{SiteName};
+
+    # Get the current site name
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+
+    # Add additional debug information
+    $c->stash->{debug_info} ||= [];
+
+    # Add information about the current domain
+    my $domain = $c->req->uri->host;
+    push @{$c->stash->{debug_info}}, "Current domain: $domain";
+
+    # Try to get all domains from the database
+    eval {
+        my @domains = $c->model('DBEncy::SiteDomain')->all();
+        push @{$c->stash->{debug_info}}, "Total domains in database: " . scalar(@domains);
+
+        foreach my $domain_record (@domains) {
+            push @{$c->stash->{debug_info}},
+                "Domain: " . $domain_record->domain .
+                " (ID: " . $domain_record->id .
+                ", Site ID: " . $domain_record->site_id . ")";
+        }
+    };
+    if ($@) {
+        push @{$c->stash->{debug_info}}, "Error fetching domains: $@";
+    }
+
+    # Add information about the database connection
+    eval {
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        push @{$c->stash->{debug_info}}, "Database connection active: " . ($dbh ? "Yes" : "No");
+
+        # Get database name
+        my $db_name = $dbh->get_info(17); # SQL_DBMS_NAME
+        push @{$c->stash->{debug_info}}, "Connected to database: $db_name";
+    };
+    if ($@) {
+        push @{$c->stash->{debug_info}}, "Error checking database connection: $@";
+    }
+
+    # Set the template and forward to the view
     $c->stash(template => 'debug.tt');
     $c->forward($c->view('TT'));
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'debug', "Completed debug action");
-}
-sub debug :Path('/debug') {
-    my ($self, $c) = @_;
-    my $site_name = $c->stash->{SiteName};
-    $c->stash(template => 'debug.tt');
-    $c->forward($c->view('TT'));
-   $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Completed site_setup action");
 }
 
 sub accounts :Path('/accounts') :Args(0) {

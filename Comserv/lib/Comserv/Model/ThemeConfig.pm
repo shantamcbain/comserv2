@@ -138,6 +138,22 @@ sub get_site_theme {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_site_theme',
         "Getting theme for site: $site_name");
 
+    # Ensure site_name is defined
+    return 'default' unless defined $site_name;
+
+    # First check if we have a global theme_name set in the session
+    # This takes precedence for 'default' site
+    if ($site_name eq 'default' && $c->session->{theme_name}) {
+        my $theme = $c->session->{theme_name};
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_site_theme',
+            "Using global theme from session for default site: $theme");
+
+        # Store in stash for current request
+        $c->stash->{theme_name} = $theme;
+
+        return $theme;
+    }
+
     # Check if we already have a theme in the stash or session for this site
     my $site_key = "theme_" . lc($site_name);
 
@@ -168,13 +184,26 @@ sub get_site_theme {
 
     # If no theme found, try case-insensitive matching
     if (!$theme) {
+        # Convert site_name to lowercase for comparison
+        my $lc_site_name = lc($site_name);
+
         foreach my $mapping_site (keys %{$mappings->{sites}}) {
-            if (lc($mapping_site) eq lc($site_name)) {
+            if (lc($mapping_site) eq $lc_site_name) {
                 $theme = $mappings->{sites}{$mapping_site};
                 $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_site_theme',
                     "Found theme via case-insensitive match: $mapping_site -> $theme");
                 last;
             }
+        }
+    }
+
+    # If still no theme found, try with uppercase version (common in mappings)
+    if (!$theme) {
+        my $uc_site_name = uc($site_name);
+        if ($mappings->{sites}{$uc_site_name}) {
+            $theme = $mappings->{sites}{$uc_site_name};
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_site_theme',
+                "Found theme via uppercase match: $uc_site_name -> $theme");
         }
     }
 
@@ -197,6 +226,9 @@ sub get_site_theme {
 sub set_site_theme {
     my ($self, $c, $site_name, $theme_name) = @_;
 
+    # Ensure site_name is defined
+    return 0 unless defined $site_name;
+
     # Log the theme update attempt
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'set_site_theme',
         "Setting theme for site $site_name to $theme_name");
@@ -210,8 +242,10 @@ sub set_site_theme {
 
     # Check if the site already exists in the mappings (case-insensitive)
     my $existing_site_key = undef;
+    my $lc_site_name = lc($site_name);
+
     foreach my $mapping_site (keys %{$mappings->{sites}}) {
-        if (lc($mapping_site) eq lc($site_name)) {
+        if (lc($mapping_site) eq $lc_site_name) {
             $existing_site_key = $mapping_site;
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'set_site_theme',
                 "Found existing site mapping: $mapping_site");
@@ -219,18 +253,25 @@ sub set_site_theme {
         }
     }
 
-    # If the site exists, update its theme; otherwise, add a new entry with the original case
+    # If the site exists, update its theme; otherwise, add a new entry
     if ($existing_site_key) {
+        # Update existing entry, preserving the original case
         $mappings->{sites}{$existing_site_key} = $validated_theme;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'set_site_theme',
+            "Updated existing mapping for $existing_site_key to $validated_theme");
     } else {
-        $mappings->{sites}{$site_name} = $validated_theme;
+        # For new entries, use uppercase for consistency with existing mappings
+        my $uc_site_name = uc($site_name);
+        $mappings->{sites}{$uc_site_name} = $validated_theme;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'set_site_theme',
+            "Added new mapping for $uc_site_name to $validated_theme");
     }
 
     # Store the theme in both stash and session for immediate use
     $c->stash->{theme_name} = $validated_theme;
 
-    # Store with site-specific key
-    my $site_key = "theme_" . lc($site_name);
+    # Store with site-specific key (always use lowercase for session keys)
+    my $site_key = "theme_" . $lc_site_name;
     $c->session->{$site_key} = $validated_theme;
 
     # Also store in general key for backward compatibility
@@ -248,6 +289,9 @@ sub set_site_theme {
 sub remove_site_theme {
     my ($self, $c, $site_name) = @_;
 
+    # Ensure site_name is defined
+    return 0 unless defined $site_name;
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'remove_site_theme',
         "Removing theme for site $site_name");
 
@@ -255,8 +299,10 @@ sub remove_site_theme {
 
     # Check if the site exists in the mappings (case-insensitive)
     my $existing_site_key = undef;
+    my $lc_site_name = lc($site_name);
+
     foreach my $mapping_site (keys %{$mappings->{sites}}) {
-        if (lc($mapping_site) eq lc($site_name)) {
+        if (lc($mapping_site) eq $lc_site_name) {
             $existing_site_key = $mapping_site;
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'remove_site_theme',
                 "Found existing site mapping to remove: $mapping_site");
@@ -267,9 +313,11 @@ sub remove_site_theme {
     # If the site exists, remove it
     if ($existing_site_key) {
         delete $mappings->{sites}{$existing_site_key};
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'remove_site_theme',
+            "Removed mapping for site: $existing_site_key");
 
         # Clear the site-specific session key
-        my $site_key = "theme_" . lc($site_name);
+        my $site_key = "theme_" . $lc_site_name;
         delete $c->session->{$site_key};
 
         # If this was the current theme, clear the general key too
@@ -278,8 +326,26 @@ sub remove_site_theme {
             delete $c->stash->{theme_name};
         }
     } else {
-        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'remove_site_theme',
-            "No mapping found for site: $site_name");
+        # Also try with uppercase version (common in mappings)
+        my $uc_site_name = uc($site_name);
+        if (exists $mappings->{sites}{$uc_site_name}) {
+            delete $mappings->{sites}{$uc_site_name};
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'remove_site_theme',
+                "Removed mapping for uppercase site: $uc_site_name");
+
+            # Clear the site-specific session key
+            my $site_key = "theme_" . $lc_site_name;
+            delete $c->session->{$site_key};
+
+            # If this was the current theme, clear the general key too
+            if ($c->session->{theme_name} && $c->session->{theme_name} eq $c->stash->{theme_name}) {
+                delete $c->session->{theme_name};
+                delete $c->stash->{theme_name};
+            }
+        } else {
+            $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'remove_site_theme',
+                "No mapping found for site (case-insensitive): $site_name");
+        }
     }
 
     my $result = $self->save_theme_mappings($c, $mappings);

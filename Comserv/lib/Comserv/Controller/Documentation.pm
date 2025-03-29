@@ -20,13 +20,12 @@ has 'documentation_pages' => (
 );
 
 # Initialize - scan for documentation files
+# Initialize - scan for documentation files
 sub BUILD {
     my ($self) = @_;
 
-    # Log the start of BUILD
-    my $file = __FILE__;
-    my $line = __LINE__;
-    Comserv::Util::Logging::log_to_file("[$file:$line] Starting BUILD method for Documentation controller", undef, 'INFO');
+    # Create a logging instance
+    my $logging = $self->logging;
 
     # Scan the Documentation directory for all files
     my $doc_dir = "root/Documentation";
@@ -67,13 +66,16 @@ sub BUILD {
         );
     }
 
-    # Log the discovered documentation pages without context object
-    $file = __FILE__;
-    $line = __LINE__;
+    # Log the number of pages found using the logging attribute
     my $message = "Found " . scalar(keys %{$self->documentation_pages}) . " documentation pages";
-
-    # Use log_to_file directly since we don't have a context object in BUILD
-    Comserv::Util::Logging::log_to_file("[$file:$line] BUILD - $message", undef, 'INFO');
+    $logging->log_with_details(
+        undef,  # No context object in BUILD
+        'info',
+        __FILE__,
+        __LINE__,
+        'BUILD',
+        $message
+    );
 }
 
 # Main documentation index
