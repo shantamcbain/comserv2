@@ -244,6 +244,7 @@
     "apis": "apis",
     "usbm": "usbm",
     "csc": "csc",
-    "bmaster": "apis"
+    "bmaster": "apis",
+    "mcoop": "mcoop"
   }
 }

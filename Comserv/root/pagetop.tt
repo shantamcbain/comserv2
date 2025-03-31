@@ -49,6 +49,7 @@
         [% INCLUDE 'Navigation/TopDropListGlobal.tt' %]
         [% INCLUDE 'Navigation/TopDropListHosted.tt' %]
         [% INCLUDE 'Navigation/TopDropListMember.tt' %]
+        <!-- TopDropListCoop.tt has been removed and merged into admintopmenu.tt -->
 
         [% SET is_admin = c.session.roles.grep('admin').size > 0 %]
 

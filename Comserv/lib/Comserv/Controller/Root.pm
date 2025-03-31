@@ -49,6 +49,12 @@ sub index :Path('/') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Starting index action. User exists: " . ($self->user_exists($c) ? 'Yes' : 'No'));
     $c->stash->{forwarder} = '/'; # Set a default forward path
 
+    # Log if there's a view parameter, but don't handle specific views here
+    if ($c->req->param('view')) {
+        my $view = $c->req->param('view');
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "View parameter detected: $view");
+    }
+
     # Get ControllerName from the session
     my $ControllerName = $c->session->{ControllerName} || undef; # Default to undef if not set
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Fetched ControllerName from session: " . ($ControllerName // 'undefined'));
@@ -692,6 +698,8 @@ sub accounts :Path('/accounts') :Args(0) {
     $c->forward($c->view('TT'));
 }
 
+
+
 # Special route for hosting
 
 
@@ -722,11 +730,26 @@ sub default :Path {
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'default',
         "Requested path: $path (not found)");
 
+    # Log the 404 for server room plan but don't handle it here
+    if ($c->req->uri->path =~ /server[-_]room[-_]plan/) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'default',
+            "Detected server room plan in path, but this should be handled by the MCoop controller");
+    }
+
+    # Check if this is a request for the MCoop controller
+    if ($c->req->uri->path =~ m{^/mcoop/}) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'default', "Detected mcoop path in 404, forwarding to MCoop controller");
+        my $path = $c->req->uri->path;
+        $path =~ s{^/mcoop/}{};
+        $c->detach('/mcoop/' . $path);
+        return;
+    }
+
     # Set up the 404 page
     $c->stash(
         template => 'error.tt',
         error_title => '404 - Page Not Found',
-        error_msg => 'The page you requested could not be found.',
+        error_msg => 'The page you requested could not be found. <br><a href="/server-room-plan" style="color: #006633; font-weight: bold;">View Server Room Plan</a>',
         requested_path => $c->req->uri->path,
         status_code => 404
     );

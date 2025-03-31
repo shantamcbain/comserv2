@@ -42,6 +42,24 @@ sub index :Path :Args(0) {
     # Pass the sites to the template
     $c->stash->{sites} = $sites;
 
+    # Add helpful context messages for users
+    my $help_message = "You are currently in the HelpDesk support view of the main site.";
+    my $account_message = "To access additional features, please create an account. Once created, you will have access to the public view of the site.";
+
+    # Add specific message for Monashee Coop
+    if (lc($current_site_name) eq 'mcoop') {
+        $help_message = "Welcome to the Monashee Coop HelpDesk support portal. This is the administrative view of monasheecoop.ca.";
+        $account_message = "To access the public features of the Monashee Coop site, please create an account. After registration, you will be able to view the public content.";
+
+        # Add a link to the main website
+        $c->stash->{main_website} = "https://monasheecoop.ca";
+    }
+
+    # Add messages to stash
+    $c->stash->{help_message} = $help_message;
+    $c->stash->{account_message} = $account_message;
+    $c->stash->{debug_msg} = "Site controller index view for $current_site_name";
+
     # Set the template to site/index.tt
     $c->stash(template => 'site/index.tt');
 }

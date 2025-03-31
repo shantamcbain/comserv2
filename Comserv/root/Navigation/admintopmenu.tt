@@ -155,6 +155,22 @@
                     [% END %]
                 </div>
             </div>
+            <!-- MCOOP Admin Section (moved from TopDropListCoop.tt) -->
+            [% IF c.session.roles && c.session.roles.grep('^admin$').size %]
+            <div class="submenu-item">
+                <span class="submenu-header">MCOOP Admin</span>
+                <div class="submenu">
+                    <a href="/mcoop">MCOOP Home</a>
+                    <a href="/mcoop/server-room-plan">Server Room Plan</a>
+                    <a href="/mcoop/network">Network Infrastructure</a>
+                    <a href="/mcoop/services">COOP Services</a>
+                    <a href="/mcoop/admin/infrastructure">Infrastructure Management</a>
+                    <a href="/mcoop/admin/reports">COOP Reports</a>
+                    <a href="/mcoop/admin/planning">Strategic Planning</a>
+                </div>
+            </div>
+            [% END %]
+
             <div class="submenu-item">
                 <span class="submenu-header">Other Options</span>
                 <div class="submenu">

@@ -1,30 +1,123 @@
-
-[% PageVersion = 'coop/index.tt,v 0.01 2024/11/22 shanta Exp shanta ' %]
+[% META title = 'Mcoop home page' %]
+[% PageVersion = 'coop/index.tt,v 0.03 2025/03/31 shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
+    [% IF debug_msg %]<div class="debug-message">[% debug_msg %]</div>[% END %]
 [% END %]
 [% USE Date %]
 <div class="container">
     <header>
-
-        <p>Welcome to the admin support site for Monashee Coop in Lumby, BC.</p>
+        <div class="header-banner">
+            <h2 class="header-logo">MONASHEE COOP</h2>
+        </div>
+        <h1>HelpDesk Support Portal</h1>
         <p>Date: [% Date.format(Date.now, '%Y-%m-%d') %]</p>
     </header>
-   <nav>
 
-            <a href="[% c.uri_for('Http://monasheecoop.com') %]">Main website.</a> |
+    <div class="info-panel">
+        [% IF help_message %]
+            <div class="help-message">
+                <p>[% help_message %]</p>
+            </div>
+        [% END %]
 
-            <!-- Add more navigation links as needed -->
+        [% IF account_message %]
+            <div class="account-message">
+                <p>[% account_message %]</p>
+            </div>
+        [% END %]
+    </div>
 
-    </nav>
-
-
-
+    [% # The navigation menu has been moved to pagetop.tt and TopDropListCoop.tt %]
 
     <main>
-        <h2>Admin Dashboard</h2>
-        <p>Use this dashboard to manage coop operations and support tasks.</p>
-        <!-- Add more content and functionality as needed -->
+        [% # Content for not logged in users or normal role users %]
+        [% IF !c.session.username || (c.session.roles && !c.session.roles.grep('^admin$').size) %]
+            <div class="public-view">
+                <h2>Welcome to Monashee Coop HelpDesk</h2>
+                <div class="alert alert-info">
+                    <p>This is the Monashee Coop HelpDesk support portal. We provide technical support and assistance for Monashee Coop members and staff.</p>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h3>Support Services</h3>
+                    </div>
+                    <div class="card-body">
+                        <p>To access our support services, please create an account or log in to your existing account.</p>
+                        <p>With an account, you can:</p>
+                        <ul>
+                            <li>Create support tickets</li>
+                            <li>Track the status of your requests</li>
+                            <li>Access help documentation</li>
+                            <li>Contact our support team</li>
+                        </ul>
+
+                        [% IF !c.session.username %]
+                            <div class="mt-3">
+                                <a href="/user/register" class="btn btn-primary">Create Account</a>
+                                <a href="/user/login" class="btn btn-secondary">Login</a>
+                            </div>
+                        [% END %]
+                    </div>
+                </div>
+            </div>
+        [% END %]
+
+        [% # Admin view - only shown to admin users %]
+        [% IF c.session.roles && c.session.roles.grep('^admin$').size %]
+            <h2>Support Dashboard</h2>
+            <p>This is the administrative view of the Monashee Coop website. You are currently in the HelpDesk support portal.</p>
+            <p>To access the public features of the Monashee Coop site, please create an account using the link above. After registration, you will be able to view the public content.</p>
+
+            <div class="features">
+                <h3>Available Support Features:</h3>
+                <ul>
+                    <li>View site information</li>
+                    <li>Access help documentation</li>
+                    <li>Contact support team</li>
+                    <li><a href="/mcoop/server-room-plan" style="font-weight: bold; color: #006633;">View Server Room Plan</a></li>
+                </ul>
+            </div>
+
+            <div class="admin-section">
+                <h3>Administration</h3>
+                <div class="admin-grid">
+                    <div class="admin-card">
+                        <h4>Infrastructure</h4>
+                        <ul>
+                            <li><a href="/mcoop/server-room-plan">Server Room Plan</a></li>
+                            <li><a href="#">Network Configuration</a></li>
+                            <li><a href="#">Backup Systems</a></li>
+                        </ul>
+                    </div>
+                    <div class="admin-card">
+                        <h4>User Management</h4>
+                        <ul>
+                            <li><a href="#">Member Accounts</a></li>
+                            <li><a href="#">Staff Accounts</a></li>
+                            <li><a href="#">Permissions</a></li>
+                        </ul>
+                    </div>
+                    <div class="admin-card">
+                        <h4>Content</h4>
+                        <ul>
+                            <li><a href="#">News Updates</a></li>
+                            <li><a href="#">Events Calendar</a></li>
+                            <li><a href="#">Document Library</a></li>
+                        </ul>
+                    </div>
+                    <div class="admin-card">
+                        <h4>Settings</h4>
+                        <ul>
+                            <li><a href="#">Site Configuration</a></li>
+                            <li><a href="#">Email Templates</a></li>
+                            <li><a href="#">Theme Options</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        [% END %]
     </main>
 
     <footer>

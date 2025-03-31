@@ -1,4 +1,23 @@
-Fix project edit functionality and parent project updates
+Implement MCoop Server Room Plan and Restructure Menus
+
+This commit implements the Monashee Coop Server Room Plan feature and restructures the navigation menus for improved security and organization.
+
+Key changes:
+- Added server_room_plan method in MCoop controller with support for both underscore and hyphen URL formats
+- Removed duplicate routes from Root controller
+- Moved MCoop menu items to Admin menu with proper role-based access control
+- Updated documentation to reflect the changes
+
+The server room plan provides a detailed proposal for the Monashee Coop's server infrastructure, including equipment requirements, options analysis, and recommendations.
+
+Security is improved by restricting MCoop features to administrators only through the Admin menu.
+
+Documentation updates:
+- Added detailed changelog entry
+- Created comprehensive MCoop module documentation
+- Updated completed_items.json tracking
+
+Related issue: MCoop server room plan implementationFix project edit functionality and parent project updates
 
 This commit fixes two issues with the project editing functionality:
 

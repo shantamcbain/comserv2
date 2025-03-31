@@ -1,3 +1,4 @@
+[% META title = 'admin home page' %]
 [% PageVersion = 'Documentation/admin.tt,v 0.01 2024/05/27 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
