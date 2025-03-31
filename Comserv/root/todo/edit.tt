@@ -1,4 +1,4 @@
-[% PageVersion  = 'todo/edit.tt,v 0.01 2025/03/26 Shanta Exp shanta'; %]
+[% PageVersion  = 'todo/edit.tt,v 0.02 2025/04/01 Shanta Exp shanta'; %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -8,17 +8,17 @@
         max-width: 800px;
         margin: 0 auto;
     }
-    
+
     .form-group {
         margin-bottom: 15px;
     }
-    
+
     .form-group label {
         display: block;
         margin-bottom: 5px;
         font-weight: bold;
     }
-    
+
     .form-group input[type="text"],
     .form-group input[type="date"],
     .form-group input[type="number"],
@@ -29,17 +29,17 @@
         border: 1px solid #ddd;
         border-radius: 4px;
     }
-    
+
     .form-group textarea {
         min-height: 100px;
     }
-    
+
     .action-buttons {
         margin: 20px 0;
         display: flex;
         gap: 10px;
     }
-    
+
     .action-buttons button,
     .form-group input[type="submit"] {
         padding: 10px 15px;
@@ -50,40 +50,69 @@
         cursor: pointer;
         font-weight: bold;
     }
-    
+
     .action-buttons button:hover,
     .form-group input[type="submit"]:hover {
         background-color: #45a049;
     }
-    
+
     .return-button {
         background-color: #2196F3 !important;
     }
-    
+
     .return-button:hover {
         background-color: #0b7dda !important;
+    }
+
+    .return-nav {
+        margin-bottom: 20px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .return-nav a {
+        padding: 8px 15px;
+        background-color: #2196F3;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+        text-decoration: none;
+        display: inline-block;
+    }
+
+    .return-nav a:hover {
+        background-color: #0b7dda;
     }
 </style>
 
 <div class="form-container">
     <h1>Edit Todo</h1>
-    
+
     <!-- Display error message if there is one -->
     [% IF error_msg %]
         <div class="error-message">
             <p>[% error_msg %]</p>
         </div>
     [% END %]
-    
+
     <!-- Display success message if there is one -->
     [% IF success_msg %]
         <div class="success-message">
             <p>[% success_msg %]</p>
         </div>
     [% END %]
-    
-    <!-- Button to return to the previous page -->
-    <button type="button" class="return-button" onclick="window.history.back();">Return to List</button>
+
+    <!-- Return navigation buttons -->
+    <div class="return-nav">
+        <a href="/todo">Return to List View</a>
+        <a href="/todo/day">Return to Day View</a>
+        <a href="/todo/week">Return to Week View</a>
+        <a href="/todo/month">Return to Month View</a>
+        <button type="button" class="return-button" onclick="window.history.back();">Return to Previous Page</button>
+    </div>
     
     <p>Record ID: [% record.get_column('record_id') %]</p>
     
@@ -219,6 +248,12 @@
         </form>
     </div>
     
-    <!-- Button to return to the previous page -->
-    <button type="button" class="return-button" onclick="window.history.back();">Return to List</button>
+    <!-- Return navigation buttons -->
+    <div class="return-nav">
+        <a href="/todo">Return to List View</a>
+        <a href="/todo/day">Return to Day View</a>
+        <a href="/todo/week">Return to Week View</a>
+        <a href="/todo/month">Return to Month View</a>
+        <button type="button" class="return-button" onclick="window.history.back();">Return to Previous Page</button>
+    </div>
 </div>
