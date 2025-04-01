@@ -1,0 +1,75 @@
+[% META title = 'Connection Test Results' %]
+[% PageVersion = 'proxmox/test_result.tt,v 0.01 2024/06/01 shanta Exp shanta ' %]
+
+<div class="container">
+    <h1>Connection Test Results for Server: [% server_id %]</h1>
+    
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3>Test Summary</h3>
+        </div>
+        <div class="card-body">
+            [% IF result.success %]
+                <div class="alert alert-success">
+                    <h4 class="alert-heading">Connection Successful!</h4>
+                    <p>[% result.message %]</p>
+                    [% IF result.elapsed_time %]
+                        <p>Connection time: [% result.elapsed_time %] seconds</p>
+                    [% END %]
+                </div>
+            [% ELSE %]
+                <div class="alert alert-danger">
+                    <h4 class="alert-heading">Connection Failed</h4>
+                    <p>[% result.error || 'Unknown error occurred' %]</p>
+                    [% IF result.elapsed_time %]
+                        <p>Connection time: [% result.elapsed_time %] seconds</p>
+                    [% END %]
+                    <div class="mt-3">
+                        <h5>Troubleshooting Tips:</h5>
+                        <ul>
+                            <li>Verify the hostname or IP address is correct</li>
+                            <li>Check that the API token is valid and has not expired</li>
+                            <li>Ensure the API token has sufficient permissions</li>
+                            <li>Check network connectivity and firewall settings</li>
+                        </ul>
+                    </div>
+                </div>
+            [% END %]
+        </div>
+    </div>
+    
+    [% IF result.debug_msg && result.debug_msg.size > 0 %]
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3>Debug Messages</h3>
+            </div>
+            <div class="card-body">
+                <div class="debug-log" style="background-color: #f8f9fa; border: 1px solid #ddd; padding: 15px; max-height: 400px; overflow-y: auto; font-family: monospace;">
+                    [% FOREACH msg IN result.debug_msg %]
+                        <div class="debug-entry" style="margin-bottom: 5px; padding: 3px 0; border-bottom: 1px dotted #ddd;">
+                            <span class="debug-index" style="display: inline-block; width: 30px; font-weight: bold;">[% loop.index %]:</span>
+                            <span class="debug-message">[% msg %]</span>
+                        </div>
+                    [% END %]
+                </div>
+            </div>
+        </div>
+    [% END %]
+    
+    [% IF result.debug_info %]
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3>Technical Details</h3>
+            </div>
+            <div class="card-body">
+                <pre style="background-color: #f8f9fa; border: 1px solid #ddd; padding: 15px;">[% USE Dumper; Dumper.dump(result.debug_info) %]</pre>
+            </div>
+        </div>
+    [% END %]
+    
+    <div class="mt-4">
+        <a href="[% c.uri_for('/proxmox_servers') %]" class="btn btn-primary">Back to Server List</a>
+        <a href="[% c.uri_for('/proxmox_servers/edit', server_id) %]" class="btn btn-secondary">Edit Server</a>
+        <a href="[% c.uri_for('/proxmox_servers/test', server_id) %]" class="btn btn-info">Test Again</a>
+    </div>
+</div>

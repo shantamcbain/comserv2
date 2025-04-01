@@ -2,22 +2,20 @@ package Comserv::Model::Schema::Forager::Result::Herb;
 
 use strict;
 use warnings;
-
 use base 'DBIx::Class::Core';
 
-# Set the table name
+__PACKAGE__->load_components('InflateColumn::DateTime', 'TimeStamp', 'EncodedColumn');
 __PACKAGE__->table('ency_herb_tb');
-
-# Set the columns in the table
 __PACKAGE__->add_columns(
     'therapeutic_action',
     'record_id',
     'apis',
     'botanical_name',
-    'common_names',
     'key_name',
+    'common_names',
     'parts_used',
     'comments',
+    'url',
     'medical_uses',
     'homiopathic',
     'ident_character',
@@ -51,10 +49,14 @@ __PACKAGE__->add_columns(
     'reference',
     'username_of_poster',
     'group_of_poster',
-    'date_time_posted'
+    'date_time_posted',
+    'share' => { data_type => 'integer', default_value => 0, is_nullable => 0 },
+     'preparation' => { data_type => 'varchar', size => 150, is_nullable => 0 },
+    'pollennotes' => { data_type => 'text', is_nullable => 0 },
+    'nectarnotes' => { data_type => 'text', is_nullable => 0 },
+    'apis' => { data_type => 'varchar', size => 100, is_nullable => 0 },
 );
 
-# Set the primary key for the table
 __PACKAGE__->set_primary_key('record_id');
 
 1;

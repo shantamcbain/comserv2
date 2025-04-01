@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>[% template.title || 'Comserv' %]</title>
+
+    <!-- Base CSS -->
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="/static/css/base.css">
+
+    <!-- Theme CSS - using JSON-based theme system -->
+    [%
+        # The theme_name should be set in the stash by the Root controller's set_theme method
+        # But we'll add a fallback just in case
+
+        # Default theme
+        IF !theme_name;
+            theme_name = 'default';
+
+            # Set theme based on site name (lowercase)
+            site_name_lower = c.session.SiteName | lower;
+
+            # Check if we have a CSS file for this site
+            IF site_name_lower == 'csc' || site_name_lower == 'apis' || site_name_lower == 'usbm';
+                theme_name = site_name_lower;
+            END;
+        END;
+
+        # Log the theme selection
+        IF c.session.debug_mode == 1;
+            c.log.info("Selected theme: " _ theme_name _ " for site: " _ c.session.SiteName);
+            IF available_themes;
+                c.log.info("Available themes: " _ available_themes.join(", "));
+            END;
+        END;
+    %]
+    <!-- Theme CSS: [% theme_name %] -->
+    <link rel="stylesheet" type="text/css" href="/static/css/themes/[% theme_name %].css">
+
+    <!-- Site-specific CSS (for backward compatibility) -->
+    [% IF c.session.SiteName %]
+    <link rel="stylesheet" href="/static/css/[% c.session.SiteName %]style.css">
+    [% END %]
+    
+    <!-- Additional CSS -->
+    [% IF additional_css %]
+    [% FOREACH css_file IN additional_css %]
+    <link rel="stylesheet" href="[% css_file %]">
+    [% END %]
+    [% END %]
+    
+    <!-- Additional JavaScript -->
+    [% IF additional_js %]
+    [% FOREACH js_file IN additional_js %]
+    <script src="[% js_file %]"></script>
+    [% END %]
+    [% END %]
+</head>
+<body class="theme-[% theme_name %]">
+    <header class="site-header">
+        <div class="container">
+            <div class="row">
+                <div class="col-50">
+                    <h1>[% c.session.SiteName || 'Comserv' %]</h1>
+                </div>
+                <div class="col-50" style="text-align: right;">
+                    [% IF c.user_exists %]
+                    <p>Welcome, [% c.user.username %] | <a href="/logout">Logout</a></p>
+                    [% ELSE %]
+                    <p><a href="/login">Login</a></p>
+                    [% END %]
+                </div>
+            </div>
+        </div>
+    </header>
+    
+    <nav>
+        [% INCLUDE 'navigation.tt' %]
+    </nav>
+    
+    <div class="container">
+        <div class="row">
+            <div class="col-25">
+                [% INCLUDE 'sidebar.tt' %]
+            </div>
+            <div class="col-75">
+                <main class="main-content">
+                    [% IF error %]
+                    <div class="warning">
+                        [% error %]
+                    </div>
+                    [% END %]
+                    
+                    [% IF message %]
+                    <div class="form-success">
+                        [% message %]
+                    </div>
+                    [% END %]
+                    
+                    [% content %]
+                </main>
+            </div>
+        </div>
+    </div>
+    
+    <footer class="site-footer">
+        <div class="container">
+            <p>&copy; [% current_year || '2023' %] [% c.session.SiteName || 'Comserv' %]. All rights reserved.</p>
+        </div>
+    </footer>
+</body>
+</html>

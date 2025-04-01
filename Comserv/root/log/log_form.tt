@@ -15,19 +15,39 @@ window.onload = function() {
     document.getElementById('start_time').value = hours + ":" + minutes;
 };
 </script>
+<h1>Log Form</h1>
+[% IF error_msg %]
+    <p>Error: [% error_msg %]</p>
+[% END %]
+[% IF success_msg %]
+    <p>Success: [% success_msg %]</p>
+[% END %]
 <form action="/log/create_log" method="POST">
 
-    <label for="record_id">Todo Record ID:</label><br>
-    <input type="text" id="todo_record_id" name="todo_record_id" value="[% todo_record_id %]">  <a href="[% c.uri_for('/todo/addtodo') %]"> Add Todo</a><br>
+    <label for="todo_record_id">Todo Record ID:</label><br>
+    <input type="hidden" id="todo_record_id" name="todo_record_id" value="[% todo_record_id %]">
+    <input type="text" id="todo_record_id_display" name="todo_record_id_display" value="[% todo_record_id %]" readonly>
 
-    <label for="sitename">Site Name:</label><br>
-    <input type="text" id="sitename" name="sitename" value="[% site_name %]" readonly><br>
+    <a href="[% c.uri_for('/todo/addtodo') %]"> Add Todo</a><br>
+
+    [% INCLUDE "todo/site_list.tt" %]<br>
 
     <label for="start_date">Start Date:</label><br>
     <input type="date" id="start_date" name="start_date" value="[% start_date %]"><br>
 
-    <label for="project_code">Project Code:</label><br>
-    <input type="text" id="project_code" name="project_code" value="[% project_code %]"><br>
+
+
+
+
+[% # Set up selected_project_id for project_list.tt %]
+[% SET selected_project_id = '' %]
+[% IF current_project %]
+    [% SET selected_project_id = current_project.id %]
+[% ELSIF project_id %]
+    [% SET selected_project_id = project_id %]
+[% END %]
+
+[% INCLUDE "todo/project_list.tt" projects=projects selected_project_id=selected_project_id %]
 
     <label for="due_date">Due Date:</label><br>
     <input type="date" id="due_date" name="due_date" value="[% due_date %]"><br>

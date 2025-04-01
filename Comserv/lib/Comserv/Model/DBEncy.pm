@@ -7,7 +7,6 @@ use Socket;
 use JSON;
 use Data::Dumper;
 
-# Load the database configuration from db_config.json
 my $json_text;
 {
     local $/; # Enable 'slurp' mode
@@ -26,6 +25,13 @@ __PACKAGE__->config(
         password => $config->{shanta_ency}->{password},
     }
 );
+sub list_tables {
+    my $self = shift;
+
+    return $self->schema->storage->dbh->selectcol_arrayref(
+        "SHOW TABLES"  # Adjust if the database uses a different query for metadata
+    );
+}
 
 sub get_active_projects {
     my ($self, $site_name) = @_;
@@ -43,7 +49,6 @@ sub get_active_projects {
 
     return \@projects;
 }
-
 sub get_table_info {
     my ($self, $table_name) = @_;
 
@@ -64,9 +69,64 @@ sub get_table_info {
     }
 }
 
-sub schema {
-    my ($self) = @_;
-    return $self->schema_class->connect($self->connect_info);
-}
+sub create_table_from_result {
+    my ($self, $table_name, $schema, $c) = @_;
 
+    # Log the table name at the beginning of the method
+    $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Starting method for table: $table_name");
+
+    # Check if the required fields are present and in the correct format
+    unless ($schema && $schema->isa('DBIx::Class::Schema')) {
+        $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Schema is not a DBIx::Class::Schema object. Table name: $table_name");
+        return;
+    }
+
+    # Get a DBI database handle
+    my $dbh = $schema->storage->dbh;
+
+    # Execute a SHOW TABLES LIKE 'table_name' SQL statement
+    my $sth = $dbh->prepare("SHOW TABLES LIKE ?");
+    $sth->execute($table_name);
+
+    # Fetch the result
+    my $result = $sth->fetch;
+
+    # Check if the table exists
+    if (!$result) {
+        # The table does not exist, create it
+        my $result_class = "Comserv::Model::Schema::Ency::Result::$table_name";
+        eval "require $result_class";
+        if ($@) {
+            $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Could not load $result_class: $@. Table name: $table_name");
+            return;
+        }
+
+        # Get the columns from the result class
+        my $columns_info = $result_class->columns_info;
+        my %columns = %$columns_info if ref $columns_info eq 'HASH';
+
+        # Log the table properties before the table creation process starts
+        $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Table properties for $table_name: " . Dumper($columns_info));
+
+        # Define the structure of the table
+        my $source = $schema->source($table_name);
+        $source->add_columns(%columns);
+        $source->set_primary_key($result_class->primary_columns);
+
+        # Deploy the table
+        my $deploy_result = $schema->deploy({ sources => [$table_name] });
+
+        if ($deploy_result) {
+            $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Table $table_name deployed successfully.");
+            return 1;  # Return 1 to indicate that the table creation was successful
+        } else {
+            $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Failed to deploy table $table_name.");
+            $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Deployment details: " . Dumper($deploy_result) . ". Table name: $table_name");
+            return 0;  # Return 0 to indicate that the table creation failed but didn't raise an exception
+        }
+    } else {
+        $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Table $table_name already exists.");
+        return 1;  # Return 1 to indicate that the table already exists
+    }
+}
 1;

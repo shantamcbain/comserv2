@@ -1,0 +1,108 @@
+[% META title = 'VM Created Successfully' %]
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h2>Virtual Machine Created Successfully</h2>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-success">
+                        <p>Your virtual machine has been created and is now starting up. It may take a few minutes to complete the initialization process.</p>
+                    </div>
+                    
+                    <h3>VM Details</h3>
+                    <table class="table table-bordered">
+                        <tr>
+                            <th>VM ID:</th>
+                            <td>[% vmid %]</td>
+                        </tr>
+                        <tr>
+                            <th>Hostname:</th>
+                            <td>[% hostname %]</td>
+                        </tr>
+                        <tr>
+                            <th>Domain:</th>
+                            <td>[% domain %]</td>
+                        </tr>
+                        <tr>
+                            <th>Full Domain Name:</th>
+                            <td>[% hostname %].[% domain %]</td>
+                        </tr>
+                    </table>
+                    
+                    <h3>Next Steps</h3>
+                    <p>Once the VM is fully initialized, you can access it using the following methods:</p>
+                    <ul>
+                        <li>SSH: <code>ssh username@[% hostname %].[% domain %]</code></li>
+                        <li>Web Interface (if applicable): <code>http://[% hostname %].[% domain %]</code></li>
+                    </ul>
+                    
+                    <div class="mt-4">
+                        <a href="[% c.uri_for('/proxmox') %]" class="btn btn-primary">Return to Proxmox Dashboard</a>
+                        <a href="[% c.uri_for('/proxmox/create') %]" class="btn btn-secondary">Create Another VM</a>
+                    </div>
+                    
+                    <div class="mt-4" id="status-container">
+                        <h3>VM Status</h3>
+                        <div class="alert alert-info">
+                            <p>Loading VM status...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Poll for VM status
+(function() {
+    const vmid = '[% vmid %]';
+    const statusContainer = document.getElementById('status-container');
+    
+    function updateStatus() {
+        fetch('[% c.uri_for("/proxmox/status/") %]' + vmid)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    let status = data.status;
+                    let statusHtml = '<h3>VM Status</h3>';
+                    statusHtml += '<table class="table table-bordered">';
+                    statusHtml += '<tr><th>Status:</th><td>' + status.status + '</td></tr>';
+                    statusHtml += '<tr><th>CPU Usage:</th><td>' + (status.cpu || 0).toFixed(2) + '%</td></tr>';
+                    statusHtml += '<tr><th>Memory Usage:</th><td>' + (status.mem || 0) + ' / ' + (status.maxmem || 0) + ' MB</td></tr>';
+                    statusHtml += '<tr><th>Uptime:</th><td>' + formatUptime(status.uptime || 0) + '</td></tr>';
+                    statusHtml += '</table>';
+                    
+                    statusContainer.innerHTML = statusHtml;
+                } else {
+                    statusContainer.innerHTML = '<h3>VM Status</h3><div class="alert alert-warning">Unable to fetch VM status: ' + (data.error || 'Unknown error') + '</div>';
+                }
+            })
+            .catch(error => {
+                statusContainer.innerHTML = '<h3>VM Status</h3><div class="alert alert-danger">Error fetching VM status: ' + error.message + '</div>';
+            });
+    }
+    
+    function formatUptime(seconds) {
+        if (seconds < 60) {
+            return seconds + ' seconds';
+        }
+        
+        let minutes = Math.floor(seconds / 60);
+        if (minutes < 60) {
+            return minutes + ' minutes, ' + (seconds % 60) + ' seconds';
+        }
+        
+        let hours = Math.floor(minutes / 60);
+        minutes = minutes % 60;
+        return hours + ' hours, ' + minutes + ' minutes';
+    }
+    
+    // Update status immediately and then every 30 seconds
+    updateStatus();
+    setInterval(updateStatus, 30000);
+})();
+</script>

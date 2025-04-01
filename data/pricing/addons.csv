@@ -1,0 +1,20 @@
+Tier,vCPU,RAM (GB),Storage (GB),Bandwidth (TB),cPanel Accounts,Virtualmin Option,Backups,SSL,DDoS Protection,Support,Cloud Bursting,Price (Monthly)
+Starter Hosting,1,2,20,1,1,GPL unlimited,Daily local,Free Let's Encrypt,Basic,Email/ticket,Optional extra,$35
+Business Hosting,2,4,50,2,5,Pro 10 domains,Daily + weekly off-site,Free Let's Encrypt,Basic,24/7 email + chat,Optional extra,$75
+Pro Hosting,4,8,100,5,30,Pro unlimited,Daily + weekly + snapshots,Free Let's Encrypt,Advanced,Priority chat + phone,Optional extra,$125
+Enterprise Hosting,8,16,200,10,100,Pro unlimited,Daily + real-time snapshots,Free Let's Encrypt,Premium,Dedicated + account manager,Included (2TB),$195
+
+Add-On,Price
+Extra cPanel accounts,$0.75/account
+Virtualmin Pro upgrade (10 domains),$19/month
+Virtualmin Pro upgrade (unlimited),$49/month
+Additional bandwidth,$10/TB
+Extra SSD storage,$0.20/GB
+Cloud bursting (Starter-Pro),$10/TB + $5/node
+Managed services,$25/month
+
+Tier,Estimated Cost,Price,Margin
+Starter Hosting,$25-$30,$35,$5-$10
+Business Hosting,$50-$60,$75,$15-$25
+Pro Hosting,$80-$100,$125,$25-$45
+Enterprise Hosting,$140-$165,$195,$30-$55

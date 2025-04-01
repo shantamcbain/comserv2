@@ -1,45 +1,91 @@
 requires 'Moose';
 requires 'namespace::autoclean';
-requires 'Catalyst'; # Catalyst framework
-requires 'Catalyst::Action::RenderView';
-requires 'Catalyst::Authentication::Store::DBIx::Class';
+requires 'JSON::MaybeXS';
+
+# System modules
+requires 'Socket';
+requires 'Sys::Hostname';
+requires 'MooseX::MarkAsMethods';
+requires 'DBD::mysql';
+requires 'Catalyst::Runtime' => '5.90130';
 requires 'Catalyst::Model';
-requires 'Catalyst::Plugin::Authentication';
-requires 'Catalyst::Plugin::Authorization::Roles';
-requires 'Catalyst::Plugin::Authorization::ACL';
-requires 'Catalyst::Plugin::ConfigLoader'; # Catalyst framework
-requires 'Catalyst::Plugin::Log::Dispatch';
+requires 'Catalyst::Restarter';
+requires 'DBI';
+requires 'DBIx::Class';
+requires 'DBIx::Class::Schema::Loader';
+requires 'DBIx::Class::TimeStamp';
+requires 'DBIx::Class::Migration';
+requires 'DBIx::Class::EncodedColumn';
+requires 'SQL::Translator';
+
+#json
+requires 'JSON';
+requires 'Config::JSON';
+
+#json
+requires 'JSON';
+requires 'Config::JSON';
+
+# Template Toolkit and plugins
+requires 'Template';
+requires 'Template::Plugin::DateTime';
+requires 'Template::Plugin::JSON';
+requires 'Template::Plugin::Number::Format';
+requires 'Template::Plugin::URL';
+requires 'Template::Plugin::DBI';
+
+# Catalyst Plugins
+requires 'Catalyst::Plugin::ConfigLoader';
+requires 'Catalyst::Plugin::Static::Simple';
+requires 'Catalyst::Plugin::StackTrace';
 requires 'Catalyst::Plugin::Session';
-requires 'Catalyst::Plugin::Session::Store::DBI';
+requires 'Catalyst::Plugin::Session::Store::FastMmap';
+requires 'Catalyst::Plugin::Session::Store::Delegate';
+requires 'Catalyst::Plugin::Session::Store::DBIC';
+requires 'Catalyst::Plugin::Session::Store::Cookie';
 requires 'Catalyst::Plugin::Session::Store::File';
 requires 'Catalyst::Plugin::Session::State::Cookie';
-requires 'Catalyst::Plugin::Session::Store::File';
-requires 'Catalyst::Plugin::StackTrace';
-requires 'Catalyst::Plugin::Static::Simple';
-requires 'Catalyst::Runtime'; # Catalyst framework
-requires 'Catalyst::ScriptRunner';
+requires 'Catalyst::Plugin::Authentication';
+requires 'Catalyst::Authentication::Store::DBIx::Class';
+requires 'Catalyst::Plugin::Authorization::Roles';
+requires 'Catalyst::Plugin::Authorization::ACL';
+requires 'Catalyst::Plugin::Log::Dispatch';
+requires 'Log::Dispatch::Config';
 requires 'Catalyst::View::TT';
-requires 'Config::JSON';
-requires 'DBD::mysql'; # DBIx::Class
-requires 'DBIx::Class::Migration';
-requires 'DBIx::Class::TimeStamp';
-requires 'DBIx::Class::Schema::Loader'; # DBIx::Class
-requires 'sudo cpanm DBD::mysql';
-requires 'Data::FormValidator';
+requires 'Catalyst::Authentication::Store::DBIx::Class';
+# DateTime related
 requires 'DateTime';
 requires 'DateTime::Event::Recurrence';
 requires 'DateTime::Format::Strptime';
 requires 'DateTime::Format::ISO8601';
+
+# File handling
+requires 'File::Find';
+requires 'File::Basename';
+
+# Cryptography and Security
+requires 'Digest::SHA';
+
+# Email handling
+requires 'Email::Simple';
+requires 'Email::Simple::Creator';
 requires 'Email::Sender::Simple';
-requires 'JSON::MaybeXS';
+
+# Utility modules
 requires 'JSON';
-requires 'Log::Dispatch::Config';
-requires 'Paws'; # AWS SDK for Perl
-requires 'script::runner';
-requires 'Starman'; # DBIx::Class
-requires 'Template::Plugin::DBI';
-requires 'Template::Plugin::DateTime';
-requires 'Template::Plugin::DBI';
-requires 'Term::ReadPassword'; # Catalyst framework
-requires 'Template::Plugin::JSON'; # Template Toolkit JSON plugin
-requires 'Text::CSV'; # DBIx::Class
+requires 'URI::Escape';
+requires 'Data::FormValidator';
+requires 'LWP::UserAgent';
+requires 'HTTP::Request';
+requires 'Try::Tiny';
+
+# Development and testing
+requires 'Term::ReadPassword';
+requires 'Text::CSV';
+requires 'Starman';
+requires 'Test::More' => '0.88';
+requires 'Test::Pod';
+requires 'Test::Pod::Coverage';
+requires 'Test::WWW::Mechanize::Catalyst';
+requires 'Catalyst::ScriptRunner';
+requires 'Log::Log4perl';

@@ -1,10 +1,80 @@
-[% PageVersion = 'Documentation/Projects.tt,v 0.01 2024/01/28 Shanta Exp shanta ' %]
-[% IF c.session.debug_mode == 1 %]
-    [% PageVersion %]
-    [%# "Debugging HostName: " _ HostName %]
-    [%# INCLUDE 'debug.tt' %]
-[% END %]
-<h1>Projects</h1>
-<p>
-    <!-- Add your content here -->
-</p>
+[% META title = 'Projects Documentation' %]
+    [% PageVersion = 'Documentation/Projects.tt,v 0.04 2025/03/15 Shanta Exp shanta ' %]
+
+    <h1 id="projects-top">Projects System Documentation</h1>
+
+    <nav>
+        <a href="#projects-overview">Projects Overview</a> |
+        <a href="#projects-controller">Projects Controller</a> |
+        <a href="#projects-model">Projects Model</a> |
+        <a href="#projects-templates">Projects Templates</a> |
+        <a href="#projects-workflow">Projects Workflow</a> |
+        <a href="#projects-usage">Projects Usage</a>
+    </nav>
+
+    <h2 id="projects-overview">Projects Overview</h2>
+    <p>The Projects system manages hierarchical project structures with support for parent-child relationships. Each project can have multiple sub-projects, and the system maintains data integrity through proper handling of user permissions and data validation.</p>
+
+    <h2 id="projects-controller">Projects Controller</h2>
+    <p>Key features in <code>Comserv::Controller::Project</code>:</p>
+    <ul>
+        <li><strong>Project Creation:</strong> Handles form submissions with proper validation for:
+            <ul>
+                <li>Parent-child relationships (parent_id)</li>
+                <li>User authentication and username tracking</li>
+                <li>Required fields and data type validation</li>
+            </ul>
+        </li>
+        <li><strong>Project Hierarchy:</strong> Manages up to 4 levels of sub-projects</li>
+        <li><strong>Project Listing:</strong> Displays projects in a hierarchical structure, sorted by name</li>
+        <li><strong>Error Handling:</strong> Provides detailed error messages and logging</li>
+    </ul>
+
+    <h2 id="projects-model">Projects Model</h2>
+    <p>The database schema includes these key fields:</p>
+    <ul>
+        <li>id (Primary Key)</li>
+        <li>name (Project name)</li>
+        <li>parent_id (Optional, for sub-projects)</li>
+        <li>sitename (Associated site)</li>
+        <li>status (Project status)</li>
+        <li>username_of_poster (Creator/owner)</li>
+        <li>Various metadata fields (dates, descriptions, etc.)</li>
+    </ul>
+
+    <h2 id="projects-templates">Projects Templates</h2>
+    <p>Current template structure:</p>
+    <ul>
+        <li><strong>todo/project.tt:</strong> Main project listing with hierarchical display</li>
+        <li><strong>todo/add_project.tt:</strong> Project creation form</li>
+        <li><strong>todo/editproject.tt:</strong> Project editing interface</li>
+        <li><strong>todo/projectdetails.tt:</strong> Detailed project view</li>
+    </ul>
+
+    <h2 id="projects-workflow">Projects Workflow</h2>
+    <ol>
+        <li><strong>Project Creation:</strong>
+            <ul>
+                <li>User fills out project form</li>
+                <li>System validates input and handles parent-child relationships</li>
+                <li>Project is created with proper user and site association</li>
+            </ul>
+        </li>
+        <li><strong>Project Management:</strong>
+            <ul>
+                <li>Projects can be viewed in hierarchical list</li>
+                <li>Admin users can edit project details</li>
+                <li>Sub-projects are managed within parent context</li>
+            </ul>
+        </li>
+    </ol>
+
+    <h2 id="projects-usage">System Requirements and Limitations</h2>
+    <ul>
+        <li>User must be authenticated for project creation</li>
+        <li>Admin privileges required for editing projects</li>
+        <li>Maximum of 4 levels in project hierarchy</li>
+        <li>Project names must be unique within a site</li>
+    </ul>
+
+    <p><a href="#projects-top">Back to top</a></p>

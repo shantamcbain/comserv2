@@ -2,48 +2,209 @@
 <link rel="stylesheet" type="text/css" href="/static/css/week_view.css">
 
 <!-- Template Toolkit -->
-[% PageVersion  = '/todo/week.tt,v 0.1 2024/03/11 Shanta Exp Shanta' %]
+[% PageVersion  = '/todo/week.tt,v 0.2 2025/03/26 Shanta Exp Shanta' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
+<style>
+    .week-view-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+    }
 
-<h1>Week View: [% start_date %] - [% end_date %]</h1>
-<div style="display: flex; justify-content: space-between;">
-   <a href="/todo/week/[% prev_week_date %]">Previous Week</a>
+    .week-view-table th, .week-view-table td {
+        border: 1px solid #ddd;
+        padding: 10px;
+        vertical-align: top;
+        width: 14.28%;
+        height: 100px;
+    }
+
+    .week-view-table th {
+        background-color: #4CAF50;
+        color: white;
+        text-align: center;
+        height: auto;
+    }
+
+    .week-navigation {
+        display: flex;
+        justify-content: space-between;
+        margin: 20px 0;
+    }
+
+    .week-navigation a {
+        padding: 8px 15px;
+        background-color: #4CAF50;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+    }
+
+    .week-navigation a:hover {
+        background-color: #45a049;
+    }
+
+    .todo-button {
+        display: block;
+        width: 100%;
+        text-align: left;
+        padding: 5px;
+        margin-bottom: 5px;
+        background-color: #f1f1f1;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 0.9em;
+    }
+
+    .todo-button:hover {
+        background-color: #e0e0e0;
+    }
+
+    .overdue {
+        background-color: #ffcccc;
+    }
+
+    .overdue:hover {
+        background-color: #ffb3b3;
+    }
+
+    .priority-1 {
+        background-color: #ffcccc;
+    }
+
+    .priority-2 {
+        background-color: #ffffcc;
+    }
+
+    .priority-3 {
+        background-color: #ccffcc;
+    }
+
+    .add-button {
+        display: block;
+        width: 100%;
+        text-align: center;
+        padding: 3px;
+        margin-top: 5px;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 0.8em;
+    }
+
+    .add-button:hover {
+        background-color: #45a049;
+    }
+
+    .view-buttons {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 15px;
+    }
+
+    .view-buttons a {
+        padding: 8px 15px;
+        background-color: #2196F3;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+        text-align: center;
+    }
+
+    .view-buttons a:hover {
+        background-color: #0b7dda;
+    }
+
+    .view-buttons a.active {
+        background-color: #0b7dda;
+        font-weight: bold;
+    }
+</style>
+
+<h1>[% sitename %] Todos for Week: [% start_of_week %] - [% end_of_week %]</h1>
+
+<div class="view-buttons">
+    <a href="/todo">List View</a>
+    <a href="/todo/day">Day View</a>
+    <a href="/todo/week" class="active">Week View</a>
+    <a href="/todo/month">Month View</a>
+    <a href="/todo/addtodo" style="margin-left: auto;">Add New Todo</a>
+</div>
+
+<div class="week-navigation">
+    <a href="/todo/week/[% prev_week_date %]">Previous Week</a>
+    <a href="/todo">Back to Todo List</a>
     <a href="/todo/week/[% next_week_date %]">Next Week</a>
- </div>
+</div>
+
 <table class="week-view-table">
-    <!-- Display the days -->
+    <!-- Display the days of the week -->
     <tr>
-        [% FOREACH day IN week_days %]
-            <th>
-                <a href="/todo/day/[% day.date %]">[% day.day_name %] [% day.date %]</a>
- <form action="/todo/addtodo" method="post">
-    <input type="hidden" name="date" value="[% day.date %]">
-    <button type="submit">Add New Record</button>
-</form>           </th>
+        <th>Sunday</th>
+        <th>Monday</th>
+        <th>Tuesday</th>
+        <th>Wednesday</th>
+        <th>Thursday</th>
+        <th>Friday</th>
+        <th>Saturday</th>
+    </tr>
+
+    <!-- Create a row for the dates -->
+    <tr>
+        [% # Calculate the start date of the week (Sunday) %]
+        [% start_dt = DateTime::Format::ISO8601->parse_datetime(start_of_week) %]
+        [% # Adjust if the start date is not a Sunday %]
+        [% IF start_dt.day_of_week != 7 %]
+            [% start_dt = start_dt.subtract(days => start_dt.day_of_week) %]
+        [% END %]
+
+        [% # Generate the 7 days of the week %]
+        [% FOREACH day_offset IN [0..6] %]
+            [% current_date = start_dt.clone.add(days => day_offset) %]
+            [% date_str = current_date.strftime('%Y-%m-%d') %]
+            [% is_today = (date_str == DateTime.now.strftime('%Y-%m-%d')) %]
+
+            <td style="[% IF is_today %]background-color: #e6f7ff;[% END %]">
+                <div style="font-weight: bold; text-align: right; margin-bottom: 5px;">
+                    <a href="/todo/day/[% date_str %]">[% current_date.day %]</a>
+                </div>
+
+                [% # Find todos for this day %]
+                [% day_todos = [] %]
+                [% FOREACH todo IN todos %]
+                    [% todo_date = DateTime::Format::ISO8601->parse_datetime(todo.start_date) %]
+                    [% IF todo_date.strftime('%Y-%m-%d') == date_str %]
+                        [% day_todos.push(todo) %]
+                    [% END %]
+                [% END %]
+
+                [% # Display todos for this day %]
+                [% FOREACH todo IN day_todos %]
+                    <form action="/todo/details" method="POST">
+                        <input type="hidden" name="record_id" value="[% todo.record_id %]">
+                        <button type="submit" class="todo-button priority-[% todo.priority %]" title="[% todo.description %]">
+                            [% todo.subject %]
+                        </button>
+                    </form>
+                [% END %]
+
+                <form action="/todo/addtodo" method="post">
+                    <input type="hidden" name="start_date" value="[% date_str %]">
+                    <button type="submit" class="add-button">+ Add</button>
+                </form>
+            </td>
         [% END %]
     </tr>
-    <!-- Display the todos for each day -->
-    [% max_todos = week_days.0.todos.size; # Assuming all days have the same number of todos %]
-    [% FOREACH i IN [0..max_todos] %]
-        <tr>
-            [% FOREACH day IN week_days %]
-                [% IF day.todos.$i %]
-                    <td>
-  <!-- Debug output -->
-[%# "Due date: " _ day.todos.$i.due_date _ ", Formatted due date: " _ date.format(day.todos.$i.due_date) _ ", Now: " _ date.format('day.todos.$i.day') %]
-                      <!-- Display the todo -->
-<form action="/todo/details" method="POST">
-    <input type="hidden" name="record_id" value="[% day.todos.$i.id %]">
-  <button type="submit" class="[% IF day.todos.$i.due_date < day.date %]overdue[% ELSE %]todo-button[% END %]" title="[% day.todos.$i.description %]">[% day.todos.$i.subject %]</button>
-</form>
-</td>
-              [% ELSE %]
-                    <td></td>
-                [% END %]
-            [% END %]
-        </tr>
-    [% END %]
 </table>
+
+<div class="week-navigation">
+    <a href="/todo/week/[% prev_week_date %]">Previous Week</a>
+    <a href="/todo">Back to Todo List</a>
+    <a href="/todo/week/[% next_week_date %]">Next Week</a>
+</div>

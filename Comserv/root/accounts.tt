@@ -1,0 +1,26 @@
+[%# INCLUDE 'layout.tt' %]
+[% PageVersion = 'accounts.tt,v 0.01 2024/15/30 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+<br>[% PageVersion %] <br>
+[% "Debugging HostName: " _ HostName %]
+[%# INCLUDE 'debug.tt' %]
+[% END %]
+
+<h1>Hosted Sites</h1>
+<ul>
+    [%# Conditional display based on site name %]
+    [% IF SiteName == 'CSC' %]
+        <li><a href="https://computersystemconsulting.ca" target="_blank">computersystemconsulting.ca</a></li>
+        <li><a href="https://helpdesk.computersystemconsulting.ca" target="_blank">helpdesk.computersystemconsulting.ca</a></li>
+     [% ELSIF SiteName == 'MCOOP' %]
+        <li><a href="https://coop.computersystemconsulting.ca" target="_blank">coop.computersystemconsulting.ca</a></li>
+    [% ELSIF SiteName == 'BMaster' %]
+        <li><a href="https://forager.com" target="_blank">forager.com</a></li>
+        <li><a href="https://ve7tit.com" target="_blank">ve7tit.com</a></li>
+    [% ELSIF SiteName == 'USBM' %]
+        <li><a href="https://usbm.ca" target="_blank">usbm.ca</a></li>
+        <li><a href="https://countrystores.ca" target="_blank">countrystores.ca</a></li>
+    [% ELSE %]
+        <li>No sites available for this site name.</li>
+    [% END %]
+</ul>

@@ -1,0 +1,31 @@
+/* Theme: mcoop */
+:root {
+  --accent-color: #ffcc33;
+  --background-color: #ffffff;
+  --border-color: #99cc99;
+  --button-bg: #006633;
+  --button-border: #004d26;
+  --button-hover-bg: #004d26;
+  --button-text: #ffffff;
+  --footer-bg: #006633;
+  --footer-text-color: #ffffff;
+  --header-bg: #006633;
+  --header-color: #ffffff;
+  --link-color: #006633;
+  --link-hover-color: #004d26;
+  --nav-bg: #006633;
+  --nav-hover-bg: #004d26;
+  --nav-link-color: #ffffff;
+  --nav-text: #ffffff;
+  --primary-color: #006633;
+  --secondary-color: #99cc99;
+  --success-color: #339933;
+  --table-header-bg: #e6f2e6;
+  --text-color: #333333;
+  --warning-color: #cc3300;
+}
+
+body {
+  background-color: #ffffff;
+}
+

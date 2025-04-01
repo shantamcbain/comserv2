@@ -1,29 +1,114 @@
-[% PageVersion = 'Documentation/Git.tt,v 0.01 2024/03/10Shanta Exp shanta ' %]
+[% PageVersion = 'Documentation/Git.tt,v 0.02 2024/12/18 Shanta Exp shanta ' %]
+[%# PageVersion = 'Documentation/Git.tt,v 0.01 2024/03/10 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
-[% END %]<body>
-    <h1>Remove .idea Directory from a Git Branch</h1>
-    <ol>
-        <li>
-            <p>Fetch the branch from the remote repository:</p>
-            <pre><code>git fetch origin branch_name:branch_name</code></pre>
-        </li>
-        <li>
-            <p>Remove the .idea directory from your local working directory:</p>
-            <pre><code>rm -rf .idea</code></pre>
-        </li>
-        <li>
-            <p>Switch to the fetched branch:</p>
-            <pre><code>git checkout branch_name</code></pre>
-        </li>
-        <li>
-            <p>Remove the .idea directory and commit the change:</p>
-            <pre><code>git rm -r .idea
+[% END %]
+
+<h1>Git Usage Guide for PyCharm</h1>
+
+<nav>
+    <a href="#basic-operations">Basic Git Operations</a> |
+    <a href="#pycharm-integration">PyCharm Integration</a> |
+    <a href="#workflows">Common Workflows</a> |
+    <a href="#troubleshooting">Troubleshooting</a>
+</nav>
+
+<h2 id="pycharm-integration">PyCharm Git Integration</h2>
+<ol>
+    <li>Enable Version Control:
+        <ul>
+            <li>Go to VCS → Enable Version Control Integration</li>
+            <li>Select "Git" from the dropdown menu</li>
+        </ul>
+    </li>
+    <li>Commit Changes:
+        <ul>
+            <li>Use Alt+0 (Command+0 on Mac) to open the Commit tool window</li>
+            <li>Select changed files to commit (e.g., Forager.pm)</li>
+            <li>Write a descriptive commit message (e.g., "Add Forager controller for handling forager.com routes")</li>
+            <li>Click "Commit" or "Commit and Push"</li>
+        </ul>
+    </li>
+</ol>
+
+<h2 id="workflows">Common Workflows</h2>
+
+<h3>Adding New Features to Production</h3>
+<ol>
+    <li>Create a New Branch:
+        <pre><code>git checkout -b feature/forager-controller</code></pre>
+    </li>
+    <li>Add and Commit Changes:
+        <pre><code>git add Forager.pm
+git commit -m "Add Forager controller for handling forager.com routes"</code></pre>
+    </li>
+    <li>Push to Remote:
+        <pre><code>git push origin feature/forager-controller</code></pre>
+    </li>
+    <li>Deploy to Staging for Testing:
+        <ul>
+            <li>Use your deployment tool to push to staging environment</li>
+            <li>Test thoroughly for correct site information and route handling</li>
+        </ul>
+    </li>
+    <li>Merge to Development/Staging:
+        <ul>
+            <li>Create a Pull Request if using GitHub or similar</li>
+            <li>Or directly merge:
+                <pre><code>git checkout development
+git merge feature/forager-controller</code></pre>
+            </li>
+        </ul>
+    </li>
+    <li>Final Test on Staging:
+        <ul>
+            <li>Re-run tests to ensure no issues post-merge</li>
+        </ul>
+    </li>
+    <li>Merge to Production:
+        <pre><code>git checkout production
+git merge development
+git push origin production</code></pre>
+    </li>
+    <li>Monitor Post-Deployment:
+        <ul>
+            <li>Watch for any live site issues</li>
+        </ul>
+    </li>
+</ol>
+
+<h2>Remove .idea Directory from a Git Branch</h2>
+<ol>
+    <li>
+        <p>Fetch the branch from the remote repository:</p>
+        <pre><code>git fetch origin branch_name:branch_name</code></pre>
+    </li>
+    <li>
+        <p>Remove the .idea directory from your local working directory:</p>
+        <pre><code>rm -rf .idea</code></pre>
+    </li>
+    <li>
+        <p>Switch to the fetched branch:</p>
+        <pre><code>git checkout branch_name</code></pre>
+    </li>
+    <li>
+        <p>Remove the .idea directory and commit the change:</p>
+        <pre><code>git rm -r .idea
 git commit -m "Remove .idea directory"</code></pre>
-        </li>
-        <li>
-            <p>Push the changes to the remote branch:</p>
-            <pre><code>git push origin branch_name</code></pre>
-        </li>
-    </ol>
-    <p>Replace <code>branch_name</code> with the name of the branch you want to remove the .idea directory from.</p>
+    </li>
+    <li>
+        <p>Push the changes to the remote branch:</p>
+        <pre><code>git push origin branch_name</code></pre>
+    </li>
+</ol>
+<p>Replace <code>branch_name</code> with the name of the branch you want to remove the .idea directory from.</p>
+
+<h2 id="troubleshooting">Troubleshooting Common Issues</h2>
+<ul>
+    <li>If PyCharm doesn't detect Git:
+        <ol>
+            <li>Go to Settings/Preferences → Version Control → Git</li>
+            <li>Verify the path to Git executable</li>
+        </ol>
+    </li>
+</ul>

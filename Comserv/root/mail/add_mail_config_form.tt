@@ -1,0 +1,21 @@
+
+[% PageVersion = '/mail/add_mail_config_form.tt,v 0.01 2024/11/24 shanta Exp shanta ' %]
+[% META title = 'Edit User' %]
+[% IF debug_mode == 1 %]
+[% END %]
+  [% PageVersion %]
+    [% INCLUDE 'debug.tt' %]
+[% END %]    <h1>Add Mail Configuration</h1>
+<form method="POST" action="/mail/add_mail_config">
+    <label for="site_id">Site ID:</label>
+    <input type="text" id="site_id" name="site_id" required><br>
+    <label for="smtp_host">SMTP Host:</label>
+    <input type="text" id="smtp_host" name="smtp_host" required><br>
+    <label for="smtp_port">SMTP Port:</label>
+    <input type="text" id="smtp_port" name="smtp_port" required><br>
+    <label for="smtp_username">SMTP Username:</label>
+    <input type="text" id="smtp_username" name="smtp_username" required><br>
+    <label for="smtp_password">SMTP Password:</label>
+    <input type="password" id="smtp_password" name="smtp_password" required><br>
+    <input type="submit" value="Add Configuration">
+</form>

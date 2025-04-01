@@ -1,36 +1,64 @@
-[% PageVersion = 'Documentation/BMaster.tt,v 0.02 2024/05/0Shanta Exp shanta ' %]
+[% PageVersion = 'Documentation/BMaster.tt,v 0.05 2024/06/01 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
-<nav>
 
-    <a href="#Controller">Controller</a> |
-    <a href="#bmasteModel">Model</a> |
-    <a href="#queens">Queen Management</a> |
-    <a href="#files"></a> |
-    <a href="#git"></a> |
-    <a href="#Installation"></a> |
-    <a href="#login"></a> |
-    <a href="#logging"></a> |
-    <a href="#projects"></a> |
-    <a href="#root"></a> |
-    <a href="#schema"></a> |
-    <a href="#sites"></a> |
-    <a href="#starman-setup"></a> |
-    <a href="#todo"></a> |
-   <a href="#workshop-management"></a> |
+<h1 id="BMaster_top"><a href="#top">BMaster Application </a></h1>
+    <a href="#BMaster_overview">Overview</a> |
+    <a href="#BMaster_features">Features</a> |
+     <a href="#BMaster_future">Future Improvements</a> |
+    <a href="#BMaster_Controller">Controller</a> |
+    <a href="#BMaster_Model">Model</a> |
+    <a href="#BMaster_Queens">Queens</a> |
+    <a href="#BMaster_Routes">Routes</a> |
+    <a href="#BMaster_api-integration">API Integration</a> |
+    <a href="#BMaster_instructions">Instructions for Developers</a>
+
 </nav>
-<h1 id="BMaster_top">Beemaster Application.</h1>
-<p>This application is intended to both educate and provide a platform for beekeepers to manage their hives and apiaries</p>
-<p> We have added several links to the main page of the application most are described in the controller. The latest addition to the application is the return of access to the old database table for herbs that from the point of view of BMaster is the Bee pasture view.
-The BeePastureView give a current list of all the plants that are used by pollinators as pasture. </p>
-<h3 id="searchHerbs">searchHerbs</h3><p> The search field now works if the search string appears in the record it is returned. to the browser in a list. The details link pulls all the data in the table.</p>
-<p> Please look to the ency module for details on how this works.</p>
+<h2 id="BMaster_overview"><a href="#BMaster_top">Overview</a></h2>
+<p>This application is intended to both educate and provide a platform for beekeepers to manage their hives and apiaries. It allows beekeepers to log various details about their hives, and then use this data to generate a graph showing changes over the season.</p>
 
+<h2 id="BMaster_features"><a href="#BMaster_top">Features</a></h2>
+<p>The BMaster application includes several features designed to assist beekeepers in managing their hives:</p>
+<ul>
+    <li>Data Collection: Beekeepers can input data about their hives, such as the number of frames of bees, brood, comb, honey, pollen, and empty in each box, the queen and her heritage, and the location of the hive.</li>
+    <li>Data Visualization: The application can generate a graph showing changes in the hive over the season.</li>
+    <li>API Integration: The application includes an API that allows other systems to retrieve the data.</li>
+</ul>
 
-<p>The 'searchHerbs' function in the 'Comserv/lib/Comserv/Model/DBForager.pm' file has been updated to improve the search functionality in the BMaster system. The function now uses normalized field names that match the field names in the database and the view. It also stores all debug messages in an array and puts that array into the stash, allowing all debug messages to be passed to the template and displayed in the browser. In the case where no records are returned from the search, a specific debug message stating "No results found" is added to the debug messages array.</p>
+<h2 id="BMaster_api-integration"><a href="#BMaster_top">API Integration</a></h2>
+<p>The BMaster application includes an API that allows other systems to retrieve data about the hives. The API provides endpoints to get data for a specific hive, get data for all hives for a specific beekeeper, and get data for a specific season.</p>
 
-<h3 id="Controller"><a href="#top">Back to top</a> </h3>
+<h2 id="BMaster_instructions"><a href="#BMaster_top">Instructions for Developers</a></h2>
+<p>Developers contributing to the BMaster project should adhere to the following guidelines:</p>
+<ul>
+    <li><strong>Naming Conventions:</strong> Follow the existing naming conventions for consistency. If you encounter any deviations, normalize them to maintain uniformity.</li>
+    <li><strong>Code Quality:</strong> Ensure that all code is well-documented and adheres to the project's coding standards. Use meaningful variable and function names to enhance readability and maintainability.</li>
+    <li><strong>Error Handling:</strong> Implement robust error handling in all subroutines to ensure the application behaves predictably under unexpected conditions.</li>
+    <li><strong>To-Do List:</strong> If you identify any issues or potential improvements in the code, add them to the 'Todo' section of this documentation.</li>
+    <li><strong>Code Reviews:</strong> Submit your code for review by peers to catch potential issues early and ensure adherence to best practices.</li>
+</ul>
+
+<h2 id="BMaster_future"><a href="#BMaster_top">Future Improvements</a></h2>
+<p>Future improvements to the BMaster application may include enhancements to existing features or the addition of new ones. Developers are encouraged to contribute to these improvements by keeping this documentation up to date and following the guidelines provided.</p>
+<h2 id="BMaster_routes"><a href="#BMaster_top">Routes</a></h2>
+<p>The BMaster module includes the following routes:</p>
+<ul>
+    <li><a href="/BMaster">/BMaster</a> (Not defined yet)</li>
+    <li><a href="/BMaster/bee_pasture">/BMaster/bee_pasture</a></li>
+    <li><a href="/BMaster/add_graft">/BMaster/add_graft</a></li>
+    <li><a href="/BMaster/frames">/BMaster/frames</a> (Error: Can't call method "get_frames_data" on an undefined value)</li>
+    <li><a href="/BMaster/api/frames">/BMaster/api/frames</a> (Error: Can't call method "get_frames_data" on an undefined value)</li>
+    <li><a href="/BMaster/products">/BMaster/products</a></li>
+    <li><a href="/BMaster/yards">/BMaster/yards</a> (Error: Can't call method "get_yards" on an undefined value)</li>
+    <li><a href="/BMaster/apiary">/BMaster/apiary</a></li>
+    <li><a href="/BMaster/Queens">/BMaster/Queens</a></li>
+    <li><a href="/BMaster/hive">/BMaster/hive</a></li>
+    <li><a href="/BMaster/honey">/BMaster/honey</a></li>
+    <li><a href="/BMaster/beehealth">/BMaster/beehealth</a></li>
+    <li><a href="/BMaster/environment">/BMaster/environment</a></li>
+    <li><a href="/BMaster/education">/BMaster/education</a></li>
+</ul>
 [% INCLUDE 'Documentation/BMasterController.tt' %]
 <h3 id="Model"><a href="#top">Back to top</a> </h3>
 [% INCLUDE 'Documentation/BMaserModel.tt' %]

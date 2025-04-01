@@ -1,32 +1,145 @@
-<!-- File: root/error.tt -->
 
-<h1>An error occurred</h1>
-<div class="error-section">
-    <h2>Error Message</h2>
-    <pre>[% FOREACH msg IN error_msg %]
-[% msg %]
-[% END %]</pre>
-</div>
-<div class="error-section">
-    <h2>Stack Trace</h2>
-    <pre>[% c.error.stack_trace.join("\n") | html %]</pre>
-</div>
-<div class="error-section">
-    <h2>Request Details</h2>
-    <pre>
-Method: [% c.request.method %]
-Path: [% c.request.path %]
-Address: [% c.request.address %]
-User Agent: [% c.request.user_agent %]
-Parameters: [% c.request.parameters | html %]
-    </pre>
-</div>
-<div class="error-section">
-    <h2>Response Details</h2>
-    <pre>
-Status: [% c.response.status %]
-Content Type: [% c.response.content_type %]
-    </pre>
+
+<div class="error-container">
+    <h1>[% error_title || 'Error' %]</h1>
+
+    <div class="error-message">
+        <p>[% error_msg %]</p>
+
+        [% IF admin_msg %]
+        <p class="admin-message">[% admin_msg %]</p>
+        [% END %]
+
+        [% IF action_required %]
+        <div class="action-required">
+            <h3>Action Required:</h3>
+            <p>[% action_required %]</p>
+        </div>
+        [% END %]
+
+        [% IF technical_details && c.session.debug_mode %]
+        <div class="technical-details">
+            <h3>Technical Details:</h3>
+            <p>[% technical_details %]</p>
+        </div>
+        [% END %]
+
+        [% IF debug_msg %]
+        <div class="debug-message">
+            <h3>Debug Message:</h3>
+            <p>[% debug_msg %]</p>
+        </div>
+        [% END %]
+
+        [% IF debug_errors.size && c.session.debug_mode %]
+        <div class="debug-errors">
+            <h3>Debug Errors:</h3>
+            <ul>
+                [% FOREACH error IN debug_errors %]
+                <li>[% error %]</li>
+                [% END %]
+            </ul>
+        </div>
+        [% END %]
+    </div>
+
+    <div class="error-actions">
+        <a href="[% c.uri_for('/') %]" class="btn btn-primary">Return to Home</a>
+
+        [% IF c.session.debug_mode %]
+        <a href="javascript:history.back()" class="btn btn-secondary">Go Back</a>
+        [% END %]
+    </div>
 </div>
 
-[% INCLUDE 'debug.tt' %]
+<style>
+    .error-container {
+        max-width: 800px;
+        margin: 50px auto;
+        padding: 20px;
+        background-color: #f8f9fa;
+        border-radius: 5px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .error-container h1 {
+        color: #dc3545;
+        margin-bottom: 20px;
+    }
+
+    .error-message {
+        margin-bottom: 30px;
+    }
+
+    .admin-message {
+        font-style: italic;
+        color: #6c757d;
+    }
+
+    .technical-details {
+        background-color: #f1f1f1;
+        padding: 15px;
+        border-left: 4px solid #007bff;
+        margin-top: 20px;
+    }
+
+    .action-required {
+        background-color: #fff3cd;
+        padding: 15px;
+        border-left: 4px solid #ffc107;
+        margin-top: 20px;
+    }
+
+    .action-required h3 {
+        color: #856404;
+        margin-top: 0;
+    }
+
+    .debug-message {
+        background-color: #fff3cd;
+        padding: 15px;
+        border-left: 4px solid #ffc107;
+        margin-top: 20px;
+    }
+
+    .debug-errors {
+        background-color: #f8d7da;
+        padding: 15px;
+        border-left: 4px solid #dc3545;
+        margin-top: 20px;
+    }
+
+    .debug-errors ul {
+        margin: 0;
+        padding-left: 20px;
+    }
+
+    .debug-errors li {
+        margin-bottom: 5px;
+    }
+
+    .error-actions {
+        margin-top: 30px;
+    }
+
+    .btn {
+        display: inline-block;
+        padding: 8px 16px;
+        margin-right: 10px;
+        text-decoration: none;
+        border-radius: 4px;
+    }
+
+    .btn-primary {
+        background-color: #007bff;
+        color: white;
+    }
+
+    .btn-secondary {
+        background-color: #6c757d;
+        color: white;
+    }
+</style>
+
+
+
