@@ -156,7 +156,7 @@
                 </div>
             </div>
             <!-- MCOOP Admin Section (moved from TopDropListCoop.tt) -->
-            [% IF c.session.roles && c.session.roles.grep('^admin$').size %]
+            [% IF c.session.roles && c.session.roles.grep('^admin$').size && (c.session.SiteName == 'MCOOP' || c.stash.SiteName == 'MCOOP') %]
             <div class="submenu-item">
                 <span class="submenu-header">MCOOP Admin</span>
                 <div class="submenu">

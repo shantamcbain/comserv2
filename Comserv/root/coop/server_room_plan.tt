@@ -1,8 +1,15 @@
 [% META title = 'Monashee Coop Server Room Proposal' %]
-[% PageVersion = 'coop/server_room_plan.tt,v 0.01 2025/03/31 shanta Exp shanta' %]
+[% PageVersion = 'coop/server_room_plan.tt,v 0.02 2025/04/01 shanta Exp shanta' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
-    [% IF debug_msg %]<div class="debug-message">[% debug_msg %]</div>[% END %]
+    [% # Use the standard debug message system %]
+    [% IF debug_msg.defined && debug_msg.size > 0 %]
+        <div class="debug-messages">
+            [% FOREACH msg IN debug_msg %]
+                <p class="debug">Debug: [% msg %]</p>
+            [% END %]
+        </div>
+    [% END %]
 [% END %]
 [% USE Date %]
 <div class="container">

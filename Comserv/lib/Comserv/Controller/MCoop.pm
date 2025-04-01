@@ -38,8 +38,14 @@ sub index :Path :Args(0) {
     $c->stash->{help_message} = "Welcome to the Monashee Coop HelpDesk support portal. This is the administrative view of monasheecoop.ca.";
     $c->stash->{account_message} = "To access the public features of the Monashee Coop site, please create an account.";
     $c->stash->{main_website} = "https://monasheecoop.ca";
-    $c->stash->{debug_msg} = "MCoop controller index view - Using mcoop theme";
-    $c->stash->{debug_mode} = $c->session->{debug_mode} || 1;
+
+    # Use the standard debug message system
+    if ($c->session->{debug_mode}) {
+        $c->stash->{debug_msg} = [] unless defined $c->stash->{debug_msg};
+        push @{$c->stash->{debug_msg}}, "MCoop controller index view - Using mcoop theme";
+    }
+
+    $c->stash->{debug_mode} = $c->session->{debug_mode} || 0;
     $c->stash(template => 'coop/index.tt');
     $c->forward($c->view('TT'));
 }
@@ -58,9 +64,13 @@ sub server_room_plan :Path('server_room_plan') :Args(0) {
     $c->stash->{account_message} = "For more information or to provide feedback, please contact the IT department.";
     $c->stash->{main_website} = "https://monasheecoop.ca";
 
-    $c->stash->{debug_msg} = "MCoop controller server_room_plan view - Template: coop/server_room_plan.tt";
-    $c->stash->{debug_mode} = 1;
+    # Use the standard debug message system
+    if ($c->session->{debug_mode}) {
+        $c->stash->{debug_msg} = [] unless defined $c->stash->{debug_msg};
+        push @{$c->stash->{debug_msg}}, "MCoop controller server_room_plan view - Template: coop/server_room_plan.tt";
+    }
 
+    $c->stash->{debug_mode} = $c->session->{debug_mode} || 0;
     $c->stash(template => 'coop/server_room_plan.tt');
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'server_room_plan', 'Set template to coop/server_room_plan.tt');
 
