@@ -12,6 +12,19 @@
 [%# INCLUDE 'home.tt' %]
     [% content %]
     [% INCLUDE 'AdminNotes.tt' %]
-    [% INCLUDE 'footer.tt' %]
+    [% TRY %]
+        [% INCLUDE 'footer.tt' %]
+    [% CATCH %]
+        <!-- Error including footer.tt: [% error.info %] -->
+        <footer>
+            <div class="footer-content">
+                <p>&copy; [% USE date; date.format(date.now, '%Y') %] Comserv. All rights reserved.</p>
+                [% IF c.session.debug_mode == 1 %]
+                    <p>[% PageVersion %]</p>
+                    <p><a href="[% c.uri_for('/reset_session') %]">Reset Session</a></p>
+                [% END %]
+            </div>
+        </footer>
+    [% END %]
 </body>
 </html>

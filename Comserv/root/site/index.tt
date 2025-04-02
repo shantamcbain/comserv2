@@ -10,7 +10,7 @@
         <h2>HelpDesk Support Portal</h2>
         [% IF help_message %]
             <div class="help-message">
-                <p>[% help_message %]</p>
+                <p>[%# help_message %]</p>
             </div>
         [% END %]
 

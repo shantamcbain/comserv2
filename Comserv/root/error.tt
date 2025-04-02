@@ -1,4 +1,9 @@
-
+[% META title = 'error.tt' %]
+[% PageVersion	= 'error.tt,v 0.01.01 2025/03/31 shanta Exp shanta '	%]
+[% IF debug_mode == 1 %]
+ [%	PageVersion %]
+ [% IF debug_msg %]<div class="debug-message">[% debug_msg %]</div>[% END %]
+[% END %]
 
 <div class="error-container">
     <h1>[% error_title || 'Error' %]</h1>

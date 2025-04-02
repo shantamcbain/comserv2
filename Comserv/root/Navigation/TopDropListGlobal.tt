@@ -5,11 +5,11 @@
     [%# INCLUDE 'debug.tt' %]
 [% END %]
         <li class="horizontal-dropdown">
-            <a href="#" class="dropbtn">Global</a>
+            <a href="#" class="dropbtn"><i class="icon-global"></i>Global</a>
             <div class="dropdown-content">
-                <a href="/mail">Mail</a>
-                <a href="/jobs">Jobs</a>
-                <a href="/join">Join</a>
+                <a href="/mail"><i class="icon-mail"></i>Mail</a>
+                <a href="/jobs"><i class="icon-file"></i>Jobs</a>
+                <a href="/join"><i class="icon-user-plus"></i>Join</a>
                <!-- Add more global options -->
 
     <a href="/cgi-bin/index.cgi?[% session_string %]&amp;site=[% SiteName%]&amp;view=JobView" Target

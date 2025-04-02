@@ -7,10 +7,7 @@
     [% PageVersion %]
     [% INCLUDE 'debug.tt' %]
 
-</div>
-[% END %]
-
-[% IF c.stash.debug_msg.defined && c.stash.debug_msg.size > 0 %]
+</div>[% IF c.stash.debug_msg.defined && c.stash.debug_msg.size > 0 %]
     <div class="debug-messages" style="background-color: #f8f9fa; border: 1px solid #ddd; padding: 10px; margin-bottom: 15px;">
         <h4>Debug Messages</h4>
         [% FOREACH msg IN c.stash.debug_msg %]
@@ -18,6 +15,9 @@
         [% END %]
     </div>
 [% END %]
+[% END %]
+
+
 
 
 [% SET roles = c.session.roles || [] %]

@@ -5,36 +5,36 @@
 [% END %]
 <ul class="horizontal-menu">
     <li class="horizontal-dropdown">
-        <a href="/admin" class="dropbtn">Admin</a>
+        <a href="/admin" class="dropbtn"><i class="icon-admin"></i>Admin</a>
         <div class="dropdown-content">
-            <a href="/add_link?menu=admin">Add New Link</a>
+            <a href="/add_link?menu=admin"><i class="icon-add"></i>Add New Link</a>
     <div class="submenu-item">
-    <span class="submenu-header"><a href="/admin" class="dropbtn">admin</a></span>
+    <span class="submenu-header"><a href="/admin" class="dropbtn"><i class="icon-admin"></i>Admin</a></span>
     <div class="submenu">
-                <a href='/admin/view_log'>View Log</a>
+                <a href='/admin/view_log'><i class="icon-log"></i>View Log</a>
 
-        <a href="/documentation">Documentation</a>
+        <a href="/documentation"><i class="icon-documentation"></i>Documentation</a>
 <!--<a href="[% c.uri_for(c.controller('Log').action_for('log')) %]">Open Log</a>-->
 <!-- Manually constructing the URL as a temporary workaround-->
 
-<a href="/log">Open Log</a>
-        <a href="[% c.uri_for(c.controller('project').action_for('project')) %]">Projects</a>
+<a href="/log"><i class="icon-log"></i>Open Log</a>
+        <a href="[% c.uri_for(c.controller('project').action_for('project')) %]"><i class="icon-file"></i>Projects</a>
 
     </div>
 </div>
 
 <div class="submenu-item">
-    <span class="submenu-header">ToDo</span>
+    <span class="submenu-header"><i class="icon-todo"></i>ToDo</span>
     <div class="submenu">
-        <a href="/todo">All Todos</a>
-        <a href="/todo?filter=day">Today's Todos</a>
-        <a href="/todo?filter=week">This Week's Todos</a>
-        <a href="/todo?filter=month">This Month's Todos</a>
-        <a href="/todo/day">Day View</a>
-        <a href="/todo/week">Week View</a>
-        <a href="/todo/month">Month View</a>
-        <a href="/todo/addtodo">Add New Todo</a>
-        <a href="/todo/display_tables">ToDo Tables</a>
+        <a href="/todo"><i class="icon-todo"></i>All Todos</a>
+        <a href="/todo?filter=day"><i class="icon-day"></i>Today's Todos</a>
+        <a href="/todo?filter=week"><i class="icon-week"></i>This Week's Todos</a>
+        <a href="/todo?filter=month"><i class="icon-month"></i>This Month's Todos</a>
+        <a href="/todo/day"><i class="icon-day"></i>Day View</a>
+        <a href="/todo/week"><i class="icon-week"></i>Week View</a>
+        <a href="/todo/month"><i class="icon-month"></i>Month View</a>
+        <a href="/todo/addtodo"><i class="icon-add"></i>Add New Todo</a>
+        <a href="/todo/display_tables"><i class="icon-tables"></i>ToDo Tables</a>
         <div style="margin-top: 10px; border-top: 1px solid #ddd; padding-top: 10px;">
             <strong>Recent Todos:</strong>
         </div>
@@ -50,13 +50,13 @@
 </div>
 
 <div class="submenu-item">
-    <span class="submenu-header"><a href="/file">File Management</a></span>
+    <span class="submenu-header"><a href="/file"><i class="icon-file"></i>File Management</a></span>
     <div class="submenu">
-        <a href="/file">File</a>
+        <a href="/file"><i class="icon-file"></i>File</a>
     </div>
 <div class="submenu">
-        <a href="/file/upload_file">Upload a file.</a>
-       <a href="/file/files">files in db.</a>
+        <a href="/file/upload_file"><i class="icon-upload"></i>Upload a file.</a>
+       <a href="/file/files"><i class="icon-file"></i>Files in db.</a>
     </div>
     <div class="submenu">
   <form action="file/search_and_insert" method="get">
@@ -89,32 +89,31 @@
 </div>
 
   <div class="submenu-item">
-    <span class="submenu-header"><a href="/log">Loging</a></span>
+    <span class="submenu-header"><a href="/log"><i class="icon-log"></i>Logging</a></span>
     <div class="submenu">
-        <a href="log">Loging system</a>
+        <a href="log"><i class="icon-log"></i>Logging system</a>
     </div>
 </div>
           <div class="submenu-item">
-    <span class="submenu-header">User</span>
+    <span class="submenu-header"><i class="icon-user"></i>User</span>
     <div class="submenu">
-        <a href="/user/list_users">List User</a>
-        <a href="/todo/display_tables">ToDo Tables</a>
+        <a href="/user/list_users"><i class="icon-user-list"></i>List Users</a>
+        <a href="/todo/display_tables"><i class="icon-tables"></i>ToDo Tables</a>
     </div>
 </div>
 
             <div class="submenu-item">
-                <span class="submenu-header">Setup</span>
+                <span class="submenu-header"><i class="icon-setup"></i>Setup</span>
                 <div class="submenu">
-                    <a href="/site">Site Setup</a>
-                    <a href="/site/add_site_form">Add Site</a>
-                    <a href="/site/list_domains">All Sites</a>
-                    <a href="/admin/edit_documentation">Documentation editing</a>
-                    <a href="/documentation">/Documentation</a>
-                    <a href="/css_form">CSS Settings</a>
-                    <a href="/admin/users">Users</a>
-                    <a href="/display_schema">Schema</a>
-            <a href="/mail/add_mail_config_form">Mail Configuration</a>
-
+                    <a href="/site"><i class="icon-domain"></i>Site Setup</a>
+                    <a href="/site/add_site_form"><i class="icon-add"></i>Add Site</a>
+                    <a href="/site/list_domains"><i class="icon-domain"></i>All Sites</a>
+                    <a href="/admin/edit_documentation"><i class="icon-edit"></i>Documentation editing</a>
+                    <a href="/documentation"><i class="icon-documentation"></i>Documentation</a>
+                    <a href="/css_form"><i class="icon-css"></i>CSS Settings</a>
+                    <a href="/admin/users"><i class="icon-user-list"></i>Users</a>
+                    <a href="/display_schema"><i class="icon-schema"></i>Schema</a>
+                    <a href="/mail/add_mail_config_form"><i class="icon-mail-config"></i>Mail Configuration</a>
                 </div>
             </div>
             <div class="submenu-item">
