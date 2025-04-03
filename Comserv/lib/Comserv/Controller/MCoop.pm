@@ -35,8 +35,7 @@ sub index :Path :Args(0) {
     $c->session->{theme_name} = "mcoop";
     $c->session->{"theme_" . lc("MCOOP")} = "mcoop";
     $c->model('ThemeConfig')->set_site_theme($c, "MCOOP", "mcoop");
-    $c->stash->{help_message} = "Welcome to the Monashee Coop HelpDesk support portal. This is the administrative view of monasheecoop.ca.";
-    $c->stash->{account_message} = "To access the public features of the Monashee Coop site, please create an account.";
+    # Site information is retrieved from the site table in Root.pm
     $c->stash->{main_website} = "https://monasheecoop.ca";
 
     # Use the standard debug message system

@@ -1,12 +1,12 @@
 # MCoop Module Documentation
 
-**Last Updated:** April 1, 2025  
-**Author:** Shanta  
+**Last Updated:** April 1, 2025
+**Author:** Shanta
 **Status:** Active
 
 ## Overview
 
-The MCoop (Monashee Coop) module provides functionality for managing Monashee Cooperative operations within the Comserv system. This module is designed for administrators to manage cooperative resources, infrastructure, and planning.
+The MCoop (Monashee Coop) module provides functionality for managing Monashee Cooperative operations within the Comserv system. This module is designed for administrators to manage cooperative resources, infrastructure, and planning. The module is accessible only to administrators when the current site is set to MCOOP.
 
 ## Features
 
@@ -48,17 +48,52 @@ The MCoop module is implemented in `Comserv/lib/Comserv/Controller/MCoop.pm` wit
 ```perl
 # Main index method
 sub index :Path :Args(0) {
-    # Implementation details...
+    my ($self, $c) = @_;
+
+    # Set theme and other configuration
+    $c->session->{"theme_mcoop"} = "mcoop";
+    $c->session->{theme_name} = "mcoop";
+    $c->session->{"theme_" . lc("MCOOP")} = "mcoop";
+    $c->model('ThemeConfig')->set_site_theme($c, "MCOOP", "mcoop");
+
+    # Site information is retrieved from the site table in Root.pm
+    $c->stash->{main_website} = "https://monasheecoop.ca";
+
+    # Use the standard debug message system
+    if ($c->session->{debug_mode}) {
+        $c->stash->{debug_msg} = [] unless defined $c->stash->{debug_msg};
+        push @{$c->stash->{debug_msg}}, "MCoop controller index view - Using mcoop theme";
+    }
+
+    $c->stash->{debug_mode} = $c->session->{debug_mode} || 0;
+    $c->stash(template => 'coop/index.tt');
+    $c->forward($c->view('TT'));
 }
 
 # Server room plan method
 sub server_room_plan :Path('server_room_plan') :Args(0) {
-    # Implementation details...
+    my ($self, $c) = @_;
+
+    # Set theme and help messages
+    $c->stash->{theme_name} = "mcoop";
+    $c->stash->{help_message} = "This is the server room proposal for the Monashee Coop transition team.";
+    $c->stash->{account_message} = "For more information or to provide feedback, please contact the IT department.";
+
+    $c->stash->{debug_mode} = $c->session->{debug_mode} || 0;
+    $c->stash(template => 'coop/server_room_plan.tt');
+    $c->forward($c->view('TT'));
 }
 
 # Compatibility method for hyphenated URLs
 sub server_room_plan_hyphen :Path('server-room-plan') :Args(0) {
-    # Implementation details...
+    my ($self, $c) = @_;
+    $c->forward('server_room_plan');
+}
+
+# Method with underscore for Root controller compatibility
+sub server_room_plan_underscore :Path('/mcoop/server_room_plan') :Args(0) {
+    my ($self, $c) = @_;
+    $c->forward('server_room_plan');
 }
 ```
 
@@ -67,7 +102,12 @@ sub server_room_plan_hyphen :Path('server-room-plan') :Args(0) {
 The MCoop module uses the following templates:
 
 - `coop/index.tt` - Main landing page for the MCoop module
+  - Contains the Technical Support Center content
+  - Displays different content for administrators and regular users
+  - Uses the site information from the site table via Root.pm
 - `coop/server_room_plan.tt` - Server room proposal template
+  - Contains detailed server infrastructure proposal
+  - Includes equipment requirements, options analysis, and recommendations
 - `coop/network.tt` - Network infrastructure template
 - `coop/services.tt` - COOP services template
 
@@ -94,6 +134,16 @@ Admin
     ├── COOP Reports
     └── Strategic Planning
 ```
+
+This menu structure is implemented in the `admintopmenu.tt` template with the following conditional check:
+
+```tt
+[% IF c.session.roles && c.session.roles.grep('^admin$').size && (c.session.SiteName == 'MCOOP' || c.stash.SiteName == 'MCOOP') %]
+    <!-- MCOOP Admin menu items -->
+[% END %]
+```
+
+This ensures that the MCOOP Admin menu is only visible to users with the admin role when they are viewing the MCOOP site.
 
 ## Future Development
 

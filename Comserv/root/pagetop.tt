@@ -1,5 +1,5 @@
 
-[% PageVersion = 'pagetop.tt,v 0.022 2025/02/27 shanta Exp shanta ' %]
+[% PageVersion = 'pagetop.tt,v 0.022.1 2025/04/01 shanta Exp shanta ' %]
 [%# PageVersion = 'pagetop.tt,v 0.02 2023/08/30 shanta Exp shanta ' %]
 
 [% IF c.session.debug_mode == 1 %]
@@ -27,9 +27,9 @@
         Welcome [% IF roles.grep('admin').size %]
 [% c.session.first_name %] [% c.session.last_name %] Administrator
 [% ELSIF roles.grep('user').size %]
-<p> [% c.session.first_name %] [% c.session.last_name %] User
+ [% c.session.first_name %] [% c.session.last_name %] User
 [% ELSE %]
-<p> Guest
+ Guest
 [% END %] to [% c.stash.ScriptDisplayName %]!
     </h1>
 

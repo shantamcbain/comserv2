@@ -65,7 +65,10 @@ sub do_login :Local {
             $c, 'info', __FILE__, __LINE__, 'do_login',
             "User already logged in as: " . $c->session->{username} . ", proceeding with login"
         );
+$c->stash(
 
+            template => 'user/login.tt'
+        );
         # Clear the session to allow re-login
         $c->session({});
     }
@@ -188,7 +191,8 @@ sub do_login :Local {
         "Redirecting user '$username' to: $redirect_path");
 
     # Redirect to the appropriate page
-    $c->res->redirect($redirect_path);
+    #$c->res->redirect($redirect_path);
+
     return;
 }
 

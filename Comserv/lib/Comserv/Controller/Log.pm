@@ -213,6 +213,9 @@ sub log_form :Path('/log/log_form') :Args() {
     # Get the current time
     my $current_time = DateTime->now->strftime('%H:%M:%S');
 
+    # We'll use the current time for both start_time and end_time by default
+    my $current_time_short = DateTime->now->strftime('%H:%M');
+
     # Fetch project data from the Project Controller
     my $project_controller = $c->controller('Project');
     my $projects = $project_controller->fetch_projects_with_subprojects($c);
@@ -247,7 +250,8 @@ sub log_form :Path('/log/log_form') :Args() {
         abstract       => $todo_record ? $todo_record->subject : '',
         details        => $todo_record ? $todo_record->description : '',
         comments       => $todo_record ? $todo_record->comments : '',
-        end_time       => $current_time, # Set end_time to current time
+        start_time     => $current_time_short, # Set start_time to current time
+        end_time       => $current_time_short, # Set end_time to current time
         projects       => $projects,     # Add projects for selection
         sites          => $sites,        # Add sites for selection
         form_data      => $form_data,    # Add form_data for project_list.tt and site_list.tt
@@ -327,12 +331,20 @@ sub create_log :Path('/log/create_log') :Args() {
     my $start_time = $c->request->body_parameters->{start_time};
     my $end_time = $c->request->body_parameters->{end_time};
 
-    # Set end_time to a default value if it's an empty string or undefined
+    # Set default values if they're empty strings or undefined
+    $start_time = '00:00:00' if !defined $start_time || $start_time eq '';
     $end_time = '00:00:00' if !defined $end_time || $end_time eq '';
 
     # Calculate time difference
-    my ($start_hour, $start_min) = split(':', $start_time);
-    my ($end_hour, $end_min) = defined $end_time ? split(':', $end_time) : (0, 0);
+    my ($start_hour, $start_min, $start_sec) = split(':', $start_time);
+    my ($end_hour, $end_min, $end_sec) = split(':', $end_time);
+
+    # Ensure we have valid numeric values
+    $start_hour = int($start_hour // 0);
+    $start_min = int($start_min // 0);
+    $end_hour = int($end_hour // 0);
+    $end_min = int($end_min // 0);
+
     my $time_diff_in_minutes = ($end_hour - $start_hour) * 60 + ($end_min - $start_min);
 
     # Convert time difference in minutes to 'HH:MM:SS' format
@@ -387,6 +399,12 @@ sub create_log :Path('/log/create_log') :Args() {
         "Setting group_of_poster to: $group_of_poster"
     );
 
+    # Log the values for debugging
+    $self->logging->log_with_details(
+        $c, 'debug', __FILE__, __LINE__, 'create_log',
+        "Creating log entry with start_time: '$start_time', end_time: '$end_time'"
+    );
+
     my $logEntry = $rs->create({
         todo_record_id  => $c->request->body_parameters->{todo_record_id},
         owner           => $owner,
@@ -396,8 +414,8 @@ sub create_log :Path('/log/create_log') :Args() {
         due_date        => $c->request->body_parameters->{due_date},
         abstract        => $subject,
         details         => $c->request->body_parameters->{details},
-        start_time      => $start_time,
-        end_time        => $end_time, # Use default value if not provided
+        start_time      => $start_time, # Now has a default value if empty
+        end_time        => $end_time,   # Now has a default value if empty
         time            => $time_diff,
         group_of_poster => $group_of_poster, # Use the converted string value
         status          => $c->request->body_parameters->{status},

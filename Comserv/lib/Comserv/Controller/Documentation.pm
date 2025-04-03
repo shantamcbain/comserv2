@@ -4,8 +4,18 @@ use namespace::autoclean;
 use Comserv::Util::Logging;
 use File::Find;
 use File::Basename;
+use DateTime;
+use Try::Tiny;
+use Template::Stash;
+use JSON;
+use Text::Markdown;
 
 BEGIN { extends 'Catalyst::Controller'; }
+
+# Set up Template::Stash to allow raw HTML output
+$Template::Stash::SCALAR_OPS->{raw} = sub {
+    return Template::Stash::SCALAR_OPS->{html} ? $_[0] : $_[0];
+};
 
 has 'logging' => (
     is => 'ro',
@@ -20,29 +30,29 @@ has 'documentation_pages' => (
 );
 
 # Store documentation categories
-# Updated to include all necessary categories and ensure proper organization
 has 'documentation_categories' => (
     is => 'ro',
     default => sub {
-        {
+        my $self = shift;
+        return $self->_load_documentation_config()->{categories} || {
             'user_guides' => {
                 title => 'User Guides',
                 description => 'Documentation for end users of the system',
-                pages => [],
+                pages => ['user_guide', 'getting_started', 'faq'],
                 roles => ['normal', 'editor', 'admin', 'developer'],
                 site_specific => 0,
             },
             'admin_guides' => {
                 title => 'Administrator Guides',
                 description => 'Documentation for system administrators',
-                pages => [],
+                pages => ['admin_guide', 'installation', 'configuration'],
                 roles => ['admin'],
                 site_specific => 0,
             },
             'developer_guides' => {
                 title => 'Developer Documentation',
                 description => 'Documentation for developers',
-                pages => [],
+                pages => ['api_reference', 'database_schema', 'coding_standards'],
                 roles => ['developer'],
                 site_specific => 0,
             },
@@ -67,35 +77,17 @@ has 'documentation_categories' => (
                 roles => ['admin', 'developer'],
                 site_specific => 0,
             },
-            'proxmox' => {
-                title => 'Proxmox Documentation',
-                description => 'Documentation for Proxmox virtualization environment',
-                pages => [],
-                roles => ['admin'],
-                site_specific => 0,
-            },
-            'controllers' => {
-                title => 'Controller Documentation',
-                description => 'Documentation for system controllers',
-                pages => [],
-                roles => ['admin', 'developer'],
-                site_specific => 0,
-            },
-            'changelog' => {
-                title => 'Changelog',
-                description => 'System changes and updates',
-                pages => [],
-                roles => ['admin', 'developer'],
-                site_specific => 0,
-            },
-            'general' => {
-                title => 'All Documentation',
-                description => 'Complete list of all documentation files',
-                pages => [],
-                roles => ['admin', 'developer'],
-                site_specific => 0,
-            },
-        }
+        };
+    },
+    lazy => 1,
+);
+
+# Store default paths for documentation pages
+has 'default_paths' => (
+    is => 'ro',
+    default => sub {
+        my $self = shift;
+        return $self->_load_documentation_config()->{default_paths} || {};
     },
     lazy => 1,
 );
@@ -103,304 +95,426 @@ has 'documentation_categories' => (
 # Initialize - scan for documentation files
 sub BUILD {
     my ($self) = @_;
-    my $logger = $self->logging;
 
-    $logger->log_to_file("Starting Documentation controller initialization", undef, 'INFO');
+    # Log the start of BUILD
+    my $file = __FILE__;
+    my $line = __LINE__;
+    Comserv::Util::Logging::log_to_file("[$file:$line] Starting BUILD method for Documentation controller", undef, 'INFO');
 
-    # Helper function to generate safe keys
-    my $generate_key = sub {
-        my ($path, $filename) = @_;
+    # Call scan_documentation_files to populate documentation pages from JSON configuration
+    $self->scan_documentation_files();
 
-        # Remove problematic characters
-        $filename =~ s/[^a-zA-Z0-9\-_\.]//g;
+    # Log completion of BUILD
+    Comserv::Util::Logging::log_to_file("[$file:$line] Completed BUILD method for Documentation controller", undef, 'INFO');
+}
 
-        # Split filename and extension
-        my ($name, $dir, $ext) = fileparse($filename, qr/\.[^.]*/);
+# Scan for documentation files and populate documentation_pages
+sub scan_documentation_files {
+    my ($self) = @_;
 
-        # Handle special file types
-        return $name if $ext =~ /\.tt$/;
-        return $name if $ext =~ /\.md$/;
-        return $name if $ext =~ /\.html$/;
-        return $name if $ext =~ /\.txt$/;
-        return $filename if $ext eq '';
+    # Clear existing documentation pages
+    %{$self->documentation_pages} = ();
 
-        # For other extensions, keep both name and extension in key
-        return "${name}${ext}";
-    };
+    # Log the start of scan
+    my $file = __FILE__;
+    my $line = __LINE__;
+    Comserv::Util::Logging::log_to_file("[$file:$line] Starting scan_documentation_files method", undef, 'INFO');
 
-    # Scan documentation directories
-    # Modified to ensure all documentation is accessible to admin group and properly categorized
-    my $scan_dirs = sub {
-        my ($base_dir, $category_handler, $metadata_handler) = @_;
+    # Load configuration from JSON file
+    my $config = $self->_load_documentation_config();
 
-        return unless -d $base_dir;
+    # If we have categories in the config, use them
+    if ($config && $config->{categories}) {
+        $self->{documentation_categories} = $config->{categories};
+        Comserv::Util::Logging::log_to_file(
+            "Loaded " . scalar(keys %{$config->{categories}}) . " categories from configuration",
+            undef, 'INFO'
+        );
+    }
 
-        # Log the start of scanning
-        $logger->log_to_file("Scanning directory: $base_dir", undef, 'INFO');
+    # If we have default paths in the config, use them to populate documentation_pages
+    if ($config && $config->{default_paths}) {
+        my $default_paths = $config->{default_paths};
+        Comserv::Util::Logging::log_to_file(
+            "Loading " . scalar(keys %$default_paths) . " pages from configuration",
+            undef, 'INFO'
+        );
 
-        find({
-            wanted => sub {
-                return if -d $_;
+        # Process each page in the configuration
+        foreach my $page_id (keys %$default_paths) {
+            my $path = $default_paths->{$page_id};
 
-                # Only process .md, .tt, .html, and .txt files
-                return unless /\.(md|tt|html|txt)$/i;
+            # Skip if path doesn't exist in the filesystem
+            unless (-e "root/$path") {
+                Comserv::Util::Logging::log_to_file(
+                    "Warning: File not found for page '$page_id': root/$path",
+                    undef, 'WARN'
+                );
+                next;
+            }
 
-                my $full_path = $File::Find::name;
-                my $rel_path = $full_path =~ s/^root\///r;
-                my $filename = basename($full_path);
+            # Determine site and role requirements based on path
+            my $site = 'all';
+            my @roles = ('normal', 'editor', 'admin', 'developer');
 
-                # Log file found
-                $logger->log_to_file("Found documentation file: $rel_path", undef, 'DEBUG');
+            # Check if this is site-specific documentation
+            if ($path =~ m{Documentation/sites/([^/]+)/}) {
+                $site = uc($1); # Convert site name to uppercase to match SiteName format
+            }
 
-                # Generate safe key
-                my $key = $generate_key->($rel_path, $filename);
+            # Check if this is role-specific documentation
+            if ($path =~ m{Documentation/roles/([^/]+)/}) {
+                my $role = $1;
+                if ($role eq 'admin') {
+                    @roles = ('admin', 'developer');
+                } elsif ($role eq 'developer') {
+                    @roles = ('developer');
+                } elsif ($role eq 'editor') {
+                    @roles = ('editor', 'admin', 'developer');
+                }
+            }
 
-                unless ($key) {
-                    $logger->log_to_file("Failed to generate key for: $full_path", undef, 'ERROR');
-                    return;
+            # Determine file format
+            my $format = 'unknown';
+            if ($path =~ /\.md$/i) {
+                $format = 'markdown';
+            } elsif ($path =~ /\.tt$/i) {
+                $format = 'template';
+            }
+
+            # Store the page with metadata
+            $self->documentation_pages->{$page_id} = {
+                path => $path,
+                site => $site,
+                roles => \@roles,
+                format => $format,
+                original_name => $page_id,
+                display_name => $self->_format_title($page_id)
+            };
+
+            Comserv::Util::Logging::log_to_file(
+                "Added page '$page_id' from configuration: path=$path, site=$site, format=$format",
+                undef, 'INFO'
+            );
+        }
+    } else {
+        # If no configuration found, log an error - we no longer scan directories
+        Comserv::Util::Logging::log_to_file(
+            "No configuration found or empty configuration. Please create a valid documentation_config.json file.",
+            undef, 'ERROR'
+        );
+    }
+
+    # Ensure all pages are properly categorized
+    $self->_categorize_pages();
+
+    # Log completion
+    Comserv::Util::Logging::log_to_file(
+        "Completed scan_documentation_files. Found " . scalar(keys %{$self->documentation_pages}) . " pages.",
+        undef, 'INFO'
+    );
+}
+
+# This method has been removed as part of the migration to JSON-only configuration
+# Documentation files are now managed exclusively through the documentation_config.json file
+
+# Categorize pages based on their paths
+sub _categorize_pages {
+    my ($self) = @_;
+
+    Comserv::Util::Logging::log_to_file("Categorizing documentation pages", undef, 'INFO');
+
+    # Clear existing category pages
+    foreach my $category_key (keys %{$self->documentation_categories}) {
+        $self->documentation_categories->{$category_key}->{pages} = [];
+    }
+
+    # Categorize each page
+    foreach my $page_id (keys %{$self->documentation_pages}) {
+        my $page = $self->documentation_pages->{$page_id};
+        my $path = $page->{path};
+        my $site = $page->{site};
+
+        # Add to appropriate categories
+        foreach my $category_key (keys %{$self->documentation_categories}) {
+            my $category = $self->documentation_categories->{$category_key};
+
+            # Add to site-specific category if applicable
+            if ($category_key eq 'site_specific' && $site ne 'all') {
+                push @{$category->{pages}}, $page_id unless grep { $_ eq $page_id } @{$category->{pages}};
+                Comserv::Util::Logging::log_to_file(
+                    "Added '$page_id' to site-specific category (site: $site)", undef, 'INFO');
+            }
+
+            # Add to module category if it's in a module directory
+            if ($category_key eq 'modules' && $path =~ m{Documentation/modules/}) {
+                push @{$category->{pages}}, $page_id unless grep { $_ eq $page_id } @{$category->{pages}};
+                Comserv::Util::Logging::log_to_file(
+                    "Added '$page_id' to modules category", undef, 'INFO');
+            }
+
+            # Add to tutorials if it's in the tutorials directory
+            if ($category_key eq 'tutorials' && $path =~ m{Documentation/tutorials/}) {
+                push @{$category->{pages}}, $page_id unless grep { $_ eq $page_id } @{$category->{pages}};
+                Comserv::Util::Logging::log_to_file(
+                    "Added '$page_id' to tutorials category", undef, 'INFO');
+            }
+
+            # Add to user guides if it's in the normal roles directory
+            if ($category_key eq 'user_guides' && $path =~ m{Documentation/roles/normal/}) {
+                push @{$category->{pages}}, $page_id unless grep { $_ eq $page_id } @{$category->{pages}};
+                Comserv::Util::Logging::log_to_file(
+                    "Added '$page_id' to user_guides category", undef, 'INFO');
+            }
+
+            # Add to admin guides if it's in the admin roles directory
+            if ($category_key eq 'admin_guides' && $path =~ m{Documentation/roles/admin/}) {
+                push @{$category->{pages}}, $page_id unless grep { $_ eq $page_id } @{$category->{pages}};
+                Comserv::Util::Logging::log_to_file(
+                    "Added '$page_id' to admin_guides category", undef, 'INFO');
+            }
+
+            # Add to developer guides if it's in the developer roles directory
+            if ($category_key eq 'developer_guides' && $path =~ m{Documentation/roles/developer/}) {
+                push @{$category->{pages}}, $page_id unless grep { $_ eq $page_id } @{$category->{pages}};
+                Comserv::Util::Logging::log_to_file(
+                    "Added '$page_id' to developer_guides category", undef, 'INFO');
+            }
+
+            # Also add to changelog category if it's in the changelog directory
+            if ($category_key eq 'changelog' && $path =~ m{Documentation/changelog/}) {
+                # Create the changelog category if it doesn't exist
+                unless (exists $self->documentation_categories->{changelog}) {
+                    $self->documentation_categories->{changelog} = {
+                        title => 'Changelog',
+                        description => 'System changes and updates',
+                        pages => [],
+                        roles => ['normal', 'editor', 'admin', 'developer'],
+                        site_specific => 0,
+                    };
                 }
 
-                # Process metadata
-                my $title = $self->_format_title($filename);
-                my %meta = (
-                    path => $rel_path,
-                    site => 'all',
+                push @{$self->documentation_categories->{changelog}->{pages}}, $page_id
+                    unless grep { $_ eq $page_id } @{$self->documentation_categories->{changelog}->{pages}};
+
+                Comserv::Util::Logging::log_to_file(
+                    "Added '$page_id' to changelog category", undef, 'INFO');
+            }
+        }
+    }
+
+    # Add any files in the root Documentation directory to a "General" category
+    my $general_category_exists = 0;
+    foreach my $page_id (keys %{$self->documentation_pages}) {
+        my $page = $self->documentation_pages->{$page_id};
+        my $path = $page->{path};
+
+        # Check if the file is directly in the Documentation directory (not in a subdirectory)
+        if ($path =~ m{^Documentation/[^/]+\.(md|tt)$}) {
+            # Create the general category if it doesn't exist
+            unless (exists $self->documentation_categories->{general}) {
+                $self->documentation_categories->{general} = {
+                    title => 'General Documentation',
+                    description => 'General system documentation',
+                    pages => [],
                     roles => ['normal', 'editor', 'admin', 'developer'],
-                    file_type => ($filename =~ /\.tt$/i) ? 'template' :
-                                 ($filename =~ /\.md$/i) ? 'markdown' : 'other',
-                    title => $title,
-                    description => "Documentation for $title"
-                );
+                    site_specific => 0,
+                };
+                $general_category_exists = 1;
+            }
 
-                # Custom metadata handling
-                $metadata_handler->(\%meta, $full_path) if $metadata_handler;
+            push @{$self->documentation_categories->{general}->{pages}}, $page_id
+                unless grep { $_ eq $page_id } @{$self->documentation_categories->{general}->{pages}};
 
-                # Ensure admin role is always included for all documentation
-                push @{$meta{roles}}, 'admin' unless grep { $_ eq 'admin' } @{$meta{roles}};
-
-                # Store in documentation pages
-                $self->documentation_pages->{$key} = \%meta;
-
-                # Categorize
-                $category_handler->($key, \%meta) if $category_handler;
-
-                # Log the found documentation
-                $logger->log_to_file("Found documentation: $key (type: $meta{file_type}, path: $rel_path)", undef, 'DEBUG');
-            },
-            no_chdir => 1
-        }, $base_dir);
-    };
-
-    # Helper method to format titles from filenames
-    sub _format_title {
-        my ($self, $filename) = @_;
-
-        # Remove file extension
-        $filename =~ s/\.(md|tt)$//i;
-
-        # Replace underscores with spaces
-        $filename =~ s/_/ /g;
-
-        # Replace hyphens with spaces
-        $filename =~ s/-/ /g;
-
-        # Capitalize first letter of each word
-        my $title = join(' ', map { ucfirst $_ } split(/\s+/, $filename));
-
-        return $title;
+            Comserv::Util::Logging::log_to_file(
+                "Added '$page_id' to general category", undef, 'INFO');
+        }
     }
 
-    # Initialize category pages as empty arrays to avoid duplicates
-    foreach my $category (keys %{$self->documentation_categories}) {
-        $self->documentation_categories->{$category}{pages} = [];
+    # Log the number of pages in each category
+    foreach my $category_key (keys %{$self->documentation_categories}) {
+        my $category = $self->documentation_categories->{$category_key};
+        my $page_count = scalar(@{$category->{pages}});
+
+        Comserv::Util::Logging::log_to_file(
+            "Category '$category_key' has $page_count pages", undef, 'INFO');
     }
 
-    # Create a hash to track which files have been categorized
-    my %categorized_files;
+    Comserv::Util::Logging::log_to_file("Page categorization completed", undef, 'INFO');
+}
 
-    # Scan main documentation directory
-    # Modified to properly categorize all documentation files and avoid duplicates
-    $scan_dirs->(
-        "root/Documentation",
-        sub {
-            my ($key, $meta) = @_;
+# Debug documentation index
+sub debug :Local :Args(0) {
+    my ($self, $c) = @_;
 
-            # Always add to general category first for the complete list
-            push @{$self->documentation_categories->{general}{pages}}, $key;
+    # Log the action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'debug', "Debugging documentation index");
 
-            # Skip if already categorized in a specific section
-            return if $categorized_files{$key};
+    # Get all documentation pages
+    my $pages = $self->documentation_pages;
 
-            # Set a default category for uncategorized files
-            my $category = 'general';
+    # Create a debug output
+    my $debug_output = "Documentation Pages (" . scalar(keys %$pages) . " total):\n\n";
 
-            # Categorize based on path and filename
-            if ($meta->{path} =~ m{/tutorials/}) {
-                $category = 'tutorials';
-            }
-            elsif ($meta->{path} =~ m{/modules/}) {
-                $category = 'modules';
-            }
-            elsif ($meta->{path} =~ m{/proxmox/}) {
-                $category = 'proxmox';
-            }
-            elsif ($meta->{path} =~ m{/developer/}) {
-                $category = 'developer_guides';
-            }
-            elsif ($meta->{path} =~ m{/changelog/}) {
-                $category = 'changelog';
-            }
-            elsif ($meta->{path} =~ m{/controllers/} || $key =~ /controller/i) {
-                $category = 'controllers';
-            }
-            elsif ($meta->{path} =~ m{/roles/admin/}) {
-                $category = 'admin_guides';
-            }
-            elsif ($meta->{path} =~ m{/roles/normal/}) {
-                $category = 'user_guides';
-            }
-            elsif ($meta->{path} =~ m{/roles/developer/}) {
-                $category = 'developer_guides';
-            }
-            # Categorize by filename patterns
-            elsif ($key =~ /^(installation|configuration|system|admin|user_management)/i) {
-                $category = 'admin_guides';
-            }
-            elsif ($key =~ /^(getting_started|account_management|user_guide|faq)/i) {
-                $category = 'user_guides';
-            }
-            elsif ($key =~ /^(todo|project|task)/i) {
-                $category = 'modules';
-            }
-            elsif ($key =~ /^(proxmox)/i) {
-                $category = 'proxmox';
-            }
+    # Count file types
+    my $md_count = 0;
+    my $tt_count = 0;
+    my $other_count = 0;
 
-            # Add to appropriate category if it exists
-            if (exists $self->documentation_categories->{$category} && $category ne 'general') {
-                push @{$self->documentation_categories->{$category}{pages}}, $key;
-                $categorized_files{$key} = 1;
-                $logger->log_to_file("Added $key to $category category", undef, 'DEBUG');
+    foreach my $page_name (sort keys %$pages) {
+        my $metadata = $pages->{$page_name};
+        $debug_output .= "Page: $page_name\n";
+        $debug_output .= "  Path: $metadata->{path}\n";
+        $debug_output .= "  Site: $metadata->{site}\n";
+        $debug_output .= "  Format: $metadata->{format}\n";
+        $debug_output .= "  Original Name: $metadata->{original_name}\n";
+        $debug_output .= "  Display Name: $metadata->{display_name}\n";
+        $debug_output .= "  Roles: " . join(", ", @{$metadata->{roles}}) . "\n\n";
+
+        # Count by format
+        if ($metadata->{format} eq 'markdown') {
+            $md_count++;
+        } elsif ($metadata->{format} eq 'template') {
+            $tt_count++;
+        } else {
+            $other_count++;
+        }
+    }
+
+    # Add file type summary
+    $debug_output .= "\nFile Type Summary:\n";
+    $debug_output .= "  Markdown (.md) files: $md_count\n";
+    $debug_output .= "  Template (.tt) files: $tt_count\n";
+    $debug_output .= "  Other file types: $other_count\n\n";
+
+    # Add categories debug info
+    $debug_output .= "\nDocumentation Categories:\n\n";
+
+    foreach my $category_key (sort keys %{$self->documentation_categories}) {
+        my $category = $self->documentation_categories->{$category_key};
+        $debug_output .= "Category: $category_key\n";
+        $debug_output .= "  Title: $category->{title}\n";
+        $debug_output .= "  Description: $category->{description}\n";
+        $debug_output .= "  Pages (" . scalar(@{$category->{pages}}) . " total): " . join(", ", @{$category->{pages}}) . "\n";
+        $debug_output .= "  Roles: " . join(", ", @{$category->{roles}}) . "\n";
+        $debug_output .= "  Site Specific: " . ($category->{site_specific} ? "Yes" : "No") . "\n\n";
+    }
+
+    # Add JSON configuration info
+    my $config = $self->_load_documentation_config();
+    $debug_output .= "\nJSON Configuration:\n\n";
+
+    if ($config && $config->{default_paths}) {
+        $debug_output .= "Default Paths in JSON (" . scalar(keys %{$config->{default_paths}}) . " total):\n";
+        foreach my $page_id (sort keys %{$config->{default_paths}}) {
+            $debug_output .= "  $page_id: " . $config->{default_paths}->{$page_id} . "\n";
+
+            # Check if this path exists in the filesystem
+            my $full_path = "root/" . $config->{default_paths}->{$page_id};
+            if (-e $full_path) {
+                $debug_output .= "    [EXISTS]\n";
+            } else {
+                $debug_output .= "    [MISSING]\n";
             }
         }
-    );
+    } else {
+        $debug_output .= "No default paths found in JSON configuration.\n";
+    }
 
-    # Scan role-specific documentation
-    # Modified to ensure proper categorization and admin access, avoiding duplicates
-    $scan_dirs->(
-        "root/Documentation/roles",
-        sub {
-            my ($key, $meta) = @_;
+    # Add directory structure info
+    $debug_output .= "\nDocumentation Directory Structure:\n\n";
 
-            # Skip if already categorized
-            return if $categorized_files{$key};
-
-            # Fixed variable declaration - removed redundant assignments
-            my @roles;
-            my $category = 'user_guides'; # Default category
-
-            if ($meta->{path} =~ m{/admin/}) {
-                @roles = ('admin');
-                $category = 'admin_guides';
-            }
-            elsif ($meta->{path} =~ m{/developer/}) {
-                @roles = ('developer');
-                $category = 'developer_guides';
-            }
-            else {
-                @roles = ('normal', 'editor');
-            }
-
-            # Always add admin role to ensure admin access
-            push @roles, 'admin' unless grep { $_ eq 'admin' } @roles;
-            $meta->{roles} = \@roles;
-
-            # Add to appropriate category
-            push @{$self->documentation_categories->{$category}{pages}}, $key;
-            $categorized_files{$key} = 1;
-
-            # Add to general category
-            push @{$self->documentation_categories->{general}{pages}}, $key;
-
-            # Log categorization
-            $logger->log_to_file("Categorized $key in $category category", undef, 'DEBUG');
-        },
-        sub {
-            my ($meta, $path) = @_;
-            $meta->{site} = 'all';
-
-            # Add file type detection
-            my $filename = basename($path);
-            $meta->{file_type} = ($filename =~ /\.tt$/i) ? 'template' :
-                               ($filename =~ /\.md$/i) ? 'markdown' : 'other';
-
-            # Format title from filename
-            $meta->{title} = $self->_format_title(basename($path));
-
-            # Add description
-            $meta->{description} = "Documentation for " . $meta->{title};
-        }
-    );
-
-    # Scan site-specific documentation
-    # Modified to ensure proper categorization and admin access, avoiding duplicates
-    $scan_dirs->(
+    # Check for key directories
+    my @key_dirs = (
+        "root/Documentation/roles/normal",
+        "root/Documentation/roles/admin",
+        "root/Documentation/roles/developer",
         "root/Documentation/sites",
-        sub {
-            my ($key, $meta) = @_;
-
-            # Skip if already categorized
-            return if $categorized_files{$key};
-
-            # Add to site-specific category
-            push @{$self->documentation_categories->{site_specific}{pages}}, $key;
-            $categorized_files{$key} = 1;
-
-            # Add to general category
-            push @{$self->documentation_categories->{general}{pages}}, $key;
-
-            # Ensure admin role is included
-            push @{$meta->{roles}}, 'admin' unless grep { $_ eq 'admin' } @{$meta->{roles}};
-
-            # Log categorization
-            $logger->log_to_file("Added $key to site-specific category for site: $meta->{site}", undef, 'DEBUG');
-        },
-        sub {
-            my ($meta, $path) = @_;
-            if ($path =~ m{/sites/([^/]+)/}) {
-                $meta->{site} = $1;
-            }
-
-            # Add file type detection
-            my $filename = basename($path);
-            $meta->{file_type} = ($filename =~ /\.tt$/i) ? 'template' :
-                               ($filename =~ /\.md$/i) ? 'markdown' : 'other';
-
-            # Format title from filename
-            $meta->{title} = $self->_format_title(basename($path));
-
-            # Add description
-            $meta->{description} = "Site-specific documentation for " . ($meta->{site} || 'all sites');
-        }
+        "root/Documentation/tutorials",
+        "root/Documentation/modules",
+        "root/Documentation/changelog"
     );
 
-    # Post-process categories
-    foreach my $category (values %{$self->documentation_categories}) {
-        # Remove duplicates
-        my %seen;
-        my @unique = grep { !$seen{$_}++ } @{$category->{pages}};
+    foreach my $dir (@key_dirs) {
+        $debug_output .= "$dir: ";
+        if (-d $dir) {
+            $debug_output .= "[EXISTS]\n";
 
-        # Sort alphabetically by title
-        $category->{pages} = [ sort {
-            lc($self->_format_title($a)) cmp lc($self->_format_title($b))
-        } @unique ];
+            # Count files in this directory
+            my $md_files = 0;
+            my $tt_files = 0;
+            my $other_files = 0;
 
-        # Log the count
-        $logger->log_to_file("Category " . ($category->{title} || 'unknown') . " has " . scalar(@{$category->{pages}}) . " pages", undef, 'DEBUG');
+            if (opendir(my $dh, $dir)) {
+                while (my $file = readdir($dh)) {
+                    next if $file =~ /^\.\.?$/;  # Skip . and ..
+                    next if -d "$dir/$file";     # Skip subdirectories
+
+                    if ($file =~ /\.md$/i) {
+                        $md_files++;
+                    } elsif ($file =~ /\.tt$/i) {
+                        $tt_files++;
+                    } else {
+                        $other_files++;
+                    }
+                }
+                closedir($dh);
+
+                $debug_output .= "    Files: $md_files .md, $tt_files .tt, $other_files other\n";
+            } else {
+                $debug_output .= "    [ERROR: Could not open directory]\n";
+            }
+        } else {
+            $debug_output .= "[MISSING]\n";
+        }
     }
 
-    $logger->log_to_file(sprintf("Documentation system initialized with %d pages",
-        scalar keys %{$self->documentation_pages}), undef, 'INFO');
+    # Log the debug output
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'debug', $debug_output);
+
+    # Add debug info to stash
+    if ($c->session->{debug_mode}) {
+        $c->stash->{debug_msg} = [] unless defined $c->stash->{debug_msg};
+        push @{$c->stash->{debug_msg}}, "Generated debug output for documentation system";
+    }
+
+    # Display the debug output
+    $c->response->content_type('text/plain');
+    $c->response->body($debug_output);
+}
+
+# Configuration management page
+sub config :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    # Check if user has admin or developer role
+    unless ($c->user_exists && ($c->user->role eq 'admin' || $c->user->role eq 'developer')) {
+        $c->stash(error_msg => "You don't have permission to access this page");
+        $c->detach('/error/access_denied');
+        return;
+    }
+
+    # Log the action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'config', "Accessing documentation configuration");
+
+    # Add debug message to stash
+    if ($c->session->{debug_mode}) {
+        $c->stash->{debug_msg} = [] unless defined $c->stash->{debug_msg};
+        push @{$c->stash->{debug_msg}}, "Accessing documentation configuration page";
+    }
+
+    # Get all documentation pages
+    my $pages = $self->documentation_pages;
+
+    # Get all categories
+    my $categories = $self->documentation_categories;
+
+    # Add to stash
+    $c->stash(
+        pages => $pages,
+        categories => $categories,
+        template => 'Documentation/config.tt'
+    );
 }
 
 # Main documentation index
@@ -423,48 +537,73 @@ sub index :Path :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
         "User role: $user_role, Site: $site_name");
 
+    # Initialize debug messages array if debug mode is enabled
+    if ($c->session->{debug_mode}) {
+        $c->stash->{debug_msg} = [] unless defined $c->stash->{debug_msg};
+        push @{$c->stash->{debug_msg}}, "Documentation index - User role: $user_role, Site: $site_name";
+    }
+
     # Get all documentation pages
     my $pages = $self->documentation_pages;
 
+    # Add debug info about total pages
+    if ($c->session->{debug_mode}) {
+        push @{$c->stash->{debug_msg}}, "Total documentation pages: " . scalar(keys %$pages);
+    }
+
     # Filter pages based on user role and site
-    # Modified to ensure admins can see all documentation and pages are properly categorized
     my %filtered_pages;
     foreach my $page_name (keys %$pages) {
         my $metadata = $pages->{$page_name};
 
-        # Skip if this is site-specific documentation for a different site
-        # But allow admins to see all site-specific documentation
-        if ($metadata->{site} ne 'all' && $metadata->{site} ne $site_name) {
-            # Only skip for non-admins
-            next unless $user_role eq 'admin';
+        # Special case: CSC site admins can see all documentation
+        if ($site_name eq 'CSC' && $user_role eq 'admin') {
+            $filtered_pages{$page_name} = $metadata;
+            next;
         }
 
-        # Skip if the user doesn't have the required role
-        # But always include for admins
-        my $has_role = ($user_role eq 'admin'); # Admins can see everything
+        # For other users, apply normal filtering rules:
 
-        unless ($has_role) {
-            foreach my $role (@{$metadata->{roles}}) {
-                if ($role eq $user_role || ($role eq 'normal' && $user_role)) {
-                    $has_role = 1;
-                    last;
-                }
+        # 1. Site-specific documentation is only visible to its respective site
+        if ($metadata->{site} ne 'all' && $metadata->{site} ne $site_name) {
+            if ($c->session->{debug_mode}) {
+                push @{$c->stash->{debug_msg}}, "Skipping page '$page_name' - site mismatch (page site: $metadata->{site}, current site: $site_name)";
+            }
+            next;
+        }
+
+        # 2. Role-specific documentation is filtered by user role
+        my $has_role = 0;
+        foreach my $role (@{$metadata->{roles}}) {
+            if ($role eq $user_role || ($role eq 'normal' && $user_role)) {
+                $has_role = 1;
+                last;
             }
         }
-        next unless $has_role;
+
+        unless ($has_role) {
+            if ($c->session->{debug_mode}) {
+                push @{$c->stash->{debug_msg}}, "Skipping page '$page_name' - role mismatch (page roles: " .
+                    join(", ", @{$metadata->{roles}}) . ", user role: $user_role)";
+            }
+            next;
+        }
 
         # Add to filtered pages
         $filtered_pages{$page_name} = $metadata;
 
-        # Log access granted
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
-            "Access granted to $page_name for user with role $user_role");
+        if ($c->session->{debug_mode}) {
+            push @{$c->stash->{debug_msg}}, "Including page '$page_name' - site: $metadata->{site}, path: $metadata->{path}";
+        }
     }
 
-    # Sort pages alphabetically by title for better presentation
-    my @sorted_pages = sort {
-        lc($self->_format_title($a)) cmp lc($self->_format_title($b))
-    } keys %filtered_pages;
+    # Log the number of filtered pages
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+        "Filtered documentation pages: " . scalar(keys %filtered_pages) .
+        " (Site: $site_name, Role: $user_role)");
+
+    # Sort pages alphabetically for better presentation
+    my @sorted_pages = sort keys %filtered_pages;
 
     # Create a structured list of documentation pages with metadata
     my $structured_pages = {};
@@ -473,8 +612,21 @@ sub index :Path :Args(0) {
         my $path = $metadata->{path};
         my $title = $self->_format_title($page_name);
 
-        # Always use the view action with the page name as parameter
-        my $url = $c->uri_for($self->action_for('view'), [$page_name]);
+        # Use the full path to ensure we're linking to the correct document
+        # This ensures each category links to its own specific document
+        my $url;
+
+        # Log the path for debugging
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+            "Processing page: $page_name, Path: $path");
+
+        if ($path =~ /\.md$/) {
+            # For markdown files, use the view action with the full path
+            $url = $c->uri_for($self->action_for('view'), [$path]);
+        } else {
+            # For other files, use the view action with just the page name
+            $url = $c->uri_for($self->action_for('view'), [$page_name]);
+        }
 
         $structured_pages->{$page_name} = {
             title => $title,
@@ -491,24 +643,36 @@ sub index :Path :Args(0) {
         my $category = $self->documentation_categories->{$category_key};
 
         # Skip if the user doesn't have the required role
-        # But always include for admins
-        my $has_role = ($user_role eq 'admin'); # Admins can see everything
-
-        unless ($has_role) {
-            foreach my $role (@{$category->{roles}}) {
-                if ($role eq $user_role || ($role eq 'normal' && $user_role)) {
-                    $has_role = 1;
-                    last;
-                }
+        my $has_role = 0;
+        foreach my $role (@{$category->{roles}}) {
+            if ($role eq $user_role || ($role eq 'normal' && $user_role)) {
+                $has_role = 1;
+                last;
             }
         }
-        next unless $has_role;
+
+        unless ($has_role) {
+            if ($c->session->{debug_mode}) {
+                push @{$c->stash->{debug_msg}}, "Skipping category '$category_key' - role mismatch (category roles: " .
+                    join(", ", @{$category->{roles}}) . ", user role: $user_role)";
+            }
+            next;
+        }
 
         # Skip site-specific categories if not relevant to this site
-        next if $category->{site_specific} && !$self->_has_site_specific_docs($site_name, \%filtered_pages);
+        if ($category->{site_specific} && !$self->_has_site_specific_docs($site_name, \%filtered_pages)) {
+            if ($c->session->{debug_mode}) {
+                push @{$c->stash->{debug_msg}}, "Skipping site-specific category '$category_key' - no relevant docs for site: $site_name";
+            }
+            next;
+        }
 
         # Add to filtered categories
         $filtered_categories{$category_key} = $category;
+
+        if ($c->session->{debug_mode}) {
+            push @{$c->stash->{debug_msg}}, "Including category '$category_key' - title: $category->{title}";
+        }
 
         # If this is the site-specific category, populate it with site-specific pages
         if ($category_key eq 'site_specific') {
@@ -516,9 +680,16 @@ sub index :Path :Args(0) {
             foreach my $page_name (keys %filtered_pages) {
                 if ($filtered_pages{$page_name}->{site} eq $site_name) {
                     push @site_pages, $page_name;
+                    if ($c->session->{debug_mode}) {
+                        push @{$c->stash->{debug_msg}}, "Adding page '$page_name' to site-specific category for site: $site_name";
+                    }
                 }
             }
             $filtered_categories{$category_key}->{pages} = \@site_pages;
+
+            if ($c->session->{debug_mode}) {
+                push @{$c->stash->{debug_msg}}, "Site-specific category has " . scalar(@site_pages) . " pages for site: $site_name";
+            }
         }
     }
 
@@ -542,9 +713,20 @@ sub index :Path :Args(0) {
                 sort { $b->{date_created} cmp $a->{date_created} }
                 @{$data->{completed_items}}
             ];
+
+            if ($c->session->{debug_mode}) {
+                push @{$c->stash->{debug_msg}}, "Loaded " . scalar(@$completed_items) . " completed items from JSON";
+            }
         };
         if ($@) {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index', "Error loading completed items JSON: $@");
+            if ($c->session->{debug_mode}) {
+                push @{$c->stash->{debug_msg}}, "Error loading completed items JSON: $@";
+            }
+        }
+    } else {
+        if ($c->session->{debug_mode}) {
+            push @{$c->stash->{debug_msg}}, "Completed items JSON file not found: $json_file";
         }
     }
 
@@ -557,7 +739,8 @@ sub index :Path :Args(0) {
         categories => \%filtered_categories,
         user_role => $user_role,
         site_name => $site_name,
-        template => 'Documentation/index.tt'
+        template => 'Documentation/index.tt',
+        debug_mode => $c->session->{debug_mode} || 0
     );
 
     $c->forward($c->view('TT'));
@@ -576,66 +759,921 @@ sub _has_site_specific_docs {
     return 0;
 }
 
-# Helper method to format page names into readable titles
+# Helper method to format page titles
 sub _format_title {
     my ($self, $page_name) = @_;
 
-    # Convert underscores and hyphens to spaces
+    # Convert underscores to spaces
     my $title = $page_name;
     $title =~ s/_/ /g;
-    $title =~ s/-/ /g;
-
-    # Remove file extensions if present
-    $title =~ s/\.(md|tt|html|txt)$//i;
 
     # Capitalize each word
-    $title = join(' ', map { ucfirst $_ } split(/\s+/, $title));
+    $title = join(' ', map { ucfirst } split(/\s+/, $title));
 
-    # Special case handling for acronyms
-    $title =~ s/\bAi\b/AI/g;
+    # Special case for API to be all caps
     $title =~ s/\bApi\b/API/g;
-    $title =~ s/\bKvm\b/KVM/g;
-    $title =~ s/\bIso\b/ISO/g;
-    $title =~ s/\bCd\b/CD/g;
-    $title =~ s/\bDbi\b/DBI/g;
-    $title =~ s/\bEncy\b/ENCY/g;
 
     return $title;
 }
 
-# Display specific documentation page
-sub view :Path :Args(1) {
-    my ($self, $c, $page) = @_;
+# View a documentation page
+sub view :Local {
+    my ($self, $c) = @_;
 
     # Log the action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view', "Accessing documentation page: $page");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view', "Viewing documentation page");
+
+    # Get the path or page_id from the query parameters
+    my $path = $c->request->query_parameters->{path};
+    my $page_id = $c->request->query_parameters->{page_id};
+
+    # If no path or page_id is provided, check if it's in the path_info
+    unless ($path || $page_id) {
+        my $path_info = $c->request->path_info;
+        if ($path_info =~ m{/documentation/view/(.+)}) {
+            $path = $1;
+        }
+    }
+
+    # If still no path or page_id, redirect to the index
+    unless ($path || $page_id) {
+        $c->flash->{error_msg} = "No documentation page specified";
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    # Log the requested path or page_id
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
+        "Requested documentation: " . ($path ? "path=$path" : "page_id=$page_id"));
+
+    # If we have a page_id but no path, look up the path
+    if ($page_id && !$path) {
+        if (exists $self->documentation_pages->{$page_id}) {
+            $path = $self->documentation_pages->{$page_id}->{path};
+        } else {
+            # Try to find the page by its original name
+            foreach my $key (keys %{$self->documentation_pages}) {
+                if ($self->documentation_pages->{$key}->{original_name} eq $page_id) {
+                    $path = $self->documentation_pages->{$key}->{path};
+                    last;
+                }
+            }
+        }
+    }
+
+    # If we still don't have a path, redirect to the index
+    unless ($path) {
+        $c->flash->{error_msg} = "Documentation page not found: $page_id";
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    # Check if the file exists
+    my $full_path = "root/$path";
+    unless (-e $full_path) {
+        $c->flash->{error_msg} = "Documentation file not found: $path";
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    # Determine the file format
+    my $format = 'unknown';
+    if ($path =~ /\.md$/i) {
+        $format = 'markdown';
+    } elsif ($path =~ /\.tt$/i) {
+        $format = 'template';
+    }
+
+    # Read the file content
+    my $content = '';
+    eval {
+        open my $fh, '<:encoding(UTF-8)', $full_path or die "Cannot open $full_path: $!";
+        $content = do { local $/; <$fh> };
+        close $fh;
+    };
+
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'view', "Error reading file: $@");
+        $c->flash->{error_msg} = "Error reading documentation file: $@";
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    # Get the page name from the path
+    my $page_name = $path;
+    $page_name =~ s/.*\///; # Remove directory part
+    $page_name =~ s/\.[^.]+$//; # Remove extension
+
+    # Format the title
+    my $title = $self->_format_title($page_name);
+
+    # Process the content based on format
+    if ($format eq 'markdown') {
+        # Convert markdown to HTML
+        my $markdown = Text::Markdown->new;
+        $content = $markdown->markdown($content);
+    }
+
+    # Add to stash
+    $c->stash(
+        template => $format eq 'markdown' ? 'Documentation/view.tt' : 'Documentation/view_template.tt',
+        page_title => $title,
+        page_content => $content,
+        page_path => $path,
+        format => $format
+    );
+}
+
+# View a template file
+sub view_template :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    # Log the action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view_template', "Viewing template file");
+
+    # Get the path from the query parameters
+    my $path = $c->request->query_parameters->{path};
+
+    # If no path is provided, redirect to the index
+    unless ($path) {
+        $c->flash->{error_msg} = "No template path specified";
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    # Log the requested path
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view_template', "Requested template path: $path");
+
+    # Check if the file exists
+    my $full_path = "root/$path";
+    unless (-e $full_path) {
+        $c->flash->{error_msg} = "Template file not found: $path";
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    # Read the template file content
+    my $content = '';
+    eval {
+        open my $fh, '<:encoding(UTF-8)', $full_path or die "Cannot open $full_path: $!";
+        $content = do { local $/; <$fh> };
+        close $fh;
+    };
+
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'view_template', "Error reading template file: $@");
+        $c->flash->{error_msg} = "Error reading template file: $@";
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    # Get the page name from the path
+    my $page_name = $path;
+    $page_name =~ s/.*\///; # Remove directory part
+    $page_name =~ s/\.[^.]+$//; # Remove extension
+
+    # Format the title
+    my $title = $self->_format_title($page_name);
+
+    # Add to stash
+    $c->stash(
+        template => 'Documentation/view_template.tt',
+        page_title => $title,
+        page_content => $content,
+        page_path => $path,
+        format => 'template'
+    );
+}
+
+# Refresh documentation index
+sub refresh :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    # Log the action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'refresh', "Refreshing documentation index");
+
+    # Add debug message to stash
+    if ($c->session->{debug_mode}) {
+        $c->stash->{debug_msg} = [] unless defined $c->stash->{debug_msg};
+        push @{$c->stash->{debug_msg}}, "Starting documentation refresh...";
+    }
+
+    # First, update the configuration with any new files
+    $self->_update_documentation_config();
+
+    # Then rescan documentation files from the updated JSON configuration
+    $self->scan_documentation_files();
+
+    # Save the current configuration back to JSON
+    $self->_save_documentation_config();
+
+    # Get the count of documentation pages
+    my $page_count = scalar(keys %{$self->documentation_pages});
+
+    # Log completion with detailed information
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'refresh',
+        "Documentation index refreshed. Found $page_count documentation pages");
+
+    # Add debug message with page count
+    if ($c->session->{debug_mode}) {
+        push @{$c->stash->{debug_msg}}, "Documentation refresh completed. Found $page_count pages.";
+    }
+
+    # Add a success message to the stash
+    $c->stash->{status_msg} = "Documentation index refreshed successfully. Found $page_count documentation pages.";
+
+    # Redirect back to the documentation index
+    $c->response->redirect($c->uri_for($self->action_for('index')));
+    $c->detach();
+}
+
+# Update documentation configuration with any new files found
+sub _update_documentation_config {
+    my ($self) = @_;
+
+    Comserv::Util::Logging::log_to_file("Updating documentation configuration with new files", undef, 'INFO');
+
+    # Load the current configuration
+    my $config = $self->_load_documentation_config();
+
+    # Initialize default_paths if it doesn't exist
+    $config->{default_paths} ||= {};
+
+    # Scan for .tt and .md files
+    my $doc_dir = "root/Documentation";
+    if (-d $doc_dir) {
+        my @found_files;
+
+        # Use File::Find to locate all .tt and .md files
+        find(
+            {
+                wanted => sub {
+                    my $file = $_;
+                    # Skip directories
+                    return if -d $file;
+
+                    # Only process .tt and .md files
+                    return unless $file =~ /\.(tt|md)$/i;
+
+                    my $path = $File::Find::name;
+                    $path =~ s/^root\///; # Remove 'root/' prefix
+
+                    # Skip configuration files
+                    return if $path =~ m{Documentation/.*_config\.json$};
+                    # Skip completed_items.json
+                    return if $path =~ m{Documentation/completed_items\.json$};
+                    # Skip specific directories that don't contain documentation
+                    return if $path =~ m{Documentation/config/};
+
+                    push @found_files, {
+                        path => $path,
+                        basename => basename($file)
+                    };
+                },
+                no_chdir => 1,
+            },
+            $doc_dir
+        );
+
+        # Check if each found file is already in the configuration
+        foreach my $file_info (@found_files) {
+            my $path = $file_info->{path};
+            my $basename = $file_info->{basename};
+
+            # Check if this path is already in the configuration
+            my $exists = 0;
+            foreach my $page_id (keys %{$config->{default_paths}}) {
+                if ($config->{default_paths}->{$page_id} eq $path) {
+                    $exists = 1;
+                    last;
+                }
+            }
+
+            # If not in configuration, add it
+            if (!$exists) {
+                # Create a unique key for this file
+                my $key;
+
+                # Handle .tt files and .md files
+                if ($basename =~ /\.tt$/) {
+                    $key = basename($basename, '.tt');
+                } elsif ($basename =~ /\.md$/) {
+                    $key = basename($basename, '.md');
+                } else {
+                    # Handle other file types (shouldn't happen with our filter)
+                    my ($name, $ext) = split(/\./, $basename, 2);
+                    $key = $name;
+                }
+
+                # Make the key unique by adding a prefix based on the path
+                my $path_prefix = '';
+                if ($path =~ m{Documentation/roles/([^/]+)/}) {
+                    $path_prefix = $1 . '_';
+                } elsif ($path =~ m{Documentation/sites/([^/]+)/}) {
+                    $path_prefix = 'site_' . $1 . '_';
+                } elsif ($path =~ m{Documentation/tutorials/}) {
+                    $path_prefix = 'tutorial_';
+                } elsif ($path =~ m{Documentation/modules/}) {
+                    $path_prefix = 'module_';
+                } elsif ($path =~ m{Documentation/changelog/}) {
+                    $path_prefix = 'changelog_';
+                }
+
+                # Add file extension suffix for .tt files to distinguish them
+                my $suffix = '';
+                if ($basename =~ /\.tt$/) {
+                    $suffix = '_tt';
+                }
+
+                # Create a unique key with the path prefix and suffix
+                my $unique_key = $path_prefix . $key . $suffix;
+
+                # Ensure the key is unique by adding a number if needed
+                my $original_key = $unique_key;
+                my $counter = 1;
+                while (exists $config->{default_paths}->{$unique_key}) {
+                    $unique_key = $original_key . "_" . $counter;
+                    $counter++;
+                }
+
+                # Add to configuration
+                $config->{default_paths}->{$unique_key} = $path;
+
+                # Also add to appropriate category if we can determine it
+                if ($path =~ m{Documentation/roles/normal/}) {
+                    push @{$config->{categories}->{user_guides}->{pages}}, $unique_key
+                        unless grep { $_ eq $unique_key } @{$config->{categories}->{user_guides}->{pages}};
+                } elsif ($path =~ m{Documentation/roles/admin/}) {
+                    push @{$config->{categories}->{admin_guides}->{pages}}, $unique_key
+                        unless grep { $_ eq $unique_key } @{$config->{categories}->{admin_guides}->{pages}};
+                } elsif ($path =~ m{Documentation/roles/developer/}) {
+                    push @{$config->{categories}->{developer_guides}->{pages}}, $unique_key
+                        unless grep { $_ eq $unique_key } @{$config->{categories}->{developer_guides}->{pages}};
+                } elsif ($path =~ m{Documentation/sites/}) {
+                    push @{$config->{categories}->{site_specific}->{pages}}, $unique_key
+                        unless grep { $_ eq $unique_key } @{$config->{categories}->{site_specific}->{pages}};
+                } elsif ($path =~ m{Documentation/tutorials/}) {
+                    push @{$config->{categories}->{tutorials}->{pages}}, $unique_key
+                        unless grep { $_ eq $unique_key } @{$config->{categories}->{tutorials}->{pages}};
+                } elsif ($path =~ m{Documentation/modules/}) {
+                    push @{$config->{categories}->{modules}->{pages}}, $unique_key
+                        unless grep { $_ eq $unique_key } @{$config->{categories}->{modules}->{pages}};
+                }
+
+                # If it's a .tt file, also add to templates category
+                if ($basename =~ /\.tt$/) {
+                    # Create templates category if it doesn't exist
+                    unless (exists $config->{categories}->{templates}) {
+                        $config->{categories}->{templates} = {
+                            title => 'Template Documentation',
+                            description => 'Documentation in template format',
+                            roles => ['normal', 'editor', 'admin', 'developer'],
+                            site_specific => 0,
+                            pages => []
+                        };
+                    }
+
+                    push @{$config->{categories}->{templates}->{pages}}, $unique_key
+                        unless grep { $_ eq $unique_key } @{$config->{categories}->{templates}->{pages}};
+                }
+
+                Comserv::Util::Logging::log_to_file(
+                    "Added new file to configuration: $unique_key => $path",
+                    undef, 'INFO'
+                );
+            }
+        }
+
+        # Save the updated configuration
+        my $config_file = "root/Documentation/documentation_config.json";
+        try {
+            # Convert to JSON
+            require JSON;
+            my $json = JSON->new->pretty->encode($config);
+
+            # Write to file
+            open my $fh, '>:encoding(UTF-8)', $config_file or die "Cannot open $config_file for writing: $!";
+            print $fh $json;
+            close $fh;
+
+            Comserv::Util::Logging::log_to_file(
+                "Updated documentation configuration saved to $config_file",
+                undef, 'INFO'
+            );
+        } catch {
+            Comserv::Util::Logging::log_to_file(
+                "Error saving updated documentation configuration to $config_file: $_",
+                undef, 'ERROR'
+            );
+        };
+    }
+}
+
+# Save documentation configuration to JSON file
+sub _save_documentation_config {
+    my ($self) = @_;
+
+    my $config_file = "root/Documentation/documentation_config.json";
+
+    # Create configuration object
+    my $config = {
+        categories => $self->documentation_categories,
+        default_paths => {}
+    };
+
+    # Add default paths for all pages
+    foreach my $page_id (keys %{$self->documentation_pages}) {
+        $config->{default_paths}->{$page_id} = $self->documentation_pages->{$page_id}->{path};
+    }
+
+    try {
+        # Convert to JSON
+        require JSON;
+        my $json = JSON->new->pretty->encode($config);
+
+        # Write to file
+        open my $fh, '>:encoding(UTF-8)', $config_file or die "Cannot open $config_file for writing: $!";
+        print $fh $json;
+        close $fh;
+
+        Comserv::Util::Logging::log_to_file(
+            "Saved documentation configuration to $config_file",
+            undef, 'INFO'
+        );
+    } catch {
+        Comserv::Util::Logging::log_to_file(
+            "Error saving documentation configuration to $config_file: $_",
+            undef, 'ERROR'
+        );
+    };
+}
+
+# Debug documentation index
+sub debug :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    # Log the action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'debug', "Debugging documentation index");
+
+    # Get all documentation pages
+    my $pages = $self->documentation_pages;
+
+    # Create a debug output
+    my $debug_output = "Documentation Pages (" . scalar(keys %$pages) . " total):\n\n";
+
+    foreach my $page_name (sort keys %$pages) {
+        my $metadata = $pages->{$page_name};
+        $debug_output .= "Page: $page_name\n";
+        $debug_output .= "  Path: $metadata->{path}\n";
+        $debug_output .= "  Site: $metadata->{site}\n";
+        $debug_output .= "  Roles: " . join(", ", @{$metadata->{roles}}) . "\n\n";
+    }
+
+    # Add categories debug info
+    $debug_output .= "\nDocumentation Categories:\n\n";
+
+    foreach my $category_key (sort keys %{$self->documentation_categories}) {
+        my $category = $self->documentation_categories->{$category_key};
+        $debug_output .= "Category: $category_key\n";
+        $debug_output .= "  Title: $category->{title}\n";
+        $debug_output .= "  Description: $category->{description}\n";
+        $debug_output .= "  Pages: " . join(", ", @{$category->{pages}}) . "\n";
+        $debug_output .= "  Roles: " . join(", ", @{$category->{roles}}) . "\n";
+        $debug_output .= "  Site Specific: " . ($category->{site_specific} ? "Yes" : "No") . "\n\n";
+    }
+
+    # Log the debug output
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'debug', $debug_output);
+
+    # Display the debug output
+    $c->response->content_type('text/plain');
+    $c->response->body($debug_output);
+}
+
+# Configuration management page
+sub config :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    # Check if user has admin or developer role
+    unless ($c->user_exists && ($c->user->role eq 'admin' || $c->user->role eq 'developer')) {
+        $c->stash(error_msg => "You don't have permission to access this page");
+        $c->detach('/error/access_denied');
+        return;
+    }
+
+    # Log the action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'config', "Accessing documentation configuration");
+
+    # Get all documentation pages
+    my $pages = $self->documentation_pages;
+
+    # Get all categories
+    my $categories = $self->documentation_categories;
+
+    # Add to stash
+    $c->stash(
+        pages => $pages,
+        categories => $categories,
+        template => 'Documentation/config.tt'
+    );
+}
+
+# Main documentation index
+sub index :Path :Args(0) {
+    my ($self, $c) = @_;
+
+    # Log the action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Accessing documentation index");
 
     # Get the current user's role
     my $user_role = 'normal';  # Default to normal user
     if ($c->user_exists) {
         $user_role = $c->user->role || 'normal';
     }
-   # Add admin check for Proxmox docs
-    if ($page =~ /^Proxmox/ && !$c->check_user_roles('admin')) {
-        $c->response->redirect($c->uri_for('/access_denied'));
-        return;
+
+    # Get the current site name
+    my $site_name = $c->stash->{SiteName} || 'default';
+
+    # Log user role and site for debugging
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+        "User role: $user_role, Site: $site_name");
+
+    # Initialize debug messages array if debug mode is enabled
+    if ($c->session->{debug_mode}) {
+        $c->stash->{debug_msg} = [] unless defined $c->stash->{debug_msg};
+        push @{$c->stash->{debug_msg}}, "Documentation index - User role: $user_role, Site: $site_name";
+    }
+
+    # Get all documentation pages
+    my $pages = $self->documentation_pages;
+
+    # Add debug info about total pages
+    if ($c->session->{debug_mode}) {
+        push @{$c->stash->{debug_msg}}, "Total documentation pages: " . scalar(keys %$pages);
+    }
+
+    # Filter pages based on user role and site
+    my %filtered_pages;
+    foreach my $page_name (keys %$pages) {
+        my $metadata = $pages->{$page_name};
+
+        # Special case: CSC site admins can see all documentation
+        if ($site_name eq 'CSC' && $user_role eq 'admin') {
+            $filtered_pages{$page_name} = $metadata;
+            next;
+        }
+
+        # For other users, apply normal filtering rules:
+
+        # 1. Site-specific documentation is only visible to its respective site
+        if ($metadata->{site} ne 'all' && $metadata->{site} ne $site_name) {
+            if ($c->session->{debug_mode}) {
+                push @{$c->stash->{debug_msg}}, "Skipping page '$page_name' - site mismatch (page site: $metadata->{site}, current site: $site_name)";
+            }
+            next;
+        }
+
+        # 2. Role-specific documentation is filtered by user role
+        my $has_role = 0;
+        foreach my $role (@{$metadata->{roles}}) {
+            if ($role eq $user_role || ($role eq 'normal' && $user_role)) {
+                $has_role = 1;
+                last;
+            }
+        }
+
+        unless ($has_role) {
+            if ($c->session->{debug_mode}) {
+                push @{$c->stash->{debug_msg}}, "Skipping page '$page_name' - role mismatch (page roles: " .
+                    join(", ", @{$metadata->{roles}}) . ", user role: $user_role)";
+            }
+            next;
+        }
+
+        # Add to filtered pages
+        $filtered_pages{$page_name} = $metadata;
+
+        if ($c->session->{debug_mode}) {
+            push @{$c->stash->{debug_msg}}, "Including page '$page_name' - site: $metadata->{site}, path: $metadata->{path}";
+        }
+    }
+
+    # Log the number of filtered pages
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+        "Filtered documentation pages: " . scalar(keys %filtered_pages) .
+        " (Site: $site_name, Role: $user_role)");
+
+    # Sort pages alphabetically for better presentation
+    my @sorted_pages = sort keys %filtered_pages;
+
+    # Create a structured list of documentation pages with metadata
+    my $structured_pages = {};
+    foreach my $page_name (@sorted_pages) {
+        my $metadata = $filtered_pages{$page_name};
+        my $path = $metadata->{path};
+        my $title = $self->_format_title($page_name);
+
+        # Use the full path to ensure we're linking to the correct document
+        # This ensures each category links to its own specific document
+        my $url;
+
+        # Log the path for debugging
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+            "Processing page: $page_name, Path: $path");
+
+        if ($path =~ /\.md$/) {
+            # For markdown files, use the view action with the full path
+            $url = $c->uri_for($self->action_for('view'), [$path]);
+        } else {
+            # For other files, use the view action with just the page name
+            $url = $c->uri_for($self->action_for('view'), [$page_name]);
+        }
+
+        $structured_pages->{$page_name} = {
+            title => $title,
+            path => $path,
+            url => $url,
+            site => $metadata->{site},
+            roles => $metadata->{roles},
+        };
+    }
+
+    # Get categories filtered by user role
+    my %filtered_categories;
+    foreach my $category_key (keys %{$self->documentation_categories}) {
+        my $category = $self->documentation_categories->{$category_key};
+
+        # Skip if the user doesn't have the required role
+        my $has_role = 0;
+        foreach my $role (@{$category->{roles}}) {
+            if ($role eq $user_role || ($role eq 'normal' && $user_role)) {
+                $has_role = 1;
+                last;
+            }
+        }
+
+        unless ($has_role) {
+            if ($c->session->{debug_mode}) {
+                push @{$c->stash->{debug_msg}}, "Skipping category '$category_key' - role mismatch (category roles: " .
+                    join(", ", @{$category->{roles}}) . ", user role: $user_role)";
+            }
+            next;
+        }
+
+        # Skip site-specific categories if not relevant to this site
+        if ($category->{site_specific} && !$self->_has_site_specific_docs($site_name, \%filtered_pages)) {
+            if ($c->session->{debug_mode}) {
+                push @{$c->stash->{debug_msg}}, "Skipping site-specific category '$category_key' - no relevant docs for site: $site_name";
+            }
+            next;
+        }
+
+        # Add to filtered categories
+        $filtered_categories{$category_key} = $category;
+
+        if ($c->session->{debug_mode}) {
+            push @{$c->stash->{debug_msg}}, "Including category '$category_key' - title: $category->{title}";
+        }
+
+        # If this is the site-specific category, populate it with site-specific pages
+        if ($category_key eq 'site_specific') {
+            my @site_pages;
+            foreach my $page_name (keys %filtered_pages) {
+                if ($filtered_pages{$page_name}->{site} eq $site_name) {
+                    push @site_pages, $page_name;
+                    if ($c->session->{debug_mode}) {
+                        push @{$c->stash->{debug_msg}}, "Adding page '$page_name' to site-specific category for site: $site_name";
+                    }
+                }
+            }
+            $filtered_categories{$category_key}->{pages} = \@site_pages;
+
+            if ($c->session->{debug_mode}) {
+                push @{$c->stash->{debug_msg}}, "Site-specific category has " . scalar(@site_pages) . " pages for site: $site_name";
+            }
+        }
+    }
+
+    # Load the completed items JSON file
+    my $json_file = $c->path_to('root', 'Documentation', 'completed_items.json');
+    my $completed_items = [];
+
+    if (-e $json_file) {
+        # Read the JSON file
+        eval {
+            open my $fh, '<:encoding(UTF-8)', $json_file or die "Cannot open $json_file: $!";
+            my $json_content = do { local $/; <$fh> };
+            close $fh;
+
+            # Parse the JSON content
+            require JSON;
+            my $data = JSON::decode_json($json_content);
+
+            # Sort items by date_created in descending order (newest first)
+            $completed_items = [
+                sort { $b->{date_created} cmp $a->{date_created} }
+                @{$data->{completed_items}}
+            ];
+
+            if ($c->session->{debug_mode}) {
+                push @{$c->stash->{debug_msg}}, "Loaded " . scalar(@$completed_items) . " completed items from JSON";
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index', "Error loading completed items JSON: $@");
+            if ($c->session->{debug_mode}) {
+                push @{$c->stash->{debug_msg}}, "Error loading completed items JSON: $@";
+            }
+        }
+    } else {
+        if ($c->session->{debug_mode}) {
+            push @{$c->stash->{debug_msg}}, "Completed items JSON file not found: $json_file";
+        }
+    }
+
+    # Add pages and completed items to stash
+    $c->stash(
+        documentation_pages => \%filtered_pages,
+        structured_pages => $structured_pages,
+        sorted_page_names => \@sorted_pages,
+        completed_items => $completed_items,
+        categories => \%filtered_categories,
+        user_role => $user_role,
+        site_name => $site_name,
+        template => 'Documentation/index.tt',
+        debug_mode => $c->session->{debug_mode} || 0
+    );
+
+    $c->forward($c->view('TT'));
+}
+
+# Helper method to check if there are site-specific docs for a site
+sub _has_site_specific_docs {
+    my ($self, $site_name, $filtered_pages) = @_;
+
+    foreach my $page_name (keys %$filtered_pages) {
+        if ($filtered_pages->{$page_name}->{site} eq $site_name) {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+# Load documentation configuration from JSON file
+sub _load_documentation_config {
+    my ($self) = @_;
+
+    my $config_file = "root/Documentation/documentation_config.json";
+    my $config = {};
+
+    if (-e $config_file) {
+        try {
+            # Read the JSON file
+            open my $fh, '<:encoding(UTF-8)', $config_file or die "Cannot open $config_file: $!";
+            my $json_content = do { local $/; <$fh> };
+            close $fh;
+
+            # Parse the JSON content
+            require JSON;
+            $config = JSON::decode_json($json_content);
+
+            Comserv::Util::Logging::log_to_file(
+                "Loaded documentation configuration from $config_file",
+                undef, 'INFO'
+            );
+        } catch {
+            Comserv::Util::Logging::log_to_file(
+                "Error loading documentation configuration from $config_file: $_",
+                undef, 'ERROR'
+            );
+        };
+    } else {
+        Comserv::Util::Logging::log_to_file(
+            "Documentation configuration file not found: $config_file",
+            undef, 'WARN'
+        );
+    }
+
+    return $config;
+}
+
+# Add default pages from configuration
+sub _add_default_pages {
+    my ($self) = @_;
+
+    # Get default paths from configuration
+    my $default_paths = $self->default_paths;
+
+    # Log the number of default paths
+    Comserv::Util::Logging::log_to_file(
+        "Adding " . scalar(keys %$default_paths) . " default pages from configuration",
+        undef, 'INFO'
+    );
+
+    # Add each default page
+    foreach my $page_id (keys %$default_paths) {
+        my $path = $default_paths->{$page_id};
+
+        # Skip if path doesn't exist
+        next unless -e "root/$path";
+
+        # Determine site and role requirements
+        my $site = 'all';
+        my @roles = ('normal', 'editor', 'admin', 'developer');
+
+        # Check if this is site-specific documentation
+        if ($path =~ m{Documentation/sites/([^/]+)/}) {
+            $site = uc($1); # Convert site name to uppercase to match SiteName format
+        }
+
+        # Check if this is role-specific documentation
+        if ($path =~ m{Documentation/roles/([^/]+)/}) {
+            my $role = $1;
+            if ($role eq 'admin') {
+                @roles = ('admin', 'developer');
+            } elsif ($role eq 'developer') {
+                @roles = ('developer');
+            } elsif ($role eq 'editor') {
+                @roles = ('editor', 'admin', 'developer');
+            }
+        }
+
+        # Store the path with metadata
+        $self->documentation_pages->{$page_id} = {
+            path => $path,
+            site => $site,
+            roles => \@roles,
+        };
+
+        # Log the added page
+        Comserv::Util::Logging::log_to_file(
+            "Added default page: $page_id, path: $path, site: $site",
+            undef, 'INFO'
+        );
+    }
+}
+
+# Helper method to format page names into readable titles
+sub _format_title {
+    my ($self, $page_name) = @_;
+
+    # Convert underscores to spaces and capitalize each word
+    my $title = $page_name;
+    $title =~ s/_/ /g;
+    $title = join(' ', map { ucfirst $_ } split(/\s+/, $title));
+
+    return $title;
+}
+
+# Display specific documentation page
+sub view :Path :Args(1) {
+    my ($self, $c, $page_or_path) = @_;
+
+    # Log the action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view', "Accessing documentation page: $page_or_path");
+
+    # Get the current user's role
+    my $user_role = 'normal';  # Default to normal user
+    if ($c->user_exists) {
+        $user_role = $c->user->role || 'normal';
     }
 
     # Get the current site name
     my $site_name = $c->stash->{SiteName} || 'default';
 
-    # Sanitize the page name to prevent directory traversal
-    $page =~ s/[^a-zA-Z0-9_\.]//g;
+    # Check if we're dealing with a full path or just a page name
+    my $is_full_path = ($page_or_path =~ m{^Documentation/});
+    my $page = $page_or_path;
+
+    # If it's a full path, extract the page name for permission checking
+    if ($is_full_path) {
+        # Extract the filename without extension
+        if ($page_or_path =~ m{/([^/]+)(?:\.\w+)?$}) {
+            $page = $1;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
+                "Extracted page name '$page' from path: $page_or_path");
+        }
+    } else {
+        # Sanitize the page name to prevent directory traversal
+        $page =~ s/[^a-zA-Z0-9_\.]//g;
+    }
 
     # Check if the user has permission to view this page
-    # Modified to ensure admins can access all documentation
     my $pages = $self->documentation_pages;
     if (exists $pages->{$page}) {
         my $metadata = $pages->{$page};
 
-        # Admins can access all documentation regardless of site or role restrictions
-        if ($user_role ne 'admin') {
-            # Check site-specific access for non-admins
+        # Special case: CSC site admins can see all documentation
+        if ($site_name eq 'CSC' && $user_role eq 'admin') {
+            # Allow access to all documentation
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
+                "CSC admin accessing documentation: $page (has full access)");
+        }
+        else {
+            # For other users, apply normal access rules:
+
+            # 1. Check site-specific access
             if ($metadata->{site} ne 'all' && $metadata->{site} ne $site_name) {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view',
                     "Access denied to site-specific documentation: $page (user site: $site_name, doc site: $metadata->{site})");
@@ -647,7 +1685,7 @@ sub view :Path :Args(1) {
                 return $c->forward($c->view('TT'));
             }
 
-            # Check role-based access for non-admins
+            # 2. Check role-based access
             my $has_role = 0;
             foreach my $role (@{$metadata->{roles}}) {
                 if ($role eq $user_role || ($role eq 'normal' && $user_role)) {
@@ -666,52 +1704,89 @@ sub view :Path :Args(1) {
                 );
                 return $c->forward($c->view('TT'));
             }
-        } else {
-            # Log admin access to documentation
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
-                "Admin access granted to documentation: $page");
         }
     }
 
-    # First check if it's a direct file request (with extension)
-    if ($page =~ /\./) {
-        my $file_path = "Documentation/$page";
-        my $full_path = $c->path_to('root', $file_path);
+    # Handle the file path differently based on whether we have a full path or just a page name
+    my $md_full_path;
+    my $found_path;
 
-        if (-e $full_path && !-d $full_path) {
-            # Determine content type based on file extension
-            my $content_type = 'text/plain';  # Default
-            if ($page =~ /\.json$/i) {
-                $content_type = 'application/json';
-            } elsif ($page =~ /\.html?$/i) {
-                $content_type = 'text/html';
-            } elsif ($page =~ /\.css$/i) {
-                $content_type = 'text/css';
-            } elsif ($page =~ /\.js$/i) {
-                $content_type = 'application/javascript';
-            } elsif ($page =~ /\.pdf$/i) {
-                $content_type = 'application/pdf';
-            } elsif ($page =~ /\.(jpe?g|png|gif)$/i) {
-                $content_type = 'image/' . lc($1);
+    if ($is_full_path) {
+        # We have a full path, so use it directly
+        $found_path = $page_or_path;
+        $md_full_path = $c->path_to('root', $found_path);
+
+        # Log the direct path access
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
+            "Using direct path: $found_path");
+
+        # Check if the file exists
+        unless (-e $md_full_path && !-d $md_full_path) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'view',
+                "File not found at direct path: $found_path");
+            $md_full_path = undef;
+            $found_path = undef;
+        }
+    } else {
+        # First check if it's a direct file request (with extension)
+        if ($page =~ /\./) {
+            my $file_path = "Documentation/$page";
+            my $full_path = $c->path_to('root', $file_path);
+
+            if (-e $full_path && !-d $full_path) {
+                # Determine content type based on file extension
+                my $content_type = 'text/plain';  # Default
+                if ($page =~ /\.json$/i) {
+                    $content_type = 'application/json';
+                } elsif ($page =~ /\.html?$/i) {
+                    $content_type = 'text/html';
+                } elsif ($page =~ /\.css$/i) {
+                    $content_type = 'text/css';
+                } elsif ($page =~ /\.js$/i) {
+                    $content_type = 'application/javascript';
+                } elsif ($page =~ /\.pdf$/i) {
+                    $content_type = 'application/pdf';
+                } elsif ($page =~ /\.(jpe?g|png|gif)$/i) {
+                    $content_type = 'image/' . lc($1);
+                }
+
+                # Read the file - binary mode for all files to be safe
+                open my $fh, '<:raw', $full_path or die "Cannot open $full_path: $!";
+                my $content = do { local $/; <$fh> };
+                close $fh;
+
+                # Set the response
+                $c->response->content_type($content_type);
+                $c->response->body($content);
+                return;
             }
+        }
 
-            # Read the file - binary mode for all files to be safe
-            open my $fh, '<:raw', $full_path or die "Cannot open $full_path: $!";
-            my $content = do { local $/; <$fh> };
-            close $fh;
+        # Check if it's a markdown file - try multiple locations
+        my @possible_paths = (
+            "Documentation/$page.md",                      # Direct in Documentation
+            "Documentation/roles/normal/$page.md",         # Normal user docs
+            "Documentation/roles/admin/$page.md",          # Admin docs
+            "Documentation/roles/developer/$page.md",      # Developer docs
+            "Documentation/tutorials/$page.md",            # Tutorials
+            "Documentation/sites/$site_name/$page.md"      # Site-specific docs
+        );
 
-            # Set the response
-            $c->response->content_type($content_type);
-            $c->response->body($content);
-            return;
+        foreach my $path (@possible_paths) {
+            my $test_path = $c->path_to('root', $path);
+            if (-e $test_path) {
+                $md_full_path = $test_path;
+                $found_path = $path;
+                last;
+            }
         }
     }
 
-    # Check if it's a markdown file
-    my $md_path = "Documentation/$page.md";
-    my $md_full_path = $c->path_to('root', $md_path);
+    if ($md_full_path) {
+        # Log which path was found
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
+            "Found markdown file at: $found_path");
 
-    if (-e $md_full_path) {
         # Read the markdown file
         open my $fh, '<:encoding(UTF-8)', $md_full_path or die "Cannot open $md_full_path: $!";
         my $content = do { local $/; <$fh> };
@@ -719,12 +1794,19 @@ sub view :Path :Args(1) {
 
         # Get file modification time
         my $mtime = (stat($md_full_path))[9];
-        my $last_updated = localtime($mtime)->strftime('%Y-%m-%d %H:%M:%S');
+        my $dt = DateTime->from_epoch(epoch => $mtime);
+        my $last_updated = $dt->ymd('-') . ' ' . $dt->hms(':');
+
+        # We'll let the template handle markdown rendering
+
+        # Format the page title
+        my $page_title = $self->_format_title($page);
 
         # Pass the content to the markdown viewer template
         $c->stash(
             page_name => $page,
-            page_title => $self->_format_title($page),
+            page_title => $page_title,
+            title => "Documentation: $page_title", # Set the page title for the HTML <title> tag
             markdown_content => $content,
             last_updated => $last_updated,
             user_role => $user_role,
@@ -735,10 +1817,45 @@ sub view :Path :Args(1) {
     }
 
     # If not a markdown file, try as a template
-    my $template_path = "Documentation/$page.tt";
-    my $full_path = $c->path_to('root', $template_path);
+    my $template_path;
 
-    if (-e $full_path) {
+    if ($is_full_path && $page_or_path =~ /\.tt$/) {
+        # If we have a full path to a template file, use it directly
+        $template_path = $page_or_path;
+        my $test_path = $c->path_to('root', $template_path);
+
+        # Verify the template exists
+        unless (-e $test_path && !-d $test_path) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'view',
+                "Template file not found at direct path: $template_path");
+            $template_path = undef;
+        } else {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
+                "Using direct template path: $template_path");
+        }
+    } else {
+        # Check multiple locations for the template
+        my @possible_template_paths = (
+            "Documentation/$page.tt",                      # Direct in Documentation
+            "Documentation/roles/normal/$page.tt",         # Normal user docs
+            "Documentation/roles/admin/$page.tt",          # Admin docs
+            "Documentation/roles/developer/$page.tt",      # Developer docs
+            "Documentation/tutorials/$page.tt",            # Tutorials
+            "Documentation/sites/$site_name/$page.tt"      # Site-specific docs
+        );
+
+        foreach my $path (@possible_template_paths) {
+            my $test_path = $c->path_to('root', $path);
+            if (-e $test_path) {
+                $template_path = $path;
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
+                    "Found template file at: $path");
+                last;
+            }
+        }
+    }
+
+    if ($template_path) {
         # Set the template and additional context
         $c->stash(
             template => $template_path,
@@ -746,41 +1863,19 @@ sub view :Path :Args(1) {
             site_name => $site_name
         );
     } else {
-        # Check for site-specific paths
-        my $site_path = "Documentation/sites/$site_name/$page.tt";
-        my $site_full_path = $c->path_to('root', $site_path);
+        # Log the error
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'view',
+            "Documentation page not found: $page (user role: $user_role, site: $site_name)");
 
-        if (-e $site_full_path) {
-            # Set the template for site-specific documentation
-            $c->stash(
-                template => $site_path,
-                user_role => $user_role,
-                site_name => $site_name
-            );
-        } else {
-            # Check for role-specific paths
-            my $role_path = "Documentation/roles/$user_role/$page.tt";
-            my $role_full_path = $c->path_to('root', $role_path);
+        # Log all the paths we checked
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'view',
+            "Checked paths: " . join(", ", @possible_paths, @possible_template_paths));
 
-            if (-e $role_full_path) {
-                # Set the template for role-specific documentation
-                $c->stash(
-                    template => $role_path,
-                    user_role => $user_role,
-                    site_name => $site_name
-                );
-            } else {
-                # Log the error
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'view',
-                    "Documentation page not found: $page (user role: $user_role, site: $site_name)");
-
-                # Set error message
-                $c->stash(
-                    error_msg => "Documentation page '$page' not found",
-                    template => 'Documentation/error.tt'
-                );
-            }
-        }
+        # Set error message
+        $c->stash(
+            error_msg => "Documentation page '$page' not found",
+            template => 'Documentation/error.tt'
+        );
     }
 
     $c->forward($c->view('TT'));
@@ -991,48 +2086,6 @@ sub database_schema :Path('database_schema') :Args(0) {
     $c->forward($c->view('TT'));
 }
 
-# KVM ISO Transfer documentation
-sub kvm_iso_transfer :Path('KVM_ISO_Transfer') :Args(0) {
-    my ($self, $c) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'kvm_iso_transfer', "Accessing KVM ISO Transfer documentation");
-    $c->stash(template => 'Documentation/KVM_ISO_Transfer.tt');
-    $c->forward($c->view('TT'));
-}
-# KVM CD Visibility documentation
-sub kvm_cd_visibility :Path('KVM_CD_Visibility') :Args(0) {
-    my ($self, $c) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'kvm_cd_visibility',
-        "Accessing KVM CD Visibility documentation");
-    $c->stash(template => 'Documentation/KVM_CD_Visibility.tt');
-    $c->forward($c->view('TT'));
-}
-
-# Proxmox CD Visibility documentation
-sub proxmox_cd_visibility :Path('Proxmox_CD_Visibility') :Args(0) {
-    my ($self, $c) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'proxmox_cd_visibility',
-        "Accessing Proxmox CD Visibility documentation");
-    $c->stash(template => 'Documentation/Proxmox_CD_Visibility.tt');
-    $c->forward($c->view('TT'));
-}
-
-# Virtualmin Integration documentation
-sub virtualmin_integration :Path('Virtualmin_Integration') :Args(0) {
-    my ($self, $c) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'virtualmin_integration',
-        "Accessing Virtualmin Integration documentation");
-    $c->stash(template => 'Documentation/Virtualmin_Integration.tt');
-    $c->forward($c->view('TT'));
-}
-
-# Starman Updated documentation
-sub starman_updated :Path('Starman') :Args(0) {
-    my ($self, $c) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'starman_updated',
-        "Accessing updated Starman documentation");
-    $c->stash(template => 'Documentation/Starman.tt');
-    $c->forward($c->view('TT'));
-}
 __PACKAGE__->meta->make_immutable;
 
 1;

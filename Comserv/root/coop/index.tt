@@ -1,4 +1,4 @@
-[% META title = 'Mcoop home page' %]
+[% META title = 'Monashee Coop Technical Support' %]
 [% PageVersion = 'coop/index.tt,v 0.04 2025/04/01 shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
@@ -13,27 +13,8 @@
 [% END %]
 [% USE Date %]
 <div class="container">
-    <header>
-        <div class="header-banner">
-            <h2 class="header-logo">MONASHEE COOP</h2>
-        </div>
-        <h1>HelpDesk Support Portal</h1>
-        <p>Date: [% Date.format(Date.now, '%Y-%m-%d') %]</p>
-    </header>
+    <!-- Header is provided by layout.tt -->
 
-    <div class="info-panel">
-        [% IF help_message %]
-            <div class="help-message">
-                <p>[% help_message %]</p>
-            </div>
-        [% END %]
-
-        [% IF account_message %]
-            <div class="account-message">
-                <p>[% account_message %]</p>
-            </div>
-        [% END %]
-    </div>
 
     [% # The navigation menu has been moved to pagetop.tt and TopDropListCoop.tt %]
 
@@ -41,29 +22,29 @@
         [% # Content for not logged in users or normal role users %]
         [% IF !c.session.username || (c.session.roles && !c.session.roles.grep('^admin$').size) %]
             <div class="public-view">
-                <h2>Welcome to Monashee Coop HelpDesk</h2>
+                <h2>Technical Support Center</h2>
                 <div class="alert alert-info">
-                    <p>This is the Monashee Coop HelpDesk support portal. We provide technical support and assistance for Monashee Coop members and staff.</p>
+                    <p> Our team is ready to assist you with any technical issues or questions.</p>
                 </div>
 
                 <div class="card mb-4">
                     <div class="card-header">
-                        <h3>Support Services</h3>
+                        <h3>Member Services</h3>
                     </div>
                     <div class="card-body">
-                        <p>To access our support services, please create an account or log in to your existing account.</p>
-                        <p>With an account, you can:</p>
+                        <p>Please sign in or create an account to access our support services.</p>
+                        <p>As a registered user, you'll be able to:</p>
                         <ul>
-                            <li>Create support tickets</li>
-                            <li>Track the status of your requests</li>
-                            <li>Access help documentation</li>
-                            <li>Contact our support team</li>
+                            <li>Submit technical support requests</li>
+                            <li>Monitor the progress of your support tickets</li>
+                            <li>Browse our knowledge base and documentation</li>
+                            <li>Communicate directly with our support specialists</li>
                         </ul>
 
                         [% IF !c.session.username %]
                             <div class="mt-3">
                                 <a href="/user/register" class="btn btn-primary">Create Account</a>
-                                <a href="/user/login" class="btn btn-secondary">Login</a>
+                                <a href="/user/login" class="btn btn-secondary">Sign In</a>
                             </div>
                         [% END %]
                     </div>
@@ -73,17 +54,17 @@
 
         [% # Admin view - only shown to admin users %]
         [% IF c.session.roles && c.session.roles.grep('^admin$').size %]
-            <h2>Support Dashboard</h2>
-            <p>This is the administrative view of the Monashee Coop website. You are currently in the HelpDesk support portal.</p>
-            <p>To access the public features of the Monashee Coop site, please create an account using the link above. After registration, you will be able to view the public content.</p>
+            <h2>Administrator Dashboard</h2>
+            <p>Welcome to the administrative dashboard for Monashee Coop technical support services.</p>
+            <p>From here, you can manage support tickets, user accounts, and system configurations.</p>
 
             <div class="features">
-                <h3>Available Support Features:</h3>
+                <h3>Quick Access:</h3>
                 <ul>
-                    <li>View site information</li>
-                    <li>Access help documentation</li>
-                    <li>Contact support team</li>
-                    <li><a href="/mcoop/server-room-plan" style="font-weight: bold; color: #006633;">View Server Room Plan</a></li>
+                    <li>View and respond to support tickets</li>
+                    <li>Manage knowledge base articles</li>
+                    <li>Monitor system status</li>
+                    <li><a href="/mcoop/server-room-plan" style="font-weight: bold; color: #006633;">Server Infrastructure</a></li>
                 </ul>
             </div>
 
@@ -93,33 +74,33 @@
                     <div class="admin-card">
                         <h4>Infrastructure</h4>
                         <ul>
-                            <li><a href="/mcoop/server-room-plan">Server Room Plan</a></li>
-                            <li><a href="#">Network Configuration</a></li>
-                            <li><a href="#">Backup Systems</a></li>
+                            <li><a href="/mcoop/server-room-plan">Server Infrastructure</a></li>
+                            <li><a href="#">Network Management</a></li>
+                            <li><a href="#">Backup & Recovery</a></li>
                         </ul>
                     </div>
                     <div class="admin-card">
                         <h4>User Management</h4>
                         <ul>
-                            <li><a href="#">Member Accounts</a></li>
+                            <li><a href="#">Member Directory</a></li>
                             <li><a href="#">Staff Accounts</a></li>
-                            <li><a href="#">Permissions</a></li>
+                            <li><a href="#">Access Control</a></li>
                         </ul>
                     </div>
                     <div class="admin-card">
-                        <h4>Content</h4>
+                        <h4>Support Resources</h4>
                         <ul>
-                            <li><a href="#">News Updates</a></li>
-                            <li><a href="#">Events Calendar</a></li>
-                            <li><a href="#">Document Library</a></li>
+                            <li><a href="#">Knowledge Base</a></li>
+                            <li><a href="#">Support Tickets</a></li>
+                            <li><a href="#">Documentation</a></li>
                         </ul>
                     </div>
                     <div class="admin-card">
-                        <h4>Settings</h4>
+                        <h4>System Settings</h4>
                         <ul>
-                            <li><a href="#">Site Configuration</a></li>
-                            <li><a href="#">Email Templates</a></li>
-                            <li><a href="#">Theme Options</a></li>
+                            <li><a href="#">Portal Configuration</a></li>
+                            <li><a href="#">Notification Settings</a></li>
+                            <li><a href="#">Interface Customization</a></li>
                         </ul>
                     </div>
                 </div>
