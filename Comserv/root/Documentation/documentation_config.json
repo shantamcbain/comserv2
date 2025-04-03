@@ -1,0 +1,77 @@
+{
+  "categories": {
+    "user_guides": {
+      "title": "User Guides",
+      "description": "Documentation for end users of the system",
+      "roles": ["normal", "editor", "admin", "developer"],
+      "site_specific": false,
+      "pages": ["user_guide", "getting_started", "faq", "user_guide_tt"]
+    },
+    "admin_guides": {
+      "title": "Administrator Guides",
+      "description": "Documentation for system administrators",
+      "roles": ["admin", "developer"],
+      "site_specific": false,
+      "pages": ["admin_guide", "installation", "configuration", "user_management", "system_configuration", "admin_guide_tt"]
+    },
+    "developer_guides": {
+      "title": "Developer Documentation",
+      "description": "Documentation for developers",
+      "roles": ["developer"],
+      "site_specific": false,
+      "pages": ["api_reference", "database_schema", "coding_standards", "authentication_system", "template_system", "troubleshooting", "developer_guide_tt"]
+    },
+    "tutorials": {
+      "title": "Tutorials",
+      "description": "Step-by-step guides for common tasks",
+      "roles": ["normal", "editor", "admin", "developer"],
+      "site_specific": false,
+      "pages": []
+    },
+    "site_specific": {
+      "title": "Site-Specific Documentation",
+      "description": "Documentation specific to this site",
+      "roles": ["normal", "editor", "admin", "developer"],
+      "site_specific": true,
+      "pages": ["site_overview", "site_guide", "site_default_guide_tt"]
+    },
+    "modules": {
+      "title": "Module Documentation",
+      "description": "Documentation for specific system modules",
+      "roles": ["admin", "developer"],
+      "site_specific": false,
+      "pages": ["user_module", "documentation_system"]
+    },
+    "templates": {
+      "title": "Template Documentation",
+      "description": "Documentation in template format",
+      "roles": ["normal", "editor", "admin", "developer"],
+      "site_specific": false,
+      "pages": ["user_guide_tt", "admin_guide_tt", "developer_guide_tt", "site_default_guide_tt"]
+    }
+  },
+  "default_paths": {
+    "user_guide": "Documentation/roles/normal/user_guide.md",
+    "getting_started": "Documentation/roles/normal/getting_started.md",
+    "faq": "Documentation/roles/normal/faq.md",
+    "admin_guide": "Documentation/roles/admin/admin_guide.md",
+    "installation": "Documentation/roles/admin/installation.md",
+    "configuration": "Documentation/roles/admin/configuration.md",
+    "user_management": "Documentation/roles/admin/user_management.md",
+    "system_configuration": "Documentation/roles/admin/system_configuration.md",
+    "api_reference": "Documentation/roles/developer/api_reference.md",
+    "database_schema": "Documentation/roles/developer/database_schema.md",
+    "coding_standards": "Documentation/roles/developer/coding_standards.md",
+    "authentication_system": "Documentation/roles/developer/authentication_system.md",
+    "template_system": "Documentation/roles/developer/template_system.md",
+    "troubleshooting": "Documentation/roles/developer/troubleshooting.md",
+    "site_overview": "Documentation/sites/default/site_overview.md",
+    "site_guide": "Documentation/sites/default/site_guide.md",
+    "user_module": "Documentation/modules/user_module.md",
+    "documentation_system": "Documentation/modules/documentation_system.md",
+    "user_guide_tt": "Documentation/roles/normal/user_guide.tt",
+    "admin_guide_tt": "Documentation/roles/admin/admin_guide.tt",
+    "developer_guide_tt": "Documentation/roles/developer/developer_guide.tt",
+    "site_default_guide_tt": "Documentation/sites/default/site_guide.tt"
+  }
+}

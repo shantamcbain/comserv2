@@ -1,9 +1,14 @@
-[% PageVersion = 'Documentation/markdown_viewer.tt,v 0.01 2024/05/31 shanta Exp shanta ' %]
+[% PageVersion = 'Documentation/markdown_viewer.tt,v 0.04 2025/04/02 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
-[% META title = page_title %]
+[% META title = 'Documentation' %]
+
+<!-- Include Font Awesome for icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+<!-- Include documentation CSS -->
+<link rel="stylesheet" href="/static/css/documentation.css">
 
 <div class="markdown-viewer">
     <div class="markdown-header">
@@ -45,6 +50,14 @@
                 </a>
                 [% END %]
                 
+                <button id="expand-all-button" class="action-link">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="7 13 12 18 17 13"></polyline>
+                        <polyline points="7 6 12 11 17 6"></polyline>
+                    </svg>
+                    Expand All
+                </button>
+
                 <button id="print-button" class="action-link">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="6 9 6 2 18 2 18 9"></polyline>
@@ -58,9 +71,213 @@
     </div>
     
     <div class="markdown-content">
-        [% USE Markdown %]
-        [% Markdown.markdown(markdown_content) %]
+        <!-- Display the markdown content with basic formatting -->
+        <div class="markdown-fallback" id="markdown-content">
+            [% markdown_content | html | html_line_break %]
+        </div>
     </div>
+
+    <script>
+        // Enhanced client-side markdown formatting with collapsible sections
+        document.addEventListener('DOMContentLoaded', function() {
+            const content = document.getElementById('markdown-content');
+            if (!content) return;
+
+            let html = content.innerHTML;
+
+            // Process the content line by line for block-level elements
+            const lines = html.split('<br>');
+            let inList = false;
+            let listItems = [];
+            let listType = 'ul'; // Default to unordered list
+            let processedLines = [];
+            let sectionId = 0;
+            let inSection = false;
+            let sectionContent = [];
+
+            function endCurrentList() {
+                if (inList && listItems.length > 0) {
+                    const listHtml = '<' + listType + ' class="markdown-list">' + listItems.join('') + '</' + listType + '>';
+                    if (inSection) {
+                        sectionContent.push(listHtml);
+                    } else {
+                        processedLines.push(listHtml);
+                    }
+                    listItems = [];
+                    inList = false;
+                }
+            }
+
+            function processInlineFormatting(text) {
+                // Bold
+                text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                text = text.replace(/__(.*?)__/g, '<strong>$1</strong>');
+                // Italic
+                text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+                text = text.replace(/_(.*?)_/g, '<em>$1</em>');
+                // Links
+                text = text.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2">$1</a>');
+                // Code
+                text = text.replace(/`(.*?)`/g, '<code>$1</code>');
+                return text;
+            }
+
+            for (let i = 0; i < lines.length; i++) {
+                let line = lines[i].trim();
+
+                // Skip empty lines
+                if (line === '') {
+                    endCurrentList();
+                    if (inSection) {
+                        sectionContent.push('<br>');
+                    } else {
+                        processedLines.push('<br>');
+                    }
+                    continue;
+                }
+
+                // Main heading (h1) - not collapsible
+                if (line.startsWith('# ')) {
+                    endCurrentList();
+
+                    // Close any open section
+                    if (inSection) {
+                        processedLines.push('<div class="section-content" id="section-' + sectionId + '">' + sectionContent.join('') + '</div>');
+                        inSection = false;
+                        sectionContent = [];
+                    }
+
+                    processedLines.push('<h1>' + processInlineFormatting(line.substring(2)) + '</h1>');
+                    continue;
+                }
+
+                // Section heading (h2) - collapsible
+                if (line.startsWith('## ')) {
+                    endCurrentList();
+
+                    // Close any open section
+                    if (inSection) {
+                        processedLines.push('<div class="section-content" id="section-' + sectionId + '">' + sectionContent.join('') + '</div>');
+                    }
+
+                    // Start a new section
+                    sectionId++;
+                    inSection = true;
+                    sectionContent = [];
+
+                    const sectionTitle = processInlineFormatting(line.substring(3));
+                    processedLines.push('<h2 class="section-toggle" data-target="section-' + sectionId + '">' +
+                                       sectionTitle +
+                                       '<i class="fas fa-chevron-down toggle-icon"></i></h2>');
+                    continue;
+                }
+
+                // Subsection heading (h3)
+                if (line.startsWith('### ')) {
+                    endCurrentList();
+
+                    if (inSection) {
+                        sectionContent.push('<h3>' + processInlineFormatting(line.substring(4)) + '</h3>');
+                    } else {
+                        processedLines.push('<h3>' + processInlineFormatting(line.substring(4)) + '</h3>');
+                    }
+                    continue;
+                }
+
+                // Subsection heading (h4)
+                if (line.startsWith('#### ')) {
+                    endCurrentList();
+
+                    if (inSection) {
+                        sectionContent.push('<h4>' + processInlineFormatting(line.substring(5)) + '</h4>');
+                    } else {
+                        processedLines.push('<h4>' + processInlineFormatting(line.substring(5)) + '</h4>');
+                    }
+                    continue;
+                }
+
+                // Unordered Lists
+                if (line.startsWith('- ') || line.startsWith('* ')) {
+                    // If we're switching from ordered to unordered, end the current list
+                    if (inList && listType === 'ol') {
+                        endCurrentList();
+                    }
+
+                    inList = true;
+                    listType = 'ul';
+                    listItems.push('<li>' + processInlineFormatting(line.substring(2)) + '</li>');
+                    continue;
+                }
+
+                // Ordered Lists
+                if (line.match(/^\d+\. /)) {
+                    // If we're switching from unordered to ordered, end the current list
+                    if (inList && listType === 'ul') {
+                        endCurrentList();
+                    }
+
+                    inList = true;
+                    listType = 'ol';
+                    listItems.push('<li>' + processInlineFormatting(line.substring(line.indexOf('. ') + 2)) + '</li>');
+                    continue;
+                }
+
+                // Regular paragraph
+                endCurrentList();
+
+                if (inSection) {
+                    sectionContent.push('<p>' + processInlineFormatting(line) + '</p>');
+                } else {
+                    processedLines.push('<p>' + processInlineFormatting(line) + '</p>');
+                }
+            }
+
+            // End any open list
+            endCurrentList();
+
+            // Close any open section
+            if (inSection) {
+                processedLines.push('<div class="section-content" id="section-' + sectionId + '">' + sectionContent.join('') + '</div>');
+            }
+
+            // Join the processed lines
+            html = processedLines.join('');
+
+            // Set the processed HTML
+            content.innerHTML = html;
+
+            // Remove empty paragraphs
+            const emptyParagraphs = content.querySelectorAll('p:empty');
+            emptyParagraphs.forEach(p => p.remove());
+
+            // Add click handlers for collapsible sections
+            const toggles = document.querySelectorAll('.section-toggle');
+            toggles.forEach(toggle => {
+                const targetId = toggle.getAttribute('data-target');
+                const targetSection = document.getElementById(targetId);
+
+                // Initially hide all sections
+                if (targetSection) {
+                    targetSection.style.display = 'none';
+                }
+
+                toggle.addEventListener('click', function() {
+                    const icon = this.querySelector('.toggle-icon');
+                    if (targetSection) {
+                        if (targetSection.style.display === 'none') {
+                            targetSection.style.display = 'block';
+                            targetSection.classList.add('open');
+                            icon.classList.add('open');
+                        } else {
+                            targetSection.style.display = 'none';
+                            targetSection.classList.remove('open');
+                            icon.classList.remove('open');
+                        }
+                    }
+                });
+            });
+        });
+    </script>
     
     <div class="markdown-footer">
         <div class="navigation">
@@ -92,7 +309,7 @@
             const copyButton = document.createElement('button');
             copyButton.className = 'copy-button';
             copyButton.textContent = 'Copy';
-            
+
             copyButton.addEventListener('click', function() {
                 const code = codeBlock.textContent;
                 navigator.clipboard.writeText(code).then(function() {
@@ -108,385 +325,127 @@
                     }, 2000);
                 });
             });
-            
+
             container.style.position = 'relative';
             container.appendChild(copyButton);
         });
-        
+
         // Print functionality
         document.getElementById('print-button').addEventListener('click', function() {
             window.print();
+        });
+
+        // Expand All functionality
+        document.getElementById('expand-all-button').addEventListener('click', function() {
+            const expandButton = this;
+            const allSections = document.querySelectorAll('.section-content');
+            const allToggles = document.querySelectorAll('.section-toggle');
+            const allIcons = document.querySelectorAll('.toggle-icon');
+
+            // Check if all sections are already expanded
+            let allExpanded = true;
+            allSections.forEach(section => {
+                if (section.style.display === 'none') {
+                    allExpanded = false;
+                }
+            });
+
+            if (allExpanded) {
+                // Collapse all sections
+                allSections.forEach(section => {
+                    section.style.display = 'none';
+                    section.classList.remove('open');
+                });
+                allIcons.forEach(icon => {
+                    icon.classList.remove('open');
+                });
+                expandButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="7 13 12 18 17 13"></polyline><polyline points="7 6 12 11 17 6"></polyline></svg> Expand All';
+            } else {
+                // Expand all sections
+                allSections.forEach(section => {
+                    section.style.display = 'block';
+                    section.classList.add('open');
+                });
+                allIcons.forEach(icon => {
+                    icon.classList.add('open');
+                });
+                expandButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 11 12 6 7 11"></polyline><polyline points="17 18 12 13 7 18"></polyline></svg> Collapse All';
+            }
         });
     });
 </script>
 
 <style>
-    .markdown-viewer {
-        max-width: 900px;
-        margin: 0 auto;
-        padding: 20px;
-        font-family: Arial, sans-serif;
-    }
-    
-    .markdown-header {
-        margin-bottom: 30px;
-    }
-    
-    .markdown-header h1 {
-        color: #0066cc;
-        border-bottom: 2px solid #eee;
-        padding-bottom: 10px;
-        margin-top: 0;
-    }
-    
-    .document-info {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-top: 20px;
-        padding: 10px 0;
-        border-bottom: 1px solid #eee;
-    }
-    
-    .last-updated {
-        color: #666;
-        font-size: 0.9em;
-    }
-    
-    .actions {
-        display: flex;
-        gap: 15px;
-    }
-    
-    .action-link {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        color: #0066cc;
-        text-decoration: none;
-        font-size: 0.9em;
-        padding: 5px 10px;
-        border-radius: 4px;
-        background-color: #f0f7ff;
-        border: none;
+    /* Additional styles for collapsible sections */
+    .section-toggle {
         cursor: pointer;
-    }
-    
-    .action-link:hover {
-        background-color: #e0f0ff;
-    }
-    
-    .markdown-content {
-        line-height: 1.6;
-        color: #333;
-    }
-    
-    /* Markdown content styling */
-    .markdown-content h1 {
-        color: #0066cc;
-        border-bottom: 1px solid #eee;
-        padding-bottom: 10px;
-    }
-    
-    .markdown-content h2 {
-        color: #0066cc;
-        margin-top: 30px;
-    }
-    
-    .markdown-content h3 {
-        color: #333;
-        margin-top: 25px;
-    }
-    
-    .markdown-content p {
-        margin: 15px 0;
-    }
-    
-    .markdown-content ul, .markdown-content ol {
-        padding-left: 25px;
-        margin: 15px 0;
-    }
-    
-    .markdown-content li {
-        margin-bottom: 5px;
-    }
-    
-    .markdown-content code {
-        background-color: #f5f5f5;
-        padding: 2px 5px;
-        border-radius: 3px;
-        font-family: monospace;
-        font-size: 0.9em;
-    }
-    
-    .markdown-content pre {
-        background-color: #f5f5f5;
-        padding: 15px;
-        border-radius: 5px;
-        overflow-x: auto;
-        margin: 20px 0;
-    }
-    
-    .markdown-content pre code {
-        background-color: transparent;
-        padding: 0;
-        border-radius: 0;
-        font-size: 0.9em;
-        display: block;
-    }
-    
-    .markdown-content blockquote {
-        border-left: 4px solid #0066cc;
-        padding-left: 15px;
-        margin-left: 0;
-        color: #555;
-    }
-    
-    .markdown-content img {
-        max-width: 100%;
-        height: auto;
-        display: block;
-        margin: 20px auto;
-    }
-    
-    .markdown-content table {
-        border-collapse: collapse;
-        width: 100%;
-        margin: 20px 0;
-    }
-    
-    .markdown-content th, .markdown-content td {
-        border: 1px solid #ddd;
-        padding: 8px 12px;
-        text-align: left;
-    }
-    
-    .markdown-content th {
-        background-color: #f5f5f5;
-    }
-    
-    .markdown-content tr:nth-child(even) {
-        background-color: #f9f9f9;
-    }
-    
-    .copy-button {
-        position: absolute;
-        top: 5px;
-        right: 5px;
-        padding: 3px 8px;
-        background-color: #0066cc;
-        color: white;
-        border: none;
-        border-radius: 3px;
-        font-size: 0.8em;
-        cursor: pointer;
-        opacity: 0.7;
-    }
-    
-    .copy-button:hover {
-        opacity: 1;
-    }
-    
-    .markdown-footer {
-        margin-top: 40px;
-        padding-top: 20px;
-        border-top: 1px solid #eee;
-    }
-    
-    .navigation {
-        display: flex;
-        justify-content: space-between;
-    }
-    
-    .nav-button {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        color: #0066cc;
-        text-decoration: none;
-        padding: 8px 15px;
-        border-radius: 4px;
-        background-color: #f0f7ff;
-    }
-    
-    .nav-button:hover {
-        background-color: #e0f0ff;
-    }
-    
-    .user-context {
-        display: flex;
-        justify-content: space-between;
+        position: relative;
+        padding-right: 30px;
         background-color: #f0f7ff;
         padding: 10px 15px;
         border-radius: 5px;
-        margin-bottom: 20px;
-        font-size: 0.9em;
+        margin-top: 20px;
+        transition: background-color 0.2s;
     }
-    
-    .site-info, .role-info {
-        display: flex;
-        align-items: center;
-    }
-    
-    .label {
-        font-weight: bold;
-        margin-right: 5px;
-        color: #555;
-    }
-    
-    .value {
-        color: #0066cc;
-        font-weight: bold;
-        text-transform: capitalize;
-    }
-    
-    /* Print styles */
-    @media print {
-        .markdown-header .actions,
-        .markdown-footer,
-        .copy-button {
-            display: none;
-        }
-        
-        .markdown-viewer {
-            padding: 0;
-        }
-        
-        .markdown-content {
-            font-size: 12pt;
-        }
-        
-        .markdown-content pre {
-            white-space: pre-wrap;
-            word-wrap: break-word;
-        }
-    }
-    
-    /* Mobile responsiveness */
-    @media (max-width: 768px) {
-        .document-info {
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 10px;
-        }
-        
-        .actions {
-            width: 100%;
-            justify-content: space-between;
-        }
-        
-        .navigation {
-            flex-direction: column;
-            gap: 10px;
-        }
-        
-        .nav-button {
-            width: 100%;
-            justify-content: center;
-        }
-        
-        .user-context {
-            flex-direction: column;
-            gap: 5px;
-        }
-    }
-</style>[% META title = 'Documentation' %]
 
-<div class="documentation-container">
-    <div class="documentation-header">
-        <h1>Documentation</h1>
-        <a href="[% c.uri_for('/documentation') %]" class="back-link">← Back to Documentation Index</a>
-    </div>
-    
-    <div class="markdown-content">
-        <pre>[% markdown_content | html %]</pre>
-    </div>
-</div>
+    .section-toggle:hover {
+        background-color: #e0f0ff;
+    }
 
-<style>
-    .documentation-container {
-        max-width: 900px;
-        margin: 0 auto;
-        padding: 20px;
+    .toggle-icon {
+        position: absolute;
+        right: 15px;
+        transition: transform 0.3s;
     }
-    
-    .documentation-header {
-        margin-bottom: 20px;
-        border-bottom: 1px solid #eee;
-        padding-bottom: 10px;
+
+    .toggle-icon.open {
+        transform: rotate(180deg);
     }
-    
-    .back-link {
-        display: inline-block;
+
+    .section-content {
+        padding: 0 15px;
         margin-top: 10px;
+        margin-bottom: 20px;
+        border-left: 3px solid #0066cc;
+    }
+
+    /* Ensure lists are properly displayed */
+    .markdown-list {
+        display: block !important;
+        list-style-position: outside !important;
+        padding-left: 2em !important;
+        margin: 1em 0 !important;
+    }
+
+    .markdown-list li {
+        display: list-item !important;
+        margin-bottom: 0.5em !important;
+    }
+
+    ul.markdown-list {
+        list-style-type: disc !important;
+    }
+
+    ol.markdown-list {
+        list-style-type: decimal !important;
+    }
+
+    /* Ensure section content is properly displayed */
+    .section-content {
+        display: none;
+    }
+
+    .section-content.open {
+        display: block;
+    }
+
+    /* Fix for links in markdown */
+    .markdown-content a {
         color: #0066cc;
         text-decoration: none;
     }
-    
-    .back-link:hover {
+
+    .markdown-content a:hover {
         text-decoration: underline;
-    }
-    
-    .markdown-content {
-        line-height: 1.6;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    }
-    
-    .markdown-content pre {
-        white-space: pre-wrap;
-        word-wrap: break-word;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    }
-    
-    .markdown-content h1, 
-    .markdown-content h2, 
-    .markdown-content h3, 
-    .markdown-content h4, 
-    .markdown-content h5, 
-    .markdown-content h6 {
-        margin-top: 24px;
-        margin-bottom: 16px;
-        font-weight: 600;
-        line-height: 1.25;
-    }
-    
-    .markdown-content h1 {
-        font-size: 2em;
-        border-bottom: 1px solid #eaecef;
-        padding-bottom: .3em;
-    }
-    
-    .markdown-content h2 {
-        font-size: 1.5em;
-        border-bottom: 1px solid #eaecef;
-        padding-bottom: .3em;
-    }
-    
-    .markdown-content h3 {
-        font-size: 1.25em;
-    }
-    
-    .markdown-content p {
-        margin-top: 0;
-        margin-bottom: 16px;
-    }
-    
-    .markdown-content code {
-        padding: .2em .4em;
-        margin: 0;
-        font-size: 85%;
-        background-color: rgba(27,31,35,.05);
-        border-radius: 3px;
-        font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
-    }
-    
-    .markdown-content pre code {
-        display: block;
-        padding: 16px;
-        overflow: auto;
-        font-size: 85%;
-        line-height: 1.45;
-        background-color: #f6f8fa;
-        border-radius: 3px;
     }
 </style>

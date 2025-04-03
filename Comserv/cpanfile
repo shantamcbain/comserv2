@@ -33,6 +33,7 @@ requires 'Template::Plugin::JSON';
 requires 'Template::Plugin::Number::Format';
 requires 'Template::Plugin::URL';
 requires 'Template::Plugin::DBI';
+requires 'Template::Plugin::Markdown';
 
 # Catalyst Plugins
 requires 'Catalyst::Plugin::ConfigLoader';
@@ -78,6 +79,7 @@ requires 'Data::FormValidator';
 requires 'LWP::UserAgent';
 requires 'HTTP::Request';
 requires 'Try::Tiny';
+requires 'Text::Markdown';
 
 # Development and testing
 requires 'Term::ReadPassword';
