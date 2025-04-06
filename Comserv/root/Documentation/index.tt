@@ -1,4 +1,5 @@
-[% PageVersion = 'Documentation/index.tt,v 1.4 2024/06/05 shanta Exp shanta ' %]
+
+[% PageVersion = 'Documentation/index.tt,v 1.4 2025/04/06 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -40,7 +41,7 @@
             <p>Documentation for end users of the Comserv system.</p>
             <div class="section-grid expanded">
                 [% IF categories.user_guides.pages.size > 0 %]
-                    [% FOREACH page_name IN categories.user_guides.pages %]
+                    [% FOREACH page_name IN categories.user_guides.pages.sort %]
                         [% IF structured_pages.$page_name %]
                             [% page = structured_pages.$page_name %]
                             <a href="[% page.url %]" class="documentation-card">
@@ -48,6 +49,9 @@
                                 <p>[% page.description || 'User guide for Comserv functionality.' %]</p>
                                 [% IF page.site != 'all' %]
                                     <span class="site-badge">[% page.site %]</span>
+                                [% END %]
+                                [% IF page.file_type %]
+                                    <span class="file-type-badge [% page.file_type %]">[% page.file_type %]</span>
                                 [% END %]
                             </a>
                         [% END %]
@@ -57,11 +61,13 @@
                         <h3>Account Management</h3>
                         <p>Learn how to manage your account, update your profile, and change your settings.</p>
                         <a href="[% c.uri_for('/Documentation/roles/normal/account_management.md') %]" class="card-link">Read More</a>
+                        <span class="file-type-badge markdown">markdown</span>
                     </div>
                     <div class="documentation-card">
                         <h3>Getting Started</h3>
                         <p>A beginner's guide to using the Comserv system.</p>
                         <a href="[% c.uri_for('/Documentation/roles/normal/getting_started.md') %]" class="card-link">Read More</a>
+                        <span class="file-type-badge markdown">markdown</span>
                     </div>
                 [% END %]
             </div>
@@ -74,7 +80,7 @@
             <p>Step-by-step guides for common tasks.</p>
             <div class="section-grid expanded">
                 [% IF categories.tutorials.pages.size > 0 %]
-                    [% FOREACH page_name IN categories.tutorials.pages %]
+                    [% FOREACH page_name IN categories.tutorials.pages.sort %]
                         [% IF structured_pages.$page_name %]
                             [% page = structured_pages.$page_name %]
                             <a href="[% page.url %]" class="documentation-card">
@@ -82,6 +88,9 @@
                                 <p>[% page.description || 'Step-by-step tutorial for Comserv users.' %]</p>
                                 [% IF page.site != 'all' %]
                                     <span class="site-badge">[% page.site %]</span>
+                                [% END %]
+                                [% IF page.file_type %]
+                                    <span class="file-type-badge [% page.file_type %]">[% page.file_type %]</span>
                                 [% END %]
                             </a>
                         [% END %]
@@ -91,11 +100,13 @@
                         <h3>Login and Authentication</h3>
                         <p>Learn how to log in, log out, and manage your authentication settings.</p>
                         <a href="[% c.uri_for('/Documentation/tutorials/login_authentication.md') %]" class="card-link">Read More</a>
+                        <span class="file-type-badge markdown">markdown</span>
                     </div>
                     <div class="documentation-card">
                         <h3>Customizing Your Profile</h3>
                         <p>A guide to personalizing your user profile and settings.</p>
                         <a href="[% c.uri_for('/Documentation/tutorials/customizing_profile.md') %]" class="card-link">Read More</a>
+                        <span class="file-type-badge markdown">markdown</span>
                     </div>
                 [% END %]
             </div>
@@ -129,21 +140,408 @@
         </div>
         [% END %]
 
-        <!-- Proxmox Documentation Section -->
+        <!-- Admin Documentation Sections - Only visible to administrators -->
+        [% IF display_role == 'Administrator' || user_role == 'admin' %]
+
+        <!-- Admin Guides Section -->
+        [% IF categories.admin_guides %]
         <div class="documentation-section">
-            <h2 class="section-toggle expanded">Proxmox Documentation</h2>
-            <p>Documentation for Proxmox virtualization environment.</p>
+            <h2 class="section-toggle expanded">Administrator Guides</h2>
+            <p>Documentation for system administrators. <span class="admin-only-badge">Admin Only</span></p>
             <div class="section-grid expanded">
-                <div class="documentation-card">
-                    <h3>CD Visibility in Proxmox Linux VMs</h3>
-                    <p>Guide to managing CD/DVD visibility and mounting in Proxmox Linux virtual machines.</p>
-                    <a href="[% c.uri_for('/Documentation/proxmox/Proxmox_CD_Visibility.tt') %]" class="card-link">Read More</a>
-                </div>
+                [% IF categories.admin_guides.pages.size > 0 %]
+                    [% FOREACH page_name IN categories.admin_guides.pages.sort %]
+                        [% IF structured_pages.$page_name %]
+                            [% page = structured_pages.$page_name %]
+                            <a href="[% page.url %]" class="documentation-card">
+                                <h3>[% page.title %]</h3>
+                                <p>[% page.description || 'Administrator documentation.' %]</p>
+                                [% IF page.file_type %]
+                                    <span class="file-type-badge [% page.file_type %]">[% page.file_type %]</span>
+                                [% END %]
+                                <span class="role-badge admin">Administrators Only</span>
+                            </a>
+                        [% END %]
+                    [% END %]
+                [% ELSE %]
+                    <div class="documentation-card">
+                        <h3>Admin Guide</h3>
+                        <p>Guide for system administrators.</p>
+                        <a href="[% c.uri_for('/Documentation/roles/admin/admin_guide.md') %]" class="card-link">Read More</a>
+                        <span class="file-type-badge markdown">markdown</span>
+                        <span class="role-badge admin">Administrators Only</span>
+                    </div>
+                    <div class="documentation-card">
+                        <h3>User Management</h3>
+                        <p>Guide for managing users in the system.</p>
+                        <a href="[% c.uri_for('/Documentation/roles/admin/user_management.md') %]" class="card-link">Read More</a>
+                        <span class="file-type-badge markdown">markdown</span>
+                        <span class="role-badge admin">Administrators Only</span>
+                    </div>
+                [% END %]
             </div>
         </div>
+        [% END %]
 
+        <!-- Proxmox Documentation Section -->
+        [% IF categories.proxmox %]
+        <div class="documentation-section">
+            <h2 class="section-toggle expanded">Proxmox Documentation</h2>
+            <p>Documentation for Proxmox virtualization environment. <span class="admin-only-badge">Admin Only</span></p>
+            <div class="section-grid expanded">
+                [% IF categories.proxmox.pages.size > 0 %]
+                    [% FOREACH page_name IN categories.proxmox.pages.sort %]
+                        [% IF structured_pages.$page_name %]
+                            [% page = structured_pages.$page_name %]
+                            <a href="[% page.url %]" class="documentation-card">
+                                <h3>[% page.title %]</h3>
+                                <p>[% page.description || 'Proxmox virtualization documentation.' %]</p>
+                                [% IF page.file_type %]
+                                    <span class="file-type-badge [% page.file_type %]">[% page.file_type %]</span>
+                                [% END %]
+                                <span class="role-badge admin">Administrators Only</span>
+                            </a>
+                        [% END %]
+                    [% END %]
+                [% ELSE %]
+                    <div class="documentation-card">
+                        <h3>CD Visibility in Proxmox Linux VMs</h3>
+                        <p>Guide to managing CD/DVD visibility and mounting in Proxmox Linux virtual machines.</p>
+                        <a href="[% c.uri_for('/Documentation/proxmox/Proxmox_CD_Visibility.tt') %]" class="card-link">Read More</a>
+                        <span class="file-type-badge template">template</span>
+                        <span class="role-badge admin">Administrators Only</span>
+                    </div>
+                [% END %]
+            </div>
+        </div>
+        [% END %]
+
+        <!-- Controller Documentation Section -->
+        [% IF categories.controllers %]
+        <div class="documentation-section">
+            <h2 class="section-toggle expanded">Controller Documentation</h2>
+            <p>Documentation for system controllers. <span class="admin-only-badge">Admin Only</span></p>
+            <div class="section-grid expanded">
+                [% IF categories.controllers.pages.size > 0 %]
+                    [% FOREACH page_name IN categories.controllers.pages.sort %]
+                        [% IF structured_pages.$page_name %]
+                            [% page = structured_pages.$page_name %]
+                            <a href="[% page.url %]" class="documentation-card">
+                                <h3>[% page.title %]</h3>
+                                <p>[% page.description || 'Controller documentation.' %]</p>
+                                [% IF page.file_type %]
+                                    <span class="file-type-badge [% page.file_type %]">[% page.file_type %]</span>
+                                [% END %]
+                                <span class="role-badge admin">Administrators Only</span>
+                            </a>
+                        [% END %]
+                    [% END %]
+                [% ELSE %]
+                    <div class="documentation-card">
+                        <h3>No Controller Documentation</h3>
+                        <p>No controller documentation is currently available.</p>
+                    </div>
+                [% END %]
+            </div>
+        </div>
+        [% END %]
+
+        <!-- Changelog Section -->
+        [% IF categories.changelog %]
+        <div class="documentation-section">
+            <h2 class="section-toggle expanded">Changelog</h2>
+            <p>System changes and updates. <span class="admin-only-badge">Admin Only</span></p>
+            <div class="section-grid expanded">
+                [% IF categories.changelog.pages.size > 0 %]
+                    [% FOREACH page_name IN categories.changelog.pages.sort %]
+                        [% IF structured_pages.$page_name %]
+                            [% page = structured_pages.$page_name %]
+                            <a href="[% page.url %]" class="documentation-card">
+                                <h3>[% page.title %]</h3>
+                                <p>[% page.description || 'System change documentation.' %]</p>
+                                [% IF page.file_type %]
+                                    <span class="file-type-badge [% page.file_type %]">[% page.file_type %]</span>
+                                [% END %]
+                                <span class="role-badge admin">Administrators Only</span>
+                            </a>
+                        [% END %]
+                    [% END %]
+                [% ELSE %]
+                    <div class="documentation-card">
+                        <h3>No Changelog Entries</h3>
+                        <p>No changelog entries are currently available.</p>
+                    </div>
+                [% END %]
+            </div>
+        </div>
+        [% END %]
+
+        <!-- All Documentation Section - Alphabetical List (Admin Only) -->
+        [% IF (display_role == 'Administrator' || user_role == 'admin') && categories.general && categories.general.pages.size > 0 %]
+        <div class="documentation-section">
+            <h2 class="section-toggle expanded">All Documentation Files</h2>
+            <p>Complete alphabetical list of all documentation files. <span class="admin-only-badge">Admin Only</span></p>
+
+            <!-- Group documentation by file type -->
+            <div class="file-type-tabs">
+                <button class="file-type-tab active" onclick="showFileType(event, 'all-docs')">All Files</button>
+                <button class="file-type-tab" onclick="showFileType(event, 'template-docs')">Template Files (.tt)</button>
+                <button class="file-type-tab" onclick="showFileType(event, 'markdown-docs')">Markdown Files (.md)</button>
+                <button class="file-type-tab" onclick="showFileType(event, 'other-docs')">Other Files</button>
+            </div>
+
+            <div class="section-grid expanded file-type-content active" id="all-docs">
+                [% # Sort page names alphabetically by title %]
+                [% sorted_pages = [] %]
+                [% FOREACH page_name IN categories.general.pages %]
+                    [% IF structured_pages.$page_name %]
+                        [% sorted_pages.push({
+                            name => page_name,
+                            title => structured_pages.$page_name.title
+                        }) %]
+                    [% END %]
+                [% END %]
+
+                [% # Sort the array alphabetically by title %]
+                [% sorted_pages = sorted_pages.nsort('title') %]
+
+                [% # Display the sorted pages %]
+                [% FOREACH page_info IN sorted_pages %]
+                    [% page_name = page_info.name %]
+                    [% page = structured_pages.$page_name %]
+                    <a href="[% page.url %]" class="documentation-card">
+                        <h3>[% page.title %]</h3>
+                        <p>[% page.description || 'Documentation file.' %]</p>
+                        [% IF page.site != 'all' %]
+                            <span class="site-badge">[% page.site %]</span>
+                        [% END %]
+                        [% IF page.file_type %]
+                            <span class="file-type-badge [% page.file_type %]">[% page.file_type %]</span>
+                        [% END %]
+                    </a>
+                [% END %]
+            </div>
+
+            <!-- Template files tab content -->
+            <div class="section-grid file-type-content" id="template-docs" style="display: none;">
+                [% # Sort template files alphabetically by title %]
+                [% template_pages = [] %]
+                [% FOREACH page_name IN categories.general.pages %]
+                    [% IF structured_pages.$page_name && structured_pages.$page_name.file_type == 'template' %]
+                        [% template_pages.push({
+                            name => page_name,
+                            title => structured_pages.$page_name.title
+                        }) %]
+                    [% END %]
+                [% END %]
+
+                [% # Sort the array alphabetically by title %]
+                [% template_pages = template_pages.nsort('title') %]
+
+                [% # Display the sorted template pages %]
+                [% IF template_pages.size > 0 %]
+                    [% FOREACH page_info IN template_pages %]
+                        [% page_name = page_info.name %]
+                        [% page = structured_pages.$page_name %]
+                        <a href="[% page.url %]" class="documentation-card">
+                            <h3>[% page.title %]</h3>
+                            <p>[% page.description || 'Template documentation file.' %]</p>
+                            [% IF page.site != 'all' %]
+                                <span class="site-badge">[% page.site %]</span>
+                            [% END %]
+                            <span class="file-type-badge template">template</span>
+                        </a>
+                    [% END %]
+                [% ELSE %]
+                    <div class="documentation-card">
+                        <p>No template files found.</p>
+                    </div>
+                [% END %]
+            </div>
+
+            <!-- Markdown files tab content -->
+            <div class="section-grid file-type-content" id="markdown-docs" style="display: none;">
+                [% # Sort markdown files alphabetically by title %]
+                [% markdown_pages = [] %]
+                [% FOREACH page_name IN categories.general.pages %]
+                    [% IF structured_pages.$page_name && structured_pages.$page_name.file_type == 'markdown' %]
+                        [% markdown_pages.push({
+                            name => page_name,
+                            title => structured_pages.$page_name.title
+                        }) %]
+                    [% END %]
+                [% END %]
+
+                [% # Sort the array alphabetically by title %]
+                [% markdown_pages = markdown_pages.nsort('title') %]
+
+                [% # Display the sorted markdown pages %]
+                [% IF markdown_pages.size > 0 %]
+                    [% FOREACH page_info IN markdown_pages %]
+                        [% page_name = page_info.name %]
+                        [% page = structured_pages.$page_name %]
+                        <a href="[% page.url %]" class="documentation-card">
+                            <h3>[% page.title %]</h3>
+                            <p>[% page.description || 'Markdown documentation file.' %]</p>
+                            [% IF page.site != 'all' %]
+                                <span class="site-badge">[% page.site %]</span>
+                            [% END %]
+                            <span class="file-type-badge markdown">markdown</span>
+                        </a>
+                    [% END %]
+                [% ELSE %]
+                    <div class="documentation-card">
+                        <p>No markdown files found.</p>
+                    </div>
+                [% END %]
+            </div>
+
+            <!-- Other files tab content -->
+            <div class="section-grid file-type-content" id="other-docs" style="display: none;">
+                [% # Sort other files alphabetically by title %]
+                [% other_pages = [] %]
+                [% FOREACH page_name IN categories.general.pages %]
+                    [% IF structured_pages.$page_name && structured_pages.$page_name.file_type == 'other' %]
+                        [% other_pages.push({
+                            name => page_name,
+                            title => structured_pages.$page_name.title
+                        }) %]
+                    [% END %]
+                [% END %]
+
+                [% # Sort the array alphabetically by title %]
+                [% other_pages = other_pages.nsort('title') %]
+
+                [% # Display the sorted other pages %]
+                [% IF other_pages.size > 0 %]
+                    [% FOREACH page_info IN other_pages %]
+                        [% page_name = page_info.name %]
+                        [% page = structured_pages.$page_name %]
+                        <a href="[% page.url %]" class="documentation-card">
+                            <h3>[% page.title %]</h3>
+                            <p>[% page.description || 'Other documentation file.' %]</p>
+                            [% IF page.site != 'all' %]
+                                <span class="site-badge">[% page.site %]</span>
+                            [% END %]
+                            <span class="file-type-badge other">other</span>
+                        </a>
+                    [% END %]
+                [% ELSE %]
+                    <div class="documentation-card">
+                        <p>No other file types found.</p>
+                    </div>
+                [% END %]
+            </div>
+        </div>
+        [% END %]
+
+        [% END %]
+
+
+
+            <style>
+                /* Add to existing styles */
+                .admin-only-badge {
+                    background-color: #dc3545;
+                    color: white;
+                    padding: 2px 8px;
+                    border-radius: 4px;
+                    font-size: 0.8em;
+                    margin-left: 10px;
+                }
+
+                .role-badge {
+                    display: block;
+                    margin-top: 10px;
+                    font-size: 0.75em;
+                    padding: 2px 6px;
+                    border-radius: 3px;
+                    width: fit-content;
+                }
+
+                .role-badge.admin {
+                    background-color: #dc3545;
+                    color: white;
+                }
+
+                /* File type tabs and badges */
+                .file-type-tabs {
+                    display: flex;
+                    margin-bottom: 20px;
+                    border-bottom: 1px solid #ddd;
+                }
+
+                .file-type-tab {
+                    background-color: #f8f9fa;
+                    border: 1px solid #ddd;
+                    border-bottom: none;
+                    padding: 8px 16px;
+                    margin-right: 5px;
+                    cursor: pointer;
+                    border-top-left-radius: 4px;
+                    border-top-right-radius: 4px;
+                }
+
+                .file-type-tab.active {
+                    background-color: #fff;
+                    border-bottom: 1px solid #fff;
+                    margin-bottom: -1px;
+                    font-weight: bold;
+                }
+
+                .file-type-content {
+                    display: none;
+                }
+
+                .file-type-content.active {
+                    display: grid;
+                }
+
+                .file-type-badge {
+                    display: inline-block;
+                    margin-top: 10px;
+                    font-size: 0.75em;
+                    padding: 2px 6px;
+                    border-radius: 3px;
+                    width: fit-content;
+                }
+
+                .file-type-badge.template {
+                    background-color: #28a745;
+                    color: white;
+                }
+
+                .file-type-badge.markdown {
+                    background-color: #007bff;
+                    color: white;
+                }
+
+                .file-type-badge.other {
+                    background-color: #6c757d;
+                    color: white;
+                }
+            </style>
+
+            <script>
+                function showFileType(evt, fileType) {
+                    // Hide all file type content
+                    var contents = document.getElementsByClassName("file-type-content");
+                    for (var i = 0; i < contents.length; i++) {
+                        contents[i].style.display = "none";
+                    }
+
+                    // Remove active class from all tabs
+                    var tabs = document.getElementsByClassName("file-type-tab");
+                    for (var i = 0; i < tabs.length; i++) {
+                        tabs[i].className = tabs[i].className.replace(" active", "");
+                    }
+
+                    // Show the selected content and mark the tab as active
+                    document.getElementById(fileType).style.display = "grid";
+                    evt.currentTarget.className += " active";
+                }
+            </script>
         [% IF display_role == 'Administrator' || display_role == 'Developer' || c.session.debug_mode == 1 %]
-        [% IF categories.admin_guides %]
         <div class="documentation-system-info">
         <h2>Documentation System</h2>
         <p>The Comserv documentation system is currently in transition. We are moving from a monolithic documentation approach to a more modular, organized system with separate files for different topics.</p>
@@ -156,12 +554,22 @@
         </div>
     </div>
 
+    [% IF categories.admin_guides %]
     <div class="documentation-section">
             <h2 class="section-toggle expanded">Administrator Documentation</h2>
             <p>Documentation for system administrators.</p>
-            <div class="section-grid expanded">
+
+            <!-- Group documentation by file type -->
+            <div class="file-type-tabs">
+                <button class="file-type-tab active" onclick="showFileType(event, 'all')">All Files</button>
+                <button class="file-type-tab" onclick="showFileType(event, 'template')">Template Files (.tt)</button>
+                <button class="file-type-tab" onclick="showFileType(event, 'markdown')">Markdown Files (.md)</button>
+                <button class="file-type-tab" onclick="showFileType(event, 'other')">Other Files</button>
+            </div>
+
+            <div class="section-grid expanded file-type-content active" id="all">
                 [% IF categories.admin_guides.pages.size > 0 %]
-                    [% FOREACH page_name IN categories.admin_guides.pages %]
+                    [% FOREACH page_name IN categories.admin_guides.pages.sort %]
                         [% IF structured_pages.$page_name %]
                             [% page = structured_pages.$page_name %]
                             <a href="[% page.url %]" class="documentation-card">
@@ -169,6 +577,9 @@
                                 <p>[% page.description || 'Administrator guide for Comserv management.' %]</p>
                                 [% IF page.site != 'all' %]
                                     <span class="site-badge">[% page.site %]</span>
+                                [% END %]
+                                [% IF page.file_type %]
+                                    <span class="file-type-badge [% page.file_type %]">[% page.file_type %]</span>
                                 [% END %]
                             </a>
                         [% END %]
@@ -178,18 +589,108 @@
                         <h3>User Management</h3>
                         <p>Learn how to manage users, roles, and permissions in the system.</p>
                         <a href="[% c.uri_for('/Documentation/roles/admin/user_management.md') %]" class="card-link">Read More</a>
+                        <span class="file-type-badge markdown">markdown</span>
                     </div>
                     <div class="documentation-card">
                         <h3>System Configuration</h3>
                         <p>Guide to configuring system settings and preferences.</p>
                         <a href="[% c.uri_for('/Documentation/roles/admin/system_configuration.md') %]" class="card-link">Read More</a>
+                        <span class="file-type-badge markdown">markdown</span>
                     </div>
                     <div class="documentation-card">
                         <h3>Theme System</h3>
                         <p>Guide to the theme system implementation and customization.</p>
                         <a href="[% c.uri_for('/Documentation/theme_system_implementation') %]" class="card-link">Read More</a>
+                        <span class="file-type-badge template">template</span>
                     </div>
-        [% END %]
+                [% END %]
+            </div>
+
+            <!-- Template files tab content -->
+            <div class="section-grid file-type-content" id="template" style="display: none;">
+                [% template_count = 0 %]
+                [% IF categories.admin_guides.pages.size > 0 %]
+                    [% FOREACH page_name IN categories.admin_guides.pages.sort %]
+                        [% IF structured_pages.$page_name && structured_pages.$page_name.file_type == 'template' %]
+                            [% template_count = template_count + 1 %]
+                            [% page = structured_pages.$page_name %]
+                            <a href="[% page.url %]" class="documentation-card">
+                                <h3>[% page.title %]</h3>
+                                <p>[% page.description || 'Administrator guide for Comserv management.' %]</p>
+                                [% IF page.site != 'all' %]
+                                    <span class="site-badge">[% page.site %]</span>
+                                [% END %]
+                                <span class="file-type-badge template">template</span>
+                            </a>
+                        [% END %]
+                    [% END %]
+                [% END %]
+
+                [% IF template_count == 0 %]
+                    <div class="documentation-card">
+                        <h3>Theme System</h3>
+                        <p>Guide to the theme system implementation and customization.</p>
+                        <a href="[% c.uri_for('/Documentation/theme_system_implementation') %]" class="card-link">Read More</a>
+                        <span class="file-type-badge template">template</span>
+                    </div>
+                [% END %]
+            </div>
+
+            <!-- Markdown files tab content -->
+            <div class="section-grid file-type-content" id="markdown" style="display: none;">
+                [% markdown_count = 0 %]
+                [% IF categories.admin_guides.pages.size > 0 %]
+                    [% FOREACH page_name IN categories.admin_guides.pages.sort %]
+                        [% IF structured_pages.$page_name && structured_pages.$page_name.file_type == 'markdown' %]
+                            [% markdown_count = markdown_count + 1 %]
+                            [% page = structured_pages.$page_name %]
+                            <a href="[% page.url %]" class="documentation-card">
+                                <h3>[% page.title %]</h3>
+                                <p>[% page.description || 'Administrator guide for Comserv management.' %]</p>
+                                [% IF page.site != 'all' %]
+                                    <span class="site-badge">[% page.site %]</span>
+                                [% END %]
+                                <span class="file-type-badge markdown">markdown</span>
+                            </a>
+                        [% END %]
+                    [% END %]
+                [% END %]
+
+                [% IF markdown_count == 0 %]
+                    <div class="documentation-card">
+                        <h3>User Management</h3>
+                        <p>Learn how to manage users, roles, and permissions in the system.</p>
+                        <a href="[% c.uri_for('/Documentation/roles/admin/user_management.md') %]" class="card-link">Read More</a>
+                        <span class="file-type-badge markdown">markdown</span>
+                    </div>
+                [% END %]
+            </div>
+
+            <!-- Other files tab content -->
+            <div class="section-grid file-type-content" id="other" style="display: none;">
+                [% other_count = 0 %]
+                [% IF categories.admin_guides.pages.size > 0 %]
+                    [% FOREACH page_name IN categories.admin_guides.pages.sort %]
+                        [% IF structured_pages.$page_name && structured_pages.$page_name.file_type == 'other' %]
+                            [% other_count = other_count + 1 %]
+                            [% page = structured_pages.$page_name %]
+                            <a href="[% page.url %]" class="documentation-card">
+                                <h3>[% page.title %]</h3>
+                                <p>[% page.description || 'Administrator guide for Comserv management.' %]</p>
+                                [% IF page.site != 'all' %]
+                                    <span class="site-badge">[% page.site %]</span>
+                                [% END %]
+                                <span class="file-type-badge other">other</span>
+                            </a>
+                        [% END %]
+                    [% END %]
+                [% END %]
+
+                [% IF other_count == 0 %]
+                    <div class="documentation-card">
+                        <p>No other file types found in this category.</p>
+                    </div>
+                [% END %]
             </div>
         </div>
         [% END %]

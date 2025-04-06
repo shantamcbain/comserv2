@@ -43,24 +43,7 @@ BEGIN { extends 'Catalyst::Controller' }
 
 __PACKAGE__->config(namespace => '');
 
-sub default :Path :Args {
-    my ($self, $c) = @_;
 
-    # Initialize debug_errors array
-    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
-
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'default', "Root default method called for path: " . $c->req->path);
-    push @{$c->stash->{debug_errors}}, "Root default method called for path: " . $c->req->path;
-
-    # Set the 404 status
-    $c->response->status(404);
-
-    # Set up the 404 template
-    $c->stash(
-        template => 'errors/404.tt',
-        debug_msg => "Page not found: " . $c->req->path
-    );
-}
 
 sub index :Path('/') :Args(0) {
     my ($self, $c) = @_;

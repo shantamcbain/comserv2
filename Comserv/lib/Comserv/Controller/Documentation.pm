@@ -20,6 +20,7 @@ has 'documentation_pages' => (
 );
 
 # Store documentation categories
+# Updated to include all necessary categories and ensure proper organization
 has 'documentation_categories' => (
     is => 'ro',
     default => sub {
@@ -27,21 +28,21 @@ has 'documentation_categories' => (
             'user_guides' => {
                 title => 'User Guides',
                 description => 'Documentation for end users of the system',
-                pages => ['user_guide', 'getting_started', 'faq'],
+                pages => [],
                 roles => ['normal', 'editor', 'admin', 'developer'],
                 site_specific => 0,
             },
             'admin_guides' => {
                 title => 'Administrator Guides',
                 description => 'Documentation for system administrators',
-                pages => ['admin_guide', 'installation', 'configuration'],
+                pages => [],
                 roles => ['admin'],
                 site_specific => 0,
             },
             'developer_guides' => {
                 title => 'Developer Documentation',
                 description => 'Documentation for developers',
-                pages => ['api_reference', 'database_schema', 'coding_standards'],
+                pages => [],
                 roles => ['developer'],
                 site_specific => 0,
             },
@@ -66,6 +67,34 @@ has 'documentation_categories' => (
                 roles => ['admin', 'developer'],
                 site_specific => 0,
             },
+            'proxmox' => {
+                title => 'Proxmox Documentation',
+                description => 'Documentation for Proxmox virtualization environment',
+                pages => [],
+                roles => ['admin'],
+                site_specific => 0,
+            },
+            'controllers' => {
+                title => 'Controller Documentation',
+                description => 'Documentation for system controllers',
+                pages => [],
+                roles => ['admin', 'developer'],
+                site_specific => 0,
+            },
+            'changelog' => {
+                title => 'Changelog',
+                description => 'System changes and updates',
+                pages => [],
+                roles => ['admin', 'developer'],
+                site_specific => 0,
+            },
+            'general' => {
+                title => 'All Documentation',
+                description => 'Complete list of all documentation files',
+                pages => [],
+                roles => ['admin', 'developer'],
+                site_specific => 0,
+            },
         }
     },
     lazy => 1,
@@ -74,229 +103,304 @@ has 'documentation_categories' => (
 # Initialize - scan for documentation files
 sub BUILD {
     my ($self) = @_;
+    my $logger = $self->logging;
 
-    # Log the start of BUILD
-    my $file = __FILE__;
-    my $line = __LINE__;
-    Comserv::Util::Logging::log_to_file("[$file:$line] Starting BUILD method for Documentation controller", undef, 'INFO');
+    $logger->log_to_file("Starting Documentation controller initialization", undef, 'INFO');
 
-    # Scan the Documentation directory for all files
-    my $doc_dir = "root/Documentation";
-    if (-d $doc_dir) {
-        find(
-            {
-                wanted => sub {
-                    my $file = $_;
-                    # Skip directories
-                    return if -d $file;
+    # Helper function to generate safe keys
+    my $generate_key = sub {
+        my ($path, $filename) = @_;
 
-                    my $basename = basename($file);
-                    my $path = $File::Find::name;
-                    $path =~ s/^root\///; # Remove 'root/' prefix
+        # Remove problematic characters
+        $filename =~ s/[^a-zA-Z0-9\-_\.]//g;
 
-                    # Create a safe key for the documentation_pages hash
-                    my $key;
+        # Split filename and extension
+        my ($name, $dir, $ext) = fileparse($filename, qr/\.[^.]*/);
 
-                    # Handle .tt files
-                    if ($file =~ /\.tt$/) {
-                        $key = basename($file, '.tt');
-                    } else {
-                        # Handle other file types (json, md, etc.)
-                        my ($name, $ext) = split(/\./, $basename, 2);
-                        if ($ext) {
-                            $key = "${name}";
-                        } else {
-                            $key = $basename;
-                        }
-                    }
+        # Handle special file types
+        return $name if $ext =~ /\.tt$/;
+        return $name if $ext =~ /\.md$/;
+        return $name if $ext =~ /\.html$/;
+        return $name if $ext =~ /\.txt$/;
+        return $filename if $ext eq '';
 
-                    # Determine site and role requirements
-                    my $site = 'all';
-                    my @roles = ('normal', 'editor', 'admin', 'developer');
+        # For other extensions, keep both name and extension in key
+        return "${name}${ext}";
+    };
 
-                    # Check if this is site-specific documentation
-                    if ($path =~ m{Documentation/sites/([^/]+)/}) {
-                        $site = $1;
-                    }
+    # Scan documentation directories
+    # Modified to ensure all documentation is accessible to admin group and properly categorized
+    my $scan_dirs = sub {
+        my ($base_dir, $category_handler, $metadata_handler) = @_;
 
-                    # Check if this is role-specific documentation
-                    if ($path =~ m{Documentation/roles/([^/]+)/}) {
-                        my $role = $1;
-                        if ($role eq 'admin') {
-                            @roles = ('admin', 'developer');
-                        } elsif ($role eq 'developer') {
-                            @roles = ('developer');
-                        } elsif ($role eq 'editor') {
-                            @roles = ('editor', 'admin', 'developer');
-                        }
-                    }
+        return unless -d $base_dir;
 
-                    # Store the path with metadata
-                    $self->documentation_pages->{$key} = {
-                        path => $path,
-                        site => $site,
-                        roles => \@roles,
-                    };
+        # Log the start of scanning
+        $logger->log_to_file("Scanning directory: $base_dir", undef, 'INFO');
 
-                    # Add to appropriate category if it matches
-                    foreach my $category_key (keys %{$self->documentation_categories}) {
-                        my $category = $self->documentation_categories->{$category_key};
+        find({
+            wanted => sub {
+                return if -d $_;
 
-                        # Add to site-specific category if applicable
-                        if ($category_key eq 'site_specific' && $site ne 'all') {
-                            push @{$category->{pages}}, $key unless grep { $_ eq $key } @{$category->{pages}};
-                        }
+                # Only process .md, .tt, .html, and .txt files
+                return unless /\.(md|tt|html|txt)$/i;
 
-                        # Add to module category if it's in a module directory
-                        if ($category_key eq 'modules' && $path =~ m{Documentation/modules/}) {
-                            push @{$category->{pages}}, $key unless grep { $_ eq $key } @{$category->{pages}};
-                        }
+                my $full_path = $File::Find::name;
+                my $rel_path = $full_path =~ s/^root\///r;
+                my $filename = basename($full_path);
 
-                        # Add to tutorials if it's in the tutorials directory
-                        if ($category_key eq 'tutorials' && $path =~ m{Documentation/tutorials/}) {
-                            push @{$category->{pages}}, $key unless grep { $_ eq $key } @{$category->{pages}};
-                        }
-                    }
-                },
-                no_chdir => 1,
+                # Log file found
+                $logger->log_to_file("Found documentation file: $rel_path", undef, 'DEBUG');
+
+                # Generate safe key
+                my $key = $generate_key->($rel_path, $filename);
+
+                unless ($key) {
+                    $logger->log_to_file("Failed to generate key for: $full_path", undef, 'ERROR');
+                    return;
+                }
+
+                # Process metadata
+                my $title = $self->_format_title($filename);
+                my %meta = (
+                    path => $rel_path,
+                    site => 'all',
+                    roles => ['normal', 'editor', 'admin', 'developer'],
+                    file_type => ($filename =~ /\.tt$/i) ? 'template' :
+                                 ($filename =~ /\.md$/i) ? 'markdown' : 'other',
+                    title => $title,
+                    description => "Documentation for $title"
+                );
+
+                # Custom metadata handling
+                $metadata_handler->(\%meta, $full_path) if $metadata_handler;
+
+                # Ensure admin role is always included for all documentation
+                push @{$meta{roles}}, 'admin' unless grep { $_ eq 'admin' } @{$meta{roles}};
+
+                # Store in documentation pages
+                $self->documentation_pages->{$key} = \%meta;
+
+                # Categorize
+                $category_handler->($key, \%meta) if $category_handler;
+
+                # Log the found documentation
+                $logger->log_to_file("Found documentation: $key (type: $meta{file_type}, path: $rel_path)", undef, 'DEBUG');
             },
-            $doc_dir
-        );
+            no_chdir => 1
+        }, $base_dir);
+    };
+
+    # Helper method to format titles from filenames
+    sub _format_title {
+        my ($self, $filename) = @_;
+
+        # Remove file extension
+        $filename =~ s/\.(md|tt)$//i;
+
+        # Replace underscores with spaces
+        $filename =~ s/_/ /g;
+
+        # Replace hyphens with spaces
+        $filename =~ s/-/ /g;
+
+        # Capitalize first letter of each word
+        my $title = join(' ', map { ucfirst $_ } split(/\s+/, $filename));
+
+        return $title;
     }
 
-    # Also scan for role-specific documentation
-    my $roles_dir = "root/Documentation/roles";
-    if (-d $roles_dir) {
-        find(
-            {
-                wanted => sub {
-                    my $file = $_;
-                    # Skip directories
-                    return if -d $file;
-
-                    my $basename = basename($file);
-                    my $path = $File::Find::name;
-                    $path =~ s/^root\///; # Remove 'root/' prefix
-
-                    # Create a safe key for the documentation_pages hash
-                    my $key;
-
-                    # Handle .tt files
-                    if ($file =~ /\.tt$/) {
-                        $key = basename($file, '.tt');
-                    } elsif ($file =~ /\.md$/) {
-                        $key = basename($file, '.md');
-                    } else {
-                        # Handle other file types
-                        my ($name, $ext) = split(/\./, $basename, 2);
-                        if ($ext) {
-                            $key = "${name}";
-                        } else {
-                            $key = $basename;
-                        }
-                    }
-
-                    # Determine role requirements
-                    my @roles = ('normal', 'editor', 'admin', 'developer');
-
-                    if ($path =~ m{Documentation/roles/([^/]+)/}) {
-                        my $role = $1;
-                        if ($role eq 'admin') {
-                            @roles = ('admin', 'developer');
-                        } elsif ($role eq 'developer') {
-                            @roles = ('developer');
-                        } elsif ($role eq 'editor') {
-                            @roles = ('editor', 'admin', 'developer');
-                        }
-                    }
-
-                    # Store the path with metadata
-                    $self->documentation_pages->{$key} = {
-                        path => $path,
-                        site => 'all',
-                        roles => \@roles,
-                    };
-
-                    # Add to appropriate category
-                    if ($path =~ m{roles/admin/}) {
-                        push @{$self->documentation_categories->{admin_guides}->{pages}}, $key
-                            unless grep { $_ eq $key } @{$self->documentation_categories->{admin_guides}->{pages}};
-                    } elsif ($path =~ m{roles/developer/}) {
-                        push @{$self->documentation_categories->{developer_guides}->{pages}}, $key
-                            unless grep { $_ eq $key } @{$self->documentation_categories->{developer_guides}->{pages}};
-                    } else {
-                        push @{$self->documentation_categories->{user_guides}->{pages}}, $key
-                            unless grep { $_ eq $key } @{$self->documentation_categories->{user_guides}->{pages}};
-                    }
-                },
-                no_chdir => 1,
-            },
-            $roles_dir
-        );
+    # Initialize category pages as empty arrays to avoid duplicates
+    foreach my $category (keys %{$self->documentation_categories}) {
+        $self->documentation_categories->{$category}{pages} = [];
     }
 
-    # Also scan for site-specific documentation
-    my $sites_dir = "root/Documentation/sites";
-    if (-d $sites_dir) {
-        find(
-            {
-                wanted => sub {
-                    my $file = $_;
-                    # Skip directories
-                    return if -d $file;
+    # Create a hash to track which files have been categorized
+    my %categorized_files;
 
-                    my $basename = basename($file);
-                    my $path = $File::Find::name;
-                    $path =~ s/^root\///; # Remove 'root/' prefix
+    # Scan main documentation directory
+    # Modified to properly categorize all documentation files and avoid duplicates
+    $scan_dirs->(
+        "root/Documentation",
+        sub {
+            my ($key, $meta) = @_;
 
-                    # Create a safe key for the documentation_pages hash
-                    my $key;
+            # Always add to general category first for the complete list
+            push @{$self->documentation_categories->{general}{pages}}, $key;
 
-                    # Handle .tt files
-                    if ($file =~ /\.tt$/) {
-                        $key = basename($file, '.tt');
-                    } elsif ($file =~ /\.md$/) {
-                        $key = basename($file, '.md');
-                    } else {
-                        # Handle other file types
-                        my ($name, $ext) = split(/\./, $basename, 2);
-                        if ($ext) {
-                            $key = "${name}";
-                        } else {
-                            $key = $basename;
-                        }
-                    }
+            # Skip if already categorized in a specific section
+            return if $categorized_files{$key};
 
-                    # Determine site
-                    my $site = 'all';
-                    if ($path =~ m{Documentation/sites/([^/]+)/}) {
-                        $site = $1;
-                    }
+            # Set a default category for uncategorized files
+            my $category = 'general';
 
-                    # Store the path with metadata
-                    $self->documentation_pages->{$key} = {
-                        path => $path,
-                        site => $site,
-                        roles => ['normal', 'editor', 'admin', 'developer'],
-                    };
+            # Categorize based on path and filename
+            if ($meta->{path} =~ m{/tutorials/}) {
+                $category = 'tutorials';
+            }
+            elsif ($meta->{path} =~ m{/modules/}) {
+                $category = 'modules';
+            }
+            elsif ($meta->{path} =~ m{/proxmox/}) {
+                $category = 'proxmox';
+            }
+            elsif ($meta->{path} =~ m{/developer/}) {
+                $category = 'developer_guides';
+            }
+            elsif ($meta->{path} =~ m{/changelog/}) {
+                $category = 'changelog';
+            }
+            elsif ($meta->{path} =~ m{/controllers/} || $key =~ /controller/i) {
+                $category = 'controllers';
+            }
+            elsif ($meta->{path} =~ m{/roles/admin/}) {
+                $category = 'admin_guides';
+            }
+            elsif ($meta->{path} =~ m{/roles/normal/}) {
+                $category = 'user_guides';
+            }
+            elsif ($meta->{path} =~ m{/roles/developer/}) {
+                $category = 'developer_guides';
+            }
+            # Categorize by filename patterns
+            elsif ($key =~ /^(installation|configuration|system|admin|user_management)/i) {
+                $category = 'admin_guides';
+            }
+            elsif ($key =~ /^(getting_started|account_management|user_guide|faq)/i) {
+                $category = 'user_guides';
+            }
+            elsif ($key =~ /^(todo|project|task)/i) {
+                $category = 'modules';
+            }
+            elsif ($key =~ /^(proxmox)/i) {
+                $category = 'proxmox';
+            }
 
-                    # Add to site-specific category
-                    push @{$self->documentation_categories->{site_specific}->{pages}}, $key
-                        unless grep { $_ eq $key } @{$self->documentation_categories->{site_specific}->{pages}};
-                },
-                no_chdir => 1,
-            },
-            $sites_dir
-        );
+            # Add to appropriate category if it exists
+            if (exists $self->documentation_categories->{$category} && $category ne 'general') {
+                push @{$self->documentation_categories->{$category}{pages}}, $key;
+                $categorized_files{$key} = 1;
+                $logger->log_to_file("Added $key to $category category", undef, 'DEBUG');
+            }
+        }
+    );
+
+    # Scan role-specific documentation
+    # Modified to ensure proper categorization and admin access, avoiding duplicates
+    $scan_dirs->(
+        "root/Documentation/roles",
+        sub {
+            my ($key, $meta) = @_;
+
+            # Skip if already categorized
+            return if $categorized_files{$key};
+
+            # Fixed variable declaration - removed redundant assignments
+            my @roles;
+            my $category = 'user_guides'; # Default category
+
+            if ($meta->{path} =~ m{/admin/}) {
+                @roles = ('admin');
+                $category = 'admin_guides';
+            }
+            elsif ($meta->{path} =~ m{/developer/}) {
+                @roles = ('developer');
+                $category = 'developer_guides';
+            }
+            else {
+                @roles = ('normal', 'editor');
+            }
+
+            # Always add admin role to ensure admin access
+            push @roles, 'admin' unless grep { $_ eq 'admin' } @roles;
+            $meta->{roles} = \@roles;
+
+            # Add to appropriate category
+            push @{$self->documentation_categories->{$category}{pages}}, $key;
+            $categorized_files{$key} = 1;
+
+            # Add to general category
+            push @{$self->documentation_categories->{general}{pages}}, $key;
+
+            # Log categorization
+            $logger->log_to_file("Categorized $key in $category category", undef, 'DEBUG');
+        },
+        sub {
+            my ($meta, $path) = @_;
+            $meta->{site} = 'all';
+
+            # Add file type detection
+            my $filename = basename($path);
+            $meta->{file_type} = ($filename =~ /\.tt$/i) ? 'template' :
+                               ($filename =~ /\.md$/i) ? 'markdown' : 'other';
+
+            # Format title from filename
+            $meta->{title} = $self->_format_title(basename($path));
+
+            # Add description
+            $meta->{description} = "Documentation for " . $meta->{title};
+        }
+    );
+
+    # Scan site-specific documentation
+    # Modified to ensure proper categorization and admin access, avoiding duplicates
+    $scan_dirs->(
+        "root/Documentation/sites",
+        sub {
+            my ($key, $meta) = @_;
+
+            # Skip if already categorized
+            return if $categorized_files{$key};
+
+            # Add to site-specific category
+            push @{$self->documentation_categories->{site_specific}{pages}}, $key;
+            $categorized_files{$key} = 1;
+
+            # Add to general category
+            push @{$self->documentation_categories->{general}{pages}}, $key;
+
+            # Ensure admin role is included
+            push @{$meta->{roles}}, 'admin' unless grep { $_ eq 'admin' } @{$meta->{roles}};
+
+            # Log categorization
+            $logger->log_to_file("Added $key to site-specific category for site: $meta->{site}", undef, 'DEBUG');
+        },
+        sub {
+            my ($meta, $path) = @_;
+            if ($path =~ m{/sites/([^/]+)/}) {
+                $meta->{site} = $1;
+            }
+
+            # Add file type detection
+            my $filename = basename($path);
+            $meta->{file_type} = ($filename =~ /\.tt$/i) ? 'template' :
+                               ($filename =~ /\.md$/i) ? 'markdown' : 'other';
+
+            # Format title from filename
+            $meta->{title} = $self->_format_title(basename($path));
+
+            # Add description
+            $meta->{description} = "Site-specific documentation for " . ($meta->{site} || 'all sites');
+        }
+    );
+
+    # Post-process categories
+    foreach my $category (values %{$self->documentation_categories}) {
+        # Remove duplicates
+        my %seen;
+        my @unique = grep { !$seen{$_}++ } @{$category->{pages}};
+
+        # Sort alphabetically by title
+        $category->{pages} = [ sort {
+            lc($self->_format_title($a)) cmp lc($self->_format_title($b))
+        } @unique ];
+
+        # Log the count
+        $logger->log_to_file("Category " . ($category->{title} || 'unknown') . " has " . scalar(@{$category->{pages}}) . " pages", undef, 'DEBUG');
     }
 
-    # Log the discovered documentation pages without context object
-    $file = __FILE__;
-    $line = __LINE__;
-    my $message = "Found " . scalar(keys %{$self->documentation_pages}) . " documentation pages";
-
-    # Use log_to_file directly since we don't have a context object in BUILD
-    Comserv::Util::Logging::log_to_file("[$file:$line] BUILD - $message", undef, 'INFO');
+    $logger->log_to_file(sprintf("Documentation system initialized with %d pages",
+        scalar keys %{$self->documentation_pages}), undef, 'INFO');
 }
 
 # Main documentation index
@@ -323,29 +427,44 @@ sub index :Path :Args(0) {
     my $pages = $self->documentation_pages;
 
     # Filter pages based on user role and site
+    # Modified to ensure admins can see all documentation and pages are properly categorized
     my %filtered_pages;
     foreach my $page_name (keys %$pages) {
         my $metadata = $pages->{$page_name};
 
         # Skip if this is site-specific documentation for a different site
-        next if $metadata->{site} ne 'all' && $metadata->{site} ne $site_name;
+        # But allow admins to see all site-specific documentation
+        if ($metadata->{site} ne 'all' && $metadata->{site} ne $site_name) {
+            # Only skip for non-admins
+            next unless $user_role eq 'admin';
+        }
 
         # Skip if the user doesn't have the required role
-        my $has_role = 0;
-        foreach my $role (@{$metadata->{roles}}) {
-            if ($role eq $user_role || ($role eq 'normal' && $user_role)) {
-                $has_role = 1;
-                last;
+        # But always include for admins
+        my $has_role = ($user_role eq 'admin'); # Admins can see everything
+
+        unless ($has_role) {
+            foreach my $role (@{$metadata->{roles}}) {
+                if ($role eq $user_role || ($role eq 'normal' && $user_role)) {
+                    $has_role = 1;
+                    last;
+                }
             }
         }
         next unless $has_role;
 
         # Add to filtered pages
         $filtered_pages{$page_name} = $metadata;
+
+        # Log access granted
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
+            "Access granted to $page_name for user with role $user_role");
     }
 
-    # Sort pages alphabetically for better presentation
-    my @sorted_pages = sort keys %filtered_pages;
+    # Sort pages alphabetically by title for better presentation
+    my @sorted_pages = sort {
+        lc($self->_format_title($a)) cmp lc($self->_format_title($b))
+    } keys %filtered_pages;
 
     # Create a structured list of documentation pages with metadata
     my $structured_pages = {};
@@ -372,11 +491,15 @@ sub index :Path :Args(0) {
         my $category = $self->documentation_categories->{$category_key};
 
         # Skip if the user doesn't have the required role
-        my $has_role = 0;
-        foreach my $role (@{$category->{roles}}) {
-            if ($role eq $user_role || ($role eq 'normal' && $user_role)) {
-                $has_role = 1;
-                last;
+        # But always include for admins
+        my $has_role = ($user_role eq 'admin'); # Admins can see everything
+
+        unless ($has_role) {
+            foreach my $role (@{$category->{roles}}) {
+                if ($role eq $user_role || ($role eq 'normal' && $user_role)) {
+                    $has_role = 1;
+                    last;
+                }
             }
         }
         next unless $has_role;
@@ -457,10 +580,25 @@ sub _has_site_specific_docs {
 sub _format_title {
     my ($self, $page_name) = @_;
 
-    # Convert underscores to spaces and capitalize each word
+    # Convert underscores and hyphens to spaces
     my $title = $page_name;
     $title =~ s/_/ /g;
+    $title =~ s/-/ /g;
+
+    # Remove file extensions if present
+    $title =~ s/\.(md|tt|html|txt)$//i;
+
+    # Capitalize each word
     $title = join(' ', map { ucfirst $_ } split(/\s+/, $title));
+
+    # Special case handling for acronyms
+    $title =~ s/\bAi\b/AI/g;
+    $title =~ s/\bApi\b/API/g;
+    $title =~ s/\bKvm\b/KVM/g;
+    $title =~ s/\bIso\b/ISO/g;
+    $title =~ s/\bCd\b/CD/g;
+    $title =~ s/\bDbi\b/DBI/g;
+    $title =~ s/\bEncy\b/ENCY/g;
 
     return $title;
 }
@@ -477,6 +615,11 @@ sub view :Path :Args(1) {
     if ($c->user_exists) {
         $user_role = $c->user->role || 'normal';
     }
+   # Add admin check for Proxmox docs
+    if ($page =~ /^Proxmox/ && !$c->check_user_roles('admin')) {
+        $c->response->redirect($c->uri_for('/access_denied'));
+        return;
+    }
 
     # Get the current site name
     my $site_name = $c->stash->{SiteName} || 'default';
@@ -485,40 +628,48 @@ sub view :Path :Args(1) {
     $page =~ s/[^a-zA-Z0-9_\.]//g;
 
     # Check if the user has permission to view this page
+    # Modified to ensure admins can access all documentation
     my $pages = $self->documentation_pages;
     if (exists $pages->{$page}) {
         my $metadata = $pages->{$page};
 
-        # Check site-specific access
-        if ($metadata->{site} ne 'all' && $metadata->{site} ne $site_name) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view',
-                "Access denied to site-specific documentation: $page (user site: $site_name, doc site: $metadata->{site})");
+        # Admins can access all documentation regardless of site or role restrictions
+        if ($user_role ne 'admin') {
+            # Check site-specific access for non-admins
+            if ($metadata->{site} ne 'all' && $metadata->{site} ne $site_name) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view',
+                    "Access denied to site-specific documentation: $page (user site: $site_name, doc site: $metadata->{site})");
 
-            $c->stash(
-                error_msg => "You don't have permission to view this documentation page. It's specific to the '$metadata->{site}' site.",
-                template => 'Documentation/error.tt'
-            );
-            return $c->forward($c->view('TT'));
-        }
-
-        # Check role-based access
-        my $has_role = 0;
-        foreach my $role (@{$metadata->{roles}}) {
-            if ($role eq $user_role || ($role eq 'normal' && $user_role)) {
-                $has_role = 1;
-                last;
+                $c->stash(
+                    error_msg => "You don't have permission to view this documentation page. It's specific to the '$metadata->{site}' site.",
+                    template => 'Documentation/error.tt'
+                );
+                return $c->forward($c->view('TT'));
             }
-        }
 
-        unless ($has_role) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view',
-                "Access denied to role-protected documentation: $page (user role: $user_role)");
+            # Check role-based access for non-admins
+            my $has_role = 0;
+            foreach my $role (@{$metadata->{roles}}) {
+                if ($role eq $user_role || ($role eq 'normal' && $user_role)) {
+                    $has_role = 1;
+                    last;
+                }
+            }
 
-            $c->stash(
-                error_msg => "You don't have permission to view this documentation page. It requires higher privileges.",
-                template => 'Documentation/error.tt'
-            );
-            return $c->forward($c->view('TT'));
+            unless ($has_role) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view',
+                    "Access denied to role-protected documentation: $page (user role: $user_role)");
+
+                $c->stash(
+                    error_msg => "You don't have permission to view this documentation page. It requires higher privileges.",
+                    template => 'Documentation/error.tt'
+                );
+                return $c->forward($c->view('TT'));
+            }
+        } else {
+            # Log admin access to documentation
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
+                "Admin access granted to documentation: $page");
         }
     }
 
@@ -847,7 +998,41 @@ sub kvm_iso_transfer :Path('KVM_ISO_Transfer') :Args(0) {
     $c->stash(template => 'Documentation/KVM_ISO_Transfer.tt');
     $c->forward($c->view('TT'));
 }
+# KVM CD Visibility documentation
+sub kvm_cd_visibility :Path('KVM_CD_Visibility') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'kvm_cd_visibility',
+        "Accessing KVM CD Visibility documentation");
+    $c->stash(template => 'Documentation/KVM_CD_Visibility.tt');
+    $c->forward($c->view('TT'));
+}
 
+# Proxmox CD Visibility documentation
+sub proxmox_cd_visibility :Path('Proxmox_CD_Visibility') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'proxmox_cd_visibility',
+        "Accessing Proxmox CD Visibility documentation");
+    $c->stash(template => 'Documentation/Proxmox_CD_Visibility.tt');
+    $c->forward($c->view('TT'));
+}
+
+# Virtualmin Integration documentation
+sub virtualmin_integration :Path('Virtualmin_Integration') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'virtualmin_integration',
+        "Accessing Virtualmin Integration documentation");
+    $c->stash(template => 'Documentation/Virtualmin_Integration.tt');
+    $c->forward($c->view('TT'));
+}
+
+# Starman Updated documentation
+sub starman_updated :Path('Starman') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'starman_updated',
+        "Accessing updated Starman documentation");
+    $c->stash(template => 'Documentation/Starman.tt');
+    $c->forward($c->view('TT'));
+}
 __PACKAGE__->meta->make_immutable;
 
 1;
