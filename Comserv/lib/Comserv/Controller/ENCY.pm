@@ -170,8 +170,14 @@ sub search :Path('/ENCY/search') :Args(0) {
     # Get the referer from the request headers
     my $referer = $c->req->headers->referer;
 
-    # Extract the template name from the referer
-    $c->stash(template => 'ENCY/BotanicalNameView.tt');
+    # Determine which template to use based on the referer
+    my $template = 'ENCY/BotanicalNameView.tt';
+    if ($referer && $referer =~ /BeePastureView/) {
+        $template = 'ENCY/BeePastureView.tt';
+    }
+
+    # Set the template
+    $c->stash(template => $template);
 }
 sub get_category_by_id :Local {
     my ( $self, $c, $id ) = @_;
@@ -186,6 +192,34 @@ sub create_category :Local {
     my ( $self, $c ) = @_;
     # Implement the logic to display the form for creating a new category
     $c->stash(template => 'ency/create_category_form.tt');
+}
+
+sub bee_pasture_view :Path('/ENCY/BeePastureView') :Args(0) {
+    my ( $self, $c ) = @_;
+
+    # Initialize debug_errors array
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+
+    # Log entry into the bee_pasture_view method
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'bee_pasture_view', 'Entered bee_pasture_view method');
+    push @{$c->stash->{debug_errors}}, "Entered bee_pasture_view method";
+
+    # Fetch bee forage plants data
+    my $bee_plants = $c->model('DBForager')->get_bee_forage_plants();
+
+    # If no specific bee forage plants method exists, use the general herbal data
+    if (!$bee_plants || !@$bee_plants) {
+        $bee_plants = $c->model('DBForager')->get_herbal_data();
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'bee_pasture_view', 'Using general herbal data for bee pasture view');
+        push @{$c->stash->{debug_errors}}, "Using general herbal data for bee pasture view";
+    }
+
+    # Pass the data to the template
+    $c->stash(
+        herbal_data => $bee_plants,
+        template => 'ENCY/BeePastureView.tt',
+        debug_msg => "Bee Pasture View loaded with " . scalar(@$bee_plants) . " plants"
+    );
 }
 
 __PACKAGE__->meta->make_immutable;

@@ -41,7 +41,28 @@ sub get_herbal_data {
     return [$dbforager->all]
 
 }
-# In Comserv::Model::DBForager
+# Get herbs with bee forage information
+sub get_bee_forage_plants {
+    my ($self) = @_;
+
+    # Search for herbs that have apis, nectar, or pollen information
+    my $bee_plants = $self->schema->resultset('Herb')->search(
+        {
+            -or => [
+                'apis' => { '!=' => '', '!=' => undef },
+                'nectar' => { '!=' => '', '!=' => undef },
+                'pollen' => { '!=' => '', '!=' => undef }
+            ]
+        },
+        {
+            order_by => 'botanical_name',
+            columns => [qw(record_id botanical_name common_names apis nectar pollen image)]
+        }
+    );
+
+    return [$bee_plants->all];
+}
+
 # In Comserv::Model::DBForager
 sub get_herbs_with_apis {
     my ($self) = @_;

@@ -43,6 +43,8 @@ BEGIN { extends 'Catalyst::Controller' }
 
 __PACKAGE__->config(namespace => '');
 
+
+
 sub index :Path('/') :Args(0) {
     my ($self, $c) = @_;
 
@@ -71,7 +73,11 @@ sub index :Path('/') :Args(0) {
         if ($controller_exists) {
             # Forward to the controller's index action
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Forwarding to $ControllerName controller's index action");
-            $c->detach($ControllerName, 'index');
+
+            # Use a standard redirect to the controller's path
+            # This is a more reliable approach that works for all controllers
+            $c->response->redirect("/$ControllerName");
+            $c->detach();
         } else {
             # Log the error and fall back to Root's index template
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',

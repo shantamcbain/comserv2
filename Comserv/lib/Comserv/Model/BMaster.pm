@@ -1,9 +1,15 @@
-package Comserv::Model::BMasterModel;
+package Comserv::Model::BMaster;
 use Moose;
 use namespace::autoclean;
+use Comserv::Model::ApiaryModel;
 
 # This package extends the Catalyst::Model class
 extends 'Catalyst::Model';
+
+has 'apiary_model' => (
+    is => 'ro',
+    default => sub { Comserv::Model::ApiaryModel->new }
+);
 
 # This subroutine fetches frames for a given queen
 # @param $queen_tag_number - The tag number of the queen for which frames are to be fetched
@@ -11,24 +17,10 @@ extends 'Catalyst::Model';
 sub get_frames_for_queen {
     my ($self, $queen_tag_number) = @_;
 
-    my @frames;
-    eval {
-        # Get a DBIx::Class::Schema object
-        my $schema = $self->schema;
+    warn "DEPRECATED: get_frames_for_queen in BMaster.pm is deprecated. Please use ApiaryModel->get_frames_for_queen instead.";
 
-        # Get a DBIx::Class::ResultSet object for the 'Frame' table
-        my $rs = $schema->resultset('Frame');
-
-        # Fetch the frames for the given queen
-        @frames = $rs->search({ queen_id => $queen_tag_number });
-    };
-    if ($@) {
-        # An error occurred, handle it here
-        warn "An error occurred while fetching frames for queen: $@";
-        return;
-    }
-
-    return \@frames;
+    # Forward to the ApiaryModel implementation
+    return $self->apiary_model->get_frames_for_queen($queen_tag_number);
 }
 
 # This subroutine fetches yards for a given site
@@ -37,24 +29,10 @@ sub get_frames_for_queen {
 sub get_yards_for_site {
     my ($self, $site_name) = @_;
 
-    my @yards;
-    eval {
-        # Get a DBIx::Class::Schema object
-        my $schema = $self->schema;
+    warn "DEPRECATED: get_yards_for_site in BMaster.pm is deprecated. Please use ApiaryModel->get_yards_for_site instead.";
 
-        # Get a DBIx::Class::ResultSet object for the 'ApisYardsTb' table
-        my $rs = $schema->resultset('ApisYardsTb');
-
-        # Fetch all yards for the given site
-        @yards = $rs->search({ sitename => $site_name });
-    };
-    if ($@) {
-        # An error occurred, handle it here
-        warn "An error occurred while fetching yards: $@";
-        return;
-    }
-
-    return \@yards;
+    # Forward to the ApiaryModel implementation
+    return $self->apiary_model->get_yards_for_site($site_name);
 }
 
 # This subroutine counts the number of queens
@@ -62,24 +40,10 @@ sub get_yards_for_site {
 sub count_queens {
     my ($self) = @_;
 
-    my $count;
-    eval {
-        # Get a DBIx::Class::Schema object
-        my $schema = $self->schema;
+    warn "DEPRECATED: count_queens in BMaster.pm is deprecated. Please use ApiaryModel->count_queens instead.";
 
-        # Get a DBIx::Class::ResultSet object for the 'Queen' table
-        my $rs = $schema->resultset('Queen');
-
-        # Count the number of queens
-        $count = $rs->count();
-    };
-    if ($@) {
-        # An error occurred, handle it here
-        warn "An error occurred while counting queens: $@";
-        return;
-    }
-
-    return $count;
+    # Forward to the ApiaryModel implementation
+    return $self->apiary_model->count_queens();
 }
 
 # This subroutine adds a yard
@@ -89,33 +53,10 @@ sub count_queens {
 sub add_yard {
     my ($self, $c, $yard_name) = @_;
 
-    # Validate the yard_name parameter
-    unless (defined $yard_name && $yard_name =~ /^[a-zA-Z0-9_]+$/) {
-        warn "Invalid yard name: $yard_name";
-        return;
-    }
+    warn "DEPRECATED: add_yard in BMaster.pm is deprecated. Please use ApiaryModel->add_yard instead.";
 
-    eval {
-        # Get a DBIx::Class::Schema object
-        my $schema = $self->schema;
-
-        # Check if the 'Yard' table exists
-        my $rs = $schema->resultset('Yard');
-
-        # If the 'Yard' table does not exist, create it
-        if (!$rs) {
-$c->model('DBEncy')->create_table_from_result('Yard', $schema);        }
-
-        # Add the new yard to the 'Yard' table
-        $rs->create({ yard_name => $yard_name });
-    };
-    if ($@) {
-        # An error occurred, handle it here
-        warn "An error occurred while adding a yard: $@";
-        return;
-    }
-
-    return 1;
+    # Forward to the ApiaryModel implementation
+    return $self->apiary_model->add_yard($c, $yard_name);
 }
 
 # This subroutine counts the number of frames
@@ -123,24 +64,10 @@ $c->model('DBEncy')->create_table_from_result('Yard', $schema);        }
 sub count_frames {
     my ($self) = @_;
 
-    my $count;
-    eval {
-        # Get a DBIx::Class::Schema object
-        my $schema = $self->schema;
+    warn "DEPRECATED: count_frames in BMaster.pm is deprecated. Please use ApiaryModel->count_frames instead.";
 
-        # Get a DBIx::Class::ResultSet object for the 'Frame' table
-        my $rs = $schema->resultset('Frame');
-
-        # Count the number of frames
-        $count = $rs->count();
-    };
-    if ($@) {
-        # An error occurred, handle it here
-        warn "An error occurred while counting frames: $@";
-        return;
-    }
-
-    return $count;
+    # Forward to the ApiaryModel implementation
+    return $self->apiary_model->count_frames();
 }
 
 # This line makes the package immutable

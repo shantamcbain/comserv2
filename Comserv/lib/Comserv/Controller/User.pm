@@ -722,9 +722,18 @@ sub do_create_account :Local {
     my $password_confirm = $c->request->params->{password_confirm};  # Retrieve the confirmation password
     my $first_name = $c->request->params->{first_name};
     my $last_name = $c->request->params->{last_name};
+    my $email = $c->request->params->{email};
+    my $roles = $c->request->params->{roles} || 'user';  # Default role is 'user'
+
+    # Log the account creation attempt
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
+        "Account creation attempt for username: $username");
 
     # Ensure all required fields are filled
     unless ($username && $password && $password_confirm && $first_name && $last_name) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
+            "Missing required fields for account creation");
+
         $c->stash(
             error_msg => 'All fields are required to create an account',
             template  => 'user/create_account.tt',
@@ -734,6 +743,9 @@ sub do_create_account :Local {
 
     # Check if the passwords match
     if ($password ne $password_confirm) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
+            "Passwords do not match for account creation");
+
         $c->stash(
             error_msg => 'Passwords do not match',
             template  => 'user/create_account.tt',
@@ -745,8 +757,11 @@ sub do_create_account :Local {
     my $hashed_password = $self->hash_password($password);
 
     # Check if the username already exists in the database
-    my $existing_user = $c->model('DBEncy::Ency::User')->find({ username => $username });
+    my $existing_user = $c->model('DBEncy::User')->find({ username => $username });
     if ($existing_user) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
+            "Username already exists: $username");
+
         $c->stash(
             error_msg => 'Username already exists. Please choose another.',
             template  => 'user/create_account.tt',
@@ -756,11 +771,18 @@ sub do_create_account :Local {
 
     # Create the new user in the database
     eval {
-        $c->model('DBEncy::Ency::User')->create({
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
+            "Creating new user: $username with roles: $roles");
+
+        $c->model('DBEncy::User')->create({
             username    => $username,
             password    => $hashed_password,
             first_name  => $first_name,
             last_name   => $last_name,
+            email       => $email,
+            roles       => $roles,
+            active      => 1,
+            created_at  => \'NOW()',
         });
     };
 

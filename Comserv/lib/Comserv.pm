@@ -98,6 +98,9 @@ sub psgi_app {
                 # Explicitly load controllers to ensure they're available
                 use Comserv::Controller::ProxmoxServers;
                 use Comserv::Controller::Proxmox;
+                use Comserv::Controller::BMaster;
+                use Comserv::Controller::ENCY;
+                use Comserv::Controller::Apiary;
 
                 __PACKAGE__->setup();
 
