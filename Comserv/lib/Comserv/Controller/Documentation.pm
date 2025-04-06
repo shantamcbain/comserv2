@@ -4,6 +4,7 @@ use namespace::autoclean;
 use Comserv::Util::Logging;
 use File::Find;
 use File::Basename;
+use Comserv::Controller::Documentation::ScanMethods qw(_scan_directories _categorize_pages);
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -191,24 +192,7 @@ sub BUILD {
         }, $base_dir);
     };
 
-    # Helper method to format titles from filenames
-    sub _format_title {
-        my ($self, $filename) = @_;
-
-        # Remove file extension
-        $filename =~ s/\.(md|tt)$//i;
-
-        # Replace underscores with spaces
-        $filename =~ s/_/ /g;
-
-        # Replace hyphens with spaces
-        $filename =~ s/-/ /g;
-
-        # Capitalize first letter of each word
-        my $title = join(' ', map { ucfirst $_ } split(/\s+/, $filename));
-
-        return $title;
-    }
+    # Using the standalone _format_title method defined below
 
     # Initialize category pages as empty arrays to avoid duplicates
     foreach my $category (keys %{$self->documentation_categories}) {
@@ -580,6 +564,9 @@ sub _has_site_specific_docs {
 sub _format_title {
     my ($self, $page_name) = @_;
 
+    # Log the input for debugging
+    $self->logging->log_to_file("Formatting title from: $page_name", undef, 'DEBUG');
+
     # Convert underscores and hyphens to spaces
     my $title = $page_name;
     $title =~ s/_/ /g;
@@ -599,6 +586,9 @@ sub _format_title {
     $title =~ s/\bCd\b/CD/g;
     $title =~ s/\bDbi\b/DBI/g;
     $title =~ s/\bEncy\b/ENCY/g;
+
+    # Log the output for debugging
+    $self->logging->log_to_file("Formatted title result: $title", undef, 'DEBUG');
 
     return $title;
 }
