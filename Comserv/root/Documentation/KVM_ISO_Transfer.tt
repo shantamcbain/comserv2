@@ -1,0 +1,110 @@
+[% META title = 'KVM ISO File Transfer Documentation' %]
+[% PageVersion = 'Documentation/KVM_ISO_Transfer.tt,v 0.01.1 2025/04/07 Admin Exp admin ' %]
+
+<h1 id="kvm-iso-top">KVM ISO File Transfer System Documentation</h1>
+
+<nav>
+    <a href="#kvm-overview">Overview</a> |
+    <a href="#kvm-prerequisites">Prerequisites</a> |
+    <a href="#kvm-workflow">Workflow</a> |
+    <a href="#kvm-automation">Automation Scripts</a> |
+    <a href="#kvm-troubleshooting">Troubleshooting</a> |
+    <a href="#kvm-limitations">Limitations</a>
+</nav>
+
+<h2 id="kvm-overview">Overview</h2>
+<p>The ISO file transfer system provides a reliable method for moving files between host systems and KVM virtual machines. This solution uses virtual CD-ROM devices to create a secure file transfer channel without requiring network connectivity.</p>
+
+<h2 id="kvm-prerequisites">Prerequisites</h2>
+<ul>
+    <li><strong>Required Packages:</strong>
+        <ul>
+            <li><code>mkisofs</code> or <code>genisoimage</code></li>
+            <li><code>virt-manager</code> (GUI) or <code>virsh</code> (CLI)</li>
+        </ul>
+    </li>
+    <li><strong>Directory Structure:</strong>
+        <pre>
+~/kvm_shared_files/
+├── scripts/
+│   ├── create_shared_iso.sh
+│   └── detach_shared_iso.sh
+└── data/</pre>
+    </li>
+</ul>
+
+<h2 id="kvm-workflow">Workflow</h2>
+<ol>
+    <li><strong>File Preparation:</strong>
+        <ul>
+            <li>Place files in <code>~/kvm_shared_files/data/</code></li>
+            <li>Run ISO creation script:
+                <pre>./scripts/create_shared_iso.sh</pre>
+            </li>
+        </ul>
+    </li>
+    <li><strong>VM Attachment:</strong>
+        <ul>
+            <li>GUI Method:
+                <pre>virt-manager → Add Hardware → Storage → Select ISO</pre>
+            </li>
+            <li>CLI Method:
+                <pre>virsh attach-disk &lt;vm-name&gt; ~/kvm_shared.iso hda --type cdrom</pre>
+            </li>
+        </ul>
+    </li>
+    <li><strong>File Access in VM:</strong>
+        <ul>
+            <li>Mount appears as DVD drive in Windows</li>
+            <li>Standard file copy operations</li>
+        </ul>
+    </li>
+</ol>
+
+<h2 id="kvm-automation">Automation Scripts</h2>
+<h3>create_shared_iso.sh</h3>
+<pre>
+#!/bin/bash
+SOURCE_DIR="$HOME/kvm_shared_files/data"
+ISO_PATH="$HOME/kvm_shared.iso"
+
+mkisofs -V "KVM_TRANSFER" -J -r -o "$ISO_PATH" "$SOURCE_DIR"
+[ -f "$ISO_PATH" ] && echo "ISO created" || exit 1</pre>
+
+<h3>detach_shared_iso.sh</h3>
+<pre>
+#!/bin/bash
+virsh detach-disk &lt;vm-name&gt; hda --type cdrom</pre>
+
+<h2 id="kvm-troubleshooting">Troubleshooting</h2>
+<table class="table">
+    <tr>
+        <th>Issue</th>
+        <th>Solution</th>
+    </tr>
+    <tr>
+        <td>ISO not detected</td>
+        <td>
+            <ol>
+                <li>Verify CD-ROM drive exists in VM hardware</li>
+                <li>Check IDE bus configuration</li>
+                <li>Confirm ISO file permissions</li>
+            </ol>
+        </td>
+    </tr>
+    <tr>
+        <td>Permission denied errors</td>
+        <td>
+            <pre>sudo chmod 644 ~/kvm_shared.iso</pre>
+        </td>
+    </tr>
+</table>
+
+<h2 id="kvm-limitations">System Limitations</h2>
+<ul>
+    <li>Maximum ISO size: 4.7GB (DVD-R limit)</li>
+    <li>Read-only access to transferred files</li>
+    <li>Requires VM reboot for new ISO attachments</li>
+</ul>
+
+<p><a href="#kvm-iso-top">Back to top</a></p>

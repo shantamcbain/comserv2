@@ -425,6 +425,14 @@ sub database_schema :Path('database_schema') :Args(0) {
     $c->forward($c->view('TT'));
 }
 
+# KVM ISO Transfer documentation
+sub kvm_iso_transfer :Path('KVM_ISO_Transfer') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'kvm_iso_transfer', "Accessing KVM ISO Transfer documentation");
+    $c->stash(template => 'Documentation/KVM_ISO_Transfer.tt');
+    $c->forward($c->view('TT'));
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;
