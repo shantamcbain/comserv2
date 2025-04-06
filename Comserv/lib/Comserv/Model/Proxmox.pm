@@ -52,6 +52,11 @@ has 'api_token' => (
     default => ''
 );
 
+has 'token' => (
+    is => 'rw',
+    default => ''
+);
+
 has 'credentials_loaded' => (
     is => 'rw',
     default => 0
@@ -198,20 +203,7 @@ sub get_credentials {
     return $credentials;
 }
 
-# This is a duplicate method that was added by mistake
-# Get credentials for a specific server - DUPLICATE
-sub get_credentials {
-    my ($self, $server_id) = @_;
-
-    my $logging = Comserv::Util::Logging->instance;
-    $logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'get_credentials',
-        "Getting credentials for server: $server_id");
-
-    # Get the credentials from the credentials file
-    my $credentials = Comserv::Util::ProxmoxCredentials::get_credentials($server_id);
-
-    return $credentials;
-}
+# Duplicate method removed to fix declaration error
 
 # Set the server ID
 sub set_server_id {
@@ -229,6 +221,7 @@ sub set_server_id {
 
     # Reset API token
     $self->{api_token} = '';
+    $self->{token} = '';  # For backward compatibility
 
     return 1;
 }
@@ -273,6 +266,7 @@ sub check_connection {
 
         # Store the token for future use
         $self->{api_token} = $token;
+        $self->{token} = $token;  # For backward compatibility
 
         $logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'check_connection',
             "Stored API token for future use");
@@ -326,114 +320,6 @@ sub check_connection {
 
         return 0;
     }
-}
-
-# Test direct connection to the 'proxmox' node
-sub test_proxmox_node {
-    my ($self) = @_;
-
-    my $logging = Comserv::Util::Logging->instance;
-    $logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'test_proxmox_node',
-        "Testing direct connection to 'proxmox' node");
-
-    # Make sure credentials are loaded
-    $self->_load_credentials() unless $self->{credentials_loaded};
-
-    # Check if we have valid credentials
-    if (!$self->{api_url_base}) {
-        $logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'test_proxmox_node',
-            "No valid API URL found for server: " . $self->{server_id});
-        return [];
-    }
-
-    # Create a user agent
-    my $ua = LWP::UserAgent->new;
-    $ua->ssl_opts(verify_hostname => 0, SSL_verify_mode => 0);
-    $ua->timeout(30);
-
-    # Construct the URL for QEMU VMs on the 'proxmox' node
-    my $proxmox_url = $self->{api_url_base} . '/nodes/proxmox/qemu';
-    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'test_proxmox_node',
-        "Trying to get VMs from URL: $proxmox_url");
-
-    # Create the request
-    my $proxmox_req = HTTP::Request->new(GET => $proxmox_url);
-
-    # Add the API token header if available
-    if ($self->{token_user} && $self->{token_value}) {
-        my $token = "PVEAPIToken=" . $self->{token_user} . "=" . $self->{token_value};
-        $proxmox_req->header('Authorization' => $token);
-    } elsif ($self->{api_token}) {
-        $proxmox_req->header('Authorization' => $self->{api_token});
-    }
-
-    # Send the request
-    my $proxmox_res = $ua->request($proxmox_req);
-
-    # Log the response status
-    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'test_proxmox_node',
-        "Direct 'proxmox' node API response status: " . $proxmox_res->status_line);
-
-    # Store the response for debugging
-    $self->{debug_info}->{direct_proxmox_url} = $proxmox_url;
-    $self->{debug_info}->{direct_proxmox_response_code} = $proxmox_res->code;
-    $self->{debug_info}->{direct_proxmox_response_status} = $proxmox_res->status_line;
-    $self->{debug_info}->{direct_proxmox_response_content} = substr($proxmox_res->content, 0, 1000);
-
-    # If we got a successful response, try to parse the VMs
-    if ($proxmox_res->is_success) {
-        eval {
-            my $proxmox_data = decode_json($proxmox_res->content);
-            if ($proxmox_data && $proxmox_data->{data} && ref($proxmox_data->{data}) eq 'ARRAY') {
-                # Process the VM data
-                my @vms;
-                foreach my $vm (@{$proxmox_data->{data}}) {
-                    # Extract the VM ID
-                    my $vmid = $vm->{vmid};
-
-                    # Log the VM being processed
-                    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'test_proxmox_node',
-                        "Processing VM from 'proxmox' node: ID=$vmid, Name=" . ($vm->{name} || 'unnamed'));
-
-                    # Create a VM object
-                    my $vm_obj = {
-                        vmid => $vmid,
-                        name => $vm->{name} || "VM $vmid",
-                        status => $vm->{status} || 'unknown',
-                        type => 'qemu',
-                        node => 'proxmox',
-                        maxmem => $vm->{maxmem} || 0,
-                        maxdisk => $vm->{maxdisk} || 0,
-                        uptime => $vm->{uptime} || 0,
-                        cpu => $vm->{cpu} || 0,
-                        server_id => $self->{server_id},
-                    };
-
-                    # Add the VM to the list
-                    push @vms, $vm_obj;
-                }
-
-                $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'test_proxmox_node',
-                    "Successfully retrieved " . scalar(@vms) . " VMs directly from 'proxmox' node");
-
-                # Return the VMs
-                return \@vms;
-            } else {
-                $logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'test_proxmox_node',
-                    "No VMs found in direct 'proxmox' node response");
-            }
-        };
-        if ($@) {
-            $logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'test_proxmox_node',
-                "Error parsing direct 'proxmox' node response: $@");
-        }
-    } else {
-        $logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'test_proxmox_node',
-            "Failed to get VMs directly from 'proxmox' node: " . $proxmox_res->status_line);
-    }
-
-    # Return an empty array if we couldn't get any VMs
-    return [];
 }
 
 # Test direct connection to the 'proxmox' node
@@ -1148,37 +1034,10 @@ sub _get_real_vms_new {
 
             return [];
         }
-        }
     }
 }
 
-# Direct test for the 'proxmox' node
-sub test_proxmox_node {
-    my ($self) = @_;
-
-    my $logging = Comserv::Util::Logging->instance;
-    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'test_proxmox_node',
-        "Testing direct connection to 'proxmox' node");
-
-    # Create a user agent
-    my $ua = LWP::UserAgent->new;
-    $ua->ssl_opts(verify_hostname => 0, SSL_verify_mode => 0);
-    $ua->timeout(30);
-
-    # Try a direct call to the 'proxmox' node
-    my $vms = $self->_try_get_node_vms($ua, 'proxmox');
-
-    if ($vms && @$vms > 0) {
-        $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'test_proxmox_node',
-            "Successfully retrieved " . scalar(@$vms) . " VMs directly from 'proxmox' node");
-        return $vms;
-    }
-
-    $logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'test_proxmox_node',
-        "No VMs found on 'proxmox' node");
-
-    return [];
-}
+# This duplicate test_proxmox_node method has been removed to fix declaration errors
 
 # Helper function to try getting VMs from a specific node
 sub _try_get_node_vms {

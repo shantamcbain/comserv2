@@ -2,6 +2,7 @@ package Comserv::Controller::Admin;
 use Moose;
 use namespace::autoclean;
 use Data::Dumper;
+use Fcntl qw(:DEFAULT :flock);  # Import O_WRONLY, O_APPEND, O_CREAT constants
 BEGIN { extends 'Catalyst::Controller'; }
 
 sub begin : Private {
@@ -48,15 +49,15 @@ sub index :Path :Args(0) {
     $c->forward($c->view('TT'));
 }
 
-sub edit_documentation :Path('/edit_documentation') :Args(0) {
-    my ( $self, $c ) = @_;
-    $c->stash(template => 'admin/edit_documentation.tt');
-}
+# This method has been moved to Path('admin/edit_documentation')
 
 sub add_schema :Path('/add_schema') :Args(0) {
     my ( $self, $c ) = @_;
     # Debug logging for add_schema action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_schema', "Starting add_schema action");
+
+    # Initialize output variable
+    my $output = '';
 
     if ( $c->request->method eq 'POST' ) {
         my $migration = DBIx::Class::Migration->new(
@@ -71,12 +72,15 @@ sub add_schema :Path('/add_schema') :Args(0) {
             eval {
                 $migration->make_schema;
                 $c->stash(message => 'Migration script created successfully.');
+                $output = "Created migration script for schema: $schema_name";
             };
             if ($@) {
                 $c->stash(error_msg => 'Failed to create migration script: ' . $@);
+                $output = "Error: $@";
             }
         } else {
             $c->stash(error_msg => 'Schema name and description cannot be empty.');
+            $output = "Error: Schema name and description cannot be empty.";
         }
 
         # Add the output to the stash so it can be displayed in the template
@@ -403,11 +407,17 @@ sub migrate_schema :Path('migrate_schema') :Args(0) {
 }
 
 # Edit documentation action
-sub edit_documentation :Path('admin/edit_documentation') :Args(0) {
+sub edit_documentation :Path('/admin/edit_documentation') :Args(0) {
     my ( $self, $c ) = @_;
     # Debug logging for edit_documentation action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_documentation', "Starting edit_documentation action");
-    $c->stash(template => 'admin/edit_documentation.tt');
+
+    # Add debug message to stash
+    $c->stash(
+        debug_msg => "Edit documentation page loaded",
+        template => 'admin/edit_documentation.tt'
+    );
+
     $c->forward($c->view('TT'));
 }
 
