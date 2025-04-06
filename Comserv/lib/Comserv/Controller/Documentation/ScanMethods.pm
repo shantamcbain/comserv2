@@ -1,3 +1,13 @@
+package Comserv::Controller::Documentation::ScanMethods;
+use strict;
+use warnings;
+use File::Find;
+use File::Basename;
+use Comserv::Util::Logging;
+use Exporter 'import';
+
+our @EXPORT = qw(_scan_directories _categorize_pages);
+
 # Scan directories for documentation files
 sub _scan_directories {
     my ($self) = @_;
@@ -161,3 +171,6 @@ sub _categorize_pages {
     
     Comserv::Util::Logging::log_to_file("Page categorization completed", undef, 'INFO');
 }
+
+# Return true value at the end of the module
+1;
