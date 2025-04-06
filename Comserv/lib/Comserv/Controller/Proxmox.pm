@@ -155,6 +155,10 @@ sub index :Path :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
         "Testing multiple Proxmox API endpoints");
 
+    # Get the credentials for API testing
+    require Comserv::Util::ProxmoxCredentials;
+    my $credentials = Comserv::Util::ProxmoxCredentials::get_credentials($server_id);
+
     # Create a user agent
     my $ua = LWP::UserAgent->new;
     $ua->ssl_opts(verify_hostname => 0, SSL_verify_mode => 0);
@@ -231,12 +235,8 @@ sub index :Path :Args(0) {
             ", current_server_name=$current_server_name, vm_count=" . scalar(@$vms));
 
     # Add debug info to the stash
-    require Comserv::Util::ProxmoxCredentials;
     my $creds_file = Comserv::Util::ProxmoxCredentials::get_credentials_file_path();
     my $creds_exists = -f $creds_file ? 'yes' : 'no';
-
-    # Get the credentials for debugging
-    my $credentials = Comserv::Util::ProxmoxCredentials::get_credentials($server_id);
 
     # Get the Proxmox model's debug info
     my $proxmox_debug_info = $proxmox->{debug_info} || {};

@@ -1,4 +1,4 @@
-[% PageVersion = 'Documentation/index.tt,v 1.2 2024/05/31 shanta Exp shanta ' %]
+[% PageVersion = 'Documentation/index.tt,v 1.4 2024/06/05 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -129,9 +129,34 @@
         </div>
         [% END %]
 
+        <!-- Proxmox Documentation Section -->
+        <div class="documentation-section">
+            <h2 class="section-toggle expanded">Proxmox Documentation</h2>
+            <p>Documentation for Proxmox virtualization environment.</p>
+            <div class="section-grid expanded">
+                <div class="documentation-card">
+                    <h3>CD Visibility in Proxmox Linux VMs</h3>
+                    <p>Guide to managing CD/DVD visibility and mounting in Proxmox Linux virtual machines.</p>
+                    <a href="[% c.uri_for('/Documentation/proxmox/Proxmox_CD_Visibility.tt') %]" class="card-link">Read More</a>
+                </div>
+            </div>
+        </div>
+
         [% IF display_role == 'Administrator' || display_role == 'Developer' || c.session.debug_mode == 1 %]
         [% IF categories.admin_guides %]
-        <div class="documentation-section">
+        <div class="documentation-system-info">
+        <h2>Documentation System</h2>
+        <p>The Comserv documentation system is currently in transition. We are moving from a monolithic documentation approach to a more modular, organized system with separate files for different topics.</p>
+
+        <div class="info-card">
+            <h3>Legacy Documentation</h3>
+            <p>Our comprehensive legacy documentation is still available and contains detailed information about all system components:</p>
+            <a href="/Documentation/Documentation" class="legacy-doc-link">Access Legacy Documentation</a>
+            <p class="note">Note: Over time, content from the legacy documentation will be migrated to individual topic-specific files.</p>
+        </div>
+    </div>
+
+    <div class="documentation-section">
             <h2 class="section-toggle expanded">Administrator Documentation</h2>
             <p>Documentation for system administrators.</p>
             <div class="section-grid expanded">
@@ -159,7 +184,12 @@
                         <p>Guide to configuring system settings and preferences.</p>
                         <a href="[% c.uri_for('/Documentation/roles/admin/system_configuration.md') %]" class="card-link">Read More</a>
                     </div>
-                [% END %]
+                    <div class="documentation-card">
+                        <h3>Theme System</h3>
+                        <p>Guide to the theme system implementation and customization.</p>
+                        <a href="[% c.uri_for('/Documentation/theme_system_implementation') %]" class="card-link">Read More</a>
+                    </div>
+        [% END %]
             </div>
         </div>
         [% END %]
@@ -206,9 +236,9 @@
 
         [% IF categories.modules && (display_role == 'Administrator' || display_role == 'Developer' || c.session.debug_mode == 1) %]
         <div class="documentation-section">
-            <h2 class="section-toggle">Module Documentation</h2>
+            <h2 class="section-toggle expanded">Module Documentation</h2>
             <p>Documentation for specific system modules.</p>
-            <div class="section-grid">
+            <div class="section-grid expanded">
                 [% IF categories.modules.pages.size > 0 %]
                     [% FOREACH page_name IN categories.modules.pages %]
                         [% IF structured_pages.$page_name %]
@@ -223,11 +253,6 @@
                         [% END %]
                     [% END %]
                 [% ELSE %]
-                    <div class="documentation-card">
-                        <h3>User Module</h3>
-                        <p>Technical documentation for the User module.</p>
-                        <a href="[% c.uri_for('/Documentation/modules/user.md') %]" class="card-link">Read More</a>
-                    </div>
                     <div class="documentation-card">
                         <h3>Documentation Module</h3>
                         <p>Guide to the Documentation system and its features.</p>
@@ -330,12 +355,14 @@
                 const section = this.closest('.documentation-section, .recent-updates-section, .all-docs-section');
                 const content = section.querySelector('.section-grid, .section-content');
 
-                if (content.classList.contains('expanded')) {
-                    content.style.maxHeight = null;
-                    content.classList.remove('expanded');
-                } else {
-                    content.style.maxHeight = content.scrollHeight + 'px';
-                    content.classList.add('expanded');
+                if (content) {
+                    if (this.classList.contains('expanded')) {
+                        content.style.maxHeight = content.scrollHeight + 'px';
+                        content.classList.add('expanded');
+                    } else {
+                        content.style.maxHeight = '0';
+                        content.classList.remove('expanded');
+                    }
                 }
             });
         });
