@@ -728,60 +728,10 @@ sub accounts :Path('/accounts') :Args(0) {
 
 sub default :Path {
     my ( $self, $c ) = @_;
-
-    # Log the 404 error with detailed information
-    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'default',
-        "404 Not Found: " . $c->req->uri->path);
-    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'default',
-        "Request method: " . $c->req->method);
-    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'default',
-        "Controller: " . __PACKAGE__);
-
-    # Log the available controllers and their namespaces
-    # Using a safer approach to get controller names
-    my @controllers = ();
-    foreach my $component (sort keys %{$c->components}) {
-        if ($component =~ /^Comserv::Controller::(.+)$/) {
-            push @controllers, $1;
-        }
-    }
-    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'default',
-        "Available controllers: " . join(", ", @controllers));
-
-    # Log the requested path
-    my $path = $c->req->uri->path;
-    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'default',
-        "Requested path: $path (not found)");
-
-    # Log the 404 for server room plan but don't handle it here
-    if ($c->req->uri->path =~ /server[-_]room[-_]plan/) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'default',
-            "Detected server room plan in path, but this should be handled by the MCoop controller");
-    }
-
-    # Check if this is a request for the MCoop controller
-    if ($c->req->uri->path =~ m{^/mcoop/}) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'default', "Detected mcoop path in 404, forwarding to MCoop controller");
-        my $path = $c->req->uri->path;
-        $path =~ s{^/mcoop/}{};
-        $c->detach('/mcoop/' . $path);
-        return;
-    }
-
-    # Set up the 404 page
-    $c->stash(
-        template => 'error.tt',
-        error_title => '404 - Page Not Found',
-        error_msg => 'The page you requested could not be found. <br><a href="/server-room-plan" style="color: #006633; font-weight: bold;">View Server Room Plan</a>',
-        requested_path => $c->req->uri->path,
-        status_code => 404
-    );
-
-    # Set the HTTP status code
+    my $requested_path = $c->req->path;
+    $c->stash->{error_msg} = "The page you requested could not be found: /$requested_path. <br><a href=\"/mcoop\" style=\"color: #006633; font-weight: bold;\">Return to Landing Page</a>";
+    $c->stash->{template} = 'error.tt';
     $c->response->status(404);
-
-    # Render the error template
-    $c->forward($c->view('TT'));
 }
 
 sub documentation :Path('documentation') :Args(0) {

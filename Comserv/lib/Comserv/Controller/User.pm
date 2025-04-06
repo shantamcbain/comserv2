@@ -412,6 +412,297 @@ sub hash_password {
     my ($self, $password) = @_;
     return sha256_hex($password);
 }
+
+sub logout :Local {
+    my ($self, $c) = @_;
+
+    # Store the current URL before logout
+    my $current_url = $c->req->referer || $c->uri_for('/');
+
+    # Log the logout action with the current URL
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'logout',
+        "User '" . ($c->session->{username} || 'unknown') . "' logging out, current URL: $current_url");
+
+    # Get username before clearing session (for the success message)
+    my $username = $c->session->{username} || 'Guest';
+
+    # Store important site information before clearing the session
+    my $site_name = $c->session->{SiteName} || '';
+    my $theme_name = $c->session->{theme_name} || '';
+    my $controller_name = $c->session->{ControllerName} || '';
+
+    # Log the site information we're preserving
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'logout',
+        "Preserving site info: SiteName=$site_name, theme=$theme_name, controller=$controller_name");
+
+    # Properly delete the session (instead of just emptying it)
+    $c->delete_session("User logged out");
+
+    # Create a new session with minimal required data
+    $c->session->{SiteName} = $site_name if $site_name;
+    $c->session->{theme_name} = $theme_name if $theme_name;
+    $c->session->{ControllerName} = $controller_name if $controller_name;
+
+    # Set a success message
+    $c->flash->{success_msg} = "You have been successfully logged out.";
+
+    # Log the session deletion
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'logout',
+        "Session deleted for user '$username'. New session ID: " . $c->sessionid);
+
+    # Check if the current page is accessible to non-logged-in users
+    # List of public pages that don't require login
+    my @public_pages = (
+        qr{^/Documentation},  # Documentation pages
+        qr{^/$},              # Home page
+        qr{^/about},          # About page
+        qr{^/contact},        # Contact page
+        qr{^/user/login},     # Login page
+        qr{^/user/create_account}, # Registration page
+        qr{^/mcoop},          # MCoop pages
+        qr{^/csc},            # CSC pages
+        qr{^/usbm},           # USBM pages
+        qr{^/forager},        # Forager pages
+        qr{^/ve7tit},         # Ve7tit pages
+    );
+
+    # Check if current URL is in the public pages list
+    my $is_public = 0;
+    foreach my $pattern (@public_pages) {
+        if ($current_url =~ $pattern) {
+            $is_public = 1;
+            last;
+        }
+    }
+
+    # Log the decision
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'logout',
+        "URL $current_url is " . ($is_public ? "public" : "not public"));
+
+    # Determine the redirect URL
+    my $redirect_url;
+
+    # Log all the information we have for debugging
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'logout',
+        "Current URL: $current_url, SiteName: $site_name, Controller: $controller_name");
+
+    # First, try to extract the site from the current URL
+    my $site_from_url = '';
+    if ($current_url =~ m{^/([^/]+)}) {
+        $site_from_url = $1;
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'logout',
+            "Extracted site from URL: $site_from_url");
+    }
+
+    # Check if the site from URL is a valid controller
+    my $site_controller_exists = 0;
+    if ($site_from_url) {
+        eval {
+            my $controller = $c->controller(ucfirst($site_from_url));
+            $site_controller_exists = 1 if $controller;
+        };
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'logout',
+            "Site controller exists: " . ($site_controller_exists ? "Yes" : "No"));
+    }
+
+    if ($is_public) {
+        # If the current page is public, stay on it
+        $redirect_url = $current_url;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'logout',
+            "Redirecting to current public page: $redirect_url");
+    } elsif ($site_controller_exists) {
+        # If we extracted a valid controller from the URL, use that
+        $redirect_url = $c->uri_for("/$site_from_url");
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'logout',
+            "Redirecting to site from URL: $redirect_url");
+    } elsif ($controller_name && $controller_name ne 'Root') {
+        # If we have a site-specific controller in the session, redirect to its home page
+        $redirect_url = $c->uri_for("/$controller_name");
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'logout',
+            "Redirecting to site controller from session: $redirect_url");
+    } elsif ($site_name && $site_name ne 'none') {
+        # Try to use the site name as a fallback
+        $redirect_url = $c->uri_for("/" . lc($site_name));
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'logout',
+            "Redirecting to site from SiteName: $redirect_url");
+    } else {
+        # Default to the root home page as a last resort
+        $redirect_url = $c->uri_for('/');
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'logout',
+            "Redirecting to default home page: $redirect_url");
+    }
+
+    # Perform the redirect
+    $c->response->redirect($redirect_url);
+    return;
+}
+
+sub profile :Local {
+    my ($self, $c) = @_;
+
+    # Check if user is logged in
+    unless ($c->session->{username}) {
+        $c->flash->{error_msg} = "You must be logged in to view your profile.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    # Log the profile access
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'profile',
+        "User '" . $c->session->{username} . "' accessing profile");
+
+    # Get user data from database
+    my $user = $c->model('DBEncy::User')->find({ username => $c->session->{username} });
+
+    unless ($user) {
+        $c->flash->{error_msg} = "User not found in database. Please log in again.";
+        $c->session({});  # Clear session
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    # Prepare user data for display
+    my $user_data = {
+        username => $user->username,
+        first_name => $user->first_name,
+        last_name => $user->last_name,
+        email => $user->email,
+        roles => $c->session->{roles} || [],
+        # Add other fields as needed
+    };
+
+    # Set template and stash data
+    $c->stash(
+        user => $user_data,
+        template => 'user/profile.tt'
+    );
+
+    $c->forward($c->view('TT'));
+}
+
+sub settings :Local {
+    my ($self, $c) = @_;
+
+    # Check if user is logged in
+    unless ($c->session->{username}) {
+        $c->flash->{error_msg} = "You must be logged in to access account settings.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    # Log the settings access
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'settings',
+        "User '" . $c->session->{username} . "' accessing account settings");
+
+    # Get user data from database
+    my $user = $c->model('DBEncy::User')->find({ username => $c->session->{username} });
+
+    unless ($user) {
+        $c->flash->{error_msg} = "User not found in database. Please log in again.";
+        $c->session({});  # Clear session
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    # Set template and stash data
+    $c->stash(
+        user => {
+            username => $user->username,
+            first_name => $user->first_name,
+            last_name => $user->last_name,
+            email => $user->email,
+            email_notifications => $user->email_notifications || 0,
+            # Add other fields as needed
+        },
+        template => 'user/settings.tt'
+    );
+
+    $c->forward($c->view('TT'));
+}
+
+sub update_settings :Local {
+    my ($self, $c) = @_;
+
+    # Check if user is logged in
+    unless ($c->session->{username}) {
+        $c->flash->{error_msg} = "You must be logged in to update settings.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    # Log the update attempt
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_settings',
+        "User '" . $c->session->{username} . "' attempting to update settings");
+
+    # Get user data from database
+    my $user = $c->model('DBEncy::User')->find({ username => $c->session->{username} });
+
+    unless ($user) {
+        $c->flash->{error_msg} = "User not found in database. Please log in again.";
+        $c->session({});  # Clear session
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    # Get form data
+    my $first_name = $c->req->params->{first_name};
+    my $last_name = $c->req->params->{last_name};
+    my $email = $c->req->params->{email};
+    my $theme = $c->req->params->{theme} || 'default';
+    my $email_notifications = $c->req->params->{email_notifications} ? 1 : 0;
+    my $debug_mode = $c->req->params->{debug_mode} ? 1 : 0;
+
+    # Validate input
+    unless ($first_name && $last_name && $email) {
+        $c->flash->{error_msg} = "First name, last name, and email are required fields.";
+        $c->response->redirect($c->uri_for('/user/settings'));
+        return;
+    }
+
+    # Validate email format
+    unless ($email =~ /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/) {
+        $c->flash->{error_msg} = "Invalid email format.";
+        $c->response->redirect($c->uri_for('/user/settings'));
+        return;
+    }
+
+    # Update user in database
+    eval {
+        $user->update({
+            first_name => $first_name,
+            last_name => $last_name,
+            email => $email,
+            email_notifications => $email_notifications,
+            # Add other fields as needed
+        });
+    };
+
+    if ($@) {
+        # Log the error
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_settings',
+            "Error updating user settings: $@");
+
+        $c->flash->{error_msg} = "An error occurred while updating your settings. Please try again.";
+        $c->response->redirect($c->uri_for('/user/settings'));
+        return;
+    }
+
+    # Update session data
+    $c->session->{first_name} = $first_name;
+    $c->session->{last_name} = $last_name;
+    $c->session->{email} = $email;
+    $c->session->{theme_name} = $theme;
+    $c->session->{debug_mode} = $debug_mode;
+
+    # Log the successful update
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_settings',
+        "User '" . $c->session->{username} . "' settings updated successfully");
+
+    # Set success message and redirect
+    $c->flash->{success_msg} = "Your settings have been updated successfully.";
+    $c->response->redirect($c->uri_for('/user/profile'));
+    return;
+}
 sub create_account :Local {
     my ($self, $c) = @_;
 
@@ -427,9 +718,18 @@ sub do_create_account :Local {
     my $password_confirm = $c->request->params->{password_confirm};  # Retrieve the confirmation password
     my $first_name = $c->request->params->{first_name};
     my $last_name = $c->request->params->{last_name};
+    my $email = $c->request->params->{email};
+    my $roles = $c->request->params->{roles} || 'user';  # Default role is 'user'
+
+    # Log the account creation attempt
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
+        "Account creation attempt for username: $username");
 
     # Ensure all required fields are filled
     unless ($username && $password && $password_confirm && $first_name && $last_name) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
+            "Missing required fields for account creation");
+
         $c->stash(
             error_msg => 'All fields are required to create an account',
             template  => 'user/create_account.tt',
@@ -439,6 +739,9 @@ sub do_create_account :Local {
 
     # Check if the passwords match
     if ($password ne $password_confirm) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
+            "Passwords do not match for account creation");
+
         $c->stash(
             error_msg => 'Passwords do not match',
             template  => 'user/create_account.tt',
@@ -450,8 +753,11 @@ sub do_create_account :Local {
     my $hashed_password = $self->hash_password($password);
 
     # Check if the username already exists in the database
-    my $existing_user = $c->model('DBEncy::Ency::User')->find({ username => $username });
+    my $existing_user = $c->model('DBEncy::User')->find({ username => $username });
     if ($existing_user) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
+            "Username already exists: $username");
+
         $c->stash(
             error_msg => 'Username already exists. Please choose another.',
             template  => 'user/create_account.tt',
@@ -461,11 +767,18 @@ sub do_create_account :Local {
 
     # Create the new user in the database
     eval {
-        $c->model('DBEncy::Ency::User')->create({
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
+            "Creating new user: $username with roles: $roles");
+
+        $c->model('DBEncy::User')->create({
             username    => $username,
             password    => $hashed_password,
             first_name  => $first_name,
             last_name   => $last_name,
+            email       => $email,
+            roles       => $roles,
+            active      => 1,
+            created_at  => \'NOW()',
         });
     };
 

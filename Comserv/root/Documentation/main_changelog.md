@@ -6,6 +6,7 @@ This document tracks major changes to the Comserv system.
 
 ### April 2025
 
+- **[MCoop Admin Menu Restriction](changelog/2025-04-mcoop-admin-menu-restriction.md)** - Restricted MCoop admin menu items to only appear when the current site is MCOOP (April 1, 2025)
 - **[MCoop Server Room Plan Implementation](changelog/2025-04-mcoop-server-room-plan.md)** - Added server room plan feature and restructured menus for improved security (April 1, 2025)
 
 ### March 2025

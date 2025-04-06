@@ -1,110 +1,365 @@
 [% META title = 'KVM ISO File Transfer Documentation' %]
-[% PageVersion = 'Documentation/KVM_ISO_Transfer.tt,v 0.01.1 2025/04/07 Admin Exp admin ' %]
+[% PageVersion = 'Documentation/KVM_ISO_Transfer.tt,v 1.0 2024/06/05 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
 
-<h1 id="kvm-iso-top">KVM ISO File Transfer System Documentation</h1>
+<div class="documentation-page">
+    <h1 id="kvm-iso-top">KVM ISO File Transfer</h1>
 
-<nav>
-    <a href="#kvm-overview">Overview</a> |
-    <a href="#kvm-prerequisites">Prerequisites</a> |
-    <a href="#kvm-workflow">Workflow</a> |
-    <a href="#kvm-automation">Automation Scripts</a> |
-    <a href="#kvm-troubleshooting">Troubleshooting</a> |
-    <a href="#kvm-limitations">Limitations</a>
-</nav>
+    <div class="doc-metadata">
+        <span class="doc-type">Technical Guide</span>
+        <span class="doc-updated">Last Updated: June 5, 2024</span>
+    </div>
 
-<h2 id="kvm-overview">Overview</h2>
-<p>The ISO file transfer system provides a reliable method for moving files between host systems and KVM virtual machines. This solution uses virtual CD-ROM devices to create a secure file transfer channel without requiring network connectivity.</p>
+    <nav class="doc-navigation">
+        <a href="#kvm-overview">Overview</a> |
+        <a href="#kvm-prerequisites">Prerequisites</a> |
+        <a href="#kvm-workflow">Workflow</a> |
+        <a href="#kvm-automation">Automation Scripts</a> |
+        <a href="#kvm-troubleshooting">Troubleshooting</a> |
+        <a href="#kvm-limitations">Limitations</a>
+    </nav>
 
-<h2 id="kvm-prerequisites">Prerequisites</h2>
-<ul>
-    <li><strong>Required Packages:</strong>
+    <div class="doc-summary">
+        <p>This guide explains how to transfer files between host systems and KVM virtual machines using virtual CD-ROM devices. This method is particularly useful when network connectivity between the host and guest is limited or unavailable.</p>
+    </div>
+
+    <div class="doc-section">
+        <h2 id="kvm-overview">Overview</h2>
+        <p>The ISO file transfer system provides a reliable method for moving files between host systems and KVM virtual machines. This solution uses virtual CD-ROM devices to create a secure file transfer channel without requiring network connectivity.</p>
+    </div>
+
+    <div class="doc-section">
+        <h2 id="kvm-prerequisites">Prerequisites</h2>
         <ul>
-            <li><code>mkisofs</code> or <code>genisoimage</code></li>
-            <li><code>virt-manager</code> (GUI) or <code>virsh</code> (CLI)</li>
-        </ul>
-    </li>
-    <li><strong>Directory Structure:</strong>
-        <pre>
-~/kvm_shared_files/
+            <li><strong>Required Packages:</strong>
+                <ul>
+                    <li><code>mkisofs</code> or <code>genisoimage</code></li>
+                    <li><code>virt-manager</code> (GUI) or <code>virsh</code> (CLI)</li>
+                </ul>
+            </li>
+            <li><strong>Directory Structure:</strong>
+                <div class="code-block">
+                    <pre><code>~/kvm_shared_files/
 ├── scripts/
 │   ├── create_shared_iso.sh
 │   └── detach_shared_iso.sh
-└── data/</pre>
-    </li>
-</ul>
+└── data/</code></pre>
+                </div>
+            </li>
+            <li>Access to the Proxmox host system with root privileges</li>
+            <li>A running KVM virtual machine</li>
+        </ul>
 
-<h2 id="kvm-workflow">Workflow</h2>
-<ol>
-    <li><strong>File Preparation:</strong>
-        <ul>
-            <li>Place files in <code>~/kvm_shared_files/data/</code></li>
-            <li>Run ISO creation script:
-                <pre>./scripts/create_shared_iso.sh</pre>
-            </li>
-        </ul>
-    </li>
-    <li><strong>VM Attachment:</strong>
-        <ul>
-            <li>GUI Method:
-                <pre>virt-manager → Add Hardware → Storage → Select ISO</pre>
-            </li>
-            <li>CLI Method:
-                <pre>virsh attach-disk &lt;vm-name&gt; ~/kvm_shared.iso hda --type cdrom</pre>
-            </li>
-        </ul>
-    </li>
-    <li><strong>File Access in VM:</strong>
-        <ul>
-            <li>Mount appears as DVD drive in Windows</li>
-            <li>Standard file copy operations</li>
-        </ul>
-    </li>
-</ol>
+        <div class="code-block">
+            <pre><code>apt-get install genisoimage</code></pre>
+        </div>
+    </div>
 
-<h2 id="kvm-automation">Automation Scripts</h2>
-<h3>create_shared_iso.sh</h3>
-<pre>
-#!/bin/bash
+    <div class="doc-section">
+        <h2 id="kvm-workflow">File Transfer Process</h2>
+
+        <h3>Step 1: Create a Directory for Files</h3>
+        <p>Create a directory on the host system to store the files you want to transfer:</p>
+        <div class="code-block">
+            <pre><code>mkdir -p /tmp/transfer-files</code></pre>
+        </div>
+
+        <h3>Step 2: Copy Files to the Transfer Directory</h3>
+        <p>Copy the files you want to transfer to the directory:</p>
+        <div class="code-block">
+            <pre><code>cp /path/to/your/files/* /tmp/transfer-files/</code></pre>
+        </div>
+
+        <h3>Step 3: Create an ISO Image</h3>
+        <p>Create an ISO image from the directory:</p>
+        <div class="code-block">
+            <pre><code>genisoimage -o /tmp/transfer.iso -r -J /tmp/transfer-files</code></pre>
+        </div>
+        <p>Options explained:</p>
+        <ul>
+            <li><code>-o /tmp/transfer.iso</code>: Output file name</li>
+            <li><code>-r</code>: Generate Rock Ridge extensions</li>
+            <li><code>-J</code>: Generate Joliet extensions for Windows compatibility</li>
+        </ul>
+
+        <h3>Step 4: Attach the ISO to the VM</h3>
+        <p>Attach the ISO image to the virtual machine as a CD-ROM device:</p>
+        <div class="code-block">
+            <pre><code>qm set VMID --ide2 local:iso/transfer.iso</code></pre>
+        </div>
+        <p>Replace <code>VMID</code> with your virtual machine ID.</p>
+
+        <h3>Step 5: Mount the ISO in the Guest VM</h3>
+        <p>Inside the guest VM, mount the CD-ROM device:</p>
+        <div class="code-block">
+            <pre><code>mkdir -p /mnt/cdrom
+mount /dev/cdrom /mnt/cdrom</code></pre>
+        </div>
+
+        <h3>Step 6: Copy Files from the ISO</h3>
+        <p>Copy the files from the mounted CD-ROM to the desired location in the guest VM:</p>
+        <div class="code-block">
+            <pre><code>cp -r /mnt/cdrom/* /destination/path/</code></pre>
+        </div>
+
+        <h3>Step 7: Unmount and Detach</h3>
+        <p>Unmount the CD-ROM in the guest VM and detach it from the VM:</p>
+        <div class="code-block">
+            <pre><code># In the guest VM:
+umount /mnt/cdrom
+
+# On the host:
+qm set VMID --ide2 none</code></pre>
+        </div>
+    </div>
+
+    <div class="doc-section">
+        <h2 id="kvm-automation">Automation Scripts</h2>
+        <p>You can use the following scripts to automate the ISO creation and attachment process:</p>
+
+        <h3>create_shared_iso.sh</h3>
+        <div class="code-block">
+            <pre><code>#!/bin/bash
 SOURCE_DIR="$HOME/kvm_shared_files/data"
 ISO_PATH="$HOME/kvm_shared.iso"
 
 mkisofs -V "KVM_TRANSFER" -J -r -o "$ISO_PATH" "$SOURCE_DIR"
-[ -f "$ISO_PATH" ] && echo "ISO created" || exit 1</pre>
+[ -f "$ISO_PATH" ] && echo "ISO created" || exit 1</code></pre>
+        </div>
 
-<h3>detach_shared_iso.sh</h3>
-<pre>
-#!/bin/bash
-virsh detach-disk &lt;vm-name&gt; hda --type cdrom</pre>
+        <h3>detach_shared_iso.sh</h3>
+        <div class="code-block">
+            <pre><code>#!/bin/bash
+virsh detach-disk &lt;vm-name&gt; hda --type cdrom</code></pre>
+        </div>
 
-<h2 id="kvm-troubleshooting">Troubleshooting</h2>
-<table class="table">
-    <tr>
-        <th>Issue</th>
-        <th>Solution</th>
-    </tr>
-    <tr>
-        <td>ISO not detected</td>
-        <td>
-            <ol>
-                <li>Verify CD-ROM drive exists in VM hardware</li>
-                <li>Check IDE bus configuration</li>
-                <li>Confirm ISO file permissions</li>
-            </ol>
-        </td>
-    </tr>
-    <tr>
-        <td>Permission denied errors</td>
-        <td>
-            <pre>sudo chmod 644 ~/kvm_shared.iso</pre>
-        </td>
-    </tr>
-</table>
+        <h3>Complete Transfer Script</h3>
+        <div class="code-block">
+            <pre><code>#!/bin/bash
+# Usage: ./transfer-to-vm.sh VMID /path/to/source/directory
 
-<h2 id="kvm-limitations">System Limitations</h2>
-<ul>
-    <li>Maximum ISO size: 4.7GB (DVD-R limit)</li>
-    <li>Read-only access to transferred files</li>
-    <li>Requires VM reboot for new ISO attachments</li>
-</ul>
+if [ $# -lt 2 ]; then
+    echo "Usage: $0 VMID /path/to/source/directory"
+    exit 1
+fi
 
-<p><a href="#kvm-iso-top">Back to top</a></p>
+VMID=$1
+SOURCE_DIR=$2
+ISO_FILE="/tmp/transfer-${VMID}.iso"
+
+# Create ISO
+echo "Creating ISO from $SOURCE_DIR..."
+genisoimage -o $ISO_FILE -r -J $SOURCE_DIR
+
+# Copy to ISO storage
+echo "Copying ISO to Proxmox storage..."
+cp $ISO_FILE /var/lib/vz/template/iso/
+
+# Attach to VM
+echo "Attaching ISO to VM $VMID..."
+qm set $VMID --ide2 local:iso/transfer-${VMID}.iso
+
+echo "ISO attached to VM $VMID. Mount it inside the guest with:"
+echo "  mkdir -p /mnt/cdrom"
+echo "  mount /dev/cdrom /mnt/cdrom"
+echo ""
+echo "When finished, detach with:"
+echo "  qm set $VMID --ide2 none"</code></pre>
+        </div>
+    </div>
+
+    <div class="doc-section">
+        <h2 id="kvm-troubleshooting">Troubleshooting</h2>
+        <table class="troubleshooting-table">
+            <tr>
+                <th>Issue</th>
+                <th>Solution</th>
+            </tr>
+            <tr>
+                <td>ISO not detected</td>
+                <td>
+                    <ol>
+                        <li>Verify CD-ROM drive exists in VM hardware</li>
+                        <li>Check IDE bus configuration</li>
+                        <li>Confirm ISO file permissions</li>
+                    </ol>
+                </td>
+            </tr>
+            <tr>
+                <td>Permission denied errors</td>
+                <td>
+                    <div class="code-block">
+                        <pre><code>sudo chmod 644 ~/kvm_shared.iso</code></pre>
+                    </div>
+                </td>
+            </tr>
+            <tr>
+                <td>Cannot mount CD-ROM</td>
+                <td>
+                    <ul>
+                        <li>Verify the CD-ROM device exists with <code>ls -la /dev/cdrom</code></li>
+                        <li>Try using the actual device path (e.g., <code>/dev/sr0</code>)</li>
+                        <li>Check if the guest OS has automount enabled, which might interfere</li>
+                    </ul>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="doc-section">
+        <h2 id="kvm-limitations">System Limitations</h2>
+        <ul>
+            <li>Maximum ISO size: 4.7GB (DVD-R limit)</li>
+            <li>Read-only access to transferred files</li>
+            <li>Requires VM reboot for new ISO attachments in some cases</li>
+            <li>For transferring files from the guest to the host, you would need to create a new ISO or use another method</li>
+        </ul>
+    </div>
+
+    <div class="doc-section">
+        <h2>Related Documentation</h2>
+        <ul>
+            <li><a href="/proxmox">Proxmox VM Management</a></li>
+            <li><a href="https://pve.proxmox.com/wiki/Manual:_qm.conf">Proxmox VM Configuration Reference</a></li>
+        </ul>
+    </div>
+
+    <p class="back-to-top"><a href="#kvm-iso-top">Back to top</a></p>
+</div>
+
+<style>
+    .documentation-page {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+    }
+
+    .doc-navigation {
+        margin: 20px 0;
+        padding: 10px;
+        background-color: #f9f9f9;
+        border-radius: 5px;
+        text-align: center;
+    }
+
+    .doc-navigation a {
+        margin: 0 8px;
+        color: #0066cc;
+        text-decoration: none;
+    }
+
+    .doc-navigation a:hover {
+        text-decoration: underline;
+    }
+
+    .doc-metadata {
+        margin: 20px 0;
+        color: #666;
+        font-size: 0.9em;
+    }
+
+    .doc-type {
+        background-color: #e6f7ff;
+        padding: 3px 8px;
+        border-radius: 3px;
+        margin-right: 15px;
+    }
+
+    .doc-updated {
+        font-style: italic;
+    }
+
+    .doc-summary {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-left: 4px solid #0066cc;
+        margin: 20px 0;
+        font-size: 1.1em;
+    }
+
+    .doc-section {
+        margin: 30px 0;
+    }
+
+    .doc-section h2 {
+        color: #0066cc;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 8px;
+    }
+
+    .doc-section h3 {
+        color: #333;
+        margin-top: 20px;
+    }
+
+    .code-block {
+        background-color: #f5f5f5;
+        padding: 15px;
+        border-radius: 5px;
+        overflow-x: auto;
+        margin: 15px 0;
+    }
+
+    .code-block pre {
+        margin: 0;
+    }
+
+    .code-block code {
+        font-family: monospace;
+        font-size: 14px;
+    }
+
+    ul li {
+        margin-bottom: 8px;
+    }
+
+    code {
+        background-color: #f0f0f0;
+        padding: 2px 4px;
+        border-radius: 3px;
+        font-family: monospace;
+    }
+
+    .troubleshooting-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 20px 0;
+    }
+
+    .troubleshooting-table th,
+    .troubleshooting-table td {
+        border: 1px solid #ddd;
+        padding: 12px;
+        text-align: left;
+    }
+
+    .troubleshooting-table th {
+        background-color: #f2f2f2;
+    }
+
+    .troubleshooting-table tr:nth-child(even) {
+        background-color: #f9f9f9;
+    }
+
+    .back-to-top {
+        text-align: right;
+        margin-top: 30px;
+    }
+
+    .back-to-top a {
+        background-color: #0066cc;
+        color: white;
+        padding: 8px 15px;
+        border-radius: 4px;
+        text-decoration: none;
+        font-size: 0.9em;
+    }
+
+    .back-to-top a:hover {
+        background-color: #0055aa;
+    }
+</style>

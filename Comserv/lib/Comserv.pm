@@ -25,16 +25,16 @@
                     Authorization::ACL
                 /;
 
-                extends 'Catalyst';
+extends 'Catalyst';
 
-                our $VERSION = '0.01';
+our $VERSION = '0.01';
 
-                __PACKAGE__->log(Catalyst::Log->new(output => sub {
-                    my ($self, $level, $message) = @_;
-                    $level = 'debug' unless defined $level;
-                    $message = '' unless defined $message;
-                    $self->dispatchers->[0]->log(level => $level, message => $message);
-                }));
+__PACKAGE__->log(Catalyst::Log->new(output => sub {
+    my ($self, $level, $message) = @_;
+    $level = 'debug' unless defined $level;
+    $message = '' unless defined $message;
+    $self->dispatchers->[0]->log(level => $level, message => $message);
+}));
 
                 __PACKAGE__->config(
                     name => 'Comserv',
@@ -80,13 +80,13 @@
                     },
                 );
 
-                sub psgi_app {
-                    my $self = shift;
+sub psgi_app {
+    my $self = shift;
 
-                    my $app = $self->SUPER::psgi_app(@_);
+    my $app = $self->SUPER::psgi_app(@_);
 
-                    return sub {
-                        my $env = shift;
+    return sub {
+        my $env = shift;
 
                         $self->config->{enable_catalyst_header} = $ENV{CATALYST_HEADER} // 1;
                         $self->config->{debug} = $ENV{CATALYST_DEBUG} // 0;

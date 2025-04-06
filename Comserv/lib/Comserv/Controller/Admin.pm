@@ -2,91 +2,62 @@ package Comserv::Controller::Admin;
 use Moose;
 use namespace::autoclean;
 use Data::Dumper;
-use DBIx::Class::Migration;
-use Comserv::Util::Logging;
-use File::Path qw(make_path);
-use File::Spec;
-use File::Copy;
-use POSIX qw(strftime);
-use Fcntl qw(:flock O_WRONLY O_APPEND O_CREAT);
+use Fcntl qw(:DEFAULT :flock);  # Import O_WRONLY, O_APPEND, O_CREAT constants
 BEGIN { extends 'Catalyst::Controller'; }
-
-has 'logging' => (
-    is => 'ro',
-    default => sub { Comserv::Util::Logging->instance }
-);
-
-# Authentication check at the beginning of each request
 
 sub begin : Private {
     my ( $self, $c ) = @_;
-    warn "Entering Comserv::Controller::Admin::begin\n";
-    # Debug logging for begin action
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "Starting begin action");
-    $c->stash->{debug_errors} //= []; # Ensure debug_errors is initialized
-
-    # Add debug information to the stash
-    $c->stash->{debug_info} = {
-        user_exists => $c->user_exists ? 'Yes' : 'No',
-        session_id => $c->sessionid,
-        session_data => $c->session,
-        roles => $c->session->{roles},
-    };
 
     # Check if the user is logged in
-    if (!$c->user_exists && !$c->session->{user_id}) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "User not logged in, redirecting to home.");
-        $c->flash->{error} = 'You must be logged in to access the admin area.';
-        $c->response->redirect($c->uri_for('/'));
-        return 0; # Important: Return 0 to stop the request chain
+    if (!$c->user_exists) {
+        # If the user isn't logged in, call the index method
+        $self->index($c);
+        return;
     }
-
     # Fetch the roles from the session
     my $roles = $c->session->{roles};
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "Roles: " . Dumper($roles));
-
+    # Log the roles
+    $c->log->info("admin begin Roles: " . Dumper($roles));  # Change this line
     # Check if roles is defined and is an array reference
-    if ( defined $roles && ref $roles eq 'ARRAY' ) {
-        # Log the roles being checked
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "Checking roles: " . join(", ", @$roles));
-
-        # Directly check for 'admin' role using grep
-        if ( grep { $_ eq 'admin' } @$roles ) {
-            # User is admin, proceed with accessing the admin area
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "Admin user detected, proceeding.");
-            return 1; # Important: Return 1 to allow admin to proceed
+    if (defined $roles && ref $roles eq 'ARRAY') {
+        # Check if the user has the 'admin' role
+        if (grep { $_ eq 'admin' } @$roles) {
+            # User is an admin, proceed with the request
         } else {
-            # User is not admin, redirect to home
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "Non-admin user, redirecting to home. Roles found: " . join(", ", @$roles));
-            $c->flash->{error} = 'You do not have permission to access the admin area. Required role: admin. Your roles: ' . join(", ", @$roles);
-            $c->response->redirect($c->uri_for('/'));
-            return 0; # Important: Return 0 to stop the request chain
+            # User is not an admin, call the index method
+            $self->index($c);
+            return;
         }
     } else {
-        # Log that roles are not defined or not an array
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "No roles defined or roles is not an array, redirecting to home.");
-        $c->flash->{error} = 'You do not have permission to access the admin area. No roles defined or roles is not an array.';
-        $c->response->redirect($c->uri_for('/'));
-        return 0; # Important: Return 0 to stop the request chain
+        # Roles is not defined or not an array, call the index method
+        $self->index($c);
+        return;
     }
 }
 
 # Main admin page
 sub index :Path :Args(0) {
     my ( $self, $c ) = @_;
-    # Debug logging for index action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Starting index action");
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Template path: " . $c->path_to('root'));
+    # Log the application's configured template path
+    $c->log->debug("Template path: " . $c->path_to('root'));
+
+    # Set the TT template to use.
     $c->stash(template => 'admin/index.tt');
+
+    # Forward to the view
     $c->forward($c->view('TT'));
 }
 
-# Add a new schema
-sub add_schema :Path('add_schema') :Args(0) {
+# This method has been moved to Path('admin/edit_documentation')
+
+sub add_schema :Path('/add_schema') :Args(0) {
     my ( $self, $c ) = @_;
     # Debug logging for add_schema action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_schema', "Starting add_schema action");
+
+    # Initialize output variable
+    my $output = '';
 
     if ( $c->request->method eq 'POST' ) {
         my $migration = DBIx::Class::Migration->new(
@@ -101,13 +72,19 @@ sub add_schema :Path('add_schema') :Args(0) {
             eval {
                 $migration->make_schema;
                 $c->stash(message => 'Migration script created successfully.');
+                $output = "Created migration script for schema: $schema_name";
             };
             if ($@) {
                 $c->stash(error_msg => 'Failed to create migration script: ' . $@);
+                $output = "Error: $@";
             }
         } else {
             $c->stash(error_msg => 'Schema name and description cannot be empty.');
+            $output = "Error: Schema name and description cannot be empty.";
         }
+
+        # Add the output to the stash so it can be displayed in the template
+        $c->stash(output => $output);
     }
 
     $c->stash(template => 'admin/add_schema.tt');
@@ -163,6 +140,146 @@ sub schema_manager :Path('/admin/schema_manager') :Args(0) {
         template  => 'admin/SchemaManager.tt',
     );
 
+    $c->forward($c->view('TT'));
+}
+
+=head2 manage_users
+
+Admin interface to manage users
+
+=cut
+
+sub manage_users :Path('/admin/users') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Log the beginning of the manage_users action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'manage_users', "Starting manage_users action");
+
+    # Get all users from the database
+    my @users = $c->model('DBEncy::User')->search({}, {
+        order_by => { -asc => 'username' }
+    });
+
+    # Pass data to the stash for rendering the template
+    $c->stash(
+        users => \@users,
+        template => 'admin/manage_users.tt',
+    );
+
+    $c->forward($c->view('TT'));
+}
+
+=head2 add_user
+
+Admin interface to add a new user
+
+=cut
+
+sub add_user :Path('/admin/add_user') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Log the beginning of the add_user action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_user', "Starting add_user action");
+
+    # If this is a form submission, process it
+    if ($c->req->method eq 'POST') {
+        # Retrieve the form data
+        my $username = $c->req->params->{username};
+        my $password = $c->req->params->{password};
+        my $password_confirm = $c->req->params->{password_confirm};
+        my $first_name = $c->req->params->{first_name};
+        my $last_name = $c->req->params->{last_name};
+        my $email = $c->req->params->{email};
+        my $roles = $c->req->params->{roles} || 'user';
+        my $active = $c->req->params->{active} ? 1 : 0;
+
+        # Log the user creation attempt
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_user',
+            "User creation attempt for username: $username with roles: $roles");
+
+        # Ensure all required fields are filled
+        unless ($username && $password && $password_confirm && $first_name && $last_name) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'add_user',
+                "Missing required fields for user creation");
+
+            $c->stash(
+                error_msg => 'All fields are required to create a user',
+                template => 'admin/add_user.tt',
+            );
+            $c->forward($c->view('TT'));
+            return;
+        }
+
+        # Check if the passwords match
+        if ($password ne $password_confirm) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'add_user',
+                "Passwords do not match for user creation");
+
+            $c->stash(
+                error_msg => 'Passwords do not match',
+                template => 'admin/add_user.tt',
+            );
+            $c->forward($c->view('TT'));
+            return;
+        }
+
+        # Check if the username already exists
+        my $existing_user = $c->model('DBEncy::User')->find({ username => $username });
+        if ($existing_user) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'add_user',
+                "Username already exists: $username");
+
+            $c->stash(
+                error_msg => 'Username already exists. Please choose another.',
+                template => 'admin/add_user.tt',
+            );
+            $c->forward($c->view('TT'));
+            return;
+        }
+
+        # Hash the password
+        my $hashed_password = Comserv::Controller::User->hash_password($password);
+
+        # Create the new user
+        eval {
+            $c->model('DBEncy::User')->create({
+                username => $username,
+                password => $hashed_password,
+                first_name => $first_name,
+                last_name => $last_name,
+                email => $email,
+                roles => $roles,
+                active => $active,
+                created_at => \'NOW()',
+            });
+
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_user',
+                "User created successfully: $username with roles: $roles");
+
+            # Set success message and redirect to user management
+            $c->flash->{success_msg} = "User '$username' created successfully.";
+            $c->response->redirect($c->uri_for('/admin/users'));
+            return;
+        };
+
+        if ($@) {
+            # Handle database errors
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_user',
+                "Error creating user: $@");
+
+            $c->stash(
+                error_msg => "Error creating user: $@",
+                template => 'admin/add_user.tt',
+            );
+            $c->forward($c->view('TT'));
+            return;
+        }
+    }
+
+    # Display the add user form
+    $c->stash(
+        template => 'admin/add_user.tt',
+    );
     $c->forward($c->view('TT'));
 }
 
@@ -290,11 +407,17 @@ sub migrate_schema :Path('migrate_schema') :Args(0) {
 }
 
 # Edit documentation action
-sub edit_documentation :Path('admin/edit_documentation') :Args(0) {
+sub edit_documentation :Path('/admin/edit_documentation') :Args(0) {
     my ( $self, $c ) = @_;
     # Debug logging for edit_documentation action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_documentation', "Starting edit_documentation action");
-    $c->stash(template => 'admin/edit_documentation.tt');
+
+    # Add debug message to stash
+    $c->stash(
+        debug_msg => "Edit documentation page loaded",
+        template => 'admin/edit_documentation.tt'
+    );
+
     $c->forward($c->view('TT'));
 }
 

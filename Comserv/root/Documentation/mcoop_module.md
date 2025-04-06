@@ -76,15 +76,16 @@ The MCoop module uses the following templates:
 All MCoop features are restricted to administrators only. This is implemented through:
 
 1. Role-based menu visibility in `admintopmenu.tt`
-2. Controller-level checks for administrator privileges
+2. Site-specific menu visibility (only shown when the current site is MCOOP)
+3. Controller-level checks for administrator privileges
 
 ## Navigation
 
-MCoop features are accessible through the Admin menu in the main navigation. The menu structure is:
+MCoop features are accessible through the Admin menu in the main navigation, but only when the current site is MCOOP. The menu structure is:
 
 ```
 Admin
-└── MCOOP Admin
+└── MCOOP Admin (only visible when current site is MCOOP)
     ├── MCOOP Home
     ├── Server Room Plan
     ├── Network Infrastructure
@@ -106,5 +107,6 @@ Planned enhancements for the MCoop module include:
 
 ## Related Documentation
 
+- [MCoop Admin Menu Restriction](changelog/2025-04-mcoop-admin-menu-restriction.md)
 - [MCoop Server Room Plan Implementation](changelog/2025-04-mcoop-server-room-plan.md)
 - [Theme System Implementation](theme_system_implementation.md)

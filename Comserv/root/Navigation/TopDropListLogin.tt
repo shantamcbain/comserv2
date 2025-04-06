@@ -1,27 +1,175 @@
-[% PageVersion = 'Navigation/TopDropLisLogin.tt,v 0.01 2024/01/01hanta Exp shanta ' %]
+[% PageVersion = 'Navigation/TopDropListLogin.tt,v 0.05 2024/06/02 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
-    [%# PageVersion %]
-    [%# "Debugging HostName: " _ HostName %]
-    [%# INCLUDE 'debug.tt' %]
+    [% PageVersion %]
 [% END %]
-       <li class="horizontal-dropdown">
-            <a href="/user/login" class="dropbtn">Login</a>
-            <div class="dropdown-content">
-                <a href="/user/login">Login</a>
-                <a href="/user/logout">Logout</a>
-                <a href="/user/register">Register</a>
- <!-- Add more login options if needed -->
-                [% IF c.session.login_links.size %]
-                    [% FOREACH link IN c.session.login_links %]
-                        <a href="[% link.url %]">[% link.name %]</a>
-                        [% IF c.session.group == 'admin' %]
-                            <a href="/edit_link?link_id=[% link.id %]">Edit/Delete</a>
-                        [% END %]
-                    [% END %]
-                [% END %]
-                [% IF c.session.group == 'admin' %]
-                    <a href="/add_link?menu=login">Add</a>
-                [% END %]
 
-           </div>
-        </li>
+[%# Determine user role for display %]
+[% SET display_role = 'Guest' %]
+[% IF c.session.roles && c.session.roles.size %]
+    [% IF c.session.roles.grep('admin').size %]
+        [% SET display_role = 'Administrator' %]
+    [% ELSIF c.session.roles.grep('developer').size %]
+        [% SET display_role = 'Developer' %]
+    [% ELSIF c.session.roles.grep('editor').size %]
+        [% SET display_role = 'Editor' %]
+    [% ELSIF c.session.roles.grep('user').size %]
+        [% SET display_role = 'User' %]
+    [% END %]
+[% END %]
+
+[% IF c.session.debug_mode == 1 %]
+    <!-- Debug: Username: [% c.session.username %] -->
+    <!-- Debug: Roles: [% c.session.roles.join(', ') %] -->
+    <!-- Debug: Display Role: [% display_role %] -->
+    <!-- Debug: SiteName: [% c.session.SiteName %] -->
+    <!-- Debug: ControllerName: [% c.session.ControllerName %] -->
+[% END %]
+
+<li class="horizontal-dropdown">
+    [% IF c.session.username %]
+        <!-- User is logged in -->
+        <a href="#" class="dropbtn user-menu">
+            <span class="username">[% c.session.username %]</span>
+            <span class="role-badge">[% display_role %]</span>
+        </a>
+        <div class="dropdown-content">
+            <a href="[% c.uri_for('/user/profile') %]" class="menu-item">
+                <i class="icon-user"></i> My Profile
+            </a>
+            <a href="[% c.uri_for('/user/settings') %]" class="menu-item">
+                <i class="icon-cog"></i> Account Settings
+            </a>
+
+            [% IF c.session.roles.grep('admin').size || c.session.roles.grep('developer').size %]
+                <div class="dropdown-divider"></div>
+                <a href="[% c.uri_for('/admin') %]" class="menu-item">
+                    <i class="icon-tachometer-alt"></i> Admin Dashboard
+                </a>
+                [% IF c.session.debug_mode == 1 %]
+                    <a href="[% c.uri_for('/reset_session') %]" class="menu-item">
+                        <i class="icon-sync"></i> Reset Session
+                    </a>
+                [% END %]
+            [% END %]
+
+            <div class="dropdown-divider"></div>
+            <a href="[% c.uri_for('/user/logout') %]" class="menu-item logout" id="logout-link">
+                <i class="icon-sign-out-alt"></i> Logout
+            </a>
+
+            [% IF c.session.debug_mode == 1 %]
+            <script>
+                // Add event listener to capture the current page before logout
+                document.getElementById('logout-link').addEventListener('click', function(e) {
+                    // Log the current URL for debugging
+                    console.log('Logging out from: ' + window.location.href);
+                });
+            </script>
+            [% END %]
+        </div>
+    [% ELSE %]
+        <!-- User is not logged in -->
+        <a href="[% c.uri_for('/user/login') %]" class="dropbtn login-menu">
+            <span class="username">Guest</span>
+            <span class="role-badge">Login</span>
+        </a>
+        <div class="dropdown-content">
+            <a href="[% c.uri_for('/user/login') %]" class="menu-item">
+                <i class="icon-sign-in-alt"></i> Login
+            </a>
+            <a href="[% c.uri_for('/user/create_account') %]" class="menu-item">
+                <i class="icon-user-plus"></i> Register
+            </a>
+            <a href="[% c.uri_for('/user/forgot_password') %]" class="menu-item">
+                <i class="icon-key"></i> Forgot Password
+            </a>
+        </div>
+    [% END %]
+
+    <!-- Additional login-related links -->
+    [% IF c.session.login_links.size %]
+        <div class="dropdown-divider"></div>
+        [% FOREACH link IN c.session.login_links %]
+            <a href="[% link.url %]" class="menu-item">[% link.name %]</a>
+            [% IF c.session.roles.grep('admin').size %]
+                <a href="[% c.uri_for('/edit_link') %]?link_id=[% link.id %]" class="edit-link">Edit</a>
+            [% END %]
+        [% END %]
+    [% END %]
+
+    [% IF c.session.roles.grep('admin').size %]
+        <a href="[% c.uri_for('/add_link') %]?menu=login" class="add-link">Add Link</a>
+    [% END %]
+</li>
+
+<style>
+    .horizontal-dropdown .dropbtn {
+        display: flex;
+        align-items: center;
+        padding: 8px 15px;
+    }
+
+    .horizontal-dropdown .user-menu {
+        background-color: #f0f7ff;
+    }
+
+    .horizontal-dropdown .login-menu {
+        background-color: #e9ecef;
+    }
+
+    .horizontal-dropdown .username {
+        font-weight: bold;
+        margin-right: 8px;
+    }
+
+    .horizontal-dropdown .role-badge {
+        font-size: 0.7em;
+        background-color: #0066cc;
+        color: white;
+        padding: 2px 6px;
+        border-radius: 3px;
+    }
+
+    .dropdown-content {
+        min-width: 200px;
+    }
+
+    .dropdown-content .menu-item {
+        padding: 10px 15px;
+        display: flex;
+        align-items: center;
+    }
+
+    .dropdown-content .menu-item i {
+        margin-right: 8px;
+        width: 16px;
+        text-align: center;
+    }
+
+    .dropdown-content .logout {
+        color: #dc3545;
+    }
+
+    .dropdown-divider {
+        height: 1px;
+        margin: 5px 0;
+        overflow: hidden;
+        background-color: #e9ecef;
+    }
+
+    .edit-link, .add-link {
+        font-size: 0.8em;
+        color: #6c757d;
+        margin-left: 5px;
+    }
+
+    /* Icon placeholders - replace with actual icons if available */
+    .icon-user:before { content: "👤"; }
+    .icon-cog:before { content: "⚙️"; }
+    .icon-dashboard:before { content: "📊"; }
+    .icon-refresh:before { content: "🔄"; }
+    .icon-signout:before { content: "🚪"; }
+    .icon-signin:before { content: "🔑"; }
+    .icon-user-plus:before { content: "➕"; }
+    .icon-key:before { content: "🔑"; }
+</style>

@@ -1,4 +1,307 @@
-[% META title = 'Proxmox VM Management' %]
+[% META title = 'Proxmox Dashboard' %]
+[% PageVersion = '/proxmox/index.tt,v 0.02.01 2025/03/30 shanta Exp shanta ' %]
+[% IF debug == 1 %]
+    [% PageVersion %]
+
+[% END %]
+<div class="container">
+    <h1>Proxmox VE Dashboard 546546</h1>
+  [% PageVersion %]
+[% IF error_msg %]
+<div class="error-message">
+    [% error_msg %]
+</div>
+[% END %]
+
+[% IF success_msg %]
+<div class="success-message">
+    [% success_msg %]
+</div>
+[% END %]
+
+[% IF c.session.proxmox_token_user %]
+<!-- User is logged in -->
+<div class="user-info">
+    <p>Logged in as: <strong>[% c.session.proxmox_token_user %]</strong></p>
+    <a href="[% c.uri_for('/proxmox/logout') %]" class="btn-logout">Logout</a>
+</div>
+
+<div class="action-panel">
+    <h2>Actions</h2>
+    <div class="action-buttons">
+        <a href="[% c.uri_for('/proxmox/create_vm') %]" class="btn-action">
+            <i class="icon-plus"></i>
+            Create New VM
+        </a>
+        <a href="#" class="btn-action" onclick="refreshVMList()">
+            <i class="icon-refresh"></i>
+            Refresh VM List
+        </a>
+    </div>
+</div>
+
+<div class="vm-list-panel">
+    <h2>Virtual Machines</h2>
+
+    [% IF vms && vms.size > 0 %]
+    <table class="vm-table">
+        <thead>
+        <tr>
+            <th>VMID</th>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Memory</th>
+            <th>CPU</th>
+            <th>Uptime</th>
+            <th>Actions</th>
+        </tr>
+        </thead>
+        <tbody>
+            [% FOREACH vm IN vms %]
+            <tr>
+                <td>[% vm.vmid %]</td>
+                <td>[% vm.name %]</td>
+                <td class="status [% vm.status %]">[% vm.status %]</td>
+                <td>[% vm.maxmem ? (vm.maxmem / (1024*1024)) _ ' MB' : 'N/A' %]</td>
+                <td>[% vm.cpus || 'N/A' %]</td>
+                <td>[% vm.uptime ? formatUptime(vm.uptime) : 'Not running' %]</td>
+                <td class="actions">
+                    <a href="[% c.uri_for('/proxmox/vm_status', vm.vmid) %]" class="btn-small">Details</a>
+                </td>
+            </tr>
+            [% END %]
+        </tbody>
+    </table>
+    [% ELSE %]
+    <div class="no-vms">
+        <p>No virtual machines found.</p>
+        <p>Click "Create New VM" to get started.</p>
+    </div>
+    [% END %]
+</div>
+
+[% ELSE %]
+<!-- User is not logged in -->
+<div class="login-prompt">
+    <p>You need to log in to access the Proxmox dashboard.</p>
+    <a href="[% c.uri_for('/proxmox/login') %]" class="btn-login">Login to Proxmox</a>
+</div>
+[% END %]
+
+[% IF debug_info %]
+<div class="debug-info">
+    <h3>Debug Information</h3>
+    <pre>[% debug_info_json %]</pre>
+</div>
+[% END %]
+</div>
+
+<style>
+    .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+    }
+
+    h1 {
+        color: #333;
+        margin-bottom: 30px;
+        text-align: center;
+    }
+
+    h2 {
+        color: #555;
+        margin-top: 0;
+        margin-bottom: 20px;
+        border-bottom: 1px solid #ddd;
+        padding-bottom: 10px;
+    }
+
+    .user-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+    }
+
+    .btn-logout {
+        background-color: #f8d7da;
+        color: #721c24;
+        padding: 8px 15px;
+        border-radius: 4px;
+        text-decoration: none;
+        font-size: 0.9em;
+    }
+
+    .btn-logout:hover {
+        background-color: #f5c6cb;
+    }
+
+    .action-panel, .vm-list-panel {
+        background-color: #f9f9f9;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+
+    .action-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .btn-action {
+        background-color: #4CAF50;
+        color: white;
+        padding: 12px 20px;
+        border-radius: 4px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        font-weight: bold;
+    }
+
+    .btn-action:hover {
+        background-color: #45a049;
+    }
+
+    .icon-plus::before {
+        content: "+";
+        margin-right: 8px;
+        font-size: 1.2em;
+    }
+
+    .icon-refresh::before {
+        content: "↻";
+        margin-right: 8px;
+        font-size: 1.2em;
+    }
+
+    .vm-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+    }
+
+    .vm-table th, .vm-table td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid #ddd;
+    }
+
+    .vm-table th {
+        background-color: #f2f2f2;
+        font-weight: bold;
+    }
+
+    .vm-table tr:hover {
+        background-color: #f5f5f5;
+    }
+
+    .status {
+        padding: 5px 10px;
+        border-radius: 3px;
+        font-size: 0.9em;
+        text-align: center;
+    }
+
+    .status.running {
+        background-color: #d4edda;
+        color: #155724;
+    }
+
+    .status.stopped {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+
+    .actions {
+        white-space: nowrap;
+    }
+
+    .btn-small {
+        background-color: #007bff;
+        color: white;
+        padding: 5px 10px;
+        border-radius: 3px;
+        text-decoration: none;
+        font-size: 0.9em;
+    }
+
+    .btn-small:hover {
+        background-color: #0069d9;
+    }
+
+    .no-vms {
+        text-align: center;
+        padding: 30px;
+        color: #666;
+    }
+
+    .login-prompt {
+        text-align: center;
+        padding: 50px 20px;
+        background-color: #f9f9f9;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+    }
+
+    .btn-login {
+        display: inline-block;
+        background-color: #4CAF50;
+        color: white;
+        padding: 12px 25px;
+        border-radius: 4px;
+        text-decoration: none;
+        font-weight: bold;
+        margin-top: 20px;
+    }
+
+    .btn-login:hover {
+        background-color: #45a049;
+    }
+
+    .error-message, .success-message {
+        padding: 15px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+        font-weight: bold;
+    }
+
+    .error-message {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+
+    .success-message {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+
+    .debug-info {
+        margin-top: 30px;
+        padding: 15px;
+        background-color: #f8f9fa;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        overflow-x: auto;
+    }
+
+    .debug-info pre {
+        margin: 0;
+        white-space: pre-wrap;
+        font-family: monospace;
+    }
+</style>
+
+<[% META title = 'Proxmox VM Management' %]
 
 <div class="container">
     <h1>Proxmox VM Management</h1>
@@ -21,20 +324,20 @@
                     <h3>Server Selection</h3>
                 </div>
                 <div class="card-body">
-                    [% IF servers.size > 0 %]
-                        <form method="get" action="[% c.uri_for('/proxmox') %]" class="d-flex">
-                            <select name="server_id" class="form-select me-2">
-                                [% FOREACH server IN servers %]
-                                <option value="[% server.id %]" [% IF server.id == server_id %]selected[% END %]>
-                                    [% server.name %] ([% server.host %])
-                                </option>
-                                [% END %]
-                            </select>
-                            <button type="submit" class="btn btn-primary">Switch Server</button>
-                        </form>
-                    [% ELSE %]
-                        <p>No Proxmox servers configured. <a href="[% c.uri_for('/proxmox_servers/add') %]" class="btn btn-sm btn-primary">Add Server</a></p>
-                    [% END %]
+                [% IF servers.size > 0 %]
+                <form method="get" action="[% c.uri_for('/proxmox') %]" class="d-flex">
+                    <select name="server_id" class="form-select me-2">
+                        [% FOREACH server IN servers %]
+                        <option value="[% server.id %]" [% IF server.id == server_id %]selected[% END %]>
+                            [% server.name %] ([% server.host %])
+                        </option>
+                        [% END %]
+                    </select>
+                    <button type="submit" class="btn btn-primary">Switch Server</button>
+                </form>
+                [% ELSE %]
+                <p>No Proxmox servers configured. <a href="[% c.uri_for('/proxmox_servers/add') %]" class="btn btn-sm btn-primary">Add Server</a></p>
+                [% END %]
                 </div>
             </div>
         </div>
@@ -53,17 +356,17 @@
         </div>
     </div>
 
-    [% IF auth_error %]
-    <div class="alert alert-danger">
-        <strong>Error:</strong> [% auth_error %]
-        [% IF auth_error.search('Missing Proxmox server credentials') %]
-            <p>Please <a href="[% c.uri_for('/proxmox_servers/add') %]">add a Proxmox server</a> to get started.</p>
-        [% ELSE %]
-            <p>Please check the Proxmox server credentials.</p>
-        [% END %]
-    </div>
+[% IF auth_error %]
+<div class="alert alert-danger">
+    <strong>Error:</strong> [% auth_error %]
+    [% IF auth_error.search('Missing Proxmox server credentials') %]
+    <p>Please <a href="[% c.uri_for('/proxmox_servers/add') %]">add a Proxmox server</a> to get started.</p>
+    [% ELSE %]
+    <p>Please check the Proxmox server credentials.</p>
     [% END %]
-    
+</div>
+[% END %]
+
     <div class="row">
         <div class="col-md-12">
             <div class="card">
@@ -72,74 +375,74 @@
                 </div>
                 <div class="card-body">
                     <p>Welcome to the Proxmox VM Management interface. From here, you can create and manage virtual machines on the Proxmox server.</p>
-                    
+
                     <div class="actions mb-4">
                         <a href="[% c.uri_for('/proxmox/create') %]" class="btn btn-primary">Create New VM</a>
                     </div>
-                    
-                    [% IF auth_success %]
-                        [% IF vms.size > 0 %]
-                            <h3>Existing Virtual Machines</h3>
-                            <div class="table-responsive">
-                                <table class="table table-striped table-bordered">
-                                    <thead>
-                                        <tr>
-                                            <th>VMID</th>
-                                            <th>Name</th>
-                                            <th>Status</th>
-                                            <th>CPU</th>
-                                            <th>Memory</th>
-                                            <th>Disk</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        [% FOREACH vm IN vms %]
-                                        <tr>
-                                            <td>[% vm.vmid %]</td>
-                                            <td>[% vm.name %]</td>
-                                            <td>
-                                                [% IF vm.status == 'running' %]
-                                                <span class="badge bg-success">Running</span>
-                                                [% ELSIF vm.status == 'stopped' %]
-                                                <span class="badge bg-danger">Stopped</span>
-                                                [% ELSE %]
-                                                <span class="badge bg-secondary">[% vm.status %]</span>
-                                                [% END %]
-                                            </td>
-                                            <td>[% vm.cpus %] cores</td>
-                                            <td>[% vm.maxmem / (1024*1024) %] MB</td>
-                                            <td>[% vm.maxdisk / (1024*1024*1024) %] GB</td>
-                                            <td>
-                                                <div class="btn-group btn-group-sm">
-                                                    <a href="#" class="btn btn-info" onclick="viewVmDetails([% vm.vmid %]); return false;">Details</a>
-                                                    [% IF vm.status == 'stopped' %]
-                                                    <a href="#" class="btn btn-success" onclick="startVm([% vm.vmid %]); return false;">Start</a>
-                                                    [% ELSIF vm.status == 'running' %]
-                                                    <a href="#" class="btn btn-warning" onclick="stopVm([% vm.vmid %]); return false;">Stop</a>
-                                                    [% END %]
-                                                </div>
-                                            </td>
-                                        </tr>
+
+                [% IF auth_success %]
+                    [% IF vms.size > 0 %]
+                    <h3>Existing Virtual Machines</h3>
+                    <div class="table-responsive">
+                        <table class="table table-striped table-bordered">
+                            <thead>
+                            <tr>
+                                <th>VMID</th>
+                                <th>Name</th>
+                                <th>Status</th>
+                                <th>CPU</th>
+                                <th>Memory</th>
+                                <th>Disk</th>
+                                <th>Actions</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                                [% FOREACH vm IN vms %]
+                                <tr>
+                                    <td>[% vm.vmid %]</td>
+                                    <td>[% vm.name %]</td>
+                                    <td>
+                                        [% IF vm.status == 'running' %]
+                                        <span class="badge bg-success">Running</span>
+                                        [% ELSIF vm.status == 'stopped' %]
+                                        <span class="badge bg-danger">Stopped</span>
+                                        [% ELSE %]
+                                        <span class="badge bg-secondary">[% vm.status %]</span>
                                         [% END %]
-                                    </tbody>
-                                </table>
-                            </div>
-                        [% ELSE %]
-                            <div class="alert alert-info">
-                                <p>No virtual machines found. Click the "Create New VM" button to create your first VM.</p>
-                            </div>
-                        [% END %]
+                                    </td>
+                                    <td>[% vm.cpus %] cores</td>
+                                    <td>[% vm.maxmem / (1024*1024) %] MB</td>
+                                    <td>[% vm.maxdisk / (1024*1024*1024) %] GB</td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="#" class="btn btn-info" onclick="viewVmDetails([% vm.vmid %]); return false;">Details</a>
+                                            [% IF vm.status == 'stopped' %]
+                                            <a href="#" class="btn btn-success" onclick="startVm([% vm.vmid %]); return false;">Start</a>
+                                            [% ELSIF vm.status == 'running' %]
+                                            <a href="#" class="btn btn-warning" onclick="stopVm([% vm.vmid %]); return false;">Stop</a>
+                                            [% END %]
+                                        </div>
+                                    </td>
+                                </tr>
+                                [% END %]
+                            </tbody>
+                        </table>
+                    </div>
                     [% ELSE %]
-                        <div class="alert alert-warning">
-                            <p>Unable to retrieve VM list. Please check Proxmox server connection and credentials.</p>
-                        </div>
+                    <div class="alert alert-info">
+                        <p>No virtual machines found. Click the "Create New VM" button to create your first VM.</p>
+                    </div>
                     [% END %]
+                [% ELSE %]
+                <div class="alert alert-warning">
+                    <p>Unable to retrieve VM list. Please check Proxmox server connection and credentials.</p>
+                </div>
+                [% END %]
                 </div>
             </div>
         </div>
     </div>
-    
+
     <div class="row mt-4">
         <div class="col-md-12">
             <div class="card">
@@ -148,7 +451,7 @@
                 </div>
                 <div class="card-body">
                     <p>Proxmox Virtual Environment is an open-source server management platform for enterprise virtualization. It allows you to run virtual machines and containers, manage storage, configure high-availability clustering, and more.</p>
-                    
+
                     <p>This interface provides a simplified way to create and manage virtual machines on our Proxmox server at 172.30.236.89.</p>
                 </div>
             </div>
@@ -184,7 +487,7 @@
         // Show the modal
         var modal = new bootstrap.Modal(document.getElementById('vmDetailsModal'));
         modal.show();
-        
+
         // Load VM details
         fetch('[% c.uri_for("/proxmox/status/") %]' + vmid)
             .then(response => response.json())
@@ -201,7 +504,7 @@
                     detailsHtml += '<tr><th>Uptime:</th><td>' + formatUptime(status.uptime || 0) + '</td></tr>';
                     detailsHtml += '</table>';
                     detailsHtml += '</div>';
-                    
+
                     document.getElementById('vmDetailsContent').innerHTML = detailsHtml;
                 } else {
                     document.getElementById('vmDetailsContent').innerHTML = '<div class="alert alert-danger">Error: ' + (data.error || 'Failed to load VM details') + '</div>';
@@ -211,41 +514,41 @@
                 document.getElementById('vmDetailsContent').innerHTML = '<div class="alert alert-danger">Error: ' + error.message + '</div>';
             });
     }
-    
+
     function startVm(vmid) {
         if (confirm('Are you sure you want to start VM ' + vmid + '?')) {
             // TODO: Implement VM start functionality
             alert('Start VM functionality not yet implemented');
         }
     }
-    
+
     function stopVm(vmid) {
         if (confirm('Are you sure you want to stop VM ' + vmid + '?')) {
             // TODO: Implement VM stop functionality
             alert('Stop VM functionality not yet implemented');
         }
     }
-    
+
     function formatUptime(seconds) {
         if (!seconds || seconds === 0) {
             return 'Not running';
         }
-        
+
         if (seconds < 60) {
             return seconds + ' seconds';
         }
-        
+
         let minutes = Math.floor(seconds / 60);
         if (minutes < 60) {
             return minutes + ' minutes, ' + (seconds % 60) + ' seconds';
         }
-        
+
         let hours = Math.floor(minutes / 60);
         minutes = minutes % 60;
         if (hours < 24) {
             return hours + ' hours, ' + minutes + ' minutes';
         }
-        
+
         let days = Math.floor(hours / 24);
         hours = hours % 24;
         return days + ' days, ' + hours + ' hours, ' + minutes + ' minutes';

@@ -199,6 +199,10 @@ sub log_with_details {
 
     # Format the log message with a timestamp
     my $timestamp = _get_timestamp();
+
+    # Make sure $line is numeric, default to 0 if not
+    $line = 0 unless defined $line && $line =~ /^\d+$/;
+
     my $log_message = sprintf("[%s] [%s:%d] %s - %s", $timestamp, $file, $line, ($subroutine // 'unknown'), $message);
 
     # Log to file - this is our primary logging mechanism
