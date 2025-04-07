@@ -7,6 +7,7 @@
                     <a href="/add_link?menu=HelpDesk">Add</a>
                     [% END %]
                     <a href="/HelpDesk"target=.blank'>HelpDesk</a>
+                    <a href="/Documentation" target="_blank">Documentation</a>
                     <a href="/faq" target="_blank" ><font   class="LeftSideBarNavStyle">Our FAQ</font></a>
                     <a href="/KnowlegeBase" target="_blank" >Knowledge
                             base</a>

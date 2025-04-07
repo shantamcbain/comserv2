@@ -2,7 +2,9 @@
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
-
+<head>
+    <link rel="stylesheet" href="[% c.uri_for('/static/css/componets/documentation.css') %]">
+</head>
 [%# Determine user role for display %]
 [% SET display_role = 'Guest' %]
 [% IF c.session.roles %]
@@ -117,5 +119,7 @@
         font-family: Arial, sans-serif;
         background: #f8f9fa;
     }
+    
+
     /* ... rest of your CSS ... */
 </style>
