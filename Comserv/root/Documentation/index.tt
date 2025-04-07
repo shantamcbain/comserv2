@@ -3,7 +3,7 @@
     [% PageVersion %]
 [% END %]
 <head>
-    <link rel="stylesheet" href="[% c.uri_for('/static/css/componets/documentation.css') %]">
+    <link rel="stylesheet" href="[% c.uri_for('/static/css/components/documentation.css') %]">
 </head>
 [%# Determine user role for display %]
 [% SET display_role = 'Guest' %]
@@ -34,8 +34,31 @@
         <li>admin_guides: [% categories.admin_guides ? 'Yes' : 'No' %]</li>
         <li>proxmox: [% categories.proxmox ? 'Yes' : 'No' %]</li>
         <li>controllers: [% categories.controllers ? 'Yes' : 'No' %]</li>
+        <li>models: [% categories.models ? 'Yes' : 'No' %]</li>
         <li>changelog: [% categories.changelog ? 'Yes' : 'No' %]</li>
         <li>general: [% categories.general ? 'Yes' : 'No' %]</li>
+    </ul>
+    
+    <h4>Controller Documentation Files:</h4>
+    <ul>
+        [% IF categories.controllers && categories.controllers.pages.size > 0 %]
+            [% FOREACH page_name IN categories.controllers.pages.sort %]
+                <li>[% page_name %] - [% structured_pages.$page_name ? 'Found' : 'Not Found' %]</li>
+            [% END %]
+        [% ELSE %]
+            <li>No controller documentation files found.</li>
+        [% END %]
+    </ul>
+    
+    <h4>Model Documentation Files:</h4>
+    <ul>
+        [% IF categories.models && categories.models.pages.size > 0 %]
+            [% FOREACH page_name IN categories.models.pages.sort %]
+                <li>[% page_name %] - [% structured_pages.$page_name ? 'Found' : 'Not Found' %]</li>
+            [% END %]
+        [% ELSE %]
+            <li>No model documentation files found.</li>
+        [% END %]
     </ul>
 </div>
 [% END %]
@@ -60,6 +83,7 @@
     [% INCLUDE 'Documentation/admin_guides.tt' %]
     [% INCLUDE 'Documentation/proxmox.tt' %]
     [% INCLUDE 'Documentation/controllers.tt' %]
+    [% INCLUDE 'Documentation/models.tt' %]
     [% INCLUDE 'Documentation/changelog.tt' %]
     [% INCLUDE 'Documentation/all_docs.tt' %]
 [% END %]
@@ -77,7 +101,10 @@
         document.querySelectorAll('.section-toggle').forEach(header => {
             header.addEventListener('click', function() {
                 this.classList.toggle('expanded');
-                const content = this.nextElementSibling.nextElementSibling;
+                // Find the next .section-content element within the same section
+                const section = this.closest('.doc-section');
+                const content = section.querySelector('.section-content');
+                
                 if (content.classList.contains('expanded')) {
                     content.style.maxHeight = '0';
                     content.classList.remove('expanded');
@@ -87,6 +114,8 @@
                 }
             });
         });
+        
+        // Initialize all expanded sections
         document.querySelectorAll('.section-content.expanded').forEach(content => {
             content.style.maxHeight = content.scrollHeight + 'px';
         });

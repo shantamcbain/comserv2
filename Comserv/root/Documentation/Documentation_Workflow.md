@@ -1,17 +1,12 @@
-# Documentation System
+# Documentation Workflow
+
+**Last Updated:** May 15, 2025  
+**Author:** Shanta  
+**Status:** Active
 
 ## Overview
 
-The Comserv Documentation System provides a structured way to organize, categorize, and display documentation files for different user roles and sites. The system automatically scans the documentation directory, categorizes files based on their location and content, and presents them in an organized interface.
-
-## Features
-
-- **Role-Based Access Control**: Documentation is filtered based on user roles, ensuring users only see documentation relevant to their permissions.
-- **Site-Specific Documentation**: Support for site-specific documentation that is only shown when viewing the relevant site.
-- **Categorized Documentation**: Documentation is automatically categorized into sections like User Guides, Tutorials, Admin Guides, etc.
-- **File Type Support**: Supports multiple file types including Markdown (.md), Template Toolkit (.tt), HTML (.html), and plain text (.txt).
-- **Alphabetical Sorting**: All documentation is displayed in alphabetical order by title.
-- **Tabbed Interface**: Documentation can be filtered by file type using a tabbed interface.
+The Comserv Documentation System provides a structured way to organize, categorize, and display documentation files for different user roles and sites. This document outlines the workflow for creating, updating, and maintaining documentation in the system.
 
 ## Documentation Structure
 
@@ -24,33 +19,55 @@ The documentation is organized in the following directory structure:
   │   ├── normal/        # Regular user documentation
   │   └── developer/     # Developer documentation
   ├── tutorials/         # Step-by-step guides
-  ├── modules/           # Module-specific documentation
+  ├── developer/         # Developer-specific documentation
   ├── proxmox/           # Proxmox-related documentation
   ├── changelog/         # System changes and updates
   ├── controllers/       # Controller documentation
-  ├── sites/      # Site-specific documentation
-  │   ├── mcoop/         # MCOOP-specific documentation/  
-    
+  ├── models/            # Model documentation
+  ├── sites/             # Site-specific documentation
+  │   └── mcoop/         # MCOOP-specific documentation
+  ├── documentation_config.json  # Configuration file for documentation
+  └── completed_items.json       # Recent updates tracking
 ```
+
+## Configuration File
+
+The documentation system uses a central configuration file (`documentation_config.json`) to manage documentation categories and file paths. This file has two main sections:
+
+1. **Categories**: Defines all documentation categories and their properties
+2. **Default Paths**: Maps documentation keys to file paths
+
+When adding new documentation or moving existing files, you must update this configuration file to ensure the documentation is properly categorized and accessible.
 
 ## File Naming and Formatting
 
-- **File Names**: Use descriptive names with underscores for spaces (e.g., `user_management.md`).
-- **Title Format**: Titles are automatically generated from filenames by replacing underscores with spaces and capitalizing words.
-- **Acronyms**: Common acronyms like API, KVM, ISO, etc. are properly capitalized in titles.
+- **File Names**: Use descriptive names with underscores for spaces (e.g., `user_management.md`)
+- **Title Format**: Titles are automatically generated from filenames by replacing underscores with spaces and capitalizing words
+- **Acronyms**: Common acronyms like API, KVM, ISO, etc. are properly capitalized in titles
+- **Metadata**: Include metadata at the top of each document:
+  ```markdown
+  # Document Title
+  
+  **Last Updated:** Month Day, Year  
+  **Author:** Your Name  
+  **Status:** Active/Draft/Deprecated
+  ```
 
 ## Categories
 
-The system automatically categorizes documentation into the following sections:
+The system organizes documentation into the following categories:
 
-1. **User Documentation**: End-user guides and documentation
+1. **User Guides**: End-user guides and documentation
 2. **Tutorials**: Step-by-step guides for common tasks
 3. **Site-Specific Documentation**: Documentation specific to the current site
 4. **Administrator Guides**: Documentation for system administrators (admin only)
-5. **Proxmox Documentation**: Documentation for Proxmox virtualization (admin only)
-6. **Controller Documentation**: Documentation for system controllers (admin only)
-7. **Changelog**: System changes and updates (admin only)
-8. **All Documentation Files**: Complete alphabetical list of all documentation (admin only)
+5. **Developer Documentation**: Technical documentation for developers
+6. **Module Documentation**: Documentation for specific system modules
+7. **Controllers Documentation**: Documentation for system controllers (admin/developer only)
+8. **Models Documentation**: Documentation for system models (admin/developer only)
+9. **Proxmox Documentation**: Documentation for Proxmox virtualization (admin only)
+10. **Changelog**: System changes and updates (admin/developer only)
+11. **All Documentation**: Complete alphabetical list of all documentation (admin only)
 
 ## Development Workflow
 
@@ -73,6 +90,7 @@ When working with documentation, follow this workflow to ensure consistency and 
 - Create or modify documentation files in the appropriate directory
 - Follow the file naming conventions and markdown structure
 - Ensure content is accurate, clear, and concise
+- Update the `documentation_config.json` file if adding new documentation or moving files
 
 ### 4. Test Changes
 
@@ -109,15 +127,22 @@ When working with documentation, follow this workflow to ensure consistency and 
 
 To add new documentation:
 
-1. Create a new file in the appropriate directory with a `.md` or `.tt` extension.
-2. Use a descriptive filename with underscores for spaces.
-3. The file will be automatically categorized based on its location and filename.
-4. Update the changelog to reflect the addition.
+1. Create a new file in the appropriate directory with a `.md` extension
+2. Use a descriptive filename with underscores for spaces
+3. Include proper metadata at the top of the document
+4. Add the document to the `documentation_config.json` file:
+   - Add the document key to the appropriate category in the "categories" section
+   - Add the document path to the "default_paths" section
+5. Update the changelog to reflect the addition
 
 ### Example Markdown Structure
 
 ```markdown
 # Title of Documentation
+
+**Last Updated:** Month Day, Year  
+**Author:** Your Name  
+**Status:** Active
 
 ## Overview
 Brief description of the topic.
@@ -133,6 +158,45 @@ Instructions for using the feature.
 Code examples or usage examples.
 ```
 
+## Moving or Renaming Documentation
+
+When moving or renaming documentation files:
+
+1. Move or rename the file in the file system
+2. Update the path in the `documentation_config.json` file
+3. Test that the documentation is still accessible
+4. Add a changelog entry to document the change
+
+## Template Files
+
+When working with Template Toolkit (.tt) files:
+
+1. Follow the same naming conventions as markdown files
+2. Include debug information sections:
+   ```tt
+   [% IF debug_mode == 1 %]
+       [% PageVersion %]
+       [% # Use the standard debug message system %]
+       [% IF debug_msg.defined && debug_msg.size > 0 %]
+           <div class="debug-messages">
+               [% FOREACH msg IN debug_msg %]
+                   <p class="debug">Debug: [% msg %]</p>
+               [% END %]
+           </div>
+       [% END %]
+   [% END %]
+   ```
+3. Include version information:
+   ```tt
+   [% PageVersion = 'template_name.tt,v X.XX YYYY/MM/DD author Exp author' %]
+   ```
+4. Use proper role-based access control:
+   ```tt
+   [% IF c.session.roles && c.session.roles.grep('^admin$').size %]
+       <!-- Admin-only content -->
+   [% END %]
+   ```
+
 ## Administrator View
 
 Administrators have access to all documentation in the system, including:
@@ -144,14 +208,15 @@ Administrators have access to all documentation in the system, including:
 
 ## Recent Updates
 
-The documentation system also displays recent updates to the system, pulled from the `completed_items.json` file. This provides users with information about recent changes and improvements.
+The documentation system displays recent updates to the system, pulled from the `completed_items.json` file. This provides users with information about recent changes and improvements.
 
 ## Technical Implementation
 
 The Documentation system is implemented using:
 
 - **Controller**: `Comserv::Controller::Documentation`
-- **Template**: `Documentation/index.tt`
+- **Configuration**: `documentation_config.json`
+- **Template**: `Documentation/index.tt` and category-specific templates
 - **JavaScript**: Client-side sorting and tab switching
 - **CSS**: Styling for documentation cards, tabs, and badges
 
@@ -162,17 +227,20 @@ The documentation system uses the application's logging framework:
 - All documentation scanning and categorization is logged
 - Debug information can be viewed by enabling debug mode
 - Errors during documentation processing are logged to the application log
+- Debug messages are pushed to the stash and can be displayed in templates
 
 ## Troubleshooting
 
 If documentation is not appearing as expected:
 
 1. Check that the file is in the correct directory
-2. Verify that the user has the appropriate role to view the documentation
-3. Ensure the file has a supported extension (.md, .tt, .html, .txt)
-4. Check the logs for any errors in the documentation scanning process
-5. Verify that the file follows the correct naming conventions
-6. Check that the documentation controller is properly initialized
+2. Verify that the path in `documentation_config.json` is correct
+3. Verify that the user has the appropriate role to view the documentation
+4. Ensure the file has a supported extension (.md, .tt, .html, .txt)
+5. Check the logs for any errors in the documentation scanning process
+6. Verify that the file follows the correct naming conventions
+7. Check that the documentation controller is properly initialized
+8. Enable debug mode to see more detailed information
 
 ## Maintenance
 
@@ -183,3 +251,6 @@ Regular maintenance tasks for the documentation system:
 3. Check for broken links or references
 4. Ensure all new features have corresponding documentation
 5. Verify that role-based access is correctly configured
+6. Update the `documentation_config.json` file to reflect the current state of documentation
+7. Check that all paths in the configuration file are correct
+8. Test documentation visibility for different user roles

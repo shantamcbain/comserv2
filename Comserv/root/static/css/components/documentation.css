@@ -52,6 +52,7 @@ h1 {
     margin: 0 0 10px 0;
     cursor: pointer;
     position: relative;
+    border-bottom: none !important; /* Ensure no border appears under headers */
 }
 
 .section-toggle::after {
@@ -72,7 +73,13 @@ h1 {
     gap: 20px;
     max-height: 0;
     overflow: hidden;
-    transition: max-height 0.3s ease;
+    transition: max-height 0.5s ease;
+}
+
+/* Ensure expanded content is visible */
+.section-content.expanded {
+    max-height: 5000px !important; /* Use a very large value to accommodate all content */
+    overflow: visible;
 }
 
 .doc-card {
@@ -87,6 +94,28 @@ h1 {
 
 .doc-card:hover {
     box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.doc-card.special-card {
+    background: #f0f7ff;
+    border-left: 4px solid #0056b3;
+    font-weight: bold;
+}
+
+.controller-grid, .model-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+    margin: 20px 0;
+}
+
+.no-docs-message {
+    background: #fff3cd;
+    border: 1px solid #ffeeba;
+    border-radius: 4px;
+    padding: 15px;
+    margin: 20px 0;
+    color: #856404;
 }
 
 .doc-card h3 {
