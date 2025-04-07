@@ -1,0 +1,199 @@
+[% PageVersion = 'network.tt,v 1.0 2025/05/15 Shanta Exp Shanta' %]
+[% PROCESS header.tt %]
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>Network Information</h1>
+            <p class="lead">Information about our network infrastructure.</p>
+            
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="[% c.uri_for('/it') %]">IT Home</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Network</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h4>Network Overview</h4>
+                </div>
+                <div class="card-body">
+                    <p>Our network infrastructure is designed to provide reliable, secure, and high-performance connectivity for all our operations. The network is segmented into different VLANs for security and performance optimization.</p>
+                    
+                    <h5 class="mt-4">Network Segments</h5>
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Segment</th>
+                                    <th>Purpose</th>
+                                    <th>IP Range</th>
+                                    <th>Access Level</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Staff Network</td>
+                                    <td>General staff connectivity</td>
+                                    <td>10.1.0.0/24</td>
+                                    <td>Standard</td>
+                                </tr>
+                                <tr>
+                                    <td>Admin Network</td>
+                                    <td>Administrative functions</td>
+                                    <td>10.2.0.0/24</td>
+                                    <td>Restricted</td>
+                                </tr>
+                                <tr>
+                                    <td>Server Network</td>
+                                    <td>Server infrastructure</td>
+                                    <td>10.3.0.0/24</td>
+                                    <td>Highly Restricted</td>
+                                </tr>
+                                <tr>
+                                    <td>Guest Network</td>
+                                    <td>Guest internet access</td>
+                                    <td>192.168.100.0/24</td>
+                                    <td>Internet Only</td>
+                                </tr>
+                                <tr>
+                                    <td>IoT Network</td>
+                                    <td>IoT devices</td>
+                                    <td>192.168.200.0/24</td>
+                                    <td>Isolated</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <h5 class="mt-4">Network Equipment</h5>
+                    <p>Our network infrastructure includes the following key components:</p>
+                    <ul>
+                        <li><strong>Core Switches:</strong> Cisco Catalyst 9300 Series</li>
+                        <li><strong>Edge Switches:</strong> Cisco Catalyst 2960-X Series</li>
+                        <li><strong>Firewalls:</strong> Palo Alto PA-3200 Series</li>
+                        <li><strong>Wireless:</strong> Cisco Meraki MR Series Access Points</li>
+                        <li><strong>Internet Connectivity:</strong> Dual 1Gbps fiber connections with automatic failover</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h4>Network Policies</h4>
+                </div>
+                <div class="card-body">
+                    <h5>General Network Usage Policies</h5>
+                    <ul>
+                        <li>All network usage must comply with the organization's acceptable use policy</li>
+                        <li>Personal devices must be registered before connecting to the network</li>
+                        <li>Guest network access is available for visitors with time-limited credentials</li>
+                        <li>VPN access is required for remote connections to internal resources</li>
+                        <li>Network traffic is monitored for security and performance purposes</li>
+                    </ul>
+                    
+                    <h5 class="mt-4">Wireless Network</h5>
+                    <ul>
+                        <li>Separate SSIDs are provided for staff, guests, and IoT devices</li>
+                        <li>Staff wireless requires WPA2-Enterprise authentication</li>
+                        <li>Guest wireless uses a captive portal with terms of service acceptance</li>
+                        <li>Wireless coverage is designed for complete coverage of all work areas</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h4>Network Status</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle"></i> All systems operational
+                    </div>
+                    
+                    <h5 class="mt-3">Internet Connectivity</h5>
+                    <div class="progress mb-3">
+                        <div class="progress-bar bg-success" role="progressbar" style="width: 25%;" aria-valuenow="25" aria-valuemin="0" aria-valuemax="100">25% Utilization</div>
+                    </div>
+                    
+                    <h5>Internal Network</h5>
+                    <div class="progress mb-3">
+                        <div class="progress-bar bg-info" role="progressbar" style="width: 40%;" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100">40% Utilization</div>
+                    </div>
+                    
+                    <h5>Wireless Network</h5>
+                    <div class="progress mb-3">
+                        <div class="progress-bar bg-warning" role="progressbar" style="width: 65%;" aria-valuenow="65" aria-valuemin="0" aria-valuemax="100">65% Utilization</div>
+                    </div>
+                    
+                    <p class="mt-3"><small>Last updated: Today at 10:15 AM</small></p>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h4>Network Support</h4>
+                </div>
+                <div class="card-body">
+                    <p>For network-related issues or requests, please contact:</p>
+                    
+                    <p><strong>Network Team:</strong><br>
+                    Email: <a href="mailto:network@example.com">network@example.com</a><br>
+                    Phone: (555) 123-4567</p>
+                    
+                    <p><strong>Common Requests:</strong></p>
+                    <ul>
+                        <li><a href="#">Request Network Access</a></li>
+                        <li><a href="#">Report Network Issue</a></li>
+                        <li><a href="#">Request VPN Access</a></li>
+                        <li><a href="#">Request Port Activation</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header bg-secondary text-white">
+                    <h4>Network Documentation</h4>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group">
+                        <li class="list-group-item"><a href="#"><i class="fas fa-file-pdf"></i> Network Diagram</a></li>
+                        <li class="list-group-item"><a href="#"><i class="fas fa-file-alt"></i> IP Address Scheme</a></li>
+                        <li class="list-group-item"><a href="#"><i class="fas fa-file-alt"></i> Firewall Rules</a></li>
+                        <li class="list-group-item"><a href="#"><i class="fas fa-file-alt"></i> VPN Setup Guide</a></li>
+                        <li class="list-group-item"><a href="#"><i class="fas fa-file-alt"></i> Wireless Coverage Map</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+[% IF debug_mode == 1 %]
+    <div class="container mt-4">
+        <div class="card">
+            <div class="card-header bg-dark text-white">
+                Debug Information
+            </div>
+            <div class="card-body">
+                <p>Page Version: [% PageVersion %]</p>
+                [% IF debug_msg.defined && debug_msg.size > 0 %]
+                    <div class="debug-messages">
+                        [% FOREACH msg IN debug_msg %]
+                            <p class="debug">Debug: [% msg %]</p>
+                        [% END %]
+                    </div>
+                [% END %]
+            </div>
+        </div>
+    </div>
+[% END %]
+
+[% PROCESS footer.tt %]

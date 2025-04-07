@@ -1,0 +1,106 @@
+[% PageVersion = 'index.tt,v 1.0 2025/05/15 Shanta Exp Shanta' %]
+[% PROCESS header.tt %]
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>IT Resources</h1>
+            <p class="lead">Welcome to the IT resources section. Here you can find information about our IT infrastructure, documentation, and support resources.</p>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h4><i class="fas fa-server"></i> Infrastructure</h4>
+                </div>
+                <div class="card-body">
+                    <p>Information about our servers, network, and infrastructure.</p>
+                    <ul class="list-unstyled">
+                        <li><a href="[% c.uri_for('/it/servers') %]"><i class="fas fa-server"></i> Servers</a></li>
+                        <li><a href="[% c.uri_for('/it/network') %]"><i class="fas fa-network-wired"></i> Network</a></li>
+                        <li><a href="[% c.uri_for('/proxmox') %]"><i class="fas fa-cloud"></i> Proxmox</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h4><i class="fas fa-book"></i> Documentation</h4>
+                </div>
+                <div class="card-body">
+                    <p>Access IT documentation and guides.</p>
+                    <ul class="list-unstyled">
+                        <li><a href="[% c.uri_for('/it/documentation') %]"><i class="fas fa-file-alt"></i> IT Documentation</a></li>
+                        <li><a href="[% c.uri_for('/documentation') %]"><i class="fas fa-book-open"></i> System Documentation</a></li>
+                        <li><a href="[% c.uri_for('/it/security') %]"><i class="fas fa-shield-alt"></i> Security Guidelines</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h4><i class="fas fa-tools"></i> Support & Tools</h4>
+                </div>
+                <div class="card-body">
+                    <p>IT support resources and tools.</p>
+                    <ul class="list-unstyled">
+                        <li><a href="[% c.uri_for('/it/support') %]"><i class="fas fa-headset"></i> IT Support</a></li>
+                        <li><a href="[% c.uri_for('/it/tools') %]"><i class="fas fa-wrench"></i> IT Tools</a></li>
+                        <li><a href="[% c.uri_for('/it/resources') %]"><i class="fas fa-clipboard-list"></i> Resources</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h4><i class="fas fa-bullhorn"></i> IT Announcements</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <h5><i class="fas fa-info-circle"></i> Welcome to the New IT Portal</h5>
+                        <p>This new IT section provides centralized access to all IT resources, documentation, and support information. Please explore the various sections and provide feedback on how we can improve.</p>
+                        <p class="mb-0"><small>Posted: May 15, 2025</small></p>
+                    </div>
+                    
+                    <div class="alert alert-success">
+                        <h5><i class="fas fa-check-circle"></i> Network Upgrade Completed</h5>
+                        <p>The planned network infrastructure upgrade has been successfully completed. All systems are now operating on the new network with improved performance and security.</p>
+                        <p class="mb-0"><small>Posted: May 10, 2025</small></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+[% IF debug_mode == 1 %]
+    <div class="container mt-4">
+        <div class="card">
+            <div class="card-header bg-dark text-white">
+                Debug Information
+            </div>
+            <div class="card-body">
+                <p>Page Version: [% PageVersion %]</p>
+                [% IF debug_msg.defined && debug_msg.size > 0 %]
+                    <div class="debug-messages">
+                        [% FOREACH msg IN debug_msg %]
+                            <p class="debug">Debug: [% msg %]</p>
+                        [% END %]
+                    </div>
+                [% END %]
+            </div>
+        </div>
+    </div>
+[% END %]
+
+[% PROCESS footer.tt %]
