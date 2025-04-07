@@ -3,7 +3,7 @@
     <h2 class="section-toggle expanded">Changelog</h2>
     <p>System updates and changes. <span class="admin-badge">Admin Only</span></p>
     <div class="section-content expanded">
-        [% FOREACH page_name IN categories.changelog.pages.sort %]
+        [% FOREACH page_name IN categories.changelog.pages.sort.reverse %]
             [% IF structured_pages.$page_name %]
                 [% page = structured_pages.$page_name %]
             <a href="[% page.url %]" class="doc-card">

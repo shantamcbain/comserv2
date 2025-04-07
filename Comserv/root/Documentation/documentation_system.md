@@ -1,6 +1,6 @@
 # Documentation System
 
-**Last Updated:** April 7, 2025  
+**Last Updated:** May 15, 2025  
 **Author:** Shanta  
 **Status:** Active
 
@@ -30,7 +30,17 @@ The system supports several types of documentation:
 4. **Module Documentation**
    - Documentation for specific system modules
    - Visibility depends on module access permissions
-   - Located in the `Documentation/modules` directory
+   - Located in the main Documentation directory or module-specific directories
+
+5. **Controller Documentation**
+   - Documentation for system controllers
+   - Located in the `Documentation/controllers` directory
+   - Primarily for developers and administrators
+
+6. **Changelog Documentation**
+   - Documentation of system changes and updates
+   - Located in the `Documentation/changelog` directory
+   - Helps track system evolution and recent updates
 
 ## Visibility Rules
 
@@ -83,6 +93,22 @@ Documentation is organized into the following categories:
    - Documentation for specific system modules
    - Visibility depends on module access permissions
 
+7. **Controllers Documentation**
+   - Documentation for system controllers
+   - Only visible to developers and administrators
+
+8. **Models Documentation**
+   - Documentation for system models
+   - Only visible to developers and administrators
+
+9. **Changelog**
+   - System changes and updates
+   - Only visible to developers and administrators
+
+10. **Proxmox Documentation**
+    - Documentation for Proxmox virtualization environment
+    - Only visible to administrators
+
 ## File Formats
 
 The documentation system supports multiple file formats:
@@ -98,6 +124,26 @@ The documentation system supports multiple file formats:
 3. **Other Formats**
    - JSON, HTML, CSS, and other formats are supported
    - Served with appropriate content types
+
+## Configuration
+
+The documentation system uses a JSON configuration file to manage documentation categories and file paths:
+
+1. **documentation_config.json**
+   - Located in the `Documentation` directory
+   - Defines documentation categories and their properties
+   - Maps documentation keys to file paths
+   - Allows for centralized management of documentation structure
+
+2. **Configuration Structure**
+   - Categories section defines all documentation categories
+   - Default paths section maps documentation keys to file paths
+   - This structure allows for easy reorganization of documentation
+
+3. **Updating Configuration**
+   - When adding new documentation, update the configuration file
+   - When moving files, update the paths in the configuration
+   - Ensure all paths are correct and point to existing files
 
 ## Best Practices
 
@@ -128,6 +174,11 @@ When creating documentation, follow these best practices:
    - Note the last updated date in the metadata
    - Archive or clearly mark deprecated documentation
 
+6. **Configuration Management**
+   - Update the documentation_config.json file when adding or moving documentation
+   - Ensure all paths in the configuration file are correct
+   - Test documentation visibility after configuration changes
+
 ## Adding New Documentation
 
 To add new documentation to the system:
@@ -146,7 +197,11 @@ To add new documentation to the system:
    - Follow the structured content guidelines
    - Include all necessary information
 
-5. **Test Visibility**
+5. **Update Configuration**
+   - Add the document to the documentation_config.json file
+   - Specify the correct path and category
+
+6. **Test Visibility**
    - Verify that the document is visible to the intended audience
    - Check that it appears in the appropriate category
 
@@ -177,6 +232,7 @@ The documentation system is implemented in the `Documentation.pm` controller wit
 1. **Scanning Mechanism**
    - Scans documentation directories on application startup
    - Builds metadata for each documentation file
+   - Uses the documentation_config.json file for configuration
 
 2. **Filtering Logic**
    - Filters documentation based on user role and site
@@ -224,6 +280,22 @@ The documentation system's template structure has been refactored to improve mai
    - Better organization: Code is logically grouped by functionality
    - Improved readability: Smaller, focused template files
    - Easier collaboration: Multiple developers can work on different sections
+
+## Debugging
+
+The documentation system includes debugging features to help troubleshoot issues:
+
+1. **Debug Mode**
+   - Enable debug mode to see detailed information about documentation loading
+   - Debug messages are pushed to the stash and displayed in the template
+
+2. **Logging**
+   - The system logs documentation scanning and categorization
+   - Check the application log for errors and warnings
+
+3. **Configuration Validation**
+   - The system validates the documentation_config.json file
+   - Errors in the configuration are logged
 
 ## Future Enhancements
 

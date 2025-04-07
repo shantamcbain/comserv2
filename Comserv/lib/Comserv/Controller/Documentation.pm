@@ -83,6 +83,13 @@ has 'documentation_categories' => (
                 roles => ['admin', 'developer'],
                 site_specific => 0,
             },
+            'models' => {
+                title => 'Model Documentation',
+                description => 'Documentation for system models',
+                pages => [],
+                roles => ['admin', 'developer'],
+                site_specific => 0,
+            },
             'changelog' => {
                 title => 'Changelog',
                 description => 'System changes and updates',
@@ -218,6 +225,9 @@ sub BUILD {
 
             # Set a default category for uncategorized files
             my $category = 'general';
+            
+            # Log the key and path for debugging
+            $logger->log_to_file("Categorizing file: $key, path: $meta->{path}", undef, 'DEBUG');
 
             # Categorize based on path and filename
             if ($meta->{path} =~ m{/tutorials/}) {
@@ -235,8 +245,13 @@ sub BUILD {
             elsif ($meta->{path} =~ m{/changelog/}) {
                 $category = 'changelog';
             }
-            elsif ($meta->{path} =~ m{/controllers/} || $key =~ /controller/i) {
+            elsif ($meta->{path} =~ m{/controllers/} || $key =~ /controller/i || $key =~ /^(root|user|site|admin|documentation|proxmox|todo|project|file|mail|log|themeadmin|themeeditor|csc|ency|usbm|apiary|bmaster|forager|ve7tit|workshop)$/i) {
                 $category = 'controllers';
+                $logger->log_to_file("Categorized as controller: $key", undef, 'DEBUG');
+            }
+            elsif ($meta->{path} =~ m{/models/} || $key =~ /model/i || $key =~ /^(user|site|theme|themeconfig|todo|project|proxmox|calendar|file|mail|log|dbschemamanager|dbency|dbforager|encymodel|bmaster|bmastermodel|apiarymodel|workshop)$/i) {
+                $category = 'models';
+                $logger->log_to_file("Categorized as model: $key", undef, 'DEBUG');
             }
             elsif ($meta->{path} =~ m{/roles/admin/}) {
                 $category = 'admin_guides';
@@ -368,6 +383,90 @@ sub BUILD {
             $meta->{description} = "Site-specific documentation for " . ($meta->{site} || 'all sites');
         }
     );
+    
+    # Scan controller documentation
+    # Added to ensure controller documentation is properly categorized
+    $scan_dirs->(
+        "root/Documentation/controllers",
+        sub {
+            my ($key, $meta) = @_;
+
+            # Skip if already categorized
+            return if $categorized_files{$key};
+
+            # Add to controllers category
+            push @{$self->documentation_categories->{controllers}{pages}}, $key;
+            $categorized_files{$key} = 1;
+
+            # Add to general category
+            push @{$self->documentation_categories->{general}{pages}}, $key;
+
+            # Ensure admin role is included
+            push @{$meta->{roles}}, 'admin' unless grep { $_ eq 'admin' } @{$meta->{roles}};
+
+            # Log categorization
+            $logger->log_to_file("Added $key to controllers category", undef, 'DEBUG');
+        },
+        sub {
+            my ($meta, $path) = @_;
+
+            # Add file type detection
+            my $filename = basename($path);
+            $meta->{file_type} = ($filename =~ /\.tt$/i) ? 'template' :
+                               ($filename =~ /\.md$/i) ? 'markdown' : 'other';
+
+            # Format title from filename
+            $meta->{title} = $self->_format_title(basename($path));
+
+            # Add description
+            $meta->{description} = "Controller documentation for " . $meta->{title};
+            
+            # Set roles to admin and developer
+            $meta->{roles} = ['admin', 'developer'];
+        }
+    );
+    
+    # Scan model documentation
+    # Added to ensure model documentation is properly categorized
+    $scan_dirs->(
+        "root/Documentation/models",
+        sub {
+            my ($key, $meta) = @_;
+
+            # Skip if already categorized
+            return if $categorized_files{$key};
+
+            # Add to models category
+            push @{$self->documentation_categories->{models}{pages}}, $key;
+            $categorized_files{$key} = 1;
+
+            # Add to general category
+            push @{$self->documentation_categories->{general}{pages}}, $key;
+
+            # Ensure admin role is included
+            push @{$meta->{roles}}, 'admin' unless grep { $_ eq 'admin' } @{$meta->{roles}};
+
+            # Log categorization
+            $logger->log_to_file("Added $key to models category", undef, 'DEBUG');
+        },
+        sub {
+            my ($meta, $path) = @_;
+
+            # Add file type detection
+            my $filename = basename($path);
+            $meta->{file_type} = ($filename =~ /\.tt$/i) ? 'template' :
+                               ($filename =~ /\.md$/i) ? 'markdown' : 'other';
+
+            # Format title from filename
+            $meta->{title} = $self->_format_title(basename($path));
+
+            # Add description
+            $meta->{description} = "Model documentation for " . $meta->{title};
+            
+            # Set roles to admin and developer
+            $meta->{roles} = ['admin', 'developer'];
+        }
+    );
 
     # Post-process categories
     foreach my $category (values %{$self->documentation_categories}) {
@@ -382,12 +481,44 @@ sub BUILD {
 
         # Log the count
         $logger->log_to_file("Category " . ($category->{title} || 'unknown') . " has " . scalar(@{$category->{pages}}) . " pages", undef, 'DEBUG');
+        
+        # Log all pages in this category for debugging
+        if ($category->{title} eq 'Controller Documentation' || $category->{title} eq 'Model Documentation') {
+            $logger->log_to_file("Pages in " . $category->{title} . ": " . join(", ", @{$category->{pages}}), undef, 'DEBUG');
+        }
     }
 
     $logger->log_to_file(sprintf("Documentation system initialized with %d pages",
         scalar keys %{$self->documentation_pages}), undef, 'INFO');
 }
+sub auto :Private {
+    my ($self, $c) = @_;
 
+    # Get the current action
+    my $action = $c->action->name;
+
+    # Get the path from the request
+    my $path = $c->req->path;
+
+    # If the path starts with 'documentation/' and isn't a known action
+    if ($path =~ m{^documentation/(.+)$} &&
+        $action ne 'index' &&
+        $action ne 'view' &&
+        !$c->controller('Documentation')->action_for($action)) {
+
+        my $page = $1;
+
+        # Log the action
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto',
+            "Redirecting documentation request to view action: $page");
+
+        # Forward to the view action with the page name
+        $c->forward('view', [$page]);
+        return 0; # Skip further processing
+    }
+
+    return 1; # Continue processing
+}
 # Main documentation index
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
@@ -632,6 +763,71 @@ sub index :Path :Args(0) {
 
     $c->forward($c->view('TT'));
 }
+# Admin documentation
+sub admin :Path('admin') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin', "Accessing admin documentation");
+    $c->stash(template => 'Documentation/admin.tt');
+    $c->forward($c->view('TT'));
+}
+# Admin guide
+sub admin_guide :Path('admin_guide') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_guide', "Accessing admin guide documentation");
+    $c->stash(template => 'Documentation/admin_guides.tt');
+    $c->forward($c->view('TT'));
+}
+# API reference
+sub api_reference :Path('api_reference') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_reference', "Accessing API reference documentation");
+    $c->stash(template => 'Documentation/api_reference.tt');
+    $c->forward($c->view('TT'));
+}
+
+# Architecture
+sub architecture :Path('architecture') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'architecture', "Accessing architecture documentation");
+    $c->stash(template => 'Documentation/architecture.tt');
+    $c->forward($c->view('TT'));
+}
+
+# Installation guide
+sub installation :Path('installation') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'installation', "Accessing installation documentation");
+    $c->stash(template => 'Documentation/installation.tt');
+    $c->forward($c->view('TT'));
+}
+
+# Completed items JSON
+sub completed_items_json :Path('completed_items.json') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'completed_items_json', "Accessing completed items JSON");
+
+    # Read the JSON file
+    my $json_file = $c->path_to('root', 'Documentation', 'completed_items.json');
+    my $json_content = '';
+
+    if (-e $json_file) {
+        open my $fh, '<:raw', $json_file or die "Cannot open $json_file: $!";
+        $json_content = do { local $/; <$fh> };
+        close $fh;
+    }
+
+    # Set the response
+    $c->response->content_type('application/json');
+    $c->response->body($json_content);
+}
+
+# Configuration
+sub configuration :Path('configuration') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'configuration', "Accessing configuration documentation");
+    $c->stash(template => 'Documentation/configuration.tt');
+    $c->forward($c->view('TT'));
+}
 
 # Helper method to check if there are site-specific docs for a site
 sub _has_site_specific_docs {
@@ -680,6 +876,151 @@ sub _format_title {
 }
 
 # Display specific documentation page
+
+# Database schema
+sub database_schema :Path('database_schema') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'database_schema', "Accessing database schema documentation");
+    $c->stash(template => 'Documentation/database_schema.tt');
+    $c->forward($c->view('TT'));
+}
+
+
+# Auto method for all documentation requests
+sub document_management :Path('document_management') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'document_management', "Accessing document management documentation");
+    $c->stash(template => 'Documentation/document_management.tt');
+    $c->forward($c->view('TT'));
+}
+# KVM ISO Transfer documentation
+sub kvm_iso_transfer :Path('KVM_ISO_Transfer') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'kvm_iso_transfer', "Accessing KVM ISO Transfer documentation");
+    $c->stash(template => 'Documentation/KVM_ISO_Transfer.tt');
+    $c->forward($c->view('TT'));
+}
+# KVM CD Visibility documentation
+sub kvm_cd_visibility :Path('KVM_CD_Visibility') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'kvm_cd_visibility',
+        "Accessing KVM CD Visibility documentation");
+    $c->stash(template => 'Documentation/KVM_CD_Visibility.tt');
+    $c->forward($c->view('TT'));
+}
+
+# Proxmox CD Visibility documentation
+sub proxmox_cd_visibility :Path('Proxmox_CD_Visibility') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'proxmox_cd_visibility',
+        "Accessing Proxmox CD Visibility documentation");
+    $c->stash(template => 'Documentation/proxmox/Proxmox_CD_Visibility.tt');
+    $c->forward($c->view('TT'));
+}
+
+# Recent updates
+sub recent_updates :Path('recent_updates') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'recent_updates', "Accessing recent updates documentation");
+    $c->stash(template => 'Documentation/recent_updates.tt');
+    $c->forward($c->view('TT'));
+}
+
+# IMPORTANT: We're completely disabling dynamic route registration
+# to avoid the "Can't locate object method 'attributes'" errors
+sub register_actions {
+    my ($self, $app) = @_;
+
+    # Call the parent method first to register the explicitly defined actions
+    $self->next::method($app);
+
+    # Log that we're skipping dynamic route registration
+    Comserv::Util::Logging::log_to_file(
+        "Skipping dynamic route registration for documentation pages to avoid package conflicts",
+        undef, 'INFO'
+    );
+
+    # We're intentionally NOT registering dynamic routes for documentation pages
+    # This prevents the "Can't locate object method 'attributes'" errors
+    # Instead, we'll handle all documentation page requests through the 'view' action
+}
+# Starman Updated documentation
+sub starman_updated :Path('Starman') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'starman_updated',
+        "Accessing updated Starman documentation");
+    $c->stash(template => 'Documentation/Starman.tt');
+    $c->forward($c->view('TT'));
+}
+
+# Explicitly define routes for common documentation pages
+# This allows for better URL structure and SEO
+
+# Document management documentation
+
+# System overview
+sub system_overview :Path('system_overview') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'system_overview', "Accessing system overview documentation");
+    $c->stash(template => 'Documentation/system_overview.tt');
+    $c->forward($c->view('TT'));
+}
+# Theme system documentation
+sub theme_system :Path('theme_system') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Log the action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'theme_system', "Accessing theme system documentation");
+
+    # Set the template
+    $c->stash(template => 'Documentation/theme_system.tt');
+    $c->forward($c->view('TT'));
+}
+
+# Theme system implementation documentation
+sub theme_system_implementation :Path('theme_system_implementation') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Log the action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'theme_system_implementation',
+        "Accessing theme system implementation documentation");
+
+    # Check if the markdown file exists
+    my $md_file = $c->path_to('root', 'Documentation', 'theme_system_implementation.md');
+
+    if (-e $md_file) {
+        # Read the markdown file
+        open my $fh, '<:encoding(UTF-8)', $md_file or die "Cannot open $md_file: $!";
+        my $content = do { local $/; <$fh> };
+        close $fh;
+
+        # Pass the content to the template
+        $c->stash(
+            markdown_content => $content,
+            template => 'Documentation/markdown_viewer.tt'
+        );
+    } else {
+        # If the file doesn't exist, show an error
+        $c->stash(
+            error_msg => "Documentation file 'theme_system_implementation.md' not found",
+            template => 'Documentation/error.tt'
+        );
+    }
+
+    $c->forward($c->view('TT'));
+}
+
+
+
+# User guide
+sub user_guide :Path('user_guide') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'user_guide', "Accessing user guide documentation");
+    $c->stash(template => 'Documentation/user_guide.tt');
+    $c->forward($c->view('TT'));
+}
+
+
 sub view :Path :Args(1) {
     my ($self, $c, $page) = @_;
 
@@ -704,7 +1045,7 @@ sub view :Path :Args(1) {
         }
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'view', "User role determined: $user_role");
     }
-   # Add admin check for Proxmox docs
+    # Add admin check for Proxmox docs
     if ($page =~ /^Proxmox/ && !$c->check_user_roles('admin')) {
         $c->response->redirect($c->uri_for('/access_denied'));
         return;
@@ -876,236 +1217,6 @@ sub view :Path :Args(1) {
     $c->forward($c->view('TT'));
 }
 
-# Auto method for all documentation requests
-sub auto :Private {
-    my ($self, $c) = @_;
-
-    # Get the current action
-    my $action = $c->action->name;
-
-    # Get the path from the request
-    my $path = $c->req->path;
-
-    # If the path starts with 'documentation/' and isn't a known action
-    if ($path =~ m{^documentation/(.+)$} &&
-        $action ne 'index' &&
-        $action ne 'view' &&
-        !$c->controller('Documentation')->action_for($action)) {
-
-        my $page = $1;
-
-        # Log the action
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto',
-            "Redirecting documentation request to view action: $page");
-
-        # Forward to the view action with the page name
-        $c->forward('view', [$page]);
-        return 0; # Skip further processing
-    }
-
-    return 1; # Continue processing
-}
-
-# IMPORTANT: We're completely disabling dynamic route registration
-# to avoid the "Can't locate object method 'attributes'" errors
-sub register_actions {
-    my ($self, $app) = @_;
-
-    # Call the parent method first to register the explicitly defined actions
-    $self->next::method($app);
-
-    # Log that we're skipping dynamic route registration
-    Comserv::Util::Logging::log_to_file(
-        "Skipping dynamic route registration for documentation pages to avoid package conflicts",
-        undef, 'INFO'
-    );
-
-    # We're intentionally NOT registering dynamic routes for documentation pages
-    # This prevents the "Can't locate object method 'attributes'" errors
-    # Instead, we'll handle all documentation page requests through the 'view' action
-}
-
-# Theme system documentation
-sub theme_system :Path('theme_system') :Args(0) {
-    my ($self, $c) = @_;
-
-    # Log the action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'theme_system', "Accessing theme system documentation");
-
-    # Set the template
-    $c->stash(template => 'Documentation/theme_system.tt');
-    $c->forward($c->view('TT'));
-}
-
-# Theme system implementation documentation
-sub theme_system_implementation :Path('theme_system_implementation') :Args(0) {
-    my ($self, $c) = @_;
-
-    # Log the action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'theme_system_implementation',
-        "Accessing theme system implementation documentation");
-
-    # Check if the markdown file exists
-    my $md_file = $c->path_to('root', 'Documentation', 'theme_system_implementation.md');
-
-    if (-e $md_file) {
-        # Read the markdown file
-        open my $fh, '<:encoding(UTF-8)', $md_file or die "Cannot open $md_file: $!";
-        my $content = do { local $/; <$fh> };
-        close $fh;
-
-        # Pass the content to the template
-        $c->stash(
-            markdown_content => $content,
-            template => 'Documentation/markdown_viewer.tt'
-        );
-    } else {
-        # If the file doesn't exist, show an error
-        $c->stash(
-            error_msg => "Documentation file 'theme_system_implementation.md' not found",
-            template => 'Documentation/error.tt'
-        );
-    }
-
-    $c->forward($c->view('TT'));
-}
-
-# Explicitly define routes for common documentation pages
-# This allows for better URL structure and SEO
-
-# Document management documentation
-sub document_management :Path('document_management') :Args(0) {
-    my ($self, $c) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'document_management', "Accessing document management documentation");
-    $c->stash(template => 'Documentation/document_management.tt');
-    $c->forward($c->view('TT'));
-}
-
-# Recent updates
-sub recent_updates :Path('recent_updates') :Args(0) {
-    my ($self, $c) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'recent_updates', "Accessing recent updates documentation");
-    $c->stash(template => 'Documentation/recent_updates.tt');
-    $c->forward($c->view('TT'));
-}
-
-# Admin documentation
-sub admin :Path('admin') :Args(0) {
-    my ($self, $c) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin', "Accessing admin documentation");
-    $c->stash(template => 'Documentation/admin.tt');
-    $c->forward($c->view('TT'));
-}
-
-# System overview
-sub system_overview :Path('system_overview') :Args(0) {
-    my ($self, $c) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'system_overview', "Accessing system overview documentation");
-    $c->stash(template => 'Documentation/system_overview.tt');
-    $c->forward($c->view('TT'));
-}
-
-# Architecture
-sub architecture :Path('architecture') :Args(0) {
-    my ($self, $c) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'architecture', "Accessing architecture documentation");
-    $c->stash(template => 'Documentation/architecture.tt');
-    $c->forward($c->view('TT'));
-}
-
-# Installation guide
-sub installation :Path('installation') :Args(0) {
-    my ($self, $c) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'installation', "Accessing installation documentation");
-    $c->stash(template => 'Documentation/installation.tt');
-    $c->forward($c->view('TT'));
-}
-
-# Completed items JSON
-sub completed_items_json :Path('completed_items.json') :Args(0) {
-    my ($self, $c) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'completed_items_json', "Accessing completed items JSON");
-
-    # Read the JSON file
-    my $json_file = $c->path_to('root', 'Documentation', 'completed_items.json');
-    my $json_content = '';
-
-    if (-e $json_file) {
-        open my $fh, '<:raw', $json_file or die "Cannot open $json_file: $!";
-        $json_content = do { local $/; <$fh> };
-        close $fh;
-    }
-
-    # Set the response
-    $c->response->content_type('application/json');
-    $c->response->body($json_content);
-}
-
-# Configuration
-sub configuration :Path('configuration') :Args(0) {
-    my ($self, $c) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'configuration', "Accessing configuration documentation");
-    $c->stash(template => 'Documentation/configuration.tt');
-    $c->forward($c->view('TT'));
-}
-
-# User guide
-sub user_guide :Path('user_guide') :Args(0) {
-    my ($self, $c) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'user_guide', "Accessing user guide documentation");
-    $c->stash(template => 'Documentation/user_guide.tt');
-    $c->forward($c->view('TT'));
-}
-
-# Admin guide
-sub admin_guide :Path('admin_guide') :Args(0) {
-    my ($self, $c) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_guide', "Accessing admin guide documentation");
-    $c->stash(template => 'Documentation/admin_guide.tt');
-    $c->forward($c->view('TT'));
-}
-
-# API reference
-sub api_reference :Path('api_reference') :Args(0) {
-    my ($self, $c) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_reference', "Accessing API reference documentation");
-    $c->stash(template => 'Documentation/api_reference.tt');
-    $c->forward($c->view('TT'));
-}
-
-# Database schema
-sub database_schema :Path('database_schema') :Args(0) {
-    my ($self, $c) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'database_schema', "Accessing database schema documentation");
-    $c->stash(template => 'Documentation/database_schema.tt');
-    $c->forward($c->view('TT'));
-}
-
-# KVM ISO Transfer documentation
-sub kvm_iso_transfer :Path('KVM_ISO_Transfer') :Args(0) {
-    my ($self, $c) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'kvm_iso_transfer', "Accessing KVM ISO Transfer documentation");
-    $c->stash(template => 'Documentation/KVM_ISO_Transfer.tt');
-    $c->forward($c->view('TT'));
-}
-# KVM CD Visibility documentation
-sub kvm_cd_visibility :Path('KVM_CD_Visibility') :Args(0) {
-    my ($self, $c) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'kvm_cd_visibility',
-        "Accessing KVM CD Visibility documentation");
-    $c->stash(template => 'Documentation/KVM_CD_Visibility.tt');
-    $c->forward($c->view('TT'));
-}
-
-# Proxmox CD Visibility documentation
-sub proxmox_cd_visibility :Path('Proxmox_CD_Visibility') :Args(0) {
-    my ($self, $c) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'proxmox_cd_visibility',
-        "Accessing Proxmox CD Visibility documentation");
-    $c->stash(template => 'Documentation/Proxmox_CD_Visibility.tt');
-    $c->forward($c->view('TT'));
-}
-
 # Virtualmin Integration documentation
 sub virtualmin_integration :Path('Virtualmin_Integration') :Args(0) {
     my ($self, $c) = @_;
@@ -1115,14 +1226,6 @@ sub virtualmin_integration :Path('Virtualmin_Integration') :Args(0) {
     $c->forward($c->view('TT'));
 }
 
-# Starman Updated documentation
-sub starman_updated :Path('Starman') :Args(0) {
-    my ($self, $c) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'starman_updated',
-        "Accessing updated Starman documentation");
-    $c->stash(template => 'Documentation/Starman.tt');
-    $c->forward($c->view('TT'));
-}
 __PACKAGE__->meta->make_immutable;
 
 1;
