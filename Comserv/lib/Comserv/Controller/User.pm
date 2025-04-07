@@ -65,8 +65,7 @@ sub do_login :Local {
             $c, 'info', __FILE__, __LINE__, 'do_login',
             "User already logged in as: " . $c->session->{username} . ", proceeding with login"
         );
-$c->stash(
-
+        $c->stash(
             template => 'user/login.tt'
         );
         # Clear the session to allow re-login
@@ -190,9 +189,9 @@ $c->stash(
         $c, 'info', __FILE__, __LINE__, 'do_login',
         "Redirecting user '$username' to: $redirect_path");
 
-    # Redirect to the appropriate page
-    #$c->res->redirect($redirect_path);
-
+    # After successful login, redirect to the appropriate page
+    # No need for a template here as this is an action, not a route
+    $c->res->redirect($redirect_path);
     return;
 }
 
@@ -394,10 +393,10 @@ sub process_login {
         $c, 'info', __FILE__, __LINE__, 'do_login',
         "Redirecting user '$username' to: $redirect_path");
 
-    # Try a different approach for the redirect
+    # Log the redirect attempt
     $self->logging->log_with_details(
         $c, 'info', __FILE__, __LINE__, 'do_login',
-        "Using $c->res->redirect() for redirect to: $redirect_path"
+        "Preparing to redirect to: $redirect_path"
     );
 
     # Double-check that we're not redirecting back to the login page
@@ -409,6 +408,7 @@ sub process_login {
         );
     }
 
+    # Redirect directly - no template needed for this action
     $c->res->redirect($redirect_path);
     return;
 }
