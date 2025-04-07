@@ -8,7 +8,9 @@
 <!-- Include Font Awesome for icons -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 <!-- Include documentation CSS -->
+<link rel="stylesheet" href="/static/css/components/documentation.css">
 <link rel="stylesheet" href="/static/css/documentation.css">
+<link rel="stylesheet" href="/static/css/markdown-viewer.css">
 
 <div class="markdown-viewer">
     <div class="markdown-header">
@@ -142,7 +144,7 @@
 
                     // Close any open section
                     if (inSection) {
-                        processedLines.push('<div class="section-content" id="section-' + sectionId + '">' + sectionContent.join('') + '</div>');
+                        processedLines.push('<div class="section-content expanded" id="section-' + sectionId + '">' + sectionContent.join('') + '</div>');
                         inSection = false;
                         sectionContent = [];
                     }
@@ -157,7 +159,7 @@
 
                     // Close any open section
                     if (inSection) {
-                        processedLines.push('<div class="section-content" id="section-' + sectionId + '">' + sectionContent.join('') + '</div>');
+                        processedLines.push('<div class="section-content expanded" id="section-' + sectionId + '">' + sectionContent.join('') + '</div>');
                     }
 
                     // Start a new section
@@ -237,7 +239,7 @@
 
             // Close any open section
             if (inSection) {
-                processedLines.push('<div class="section-content" id="section-' + sectionId + '">' + sectionContent.join('') + '</div>');
+                processedLines.push('<div class="section-content expanded" id="section-' + sectionId + '">' + sectionContent.join('') + '</div>');
             }
 
             // Join the processed lines
@@ -256,9 +258,9 @@
                 const targetId = toggle.getAttribute('data-target');
                 const targetSection = document.getElementById(targetId);
 
-                // Initially hide all sections
+                // Initially show all sections
                 if (targetSection) {
-                    targetSection.style.display = 'none';
+                    targetSection.style.display = 'block';
                 }
 
                 toggle.addEventListener('click', function() {

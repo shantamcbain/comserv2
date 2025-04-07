@@ -27,7 +27,10 @@ The documentation is organized in the following directory structure:
   ├── modules/           # Module-specific documentation
   ├── proxmox/           # Proxmox-related documentation
   ├── changelog/         # System changes and updates
-  └── controllers/       # Controller documentation
+  ├── controllers/       # Controller documentation
+  ├── sites/      # Site-specific documentation
+  │   ├── mcoop/         # MCOOP-specific documentation/  
+    
 ```
 
 ## File Naming and Formatting
@@ -49,6 +52,59 @@ The system automatically categorizes documentation into the following sections:
 7. **Changelog**: System changes and updates (admin only)
 8. **All Documentation Files**: Complete alphabetical list of all documentation (admin only)
 
+## Development Workflow
+
+When working with documentation, follow this workflow to ensure consistency and quality:
+
+### 1. Identify the Issue or Enhancement
+
+- Determine what documentation needs to be created, updated, or fixed
+- Check existing documentation to avoid duplication
+- Identify the appropriate category and location for the documentation
+
+### 2. Examine Existing Code and Documentation
+
+- Review related code to understand functionality
+- Check existing documentation for accuracy
+- Note any discrepancies between code and documentation
+
+### 3. Make Changes
+
+- Create or modify documentation files in the appropriate directory
+- Follow the file naming conventions and markdown structure
+- Ensure content is accurate, clear, and concise
+
+### 4. Test Changes
+
+- Run the application locally
+- Navigate to the Documentation section
+- Verify that your documentation appears in the correct category
+- Check that role-based access control works as expected
+- Test on different browsers if UI changes are involved
+
+### 5. Update Changelog
+
+- Add an entry to the appropriate changelog file in `/root/Documentation/changelog/`
+- Use the format: `YYYY-MM-DD: [Type] - Description of change`
+- Types include: `[ADD]`, `[UPDATE]`, `[FIX]`, `[REMOVE]`
+
+### 6. Commit Changes
+
+- Use descriptive commit messages following this format:
+  ```
+  [DOCS] Brief description of change
+  
+  - Detailed explanation of what was changed and why
+  - List any related issues or tickets
+  ```
+- Include both documentation and changelog updates in the same commit
+
+### 7. Review and Merge
+
+- Submit for peer review if required
+- Address any feedback
+- Merge changes to the main branch
+
 ## Adding New Documentation
 
 To add new documentation:
@@ -56,6 +112,7 @@ To add new documentation:
 1. Create a new file in the appropriate directory with a `.md` or `.tt` extension.
 2. Use a descriptive filename with underscores for spaces.
 3. The file will be automatically categorized based on its location and filename.
+4. Update the changelog to reflect the addition.
 
 ### Example Markdown Structure
 
@@ -98,6 +155,14 @@ The Documentation system is implemented using:
 - **JavaScript**: Client-side sorting and tab switching
 - **CSS**: Styling for documentation cards, tabs, and badges
 
+## Logging and Debugging
+
+The documentation system uses the application's logging framework:
+
+- All documentation scanning and categorization is logged
+- Debug information can be viewed by enabling debug mode
+- Errors during documentation processing are logged to the application log
+
 ## Troubleshooting
 
 If documentation is not appearing as expected:
@@ -106,3 +171,15 @@ If documentation is not appearing as expected:
 2. Verify that the user has the appropriate role to view the documentation
 3. Ensure the file has a supported extension (.md, .tt, .html, .txt)
 4. Check the logs for any errors in the documentation scanning process
+5. Verify that the file follows the correct naming conventions
+6. Check that the documentation controller is properly initialized
+
+## Maintenance
+
+Regular maintenance tasks for the documentation system:
+
+1. Review and update existing documentation for accuracy
+2. Remove outdated documentation
+3. Check for broken links or references
+4. Ensure all new features have corresponding documentation
+5. Verify that role-based access is correctly configured
