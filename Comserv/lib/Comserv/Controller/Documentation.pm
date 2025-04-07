@@ -4,6 +4,7 @@ use namespace::autoclean;
 use Comserv::Util::Logging;
 use File::Find;
 use File::Basename;
+use Time::Piece;
 use Comserv::Controller::Documentation::ScanMethods qw(_scan_directories _categorize_pages);
 
 BEGIN { extends 'Catalyst::Controller'; }
@@ -807,7 +808,8 @@ sub view :Path :Args(1) {
 
         # Get file modification time
         my $mtime = (stat($md_full_path))[9];
-        my $last_updated = localtime($mtime)->strftime('%Y-%m-%d %H:%M:%S');
+        my $last_updated = localtime($mtime);
+        $last_updated = $last_updated->strftime('%Y-%m-%d %H:%M:%S');
 
         # Pass the content to the markdown viewer template
         $c->stash(

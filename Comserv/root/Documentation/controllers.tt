@@ -1,0 +1,19 @@
+[% IF categories.controllers %]
+<section class="doc-section admin-only">
+    <h2 class="section-toggle expanded">Controller Documentation</h2>
+    <p>Technical details for system controllers. <span class="admin-badge">Admin Only</span></p>
+    <div class="section-content expanded">
+        [% FOREACH page_name IN categories.controllers.pages.sort %]
+            [% IF structured_pages.$page_name %]
+                [% page = structured_pages.$page_name %]
+            <a href="[% page.url %]" class="doc-card">
+                <h3>[% page.title %]</h3>
+                <p>[% page.description || 'Controller documentation.' %]</p>
+                [% IF page.file_type %]<span class="file-type-badge [% page.file_type %]">[% page.file_type %]</span>[% END %]
+                <span class="role-badge">Admin Only</span>
+            </a>
+            [% END %]
+        [% END %]
+    </div>
+</section>
+[% END %]
