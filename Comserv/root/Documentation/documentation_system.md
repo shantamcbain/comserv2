@@ -1,6 +1,6 @@
 # Documentation System
 
-**Last Updated:** April 1, 2025  
+**Last Updated:** April 7, 2025  
 **Author:** Shanta  
 **Status:** Active
 
@@ -190,6 +190,41 @@ The documentation system is implemented in the `Documentation.pm` controller wit
    - Enforces visibility rules based on site and role
    - Provides appropriate error messages for unauthorized access
 
+5. **Modular Template Structure**
+   - The main `index.tt` file has been refactored to improve maintainability
+   - Each documentation category now has its own separate template file
+   - This modular approach makes it easier to update specific sections without affecting others
+   - Template includes are used to assemble the complete documentation interface
+
+## Template Structure
+
+The documentation system's template structure has been refactored to improve maintainability and organization:
+
+1. **Main Index Template**
+   - The main `index.tt` file now serves as a container for the documentation interface
+   - It includes modular template components for different sections
+   - This approach reduces complexity and makes the code more maintainable
+
+2. **Category Templates**
+   - Each documentation category has its own dedicated template file
+   - For example:
+     - `user_guides.tt` - Template for user documentation
+     - `admin_guides.tt` - Template for administrator documentation
+     - `developer_guides.tt` - Template for developer documentation
+     - `tutorials.tt` - Template for tutorials
+     - `site_specific.tt` - Template for site-specific documentation
+
+3. **Shared Components**
+   - Common UI elements are extracted into reusable components
+   - This includes navigation, search, and filtering controls
+   - These components can be included in multiple templates
+
+4. **Benefits of Modular Structure**
+   - Easier maintenance: Changes to one category don't affect others
+   - Better organization: Code is logically grouped by functionality
+   - Improved readability: Smaller, focused template files
+   - Easier collaboration: Multiple developers can work on different sections
+
 ## Future Enhancements
 
 Planned enhancements for the documentation system include:
@@ -213,3 +248,8 @@ Planned enhancements for the documentation system include:
 5. **Documentation Analytics**
    - Track which documentation is most frequently accessed
    - Identify gaps in documentation coverage
+
+6. **Further Template Improvements**
+   - Additional modularization of template components
+   - Dynamic loading of documentation sections
+   - Improved mobile responsiveness
