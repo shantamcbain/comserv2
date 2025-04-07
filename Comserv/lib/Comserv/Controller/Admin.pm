@@ -3,7 +3,14 @@ use Moose;
 use namespace::autoclean;
 use Data::Dumper;
 use Fcntl qw(:DEFAULT :flock);  # Import O_WRONLY, O_APPEND, O_CREAT constants
+use Comserv::Util::Logging;
 BEGIN { extends 'Catalyst::Controller'; }
+
+# Returns an instance of the logging utility
+sub logging {
+    my ($self) = @_;
+    return Comserv::Util::Logging->instance();
+}
 
 sub begin : Private {
     my ( $self, $c ) = @_;
