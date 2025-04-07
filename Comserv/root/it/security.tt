@@ -1,0 +1,230 @@
+[% PageVersion = 'security.tt,v 1.0 2025/05/15 Shanta Exp Shanta' %]
+[% PROCESS header.tt %]
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>IT Security</h1>
+            <p class="lead">Information about our IT security policies and best practices.</p>
+            
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="[% c.uri_for('/it') %]">IT Home</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Security</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header bg-danger text-white">
+                    <h4>Security Policies</h4>
+                </div>
+                <div class="card-body">
+                    <p>Our IT security policies are designed to protect our systems, data, and users from security threats. All employees are required to follow these policies to maintain a secure IT environment.</p>
+                    
+                    <h5 class="mt-4">Key Security Policies</h5>
+                    <div class="accordion" id="securityPoliciesAccordion">
+                        <div class="card">
+                            <div class="card-header" id="passwordPolicy">
+                                <h2 class="mb-0">
+                                    <button class="btn btn-link" type="button" data-toggle="collapse" data-target="#collapsePassword" aria-expanded="true" aria-controls="collapsePassword">
+                                        Password Policy
+                                    </button>
+                                </h2>
+                            </div>
+                            <div id="collapsePassword" class="collapse show" aria-labelledby="passwordPolicy" data-parent="#securityPoliciesAccordion">
+                                <div class="card-body">
+                                    <ul>
+                                        <li>Passwords must be at least 12 characters long</li>
+                                        <li>Passwords must include uppercase letters, lowercase letters, numbers, and special characters</li>
+                                        <li>Passwords must be changed every 90 days</li>
+                                        <li>Previous 10 passwords cannot be reused</li>
+                                        <li>Multi-factor authentication is required for all administrative accounts</li>
+                                        <li>Password managers are recommended for generating and storing complex passwords</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header" id="dataPolicy">
+                                <h2 class="mb-0">
+                                    <button class="btn btn-link collapsed" type="button" data-toggle="collapse" data-target="#collapseData" aria-expanded="false" aria-controls="collapseData">
+                                        Data Protection Policy
+                                    </button>
+                                </h2>
+                            </div>
+                            <div id="collapseData" class="collapse" aria-labelledby="dataPolicy" data-parent="#securityPoliciesAccordion">
+                                <div class="card-body">
+                                    <ul>
+                                        <li>Sensitive data must be encrypted at rest and in transit</li>
+                                        <li>Data must be classified according to sensitivity levels</li>
+                                        <li>Access to data must be granted on a need-to-know basis</li>
+                                        <li>Regular data backups must be performed and tested</li>
+                                        <li>Data retention policies must be followed</li>
+                                        <li>Data must be securely deleted when no longer needed</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header" id="accessPolicy">
+                                <h2 class="mb-0">
+                                    <button class="btn btn-link collapsed" type="button" data-toggle="collapse" data-target="#collapseAccess" aria-expanded="false" aria-controls="collapseAccess">
+                                        Access Control Policy
+                                    </button>
+                                </h2>
+                            </div>
+                            <div id="collapseAccess" class="collapse" aria-labelledby="accessPolicy" data-parent="#securityPoliciesAccordion">
+                                <div class="card-body">
+                                    <ul>
+                                        <li>Access to systems and data must be granted based on the principle of least privilege</li>
+                                        <li>All access must be authenticated and authorized</li>
+                                        <li>Access rights must be reviewed quarterly</li>
+                                        <li>Access must be revoked immediately when no longer needed</li>
+                                        <li>Privileged access must be logged and monitored</li>
+                                        <li>Remote access must use secure methods (VPN, SSH)</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header" id="incidentPolicy">
+                                <h2 class="mb-0">
+                                    <button class="btn btn-link collapsed" type="button" data-toggle="collapse" data-target="#collapseIncident" aria-expanded="false" aria-controls="collapseIncident">
+                                        Incident Response Policy
+                                    </button>
+                                </h2>
+                            </div>
+                            <div id="collapseIncident" class="collapse" aria-labelledby="incidentPolicy" data-parent="#securityPoliciesAccordion">
+                                <div class="card-body">
+                                    <ul>
+                                        <li>All security incidents must be reported immediately</li>
+                                        <li>The incident response team must be activated for significant incidents</li>
+                                        <li>Incidents must be documented and analyzed</li>
+                                        <li>Lessons learned must be incorporated into security practices</li>
+                                        <li>Regular incident response drills must be conducted</li>
+                                        <li>Legal and regulatory requirements for incident reporting must be followed</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h4>Security Best Practices</h4>
+                </div>
+                <div class="card-body">
+                    <h5>For All Users</h5>
+                    <ul>
+                        <li>Keep your computer and devices updated with the latest security patches</li>
+                        <li>Use strong, unique passwords for all accounts</li>
+                        <li>Enable multi-factor authentication whenever possible</li>
+                        <li>Be cautious of phishing emails and suspicious links</li>
+                        <li>Lock your computer when away from your desk</li>
+                        <li>Report suspicious activities or security incidents immediately</li>
+                        <li>Only use approved software and applications</li>
+                        <li>Encrypt sensitive data before transmitting</li>
+                        <li>Regularly back up important data</li>
+                        <li>Follow clean desk policy for sensitive documents</li>
+                    </ul>
+                    
+                    <h5 class="mt-4">For Remote Workers</h5>
+                    <ul>
+                        <li>Use the company VPN for accessing internal resources</li>
+                        <li>Secure your home network with strong encryption (WPA3 if possible)</li>
+                        <li>Keep work and personal activities separate</li>
+                        <li>Be extra vigilant about physical security of devices</li>
+                        <li>Avoid using public Wi-Fi for work activities</li>
+                        <li>Use company-approved collaboration tools</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h4>Security Alerts</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-danger">
+                        <h5><i class="fas fa-exclamation-triangle"></i> Phishing Campaign Alert</h5>
+                        <p>There is an ongoing phishing campaign targeting our organization. Emails appear to come from IT support asking for password verification.</p>
+                        <p><strong>Action:</strong> Do not click links or provide credentials. Report suspicious emails immediately.</p>
+                        <p class="mb-0"><small>Posted: May 12, 2025</small></p>
+                    </div>
+                    
+                    <div class="alert alert-warning mt-3">
+                        <h5><i class="fas fa-info-circle"></i> Software Update Required</h5>
+                        <p>Critical security updates are available for Microsoft Office. Please update as soon as possible.</p>
+                        <p class="mb-0"><small>Posted: May 10, 2025</small></p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h4>Security Resources</h4>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group">
+                        <li class="list-group-item"><a href="#"><i class="fas fa-file-pdf"></i> Complete Security Policy Document</a></li>
+                        <li class="list-group-item"><a href="#"><i class="fas fa-file-alt"></i> Security Awareness Training</a></li>
+                        <li class="list-group-item"><a href="#"><i class="fas fa-file-alt"></i> Phishing Identification Guide</a></li>
+                        <li class="list-group-item"><a href="#"><i class="fas fa-file-alt"></i> Incident Reporting Procedure</a></li>
+                        <li class="list-group-item"><a href="#"><i class="fas fa-file-alt"></i> Data Classification Guide</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h4>Security Contacts</h4>
+                </div>
+                <div class="card-body">
+                    <p><strong>Security Team:</strong><br>
+                    Email: <a href="mailto:security@example.com">security@example.com</a><br>
+                    Phone: (555) 123-4567</p>
+                    
+                    <p><strong>Report Security Incidents:</strong><br>
+                    Email: <a href="mailto:incidents@example.com">incidents@example.com</a><br>
+                    Phone: (555) 987-6543 (24/7)</p>
+                    
+                    <p><strong>Report Suspicious Emails:</strong><br>
+                    Forward to: <a href="mailto:phishing@example.com">phishing@example.com</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+[% IF debug_mode == 1 %]
+    <div class="container mt-4">
+        <div class="card">
+            <div class="card-header bg-dark text-white">
+                Debug Information
+            </div>
+            <div class="card-body">
+                <p>Page Version: [% PageVersion %]</p>
+                [% IF debug_msg.defined && debug_msg.size > 0 %]
+                    <div class="debug-messages">
+                        [% FOREACH msg IN debug_msg %]
+                            <p class="debug">Debug: [% msg %]</p>
+                        [% END %]
+                    </div>
+                [% END %]
+            </div>
+        </div>
+    </div>
+[% END %]
+
+[% PROCESS footer.tt %]

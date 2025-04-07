@@ -1,0 +1,138 @@
+[% PageVersion = 'documentation.tt,v 1.0 2025/05/15 Shanta Exp Shanta' %]
+[% PROCESS header.tt %]
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>IT Documentation</h1>
+            <p class="lead">Access IT-specific documentation and guides.</p>
+            
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="[% c.uri_for('/it') %]">IT Home</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Documentation</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h4>Infrastructure Documentation</h4>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group">
+                        <li class="list-group-item"><a href="#">Server Configuration Guide</a></li>
+                        <li class="list-group-item"><a href="#">Network Topology</a></li>
+                        <li class="list-group-item"><a href="#">Backup Systems</a></li>
+                        <li class="list-group-item"><a href="#">Disaster Recovery Plan</a></li>
+                        <li class="list-group-item"><a href="#">Virtualization Environment</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h4>Security Documentation</h4>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group">
+                        <li class="list-group-item"><a href="#">Security Policies</a></li>
+                        <li class="list-group-item"><a href="#">Access Control Guidelines</a></li>
+                        <li class="list-group-item"><a href="#">Incident Response Plan</a></li>
+                        <li class="list-group-item"><a href="#">Security Audit Procedures</a></li>
+                        <li class="list-group-item"><a href="#">Data Protection Guidelines</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h4>User Guides</h4>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group">
+                        <li class="list-group-item"><a href="#">Email System Guide</a></li>
+                        <li class="list-group-item"><a href="#">VPN Access Instructions</a></li>
+                        <li class="list-group-item"><a href="#">File Sharing Guidelines</a></li>
+                        <li class="list-group-item"><a href="#">Password Management</a></li>
+                        <li class="list-group-item"><a href="#">Remote Work Setup</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card mb-4">
+                <div class="card-header bg-secondary text-white">
+                    <h4>Recent Documentation Updates</h4>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Document</th>
+                                    <th>Updated</th>
+                                    <th>Changes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><a href="#">Network Topology</a></td>
+                                    <td>May 10, 2025</td>
+                                    <td>Updated with new network infrastructure</td>
+                                </tr>
+                                <tr>
+                                    <td><a href="#">Security Policies</a></td>
+                                    <td>May 5, 2025</td>
+                                    <td>Updated password requirements</td>
+                                </tr>
+                                <tr>
+                                    <td><a href="#">Backup Systems</a></td>
+                                    <td>April 28, 2025</td>
+                                    <td>Added new cloud backup procedures</td>
+                                </tr>
+                                <tr>
+                                    <td><a href="#">VPN Access Instructions</a></td>
+                                    <td>April 15, 2025</td>
+                                    <td>Updated with new VPN client information</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+[% IF debug_mode == 1 %]
+    <div class="container mt-4">
+        <div class="card">
+            <div class="card-header bg-dark text-white">
+                Debug Information
+            </div>
+            <div class="card-body">
+                <p>Page Version: [% PageVersion %]</p>
+                [% IF debug_msg.defined && debug_msg.size > 0 %]
+                    <div class="debug-messages">
+                        [% FOREACH msg IN debug_msg %]
+                            <p class="debug">Debug: [% msg %]</p>
+                        [% END %]
+                    </div>
+                [% END %]
+            </div>
+        </div>
+    </div>
+[% END %]
+
+[% PROCESS footer.tt %]

@@ -1,0 +1,125 @@
+[% PageVersion = 'support.tt,v 1.0 2025/05/15 Shanta Exp Shanta' %]
+[% PROCESS header.tt %]
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>IT Support</h1>
+            <p class="lead">Get help with IT-related issues and requests.</p>
+            
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="[% c.uri_for('/it') %]">IT Home</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Support</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h4>IT Support Request</h4>
+                </div>
+                <div class="card-body">
+                    <form>
+                        <div class="form-group">
+                            <label for="requestType">Request Type</label>
+                            <select class="form-control" id="requestType">
+                                <option>Technical Issue</option>
+                                <option>Service Request</option>
+                                <option>Account Management</option>
+                                <option>Software Installation</option>
+                                <option>Hardware Support</option>
+                                <option>Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="priority">Priority</label>
+                            <select class="form-control" id="priority">
+                                <option>Low - No Impact on Work</option>
+                                <option>Medium - Limited Impact</option>
+                                <option>High - Significant Impact</option>
+                                <option>Critical - Cannot Work</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="subject">Subject</label>
+                            <input type="text" class="form-control" id="subject" placeholder="Brief description of the issue">
+                        </div>
+                        <div class="form-group">
+                            <label for="description">Description</label>
+                            <textarea class="form-control" id="description" rows="5" placeholder="Please provide detailed information about your issue or request"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="attachment">Attachments (Optional)</label>
+                            <input type="file" class="form-control-file" id="attachment">
+                            <small class="form-text text-muted">You can attach screenshots or relevant files.</small>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Submit Request</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h4>Contact Information</h4>
+                </div>
+                <div class="card-body">
+                    <p><strong>IT Support Hours:</strong><br>
+                    Monday - Friday: 8:00 AM - 5:00 PM</p>
+                    
+                    <p><strong>Phone:</strong><br>
+                    (555) 123-4567</p>
+                    
+                    <p><strong>Email:</strong><br>
+                    <a href="mailto:itsupport@example.com">itsupport@example.com</a></p>
+                    
+                    <p><strong>Emergency Support:</strong><br>
+                    For after-hours emergencies, call:<br>
+                    (555) 987-6543</p>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h4>Quick Links</h4>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group">
+                        <li class="list-group-item"><a href="#">Password Reset</a></li>
+                        <li class="list-group-item"><a href="#">Common Issues FAQ</a></li>
+                        <li class="list-group-item"><a href="#">Software Request Form</a></li>
+                        <li class="list-group-item"><a href="#">Remote Support Tool</a></li>
+                        <li class="list-group-item"><a href="#">IT Status Dashboard</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+[% IF debug_mode == 1 %]
+    <div class="container mt-4">
+        <div class="card">
+            <div class="card-header bg-dark text-white">
+                Debug Information
+            </div>
+            <div class="card-body">
+                <p>Page Version: [% PageVersion %]</p>
+                [% IF debug_msg.defined && debug_msg.size > 0 %]
+                    <div class="debug-messages">
+                        [% FOREACH msg IN debug_msg %]
+                            <p class="debug">Debug: [% msg %]</p>
+                        [% END %]
+                    </div>
+                [% END %]
+            </div>
+        </div>
+    </div>
+[% END %]
+
+[% PROCESS footer.tt %]
