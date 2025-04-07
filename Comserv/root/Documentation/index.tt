@@ -18,6 +18,24 @@
     [% END %]
 [% END %]
 
+[% # Add debug information to help diagnose role issues %]
+[% IF c.session.debug_mode == 1 %]
+    <div class="debug-info" style="background: #f0f0f0; border: 1px solid #ccc; padding: 10px; margin: 10px 0;">
+        <h3>Debug Information</h3>
+        <p>User Role from Controller: [% user_role %]</p>
+        <p>Display Role from Template: [% display_role %]</p>
+        <p>Session Roles: [% c.session.roles.join(', ') IF c.session.roles %]</p>
+        <p>Debug Message: [% debug_msg %]</p>
+        <p>Admin Categories Available:</p>
+        <ul>
+            <li>admin_guides: [% categories.admin_guides ? 'Yes' : 'No' %]</li>
+            <li>proxmox: [% categories.proxmox ? 'Yes' : 'No' %]</li>
+            <li>controllers: [% categories.controllers ? 'Yes' : 'No' %]</li>
+            <li>changelog: [% categories.changelog ? 'Yes' : 'No' %]</li>
+        </ul>
+    </div>
+[% END %]
+
 <div class="documentation-container">
     <h1>Comserv Documentation</h1>
 
@@ -141,7 +159,7 @@
         [% END %]
 
         <!-- Admin Documentation Sections - Only visible to administrators -->
-        [% IF display_role == 'Administrator' || user_role == 'admin' %]
+        [% IF user_role == 'admin' || c.session.roles.grep('admin').size %]
 
         <!-- Admin Guides Section -->
         [% IF categories.admin_guides %]
@@ -277,7 +295,7 @@
         [% END %]
 
         <!-- All Documentation Section - Alphabetical List (Admin Only) -->
-        [% IF (display_role == 'Administrator' || user_role == 'admin') && categories.general && categories.general.pages.size > 0 %]
+        [% IF (user_role == 'admin' || c.session.roles.grep('admin').size) && categories.general && categories.general.pages.size > 0 %]
         <div class="documentation-section">
             <h2 class="section-toggle expanded">All Documentation Files</h2>
             <p>Complete alphabetical list of all documentation files. <span class="admin-only-badge">Admin Only</span></p>

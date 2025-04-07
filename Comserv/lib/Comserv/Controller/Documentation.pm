@@ -396,9 +396,29 @@ sub index :Path :Args(0) {
 
     # Get the current user's role
     my $user_role = 'normal';  # Default to normal user
-    if ($c->user_exists) {
-        $user_role = $c->user->role || 'normal';
+
+    # First check session roles (this works even if user is not fully authenticated)
+    if ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && @{$c->session->{roles}}) {
+        # If user has multiple roles, prioritize admin role
+        if (grep { $_ eq 'admin' } @{$c->session->{roles}}) {
+            $user_role = 'admin';
+        } else {
+            # Otherwise use the first role
+            $user_role = $c->session->{roles}->[0];
+        }
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
+            "User role determined from session: $user_role");
     }
+    # If no role found in session but user exists, try to get role from user object
+    elsif ($c->user_exists) {
+        $user_role = $c->user->role || 'normal';
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
+            "User role determined from user object: $user_role");
+    }
+
+    # Log the final role determination
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+        "Final user role determined: $user_role");
 
     # Get the current site name
     my $site_name = $c->stash->{SiteName} || 'default';
@@ -406,6 +426,12 @@ sub index :Path :Args(0) {
     # Log user role and site for debugging
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
         "User role: $user_role, Site: $site_name");
+
+    # Log session roles for debugging
+    if ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY') {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+            "Session roles: " . join(", ", @{$c->session->{roles}}));
+    }
 
     # Get all documentation pages
     my $pages = $self->documentation_pages;
@@ -416,20 +442,41 @@ sub index :Path :Args(0) {
     foreach my $page_name (keys %$pages) {
         my $metadata = $pages->{$page_name};
 
+        # Check if user is admin (either by user_role or session roles)
+        my $is_admin = ($user_role eq 'admin');
+
+        # Also check if admin is in session roles
+        if (!$is_admin && $c->session->{roles} && ref $c->session->{roles} eq 'ARRAY') {
+            $is_admin = grep { $_ eq 'admin' } @{$c->session->{roles}};
+        }
+
         # Skip if this is site-specific documentation for a different site
         # But allow admins to see all site-specific documentation
         if ($metadata->{site} ne 'all' && $metadata->{site} ne $site_name) {
             # Only skip for non-admins
-            next unless $user_role eq 'admin';
+            next unless $is_admin;
         }
 
         # Skip if the user doesn't have the required role
         # But always include for admins
-        my $has_role = ($user_role eq 'admin'); # Admins can see everything
+        my $has_role = $is_admin; # Admins can see everything
 
         unless ($has_role) {
             foreach my $role (@{$metadata->{roles}}) {
-                if ($role eq $user_role || ($role eq 'normal' && $user_role)) {
+                # Check if role matches user_role
+                if ($role eq $user_role) {
+                    $has_role = 1;
+                    last;
+                }
+                # Check session roles
+                elsif ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY') {
+                    if (grep { $_ eq $role } @{$c->session->{roles}}) {
+                        $has_role = 1;
+                        last;
+                    }
+                }
+                # Special case for normal role
+                elsif ($role eq 'normal' && $user_role) {
                     $has_role = 1;
                     last;
                 }
@@ -475,17 +522,40 @@ sub index :Path :Args(0) {
         my $category = $self->documentation_categories->{$category_key};
 
         # Skip if the user doesn't have the required role
-        # But always include for admins
-        my $has_role = ($user_role eq 'admin'); # Admins can see everything
+        # But always include for admins (check both user_role and session roles)
+        my $has_role = ($user_role eq 'admin'); # Check if user_role is admin
 
+        # Also check if admin is in session roles
+        if (!$has_role && $c->session->{roles} && ref $c->session->{roles} eq 'ARRAY') {
+            $has_role = grep { $_ eq 'admin' } @{$c->session->{roles}};
+        }
+
+        # If still not admin, check for other matching roles
         unless ($has_role) {
             foreach my $role (@{$category->{roles}}) {
-                if ($role eq $user_role || ($role eq 'normal' && $user_role)) {
+                # Check if role matches user_role or is in session roles
+                if ($role eq $user_role) {
+                    $has_role = 1;
+                    last;
+                }
+                # Check session roles
+                elsif ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY') {
+                    if (grep { $_ eq $role } @{$c->session->{roles}}) {
+                        $has_role = 1;
+                        last;
+                    }
+                }
+                # Special case for normal role
+                elsif ($role eq 'normal' && $user_role) {
                     $has_role = 1;
                     last;
                 }
             }
         }
+
+        # Log role access decision
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
+            "Category $category_key access: " . ($has_role ? "granted" : "denied"));
         next unless $has_role;
 
         # Skip site-specific categories if not relevant to this site
@@ -532,6 +602,17 @@ sub index :Path :Args(0) {
         }
     }
 
+    # Add debug message to stash
+    my $admin_categories = join(', ', grep { exists $filtered_categories{$_} } qw(admin_guides proxmox controllers changelog));
+    my $debug_msg = sprintf(
+        "User role: %s, Display role: %s, Session roles: %s, Admin categories: %s, Has admin in session: %s",
+        $user_role,
+        ($user_role eq 'admin' ? 'Administrator' : $user_role),
+        ($c->session->{roles} ? join(', ', @{$c->session->{roles}}) : 'none'),
+        $admin_categories || 'none',
+        ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && grep { $_ eq 'admin' } @{$c->session->{roles}}) ? 'Yes' : 'No'
+    );
+
     # Add pages and completed items to stash
     $c->stash(
         documentation_pages => \%filtered_pages,
@@ -541,8 +622,12 @@ sub index :Path :Args(0) {
         categories => \%filtered_categories,
         user_role => $user_role,
         site_name => $site_name,
+        debug_msg => $debug_msg,
         template => 'Documentation/index.tt'
     );
+
+    # Log debug information
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index', $debug_msg);
 
     $c->forward($c->view('TT'));
 }
@@ -603,7 +688,20 @@ sub view :Path :Args(1) {
     # Get the current user's role
     my $user_role = 'normal';  # Default to normal user
     if ($c->user_exists) {
-        $user_role = $c->user->role || 'normal';
+        # Check if roles are stored in session
+        if ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && @{$c->session->{roles}}) {
+            # If user has multiple roles, prioritize admin role
+            if (grep { $_ eq 'admin' } @{$c->session->{roles}}) {
+                $user_role = 'admin';
+            } else {
+                # Otherwise use the first role
+                $user_role = $c->session->{roles}->[0];
+            }
+        } else {
+            # Fallback to user->role if available
+            $user_role = $c->user->role || 'normal';
+        }
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'view', "User role determined: $user_role");
     }
    # Add admin check for Proxmox docs
     if ($page =~ /^Proxmox/ && !$c->check_user_roles('admin')) {
