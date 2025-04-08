@@ -1,7 +1,7 @@
 # Authentication System Documentation
 
-**Version:** 1.0  
-**Last Updated:** May 31, 2024  
+**Version:** 1.1  
+**Last Updated:** June 10, 2024  
 **Author:** Development Team
 
 ## Overview
@@ -35,59 +35,110 @@ The User controller handles all authentication-related actions:
 
 ### Login Process
 
-1. User submits credentials via the login form
-2. `do_login` method validates credentials against the database
-3. On success:
+1. User accesses a protected page or clicks the login link
+2. The `login` method captures the referring URL in the session
+3. User submits credentials via the login form
+4. `do_login` method validates credentials against the database
+5. On success:
    - Session is created with user information
    - User roles are loaded
-   - User is redirected to the referring page or home
-4. On failure:
-   - Error message is displayed
-   - User remains on the login page
+   - User is redirected to the original referring page
+6. On failure:
+   - Error message is stored in flash
+   - User is redirected back to the login page
 
 ```perl
-# Login validation code
+# Storing the referring page in the login method
+sub login :Local {
+    my ($self, $c) = @_;
+    
+    # Store the referer URL if it hasn't been stored already
+    my $referer = $c->req->referer || $c->uri_for('/');
+    
+    # Get the return_to parameter if it exists (for explicit redirects)
+    my $return_to = $c->req->param('return_to');
+    if ($return_to) {
+        $referer = $return_to;
+    }
+
+    # Don't store the login page as the referer
+    if ($referer !~ m{/user/login} && $referer !~ m{/login} && $referer !~ m{/do_login}) {
+        $c->session->{referer} = $referer;
+    }
+    
+    # Store the referer in the stash for the template
+    $c->stash->{return_to} = $c->session->{referer};
+}
+
+# Login validation code in do_login
 my $user = $c->model('DBEncy::User')->find({ username => $username });
 unless ($user) {
-    $c->stash(
-        error_msg => 'Invalid username or password.',
-        template => 'user/login.tt'
-    );
+    # Store error message in flash and redirect back to login page
+    $c->flash->{error_msg} = 'Invalid username or password.';
+    $c->response->redirect($c->uri_for('/user/login'));
     return;
 }
 
 if ($self->hash_password($password) ne $user->password) {
-    $c->stash(
-        error_msg => 'Invalid username or password.',
-        template => 'user/login.tt'
-    );
+    # Store error message in flash and redirect back to login page
+    $c->flash->{error_msg} = 'Invalid username or password.';
+    $c->response->redirect($c->uri_for('/user/login'));
     return;
 }
+
+# Redirect handling after successful login
+my $redirect_path = $c->session->{referer} || '/';
+$c->res->redirect($redirect_path);
 ```
 
 ### Logout Process
 
 1. User clicks the logout link
-2. `logout` method clears the session
-3. Success message is displayed
-4. User is redirected to the home page
+2. `logout` method stores the current URL
+3. Important site information is preserved
+4. Session is properly deleted
+5. Success message is displayed
+6. User is redirected to an appropriate page based on context
 
 ```perl
 sub logout :Local {
     my ($self, $c) = @_;
-    
-    # Log the logout action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'logout', 
-        "User '" . ($c->session->{username} || 'unknown') . "' logging out");
-    
-    # Clear the session
-    $c->session({});
-    
+
+    # Store the current URL before logout
+    my $current_url = $c->req->referer || $c->uri_for('/');
+
+    # Log the logout action with the current URL
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'logout',
+        "User '" . ($c->session->{username} || 'unknown') . "' logging out, current URL: $current_url");
+
+    # Get username before clearing session (for the success message)
+    my $username = $c->session->{username} || 'Guest';
+
+    # Store important site information before clearing the session
+    my $site_name = $c->session->{SiteName} || '';
+    my $theme_name = $c->session->{theme_name} || '';
+    my $controller_name = $c->session->{ControllerName} || '';
+
+    # Properly delete the session (instead of just emptying it)
+    $c->delete_session("User logged out");
+
+    # Create a new session with minimal required data
+    $c->session->{SiteName} = $site_name if $site_name;
+    $c->session->{theme_name} = $theme_name if $theme_name;
+    $c->session->{ControllerName} = $controller_name if $controller_name;
+
     # Set a success message
     $c->flash->{success_msg} = "You have been successfully logged out.";
+
+    # Determine if the current page is accessible to non-logged-in users
+    # and redirect appropriately
+    my $redirect_url = $c->uri_for('/');
+    if ($current_url =~ m{^/([^/]+)}) {
+        # Redirect to site-specific page if appropriate
+        $redirect_url = $current_url if $site_name;
+    }
     
-    # Redirect to the home page
-    $c->response->redirect($c->uri_for('/'));
+    $c->response->redirect($redirect_url);
     return;
 }
 ```
@@ -239,10 +290,17 @@ The authentication components use CSS classes that can be customized in your the
 2. **Session Not Persisting**
    - Verify session configuration in Comserv.pm
    - Check permissions on the session storage directory
+   - Ensure `delete_session` is used properly instead of just clearing the session hash
 
 3. **Login Redirect Issues**
    - Ensure the referer URL is properly captured and sanitized
    - Check for circular redirects back to the login page
+   - Verify that login-related pages are excluded from the referer list
+   - Check that the `return_to` parameter is being properly processed
+
+4. **Template Not Found Errors**
+   - Ensure error handling uses redirects instead of trying to render templates directly
+   - Use flash messages instead of stash for error messages that need to persist across redirects
 
 ### Debugging Tips
 
@@ -273,3 +331,16 @@ Planned improvements to the authentication system:
 3. Enhanced password policies
 4. Account lockout after failed attempts
 5. User activity logging and auditing
+6. Improved return-to-origin functionality with better security checks
+7. Support for multiple authentication methods in a single deployment
+8. Enhanced session security with IP binding and browser fingerprinting
+
+## Recent Changes
+
+### Version 1.1 (June 10, 2024)
+1. Improved login redirect functionality to better handle return-to-origin
+2. Added support for explicit `return_to` parameter in login URLs
+3. Fixed template rendering issues in authentication error handling
+4. Enhanced session preservation during logout to maintain site context
+5. Improved documentation and added more detailed logging
+6. Added debug information to the stash for better troubleshooting

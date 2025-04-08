@@ -1,0 +1,40 @@
+[% META title = 'Git Pull Confirmation' %]
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>Git Pull Confirmation</h1>
+            
+            [% IF debug_msg %]
+                <div class="alert alert-info">
+                    <strong>Debug:</strong> [% debug_msg %]
+                </div>
+            [% END %]
+            
+            <div class="alert alert-warning">
+                <strong>Warning:</strong> This action will pull the latest changes from the Git repository. 
+                Make sure you don't have any uncommitted changes that you want to keep.
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h3>Confirm Git Pull</h3>
+                </div>
+                <div class="card-body">
+                    <p>
+                        Pulling from Git will update your local repository with the latest changes from the remote repository.
+                        This operation is generally safe, but if you have local changes, they might conflict with the remote changes.
+                    </p>
+                    
+                    <p>Are you sure you want to proceed?</p>
+                    
+                    <form method="POST" action="[% c.uri_for('/admin/git_pull') %]">
+                        <input type="hidden" name="confirm" value="1">
+                        <button type="submit" class="btn btn-primary">Yes, Pull from Git</button>
+                        <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">Cancel</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

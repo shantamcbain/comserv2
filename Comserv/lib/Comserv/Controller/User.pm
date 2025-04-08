@@ -23,10 +23,23 @@ sub login :Local {
 
     # Store the referer URL if it hasn't been stored already
     my $referer = $c->req->referer || $c->uri_for('/');
+    
+    # Get the return_to parameter if it exists (for explicit redirects)
+    my $return_to = $c->req->param('return_to');
+    if ($return_to) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', "Found return_to parameter: $return_to");
+        $referer = $return_to;
+    }
 
     # Don't store the login page as the referer
     if ($referer !~ m{/user/login} && $referer !~ m{/login} && $referer !~ m{/do_login}) {
         $c->session->{referer} = $referer;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', "Stored referer in session: $referer");
+    } else {
+        # If we don't have a valid referer and none is stored, use the home page
+        $c->session->{referer} = $c->session->{referer} || $c->uri_for('/');
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', 
+            "Using existing session referer: " . $c->session->{referer});
     }
 
     # Clear any error messages
@@ -44,6 +57,9 @@ sub login :Local {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', "Referer: $referer");
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', "Session referer: " . ($c->session->{referer} || 'undefined'));
 
+    # Store the referer in the stash for the template
+    $c->stash->{return_to} = $c->session->{referer};
+    
     # Display the login form
     $c->stash(template => 'user/login.tt');
     $c->forward($c->view('TT'));
@@ -64,9 +80,6 @@ sub do_login :Local {
         $self->logging->log_with_details(
             $c, 'info', __FILE__, __LINE__, 'do_login',
             "User already logged in as: " . $c->session->{username} . ", proceeding with login"
-        );
-        $c->stash(
-            template => 'user/login.tt'
         );
         # Clear the session to allow re-login
         $c->session({});
@@ -98,34 +111,51 @@ sub do_login :Local {
     );
 
     # Get redirect path
-    # Use a default path if referer is not set, avoid using undefined values
-    my $redirect_path = $c->session->{referer} || '/';
-
-    # Log the referer for debugging
-    $self->logging->log_with_details(
-        $c, 'info', __FILE__, __LINE__, 'do_login',
-        "Session referer: " . ($c->session->{referer} || 'undefined')
-    );
+    # Check for return_to parameter first (highest priority)
+    my $return_to = $c->req->param('return_to');
+    my $redirect_path;
+    
+    if ($return_to) {
+        $redirect_path = $return_to;
+        $self->logging->log_with_details(
+            $c, 'info', __FILE__, __LINE__, 'do_login',
+            "Using return_to parameter for redirect: $return_to"
+        );
+    } else {
+        # Fall back to session referer
+        $redirect_path = $c->session->{referer} || '/';
+        $self->logging->log_with_details(
+            $c, 'info', __FILE__, __LINE__, 'do_login',
+            "Using session referer for redirect: " . ($c->session->{referer} || 'undefined')
+        );
+    }
 
     # Ensure we're not redirecting back to the login page
     if ($redirect_path =~ m{/user/login} || $redirect_path =~ m{/login} || $redirect_path =~ m{/do_login}) {
         $redirect_path = '/';
+        $self->logging->log_with_details(
+            $c, 'info', __FILE__, __LINE__, 'do_login',
+            "Avoiding redirect to login page, using home page instead"
+        );
     }
+    
+    # Store the redirect path for debugging
+    $c->stash->{debug_msg} = "Redirect path: $redirect_path";
+    $self->logging->log_with_details(
+        $c, 'debug', __FILE__, __LINE__, 'do_login',
+        "Final redirect path: $redirect_path"
+    );
 
     # Find user in database
     my $user = $c->model('DBEncy::User')->find({ username => $username });
     unless ($user) {
         $self->logging->log_with_details(
             $c, 'warn', __FILE__, __LINE__, 'do_login',
-            "Login failed: Username '$username' not found."
-        );
-
-        # Improved error handling
-        $c->stash(
-            error_msg => 'Invalid username or password.',
-            template => 'user/login.tt'
-        );
-        $c->forward($c->view('TT'));
+     Store error message in flash and redirect back to login page
+        $c->flash->{"Login failed: Username '$username' not found."
+   # Store error message in flash and redirect back to login page
+        $c->flash->{error_msg}}  'Invalid username or password.';
+        $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
 
@@ -136,13 +166,12 @@ sub do_login :Local {
             "Login failed: Password mismatch for username '$username'."
         );
 
-        # Improved error handling
-        $c->stash(
-            error_msg => 'Invalid username or password.',
-            template => 'user/login.tt'
-        );
-        $c->forward($c->view('TT'));
-        return;
+        # Store error message in flash and redirect back to login page
+        $c->flash->{error_msg}}  'Invalid username or password.';
+        $c->response->redirect($c->uri_for('/user/login;
+        $c->response->redirect($c->uri_for('/user/login'));
+ Store error message in flash and redirect back to login page
+        $c->flash->{return;
     }
 
     # Success
@@ -181,8 +210,12 @@ sub do_login :Local {
     # Set a success message in the flash
     $c->flash->{success_msg} = "Login successful. Welcome, $username!";
 
-    # Clear the referer to prevent redirect loops
-    $c->session->{referer} = undef;
+    # Store the redirect path in the flash for debugging
+    $c->flash->{debug_msg} = "Redirecting to: $redirect_path";
+    
+    # We're keeping the referer in case we need it again
+    # but we'll store the current redirect path to avoid loops
+    $c->session->{last_redirect} = $redirect_path;
 
     # Log the redirect
     $self->logging->log_with_details(
@@ -281,22 +314,40 @@ sub process_login {
     );
 
     # Get redirect path
-    # Use a default path if forwarder is not set, avoid using undefined values
-    my $redirect_path = $c->session->{referer} || '/';
-
-    # Ensure we're not redirecting back to the login page
-    if ($redirect_path =~ m{/user/login} || $redirect_path =~ m{/login}) {
-        $redirect_path = '/';
+    # Check for return_to parameter first (highest priority)
+    my $return_to = $c->req->param('return_to');
+    my $redirect_path;
+    
+    if ($return_to) {
+        $redirect_path = $return_to;
+        $self->logging->log_with_details(
+            $c, 'info', __FILE__, __LINE__, 'do_login',
+            "Using return_to parameter for redirect: $return_to"
+        );
+    } else {
+        # Fall back to session referer
+        $redirect_path = $c->session->{referer} || '/';
+        $self->logging->log_with_details(
+            $c, 'info', __FILE__, __LINE__, 'do_login',
+            "Using session referer for redirect: " . ($c->session->{referer} || 'undefined')
+        )    "Avoiding redirect to login page, using home page instead"
+        );
+    }
+    
+    # Store the redirect path for debugging
+    $c->stash->{debug_msg} = "Redirect path: $redirect_path";
     }
 
-    # Log the components of the redirect path
-    $self->logging->log_with_details(
-        $c, 'debug', __FILE__, __LINE__, 'do_login',
+    # Ensure we're not redirecting back to the login page
+    if ($redirect_path =~ m{/user/login} || $redirect_path =~ m{/login} || $redirect_path =~ m{/do_login}) {
+        Final redirect_path = '/';
+        $self->logging->log_with_details(
+            $c, 'info', __FILE__, __LINE__, 'do_login',
         "session->{referer}: " . ($c->session->{referer} || 'undefined')
     );
     $self->logging->log_with_details(
         $c, 'debug', __FILE__, __LINE__, 'do_login',
-        "Redirect path resolved to: $redirect_path"
+        "Redirect path: $redirect_path"
     );
 
     # Find user in database
@@ -304,15 +355,14 @@ sub process_login {
     unless ($user) {
         $self->logging->log_with_details(
             $c, 'warn', __FILE__, __LINE__, 'do_login',
-            "Login failed: Username '$username' not found."
+     Store error message in flash and redirect back to login page
+        $c->flash->{"Login failed: Username '$username' not found."
         );
 
-        # Improved error handling
-        $c->stash(
-            error_msg => 'Invalid username or password.',
-            template => 'user/login.tt'
-        );
-        $c->forward($c->view('TT'));
+        # Store error message in flash and redirect back to login page
+        $c->flash->{error_msg}}} 'Invalid username or password.';
+        $c->response->redirect($c->uri_for('/user/login;
+        $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
 
@@ -323,12 +373,10 @@ sub process_login {
             "Login failed: Password mismatch for username '$username'."
         );
 
-        # Improved error handling
-        $c->stash(
-            error_msg => 'Invalid username or password.',
-            template => 'user/login.tt'
-        );
-        $c->forward($c->view('TT'));
+        # Store error message in flash and redirect back to login page
+        $c->flash->{error_msg} = 'Invalid username or password.';
+ Store error message in flash and redirect back to login page
+        $c->flash->{$c->response->redirect($c->uri_for('/user/login'));
         return;
     }
 

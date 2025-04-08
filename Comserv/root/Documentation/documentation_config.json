@@ -61,7 +61,7 @@
       "description": "System changes and updates",
       "roles": ["admin", "developer"],
       "site_specific": false,
-      "pages": ["main_changelog", "2024-07-project-id-fix", "2024-06-project-edit-fix", "2024-07-proxmox-controller-fixes", "2025-04-navigation-improvements", "2025-04-documentation-display-fix", "2025-04-mcoop-admin-menu-restriction", "2025-04-documentation-workflow-update", "2025-04-documentation-admin-visibility-fix", "2025-04-documentation-template-refactoring", "2025-04-mcoop-server-room-plan", "2025-05-15-documentation-system-update"]
+      "pages": ["main_changelog", "2024-07-project-id-fix", "2024-06-project-edit-fix", "2024-07-proxmox-controller-fixes", "2024-06-15-login-redirect-fix", "2025-04-navigation-improvements", "2025-04-documentation-display-fix", "2025-04-mcoop-admin-menu-restriction", "2025-04-documentation-workflow-update", "2025-04-documentation-admin-visibility-fix", "2025-04-documentation-template-refactoring", "2025-04-mcoop-server-room-plan", "2025-05-15-documentation-system-update"]
     },
     "proxmox": {
       "title": "Proxmox Documentation",
@@ -126,6 +126,7 @@
     "2025-04-documentation-template-refactoring": "Documentation/changelog/2025-04-documentation-template-refactoring.md",
     "2025-04-mcoop-server-room-plan": "Documentation/changelog/2025-04-mcoop-server-room-plan.md",
     "2025-05-15-documentation-system-update": "Documentation/changelog/2025-05-15-documentation-system-update.md",
+    "2024-06-15-login-redirect-fix": "Documentation/changelog/2024-06-15-login-redirect-fix.md",
     "templates": "Documentation/sites/mcoop/templates.md",
     "Documentation": "Documentation/Documentation.md",
     "Documentation_System": "Documentation/roles/normal/Documentation_System.md",

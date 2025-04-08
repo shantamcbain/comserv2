@@ -735,16 +735,7 @@ sub proxmox :Path('proxmox') :Args(0) {
     $c->forward('Comserv::Controller::Proxmox', 'index');
 }
 
-sub Documentation :Path('Documentation') :Args {
-    my ( $self, $c, @args ) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'Documentation', "Forwarding to Documentation controller with args: " . join(', ', @args));
 
-    if (@args) {
-        $c->detach('/documentation/view', [@args]);
-    } else {
-        $c->detach('/documentation/index');
-    }
-}
 
 sub reset_session :Global {
     my ( $self, $c ) = @_;

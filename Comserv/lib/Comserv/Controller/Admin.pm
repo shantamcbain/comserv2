@@ -4,6 +4,7 @@ use namespace::autoclean;
 use Data::Dumper;
 use Fcntl qw(:DEFAULT :flock);  # Import O_WRONLY, O_APPEND, O_CREAT constants
 use Comserv::Util::Logging;
+use Cwd;
 BEGIN { extends 'Catalyst::Controller'; }
 
 # Returns an instance of the logging utility
@@ -784,5 +785,116 @@ sub view_archived_log :Path('/admin/view_archived_log') :Args(1) {
 
     $c->forward($c->view('TT'));
 }
+
+=head2 git_pull
+
+Pull the latest changes from the Git repository
+
+=cut
+
+sub git_pull :Path('/admin/git_pull') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Debug logging for git_pull action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', "Starting git_pull action");
+    
+    # Check if the user has the admin role
+    unless ($c->user_exists && grep { $_ eq 'admin' } @{$c->session->{roles}}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_pull', 
+            "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest'));
+        $c->flash->{error_msg} = "You must be an admin to perform this action";
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+    
+    # If this is a POST request, perform the git pull
+    if ($c->request->method eq 'POST' && $c->request->params->{confirm}) {
+        # Get the application root directory
+        my $app_root = $c->path_to('');
+        
+        # Log the directory where we're running git pull
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
+            "Running git pull in directory: $app_root");
+        
+        # Change to the application root directory
+        my $current_dir = getcwd();
+        chdir($app_root) or do {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_pull', 
+                "Failed to change to directory $app_root: $!");
+            $c->flash->{error_msg} = "Failed to change to application directory: $!";
+            $c->response->redirect($c->uri_for('/admin'));
+            return;
+        };
+        
+        # Run git status first to check the repository state
+        my $git_status = qx{git status 2>&1};
+        my $status_exit_code = $? >> 8;
+        
+        if ($status_exit_code != 0) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_pull', 
+                "Error checking git status: $git_status");
+            $c->flash->{error_msg} = "Error checking git status: $git_status";
+            chdir($current_dir);
+            $c->response->redirect($c->uri_for('/admin'));
+            return;
+        }
+        
+        # Check if there are uncommitted changes
+        my $has_changes = 0;
+        if ($git_status =~ /Changes not staged for commit|Changes to be committed|Untracked files/) {
+            $has_changes = 1;
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_pull', 
+                "Repository has uncommitted changes: $git_status");
+        }
+        
+        # Run git pull
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
+            "Executing git pull");
+        my $output = qx{git pull 2>&1};
+        my $exit_code = $? >> 8;
+        
+        # Change back to the original directory
+        chdir($current_dir);
+        
+        if ($exit_code == 0) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
+                "Git pull executed successfully. Output: $output");
+                
+            # Check if there were any updates
+            if ($output =~ /Already up to date/) {
+                $c->flash->{success_msg} = "Repository is already up to date.";
+            } else {
+                $c->flash->{success_msg} = "Git pull executed successfully. Updates were applied.";
+            }
+            
+            # Add a warning if there were uncommitted changes
+            if ($has_changes) {
+                $c->flash->{warning_msg} = "Note: Your repository had uncommitted changes. " .
+                    "You may need to resolve conflicts manually.";
+            }
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_pull', 
+                "Error executing git pull: $output");
+            $c->flash->{error_msg} = "Error executing git pull: $output";
+        }
+        
+        # Redirect to avoid resubmission on refresh
+        $c->response->redirect($c->uri_for('/admin'));
+        return;
+    }
+    
+    # Display confirmation page
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
+        "Displaying git pull confirmation page");
+    
+    # Add debug message to stash
+    $c->stash(
+        debug_msg => "Git pull confirmation page loaded",
+        template => 'admin/git_pull.tt'
+    );
+    
+    $c->forward($c->view('TT'));
+}
+
 __PACKAGE__->meta->make_immutable;
 1;
