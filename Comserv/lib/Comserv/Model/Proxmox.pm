@@ -147,10 +147,64 @@ sub get_vms {
         return $vms;
     }
 
-    # If we didn't get any real VM data, return empty array
+    # If we didn't get any real VM data, check if we at least have a node
     $logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'get_vms',
         "No real VMs found for server: $server_id");
-    # Return empty array instead of mock data
+        
+    # Try to get the node information to at least show that
+    my $ua = LWP::UserAgent->new;
+    $ua->ssl_opts(verify_hostname => 0, SSL_verify_mode => 0);
+    $ua->timeout(10);
+    
+    my $node_url = $self->{api_url_base} . '/nodes';
+    my $node_req = HTTP::Request->new(GET => $node_url);
+    
+    # Add the API token header if available
+    if ($self->{token_user} && $self->{token_value}) {
+        my $token = "PVEAPIToken=" . $self->{token_user} . "=" . $self->{token_value};
+        $node_req->header('Authorization' => $token);
+    } elsif ($self->{api_token}) {
+        $node_req->header('Authorization' => $self->{api_token});
+    }
+    
+    # Send the request
+    my $node_res = $ua->request($node_req);
+    
+    # If successful, try to create a placeholder for the node
+    if ($node_res->is_success) {
+        eval {
+            my $node_data = decode_json($node_res->content);
+            if ($node_data && $node_data->{data} && ref($node_data->{data}) eq 'ARRAY' && @{$node_data->{data}} > 0) {
+                # Create a placeholder for the node
+                my @nodes;
+                foreach my $node (@{$node_data->{data}}) {
+                    my $node_obj = {
+                        vmid => 0,  # Use 0 to indicate it's a node, not a VM
+                        name => "Node: " . $node->{node},
+                        status => $node->{status} || 'unknown',
+                        type => 'node',
+                        node => $node->{node},
+                        server_id => $server_id,
+                        is_node => 1,  # Flag to indicate this is a node entry
+                    };
+                    push @nodes, $node_obj;
+                    
+                    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'get_vms',
+                        "Added node placeholder: " . $node->{node});
+                }
+                
+                if (@nodes > 0) {
+                    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'get_vms',
+                        "Returning " . scalar(@nodes) . " node placeholders instead of empty array");
+                    return \@nodes;
+                }
+            }
+        };
+    }
+    
+    # If all else fails, return empty array
+    $logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'get_vms',
+        "No nodes or VMs found for server: $server_id");
     return [];
 }
 
@@ -167,14 +221,24 @@ sub _load_credentials {
 
     # Set the credentials
     $self->{api_url_base} = $credentials->{api_url_base} || '';
-    # Always use 'proxmox' as the node name
-    $self->{node} = 'proxmox';
+    
+    # Try to determine the correct node name
+    my $node_name = 'proxmox'; # Default to 'proxmox'
+    
+    # If credentials specify a node, log it
+    if ($credentials->{node}) {
+        $logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_load_credentials',
+            "Credentials specify node name: '" . $credentials->{node} . "'");
+    }
+    
+    # Set the node name
+    $self->{node} = $node_name;
     $self->{token_user} = $credentials->{token_user} || '';
     $self->{token_value} = $credentials->{token_value} || '';
 
-    # Log that we're forcing the node name to 'proxmox'
+    # Log the node name we're using
     $logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_load_credentials',
-        "Forcing node name to 'proxmox' instead of '" . ($credentials->{node} || 'undef') . "'");
+        "Using node name '" . $node_name . "' for Proxmox API calls");
 
     # Log the credentials (without sensitive info)
     $logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_load_credentials',
@@ -450,7 +514,94 @@ sub test_proxmox_node {
             "Failed to get VMs directly from 'proxmox' node: " . $proxmox_res->status_line);
     }
 
-    # Return an empty array if we couldn't get any VMs
+    # Try to get LXC containers from the 'proxmox' node
+    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'test_proxmox_node',
+        "Trying to get LXC containers from 'proxmox' node");
+        
+    # Construct the URL for LXC containers on the 'proxmox' node
+    my $lxc_url = $self->{api_url_base} . '/nodes/proxmox/lxc';
+    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'test_proxmox_node',
+        "Trying to get LXC containers from URL: $lxc_url");
+        
+    # Store the URL in debug info
+    $self->{debug_info}->{direct_lxc_url} = $lxc_url;
+    
+    # Create the request
+    my $lxc_req = HTTP::Request->new(GET => $lxc_url);
+    
+    # Add the API token header if available
+    if ($self->{token_user} && $self->{token_value}) {
+        my $token = "PVEAPIToken=" . $self->{token_user} . "=" . $self->{token_value};
+        $lxc_req->header('Authorization' => $token);
+    } elsif ($self->{api_token}) {
+        $lxc_req->header('Authorization' => $self->{api_token});
+    }
+    
+    # Send the request
+    my $lxc_res = $ua->request($lxc_req);
+    
+    # Log the response status
+    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'test_proxmox_node',
+        "Direct 'proxmox' node LXC API response status: " . $lxc_res->status_line);
+        
+    # Store the response for debugging
+    $self->{debug_info}->{direct_lxc_response_code} = $lxc_res->code;
+    $self->{debug_info}->{direct_lxc_response_status} = $lxc_res->status_line;
+    $self->{debug_info}->{direct_lxc_response_content} = substr($lxc_res->content, 0, 1000);
+    
+    # If we got a successful response, try to parse the LXC containers
+    if ($lxc_res->is_success) {
+        eval {
+            my $lxc_data = decode_json($lxc_res->content);
+            if ($lxc_data && $lxc_data->{data} && ref($lxc_data->{data}) eq 'ARRAY') {
+                # Process the LXC container data
+                my @containers;
+                foreach my $container (@{$lxc_data->{data}}) {
+                    # Extract the container ID
+                    my $vmid = $container->{vmid};
+                    
+                    # Log the container being processed
+                    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'test_proxmox_node',
+                        "Processing LXC container from 'proxmox' node: ID=$vmid, Name=" . ($container->{name} || 'unnamed'));
+                        
+                    # Create a container object
+                    my $container_obj = {
+                        vmid => $vmid,
+                        name => $container->{name} || "Container $vmid",
+                        status => $container->{status} || 'unknown',
+                        type => 'lxc',
+                        node => 'proxmox',
+                        maxmem => $container->{maxmem} || 0,
+                        maxdisk => $container->{maxdisk} || 0,
+                        uptime => $container->{uptime} || 0,
+                        cpu => $container->{cpu} || 0,
+                        server_id => $self->{server_id},
+                    };
+                    
+                    # Add the container to the list
+                    push @containers, $container_obj;
+                }
+                
+                $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'test_proxmox_node',
+                    "Successfully retrieved " . scalar(@containers) . " LXC containers directly from 'proxmox' node");
+                    
+                # Return the containers
+                return \@containers;
+            } else {
+                $logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'test_proxmox_node',
+                    "No LXC containers found in direct 'proxmox' node response");
+            }
+        };
+        if ($@) {
+            $logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'test_proxmox_node',
+                "Error parsing direct 'proxmox' node LXC response: $@");
+        }
+    } else {
+        $logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'test_proxmox_node',
+            "Failed to get LXC containers directly from 'proxmox' node: " . $lxc_res->status_line);
+    }
+    
+    # Return an empty array if we couldn't get any VMs or containers
     return [];
 }
 
@@ -483,10 +634,21 @@ sub _get_real_vms_new {
     my $ua = LWP::UserAgent->new;
     $ua->ssl_opts(verify_hostname => 0, SSL_verify_mode => 0);
     $ua->timeout(30);
-
-    # First try directly with the 'proxmox' node
+    
+    # CHANGED: First try the cluster/resources endpoint with type=vm as recommended
     $logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_get_real_vms_new',
-        "Trying direct access to 'proxmox' node first");
+        "Trying cluster/resources endpoint with type=vm first (recommended approach)");
+    
+    my $resources_vms = $self->_try_get_cluster_resources($ua, 'vm');
+    if ($resources_vms && @$resources_vms > 0) {
+        $logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_get_real_vms_new',
+            "Successfully retrieved " . scalar(@$resources_vms) . " VMs from cluster resources with type=vm");
+        return $resources_vms;
+    }
+    
+    # If the cluster/resources endpoint failed, try directly with the 'proxmox' node
+    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_get_real_vms_new',
+        "Cluster resources endpoint failed, trying direct access to 'proxmox' node");
 
     # Construct the URL for QEMU VMs on the 'proxmox' node
     my $proxmox_url = $self->{api_url_base} . '/nodes/proxmox/qemu';
@@ -571,9 +733,96 @@ sub _get_real_vms_new {
             "Failed to get VMs directly from 'proxmox' node: " . $proxmox_res->status_line);
     }
 
-    # If direct access to 'proxmox' node failed, try the nodes endpoint to get a list of all nodes
+    # Try to get LXC containers from the 'proxmox' node
     $logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_get_real_vms_new',
-        "Direct access to 'proxmox' node failed, trying nodes endpoint");
+        "Trying to get LXC containers from 'proxmox' node");
+        
+    # Construct the URL for LXC containers on the 'proxmox' node
+    my $lxc_url = $self->{api_url_base} . '/nodes/proxmox/lxc';
+    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_get_real_vms_new',
+        "Trying to get LXC containers from URL: $lxc_url");
+        
+    # Store the URL in debug info
+    $self->{debug_info}->{direct_lxc_url} = $lxc_url;
+    
+    # Create the request
+    my $lxc_req = HTTP::Request->new(GET => $lxc_url);
+    
+    # Add the API token header if available
+    if ($self->{token_user} && $self->{token_value}) {
+        my $token = "PVEAPIToken=" . $self->{token_user} . "=" . $self->{token_value};
+        $lxc_req->header('Authorization' => $token);
+    } elsif ($self->{api_token}) {
+        $lxc_req->header('Authorization' => $self->{api_token});
+    }
+    
+    # Send the request
+    my $lxc_res = $ua->request($lxc_req);
+    
+    # Log the response status
+    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_get_real_vms_new',
+        "Direct 'proxmox' node LXC API response status: " . $lxc_res->status_line);
+        
+    # Store the response for debugging
+    $self->{debug_info}->{direct_lxc_response_code} = $lxc_res->code;
+    $self->{debug_info}->{direct_lxc_response_status} = $lxc_res->status_line;
+    $self->{debug_info}->{direct_lxc_response_content} = substr($lxc_res->content, 0, 1000);
+    
+    # If we got a successful response, try to parse the LXC containers
+    if ($lxc_res->is_success) {
+        eval {
+            my $lxc_data = decode_json($lxc_res->content);
+            if ($lxc_data && $lxc_data->{data} && ref($lxc_data->{data}) eq 'ARRAY') {
+                # Process the LXC container data
+                my @containers;
+                foreach my $container (@{$lxc_data->{data}}) {
+                    # Extract the container ID
+                    my $vmid = $container->{vmid};
+                    
+                    # Log the container being processed
+                    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_get_real_vms_new',
+                        "Processing LXC container from 'proxmox' node: ID=$vmid, Name=" . ($container->{name} || 'unnamed'));
+                        
+                    # Create a container object
+                    my $container_obj = {
+                        vmid => $vmid,
+                        name => $container->{name} || "Container $vmid",
+                        status => $container->{status} || 'unknown',
+                        type => 'lxc',
+                        node => 'proxmox',
+                        maxmem => $container->{maxmem} || 0,
+                        maxdisk => $container->{maxdisk} || 0,
+                        uptime => $container->{uptime} || 0,
+                        cpu => $container->{cpu} || 0,
+                        server_id => $self->{server_id},
+                    };
+                    
+                    # Add the container to the list
+                    push @containers, $container_obj;
+                }
+                
+                $logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_get_real_vms_new',
+                    "Successfully retrieved " . scalar(@containers) . " LXC containers directly from 'proxmox' node");
+                    
+                # Return the containers
+                return \@containers;
+            } else {
+                $logging->log_with_details(undef, 'warn', __FILE__, __LINE__, '_get_real_vms_new',
+                    "No LXC containers found in direct 'proxmox' node response");
+            }
+        };
+        if ($@) {
+            $logging->log_with_details(undef, 'warn', __FILE__, __LINE__, '_get_real_vms_new',
+                "Error parsing direct 'proxmox' node LXC response: $@");
+        }
+    } else {
+        $logging->log_with_details(undef, 'warn', __FILE__, __LINE__, '_get_real_vms_new',
+            "Failed to get LXC containers directly from 'proxmox' node: " . $lxc_res->status_line);
+    }
+    
+    # If direct access to 'proxmox' node failed for both QEMU and LXC, try the nodes endpoint to get a list of all nodes
+    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_get_real_vms_new',
+        "Direct access to 'proxmox' node failed for both QEMU and LXC, trying nodes endpoint");
 
     my $nodes_url = $self->{api_url_base} . '/nodes';
     $logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_get_real_vms_new',
@@ -659,24 +908,61 @@ sub _get_real_vms_new {
             "Successfully retrieved " . scalar(@$direct_proxmox_vms) . " VMs directly from node 'proxmox'");
         return $direct_proxmox_vms;
     }
-
-    # Try to get resources with different type parameters
-    my $resources_vms = $self->_try_get_cluster_resources($ua, 'vm');
-    if ($resources_vms && @$resources_vms > 0) {
+    
+    # Also try with 'pve' node which is common in Proxmox installations
+    my $direct_pve_vms = $self->_try_get_node_vms($ua, 'pve');
+    if ($direct_pve_vms && @$direct_pve_vms > 0) {
         $logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_get_real_vms_new',
-            "Successfully retrieved " . scalar(@$resources_vms) . " VMs from cluster resources with type=vm");
-        return $resources_vms;
+            "Successfully retrieved " . scalar(@$direct_pve_vms) . " VMs directly from node 'pve'");
+        return $direct_pve_vms;
     }
 
-    # If type=vm didn't work, try with type=qemu
-    my $resources_qemu = $self->_try_get_cluster_resources($ua, 'qemu');
-    if ($resources_qemu && @$resources_qemu > 0) {
+    # Don't try with type=qemu as it's not a valid parameter according to the API error
+    # Instead, try with the hostname as a node parameter
+    my $hostname = '';
+    if ($self->{api_url_base} =~ m{https?://([^:/]+)}) {
+        $hostname = $1;
         $logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_get_real_vms_new',
-            "Successfully retrieved " . scalar(@$resources_qemu) . " VMs from cluster resources with type=qemu");
-        return $resources_qemu;
+            "Extracted hostname from API URL: $hostname");
+            
+        # Try to get VMs from this hostname as a node
+        if ($hostname ne '' && $hostname ne '172.30.236.89') {
+            $logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_get_real_vms_new',
+                "Trying to use hostname '$hostname' as a node name");
+                
+            my $hostname_vms = $self->_try_get_node_vms($ua, $hostname);
+            if ($hostname_vms && @$hostname_vms > 0) {
+                $logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_get_real_vms_new',
+                    "Successfully retrieved " . scalar(@$hostname_vms) . " VMs directly from node '$hostname'");
+                return $hostname_vms;
+            }
+        } elsif ($hostname eq '172.30.236.89') {
+            # If the hostname is an IP address, try to get the node name from the credentials
+            my $credentials = Comserv::Util::ProxmoxCredentials::get_credentials($self->{server_id});
+            if ($credentials && $credentials->{node}) {
+                my $node_name = $credentials->{node};
+                $logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_get_real_vms_new',
+                    "Using node name '$node_name' from credentials instead of IP address");
+                    
+                my $node_vms = $self->_try_get_node_vms($ua, $node_name);
+                if ($node_vms && @$node_vms > 0) {
+                    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_get_real_vms_new',
+                        "Successfully retrieved " . scalar(@$node_vms) . " VMs directly from node '$node_name'");
+                    return $node_vms;
+                }
+            }
+        }
     }
 
-    # If type=qemu didn't work, try without a type parameter
+    # Try with the node parameter instead of qemu (which is not valid)
+    my $resources_node = $self->_try_get_cluster_resources($ua, 'node');
+    if ($resources_node && @$resources_node > 0) {
+        $logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_get_real_vms_new',
+            "Successfully retrieved " . scalar(@$resources_node) . " resources from cluster resources with type=node");
+        return $resources_node;
+    }
+    
+    # If type=node didn't work, try without a type parameter
     my $resources_all = $self->_try_get_cluster_resources($ua, '');
     if ($resources_all && @$resources_all > 0) {
         $logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_get_real_vms_new',
@@ -687,6 +973,40 @@ sub _get_real_vms_new {
     # If we didn't get any VMs from the cluster resources endpoints, try each node individually
     $logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_get_real_vms_new',
         "No VMs found from cluster resources endpoints, trying individual nodes");
+        
+    # Check if the resources response contains any nodes at all
+    my $resources_all_check = $self->_try_get_cluster_resources($ua, '');
+    if ($resources_all_check && @$resources_all_check > 0) {
+        my $has_nodes = 0;
+        my $has_vms = 0;
+        my @node_names = ();
+        
+        foreach my $resource (@$resources_all_check) {
+            if ($resource->{type} eq 'node') {
+                $has_nodes = 1;
+                push @node_names, $resource->{node};
+            }
+            if ($resource->{type} eq 'qemu' || $resource->{type} eq 'lxc') {
+                $has_vms = 1;
+            }
+        }
+        
+        if ($has_nodes) {
+            $logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_get_real_vms_new',
+                "Found " . scalar(@node_names) . " nodes in cluster: " . join(", ", @node_names));
+        } else {
+            $logging->log_with_details(undef, 'warn', __FILE__, __LINE__, '_get_real_vms_new',
+                "No nodes found in cluster resources response");
+        }
+        
+        if ($has_vms) {
+            $logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_get_real_vms_new',
+                "Found VMs/containers in cluster resources response");
+        } else {
+            $logging->log_with_details(undef, 'warn', __FILE__, __LINE__, '_get_real_vms_new',
+                "No VMs/containers found in cluster resources response");
+        }
+    }
 
     # Placeholder for a fake request to keep the rest of the code working
     my $url = $self->{api_url_base} . '/version';
@@ -1171,8 +1491,17 @@ sub _try_get_cluster_resources {
 
     # Construct the URL with or without the type parameter
     my $url = $self->{api_url_base} . '/cluster/resources';
+    
+    # Check if the type is valid (according to API error, valid types are: vm, storage, node, sdn)
+    # If 'qemu' is passed, use 'vm' instead as that's the correct parameter for VMs
     if ($type) {
-        $url .= "?type=$type";
+        if ($type eq 'qemu') {
+            $logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_try_get_cluster_resources',
+                "Converting invalid type 'qemu' to valid type 'vm'");
+            $url .= "?type=vm";
+        } else {
+            $url .= "?type=$type";
+        }
     }
 
     $logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_try_get_cluster_resources',
@@ -1199,6 +1528,8 @@ sub _try_get_cluster_resources {
     # Store this response for debugging
     $self->{debug_info}->{"resources_${type}_response_code"} = $res->code;
     $self->{debug_info}->{"resources_${type}_response_status"} = $res->status_line;
+    $self->{debug_info}->{"resources_${type}_url"} = $url;
+    $self->{debug_info}->{"resources_${type}_response_content"} = substr($res->content, 0, 1000);
 
     if ($res->is_success) {
         # Parse the response
@@ -1224,7 +1555,9 @@ sub _try_get_cluster_resources {
         my @vms;
         foreach my $resource (@{$response_data->{data}}) {
             # Skip resources that are not VMs or containers
-            next unless $resource->{type} eq 'qemu' || $resource->{type} eq 'lxc';
+            # When using type=vm, the resources will have type=qemu or type=lxc
+            # But we need to check for vmid to make sure it's actually a VM/container
+            next unless ($resource->{type} eq 'qemu' || $resource->{type} eq 'lxc') && $resource->{vmid};
 
             # Extract the VM ID
             my $vmid = $resource->{vmid};
