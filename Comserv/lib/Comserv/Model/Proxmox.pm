@@ -261,6 +261,11 @@ sub check_connection {
         $logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'check_connection',
             "Using API token for authentication");
 
+        # Log token details for debugging (without showing the full token)
+        $logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'check_connection',
+            "Token user: " . $self->{token_user} . 
+            ", Token value length: " . length($self->{token_value}));
+
         my $token = "PVEAPIToken=" . $self->{token_user} . "=" . $self->{token_value};
         $req->header('Authorization' => $token);
 
@@ -275,6 +280,10 @@ sub check_connection {
             "Using stored API token for authentication");
 
         $req->header('Authorization' => $self->{api_token});
+    } else {
+        $logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'check_connection',
+            "No API token available for authentication");
+        return 0;
     }
 
     # Send the request
@@ -355,10 +364,25 @@ sub test_proxmox_node {
 
     # Add the API token header if available
     if ($self->{token_user} && $self->{token_value}) {
+        $logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'test_proxmox_node',
+            "Using API token for authentication");
+            
+        # Log token details for debugging (without showing the full token)
+        $logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'test_proxmox_node',
+            "Token user: " . $self->{token_user} . 
+            ", Token value length: " . length($self->{token_value}));
+            
         my $token = "PVEAPIToken=" . $self->{token_user} . "=" . $self->{token_value};
         $proxmox_req->header('Authorization' => $token);
     } elsif ($self->{api_token}) {
+        $logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'test_proxmox_node',
+            "Using stored API token for authentication");
+            
         $proxmox_req->header('Authorization' => $self->{api_token});
+    } else {
+        $logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'test_proxmox_node',
+            "No API token available for authentication");
+        return [];
     }
 
     # Send the request

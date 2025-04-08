@@ -81,8 +81,16 @@ sub _deobfuscate {
         "Extracted plaintext of length: " . (defined $plaintext ? length($plaintext) : 0));
 
     if (!defined $plaintext || $plaintext eq '') {
-        $logging->log_with_details(undef, 'warn', __FILE__, __LINE__, "_deobfuscate",
-            "Failed to extract plaintext from obfuscated string");
+        $logging->log_with_details(undef, 'error', __FILE__, __LINE__, "_deobfuscate",
+            "Failed to extract plaintext from obfuscated string: $obfuscated");
+        
+        # Try a different approach - sometimes the format might be different
+        if ($obfuscated =~ /^OBFS:([^:]+):(.+)$/) {
+            $salt = $1;
+            $plaintext = $2;
+            $logging->log_with_details(undef, 'info', __FILE__, __LINE__, "_deobfuscate",
+                "Extracted plaintext using regex approach, length: " . length($plaintext));
+        }
     }
 
     return $plaintext || '';
@@ -177,8 +185,23 @@ sub get_credentials {
                 "Obfuscated token format: " . (substr($obfuscated, 0, 20) . "..."));
 
             $server_creds->{token_value} = _deobfuscate($obfuscated);
+            
+            # Check if deobfuscation was successful
+            if (!$server_creds->{token_value} || $server_creds->{token_value} eq '') {
+                $logging->log_with_details(undef, 'error', __FILE__, __LINE__, "get_credentials",
+                    "Failed to deobfuscate token value for server: $server_id");
+                
+                # As a fallback, try using the raw token value if it looks like a valid UUID
+                if ($obfuscated =~ /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i) {
+                    $server_creds->{token_value} = $1;
+                    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, "get_credentials",
+                        "Using extracted UUID as token value: " . substr($server_creds->{token_value}, 0, 8) . "...");
+                }
+            }
+            
             $logging->log_with_details(undef, 'debug', __FILE__, __LINE__, "get_credentials",
-                "Token deobfuscated successfully: " . ($server_creds->{token_value} ? "YES" : "NO"));
+                "Token deobfuscated successfully: " . ($server_creds->{token_value} ? "YES" : "NO") . 
+                ", Length: " . length($server_creds->{token_value}));
 
             delete $server_creds->{token_value_obfuscated}; # Remove the obfuscated version
         } else {

@@ -14,9 +14,9 @@ All endpoints return JSON by default unless specified otherwise.
 
 ## Authentication
 
-### Using API Tokens (Recommended)
+### Using API Tokens (Required)
 
-API tokens are the recommended authentication method for automated access. They don't require CSRF tokens for write operations.
+As of the latest update, our application exclusively uses API tokens for Proxmox authentication. This eliminates the need for user login to access Proxmox functionality. API tokens don't require CSRF tokens for write operations and provide a more secure and streamlined authentication method.
 
 ```
 Authorization: PVEAPIToken=USER@REALM!TOKENID=UUID
@@ -28,22 +28,26 @@ my $token = "PVEAPIToken=" . $self->{token_user} . "=" . $self->{token_value};
 $req->header('Authorization' => $token);
 ```
 
-### Using Username/Password
+The API tokens are stored in the `proxmox_credentials.json` configuration file and are automatically loaded and used by the application.
 
-Alternatively, you can authenticate with username and password to obtain a ticket and CSRF prevention token.
+### Token Configuration
 
-```
-GET /api2/json/access/ticket
-POST /api2/json/access/ticket
-```
+API tokens must be configured in the Proxmox VE web interface:
 
-Parameters: 
-- username (e.g., root@pam)
-- password
+1. Log in to the Proxmox VE web interface
+2. Navigate to Datacenter → Permissions → API Tokens
+3. Create a new token for the desired user
+4. Assign appropriate permissions (at minimum, VM.Audit for viewing VMs)
+5. Store the token ID and value in the `proxmox_credentials.json` file
 
-Returns: 
-- Ticket (for Cookie header)
-- CSRFPreventionToken
+### Authentication Flow
+
+1. The application loads the API token from the configuration file
+2. The token is deobfuscated by the `ProxmoxCredentials` utility
+3. The Proxmox model uses the token for all API requests
+4. No user login is required to access Proxmox functionality
+
+For more details on the authentication changes, see the [Proxmox Authentication Changes](proxmox_authentication_changes.md) document.
 
 ## Key API Endpoints
 
@@ -293,6 +297,8 @@ Our code now automatically tries both the configured node name and 'proxmox' to 
    - Verify the token format: `PVEAPIToken=USER@REALM!TOKENID=UUID`
    - Check that the token is not expired
    - Ensure the token has the correct role with VM.Audit permission
+   - No user login is required - the application uses API tokens exclusively
+   - If authentication fails, check the `proxmox_credentials.json` file for correct token configuration
 
 2. **Node Name Issues**:
    - The default node name in Proxmox is often 'pve', but it can be customized

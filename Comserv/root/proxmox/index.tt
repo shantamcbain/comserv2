@@ -19,13 +19,7 @@
 </div>
 [% END %]
 
-[% IF c.session.proxmox_token_user %]
-<!-- User is logged in -->
-<div class="user-info">
-    <p>Logged in as: <strong>[% c.session.proxmox_token_user %]</strong></p>
-    <a href="[% c.uri_for('/proxmox/logout') %]" class="btn-logout">Logout</a>
-</div>
-
+<!-- No login check required -->
 <div class="action-panel">
     <h2>Actions</h2>
     <div class="action-buttons">
@@ -79,14 +73,6 @@
     </div>
     [% END %]
 </div>
-
-[% ELSE %]
-<!-- User is not logged in -->
-<div class="login-prompt">
-    <p>You need to log in to access the Proxmox dashboard.</p>
-    <a href="[% c.uri_for('/proxmox/login') %]" class="btn-login">Login to Proxmox</a>
-</div>
-[% END %]
 
 [% IF debug_info %]
 <div class="debug-info">
