@@ -12,14 +12,14 @@
       "description": "Documentation for system administrators",
       "roles": ["admin", "developer"],
       "site_specific": false,
-      "pages": ["admin_guide", "user_management", "documentation_role_access", "documentation_system_guide"]
+      "pages": ["admin_guide", "user_management", "documentation_role_access", "documentation_system_guide", "proxy_troubleshooting"]
     },
     "developer_guides": {
       "title": "Developer Documentation",
       "description": "Documentation for developers",
       "roles": ["developer"],
       "site_specific": false,
-      "pages": ["api_reference", "authentication_system", "template_system", "troubleshooting", "navigation_system", "theme_system_implementation"]
+      "pages": ["api_reference", "authentication_system", "template_system", "troubleshooting", "navigation_system", "theme_system_implementation", "proxy_troubleshooting"]
     },
     "tutorials": {
       "title": "Tutorials",
@@ -61,7 +61,7 @@
       "description": "System changes and updates",
       "roles": ["admin", "developer"],
       "site_specific": false,
-      "pages": ["main_changelog", "2024-08-proxmox-debug-msg-fix", "2024-07-project-id-fix", "2024-06-project-edit-fix", "2024-07-proxmox-controller-fixes", "2024-06-15-login-redirect-fix", "2025-04-navigation-improvements", "2025-04-documentation-display-fix", "2025-04-mcoop-admin-menu-restriction", "2025-04-documentation-admin-visibility-fix", "2025-04-documentation-template-refactoring"]
+      "pages": ["main_changelog", "2025-04-pagetop-hostname-display", "2024-08-proxmox-debug-msg-fix", "2024-07-project-id-fix", "2024-06-project-edit-fix", "2024-07-proxmox-controller-fixes", "2024-06-15-login-redirect-fix", "2025-04-navigation-improvements", "2025-04-documentation-display-fix", "2025-04-mcoop-admin-menu-restriction", "2025-04-documentation-admin-visibility-fix"]
     },
     "proxmox": {
       "title": "Proxmox Documentation",
@@ -87,6 +87,7 @@
     "template_system": "Documentation/developer/template_system.md",
     "troubleshooting": "Documentation/developer/troubleshooting.md",
     "navigation_system": "Documentation/developer/navigation_system.md",
+    "proxy_troubleshooting": "Documentation/proxy_troubleshooting.md",
     "site_guide": "Documentation/sites/mcoop/site_guide.md",
     "member_resources": "Documentation/sites/mcoop/member_resources.md",
     "documentation_system": "Documentation/documentation_system.md",
@@ -115,6 +116,7 @@
     "fix_project_edit_button": "Documentation/fix_project_edit_button.md",
     "model_list": "Documentation/models/model_list.md",
     "main_changelog": "Documentation/main_changelog.md",
+    "2025-04-pagetop-hostname-display": "Documentation/changelog/2025-04-pagetop-hostname-display.md",
     "2024-08-proxmox-debug-msg-fix": "Documentation/changelog/2024-08-proxmox-debug-msg-fix.md",
     "2024-07-project-id-fix": "Documentation/changelog/2024-07-project-id-fix.md",
     "2024-06-project-edit-fix": "Documentation/changelog/2024-06-project-edit-fix.md",

@@ -1,13 +1,24 @@
 
-[% PageVersion = 'pagetop.tt,v 0.022.1 2025/04/01 shanta Exp shanta ' %]
-[%# PageVersion = 'pagetop.tt,v 0.02 2023/08/30 shanta Exp shanta ' %]
+[% PageVersion = 'pagetop.tt,v 0.023.0 2025/04/09 shanta Exp shanta ' %]
+[%# PageVersion = 'pagetop.tt,v 0.022.1 2025/04/01 shanta Exp shanta ' %]
+
+[% SET roles = c.session.roles || [] %]
+[% SET is_admin = roles.grep('admin').size > 0 ? 1 : 0 %]
+
+[% IF is_admin || c.session.debug_mode == 1 %]
+<div class="server-info" style="background-color: #e9ecef; border-bottom: 1px solid #dee2e6; padding: 5px 10px; font-size: 12px; text-align: right; color: #495057;">
+    Server: <strong>[% c.req.uri.host %]</strong> | 
+    IP: <strong>[% c.req.address %]</strong>
+    [% IF c.session.debug_mode == 1 %] | [% PageVersion %][% END %]
+</div>
+[% END %]
 
 [% IF c.session.debug_mode == 1 %]
 <div class="debug">
-    [% PageVersion %]
     [% INCLUDE 'debug.tt' %]
+</div>
 
-</div>[% IF c.stash.debug_msg.defined && c.stash.debug_msg.size > 0 %]
+[% IF c.stash.debug_msg.defined && c.stash.debug_msg.size > 0 %]
     <div class="debug-messages" style="background-color: #f8f9fa; border: 1px solid #ddd; padding: 10px; margin-bottom: 15px;">
         <h4>Debug Messages</h4>
         [% FOREACH msg IN c.stash.debug_msg %]
@@ -16,11 +27,6 @@
     </div>
 [% END %]
 [% END %]
-
-
-
-
-[% SET roles = c.session.roles || [] %]
 
 <header>
     <h1>
@@ -52,8 +58,6 @@
         [% INCLUDE 'Navigation/TopDropListIT.tt' %]
         <!-- TopDropListCoop.tt has been removed and merged into admintopmenu.tt -->
 
-        [% SET is_admin = c.session.roles.defined && c.session.roles.size && c.session.roles.grep('admin').size > 0 ? 1 : 0 %]
-
         [% IF is_admin %]
             [% INCLUDE 'Navigation/admintopmenu.tt' %]
         [% END %]
@@ -77,10 +81,4 @@
         [% END %]
     [% END %]
 
-[% IF c.session.roles && c.session.roles.size %]
-    [% FOREACH role IN c.session.roles %]
-        [% IF role == 'admin' %]
-            [% SET is_admin = 1 %]
-        [% END %]
-    [% END %]
-[% END %]
+[% # Admin role check is now done at the top of the file %]
