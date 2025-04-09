@@ -128,6 +128,16 @@ sub index :Path :Args(0) {
             if (!$auth_success) {
                 $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
                     "Authentication failed again, cannot retrieve VMs");
+                
+                # Make sure debug_msg exists in the stash and is an array reference
+                if (!defined $c->stash->{debug_msg}) {
+                    $c->stash->{debug_msg} = [];
+                } elsif (ref($c->stash->{debug_msg}) ne 'ARRAY') {
+                    # If debug_msg is a string, convert it to an array with the string as the first element
+                    my $original_msg = $c->stash->{debug_msg};
+                    $c->stash->{debug_msg} = [$original_msg];
+                }
+                
                 push @{$c->stash->{debug_msg}}, "Authentication failed, cannot retrieve VMs";
                 return;
             }
@@ -173,6 +183,15 @@ sub index :Path :Args(0) {
 
     # Create the API token header
     my $token = "PVEAPIToken=" . $credentials->{token_user} . "=" . $credentials->{token_value};
+
+    # Make sure debug_msg exists in the stash and is an array reference
+    if (!defined $c->stash->{debug_msg}) {
+        $c->stash->{debug_msg} = [];
+    } elsif (ref($c->stash->{debug_msg}) ne 'ARRAY') {
+        # If debug_msg is a string, convert it to an array with the string as the first element
+        my $original_msg = $c->stash->{debug_msg};
+        $c->stash->{debug_msg} = [$original_msg];
+    }
 
     # Add a section header for API tests
     push @{$c->stash->{debug_msg}}, "API Endpoint Tests";
@@ -247,9 +266,15 @@ sub index :Path :Args(0) {
 
     # Get the Proxmox model's debug info
     my $proxmox_debug_info = $proxmox->{debug_info} || {};
-
-    # Make sure debug_msg exists in the stash
-    $c->stash->{debug_msg} = [] unless $c->stash->{debug_msg};
+    
+    # Make sure debug_msg exists in the stash and is an array reference
+    if (!defined $c->stash->{debug_msg}) {
+        $c->stash->{debug_msg} = [];
+    } elsif (ref($c->stash->{debug_msg}) ne 'ARRAY') {
+        # If debug_msg is a string, convert it to an array with the string as the first element
+        my $original_msg = $c->stash->{debug_msg};
+        $c->stash->{debug_msg} = [$original_msg];
+    }
 
     # Add useful debug messages
     push @{$c->stash->{debug_msg}}, "Server ID: $server_id";

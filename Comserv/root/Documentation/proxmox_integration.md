@@ -74,6 +74,17 @@ When creating a new VM, the following parameters are available:
 
 ## Recent Changes
 
+### August 2024 - Debug Message Handling Fix
+
+Fixed an issue in the Proxmox controller where the `debug_msg` stash variable was being used inconsistently:
+
+1. Added type checking for the `debug_msg` stash variable
+2. Implemented conversion of string values to array references when needed
+3. Ensured consistent handling of debug messages throughout the controller
+4. Fixed potential errors when interacting with other controllers
+
+See the [changelog](changelog/2024-08-proxmox-debug-msg-fix.md) for more details.
+
 ### July 2024 - Syntax Error Fixes
 
 Fixed several syntax errors in the Proxmox controller file that were causing the application to fail:

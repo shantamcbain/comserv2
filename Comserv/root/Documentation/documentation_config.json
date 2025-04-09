@@ -61,7 +61,7 @@
       "description": "System changes and updates",
       "roles": ["admin", "developer"],
       "site_specific": false,
-      "pages": ["main_changelog", "2024-07-project-id-fix", "2024-06-project-edit-fix", "2024-07-proxmox-controller-fixes", "2024-06-15-login-redirect-fix", "2025-04-navigation-improvements", "2025-04-documentation-display-fix", "2025-04-mcoop-admin-menu-restriction", "2025-04-documentation-admin-visibility-fix", "2025-04-documentation-template-refactoring", "2025-04-mcoop-server-room-plan", "2025-05-15-documentation-system-update", "2025-05-16-documentation-workflow-consolidation"]
+      "pages": ["main_changelog", "2024-08-proxmox-debug-msg-fix", "2024-07-project-id-fix", "2024-06-project-edit-fix", "2024-07-proxmox-controller-fixes", "2024-06-15-login-redirect-fix", "2025-04-navigation-improvements", "2025-04-documentation-display-fix", "2025-04-mcoop-admin-menu-restriction", "2025-04-documentation-admin-visibility-fix", "2025-04-documentation-template-refactoring"]
     },
     "proxmox": {
       "title": "Proxmox Documentation",
@@ -115,6 +115,7 @@
     "fix_project_edit_button": "Documentation/fix_project_edit_button.md",
     "model_list": "Documentation/models/model_list.md",
     "main_changelog": "Documentation/main_changelog.md",
+    "2024-08-proxmox-debug-msg-fix": "Documentation/changelog/2024-08-proxmox-debug-msg-fix.md",
     "2024-07-project-id-fix": "Documentation/changelog/2024-07-project-id-fix.md",
     "2024-06-project-edit-fix": "Documentation/changelog/2024-06-project-edit-fix.md",
     "2024-07-proxmox-controller-fixes": "Documentation/changelog/2024-07-proxmox-controller-fixes.md",

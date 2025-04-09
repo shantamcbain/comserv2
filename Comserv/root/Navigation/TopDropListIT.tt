@@ -1,16 +1,16 @@
 [% PageVersion = 'TopDropListIT.tt,v 1.0 2025/05/15 Shanta Exp Shanta' %]
 
 <li class="horizontal-dropdown">
-    <a href="[% c.uri_for('/it') %]" class="dropbtn">IT</a>
+    <a href="/it" class="dropbtn">IT</a>
     <div class="dropdown-content">
-        <a href="[% c.uri_for('/it') %]">IT Home</a>
-        <a href="[% c.uri_for('/it/resources') %]">Resources</a>
-        <a href="[% c.uri_for('/it/documentation') %]">Documentation</a>
-        <a href="[% c.uri_for('/it/support') %]">Support</a>
-        <a href="[% c.uri_for('/it/tools') %]">Tools</a>
-        <a href="[% c.uri_for('/it/network') %]">Network</a>
-        <a href="[% c.uri_for('/it/servers') %]">Servers</a>
-        <a href="[% c.uri_for('/it/security') %]">Security</a>
+        <a href="/it">IT Home</a>
+        <a href="/it/resources">Resources</a>
+        <a href="/it/documentation">Documentation</a>
+        <a href="/it/support">Support</a>
+        <a href="/it/tools">Tools</a>
+        <a href="/it/network">Network</a>
+        <a href="/it/servers">Servers</a>
+        <a href="/it/security">Security</a>
     </div>
 </li>
 

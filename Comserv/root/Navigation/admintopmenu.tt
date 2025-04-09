@@ -18,7 +18,7 @@
 
 <!-- Projects Section with Improved Navigation -->
 <div class="submenu-item">
-    <span class="submenu-header"><a href="[% c.uri_for(c.controller('project').action_for('project')) %]" class="dropbtn"><i class="icon-file"></i>Projects</a></span>
+    <span class="submenu-header"><a href="/project" class="dropbtn"><i class="icon-file"></i>Projects</a></span>
     <div class="submenu">
         <a href="/project/addproject"><i class="icon-add"></i>Add New Project</a>
         <!-- Project List -->
