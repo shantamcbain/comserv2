@@ -80,95 +80,7 @@ sub index :Path :Args(0) {
     $c->forward($c->view('TT'));
 }
 
-# Git pull functionality for admins
-# Using absolute Path to ensure the route is /admin/git_pull
-sub git_pull :Path('admin/git_pull') :Args(0) {
-    my ($self, $c) = @_;
-    
-    # Debug logging for git_pull action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', "Starting git_pull action");
-    
-    # Log user information for debugging
-    my $username = $c->user_exists ? $c->user->username : 'Guest';
-    my $roles = $c->session->{roles} || [];
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
-        "User: $username, Roles: " . Dumper($roles));
-    
-    # Add debug messages to the stash
-    push @{$c->stash->{debug_msg}}, "User: $username";
-    push @{$c->stash->{debug_msg}}, "Roles: " . Dumper($roles);
-    
-    # The begin method already checks for admin role, so we don't need to redirect here
-    # Just add a check to display a message if somehow a non-admin got here
-    unless ($c->user_exists && defined $roles && ref $roles eq 'ARRAY' && grep { $_ eq 'admin' } @$roles) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_pull', 
-            "Non-admin user accessing git_pull: $username");
-        $c->stash->{error_msg} = "You must be an admin to perform this action. Please contact your administrator.";
-        $c->stash->{template} = 'admin/git_pull.tt';
-        $c->forward($c->view('TT'));
-        return;
-    }
-    
-    # Initialize output and error variables
-    my $output = '';
-    my $error = '';
-    
-    # Check if this is a POST request with confirmation
-    if ($c->req->method eq 'POST' && $c->req->param('confirm')) {
-        # Execute git pull command
-        eval {
-            # Get the repository root directory
-            my $repo_dir = $c->path_to()->stringify;
-            
-            # Change to the repository directory
-            chdir($repo_dir) or die "Cannot change to directory $repo_dir: $!";
-            
-            # Log the git pull attempt
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
-                "Executing git pull in directory: $repo_dir");
-            
-            # Execute git pull and capture output
-            $output = `git pull 2>&1`;
-            
-            # Check if the command was successful
-            if ($? != 0) {
-                $error = "Git pull failed with exit code: " . ($? >> 8);
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_pull', $error);
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_pull', "Output: $output");
-            } else {
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', "Git pull successful");
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', "Output: $output");
-            }
-        };
-        
-        # Handle any exceptions
-        if ($@) {
-            $error = "Error executing git pull: $@";
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_pull', $error);
-        }
-        
-        # Add the output and error to the stash
-        $c->stash->{output} = $output;
-        $c->stash->{error_msg} = $error if $error;
-        $c->stash->{success_msg} = "Git pull completed successfully" if !$error && $output;
-        
-        # Add debug messages to the stash
-        push @{$c->stash->{debug_msg}}, "Git pull command executed";
-        push @{$c->stash->{debug_msg}}, "Output: $output" if $output;
-        push @{$c->stash->{debug_msg}}, "Error: $error" if $error;
-    } else {
-        # This is a GET request or no confirmation, just show the confirmation page
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
-            "Displaying git pull confirmation page");
-        push @{$c->stash->{debug_msg}}, "Displaying git pull confirmation page";
-    }
-    
-    # Set the template
-    $c->stash->{template} = 'admin/git_pull.tt';
-    
-    # Forward to the view
-    $c->forward($c->view('TT'));
-}
+# This method has been moved to Path('/admin/git_pull')
 
 # This method has been moved to Path('admin/edit_documentation')
 
@@ -911,14 +823,40 @@ sub git_pull :Path('/admin/git_pull') :Args(0) {
     # Debug logging for git_pull action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', "Starting git_pull action");
     
+    # Log user information for debugging
+    my $username = $c->user_exists ? $c->user->username : 'Guest';
+    my $roles = $c->session->{roles} || [];
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
+        "User: $username, Roles: " . Dumper($roles));
+    
+    # Initialize debug messages array
+    # Make sure debug_msg is an array reference
+    if (!defined $c->stash->{debug_msg}) {
+        $c->stash->{debug_msg} = [];
+    } elsif (!ref($c->stash->{debug_msg}) || ref($c->stash->{debug_msg}) ne 'ARRAY') {
+        # If debug_msg exists but is not an array reference, convert it to an array
+        my $original_msg = $c->stash->{debug_msg};
+        $c->stash->{debug_msg} = [];
+        push @{$c->stash->{debug_msg}}, $original_msg if $original_msg;
+    }
+    
+    # Add debug messages to the stash
+    push @{$c->stash->{debug_msg}}, "User: $username";
+    push @{$c->stash->{debug_msg}}, "Roles: " . Dumper($roles);
+    
     # Check if the user has the admin role
     unless ($c->user_exists && grep { $_ eq 'admin' } @{$c->session->{roles}}) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_pull', 
             "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest'));
-        $c->flash->{error_msg} = "You must be an admin to perform this action";
-        $c->response->redirect($c->uri_for('/'));
+        $c->stash->{error_msg} = "You must be an admin to perform this action. Please contact your administrator.";
+        $c->stash->{template} = 'admin/git_pull.tt';
+        $c->forward($c->view('TT'));
         return;
     }
+    
+    # Initialize output and error variables
+    my $output = '';
+    my $error = '';
     
     # If this is a POST request, perform the git pull
     if ($c->request->method eq 'POST' && $c->request->params->{confirm}) {
@@ -928,14 +866,21 @@ sub git_pull :Path('/admin/git_pull') :Args(0) {
         # Log the directory where we're running git pull
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
             "Running git pull in directory: $app_root");
+        # Ensure debug_msg is an array reference before pushing
+        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
+        push @{$c->stash->{debug_msg}}, "Running git pull in directory: $app_root";
         
         # Change to the application root directory
         my $current_dir = getcwd();
         chdir($app_root) or do {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_pull', 
-                "Failed to change to directory $app_root: $!");
-            $c->flash->{error_msg} = "Failed to change to application directory: $!";
-            $c->response->redirect($c->uri_for('/admin'));
+            $error = "Failed to change to directory $app_root: $!";
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_pull', $error);
+            $c->stash->{error_msg} = $error;
+            # Ensure debug_msg is an array reference before pushing
+            $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
+            push @{$c->stash->{debug_msg}}, "Error: $error";
+            $c->stash->{template} = 'admin/git_pull.tt';
+            $c->forward($c->view('TT'));
             return;
         };
         
@@ -944,11 +889,15 @@ sub git_pull :Path('/admin/git_pull') :Args(0) {
         my $status_exit_code = $? >> 8;
         
         if ($status_exit_code != 0) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_pull', 
-                "Error checking git status: $git_status");
-            $c->flash->{error_msg} = "Error checking git status: $git_status";
+            $error = "Error checking git status: $git_status";
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_pull', $error);
             chdir($current_dir);
-            $c->response->redirect($c->uri_for('/admin'));
+            $c->stash->{error_msg} = $error;
+            # Ensure debug_msg is an array reference before pushing
+            $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
+            push @{$c->stash->{debug_msg}}, "Error: $error";
+            $c->stash->{template} = 'admin/git_pull.tt';
+            $c->forward($c->view('TT'));
             return;
         }
         
@@ -958,12 +907,15 @@ sub git_pull :Path('/admin/git_pull') :Args(0) {
             $has_changes = 1;
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_pull', 
                 "Repository has uncommitted changes: $git_status");
+            # Ensure debug_msg is an array reference before pushing
+            $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
+            push @{$c->stash->{debug_msg}}, "Warning: Repository has uncommitted changes";
         }
         
         # Run git pull
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
             "Executing git pull");
-        my $output = qx{git pull 2>&1};
+        $output = qx{git pull 2>&1};
         my $exit_code = $? >> 8;
         
         # Change back to the original directory
@@ -975,37 +927,44 @@ sub git_pull :Path('/admin/git_pull') :Args(0) {
                 
             # Check if there were any updates
             if ($output =~ /Already up to date/) {
-                $c->flash->{success_msg} = "Repository is already up to date.";
+                $c->stash->{success_msg} = "Repository is already up to date.";
             } else {
-                $c->flash->{success_msg} = "Git pull executed successfully. Updates were applied.";
+                $c->stash->{success_msg} = "Git pull executed successfully. Updates were applied.";
             }
             
             # Add a warning if there were uncommitted changes
             if ($has_changes) {
-                $c->flash->{warning_msg} = "Note: Your repository had uncommitted changes. " .
+                $c->stash->{warning_msg} = "Note: Your repository had uncommitted changes. " .
                     "You may need to resolve conflicts manually.";
             }
         } else {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_pull', 
-                "Error executing git pull: $output");
-            $c->flash->{error_msg} = "Error executing git pull: $output";
+            $error = "Error executing git pull: $output";
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_pull', $error);
+            $c->stash->{error_msg} = $error;
         }
         
-        # Redirect to avoid resubmission on refresh
-        $c->response->redirect($c->uri_for('/admin'));
-        return;
+        # Add the output to the stash
+        $c->stash->{output} = $output;
+        
+        # Add debug messages to the stash
+        # Ensure debug_msg is an array reference before pushing
+        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
+        push @{$c->stash->{debug_msg}}, "Git pull command executed";
+        push @{$c->stash->{debug_msg}}, "Output: $output" if $output;
+        push @{$c->stash->{debug_msg}}, "Error: $error" if $error;
+    } else {
+        # This is a GET request or no confirmation, just show the confirmation page
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
+            "Displaying git pull confirmation page");
+        # Ensure debug_msg is an array reference before pushing
+        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
+        push @{$c->stash->{debug_msg}}, "Displaying git pull confirmation page";
     }
     
-    # Display confirmation page
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
-        "Displaying git pull confirmation page");
+    # Set the template
+    $c->stash->{template} = 'admin/git_pull.tt';
     
-    # Add debug message to stash
-    $c->stash(
-        debug_msg => "Git pull confirmation page loaded",
-        template => 'admin/git_pull.tt'
-    );
-    
+    # Forward to the view
     $c->forward($c->view('TT'));
 }
 

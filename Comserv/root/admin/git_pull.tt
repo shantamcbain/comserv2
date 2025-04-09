@@ -1,4 +1,5 @@
 [% META title = 'Git Pull Confirmation' %]
+<!-- File: /home/shanta/PycharmProjects/comserv/Comserv/root/admin/git_pull.tt -->
 [% PageVersion = 'admin/git_pull.tt,v 0.03 2025/04/10 shanta Exp shanta ' %]
 
 [% IF c.session.debug_mode == 1 %]
