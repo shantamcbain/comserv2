@@ -528,24 +528,27 @@ sub index :Path :Args(0) {
 
     # Get the current user's role
     my $user_role = 'normal';  # Default to normal user
+    my $is_admin = 0;  # Flag to track if user has admin role
 
     # First check session roles (this works even if user is not fully authenticated)
     if ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && @{$c->session->{roles}}) {
         # If user has multiple roles, prioritize admin role
         if (grep { $_ eq 'admin' } @{$c->session->{roles}}) {
             $user_role = 'admin';
+            $is_admin = 1;
         } else {
             # Otherwise use the first role
             $user_role = $c->session->{roles}->[0];
         }
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
-            "User role determined from session: $user_role");
+            "User role determined from session: $user_role, is_admin: $is_admin");
     }
     # If no role found in session but user exists, try to get role from user object
     elsif ($c->user_exists) {
         $user_role = $c->user->role || 'normal';
+        $is_admin = 1 if $user_role eq 'admin';
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
-            "User role determined from user object: $user_role");
+            "User role determined from user object: $user_role, is_admin: $is_admin");
     }
 
     # Log the final role determination
@@ -574,13 +577,10 @@ sub index :Path :Args(0) {
     foreach my $page_name (keys %$pages) {
         my $metadata = $pages->{$page_name};
 
-        # Check if user is admin (either by user_role or session roles)
-        my $is_admin = ($user_role eq 'admin');
-
-        # Also check if admin is in session roles
-        if (!$is_admin && $c->session->{roles} && ref $c->session->{roles} eq 'ARRAY') {
-            $is_admin = grep { $_ eq 'admin' } @{$c->session->{roles}};
-        }
+        # Use the is_admin flag we set earlier
+        # Log the admin status for debugging
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
+            "Processing page $page_name, is_admin: $is_admin");
 
         # Skip if this is site-specific documentation for a different site
         # But allow admins to see all site-specific documentation
@@ -592,6 +592,10 @@ sub index :Path :Args(0) {
         # Skip if the user doesn't have the required role
         # But always include for admins
         my $has_role = $is_admin; # Admins can see everything
+        
+        # Debug log for admin status
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
+            "Admin check for $page_name: is_admin=$is_admin, user_role=$user_role");
 
         unless ($has_role) {
             foreach my $role (@{$metadata->{roles}}) {
@@ -655,12 +659,12 @@ sub index :Path :Args(0) {
 
         # Skip if the user doesn't have the required role
         # But always include for admins (check both user_role and session roles)
-        my $has_role = ($user_role eq 'admin'); # Check if user_role is admin
-
-        # Also check if admin is in session roles
-        if (!$has_role && $c->session->{roles} && ref $c->session->{roles} eq 'ARRAY') {
-            $has_role = grep { $_ eq 'admin' } @{$c->session->{roles}};
-        }
+        # Use the is_admin flag we set earlier
+        my $has_role = $is_admin; # Admins can see everything
+        
+        # Log category access check
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
+            "Category access check for $category_key: is_admin=$is_admin, user_role=$user_role");
 
         # If still not admin, check for other matching roles
         unless ($has_role) {
@@ -753,6 +757,7 @@ sub index :Path :Args(0) {
         completed_items => $completed_items,
         categories => \%filtered_categories,
         user_role => $user_role,
+        is_admin => $is_admin,
         site_name => $site_name,
         debug_msg => $debug_msg,
         template => 'Documentation/index.tt'

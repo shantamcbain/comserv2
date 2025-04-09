@@ -1,7 +1,7 @@
 [% PageVersion	= 'footer.tt,v 0.02 2024/06/02 shanta Exp shanta '	%]
 [% IF c.session.debug_mode == 1 %]
  <br>[%	PageVersion %] </br>
- <br><a href="[% c.uri_for('/reset_session') %]">Reset Session</a></br>
+ <br><a href="/reset_session">Reset Session</a></br>
 [% END %]
 <!-- Local chat implementation - no external dependencies -->
 <script type="text/javascript" src="/static/js/local-chat.js"></script>

@@ -151,10 +151,10 @@ sub do_login :Local {
     unless ($user) {
         $self->logging->log_with_details(
             $c, 'warn', __FILE__, __LINE__, 'do_login',
-     Store error message in flash and redirect back to login page
-        $c->flash->{"Login failed: Username '$username' not found."
-   # Store error message in flash and redirect back to login page
-        $c->flash->{error_msg}}  'Invalid username or password.';
+            "Login failed: Username '$username' not found."
+        );
+        # Store error message in flash and redirect back to login page
+        $c->flash->{error_msg} = "Invalid username or password.";
         $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
@@ -167,11 +167,9 @@ sub do_login :Local {
         );
 
         # Store error message in flash and redirect back to login page
-        $c->flash->{error_msg}}  'Invalid username or password.';
-        $c->response->redirect($c->uri_for('/user/login;
+        $c->flash->{error_msg} = 'Invalid username or password.';
         $c->response->redirect($c->uri_for('/user/login'));
- Store error message in flash and redirect back to login page
-        $c->flash->{return;
+        return;
     }
 
     # Success
@@ -224,7 +222,15 @@ sub do_login :Local {
 
     # After successful login, redirect to the appropriate page
     # No need for a template here as this is an action, not a route
-    $c->res->redirect($redirect_path);
+    # Use uri_for if it's a relative path, otherwise use the path directly
+    if ($redirect_path =~ /^\// && $redirect_path !~ /^https?:\/\//i) {
+        # It's a relative path, use uri_for
+        $c->res->redirect($c->uri_for($redirect_path));
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login', "Using uri_for for redirect: " . $c->uri_for($redirect_path));
+    } else {
+        # It's an absolute URL, use it directly
+        $c->res->redirect($redirect_path);
+    }
     return;
 }
 
@@ -330,24 +336,24 @@ sub process_login {
         $self->logging->log_with_details(
             $c, 'info', __FILE__, __LINE__, 'do_login',
             "Using session referer for redirect: " . ($c->session->{referer} || 'undefined')
-        )    "Avoiding redirect to login page, using home page instead"
         );
     }
     
     # Store the redirect path for debugging
     $c->stash->{debug_msg} = "Redirect path: $redirect_path";
-    }
 
     # Ensure we're not redirecting back to the login page
     if ($redirect_path =~ m{/user/login} || $redirect_path =~ m{/login} || $redirect_path =~ m{/do_login}) {
-        Final redirect_path = '/';
+        $redirect_path = '/';
         $self->logging->log_with_details(
             $c, 'info', __FILE__, __LINE__, 'do_login',
-        "session->{referer}: " . ($c->session->{referer} || 'undefined')
-    );
+            "Avoiding redirect to login page, using home page instead"
+        );
+    }
+    
     $self->logging->log_with_details(
         $c, 'debug', __FILE__, __LINE__, 'do_login',
-        "Redirect path: $redirect_path"
+        "Final redirect path: $redirect_path"
     );
 
     # Find user in database
@@ -355,13 +361,11 @@ sub process_login {
     unless ($user) {
         $self->logging->log_with_details(
             $c, 'warn', __FILE__, __LINE__, 'do_login',
-     Store error message in flash and redirect back to login page
-        $c->flash->{"Login failed: Username '$username' not found."
+            "Login failed: Username '$username' not found."
         );
 
         # Store error message in flash and redirect back to login page
-        $c->flash->{error_msg}}} 'Invalid username or password.';
-        $c->response->redirect($c->uri_for('/user/login;
+        $c->flash->{error_msg} = 'Invalid username or password.';
         $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
@@ -375,8 +379,7 @@ sub process_login {
 
         # Store error message in flash and redirect back to login page
         $c->flash->{error_msg} = 'Invalid username or password.';
- Store error message in flash and redirect back to login page
-        $c->flash->{$c->response->redirect($c->uri_for('/user/login'));
+        $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
 
@@ -457,7 +460,15 @@ sub process_login {
     }
 
     # Redirect directly - no template needed for this action
-    $c->res->redirect($redirect_path);
+    # Use uri_for if it's a relative path, otherwise use the path directly
+    if ($redirect_path =~ /^\//) {
+        # It's a relative path, use uri_for
+        $c->res->redirect($c->uri_for($redirect_path));
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login', "Using uri_for for redirect: " . $c->uri_for($redirect_path));
+    } else {
+        # It's an absolute URL, use it directly
+        $c->res->redirect($redirect_path);
+    }
     return;
 }
 sub hash_password {

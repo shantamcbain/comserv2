@@ -11,9 +11,9 @@
          <li class="horizontal-dropdown">
                 <a href="/" class="dropbtn"><i class="icon-main"></i>Main</a>
                 <div class="dropdown-content">
-                    <a href="[% c.uri_for('/' )%]" onclick="activateSite('Home')"><i class="icon-home"></i>Home</a>
+                    <a href="/" onclick="activateSite('Home')"><i class="icon-home"></i>Home</a>
                     <a href="[% c.session.return_url %]"><i class="icon-back"></i>Go Back</a>
-               <span><a href="[% c.uri_for('/workshop') %]" onclick="activateSite('Workshops')" target="_blenk"><i class="icon-workshop"></i>Workshops</a></span>
+               <span><a href="/workshop" onclick="activateSite('Workshops')" target="_blenk"><i class="icon-workshop"></i>Workshops</a></span>
             <div class="submenu-item">
                 <span class="submenu-header"><i class="icon-mail"></i>Mail</span>
                 <div class="submenu">

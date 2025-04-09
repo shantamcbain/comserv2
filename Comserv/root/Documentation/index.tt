@@ -79,7 +79,14 @@
 [% INCLUDE 'Documentation/site_specific.tt' %]
 
 [%# Admin-only sections %]
-[% IF user_role == 'admin' || c.session.roles.grep('admin').size %]
+[% # Use the is_admin flag passed from the controller %]
+[% IF is_admin %]
+    [% # Debug output %]
+    [% IF c.session.debug_mode == 1 %]
+        <div class="debug-info">
+            <p>Admin sections visible: user_role=[% user_role %], session roles=[% c.session.roles.join(',') IF c.session.roles %]</p>
+        </div>
+    [% END %]
     [% INCLUDE 'Documentation/admin_guides.tt' %]
     [% INCLUDE 'Documentation/proxmox.tt' %]
     [% INCLUDE 'Documentation/controllers.tt' %]

@@ -5,6 +5,7 @@ use Template;
 use Data::Dumper;
 use DateTime;
 use JSON;
+use URI;
 use Comserv::Util::Logging;
 
 # Configure static file serving
@@ -329,8 +330,16 @@ sub track_application_start {
 
 sub auto :Private {
     my ($self, $c) = @_;
+    
+    # Temporarily add back the uri_no_port function to prevent template errors
+    # This will be removed once all templates are updated
+    $c->stash->{uri_no_port} = sub {
+        my $path = shift;
+        my $uri = $c->uri_for($path, @_);
+        return $uri;
+    };
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Starting auto action");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Starting auto action with temporary uri_no_port helper");
 
     # Track application start
     $c->stash->{forwarder} = $c->req->path; # Store current path as potential redirect target
@@ -635,6 +644,19 @@ sub site_setup {
     my $default_hostname = "$protocol://$domain";
     $c->stash->{HostName} = $default_hostname;
     $c->session->{Domain} = $domain;
+    
+    # Using Catalyst's built-in proxy configuration for URLs without port
+    # This is configured in Comserv.pm with using_frontend_proxy and ignore_frontend_proxy_port
+    
+    # Log the configuration for debugging
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Using Catalyst's built-in proxy configuration for URLs without port");
+    
+    # Test the configuration by generating a sample URL
+    my $test_url = $c->uri_for('/test');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Test URL: $test_url");
+    
+    # Add to debug_msg for visibility in templates
+    $c->stash->{debug_msg} = "Using Catalyst's built-in proxy configuration. Test URL: $test_url";
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Set default HostName: $default_hostname");
 

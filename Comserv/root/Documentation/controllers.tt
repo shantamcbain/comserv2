@@ -12,6 +12,13 @@
         
         <div class="controller-grid">
             [% controller_count = 0 %]
+            [% # Debug output %]
+            [% IF c.session.debug_mode == 1 %]
+                <div class="debug-info">
+                    <p>Controller pages: [% categories.controllers.pages.size %]</p>
+                    <p>Controller pages: [% categories.controllers.pages.join(", ") %]</p>
+                </div>
+            [% END %]
             [% FOREACH page_name IN categories.controllers.pages.sort %]
                 [% IF structured_pages.$page_name %]
                     [% page = structured_pages.$page_name %]

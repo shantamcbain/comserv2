@@ -43,6 +43,9 @@ __PACKAGE__->log(Catalyst::Log->new(output => sub {
                     encoding => 'UTF-8',
                     debug => $ENV{CATALYST_DEBUG} // 0,
                     default_view => 'TT',
+                    # Configure URI generation to not include port
+                    using_frontend_proxy => 1,
+                    ignore_frontend_proxy_port => 1,
                     'Plugin::Authentication' => {
                         default_realm => 'members',
                         realms        => {
@@ -102,6 +105,7 @@ sub psgi_app {
                 use Comserv::Controller::ENCY;
                 use Comserv::Controller::Apiary;
 
+                
                 __PACKAGE__->setup();
 
                 1;
