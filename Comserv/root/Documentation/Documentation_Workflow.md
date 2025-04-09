@@ -1,12 +1,12 @@
 # Documentation Workflow
 
-**Last Updated:** May 15, 2025  
+**Last Updated:** april 9, 2025  
 **Author:** Shanta  
 **Status:** Active
 
 ## Overview
 
-The Comserv Documentation System provides a structured way to organize, categorize, and display documentation files for different user roles and sites. This document outlines the workflow for creating, updating, and maintaining documentation in the system.
+The Comserv Documentation System provides a structured way to organize, categorize, and display documentation files for different user roles and sites. This document outlines the workflow for creating, updating, and maintaining documentation in the system. It incorporates the updates from the 2025-04 documentation workflow update to provide comprehensive guidance on documentation development.
 
 ## Documentation Structure
 
@@ -254,3 +254,18 @@ Regular maintenance tasks for the documentation system:
 6. Update the `documentation_config.json` file to reflect the current state of documentation
 7. Check that all paths in the configuration file are correct
 8. Test documentation visibility for different user roles
+
+## Motivation for Workflow Guidelines
+
+The documentation workflow guidelines were established to address several challenges:
+
+1. **Inconsistent Documentation Quality**: Previously, documentation varied widely in quality and structure depending on the author.
+2. **Lack of Clear Process**: Developers were unsure about how to properly document their changes.
+3. **Outdated Documentation**: Without a clear update process, documentation often became outdated as the codebase evolved.
+4. **Discoverability Issues**: Users had difficulty finding relevant documentation due to inconsistent organization.
+
+By following these workflow guidelines, we ensure:
+- More consistent documentation quality and structure
+- Better tracking of documentation changes through standardized changelog entries
+- Clearer troubleshooting steps for documentation issues
+- Improved developer experience when working with documentation

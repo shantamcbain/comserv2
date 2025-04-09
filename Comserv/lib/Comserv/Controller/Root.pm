@@ -739,11 +739,8 @@ sub default :Path {
     $c->response->status(404);
 }
 
-sub documentation :Path('documentation') :Args(0) {
-    my ( $self, $c ) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'documentation', "Redirecting to Documentation controller");
-    $c->response->redirect($c->uri_for('/Documentation'));
-}
+# Documentation routes are now handled directly by the Documentation controller
+# See Comserv::Controller::Documentation
 
 sub proxmox_servers :Path('proxmox_servers') :Args(0) {
     my ( $self, $c ) = @_;

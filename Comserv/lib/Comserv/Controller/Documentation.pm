@@ -9,6 +9,32 @@ use Comserv::Controller::Documentation::ScanMethods qw(_scan_directories _catego
 
 BEGIN { extends 'Catalyst::Controller'; }
 
+# Set the namespace to handle both /Documentation and /documentation routes
+__PACKAGE__->config(namespace => 'Documentation');
+
+# Add a chained action to handle the lowercase route
+sub documentation_base :Chained('/') :PathPart('documentation') :CaptureArgs(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'documentation_base', 
+        "Captured lowercase documentation route");
+}
+
+# Handle the lowercase index route
+sub documentation_index :Chained('documentation_base') :PathPart('') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'documentation_index', 
+        "Handling lowercase documentation index route");
+    $c->forward('index');
+}
+
+# Handle the lowercase view route with a page parameter
+sub documentation_view :Chained('documentation_base') :PathPart('') :Args(1) {
+    my ($self, $c, $page) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'documentation_view', 
+        "Handling lowercase documentation view route for page: $page");
+    $c->forward('view', [$page]);
+}
+
 has 'logging' => (
     is => 'ro',
     default => sub { Comserv::Util::Logging->instance }
@@ -519,8 +545,8 @@ sub auto :Private {
 
     return 1; # Continue processing
 }
-# Main documentation index
-sub index :Path :Args(0) {
+# Main documentation index - handles /Documentation route
+sub index :Path('/Documentation') :Args(0) {
     my ($self, $c) = @_;
 
     # Log the action
@@ -1026,7 +1052,8 @@ sub user_guide :Path('user_guide') :Args(0) {
 }
 
 
-sub view :Path :Args(1) {
+# Handle view for both uppercase and lowercase routes
+sub view :Path('/Documentation') :Args(1) {
     my ($self, $c, $page) = @_;
 
     # Log the action
