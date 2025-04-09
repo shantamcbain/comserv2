@@ -16,28 +16,51 @@ sub logging {
 sub begin : Private {
     my ( $self, $c ) = @_;
 
+    # Add detailed logging
+    my $username = $c->user_exists ? $c->user->username : 'Guest';
+    my $path = $c->req->path;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', 
+        "Admin controller begin method called for user: $username, Path: $path");
+
+    # Log the path for debugging
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', 
+        "Request path: $path");
+
     # Check if the user is logged in
     if (!$c->user_exists) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', 
+            "User is not logged in, redirecting to login page");
         # If the user isn't logged in, call the index method
         $self->index($c);
         return;
     }
+    
     # Fetch the roles from the session
     my $roles = $c->session->{roles};
+    
     # Log the roles
-    $c->log->info("admin begin Roles: " . Dumper($roles));  # Change this line
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', 
+        "User roles: " . Dumper($roles));
+    
     # Check if roles is defined and is an array reference
     if (defined $roles && ref $roles eq 'ARRAY') {
         # Check if the user has the 'admin' role
         if (grep { $_ eq 'admin' } @$roles) {
             # User is an admin, proceed with the request
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', 
+                "User $username has admin role, proceeding with request");
         } else {
             # User is not an admin, call the index method
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'begin', 
+                "User $username does not have admin role, redirecting to admin index");
             $self->index($c);
             return;
         }
     } else {
         # Roles is not defined or not an array, call the index method
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'begin', 
+            "User $username has invalid roles format, redirecting to admin index");
         $self->index($c);
         return;
     }
@@ -53,6 +76,96 @@ sub index :Path :Args(0) {
     # Set the TT template to use.
     $c->stash(template => 'admin/index.tt');
 
+    # Forward to the view
+    $c->forward($c->view('TT'));
+}
+
+# Git pull functionality for admins
+# Using absolute Path to ensure the route is /admin/git_pull
+sub git_pull :Path('admin/git_pull') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Debug logging for git_pull action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', "Starting git_pull action");
+    
+    # Log user information for debugging
+    my $username = $c->user_exists ? $c->user->username : 'Guest';
+    my $roles = $c->session->{roles} || [];
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
+        "User: $username, Roles: " . Dumper($roles));
+    
+    # Add debug messages to the stash
+    push @{$c->stash->{debug_msg}}, "User: $username";
+    push @{$c->stash->{debug_msg}}, "Roles: " . Dumper($roles);
+    
+    # The begin method already checks for admin role, so we don't need to redirect here
+    # Just add a check to display a message if somehow a non-admin got here
+    unless ($c->user_exists && defined $roles && ref $roles eq 'ARRAY' && grep { $_ eq 'admin' } @$roles) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_pull', 
+            "Non-admin user accessing git_pull: $username");
+        $c->stash->{error_msg} = "You must be an admin to perform this action. Please contact your administrator.";
+        $c->stash->{template} = 'admin/git_pull.tt';
+        $c->forward($c->view('TT'));
+        return;
+    }
+    
+    # Initialize output and error variables
+    my $output = '';
+    my $error = '';
+    
+    # Check if this is a POST request with confirmation
+    if ($c->req->method eq 'POST' && $c->req->param('confirm')) {
+        # Execute git pull command
+        eval {
+            # Get the repository root directory
+            my $repo_dir = $c->path_to()->stringify;
+            
+            # Change to the repository directory
+            chdir($repo_dir) or die "Cannot change to directory $repo_dir: $!";
+            
+            # Log the git pull attempt
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
+                "Executing git pull in directory: $repo_dir");
+            
+            # Execute git pull and capture output
+            $output = `git pull 2>&1`;
+            
+            # Check if the command was successful
+            if ($? != 0) {
+                $error = "Git pull failed with exit code: " . ($? >> 8);
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_pull', $error);
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_pull', "Output: $output");
+            } else {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', "Git pull successful");
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', "Output: $output");
+            }
+        };
+        
+        # Handle any exceptions
+        if ($@) {
+            $error = "Error executing git pull: $@";
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_pull', $error);
+        }
+        
+        # Add the output and error to the stash
+        $c->stash->{output} = $output;
+        $c->stash->{error_msg} = $error if $error;
+        $c->stash->{success_msg} = "Git pull completed successfully" if !$error && $output;
+        
+        # Add debug messages to the stash
+        push @{$c->stash->{debug_msg}}, "Git pull command executed";
+        push @{$c->stash->{debug_msg}}, "Output: $output" if $output;
+        push @{$c->stash->{debug_msg}}, "Error: $error" if $error;
+    } else {
+        # This is a GET request or no confirmation, just show the confirmation page
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
+            "Displaying git pull confirmation page");
+        push @{$c->stash->{debug_msg}}, "Displaying git pull confirmation page";
+    }
+    
+    # Set the template
+    $c->stash->{template} = 'admin/git_pull.tt';
+    
     # Forward to the view
     $c->forward($c->view('TT'));
 }

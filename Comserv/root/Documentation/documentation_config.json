@@ -12,7 +12,7 @@
       "description": "Documentation for system administrators",
       "roles": ["admin", "developer"],
       "site_specific": false,
-      "pages": ["admin_guide", "user_management", "documentation_role_access", "documentation_system_guide", "proxy_troubleshooting"]
+      "pages": ["admin_guide", "user_management", "documentation_role_access", "documentation_system_guide", "proxy_troubleshooting", "2025-04-git-pull-functionality"]
     },
     "developer_guides": {
       "title": "Developer Documentation",
@@ -61,7 +61,7 @@
       "description": "System changes and updates",
       "roles": ["admin", "developer"],
       "site_specific": false,
-      "pages": ["main_changelog", "2025-04-pagetop-hostname-display", "2024-08-proxmox-debug-msg-fix", "2024-07-project-id-fix", "2024-06-project-edit-fix", "2024-07-proxmox-controller-fixes", "2024-06-15-login-redirect-fix", "2025-04-navigation-improvements", "2025-04-documentation-display-fix", "2025-04-mcoop-admin-menu-restriction", "2025-04-documentation-admin-visibility-fix"]
+      "pages": ["main_changelog", "2025-04-git-pull-functionality", "2025-04-pagetop-hostname-display", "2024-08-proxmox-debug-msg-fix", "2024-07-project-id-fix", "2024-06-project-edit-fix", "2024-07-proxmox-controller-fixes", "2024-06-15-login-redirect-fix", "2025-04-navigation-improvements", "2025-04-documentation-display-fix", "2025-04-mcoop-admin-menu-restriction", "2025-04-documentation-admin-visibility-fix"]
     },
     "proxmox": {
       "title": "Proxmox Documentation",
@@ -82,6 +82,7 @@
     "getting_started": "Documentation/roles/normal/getting_started.md",
     "admin_guide": "Documentation/roles/admin/admin_guide.md",
     "user_management": "Documentation/roles/admin/user_management.md",
+    "2025-04-git-pull-functionality": "Documentation/changelog/2025-04-git-pull-functionality.md",
     "api_reference": "Documentation/roles/developer/api_reference.md",
     "authentication_system": "Documentation/developer/authentication_system.md",
     "template_system": "Documentation/developer/template_system.md",
