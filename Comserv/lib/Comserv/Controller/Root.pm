@@ -7,6 +7,7 @@ use DateTime;
 use JSON;
 use URI;
 use Comserv::Util::Logging;
+use Comserv::Util::SystemInfo;
 
 # Configure static file serving
 __PACKAGE__->config(
@@ -356,6 +357,13 @@ sub auto :Private {
         $self->_theme_css_generated(1);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Generated all theme CSS files");
     }
+
+    # Get server information
+    my $system_info = Comserv::Util::SystemInfo::get_system_info();
+    $c->stash->{server_hostname} = $system_info->{hostname};
+    $c->stash->{server_ip} = $system_info->{ip};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', 
+        "Server info - Hostname: $system_info->{hostname}, IP: $system_info->{ip}");
 
     # Perform general setup tasks
     $self->setup_debug_mode($c);

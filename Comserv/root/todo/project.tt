@@ -1,55 +1,184 @@
 
-[% META title = 'Project Success' %]
-[% PageVersion = 'todo/project.tt,v 0.01 2023/11/28 shanta Exp shanta ' %]
+[% META title = 'Project Management' %]
+[% PageVersion = 'todo/project.tt,v 0.07 2024/08/18 shanta Exp shanta ' %]
+[% # Note: additional_css is now set in the controller with a timestamp to force reload %]
+
+<!-- Critical inline styles to ensure cards display correctly -->
+<style>
+    /* Card and grid styles */
+    .card { display: flex; flex-direction: column; border: 1px solid #dee2e6; border-radius: 0.25rem; margin-bottom: 1rem; background-color: #fff; }
+    .card-header { padding: 0.75rem 1.25rem; background-color: rgba(0,0,0,0.03); border-bottom: 1px solid #dee2e6; }
+    .card-body { flex: 1 1 auto; padding: 1.25rem; }
+    .card-footer { padding: 0.75rem 1.25rem; background-color: rgba(0,0,0,0.03); border-top: 1px solid #dee2e6; }
+    .row { display: flex; flex-wrap: wrap; margin-right: -15px; margin-left: -15px; }
+    .col-md-4 { position: relative; width: 100%; padding-right: 15px; padding-left: 15px; }
+    @media (min-width: 768px) { .col-md-4 { flex: 0 0 33.333333%; max-width: 33.333333%; } }
+    .col-12 { position: relative; width: 100%; padding-right: 15px; padding-left: 15px; flex: 0 0 100%; max-width: 100%; }
+    
+    /* Badge styles */
+    .badge { display: inline-block; padding: 0.25em 0.4em; font-size: 75%; font-weight: 700; line-height: 1; text-align: center; white-space: nowrap; vertical-align: baseline; border-radius: 0.25rem; }
+    .badge-danger { color: #fff; background-color: #dc3545; }
+    .badge-warning { color: #212529; background-color: #ffc107; }
+    .badge-info { color: #fff; background-color: #17a2b8; }
+    .badge-primary { color: #fff; background-color: #007bff; }
+    .badge-success { color: #fff; background-color: #28a745; }
+    .badge-secondary { color: #fff; background-color: #6c757d; }
+    
+    /* Button styles */
+    .btn { display: inline-block; font-weight: 400; text-align: center; white-space: nowrap; vertical-align: middle; user-select: none; border: 1px solid transparent; padding: 0.375rem 0.75rem; font-size: 1rem; line-height: 1.5; border-radius: 0.25rem; }
+    .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.875rem; line-height: 1.5; border-radius: 0.2rem; }
+    .btn-info { color: #fff; background-color: #17a2b8; border-color: #17a2b8; }
+    .btn-primary { color: #fff; background-color: #007bff; border-color: #007bff; }
+    .btn-success { color: #fff; background-color: #28a745; border-color: #28a745; }
+    
+    /* Utility classes */
+    .d-flex { display: flex !important; }
+    .justify-content-between { justify-content: space-between !important; }
+    .align-items-center { align-items: center !important; }
+    .mb-0 { margin-bottom: 0 !important; }
+    .mb-2 { margin-bottom: 0.5rem !important; }
+    .mb-4 { margin-bottom: 1.5rem !important; }
+    .mt-2 { margin-top: 0.5rem !important; }
+    .mt-4 { margin-top: 1.5rem !important; }
+    .text-muted { color: #6c757d !important; }
+    .bg-light { background-color: #f8f9fa !important; }
+    
+    /* List styles */
+    .list-unstyled { padding-left: 0; list-style: none; }
+    .list-unstyled li { margin-bottom: 0.5rem; }
+    
+    /* Alert styles */
+    .alert { position: relative; padding: 0.75rem 1.25rem; margin-bottom: 1rem; border: 1px solid transparent; border-radius: 0.25rem; }
+    .alert-info { color: #0c5460; background-color: #d1ecf1; border-color: #bee5eb; }
+    .alert-success { color: #155724; background-color: #d4edda; border-color: #c3e6cb; }
+</style>
+
 [% IF debug_mode == 1 %]
-        [% PageVersion %]
+    <div class="alert alert-info">
+        <small>Template version: [% PageVersion %]</small><br>
+        <small>CSS file: [% additional_css.0 %]</small>
+    </div>
 [% END %]
 
-
-<h1>Projects</h1>
+<h1 class="mb-4">Projects</h1>
 
 <!-- Display the success message -->
-<p>[% message %]</p>
-[% IF message %]
-    <p>[% message %]</p>
+[% IF success_message %]
+    <div class="alert alert-success" role="alert">
+        <i class="fas fa-check-circle"></i> [% success_message %]
+    </div>
+[% ELSIF message %]
+    <div class="alert alert-success" role="alert">
+        <i class="fas fa-check-circle"></i> [% message %]
+    </div>
 [% END %]
 
-
-<!-- Display the success message -->
-<p>[% message %]</p>
-[% IF message %]
-[% END %]
-    <p>[% message %]</p>
-<!-- Recursive macro to display projects and sub-projects -->
-
+<!-- Recursive macro to display projects and sub-projects as cards -->
 [% MACRO display_projects(projects, level) BLOCK %]
-    <ul>
+    <div class="row">
     [% FOREACH project IN projects.sort('name') %] <!-- Sort projects by name -->
-        <li>
-            [% project.name %]
-            <!-- Details Button -->
-            <form action="/project/details" method="POST" style="display:inline;">
-                <input type="hidden" name="project_id" value="[% project.id %]">
-                <button type="submit">Details</button>
-            </form>
-            <!-- Edit Button (Visible only to admin users) -->
-            [% IF c.session.roles.grep('admin').size %]
-                <form action="/project/editproject" method="POST" style="display:inline;">
-                    <input type="hidden" name="project_id" value="[% project.id %]">
-                    <button type="submit">Edit</button>
-                </form>
-            [% END %]
-            [% IF project.sub_projects.size && level < 4 %]
-                [% display_projects(project.sub_projects, level + 1) %]
-            [% END %]
-        </li>
+        <div class="col-md-4 mb-4">
+            <div class="card project-card">
+                <!-- Card header with priority badge -->
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">[% project.name %]</h5>
+                        [% SWITCH project.priority %]
+                            [% CASE 1 %]<span class="badge badge-danger"><i class="fas fa-arrow-up"></i> High</span>
+                            [% CASE 2 %]<span class="badge badge-warning"><i class="fas fa-equals"></i> Medium</span>
+                            [% CASE 3 %]<span class="badge badge-info"><i class="fas fa-arrow-down"></i> Low</span>
+                            [% CASE DEFAULT %]<span class="badge badge-warning"><i class="fas fa-equals"></i> Medium</span>
+                        [% END %]
+                    </div>
+                </div>
+                
+                <!-- Card body with project details -->
+                <div class="card-body">
+                    <!-- Description -->
+                    [% IF project.description %]
+                        <p class="card-text">[% project.description.substr(0, 100) %][% IF project.description.length > 100 %]...[% END %]</p>
+                    [% ELSE %]
+                        <p class="card-text text-muted">No description available</p>
+                    [% END %]
+                    
+                    <!-- Status badge -->
+                    <div class="mb-2">
+                        [% SWITCH project.status %]
+                            [% CASE 1 %]<span class="badge badge-info">New</span>
+                            [% CASE 2 %]<span class="badge badge-primary">In Progress</span>
+                            [% CASE 3 %]<span class="badge badge-success">Completed</span>
+                            [% CASE DEFAULT %]<span class="badge badge-secondary">Unknown</span>
+                        [% END %]
+                    </div>
+                    
+                    <!-- Project details -->
+                    <ul class="list-unstyled">
+                        [% IF project.start_date %]
+                            <li><i class="far fa-calendar-alt"></i> <strong>Start:</strong> [% project.start_date %]</li>
+                        [% END %]
+                        
+                        [% IF project.end_date %]
+                            <li><i class="far fa-calendar-check"></i> <strong>Due:</strong> [% project.end_date %]</li>
+                        [% END %]
+                        
+                        [% IF project.developer_name %]
+                            <li><i class="fas fa-user-cog"></i> <strong>Dev:</strong> [% project.developer_name %]</li>
+                        [% END %]
+                        
+                        [% IF project.client_name %]
+                            <li><i class="fas fa-user-tie"></i> <strong>Client:</strong> [% project.client_name %]</li>
+                        [% END %]
+                    </ul>
+                </div>
+                
+                <!-- Card footer with action buttons -->
+                <div class="card-footer">
+                    <div class="d-flex justify-content-between">
+                        <!-- Details Button -->
+                        <form action="/project/details" method="POST">
+                            <input type="hidden" name="project_id" value="[% project.id %]">
+                            <button type="submit" class="btn btn-sm btn-info">
+                                <i class="fas fa-eye"></i> Details
+                            </button>
+                        </form>
+                        
+                        <!-- Edit Button (Visible only to admin users) -->
+                        [% IF c.session.roles.grep('admin').size %]
+                            <form action="/project/editproject" method="POST">
+                                <input type="hidden" name="project_id" value="[% project.id %]">
+                                <button type="submit" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-edit"></i> Edit
+                                </button>
+                            </form>
+                        [% END %]
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Display sub-projects if they exist and we're not too deep -->
+        [% IF project.sub_projects.size && level < 3 %]
+            <div class="col-12 mb-4">
+                <div class="card">
+                    <div class="card-header bg-light">
+                        <i class="fas fa-project-diagram"></i> Sub-projects for [% project.name %]
+                    </div>
+                    <div class="card-body">
+                        [% display_projects(project.sub_projects, level + 1) %]
+                    </div>
+                </div>
+            </div>
+        [% END %]
     [% END %]
-    </ul>
+    </div>
 [% END %]
 
 <!-- Start displaying projects -->
 [% display_projects(projects, 1) %]
 
-
 <!-- Button to add a new project -->
-<button type="button" onclick="window.location.href='/project/addproject';">Add Project</button>
+<div class="mt-4">
+    <button type="button" class="btn btn-success" onclick="window.location.href='/project/addproject';">
+        <i class="fas fa-plus"></i> Add New Project
+    </button>
+</div>

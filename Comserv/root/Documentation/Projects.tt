@@ -1,5 +1,5 @@
 [% META title = 'Projects Documentation' %]
-    [% PageVersion = 'Documentation/Projects.tt,v 0.04 2025/03/15 Shanta Exp shanta ' %]
+    [% PageVersion = 'Documentation/Projects.tt,v 0.05 2025/08/18 Shanta Exp shanta ' %]
 
     <h1 id="projects-top">Projects System Documentation</h1>
 
@@ -8,8 +8,10 @@
         <a href="#projects-controller">Projects Controller</a> |
         <a href="#projects-model">Projects Model</a> |
         <a href="#projects-templates">Projects Templates</a> |
+        <a href="#projects-ui">Projects UI Components</a> |
         <a href="#projects-workflow">Projects Workflow</a> |
-        <a href="#projects-usage">Projects Usage</a>
+        <a href="#projects-usage">Projects Usage</a> |
+        <a href="#projects-troubleshooting">Troubleshooting</a>
     </nav>
 
     <h2 id="projects-overview">Projects Overview</h2>
@@ -26,9 +28,31 @@
             </ul>
         </li>
         <li><strong>Project Hierarchy:</strong> Manages up to 4 levels of sub-projects</li>
-        <li><strong>Project Listing:</strong> Displays projects in a hierarchical structure, sorted by name</li>
+        <li><strong>Project Listing:</strong> Displays projects in a card-based layout, sorted by name</li>
         <li><strong>Error Handling:</strong> Provides detailed error messages and logging</li>
+        <li><strong>UI Configuration:</strong> Sets up the UI with:
+            <ul>
+                <li>CSS loading with cache-busting timestamps</li>
+                <li>Fluid container layout for better card display</li>
+                <li>Debug mode for troubleshooting</li>
+                <li>Template timestamp for forced reloading</li>
+            </ul>
+        </li>
     </ul>
+    
+    <h3>Controller Code Example</h3>
+    <pre><code># Add the projects and filter info to the stash
+$c->stash(
+    projects => $projects,
+    role_filter => $role_filter,
+    project_filter => $project_filter,
+    priority_filter => $priority_filter,
+    template => 'todo/project.tt',
+    template_timestamp => time(), # Add a timestamp to force template reload
+    additional_css => ['/static/css/components/project-cards.css?v=' . time()], # Add timestamp to force CSS reload
+    use_fluid_container => 1, # Use fluid container for better card layout
+    debug_mode => 1 # Enable debug mode to see template version
+);</code></pre>
 
     <h2 id="projects-model">Projects Model</h2>
     <p>The database schema includes these key fields:</p>
@@ -45,10 +69,58 @@
     <h2 id="projects-templates">Projects Templates</h2>
     <p>Current template structure:</p>
     <ul>
-        <li><strong>todo/project.tt:</strong> Main project listing with hierarchical display</li>
+        <li><strong>todo/project.tt:</strong> Main project listing with card-based layout
+            <ul>
+                <li>Displays projects in a responsive 3-column grid on desktop</li>
+                <li>Automatically stacks cards vertically on mobile devices</li>
+                <li>Includes inline critical CSS to ensure proper rendering</li>
+                <li>Uses a recursive macro to display hierarchical project structure</li>
+            </ul>
+        </li>
         <li><strong>todo/add_project.tt:</strong> Project creation form</li>
         <li><strong>todo/editproject.tt:</strong> Project editing interface</li>
         <li><strong>todo/projectdetails.tt:</strong> Detailed project view</li>
+    </ul>
+    
+    <p>The template system uses Template Toolkit with the following features:</p>
+    <ul>
+        <li>Version tracking in PageVersion variable</li>
+        <li>Debug mode support for troubleshooting</li>
+        <li>Responsive design principles</li>
+        <li>Role-based access control for admin functions</li>
+    </ul>
+
+    <h2 id="projects-ui">Projects UI Components</h2>
+    <p>The Projects system uses a card-based UI for displaying projects:</p>
+    
+    <h3>Card Layout</h3>
+    <ul>
+        <li><strong>Card Header:</strong> Contains project name and priority badge</li>
+        <li><strong>Card Body:</strong> Displays project description, status badge, and key details</li>
+        <li><strong>Card Footer:</strong> Contains action buttons (Details, Edit)</li>
+    </ul>
+    
+    <h3>CSS Implementation</h3>
+    <p>The card layout is implemented using a combination of:</p>
+    <ul>
+        <li><strong>External CSS:</strong> <code>/static/css/components/project-cards.css</code> - Contains all card styling</li>
+        <li><strong>Inline Critical CSS:</strong> Embedded in the template to ensure proper rendering even if external CSS fails to load</li>
+        <li><strong>Bootstrap-Compatible Classes:</strong> Uses standard Bootstrap class names for compatibility</li>
+    </ul>
+    
+    <h3>Responsive Design</h3>
+    <ul>
+        <li>Desktop: 3-column grid layout (col-md-4)</li>
+        <li>Tablet: 2-column grid layout</li>
+        <li>Mobile: Single column stacked layout</li>
+        <li>Fluid container for better use of screen space</li>
+    </ul>
+    
+    <h3>Visual Indicators</h3>
+    <ul>
+        <li><strong>Priority Badges:</strong> Color-coded badges for High (red), Medium (yellow), Low (blue)</li>
+        <li><strong>Status Badges:</strong> New (blue), In Progress (primary), Completed (green)</li>
+        <li><strong>Icons:</strong> Font Awesome icons for improved visual cues</li>
     </ul>
 
     <h2 id="projects-workflow">Projects Workflow</h2>
@@ -75,6 +147,38 @@
         <li>Admin privileges required for editing projects</li>
         <li>Maximum of 4 levels in project hierarchy</li>
         <li>Project names must be unique within a site</li>
+        <li>Browser must support CSS Flexbox for optimal card layout</li>
+        <li>Font Awesome 5.x is required for icons</li>
     </ul>
+
+    <h2 id="projects-troubleshooting">Troubleshooting</h2>
+    
+    <h3>CSS Display Issues</h3>
+    <p>If projects are not displaying correctly as cards:</p>
+    <ol>
+        <li>Verify that the CSS file is being loaded correctly (check browser developer tools)</li>
+        <li>Ensure the template is using the correct CSS classes</li>
+        <li>Check that the inline critical CSS is present in the template</li>
+        <li>Verify that the controller is setting <code>use_fluid_container => 1</code></li>
+        <li>Check for JavaScript errors that might be affecting the layout</li>
+    </ol>
+    
+    <h3>Debug Mode</h3>
+    <p>Enable debug mode in the controller to see additional information:</p>
+    <pre><code>$c->stash(debug_mode => 1);</code></pre>
+    <p>This will display template version and CSS file information at the top of the page.</p>
+    
+    <h3>Common Issues</h3>
+    <ul>
+        <li><strong>Cards displaying as a list:</strong> CSS not loading or conflicts with other styles</li>
+        <li><strong>Misaligned cards:</strong> Missing row or column classes</li>
+        <li><strong>Missing badges or icons:</strong> Font Awesome not loading correctly</li>
+        <li><strong>Sub-projects not displaying:</strong> Check the recursive macro implementation</li>
+    </ul>
+    
+    <h3>Logging</h3>
+    <p>The Project controller logs important events to the application log:</p>
+    <pre><code>$self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'project', 'message');</code></pre>
+    <p>Check <code>logs/application.log</code> for debugging information.</p>
 
     <p><a href="#projects-top">Back to top</a></p>
