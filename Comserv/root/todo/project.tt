@@ -1,6 +1,6 @@
 
 [% META title = 'Project Management' %]
-[% PageVersion = 'todo/project.tt,v 0.07 2024/08/18 shanta Exp shanta ' %]
+[% PageVersion = 'todo/project.tt,v 0.08 2024/08/25 shanta Exp shanta ' %]
 [% # Note: additional_css is now set in the controller with a timestamp to force reload %]
 
 <!-- Critical inline styles to ensure cards display correctly -->
@@ -30,6 +30,7 @@
     .btn-info { color: #fff; background-color: #17a2b8; border-color: #17a2b8; }
     .btn-primary { color: #fff; background-color: #007bff; border-color: #007bff; }
     .btn-success { color: #fff; background-color: #28a745; border-color: #28a745; }
+    .btn-outline-secondary { color: #6c757d; background-color: transparent; border-color: #6c757d; }
     
     /* Utility classes */
     .d-flex { display: flex !important; }
@@ -37,9 +38,12 @@
     .align-items-center { align-items: center !important; }
     .mb-0 { margin-bottom: 0 !important; }
     .mb-2 { margin-bottom: 0.5rem !important; }
+    .mb-3 { margin-bottom: 1rem !important; }
     .mb-4 { margin-bottom: 1.5rem !important; }
     .mt-2 { margin-top: 0.5rem !important; }
+    .mt-3 { margin-top: 1rem !important; }
     .mt-4 { margin-top: 1.5rem !important; }
+    .p-3 { padding: 1rem !important; }
     .text-muted { color: #6c757d !important; }
     .bg-light { background-color: #f8f9fa !important; }
     
@@ -51,6 +55,27 @@
     .alert { position: relative; padding: 0.75rem 1.25rem; margin-bottom: 1rem; border: 1px solid transparent; border-radius: 0.25rem; }
     .alert-info { color: #0c5460; background-color: #d1ecf1; border-color: #bee5eb; }
     .alert-success { color: #155724; background-color: #d4edda; border-color: #c3e6cb; }
+    
+    /* Form styles */
+    .form-group { margin-bottom: 1rem; }
+    .form-control { display: block; width: 100%; padding: 0.375rem 0.75rem; font-size: 1rem; line-height: 1.5; color: #495057; background-color: #fff; background-clip: padding-box; border: 1px solid #ced4da; border-radius: 0.25rem; transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out; }
+    .form-inline { display: flex; flex-flow: row wrap; align-items: center; }
+    .form-inline .form-control { display: inline-block; width: auto; vertical-align: middle; }
+    .form-inline .form-group { display: flex; flex: 0 0 auto; flex-flow: row wrap; align-items: center; margin-bottom: 0; margin-right: 0.5rem; }
+    
+    /* Filter panel styles */
+    .filter-panel { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 0.25rem; padding: 1rem; margin-bottom: 1.5rem; }
+    
+    /* Collapsible card styles */
+    .collapsible-card { margin-bottom: 1rem; }
+    .collapsible-card .card-header { cursor: pointer; }
+    .collapsible-card .card-header .collapse-icon { transition: transform 0.3s; }
+    .collapsible-card .card-header[aria-expanded="true"] .collapse-icon { transform: rotate(180deg); }
+    .collapsible-card .card-body { display: none; }
+    .collapsible-card .card-body.show { display: block; }
+    
+    /* Sub-project styles */
+    .sub-projects-container { padding-left: 1.5rem; border-left: 2px solid #dee2e6; margin-top: 1rem; }
 </style>
 
 [% IF debug_mode == 1 %]
@@ -73,16 +98,59 @@
     </div>
 [% END %]
 
-<!-- Recursive macro to display projects and sub-projects as cards -->
-[% MACRO display_projects(projects, level) BLOCK %]
-    <div class="row">
-    [% FOREACH project IN projects.sort('name') %] <!-- Sort projects by name -->
-        <div class="col-md-4 mb-4">
-            <div class="card project-card">
-                <!-- Card header with priority badge -->
-                <div class="card-header">
+<!-- Filter Panel -->
+<div class="filter-panel mb-4">
+    <form id="projectFilterForm" class="form-inline" method="GET" action="/project/project">
+        <div class="form-group mb-2">
+            <label for="project_filter" class="mr-2">Project:</label>
+            <select id="project_filter" name="project_id" class="form-control">
+                <option value="">All Projects</option>
+                [% FOREACH project IN projects.sort('name') %]
+                    <option value="[% project.id %]" [% IF project_filter == project.id %]selected[% END %]>
+                        [% project.name %]
+                    </option>
+                    [% FOREACH subproject IN project.sub_projects.sort('name') %]
+                        <option value="[% subproject.id %]" [% IF project_filter == subproject.id %]selected[% END %]>
+                            &nbsp;&nbsp;└─ [% subproject.name %]
+                        </option>
+                    [% END %]
+                [% END %]
+            </select>
+        </div>
+        
+        <div class="form-group mb-2 ml-3">
+            <label for="priority_filter" class="mr-2">Priority:</label>
+            <select id="priority_filter" name="priority" class="form-control">
+                <option value="">All Priorities</option>
+                <option value="1" [% IF priority_filter == '1' %]selected[% END %]>High</option>
+                <option value="2" [% IF priority_filter == '2' %]selected[% END %]>Medium</option>
+                <option value="3" [% IF priority_filter == '3' %]selected[% END %]>Low</option>
+            </select>
+        </div>
+        
+        <button type="submit" class="btn btn-primary mb-2 ml-3">Apply Filters</button>
+        <button type="button" id="clearFilters" class="btn btn-outline-secondary mb-2 ml-2">Clear Filters</button>
+    </form>
+</div>
+
+<!-- Recursive macro to display projects and sub-projects as vertical cards -->
+[% MACRO display_project_tree(projects) BLOCK %]
+    [% FOREACH project IN projects.sort('name') %]
+        <!-- Skip this project if filtering by project_id and it doesn't match -->
+        [% NEXT IF project_filter && project_filter != project.id && !is_parent_of_filtered_project(project, project_filter) %]
+        
+        <!-- Skip this project if filtering by priority and it doesn't match -->
+        [% NEXT IF priority_filter && priority_filter != project.priority %]
+        
+        <div class="collapsible-card" id="project-[% project.id %]">
+            <div class="card">
+                <!-- Card header with priority badge and collapse toggle -->
+                <div class="card-header" onclick="toggleCollapse('project-body-[% project.id %]')" aria-expanded="false">
                     <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">[% project.name %]</h5>
+                        <div>
+                            <i class="fas fa-chevron-down collapse-icon mr-2"></i>
+                            <span class="card-title mb-0">[% project.name %]</span>
+                        </div>
                         [% SWITCH project.priority %]
                             [% CASE 1 %]<span class="badge badge-danger"><i class="fas fa-arrow-up"></i> High</span>
                             [% CASE 2 %]<span class="badge badge-warning"><i class="fas fa-equals"></i> Medium</span>
@@ -92,8 +160,8 @@
                     </div>
                 </div>
                 
-                <!-- Card body with project details -->
-                <div class="card-body">
+                <!-- Card body with project details (collapsed by default) -->
+                <div class="card-body" id="project-body-[% project.id %]">
                     <!-- Description -->
                     [% IF project.description %]
                         <p class="card-text">[% project.description.substr(0, 100) %][% IF project.description.length > 100 %]...[% END %]</p>
@@ -129,11 +197,9 @@
                             <li><i class="fas fa-user-tie"></i> <strong>Client:</strong> [% project.client_name %]</li>
                         [% END %]
                     </ul>
-                </div>
-                
-                <!-- Card footer with action buttons -->
-                <div class="card-footer">
-                    <div class="d-flex justify-content-between">
+                    
+                    <!-- Action buttons -->
+                    <div class="d-flex justify-content-between mt-3">
                         <!-- Details Button -->
                         <form action="/project/details" method="POST">
                             <input type="hidden" name="project_id" value="[% project.id %]">
@@ -152,29 +218,103 @@
                             </form>
                         [% END %]
                     </div>
+                    
+                    <!-- Display sub-projects if they exist -->
+                    [% IF project.sub_projects.size %]
+                        <div class="sub-projects-container mt-4">
+                            <h6><i class="fas fa-project-diagram"></i> Sub-projects</h6>
+                            [% display_subprojects(project.sub_projects, project_filter, priority_filter) %]
+                        </div>
+                    [% END %]
                 </div>
             </div>
         </div>
+    [% END %]
+[% END %]
+
+<!-- Macro to display sub-projects -->
+[% MACRO display_subprojects(subprojects, project_filter, priority_filter) BLOCK %]
+    [% FOREACH subproject IN subprojects.sort('name') %]
+        <!-- Skip this subproject if filtering by project_id and it doesn't match -->
+        [% NEXT IF project_filter && project_filter != subproject.id && !is_parent_of_filtered_project(subproject, project_filter) %]
         
-        <!-- Display sub-projects if they exist and we're not too deep -->
-        [% IF project.sub_projects.size && level < 3 %]
-            <div class="col-12 mb-4">
-                <div class="card">
-                    <div class="card-header bg-light">
-                        <i class="fas fa-project-diagram"></i> Sub-projects for [% project.name %]
-                    </div>
-                    <div class="card-body">
-                        [% display_projects(project.sub_projects, level + 1) %]
-                    </div>
+        <!-- Skip this subproject if filtering by priority and it doesn't match -->
+        [% NEXT IF priority_filter && priority_filter != subproject.priority %]
+        
+        <div class="card mb-3">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span>[% subproject.name %]</span>
+                    [% SWITCH subproject.priority %]
+                        [% CASE 1 %]<span class="badge badge-danger"><i class="fas fa-arrow-up"></i> High</span>
+                        [% CASE 2 %]<span class="badge badge-warning"><i class="fas fa-equals"></i> Medium</span>
+                        [% CASE 3 %]<span class="badge badge-info"><i class="fas fa-arrow-down"></i> Low</span>
+                        [% CASE DEFAULT %]<span class="badge badge-warning"><i class="fas fa-equals"></i> Medium</span>
+                    [% END %]
                 </div>
             </div>
+            <div class="card-body">
+                <!-- Status badge -->
+                <div class="mb-2">
+                    [% SWITCH subproject.status %]
+                        [% CASE 1 %]<span class="badge badge-info">New</span>
+                        [% CASE 2 %]<span class="badge badge-primary">In Progress</span>
+                        [% CASE 3 %]<span class="badge badge-success">Completed</span>
+                        [% CASE DEFAULT %]<span class="badge badge-secondary">Unknown</span>
+                    [% END %]
+                </div>
+                
+                <!-- Action buttons -->
+                <div class="d-flex justify-content-between mt-2">
+                    <form action="/project/details" method="POST">
+                        <input type="hidden" name="project_id" value="[% subproject.id %]">
+                        <button type="submit" class="btn btn-sm btn-info">
+                            <i class="fas fa-eye"></i> Details
+                        </button>
+                    </form>
+                    
+                    [% IF c.session.roles.grep('admin').size %]
+                        <form action="/project/editproject" method="POST">
+                            <input type="hidden" name="project_id" value="[% subproject.id %]">
+                            <button type="submit" class="btn btn-sm btn-primary">
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
+                        </form>
+                    [% END %]
+                </div>
+                
+                <!-- Display sub-sub-projects if they exist -->
+                [% IF subproject.sub_projects.size %]
+                    <div class="sub-projects-container mt-3">
+                        <h6><i class="fas fa-project-diagram"></i> Sub-projects</h6>
+                        [% display_subprojects(subproject.sub_projects, project_filter, priority_filter) %]
+                    </div>
+                [% END %]
+            </div>
+        </div>
+    [% END %]
+[% END %]
+
+<!-- Helper function to check if a project is a parent of the filtered project -->
+[% MACRO is_parent_of_filtered_project(project, filter_id) BLOCK %]
+    [% is_parent = 0 %]
+    [% FOREACH subproject IN project.sub_projects %]
+        [% IF subproject.id == filter_id %]
+            [% is_parent = 1 %]
+            [% LAST %]
+        [% ELSIF subproject.sub_projects.size %]
+            [% is_sub_parent = is_parent_of_filtered_project(subproject, filter_id) %]
+            [% IF is_sub_parent %]
+                [% is_parent = 1 %]
+                [% LAST %]
+            [% END %]
         [% END %]
     [% END %]
-    </div>
+    [% is_parent %]
 [% END %]
 
 <!-- Start displaying projects -->
-[% display_projects(projects, 1) %]
+[% display_project_tree(projects) %]
 
 <!-- Button to add a new project -->
 <div class="mt-4">
@@ -182,3 +322,59 @@
         <i class="fas fa-plus"></i> Add New Project
     </button>
 </div>
+
+<!-- JavaScript for collapsible cards and filter handling -->
+<script>
+    // Function to toggle collapse state of project cards
+    function toggleCollapse(elementId) {
+        const element = document.getElementById(elementId);
+        const header = element.parentNode.querySelector('.card-header');
+        const icon = header.querySelector('.collapse-icon');
+        
+        if (element.classList.contains('show')) {
+            element.classList.remove('show');
+            header.setAttribute('aria-expanded', 'false');
+            icon.classList.remove('fa-chevron-up');
+            icon.classList.add('fa-chevron-down');
+        } else {
+            element.classList.add('show');
+            header.setAttribute('aria-expanded', 'true');
+            icon.classList.remove('fa-chevron-down');
+            icon.classList.add('fa-chevron-up');
+        }
+    }
+    
+    // Clear filters button functionality
+    document.getElementById('clearFilters').addEventListener('click', function() {
+        document.getElementById('project_filter').value = '';
+        document.getElementById('priority_filter').value = '';
+        document.getElementById('projectFilterForm').submit();
+    });
+    
+    // Auto-expand project if it's the filtered project
+    document.addEventListener('DOMContentLoaded', function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const projectFilter = urlParams.get('project_id');
+        
+        if (projectFilter) {
+            // If filtering by a specific project, expand that project
+            const projectElement = document.getElementById('project-body-' + projectFilter);
+            if (projectElement) {
+                toggleCollapse('project-body-' + projectFilter);
+            } else {
+                // If it's a subproject, find and expand its parent
+                const allProjects = document.querySelectorAll('.collapsible-card');
+                allProjects.forEach(function(projectCard) {
+                    const projectId = projectCard.id.replace('project-', '');
+                    const projectBody = document.getElementById('project-body-' + projectId);
+                    
+                    // Check if this project contains the filtered subproject
+                    const hasFilteredSubproject = projectBody.innerHTML.includes('name="project_id" value="' + projectFilter + '"');
+                    if (hasFilteredSubproject) {
+                        toggleCollapse('project-body-' + projectId);
+                    }
+                });
+            }
+        }
+    });
+</script>
