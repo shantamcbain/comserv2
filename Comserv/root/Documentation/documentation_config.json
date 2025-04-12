@@ -47,7 +47,7 @@
       "description": "Documentation for system controllers",
       "roles": ["admin", "developer"],
       "site_specific": false,
-      "pages": ["Documentation_Controller", "Root", "User", "Site", "controller_list", "fix_project_edit_form", "fix_project_edit_button", "Projects"]
+      "pages": ["Documentation_Controller", "Root", "User", "Site", "controller_list", "fix_project_edit_form", "fix_project_edit_button", "Projects", "HostingSignup"]
     },
     "models": {
       "title": "Model Documentation",
@@ -61,7 +61,7 @@
       "description": "System changes and updates",
       "roles": ["admin", "developer"],
       "site_specific": false,
-      "pages": ["main_changelog", "2025-05-31-server-ip-display", "2025-04-git-pull-functionality", "2025-04-pagetop-hostname-display", "2024-08-proxmox-debug-msg-fix", "2024-07-project-id-fix", "2024-06-project-edit-fix", "2024-07-proxmox-controller-fixes", "2024-06-15-login-redirect-fix", "2025-04-navigation-improvements", "2025-04-documentation-display-fix", "2025-04-mcoop-admin-menu-restriction", "2025-04-documentation-admin-visibility-fix", "2025-05-30-documentation-structure-simplification", "2025-08-18-project-cards-css-fix"]
+      "pages": ["main_changelog", "2025-05-31-server-ip-display", "2025-04-git-pull-functionality", "2025-04-pagetop-hostname-display", "2024-08-proxmox-debug-msg-fix", "2024-07-project-id-fix", "2024-06-project-edit-fix", "2024-07-proxmox-controller-fixes", "2024-06-15-login-redirect-fix", "2025-04-navigation-improvements", "2025-04-documentation-display-fix", "2025-04-mcoop-admin-menu-restriction", "2025-04-documentation-admin-visibility-fix", "2025-05-30-documentation-structure-simplification", "2025-08-18-project-cards-css-fix", "2025-04-12-hosting-signup-implementation"]
     },
     "proxmox": {
       "title": "Proxmox Documentation",
@@ -76,9 +76,19 @@
       "roles": ["admin", "developer"],
       "site_specific": false,
       "pages": ["Documentation", "Documentation_System", "Documentation_Controller", "Documentation_Management", "documentation_system_guide", "documentation_guide", "documentation_config_guide", "documentation_migration_guide", "documentation_template", "documentation_index_adaptation"]
+    },
+    "templates": {
+      "title": "Template Documentation",
+      "description": "Documentation for system templates",
+      "roles": ["admin", "developer"],
+      "site_specific": false,
+      "pages": ["hosting_signup_templates", "documentation_template"]
     }
   },
   "default_paths": {
+    "HostingSignup": "Documentation/controllers/HostingSignup.md",
+    "hosting_signup_templates": "Documentation/templates/hosting_signup_templates.md",
+    "2025-04-12-hosting-signup-implementation": "Documentation/changelog/2025-04-12-hosting-signup-implementation.md",
     "getting_started": "Documentation/roles/normal/getting_started.md",
     "admin_guide": "Documentation/roles/admin/admin_guide.md",
     "user_management": "Documentation/roles/admin/user_management.md",

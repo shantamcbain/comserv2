@@ -1,0 +1,188 @@
+[% META title = 'Signup Successful' %]
+[% PageVersion = 'hosting/signup_success.tt,v 0.02 2025/04/12 shanta Exp shanta ' %]
+
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [% # Use the standard debug message system %]
+    [% IF debug_msg.defined && debug_msg.size > 0 %]
+        <div class="debug-messages">
+            [% FOREACH msg IN debug_msg %]
+                <p class="debug">Debug: [% msg %]</p>
+            [% END %]
+        </div>
+    [% END %]
+[% END %]
+
+[% # Documentation section - only visible to admin and developer roles %]
+[% IF c.check_user_roles('admin') || c.check_user_roles('developer') %]
+<div class="card mt-4 documentation-section">
+    <div class="card-header bg-info text-white">
+        <h3>Template Documentation: Hosting Signup Success</h3>
+    </div>
+    <div class="card-body">
+        <h4>Overview</h4>
+        <p>This template displays a success message and account information after a successful hosting signup. It provides the user with confirmation of their account creation and guidance on next steps.</p>
+        
+        <h4>Template Structure</h4>
+        <ol>
+            <li><strong>Metadata Section</strong>
+                <ul>
+                    <li>Title and version information</li>
+                    <li>Debug information display (when debug mode is enabled)</li>
+                </ul>
+            </li>
+            <li><strong>Confirmation Section</strong>
+                <ul>
+                    <li>Success message</li>
+                    <li>Account Information
+                        <ul>
+                            <li>Username</li>
+                            <li>Email</li>
+                            <li>Full Name</li>
+                        </ul>
+                    </li>
+                    <li>Website Information
+                        <ul>
+                            <li>Domain Name</li>
+                            <li>Site Name</li>
+                            <li>Display Name</li>
+                        </ul>
+                    </li>
+                </ul>
+            </li>
+            <li><strong>Next Steps Section</strong>
+                <ul>
+                    <li>Instructions for getting started</li>
+                    <li>Links to related resources</li>
+                    <li>Support contact information</li>
+                </ul>
+            </li>
+        </ol>
+        
+        <h4>Controller Integration</h4>
+        <p>This template is used by the HostingSignup controller. The controller passes the following data:</p>
+        <ul>
+            <li><code>user</code>: User object with account information</li>
+            <li><code>site</code>: Site object with website information</li>
+            <li><code>domain</code>: Domain object with domain information</li>
+            <li><code>debug_msg</code>: Debug messages (when debug mode is enabled)</li>
+        </ul>
+        
+        <h4>Security Considerations</h4>
+        <p>This template displays sensitive account information, so it should only be accessible:</p>
+        <ul>
+            <li>Immediately after a successful signup</li>
+            <li>To the user who just created the account</li>
+        </ul>
+        <p>The controller enforces these restrictions by redirecting to the signup form if accessed directly.</p>
+        
+        <h4>Related Files</h4>
+        <ul>
+            <li><strong>Controller</strong>: <code>/lib/Comserv/Controller/HostingSignup.pm</code></li>
+            <li><strong>Form Template</strong>: <code>/root/hosting/signup_form.tt</code></li>
+        </ul>
+    </div>
+</div>
+[% END %]
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h2 class="card-title">Signup Successful!</h2>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-success">
+                        <h4 class="alert-heading">Congratulations!</h4>
+                        <p>Your hosting account has been created successfully. We're excited to have you as a customer!</p>
+                    </div>
+                    
+                    <h3 class="mb-3">Account Information</h3>
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <tbody>
+                                <tr>
+                                    <th scope="row" style="width: 30%;">Username:</th>
+                                    <td>[% user.username | html %]</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Email:</th>
+                                    <td>[% user.email | html %]</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Full Name:</th>
+                                    <td>[% user.name | html %]</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <h3 class="mb-3">Website Information</h3>
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <tbody>
+                                <tr>
+                                    <th scope="row" style="width: 30%;">Domain Name:</th>
+                                    <td>[% domain.domain | html %]</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Site Name:</th>
+                                    <td>[% site.name | html %]</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Display Name:</th>
+                                    <td>[% site.site_display_name | html %]</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <h3 class="mb-3">Next Steps</h3>
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <ol class="list-group list-group-numbered">
+                                <li class="list-group-item d-flex justify-content-between align-items-start">
+                                    <div class="ms-2 me-auto">
+                                        <div class="fw-bold">Check Your Email</div>
+                                        We've sent you an email with important account information and setup instructions.
+                                    </div>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-start">
+                                    <div class="ms-2 me-auto">
+                                        <div class="fw-bold">Access Your Control Panel</div>
+                                        You can now log in to your control panel to manage your hosting account.
+                                    </div>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-start">
+                                    <div class="ms-2 me-auto">
+                                        <div class="fw-bold">Set Up Your Website</div>
+                                        Use our easy website builder or upload your own files to get started.
+                                    </div>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-start">
+                                    <div class="ms-2 me-auto">
+                                        <div class="fw-bold">Configure Email Accounts</div>
+                                        Set up your email accounts through the control panel.
+                                    </div>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                    
+                    <div class="text-center mt-4">
+                        <a href="/user/login" class="btn btn-primary btn-lg me-2">Log In to Your Account</a>
+                        <a href="/CSC" class="btn btn-outline-secondary btn-lg">Return to Home</a>
+                    </div>
+                    
+                    <div class="alert alert-info mt-4">
+                        <h5 class="alert-heading">Need Help?</h5>
+                        <p>Our support team is available 24/7 to assist you with any questions or issues.</p>
+                        <hr>
+                        <p class="mb-0">Contact us at <a href="mailto:support@computersystemconsulting.ca">support@computersystemconsulting.ca</a> or call (250) 555-1234.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

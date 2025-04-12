@@ -1,0 +1,195 @@
+[% META title = 'Starter Hosting Signup' %]
+[% PageVersion = 'hosting/signup_form.tt,v 0.01 2025/04/12 shanta Exp shanta ' %]
+
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [% # Use the standard debug message system %]
+    [% IF debug_msg.defined && debug_msg.size > 0 %]
+        <div class="debug-messages">
+            [% FOREACH msg IN debug_msg %]
+                <p class="debug">Debug: [% msg %]</p>
+            [% END %]
+        </div>
+    [% END %]
+[% END %]
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h2 class="card-title">Starter Hosting Signup</h2>
+                </div>
+                <div class="card-body">
+                    [% IF errors && errors.size %]
+                    <div class="alert alert-danger">
+                        <h4 class="alert-heading">Please fix the following errors:</h4>
+                        <ul>
+                            [% FOREACH error IN errors %]
+                            <li>[% error %]</li>
+                            [% END %]
+                        </ul>
+                    </div>
+                    [% END %]
+                    
+                    <p class="lead">Complete the form below to sign up for our Starter Hosting package.</p>
+                    
+                    <form method="POST" action="[% form_action %]" class="needs-validation" novalidate>
+                        <h3 class="mb-3">Account Information</h3>
+                        
+                        <div class="form-group row mb-3">
+                            <label for="full_name" class="col-sm-3 col-form-label">Full Name:</label>
+                            <div class="col-sm-9">
+                                <input type="text" class="form-control" id="full_name" name="full_name" 
+                                       value="[% form_data.full_name | html %]" required>
+                                <div class="invalid-feedback">Please provide your full name.</div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group row mb-3">
+                            <label for="email" class="col-sm-3 col-form-label">Email Address:</label>
+                            <div class="col-sm-9">
+                                <input type="email" class="form-control" id="email" name="email" 
+                                       value="[% form_data.email | html %]" required>
+                                <div class="invalid-feedback">Please provide a valid email address.</div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group row mb-3">
+                            <label for="username" class="col-sm-3 col-form-label">Username:</label>
+                            <div class="col-sm-9">
+                                <input type="text" class="form-control" id="username" name="username" 
+                                       value="[% form_data.username | html %]" required>
+                                <div class="invalid-feedback">Please choose a username (letters, numbers, and underscores only).</div>
+                                <small class="form-text text-muted">Use only letters, numbers, and underscores.</small>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group row mb-3">
+                            <label for="password" class="col-sm-3 col-form-label">Password:</label>
+                            <div class="col-sm-9">
+                                <input type="password" class="form-control" id="password" name="password" required>
+                                <div class="invalid-feedback">Please provide a password (minimum 8 characters).</div>
+                                <small class="form-text text-muted">Minimum 8 characters.</small>
+                            </div>
+                        </div>
+                        
+                        <hr class="my-4">
+                        
+                        <h3 class="mb-3">Website Information</h3>
+                        
+                        <div class="form-group row mb-3">
+                            <label for="domain_name" class="col-sm-3 col-form-label">Domain Name:</label>
+                            <div class="col-sm-9">
+                                <input type="text" class="form-control" id="domain_name" name="domain_name" 
+                                       value="[% form_data.domain_name | html %]" required>
+                                <div class="invalid-feedback">Please provide a valid domain name.</div>
+                                <small class="form-text text-muted">Example: yourdomain.com</small>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group row mb-3">
+                            <label for="site_name" class="col-sm-3 col-form-label">Site Name:</label>
+                            <div class="col-sm-9">
+                                <input type="text" class="form-control" id="site_name" name="site_name" 
+                                       value="[% form_data.site_name | html %]" required>
+                                <div class="invalid-feedback">Please provide a site name.</div>
+                                <small class="form-text text-muted">Internal name for your site (no spaces).</small>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group row mb-3">
+                            <label for="site_display_name" class="col-sm-3 col-form-label">Display Name:</label>
+                            <div class="col-sm-9">
+                                <input type="text" class="form-control" id="site_display_name" name="site_display_name" 
+                                       value="[% form_data.site_display_name | html %]">
+                                <small class="form-text text-muted">Public display name for your site (optional).</small>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group row mb-3">
+                            <label for="site_description" class="col-sm-3 col-form-label">Description:</label>
+                            <div class="col-sm-9">
+                                <textarea class="form-control" id="site_description" name="site_description" rows="3">[% form_data.site_description | html %]</textarea>
+                                <small class="form-text text-muted">Brief description of your website (optional).</small>
+                            </div>
+                        </div>
+                        
+                        <hr class="my-4">
+                        
+                        <h3 class="mb-3">Hosting Package</h3>
+                        
+                        <div class="card mb-4">
+                            <div class="card-header bg-success text-white">
+                                <h4 class="mb-0">Starter Hosting Package</h4>
+                            </div>
+                            <div class="card-body">
+                                <ul class="list-group list-group-flush mb-3">
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Disk Space
+                                        <span class="badge bg-primary rounded-pill">5 GB</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Bandwidth
+                                        <span class="badge bg-primary rounded-pill">50 GB/month</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Email Accounts
+                                        <span class="badge bg-primary rounded-pill">5</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        MySQL Databases
+                                        <span class="badge bg-primary rounded-pill">2</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Price
+                                        <span class="badge bg-success rounded-pill">$9.95/month</span>
+                                    </li>
+                                </ul>
+                                <p class="card-text">Our Starter Hosting package is perfect for small websites, personal blogs, and small business sites.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group row mb-3">
+                            <div class="col-sm-9 offset-sm-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="terms" name="terms" required>
+                                    <label class="form-check-label" for="terms">
+                                        I agree to the <a href="/terms" target="_blank">Terms of Service</a> and <a href="/privacy" target="_blank">Privacy Policy</a>
+                                    </label>
+                                    <div class="invalid-feedback">You must agree to the terms and conditions.</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group row mt-4">
+                            <div class="col-sm-9 offset-sm-3">
+                                <button type="submit" class="btn btn-primary btn-lg">Sign Up Now</button>
+                                <a href="/CSC/hosting" class="btn btn-outline-secondary">Cancel</a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Form validation script
+(function() {
+    'use strict';
+    window.addEventListener('load', function() {
+        var forms = document.getElementsByClassName('needs-validation');
+        var validation = Array.prototype.filter.call(forms, function(form) {
+            form.addEventListener('submit', function(event) {
+                if (form.checkValidity() === false) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+                form.classList.add('was-validated');
+            }, false);
+        });
+    }, false);
+})();
+</script>

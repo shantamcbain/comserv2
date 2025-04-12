@@ -1,0 +1,140 @@
+[% META title = 'Order Confirmation - WeaverBeck.com' %]
+[% PageVersion = 'weaverbeck/order_confirmation.tt,v 0.01 2025/08/25 Shanta Exp shanta ' %]
+
+<!-- Debug information section -->
+[% IF debug_mode == 1 %]
+    <div class="debug-info">
+        [% PageVersion %]
+        [% # Use the standard debug message system %]
+        [% IF debug_msg.defined && debug_msg.size > 0 %]
+            <div class="debug-messages">
+                [% FOREACH msg IN debug_msg %]
+                    <p class="debug">Debug: [% msg %]</p>
+                [% END %]
+            </div>
+        [% END %]
+    </div>
+[% END %]
+
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="[% c.uri_for('/weaverbeck') %]">Home</a></li>
+                    <li class="breadcrumb-item"><a href="[% c.uri_for('/weaverbeck/starter-hosting') %]">Starter Hosting</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Order Confirmation</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+    
+    [% IF success_msg %]
+        <div class="alert alert-success">
+            <h4 class="alert-heading">Success!</h4>
+            <p>[% success_msg %]</p>
+        </div>
+    [% END %]
+    
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h3 class="card-title">Order Confirmation</h3>
+                </div>
+                <div class="card-body">
+                    <h4 class="mb-4">Thank you for your order!</h4>
+                    
+                    <p>We have received your order for the [% order_data.hosting_plan %] package. Our team will begin processing your order immediately.</p>
+                    
+                    <div class="alert alert-info">
+                        <p><strong>What happens next?</strong></p>
+                        <ol>
+                            <li>You will receive an email confirmation of your order.</li>
+                            <li>Our team will set up your hosting account.</li>
+                            <li>We will contact you with your login credentials and next steps.</li>
+                            <li>Your website will be up and running within 24 hours.</li>
+                        </ol>
+                    </div>
+                    
+                    <h5 class="mt-4">Order Details</h5>
+                    <table class="table table-bordered">
+                        <tbody>
+                            <tr>
+                                <th scope="row">Hosting Plan</th>
+                                <td>[% order_data.hosting_plan %]</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Domain Name</th>
+                                <td>[% order_data.domain_name %]</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Domain Action</th>
+                                <td>
+                                    [% SWITCH order_data.domain_action %]
+                                        [% CASE 'transfer' %]Transfer existing domain
+                                        [% CASE 'register' %]Register new domain
+                                        [% CASE 'use_existing' %]Use existing domain (point nameservers)
+                                    [% END %]
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Billing Cycle</th>
+                                <td>
+                                    [% SWITCH order_data.billing_cycle %]
+                                        [% CASE 'monthly' %]Monthly ($9.99/month)
+                                        [% CASE 'annually' %]Annually ($99.99/year - Save 17%)
+                                        [% CASE 'biennially' %]2 Years ($179.99 - Save 25%)
+                                    [% END %]
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Customer Name</th>
+                                <td>[% order_data.first_name %] [% order_data.last_name %]</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Email</th>
+                                <td>[% order_data.email %]</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Phone</th>
+                                <td>[% order_data.phone %]</td>
+                            </tr>
+                            [% IF order_data.additional_notes %]
+                                <tr>
+                                    <th scope="row">Additional Notes</th>
+                                    <td>[% order_data.additional_notes %]</td>
+                                </tr>
+                            [% END %]
+                        </tbody>
+                    </table>
+                    
+                    <div class="text-center mt-4">
+                        <a href="[% c.uri_for('/weaverbeck') %]" class="btn btn-primary">Return to Homepage</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-md-8 mx-auto">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h3 class="card-title">Need Help?</h3>
+                </div>
+                <div class="card-body">
+                    <p>If you have any questions about your order or need assistance, please don't hesitate to contact our support team:</p>
+                    
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-envelope"></i> Email: <a href="mailto:support@weaverbeck.com">support@weaverbeck.com</a></li>
+                        <li><i class="fas fa-phone"></i> Phone: (555) 123-4567</li>
+                        <li><i class="fas fa-comment"></i> Live Chat: Available on our website during business hours</li>
+                    </ul>
+                    
+                    <p>Our support team is available 24/7 to assist you with any questions or concerns.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

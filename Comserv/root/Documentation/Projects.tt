@@ -1,5 +1,8 @@
 [% META title = 'Projects Documentation' %]
     [% PageVersion = 'Documentation/Projects.tt,v 0.06 2025/08/25 Shanta Exp shanta ' %]
+[% IF debug == 1 %]
+    [% PageVersion %]
+[% END %]
 
     <h1 id="projects-top">Projects System Documentation</h1>
 
