@@ -39,8 +39,8 @@ package Comserv::Model::User;
 
                 sub roles {
                     my $self = shift;
-                    my $role = $self->_user->role;
-                    return [ $role ];  # Return it as an array reference
+                    my $roles = $self->_user->roles;
+                    return [ $roles ];  # Return it as an array reference
                 }
 
                 sub create_user {
@@ -53,6 +53,19 @@ package Comserv::Model::User;
                         roles => $user_data->{roles} // 'default_role',
                     });
                     return $new_user;
+                }
+                
+                sub delete_user {
+                    my ($self, $user_id) = @_;
+                    my $schema = Comserv::Model::DBEncy->new->schema;
+                    my $user = $schema->resultset('User')->find($user_id);
+                    
+                    return "User not found" unless $user;
+                    
+                    # Delete the user
+                    $user->delete;
+                    
+                    return 1; # Success
                 }
 
                 __PACKAGE__->meta->make_immutable;

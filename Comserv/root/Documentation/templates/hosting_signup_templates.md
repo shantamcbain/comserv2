@@ -1,12 +1,12 @@
 # Hosting Signup Templates
 
-**Last Updated:** April 12, 2025  
+**Last Updated:** August 30, 2025  
 **Author:** Shanta  
 **Status:** Active
 
 ## Overview
 
-The hosting signup templates provide the user interface for the hosting signup process. These templates include the signup form and the success page displayed after a successful signup.
+The hosting signup templates provide the user interface for the hosting signup process. These templates include the signup form and the success page displayed after a successful signup. The system now includes duplicate site prevention and a complete site deletion feature.
 
 ## Template Files
 
@@ -23,6 +23,7 @@ This template displays the form for signing up for hosting services. It includes
 - Clear error message display
 - Detailed hosting package information
 - Terms and conditions acceptance checkbox
+- Duplicate site prevention feedback
 
 #### Template Structure
 
@@ -65,6 +66,48 @@ The template includes debug features that are displayed when debug mode is enabl
 
 This template displays a success message and account information after a successful signup.
 
+### 3. Site Deletion Confirmation Template
+
+**File Path:** `/root/site/delete_confirm.tt`
+
+This template displays a confirmation page before deleting a site, ensuring that users understand the implications of site deletion.
+
+#### Key Features
+
+- Clear warning about the irreversible nature of site deletion
+- Detailed display of site information to be deleted
+- Confirmation checkbox to prevent accidental deletions
+- Cancel option to return to site details
+- Responsive design using Bootstrap
+
+#### Template Structure
+
+1. **Warning Section**
+   - Alert with warning about permanent deletion
+   - List of components that will be deleted (configuration, domains, files)
+
+2. **Site Details Section**
+   - Table displaying site ID, name, display name, and description
+   - Provides clear information about which site will be deleted
+
+3. **Confirmation Form**
+   - Hidden fields for site ID and confirmation flag
+   - Required checkbox for confirming deletion understanding
+   - Submit button for deletion
+   - Cancel button to return to site details
+
+### 4. Site Deletion Error Template
+
+**File Path:** `/root/site/error.tt`
+
+This template displays error messages when site deletion encounters problems.
+
+#### Key Features
+
+- Clear error message display
+- Option to return to site list
+- Detailed error information for troubleshooting
+
 #### Key Features
 
 - Confirmation message
@@ -104,7 +147,7 @@ The template includes debug features that are displayed when debug mode is enabl
 
 ## Usage
 
-These templates are used by the HostingSignup controller to display the signup form and success page. The controller passes the following data to the templates:
+These templates are used by the HostingSignup controller to display the signup form and success page, and by the Site controller to handle site deletion. The controllers pass the following data to the templates:
 
 ### Signup Form Template
 
@@ -118,6 +161,20 @@ These templates are used by the HostingSignup controller to display the signup f
 - `user`: User object with account information
 - `site`: Site object with website information
 - `domain`: Domain object with domain information
+- `debug_msg`: Debug messages (when debug mode is enabled)
+
+### Site Deletion Confirmation Template
+
+- `site`: Site object with information about the site to be deleted
+- `form_action`: URL for form submission
+- `title`: Page title
+- `debug_msg`: Debug messages (when debug mode is enabled)
+
+### Site Deletion Error Template
+
+- `error_message`: Specific error message about what went wrong
+- `title`: Page title
+- `debug_errors`: Array of detailed error messages for troubleshooting
 - `debug_msg`: Debug messages (when debug mode is enabled)
 
 ## Styling
@@ -177,6 +234,36 @@ These templates follow these best practices:
    - Version tracking
    - Detailed error reporting
 
+## Site Management
+
+### Duplicate Site Prevention
+
+The system now includes robust duplicate site prevention:
+
+1. **User Feedback**: When a user attempts to create a site with a name that already exists, the system displays a clear error message.
+2. **Form Data Preservation**: All form data is preserved when a duplicate site error occurs, allowing the user to modify just the site name.
+3. **Detailed Error Messages**: The error messages specifically indicate that the site name is already in use.
+
+### Site Deletion
+
+The site deletion feature provides a clean way to manage the site lifecycle:
+
+1. **Access Methods**:
+   - By ID: `/site/delete?id=X` (where X is the site ID)
+   - By name: `/site/delete?name=sitename` (where sitename is the site name)
+
+2. **User Experience**:
+   - Clear confirmation page with site details
+   - Required confirmation checkbox for safety
+   - Complete cleanup of all site components
+   - Success message after deletion
+   - Automatic redirect to site list
+
+3. **Error Handling**:
+   - Detailed error messages for various failure scenarios
+   - Logging of all deletion attempts and results
+   - User-friendly error display
+
 ## Future Enhancements
 
 Potential future enhancements for these templates include:
@@ -199,3 +286,9 @@ Potential future enhancements for these templates include:
    - Allow users to select from multiple hosting plans
    - Dynamic pricing based on selected options
    - Feature comparison table
+
+5. **Site Management Enhancements**
+   - Batch site operations
+   - Site cloning functionality
+   - Site backup and restore options
+   - Site suspension/reactivation features

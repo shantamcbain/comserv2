@@ -112,7 +112,7 @@
                                 </tr>
                                 <tr>
                                     <th scope="row">Full Name:</th>
-                                    <td>[% user.name | html %]</td>
+                                    <td>[% user.first_name | html %] [% user.last_name | html %]</td>
                                 </tr>
                             </tbody>
                         </table>

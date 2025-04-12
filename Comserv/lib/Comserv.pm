@@ -99,6 +99,7 @@ sub psgi_app {
                 }
 
                 # Explicitly load controllers to ensure they're available
+                use Comserv::Controller::WeaverBeck;
                 use Comserv::Controller::ProxmoxServers;
                 use Comserv::Controller::Proxmox;
                 use Comserv::Controller::BMaster;

@@ -220,6 +220,160 @@ sub delete_domain :Local {
         $c->log->error("Error deleting domain: $@");
         $c->flash->{error_msg} = "Error deleting domain: $@";
     }
+    
+    # Redirect back to site details
+    $c->res->redirect($c->uri_for($self->action_for('details'), { id => $site_id }));
+}
+
+# Add a new method to delete a site
+sub delete :Path('delete') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Log entry into the delete method
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete', 'Entered site delete method');
+    
+    # Initialize debug arrays
+    $c->stash->{debug_errors} = [] unless ref $c->stash->{debug_errors} eq 'ARRAY';
+    $c->stash->{debug_msg} = [] unless ref $c->stash->{debug_msg} eq 'ARRAY';
+    
+    # Get the site ID from the request parameters
+    my $site_id = $c->request->param('id');
+    
+    # If no site ID is provided, check for site name
+    my $site_name = $c->request->param('name');
+    
+    # Log the parameters
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete', 
+        "Delete request with ID: " . ($site_id || 'none') . ", Name: " . ($site_name || 'none'));
+    
+    # If neither ID nor name is provided, show an error
+    if (!$site_id && !$site_name) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'delete', 
+            "No site ID or name provided for deletion");
+        
+        push @{$c->stash->{debug_errors}}, "No site ID or name provided for deletion";
+        
+        $c->stash(
+            template => 'site/error.tt',
+            title => 'Site Deletion Error',
+            error_message => 'No site ID or name provided for deletion',
+        );
+        return;
+    }
+    
+    # If we have a name but no ID, look up the site by name
+    if (!$site_id && $site_name) {
+        my $site = $c->model('Site')->get_site_details_by_name($c, $site_name);
+        if ($site) {
+            $site_id = $site->id;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete', 
+                "Found site ID $site_id for name $site_name");
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'delete', 
+                "Site with name '$site_name' not found");
+            
+            push @{$c->stash->{debug_errors}}, "Site with name '$site_name' not found";
+            
+            $c->stash(
+                template => 'site/error.tt',
+                title => 'Site Deletion Error',
+                error_message => "Site with name '$site_name' not found",
+            );
+            return;
+        }
+    }
+    
+    # Now we should have a site ID
+    if ($site_id) {
+        # Get the site details before deletion for logging
+        my $site = $c->model('Site')->get_site_details($c, $site_id);
+        
+        if (!$site) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'delete', 
+                "Site with ID $site_id not found");
+            
+            push @{$c->stash->{debug_errors}}, "Site with ID $site_id not found";
+            
+            $c->stash(
+                template => 'site/error.tt',
+                title => 'Site Deletion Error',
+                error_message => "Site with ID $site_id not found",
+            );
+            return;
+        }
+        
+        # Store site details for confirmation
+        my $site_name = $site->name;
+        my $site_display_name = $site->site_display_name || $site_name;
+        
+        # Check if this is a confirmation request
+        my $confirmed = $c->request->param('confirm');
+        
+        if ($confirmed) {
+            # Attempt to delete the site
+            eval {
+                # First, delete all domains associated with this site
+                my @domains = $c->model('DBEncy::SiteDomain')->search({ site_id => $site_id });
+                foreach my $domain (@domains) {
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete', 
+                        "Deleting domain " . $domain->domain . " for site $site_name");
+                    $domain->delete;
+                }
+                
+                # Now delete the site itself
+                $c->model('Site')->delete_site($c, $site_id);
+                
+                # Also delete the site's controller file if it exists
+                my $controller_path = "/home/shanta/PycharmProjects/comserv/Comserv/lib/Comserv/Controller/$site_name.pm";
+                if (-f $controller_path) {
+                    unlink($controller_path) or $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'delete', 
+                        "Failed to delete controller file: $!");
+                }
+                
+                # Delete the site's template directory if it exists
+                my $template_dir = "/home/shanta/PycharmProjects/comserv/Comserv/root/$site_name";
+                if (-d $template_dir) {
+                    system("rm -rf $template_dir") == 0 or $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'delete', 
+                        "Failed to delete template directory: $!");
+                }
+                
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete', 
+                    "Successfully deleted site $site_name (ID: $site_id)");
+                
+                push @{$c->stash->{debug_msg}}, "Successfully deleted site $site_name";
+            };
+            
+            if ($@) {
+                # Handle deletion errors
+                my $error = $@;
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'delete', 
+                    "Error deleting site: $error");
+                
+                push @{$c->stash->{debug_errors}}, "Error deleting site: $error";
+                
+                $c->stash(
+                    template => 'site/error.tt',
+                    title => 'Site Deletion Error',
+                    error_message => "Error deleting site: $error",
+                );
+                return;
+            }
+            
+            # Redirect to the site list with a success message
+            $c->flash->{success_msg} = "Site '$site_display_name' has been successfully deleted.";
+            $c->res->redirect($c->uri_for($self->action_for('index')));
+            return;
+        } else {
+            # Show confirmation page
+            $c->stash(
+                template => 'site/delete_confirm.tt',
+                title => 'Confirm Site Deletion',
+                site => $site,
+                form_action => $c->uri_for($self->action_for('delete')),
+            );
+            return;
+        }
+    }
 
     $c->res->redirect($c->uri_for($self->action_for('details'), { id => $site_id }));
 }

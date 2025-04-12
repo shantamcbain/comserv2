@@ -1,0 +1,30 @@
+[% META title = title || 'Error' %]
+
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header bg-danger text-white">
+            <h2>[% title | html %]</h2>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-danger">
+                <h4 class="alert-heading">Error</h4>
+                <p>[% error_message | html %]</p>
+            </div>
+            
+            [% IF debug_errors && debug_errors.size > 0 %]
+            <div class="mt-4">
+                <h5>Technical Details</h5>
+                <ul class="list-group">
+                    [% FOREACH error IN debug_errors %]
+                    <li class="list-group-item list-group-item-danger">[% error | html %]</li>
+                    [% END %]
+                </ul>
+            </div>
+            [% END %]
+            
+            <div class="mt-4">
+                <a href="[% c.uri_for('/site') %]" class="btn btn-primary">Return to Site List</a>
+            </div>
+        </div>
+    </div>
+</div>

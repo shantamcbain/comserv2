@@ -316,6 +316,64 @@ sub add_user :Path('/admin/add_user') :Args(0) {
     $c->forward($c->view('TT'));
 }
 
+=head2 delete_user
+
+Admin interface to delete a user
+
+=cut
+
+sub delete_user :Path('/admin/delete_user') :Args(1) {
+    my ($self, $c, $user_id) = @_;
+
+    # Log the beginning of the delete_user action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete_user', 
+        "Starting delete_user action for user ID: $user_id");
+
+    # Check if the user exists
+    my $user = $c->model('DBEncy::User')->find($user_id);
+    
+    unless ($user) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'delete_user',
+            "User not found with ID: $user_id");
+            
+        $c->flash->{error_msg} = "User not found.";
+        $c->response->redirect($c->uri_for('/admin/users'));
+        return;
+    }
+    
+    # Store username for logging
+    my $username = $user->username;
+    
+    # Delete the user
+    eval {
+        # Use the User model to delete the user
+        my $result = $c->model('User')->delete_user($user_id);
+        
+        if ($result eq "1") { # Success
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete_user',
+                "User deleted successfully: $username (ID: $user_id)");
+                
+            $c->flash->{success_msg} = "User '$username' deleted successfully.";
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'delete_user',
+                "Error deleting user: $result");
+                
+            $c->flash->{error_msg} = "Error deleting user: $result";
+        }
+    };
+    
+    if ($@) {
+        # Handle any exceptions
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'delete_user',
+            "Exception when deleting user: $@");
+            
+        $c->flash->{error_msg} = "An error occurred while deleting the user: $@";
+    }
+    
+    # Redirect back to the user management page
+    $c->response->redirect($c->uri_for('/admin/users'));
+}
+
 sub map_table_to_result :Path('/Admin/map_table_to_result') :Args(0) {
     my ($self, $c) = @_;
 
