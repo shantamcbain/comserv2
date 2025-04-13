@@ -27,6 +27,71 @@ sub user_exists {
     return ($c->session->{username} && $c->session->{user_id}) ? 1 : 0;
 }
 
+# Add check_user_roles method
+sub check_user_roles {
+    my ($self, $c, $role) = @_;
+    
+    # First check if the user exists
+    return 0 unless $self->user_exists($c);
+    
+    # Get roles from session
+    my $roles = $c->session->{roles};
+    
+    # Log the role check for debugging
+    my $roles_debug = 'none';
+    if (defined $roles) {
+        if (ref($roles) eq 'ARRAY') {
+            $roles_debug = join(', ', @$roles);
+        } else {
+            $roles_debug = $roles;
+        }
+    }
+    
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'check_user_roles',
+        "Checking if user has role: $role, User roles: $roles_debug");
+    
+    # Check if the user has the admin role in the session
+    if ($role eq 'admin') {
+        # For admin role, check if user is in the admin group or has admin privileges
+        return 1 if $c->session->{is_admin};
+        
+        # Check roles array
+        if (ref($roles) eq 'ARRAY') {
+            foreach my $user_role (@$roles) {
+                return 1 if lc($user_role) eq 'admin';
+            }
+        }
+        # Check roles string
+        elsif (defined $roles && !ref($roles)) {
+            return 1 if $roles =~ /\badmin\b/i;
+        }
+        
+        # Check user_groups
+        my $user_groups = $c->session->{user_groups};
+        if (ref($user_groups) eq 'ARRAY') {
+            foreach my $group (@$user_groups) {
+                return 1 if lc($group) eq 'admin';
+            }
+        }
+        elsif (defined $user_groups && !ref($user_groups)) {
+            return 1 if $user_groups =~ /\badmin\b/i;
+        }
+    }
+    
+    # For other roles, check if the role is in the user's roles
+    if (ref($roles) eq 'ARRAY') {
+        foreach my $user_role (@$roles) {
+            return 1 if lc($user_role) eq lc($role);
+        }
+    }
+    elsif (defined $roles && !ref($roles)) {
+        return 1 if $roles =~ /\b$role\b/i;
+    }
+    
+    # Role not found
+    return 0;
+}
+
 # Flag to track if application start has been recorded
 has '_application_start_tracked' => (
     is => 'rw',
@@ -762,6 +827,34 @@ sub proxmox :Path('proxmox') :Args(0) {
     $c->forward('Comserv::Controller::Proxmox', 'index');
 }
 
+# Handle both lowercase and uppercase versions of the route
+sub proxymanager :Path('proxymanager') :Args(0) {
+    my ( $self, $c ) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'proxymanager', "Forwarding to ProxyManager controller (lowercase)");
+    $c->forward('Comserv::Controller::ProxyManager', 'index');
+}
+
+# Handle uppercase version of the route
+sub ProxyManager :Path('ProxyManager') :Args(0) {
+    my ( $self, $c ) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ProxyManager', "Forwarding to ProxyManager controller (uppercase)");
+    $c->forward('Comserv::Controller::ProxyManager', 'index');
+}
+
+# Handle lowercase version of the route
+sub hosting :Path('hosting') :Args(0) {
+    my ( $self, $c ) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'hosting', "Forwarding to Hosting controller (lowercase)");
+    $c->forward('Comserv::Controller::Hosting', 'index');
+}
+
+# Handle uppercase version of the route
+sub Hosting :Path('Hosting') :Args(0) {
+    my ( $self, $c ) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'Hosting', "Forwarding to Hosting controller (uppercase)");
+    $c->forward('Comserv::Controller::Hosting', 'index');
+}
+
 
 
 sub reset_session :Global {
@@ -791,6 +884,24 @@ sub reset_session :Global {
 
 
 sub end : ActionClass('RenderView') {}
+
+# Default action for handling 404 errors
+sub default :Path {
+    my ($self, $c) = @_;
+    
+    my $path = join('/', @{$c->req->args});
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'default', 
+        "Page not found: /$path");
+    
+    $c->response->status(404);
+    $c->stash(
+        template => 'CSC/error/not_found.tt',
+        error_message => "The page you requested could not be found: /$path",
+        requested_path => $path,
+        debug_message => "Using Catalyst's built-in proxy configuration. Test URL: " . 
+                         $c->uri_for('/test')
+    );
+}
 
 __PACKAGE__->meta->make_immutable;
 

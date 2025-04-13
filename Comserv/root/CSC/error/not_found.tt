@@ -1,0 +1,31 @@
+[% META title = 'Page Not Found' %]
+
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h2>Error: Page Not Found</h2>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-danger">
+                        <p><strong>[% error_message %]</strong></p>
+                    </div>
+                    
+                    [% IF debug_message %]
+                    <div class="alert alert-info">
+                        <p><strong>Debug Message:</strong><br>
+                        [% debug_message %]</p>
+                    </div>
+                    [% END %]
+                    
+                    <p>The page you were looking for could not be found. Please check the URL and try again.</p>
+                    
+                    <div class="mt-4">
+                        <a href="[% c.uri_for('/') %]" class="btn btn-primary">Return to Home</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

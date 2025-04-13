@@ -107,6 +107,8 @@ sub psgi_app {
                 use Comserv::Controller::ProxmoxServers;
                 use Comserv::Controller::Proxmox;
                 use Comserv::Controller::NPM;
+                use Comserv::Controller::ProxyManager;
+                use Comserv::Controller::Hosting;
                 use Comserv::Controller::BMaster;
                 use Comserv::Controller::ENCY;
                 use Comserv::Controller::Apiary;
