@@ -1,9 +1,10 @@
-[% META title = title || 'Error' %]
+[% META title = 'Error' %]
+[% SET page_title = title || 'Error' %]
 
 <div class="container mt-4">
     <div class="card">
         <div class="card-header bg-danger text-white">
-            <h2>[% title | html %]</h2>
+            <h2>[% page_title | html %]</h2>
         </div>
         <div class="card-body">
             <div class="alert alert-danger">

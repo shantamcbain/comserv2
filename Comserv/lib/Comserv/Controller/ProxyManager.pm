@@ -1,4 +1,4 @@
-package Comserv::Controller::Hosting;
+package Comserv::Controller::ProxyManager;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
@@ -27,7 +27,7 @@ has 'npm_api' => (
 sub auto :Private {
     my ($self, $c) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto',
-        "Hosting controller auto method called");
+        "ProxyManager controller auto method called");
 
     # Check if we have a valid API key
     if ($self->npm_api->{key} eq 'dummy_key_for_development') {

@@ -13,6 +13,7 @@
     <div class="submenu">
         <a href='/admin/view_log'><i class="icon-log"></i>View Log</a>
         <a href="/admin/git_pull"><i class="icon-log"></i>Git Pull</a>
+        <a href='/ProxyManager'><i class="icon-log"></i>Proxy Manager</a>
         <a href="/log"><i class="icon-log"></i>Open Log</a>
 
     </div>

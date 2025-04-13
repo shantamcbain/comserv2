@@ -233,39 +233,51 @@ sub process_signup :Path('process') :Args(0) {
                     $c->stash->{debug_errors} = ["Invalid site name for controller/template creation"];
                 }
                 
-                next; # Skip to the next step in the try block
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process_signup', 
+                    "Continuing with signup process despite invalid site name");
+                # Skip controller and template creation but continue with the signup process
             }
-            
-            # Create controller with error handling
-            my $controller_result = $self->create_site_controller($c, $site_name);
-            unless ($controller_result) {
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process_signup', "Failed to create controller for site: $site_name");
-                
-                # Double-check that debug_errors is an array reference before pushing
-                if (defined $c->stash->{debug_errors} && ref $c->stash->{debug_errors} eq 'ARRAY') {
-                    push @{$c->stash->{debug_errors}}, "Failed to create controller for site: $site_name";
-                } else {
-                    # If it's still not an array reference, reinitialize it
-                    $c->stash->{debug_errors} = ["Failed to create controller for site: $site_name"];
+            else {
+                # Try to create controller with error handling
+                eval {
+                    my $controller_result = $self->create_site_controller($c, $site_name);
+                    unless ($controller_result) {
+                        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process_signup', "Failed to create controller for site: $site_name");
+                        
+                        # Double-check that debug_errors is an array reference before pushing
+                        if (defined $c->stash->{debug_errors} && ref $c->stash->{debug_errors} eq 'ARRAY') {
+                            push @{$c->stash->{debug_errors}}, "Failed to create controller for site: $site_name";
+                        } else {
+                            # If it's still not an array reference, reinitialize it
+                            $c->stash->{debug_errors} = ["Failed to create controller for site: $site_name"];
+                        }
+                    }
+                };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process_signup', 
+                        "Exception during controller creation: $@");
                 }
                 
-                # Continue with template creation even if controller creation failed
-            }
-            
-            # 5. Create the index.tt template for the site with error handling
-            my $template_result = $self->create_site_template($c, $site_name);
-            unless ($template_result) {
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process_signup', "Failed to create template for site: $site_name");
-                
-                # Double-check that debug_errors is an array reference before pushing
-                if (defined $c->stash->{debug_errors} && ref $c->stash->{debug_errors} eq 'ARRAY') {
-                    push @{$c->stash->{debug_errors}}, "Failed to create template for site: $site_name";
-                } else {
-                    # If it's still not an array reference, reinitialize it
-                    $c->stash->{debug_errors} = ["Failed to create template for site: $site_name"];
+                # Try to create the template with error handling
+                eval {
+                    # 5. Create the index.tt template for the site with error handling
+                    my $template_result = $self->create_site_template($c, $site_name);
+                    unless ($template_result) {
+                        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process_signup', "Failed to create template for site: $site_name");
+                        
+                        # Double-check that debug_errors is an array reference before pushing
+                        if (defined $c->stash->{debug_errors} && ref $c->stash->{debug_errors} eq 'ARRAY') {
+                            push @{$c->stash->{debug_errors}}, "Failed to create template for site: $site_name";
+                        } else {
+                            # If it's still not an array reference, reinitialize it
+                            $c->stash->{debug_errors} = ["Failed to create template for site: $site_name"];
+                        }
+                    }
+                };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process_signup', 
+                        "Exception during template creation: $@");
                 }
-                
-                # Continue with the signup process even if template creation failed
             }
             
             # Log success
@@ -296,7 +308,7 @@ sub process_signup :Path('process') :Args(0) {
             }
             push @{$c->stash->{debug_msg}}, "Signup successful";
             
-            # Redirect to success page
+            # Set up the success page
             $c->stash(
                 template => 'hosting/signup_success.tt',
                 title => 'Signup Successful',
@@ -305,6 +317,12 @@ sub process_signup :Path('process') :Args(0) {
                 domain => $domain,
                 # debug_msg is already an array initialized in auto
             );
+            
+            # Important: Don't try to forward to the new site controller
+            # It needs a server restart to be recognized
+            # Just render the success template directly
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process_signup', 
+                "Rendering success template directly without forwarding to new controller");
         } else {
             # Site creation failed
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process_signup', "Site creation failed");
@@ -463,8 +481,10 @@ sub create_site_controller {
     $controller_content .= "    is => 'ro',\n";
     $controller_content .= "    default => sub { Comserv::Util::Logging->instance }\n";
     $controller_content .= ");\n\n";
+    # Convert site name to lowercase for namespace
+    my $lowercase_site_name = lc($site_name);
     $controller_content .= "# Set the namespace for this controller\n";
-    $controller_content .= "__PACKAGE__->config(namespace => lc('$site_name'));\n\n";
+    $controller_content .= "__PACKAGE__->config(namespace => '$lowercase_site_name');\n\n";
     $controller_content .= "sub auto :Private {\n";
     $controller_content .= "    my (\$self, \$c) = \@_;\n";
     $controller_content .= "    \$self->logging->log_with_details(\$c, 'info', __FILE__, __LINE__, 'auto', \"$site_name controller auto method called\");\n";
@@ -503,10 +523,18 @@ sub create_site_controller {
     
     # Write the controller file with improved error handling
     eval {
-        # Check if we can write to the directory
-        my $dir = $c->path_to('lib', 'Comserv', 'Controller');
-        unless (-d $dir && -w $dir) {
-            die "Controller directory does not exist or is not writable: $dir";
+        # Check if the controller directory exists and is writable
+        my $controller_dir = "/home/shanta/PycharmProjects/comserv/Comserv/lib/Comserv/Controller";
+        
+        # Make sure the directory exists
+        unless (-d $controller_dir) {
+            require File::Path;
+            File::Path::make_path($controller_dir) or die "Failed to create controller directory: $!";
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_site_controller', "Created controller directory: $controller_dir");
+        }
+        
+        unless (-w $controller_dir) {
+            die "Controller directory is not writable: $controller_dir";
         }
         
         # Open the file for writing
@@ -581,7 +609,18 @@ sub create_site_template {
     # Log the template directory path for debugging
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_site_template', "Template directory path: $template_dir");
     
-    # Create the directory if it doesn't exist
+    # Make sure the root directory exists first
+    my $root_dir = "/home/shanta/PycharmProjects/comserv/Comserv/root";
+    unless (-d $root_dir) {
+        my $root_result = system("mkdir -p $root_dir");
+        if ($root_result != 0) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_site_template', "Failed to create root directory: $!");
+            return 0;
+        }
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_site_template', "Created root directory: $root_dir");
+    }
+    
+    # Create the site-specific directory if it doesn't exist
     unless (-d $template_dir) {
         # Use system mkdir to ensure proper permissions
         my $result = system("mkdir -p $template_dir");
@@ -858,16 +897,58 @@ sub send_confirmation_email {
     
     # Try to send the email
     eval {
+        # Set up the email data
         $c->stash->{email} = {
             to => $user_data->{email},
             cc => 'support@computersystemconsulting.ca',
             from => 'noreply@computersystemconsulting.ca',
             subject => $subject,
-            body => $body,
+            template => 'signup_confirmation.tt',
+            content_type => 'text/html',
         };
         
-        # Use Catalyst's email view to send the email
-        $c->forward($c->view('Email::Template'));
+        # Add user data to stash for the template
+        $c->stash->{username} = $user_data->{username};
+        $c->stash->{first_name} = $user_data->{first_name};
+        $c->stash->{last_name} = $user_data->{last_name};
+        $c->stash->{site_name} = $user_data->{site_name};
+        $c->stash->{domain_name} = $user_data->{domain_name};
+        
+        # Try to use the template-based email
+        eval {
+            # Check if the view exists
+            if ($c->view('Email::Template')) {
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_confirmation_email', 
+                    "Using Email::Template view");
+                $c->forward($c->view('Email::Template'));
+            } else {
+                die "Email::Template view not found";
+            }
+        };
+        
+        # If template email fails, fall back to plain text email
+        if ($@) {
+            $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'send_confirmation_email', 
+                "Template email failed, falling back to plain text: $@");
+                
+            $c->stash->{email} = {
+                to => $user_data->{email},
+                cc => 'support@computersystemconsulting.ca',
+                from => 'noreply@computersystemconsulting.ca',
+                subject => $subject,
+                body => $body,
+                content_type => 'text/plain',
+            };
+            
+            # Check if the view exists
+            if ($c->view('Email')) {
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_confirmation_email', 
+                    "Using Email view");
+                $c->forward($c->view('Email'));
+            } else {
+                die "Email view not found";
+            }
+        }
         
         # Log success
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_confirmation_email', 

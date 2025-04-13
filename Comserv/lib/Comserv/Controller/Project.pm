@@ -297,45 +297,8 @@ sub details :Path('details') :Args(0) {
     $c->forward($c->view('TT'));
 }
 
-sub enhance_project_data :Private {
-    my ($self, $c, $projects) = @_;
-    
-    # Log the start of the enhance_project_data method
-    $self->logging->log_with_details(
-        $c, 'debug', __FILE__, __LINE__, 'enhance_project_data',
-        'Enhancing project data for filtering'
-    );
-    
-    # Process each project to ensure it has a priority value
-    foreach my $project (@$projects) {
-        # Set default priority to 2 (Medium) if not set
-        $project->{priority} = 2 unless defined $project->{priority};
-        
-        # Process sub-projects recursively
-        if ($project->{sub_projects} && @{$project->{sub_projects}}) {
-            foreach my $subproject (@{$project->{sub_projects}}) {
-                # Set default priority to 2 (Medium) if not set
-                $subproject->{priority} = 2 unless defined $subproject->{priority};
-                
-                # Process sub-sub-projects
-                if ($subproject->{sub_projects} && @{$subproject->{sub_projects}}) {
-                    foreach my $subsubproject (@{$subproject->{sub_projects}}) {
-                        # Set default priority to 2 (Medium) if not set
-                        $subsubproject->{priority} = 2 unless defined $subsubproject->{priority};
-                    }
-                }
-            }
-        }
-    }
-    
-    # Log completion of the enhance_project_data method
-    $self->logging->log_with_details(
-        $c, 'debug', __FILE__, __LINE__, 'enhance_project_data',
-        'Completed enhancing project data'
-    );
-    
-    return $projects;
-}
+# This enhance_project_data implementation has been moved to line 482
+# See the implementation there
 
 sub fetch_projects_with_subprojects :Private {
     my ($self, $c) = @_;
@@ -511,85 +474,8 @@ sub enhance_project_data :Private {
     return $projects;
 }
 
-# Build a project tree with sub-projects and todos
-sub build_project_tree :Private {
-    my ($self, $c, $project) = @_;
-    
-    # Log the start of the build_project_tree method
-    $self->logging->log_with_details(
-        $c, 'info', __FILE__, __LINE__, 'build_project_tree',
-        "Building project tree for project ID: " . $project->id
-    );
-    
-    my $schema = $c->model('DBEncy');
-    
-    # Create a hashref for this project with all its properties
-    my $project_hash = {
-        id => $project->id,
-        name => $project->name,
-        description => $project->description || '',
-        start_date => $project->start_date,
-        end_date => $project->end_date,
-        status => $project->status || 1, # Default to 'New' status
-        project_code => $project->project_code || '',
-        project_size => $project->project_size || '',
-        estimated_man_hours => $project->estimated_man_hours || 0,
-        developer_name => $project->developer_name || '',
-        client_name => $project->client_name || '',
-        comments => $project->comments || '',
-        priority => 2, # Default to medium priority since field doesn't exist
-        sub_projects => [],
-        todos => []
-    };
-    
-    # Fetch todos for this project
-    my @todos;
-    eval {
-        @todos = $schema->resultset('Todo')->search(
-            { project_id => $project->id },
-            { order_by => { -asc => 'start_date' } }
-        );
-    };
-    
-    if ($@) {
-        $self->logging->log_with_details(
-            $c, 'error', __FILE__, __LINE__, 'build_project_tree',
-            "Error fetching todos for project ID " . $project->id . ": $@"
-        );
-    } else {
-        # Add todos to the project hash
-        $project_hash->{todos} = \@todos;
-    }
-    
-    # Fetch sub-projects
-    my @sub_projects;
-    eval {
-        @sub_projects = $schema->resultset('Project')->search(
-            { parent_id => $project->id },
-            { order_by => { -asc => 'name' } }
-        );
-    };
-    
-    if ($@) {
-        $self->logging->log_with_details(
-            $c, 'error', __FILE__, __LINE__, 'build_project_tree',
-            "Error fetching sub-projects for project ID " . $project->id . ": $@"
-        );
-    } else {
-        # Process each sub-project recursively
-        foreach my $sub_project (@sub_projects) {
-            push @{$project_hash->{sub_projects}}, $self->build_project_tree($c, $sub_project);
-        }
-    }
-    
-    # Log completion of the build_project_tree method
-    $self->logging->log_with_details(
-        $c, 'info', __FILE__, __LINE__, 'build_project_tree',
-        "Completed building project tree for project ID: " . $project->id
-    );
-    
-    return $project_hash;
-}
+# This build_project_tree implementation has been moved to line 672
+# See the implementation there
 
 sub editproject :Path('editproject') :Args(0) {
     my ( $self, $c ) = @_;

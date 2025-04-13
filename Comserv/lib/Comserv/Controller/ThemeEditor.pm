@@ -8,6 +8,7 @@ use File::Path qw(make_path);
 use Data::Dumper;
 use JSON;
 use Comserv::Util::Logging;
+use Class::C3;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -20,7 +21,7 @@ sub COMPONENT {
     $app->log->info("Loading ThemeEditor controller with namespace: " . $class->config->{namespace});
     $app->log->info("ThemeEditor controller actions: " . join(", ", map { $_->name } $class->get_action_methods()));
 
-    return $class->NEXT::COMPONENT($app, $args);
+    return $class->next::method($app, $args);
 }
 
 has 'logging' => (

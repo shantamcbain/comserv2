@@ -18,11 +18,7 @@ requires 'DBIx::Class::Migration';
 requires 'DBIx::Class::EncodedColumn';
 requires 'SQL::Translator';
 
-#json
-requires 'JSON';
-requires 'Config::JSON';
-
-#json
+# JSON handling
 requires 'JSON';
 requires 'Config::JSON';
 
@@ -40,11 +36,15 @@ requires 'Catalyst::Plugin::ConfigLoader';
 requires 'Catalyst::Plugin::Static::Simple';
 requires 'Catalyst::Plugin::StackTrace';
 requires 'Catalyst::Plugin::Session';
-requires 'Catalyst::Plugin::Session::Store::FastMmap';
-requires 'Catalyst::Plugin::Session::Store::Delegate';
-requires 'Catalyst::Plugin::Session::Store::DBIC';
-requires 'Catalyst::Plugin::Session::Store::Cookie';
-requires 'Catalyst::Plugin::Session::Store::File';
+
+# Session storage - with fallback options
+# At least one of these should be installed for sessions to work
+recommends 'Catalyst::Plugin::Session::Store::FastMmap';
+recommends 'Catalyst::Plugin::Session::Store::File';
+recommends 'Catalyst::Plugin::Session::Store::Cookie';
+recommends 'Catalyst::Plugin::Session::Store::DBIC';
+recommends 'Catalyst::Plugin::Session::Store::Delegate';
+
 requires 'Catalyst::Plugin::Session::State::Cookie';
 requires 'Catalyst::Plugin::Authentication';
 requires 'Catalyst::Authentication::Store::DBIx::Class';
@@ -53,7 +53,6 @@ requires 'Catalyst::Plugin::Authorization::ACL';
 requires 'Catalyst::Plugin::Log::Dispatch';
 requires 'Log::Dispatch::Config';
 requires 'Catalyst::View::TT';
-requires 'Catalyst::Authentication::Store::DBIx::Class';
 # DateTime related
 requires 'DateTime';
 requires 'DateTime::Event::Recurrence';
@@ -67,13 +66,23 @@ requires 'File::Basename';
 # Cryptography and Security
 requires 'Digest::SHA';
 
-# Email handling
+# Email handling - with more flexible version requirements
+requires 'Email::Abstract';
+requires 'Email::Address';
+requires 'Email::Date::Format';
+requires 'Email::MIME';
+requires 'Email::MIME::ContentType';
+requires 'Email::MIME::Encodings';
+requires 'Email::MessageID';
+requires 'Email::Sender::Simple';
+requires 'Email::Sender::Transport::SMTP';
 requires 'Email::Simple';
 requires 'Email::Simple::Creator';
-requires 'Email::Sender::Simple';
+requires 'Email::MIME::Creator';
+requires 'Catalyst::View::Email';
+requires 'Catalyst::View::Email::Template';
 
 # Utility modules
-requires 'JSON';
 requires 'URI::Escape';
 requires 'Data::FormValidator';
 requires 'LWP::UserAgent';
