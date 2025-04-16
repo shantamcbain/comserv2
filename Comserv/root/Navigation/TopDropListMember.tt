@@ -8,15 +8,15 @@
         <li class="horizontal-dropdown">
             <a href="/membership" class="dropbtn">Member</a>
             <div class="dropdown-content">
-                <a href="[% c.uri_for('/membership') %]">Membership Information</a>
-                <a href="[% c.uri_for('/applymembership') %]">Apply for Membership</a>
+                <a href="/membership">Membership Information</a>
+                <a href="/applymembership">Apply for Membership</a>
    [% FOREACH link = c.stash.dbi.query("SELECT * FROM internal_links_tb
                                   WHERE  category = 'Member_links'
                                    AND (sitename =  '$SiteName')
                                   ORDER BY link_order
                                   ")%]
 
-       <a href="[% c.uri_for(link.url) %]?site=[% SiteName %]&amp;[% session_string %]&amp;[% link.view_name %]" name="Contact" target="[% link.target %]" title=" [% link.name %] ">[% link.name %]</a>
+       <a href="[% link.url %]?site=[% SiteName %]&amp;[% session_string %]&amp;[% link.view_name %]" name="Contact" target="[% link.target %]" title=" [% link.name %] ">[% link.name %]</a>
 
     [% END %]
  [% FOREACH link = c.stash.dbi.query("SELECT * FROM page_tb
@@ -26,24 +26,24 @@
                                    ORDER BY link_order
                                    ")%]
 
-     <a href="[% c.uri_for('/page', { site => SiteName, session => session_string, page => link.page_code }) %]" name="Contact" target="[% link.target %]" title=" [% link.view_name %] ">[% link.view_name %]</a>
+     <a href="/page?site=[% SiteName %]&amp;session=[% session_string %]&amp;page=[% link.page_code %]" name="Contact" target="[% link.target %]" title=" [% link.view_name %] ">[% link.view_name %]</a>
          [% IF c.session.group == 'admin' %]
-        <a href="[% c.uri_for('/edit_link', { link_id => link.id }) %]">Edit/Delete</a>
+        <a href="/edit_link?link_id=[% link.id %]">Edit/Delete</a>
         [% END %]
          [% END %]
                 <!-- Add more member options -->
                 [% IF c.session.member_links.size %]
+                    [% FOREACH link IN c.session.member_links %]
+                        <a href="[% link.url %]">[% link.name %]</a>
+                        [% IF c.session.group == 'admin' %]
+                            <a href="/edit_link?link_id=[% link.id %]">Edit/Delete</a>
+                        [% END %]
+                    [% END %]
                 [% END %]
                 [% IF c.session.group == 'admin' %]
+                    <a href="/add_link?menu=member">Add</a>
                 [% END %]
-                    <a href="[% c.uri_for('/add_link', { menu => 'member' }) %]">Add</a>
-                    [% FOREACH link IN c.session.member_links %]
-                        <a href="[% c.uri_for(link.url) %]">[% link.name %]</a>
-                        [% IF c.session.group == 'admin' %]
-                        [% END %]
-                            <a href="[% c.uri_for('/edit_link', { link_id => link.id }) %]">Edit/Delete</a>
-                    [% END %]
                 <!-- Link to the list of herbs -->
-                <a href="[% c.uri_for('/ENCY/BotanicalNameView') %]">List of Herbs</a>
+                <a href="/ENCY/BotanicalNameView">List of Herbs</a>
             </div>
         </li>

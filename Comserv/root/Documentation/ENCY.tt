@@ -7,6 +7,419 @@
 <a href="#encyctop">ENCY Controller</a> |
 <a href="#encymtop">ENCY Model</a>
 </nav>
+The goal of ency is to provide a comprehensive database of herbs and their uses. We will be starting with plants that have medicinal properties, but the database can be expanded to include other types of plants as well. They will be categorized by their botanical names, common names, and uses. The database will also include references to scientific studies and other sources of information about the plants.
+Here is a preliminary view of the database structure:
 
+
+1. Core Tables This is just a start. The database structure will evolve as we add more features and functionality.
+Plants
+
+This will be the main table where each plant entry is stored.
+
+    plant_id (Primary Key)
+    botanical_name
+    common_names
+    key_name
+    description
+    image_url Should a table with a list of images be created?
+    distribution
+    comments
+    history
+    username_of_poster
+    group_of_poster
+    date_time_posted
+
+TherapeuticActions
+
+Stores different therapeutic actions associated with plants.
+
+    action_id (Primary Key)
+    name
+    description
+
+PlantTherapeuticActions
+
+A many-to-many relationship table linking plants to their therapeutic actions.
+
+    plant_id (Foreign Key to Plants)
+    action_id (Foreign Key to TherapeuticActions)
+
+Constituents
+
+Stores information about the chemical components of plants.
+
+    constituent_id (Primary Key)
+    name
+    formula
+    description
+
+PlantConstituents
+
+A many-to-many relationship table linking plants to their chemical constituents.
+
+    plant_id (Foreign Key to Plants)
+    constituent_id (Foreign Key to Constituents)
+
+Cultivation
+
+Details methods and information about the cultivation of plants.
+
+    cultivation_id (Primary Key)
+    plant_id (Foreign Key to Plants)
+    method
+    soil_type
+    sun_exposure
+    watering
+
+2. Specialized Tables
+Pollinators we want to know what part of the plant the pollinators are attracted to.
+
+    pollinator_id (Primary Key)
+    name
+    type (insect, animal, etc.)
+
+Tracks the pollinators associated with each plant.
+
+    pollinator_id (Primary Key)
+    name
+    type (insect, animal, etc.)
+
+PlantPollinators
+
+Links plants to their pollinators.
+
+    plant_id (Foreign Key to Plants)
+    pollinator_id (Foreign Key to Pollinators)
+
+PartsUsed
+
+Stores different parts of the plant that are used.
+
+    part_id (Primary Key)
+    name
+    description
+
+PlantPartsUsed
+
+Links plants to the parts used.
+
+    plant_id (Foreign Key to Plants)
+    part_id (Foreign Key to PartsUsed)
+
+3. Relational Integrity
+Formulas
+
+Details various formulas that include plants.
+
+    formula_id (Primary Key)
+    name
+    description
+    therapeutic action
+
+PlantFormulas
+
+Links plants to the formulas they are part of.
+
+    plant_id (Foreign Key to Plants)
+    formula_id (Foreign Key to Formulas)
+
+4. User Roles and Access
+Users
+
+Tracks users in the system with roles.
+
+    user_id (Primary Key)
+    username
+    role (admin, researcher, etc.)
+    group
+
+UserAccess
+
+Controls access based on roles.
+
+    user_id (Foreign Key to Users)
+    access_level
+The ency module is divided into two parts: the controller and the model.
+
+References This table will store references to scientific studies and other sources of information about the plants. if a reference is made to a plant, component therapeutic action, etc. we provide connection to that date her..
+
+    reference_id (Primary Key)
+    title
+    author
+    publication_date
+    url
+    description
+    plant_id (Foreign Key to Plants)
+References are rated as well.
+
+    rating_id (Primary Key)
+    reference_id (Foreign Key to References)
+    user_id (Foreign Key to Users)
+    rating
+    date_time_rated
+    comments
+diseases   table will store diseases that plants, animals, fungi, etc.can treat.
+    id (Primary Key)
+    reference_id (Foreign Key to References)
+    user_id (Foreign Key to Users)
+    date_time_dissed
+    comments
+
+Animals
+    id (Primary Key)
+    reference_id (Foreign Key to References)
+    user_id (Foreign Key to Users)
+    date_time_dissed
+    comments
+Fungi
+    id (Primary Key)
+    reference_id (Foreign Key to References)
+    user_id (Foreign Key to Users)
+    date_time_dissed
+    comments
+insects
+    id (Primary Key)
+    reference_id (Foreign Key to References)
+    user_id (Foreign Key to Users)
+    date_time_dissed
+    comments
+
+ We will need link tables to connect the diseases, animals, fungi, and insects to the plants that can treat them. or vice versa.
+
+    plant_id (Foreign Key to Plants)
+    disease_id (Foreign Key to Diseases)
+    animal_id (Foreign Key to Animals)
+    fungi_id (Foreign Key to Fungi)
+    insect_id (Foreign Key to Insects)
+
+    disease_id (Foreign Key to Diseases)
+    plant_id (Foreign Key to Plants)
+    animal_id (Foreign Key to Animals)
+    fungi_id (Foreign Key to Fungi)
+    insect_id (Foreign Key to Insects)
+
+    animal_id (Foreign Key to Animals)
+    plant_id (Foreign Key to Plants)
+    disease_id (Foreign Key to Diseases)
+    fungi_id (Foreign Key to Fungi)
+    insect_id (Foreign Key to Insects)
+
+    fungi_id (Foreign Key to Fungi)
+    plant_id (Foreign Key to Plants)
+    disease_id (Foreign Key to Diseases)
+    animal_id (Foreign Key to Animals)
+    insect_id (Foreign Key to Insects)
+
+    insect_id (Foreign Key to Insects)
+    plant_id (Foreign Key to Plants)
+    disease_id (Foreign Key to Diseases)
+    animal_id (Foreign Key to Animals)
+    fungi_id (Foreign Key to Fungi)
+
+    The controller is responsible for handling requests related to the ency model, while the model is responsible for handling data related to the ency controller.
+The controller is responsible for handling requests related to the ency model, while the model is responsible for handling data related to the ency controller.
 [% INCLUDE 'Documentation/ENCYController.tt' %]
-[% INCLUDE 'Documentation/ENCYModel.tt' %]   <a href="#Controller">Controller</a> |
+[% INCLUDE 'Documentation/ENCYModel.tt' %]   <a href="#Controller">Controller</a>
+<p>The goal of ENCY is to provide a comprehensive database of herbs and their uses. We will be starting with plants that have medicinal properties, but the database can be expanded to include other types of plants as well. They will be categorized by their botanical names, common names, and uses. The database will also include references to scientific studies and other sources of information about the plants.</p>
+
+<h2>Plan for Creating the ENCY Module</h2>
+<ol>
+    <li><strong>Database Design:</strong> Define the database schema and create the necessary tables and relationships.</li>
+        CREATE TABLE Plants (
+            plant_id INT PRIMARY KEY AUTO_INCREMENT,
+            botanical_name VARCHAR(255),
+            common_names TEXT,
+            key_name VARCHAR(255),
+            description TEXT,
+            image_url VARCHAR(255),
+            distribution TEXT,
+            comments TEXT,
+            history TEXT,
+            username_of_poster VARCHAR(255),
+            group_of_poster VARCHAR(255),
+            date_time_posted DATETIME
+        );
+
+        CREATE TABLE TherapeuticActions (
+            action_id INT PRIMARY KEY AUTO_INCREMENT,
+            name VARCHAR(255),
+            description TEXT
+        );
+
+        CREATE TABLE PlantTherapeuticActions (
+            plant_id INT,
+            action_id INT,
+            FOREIGN KEY (plant_id) REFERENCES Plants(plant_id),
+            FOREIGN KEY (action_id) REFERENCES TherapeuticActions(action_id)
+        );
+
+        CREATE TABLE Constituents (
+            constituent_id INT PRIMARY KEY AUTO_INCREMENT,
+            name VARCHAR(255),
+            formula VARCHAR(255),
+            description TEXT
+        );
+
+        CREATE TABLE PlantConstituents (
+            plant_id INT,
+            constituent_id INT,
+            FOREIGN KEY (plant_id) REFERENCES Plants(plant_id),
+            FOREIGN KEY (constituent_id) REFERENCES Constituents(constituent_id)
+        );
+
+        CREATE TABLE Cultivation (
+            cultivation_id INT PRIMARY KEY AUTO_INCREMENT,
+            plant_id INT,
+            method TEXT,
+            soil_type VARCHAR(255),
+            sun_exposure VARCHAR(255),
+            watering VARCHAR(255),
+            FOREIGN KEY (plant_id) REFERENCES Plants(plant_id)
+        );
+
+        CREATE TABLE Pollinators (
+            pollinator_id INT PRIMARY KEY AUTO_INCREMENT,
+            name VARCHAR(255),
+            type VARCHAR(255)
+        );
+
+        CREATE TABLE PlantPollinators (
+            plant_id INT,
+            pollinator_id INT,
+            FOREIGN KEY (plant_id) REFERENCES Plants(plant_id),
+            FOREIGN KEY (pollinator_id) REFERENCES Pollinators(pollinator_id)
+        );
+
+        CREATE TABLE PartsUsed (
+            part_id INT PRIMARY KEY AUTO_INCREMENT,
+            name VARCHAR(255),
+            description TEXT
+        );
+
+        CREATE TABLE PlantPartsUsed (
+            plant_id INT,
+            part_id INT,
+            FOREIGN KEY (plant_id) REFERENCES Plants(plant_id),
+            FOREIGN KEY (part_id) REFERENCES PartsUsed(part_id)
+        );
+
+        CREATE TABLE Formulas (
+            formula_id INT PRIMARY KEY AUTO_INCREMENT,
+            name VARCHAR(255),
+            description TEXT,
+            therapeutic_action TEXT
+        );
+
+        CREATE TABLE PlantFormulas (
+            plant_id INT,
+            formula_id INT,
+            FOREIGN KEY (plant_id) REFERENCES Plants(plant_id),
+            FOREIGN KEY (formula_id) REFERENCES Formulas(formula_id)
+        );
+
+        CREATE TABLE Users (
+            user_id INT PRIMARY KEY AUTO_INCREMENT,
+            username VARCHAR(255),
+            role VARCHAR(255),
+            group_name VARCHAR(255)
+        );
+
+        CREATE TABLE UserAccess (
+            user_id INT,
+            access_level VARCHAR(255),
+            FOREIGN KEY (user_id) REFERENCES Users(user_id)
+        );
+
+        CREATE TABLE References (
+            reference_id INT PRIMARY KEY AUTO_INCREMENT,
+            title VARCHAR(255),
+            author VARCHAR(255),
+            publication_date DATE,
+            url VARCHAR(255),
+            description TEXT,
+            plant_id INT,
+            FOREIGN KEY (plant_id) REFERENCES Plants(plant_id)
+        );
+
+        CREATE TABLE Ratings (
+            rating_id INT PRIMARY KEY AUTO_INCREMENT,
+            reference_id INT,
+            user_id INT,
+            rating INT,
+            date_time_rated DATETIME,
+            comments TEXT,
+            FOREIGN KEY (reference_id) REFERENCES References(reference_id),
+            FOREIGN KEY (user_id) REFERENCES Users(user_id)
+        );
+
+        CREATE TABLE Diseases (
+            disease_id INT PRIMARY KEY AUTO_INCREMENT,
+            name VARCHAR(255),
+            description TEXT
+        );
+
+        CREATE TABLE Animals (
+            animal_id INT PRIMARY KEY AUTO_INCREMENT,
+            name VARCHAR(255),
+            description TEXT
+        );
+
+        CREATE TABLE Fungi (
+            fungi_id INT PRIMARY KEY AUTO_INCREMENT,
+            name VARCHAR(255),
+            description TEXT
+        );
+
+        CREATE TABLE Insects (
+            insect_id INT PRIMARY KEY AUTO_INCREMENT,
+            name VARCHAR(255),
+            description TEXT
+        );
+
+        CREATE TABLE PlantDiseases (
+            plant_id INT,
+            disease_id INT,
+            FOREIGN KEY (plant_id) REFERENCES Plants(plant_id),
+            FOREIGN KEY (disease_id) REFERENCES Diseases(disease_id)
+        );
+
+        CREATE TABLE PlantAnimals (
+            plant_id INT,
+            animal_id INT,
+            FOREIGN KEY (plant_id) REFERENCES Plants(plant_id),
+            FOREIGN KEY (animal_id) REFERENCES Animals(animal_id)
+        );
+
+        CREATE TABLE PlantFungi (
+            plant_id INT,
+            fungi_id INT,
+            FOREIGN KEY (plant_id) REFERENCES Plants(plant_id),
+            FOREIGN KEY (fungi_id) REFERENCES Fungi(fungi_id)
+        );
+
+        CREATE TABLE PlantInsects (
+            plant_id INT,
+            insect_id INT,
+            FOREIGN KEY (plant_id) REFERENCES Plants(plant_id),
+            FOREIGN KEY (insect_id) REFERENCES Insects(insect_id)
+        );
+    <li><strong>Database Configuration:</strong> Load the database configuration from a JSON file.</li>
+    <li><strong>Model Development:</strong> Create the ENCY model and implement methods for data retrieval and manipulation.</li>
+    <li><strong>Controller Development:</strong> Create the ENCY controller and implement methods for handling web requests and responses.</li>
+    <li><strong>Debugging and Logging:</strong> Add debugging output and logging mechanisms.</li>
+    <li><strong>Security:</strong> Implement security measures such as password hashing.</li>
+    <li><strong>Catalyst Integration:</strong> Integrate the ENCY module with the Catalyst framework.</li>
+</ol>
+
+<h2>Pros and Cons of MySQL and PostgreSQL for Data Storage</h2>
+<h3>MySQL</h3>
+<ul>
+    <li><strong>Pros:</strong> Widely used, high performance for read-heavy operations, easy to set up, strong community support.</li>
+    <li><strong>Cons:</strong> Limited support for advanced SQL features, less efficient for write-heavy operations, less flexible in terms of data types and indexing.</li>
+</ul>
+
+<h3>PostgreSQL</h3>
+<ul>
+    <li><strong>Pros:</strong> Advanced SQL features, better performance for write-heavy operations, highly extensible, strong support for complex queries and indexing.</li>
+    <li><strong>Cons:</strong> More complex to set up, can be slower for simple read-heavy operations, smaller community compared to MySQL.</li>
+</ul>

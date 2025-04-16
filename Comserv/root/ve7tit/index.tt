@@ -118,6 +118,6 @@
 <br>
 <br>
 <p>
-<a href="http://computersystemconsulting.ca:5000/HelpDesk" target="_Blank" > HelpDesk</a>
+<a href="http://computersystemconsulting.ca/HelpDesk" target="_Blank" > HelpDesk</a>
 
 <p>Last Updated: [% data.site_last_update %]

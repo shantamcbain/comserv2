@@ -1,0 +1,30 @@
+    [% PageVersion = 'Documentation/SetupController.tt,v 0.01 2024/10/10 Shanta Exp shanta ' %]
+    [% IF c.session.debug_mode == 1 %]
+    [% END %]
+        [% PageVersion %]
+
+    <h1 id="setup_controller_top"><a href="#top">Setup Controller</a></h1>
+
+    <h2>Intent of the Setup Controller</h2>
+    <p>The Setup Controller is responsible for managing the setup process of the application. It handles user input, processes setup form submissions, and ensures that the necessary databases are created and configured correctly. The controller is built using the Catalyst framework.</p>
+
+    <h2>Current State of the Setup Controller</h2>
+    <p>As of this session, the Setup Controller includes the following functionalities:</p>
+    <ul>
+        <li>Displays the setup page to the user.</li>
+        <li>Processes the setup form submission.</li>
+        <li>Interacts with the Setup Model to deploy database schemas and check if the databases exist.</li>
+    </ul>
+
+    <h2>To-Do List for the Next Session</h2>
+    <p>In the next session, the following tasks need to be addressed:</p>
+    <ul>
+        <li>Change the load order if debug is set to 1. The application will load the admin/index.tt</li>
+        <li>Implement redirection to `setup/index.tt` to show errors and what needs to be done if the setup process is not completed.</li>
+        <li>Implement error handling for database connection issues.</li>
+        <li>Add validation for user inputs in the setup form.</li>
+        <li>Enhance logging to capture detailed setup process information.</li>
+        <li>Write unit tests for the Setup Controller methods.</li>
+    </ul>
+
+    <p><a href="#setup_controller_top">Back to top of Setup Controller Documentation</a></p>

@@ -24,6 +24,7 @@
     <ul>
       <li><a href="[% c.uri_for('/admin/theme') %]">Theme Management</a></li>
       <li><a href="[% c.uri_for('/admin/view_log') %]">View Application Log</a></li>
+      <li><a href="[% c.uri_for('/admin/git_pull') %]">Pull from Git Repository</a></li>
     </ul>
   </div>
 

@@ -29,9 +29,7 @@
 </form>
 
 <!-- Add a Register button that links to the register page -->
-<a href="[% c.uri_for('/user/register') %]" class="register-button">Register</a>
+<a href="/user/register" class="register-button">Register</a>
 
 <!-- Add a Change Password button that links to the change_password page -->
-<a href="[% c.uri_for('/user/forgot_password') %]" class="change-password-button">Forgot Password</a>
 <a href="/user/change_password_request" class="change-password-button">Change Password</a>
-<a href="[% c.uri_for('/user/change_password_request') %]" class="change-password-button">Change Password</a>

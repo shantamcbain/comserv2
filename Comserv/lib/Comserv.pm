@@ -25,16 +25,16 @@
                     Authorization::ACL
                 /;
 
-                extends 'Catalyst';
+extends 'Catalyst';
 
-                our $VERSION = '0.01';
+our $VERSION = '0.01';
 
-                __PACKAGE__->log(Catalyst::Log->new(output => sub {
-                    my ($self, $level, $message) = @_;
-                    $level = 'debug' unless defined $level;
-                    $message = '' unless defined $message;
-                    $self->dispatchers->[0]->log(level => $level, message => $message);
-                }));
+__PACKAGE__->log(Catalyst::Log->new(output => sub {
+    my ($self, $level, $message) = @_;
+    $level = 'debug' unless defined $level;
+    $message = '' unless defined $message;
+    $self->dispatchers->[0]->log(level => $level, message => $message);
+}));
 
 __PACKAGE__->config(
     name => 'Comserv',
@@ -64,6 +64,9 @@ __PACKAGE__->config(
                     encoding => 'UTF-8',
                     debug => $ENV{CATALYST_DEBUG} // 0,
                     default_view => 'TT',
+                    # Configure URI generation to not include port
+                    using_frontend_proxy => 1,
+                    ignore_frontend_proxy_port => 1,
                     'Plugin::Authentication' => {
                         default_realm => 'members',
                         realms        => {
@@ -101,13 +104,13 @@ __PACKAGE__->config(
                     },
                 );
 
-                sub psgi_app {
-                    my $self = shift;
+sub psgi_app {
+    my $self = shift;
 
-                    my $app = $self->SUPER::psgi_app(@_);
+    my $app = $self->SUPER::psgi_app(@_);
 
-                    return sub {
-                        my $env = shift;
+    return sub {
+        my $env = shift;
 
                         $self->config->{enable_catalyst_header} = $ENV{CATALYST_HEADER} // 1;
                         $self->config->{debug} = $ENV{CATALYST_DEBUG} // 0;
@@ -119,7 +122,11 @@ __PACKAGE__->config(
                 # Explicitly load controllers to ensure they're available
                 use Comserv::Controller::ProxmoxServers;
                 use Comserv::Controller::Proxmox;
+                use Comserv::Controller::BMaster;
+                use Comserv::Controller::ENCY;
+                use Comserv::Controller::Apiary;
 
+                
                 __PACKAGE__->setup();
 
                 1;

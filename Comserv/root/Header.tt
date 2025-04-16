@@ -29,7 +29,7 @@
     [% ELSE %]
         <meta name="description" content="[% http_header_description %]">
     [% END %]
-    <link rel="shortcut icon" href="[% favicon | uri('imagesfavicon.ico') %]">
+    <link rel="shortcut icon" href="/static/images/favicon.ico">
     [% IF SiteName == "CSC" %]
         [% embed('CSCWHMCSInterface') %]
     [% END %]
@@ -90,8 +90,13 @@
     <!-- Removed old CSS references: css_view_name, log_css, menu_css, todo_css -->
     [% END %]
 
-    <!-- jQuery for enhanced menu functionality -->
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Local SVG icon solution (no external dependencies) -->
+    <link rel="stylesheet" type="text/css" href="/static/css/svg-icons.css">
+
+    <!-- Fix for icons to respect theme colors -->
+    <link rel="stylesheet" type="text/css" href="/static/css/icon-fix.css">
+
+    <!-- No external dependencies - using vanilla JavaScript -->
     <script src="/static/js/sub-menu.js"></script>
     <script src="/static/js/menu.js"></script>
     <script language="javascript" type="text/javascript">

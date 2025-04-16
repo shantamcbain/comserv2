@@ -9,13 +9,13 @@
 
  <!-- Start /HTMLTemplates/Default/TopDropListMain.tt-->
          <li class="horizontal-dropdown">
-                <a href="/" class="dropbtn">Main</a>
+                <a href="/" class="dropbtn"><i class="icon-main"></i>Main</a>
                 <div class="dropdown-content">
-                    <a href="[% c.uri_for('/' )%]" onclick="activateSite('Home')">Home</a>
-                    <a href="[% c.session.return_url %]">Go Back</a>
-               <span><a href="[% c.uri_for('/workshop') %]" onclick="activateSite('Workshops')" target="_blenk">Workshops</a></span>
+                    <a href="/" onclick="activateSite('Home')"><i class="icon-home"></i>Home</a>
+                    <a href="[% c.session.return_url %]"><i class="icon-back"></i>Go Back</a>
+               <span><a href="/workshop" onclick="activateSite('Workshops')" target="_blenk"><i class="icon-workshop"></i>Workshops</a></span>
             <div class="submenu-item">
-                <span class="submenu-header">Mail</span>
+                <span class="submenu-header"><i class="icon-mail"></i>Mail</span>
                 <div class="submenu">
      [% IF c.session.username == 'Shanta' %]
     <a href="https://beemaster.ca:20000" target="_Blank">BMaster</a>

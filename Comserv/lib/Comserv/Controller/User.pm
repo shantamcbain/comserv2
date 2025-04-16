@@ -23,10 +23,23 @@ sub login :Local {
 
     # Store the referer URL if it hasn't been stored already
     my $referer = $c->req->referer || $c->uri_for('/');
+    
+    # Get the return_to parameter if it exists (for explicit redirects)
+    my $return_to = $c->req->param('return_to');
+    if ($return_to) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', "Found return_to parameter: $return_to");
+        $referer = $return_to;
+    }
 
     # Don't store the login page as the referer
     if ($referer !~ m{/user/login} && $referer !~ m{/login} && $referer !~ m{/do_login}) {
         $c->session->{referer} = $referer;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', "Stored referer in session: $referer");
+    } else {
+        # If we don't have a valid referer and none is stored, use the home page
+        $c->session->{referer} = $c->session->{referer} || $c->uri_for('/');
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', 
+            "Using existing session referer: " . $c->session->{referer});
     }
 
     # Clear any error messages
@@ -44,6 +57,9 @@ sub login :Local {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', "Referer: $referer");
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', "Session referer: " . ($c->session->{referer} || 'undefined'));
 
+    # Store the referer in the stash for the template
+    $c->stash->{return_to} = $c->session->{referer};
+    
     # Display the login form
     $c->stash(template => 'user/login.tt');
     $c->forward($c->view('TT'));
@@ -65,7 +81,6 @@ sub do_login :Local {
             $c, 'info', __FILE__, __LINE__, 'do_login',
             "User already logged in as: " . $c->session->{username} . ", proceeding with login"
         );
-
         # Clear the session to allow re-login
         $c->session({});
     }
@@ -96,19 +111,40 @@ sub do_login :Local {
     );
 
     # Get redirect path
-    # Use a default path if referer is not set, avoid using undefined values
-    my $redirect_path = $c->session->{referer} || '/';
-
-    # Log the referer for debugging
-    $self->logging->log_with_details(
-        $c, 'info', __FILE__, __LINE__, 'do_login',
-        "Session referer: " . ($c->session->{referer} || 'undefined')
-    );
+    # Check for return_to parameter first (highest priority)
+    my $return_to = $c->req->param('return_to');
+    my $redirect_path;
+    
+    if ($return_to) {
+        $redirect_path = $return_to;
+        $self->logging->log_with_details(
+            $c, 'info', __FILE__, __LINE__, 'do_login',
+            "Using return_to parameter for redirect: $return_to"
+        );
+    } else {
+        # Fall back to session referer
+        $redirect_path = $c->session->{referer} || '/';
+        $self->logging->log_with_details(
+            $c, 'info', __FILE__, __LINE__, 'do_login',
+            "Using session referer for redirect: " . ($c->session->{referer} || 'undefined')
+        );
+    }
 
     # Ensure we're not redirecting back to the login page
     if ($redirect_path =~ m{/user/login} || $redirect_path =~ m{/login} || $redirect_path =~ m{/do_login}) {
         $redirect_path = '/';
+        $self->logging->log_with_details(
+            $c, 'info', __FILE__, __LINE__, 'do_login',
+            "Avoiding redirect to login page, using home page instead"
+        );
     }
+    
+    # Store the redirect path for debugging
+    $c->stash->{debug_msg} = "Redirect path: $redirect_path";
+    $self->logging->log_with_details(
+        $c, 'debug', __FILE__, __LINE__, 'do_login',
+        "Final redirect path: $redirect_path"
+    );
 
     # Find user in database
     my $user = $c->model('DBEncy::User')->find({ username => $username });
@@ -117,13 +153,9 @@ sub do_login :Local {
             $c, 'warn', __FILE__, __LINE__, 'do_login',
             "Login failed: Username '$username' not found."
         );
-
-        # Improved error handling
-        $c->stash(
-            error_msg => 'Invalid username or password.',
-            template => 'user/login.tt'
-        );
-        $c->forward($c->view('TT'));
+        # Store error message in flash and redirect back to login page
+        $c->flash->{error_msg} = "Invalid username or password.";
+        $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
 
@@ -134,12 +166,9 @@ sub do_login :Local {
             "Login failed: Password mismatch for username '$username'."
         );
 
-        # Improved error handling
-        $c->stash(
-            error_msg => 'Invalid username or password.',
-            template => 'user/login.tt'
-        );
-        $c->forward($c->view('TT'));
+        # Store error message in flash and redirect back to login page
+        $c->flash->{error_msg} = 'Invalid username or password.';
+        $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
 
@@ -179,16 +208,29 @@ sub do_login :Local {
     # Set a success message in the flash
     $c->flash->{success_msg} = "Login successful. Welcome, $username!";
 
-    # Clear the referer to prevent redirect loops
-    $c->session->{referer} = undef;
+    # Store the redirect path in the flash for debugging
+    $c->flash->{debug_msg} = "Redirecting to: $redirect_path";
+    
+    # We're keeping the referer in case we need it again
+    # but we'll store the current redirect path to avoid loops
+    $c->session->{last_redirect} = $redirect_path;
 
     # Log the redirect
     $self->logging->log_with_details(
         $c, 'info', __FILE__, __LINE__, 'do_login',
         "Redirecting user '$username' to: $redirect_path");
 
-    # Redirect to the appropriate page
-    $c->res->redirect($redirect_path);
+    # After successful login, redirect to the appropriate page
+    # No need for a template here as this is an action, not a route
+    # Use uri_for if it's a relative path, otherwise use the path directly
+    if ($redirect_path =~ /^\// && $redirect_path !~ /^https?:\/\//i) {
+        # It's a relative path, use uri_for
+        $c->res->redirect($c->uri_for($redirect_path));
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login', "Using uri_for for redirect: " . $c->uri_for($redirect_path));
+    } else {
+        # It's an absolute URL, use it directly
+        $c->res->redirect($redirect_path);
+    }
     return;
 }
 
@@ -278,22 +320,40 @@ sub process_login {
     );
 
     # Get redirect path
-    # Use a default path if forwarder is not set, avoid using undefined values
-    my $redirect_path = $c->session->{referer} || '/';
+    # Check for return_to parameter first (highest priority)
+    my $return_to = $c->req->param('return_to');
+    my $redirect_path;
+    
+    if ($return_to) {
+        $redirect_path = $return_to;
+        $self->logging->log_with_details(
+            $c, 'info', __FILE__, __LINE__, 'do_login',
+            "Using return_to parameter for redirect: $return_to"
+        );
+    } else {
+        # Fall back to session referer
+        $redirect_path = $c->session->{referer} || '/';
+        $self->logging->log_with_details(
+            $c, 'info', __FILE__, __LINE__, 'do_login',
+            "Using session referer for redirect: " . ($c->session->{referer} || 'undefined')
+        );
+    }
+    
+    # Store the redirect path for debugging
+    $c->stash->{debug_msg} = "Redirect path: $redirect_path";
 
     # Ensure we're not redirecting back to the login page
-    if ($redirect_path =~ m{/user/login} || $redirect_path =~ m{/login}) {
+    if ($redirect_path =~ m{/user/login} || $redirect_path =~ m{/login} || $redirect_path =~ m{/do_login}) {
         $redirect_path = '/';
+        $self->logging->log_with_details(
+            $c, 'info', __FILE__, __LINE__, 'do_login',
+            "Avoiding redirect to login page, using home page instead"
+        );
     }
-
-    # Log the components of the redirect path
+    
     $self->logging->log_with_details(
         $c, 'debug', __FILE__, __LINE__, 'do_login',
-        "session->{referer}: " . ($c->session->{referer} || 'undefined')
-    );
-    $self->logging->log_with_details(
-        $c, 'debug', __FILE__, __LINE__, 'do_login',
-        "Redirect path resolved to: $redirect_path"
+        "Final redirect path: $redirect_path"
     );
 
     # Find user in database
@@ -304,12 +364,9 @@ sub process_login {
             "Login failed: Username '$username' not found."
         );
 
-        # Improved error handling
-        $c->stash(
-            error_msg => 'Invalid username or password.',
-            template => 'user/login.tt'
-        );
-        $c->forward($c->view('TT'));
+        # Store error message in flash and redirect back to login page
+        $c->flash->{error_msg} = 'Invalid username or password.';
+        $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
 
@@ -320,12 +377,9 @@ sub process_login {
             "Login failed: Password mismatch for username '$username'."
         );
 
-        # Improved error handling
-        $c->stash(
-            error_msg => 'Invalid username or password.',
-            template => 'user/login.tt'
-        );
-        $c->forward($c->view('TT'));
+        # Store error message in flash and redirect back to login page
+        $c->flash->{error_msg} = 'Invalid username or password.';
+        $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
 
@@ -390,10 +444,10 @@ sub process_login {
         $c, 'info', __FILE__, __LINE__, 'do_login',
         "Redirecting user '$username' to: $redirect_path");
 
-    # Try a different approach for the redirect
+    # Log the redirect attempt
     $self->logging->log_with_details(
         $c, 'info', __FILE__, __LINE__, 'do_login',
-        "Using $c->res->redirect() for redirect to: $redirect_path"
+        "Preparing to redirect to: $redirect_path"
     );
 
     # Double-check that we're not redirecting back to the login page
@@ -405,12 +459,312 @@ sub process_login {
         );
     }
 
-    $c->res->redirect($redirect_path);
+    # Redirect directly - no template needed for this action
+    # Use uri_for if it's a relative path, otherwise use the path directly
+    if ($redirect_path =~ /^\//) {
+        # It's a relative path, use uri_for
+        $c->res->redirect($c->uri_for($redirect_path));
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login', "Using uri_for for redirect: " . $c->uri_for($redirect_path));
+    } else {
+        # It's an absolute URL, use it directly
+        $c->res->redirect($redirect_path);
+    }
     return;
 }
 sub hash_password {
     my ($self, $password) = @_;
     return sha256_hex($password);
+}
+
+sub logout :Local {
+    my ($self, $c) = @_;
+
+    # Store the current URL before logout
+    my $current_url = $c->req->referer || $c->uri_for('/');
+
+    # Log the logout action with the current URL
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'logout',
+        "User '" . ($c->session->{username} || 'unknown') . "' logging out, current URL: $current_url");
+
+    # Get username before clearing session (for the success message)
+    my $username = $c->session->{username} || 'Guest';
+
+    # Store important site information before clearing the session
+    my $site_name = $c->session->{SiteName} || '';
+    my $theme_name = $c->session->{theme_name} || '';
+    my $controller_name = $c->session->{ControllerName} || '';
+
+    # Log the site information we're preserving
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'logout',
+        "Preserving site info: SiteName=$site_name, theme=$theme_name, controller=$controller_name");
+
+    # Properly delete the session (instead of just emptying it)
+    $c->delete_session("User logged out");
+
+    # Create a new session with minimal required data
+    $c->session->{SiteName} = $site_name if $site_name;
+    $c->session->{theme_name} = $theme_name if $theme_name;
+    $c->session->{ControllerName} = $controller_name if $controller_name;
+
+    # Set a success message
+    $c->flash->{success_msg} = "You have been successfully logged out.";
+
+    # Log the session deletion
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'logout',
+        "Session deleted for user '$username'. New session ID: " . $c->sessionid);
+
+    # Check if the current page is accessible to non-logged-in users
+    # List of public pages that don't require login
+    my @public_pages = (
+        qr{^/Documentation},  # Documentation pages
+        qr{^/$},              # Home page
+        qr{^/about},          # About page
+        qr{^/contact},        # Contact page
+        qr{^/user/login},     # Login page
+        qr{^/user/create_account}, # Registration page
+        qr{^/mcoop},          # MCoop pages
+        qr{^/csc},            # CSC pages
+        qr{^/usbm},           # USBM pages
+        qr{^/forager},        # Forager pages
+        qr{^/ve7tit},         # Ve7tit pages
+    );
+
+    # Check if current URL is in the public pages list
+    my $is_public = 0;
+    foreach my $pattern (@public_pages) {
+        if ($current_url =~ $pattern) {
+            $is_public = 1;
+            last;
+        }
+    }
+
+    # Log the decision
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'logout',
+        "URL $current_url is " . ($is_public ? "public" : "not public"));
+
+    # Determine the redirect URL
+    my $redirect_url;
+
+    # Log all the information we have for debugging
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'logout',
+        "Current URL: $current_url, SiteName: $site_name, Controller: $controller_name");
+
+    # First, try to extract the site from the current URL
+    my $site_from_url = '';
+    if ($current_url =~ m{^/([^/]+)}) {
+        $site_from_url = $1;
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'logout',
+            "Extracted site from URL: $site_from_url");
+    }
+
+    # Check if the site from URL is a valid controller
+    my $site_controller_exists = 0;
+    if ($site_from_url) {
+        eval {
+            my $controller = $c->controller(ucfirst($site_from_url));
+            $site_controller_exists = 1 if $controller;
+        };
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'logout',
+            "Site controller exists: " . ($site_controller_exists ? "Yes" : "No"));
+    }
+
+    if ($is_public) {
+        # If the current page is public, stay on it
+        $redirect_url = $current_url;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'logout',
+            "Redirecting to current public page: $redirect_url");
+    } elsif ($site_controller_exists) {
+        # If we extracted a valid controller from the URL, use that
+        $redirect_url = $c->uri_for("/$site_from_url");
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'logout',
+            "Redirecting to site from URL: $redirect_url");
+    } elsif ($controller_name && $controller_name ne 'Root') {
+        # If we have a site-specific controller in the session, redirect to its home page
+        $redirect_url = $c->uri_for("/$controller_name");
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'logout',
+            "Redirecting to site controller from session: $redirect_url");
+    } elsif ($site_name && $site_name ne 'none') {
+        # Try to use the site name as a fallback
+        $redirect_url = $c->uri_for("/" . lc($site_name));
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'logout',
+            "Redirecting to site from SiteName: $redirect_url");
+    } else {
+        # Default to the root home page as a last resort
+        $redirect_url = $c->uri_for('/');
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'logout',
+            "Redirecting to default home page: $redirect_url");
+    }
+
+    # Perform the redirect
+    $c->response->redirect($redirect_url);
+    return;
+}
+
+sub profile :Local {
+    my ($self, $c) = @_;
+
+    # Check if user is logged in
+    unless ($c->session->{username}) {
+        $c->flash->{error_msg} = "You must be logged in to view your profile.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    # Log the profile access
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'profile',
+        "User '" . $c->session->{username} . "' accessing profile");
+
+    # Get user data from database
+    my $user = $c->model('DBEncy::User')->find({ username => $c->session->{username} });
+
+    unless ($user) {
+        $c->flash->{error_msg} = "User not found in database. Please log in again.";
+        $c->session({});  # Clear session
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    # Prepare user data for display
+    my $user_data = {
+        username => $user->username,
+        first_name => $user->first_name,
+        last_name => $user->last_name,
+        email => $user->email,
+        roles => $c->session->{roles} || [],
+        # Add other fields as needed
+    };
+
+    # Set template and stash data
+    $c->stash(
+        user => $user_data,
+        template => 'user/profile.tt'
+    );
+
+    $c->forward($c->view('TT'));
+}
+
+sub settings :Local {
+    my ($self, $c) = @_;
+
+    # Check if user is logged in
+    unless ($c->session->{username}) {
+        $c->flash->{error_msg} = "You must be logged in to access account settings.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    # Log the settings access
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'settings',
+        "User '" . $c->session->{username} . "' accessing account settings");
+
+    # Get user data from database
+    my $user = $c->model('DBEncy::User')->find({ username => $c->session->{username} });
+
+    unless ($user) {
+        $c->flash->{error_msg} = "User not found in database. Please log in again.";
+        $c->session({});  # Clear session
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    # Set template and stash data
+    $c->stash(
+        user => {
+            username => $user->username,
+            first_name => $user->first_name,
+            last_name => $user->last_name,
+            email => $user->email,
+            email_notifications => $user->email_notifications || 0,
+            # Add other fields as needed
+        },
+        template => 'user/settings.tt'
+    );
+
+    $c->forward($c->view('TT'));
+}
+
+sub update_settings :Local {
+    my ($self, $c) = @_;
+
+    # Check if user is logged in
+    unless ($c->session->{username}) {
+        $c->flash->{error_msg} = "You must be logged in to update settings.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    # Log the update attempt
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_settings',
+        "User '" . $c->session->{username} . "' attempting to update settings");
+
+    # Get user data from database
+    my $user = $c->model('DBEncy::User')->find({ username => $c->session->{username} });
+
+    unless ($user) {
+        $c->flash->{error_msg} = "User not found in database. Please log in again.";
+        $c->session({});  # Clear session
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    # Get form data
+    my $first_name = $c->req->params->{first_name};
+    my $last_name = $c->req->params->{last_name};
+    my $email = $c->req->params->{email};
+    my $theme = $c->req->params->{theme} || 'default';
+    my $email_notifications = $c->req->params->{email_notifications} ? 1 : 0;
+    my $debug_mode = $c->req->params->{debug_mode} ? 1 : 0;
+
+    # Validate input
+    unless ($first_name && $last_name && $email) {
+        $c->flash->{error_msg} = "First name, last name, and email are required fields.";
+        $c->response->redirect($c->uri_for('/user/settings'));
+        return;
+    }
+
+    # Validate email format
+    unless ($email =~ /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/) {
+        $c->flash->{error_msg} = "Invalid email format.";
+        $c->response->redirect($c->uri_for('/user/settings'));
+        return;
+    }
+
+    # Update user in database
+    eval {
+        $user->update({
+            first_name => $first_name,
+            last_name => $last_name,
+            email => $email,
+            email_notifications => $email_notifications,
+            # Add other fields as needed
+        });
+    };
+
+    if ($@) {
+        # Log the error
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_settings',
+            "Error updating user settings: $@");
+
+        $c->flash->{error_msg} = "An error occurred while updating your settings. Please try again.";
+        $c->response->redirect($c->uri_for('/user/settings'));
+        return;
+    }
+
+    # Update session data
+    $c->session->{first_name} = $first_name;
+    $c->session->{last_name} = $last_name;
+    $c->session->{email} = $email;
+    $c->session->{theme_name} = $theme;
+    $c->session->{debug_mode} = $debug_mode;
+
+    # Log the successful update
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_settings',
+        "User '" . $c->session->{username} . "' settings updated successfully");
+
+    # Set success message and redirect
+    $c->flash->{success_msg} = "Your settings have been updated successfully.";
+    $c->response->redirect($c->uri_for('/user/profile'));
+    return;
 }
 sub create_account :Local {
     my ($self, $c) = @_;
@@ -427,9 +781,18 @@ sub do_create_account :Local {
     my $password_confirm = $c->request->params->{password_confirm};  # Retrieve the confirmation password
     my $first_name = $c->request->params->{first_name};
     my $last_name = $c->request->params->{last_name};
+    my $email = $c->request->params->{email};
+    my $roles = $c->request->params->{roles} || 'user';  # Default role is 'user'
+
+    # Log the account creation attempt
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
+        "Account creation attempt for username: $username");
 
     # Ensure all required fields are filled
     unless ($username && $password && $password_confirm && $first_name && $last_name) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
+            "Missing required fields for account creation");
+
         $c->stash(
             error_msg => 'All fields are required to create an account',
             template  => 'user/create_account.tt',
@@ -439,6 +802,9 @@ sub do_create_account :Local {
 
     # Check if the passwords match
     if ($password ne $password_confirm) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
+            "Passwords do not match for account creation");
+
         $c->stash(
             error_msg => 'Passwords do not match',
             template  => 'user/create_account.tt',
@@ -450,8 +816,11 @@ sub do_create_account :Local {
     my $hashed_password = $self->hash_password($password);
 
     # Check if the username already exists in the database
-    my $existing_user = $c->model('DBEncy::Ency::User')->find({ username => $username });
+    my $existing_user = $c->model('DBEncy::User')->find({ username => $username });
     if ($existing_user) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
+            "Username already exists: $username");
+
         $c->stash(
             error_msg => 'Username already exists. Please choose another.',
             template  => 'user/create_account.tt',
@@ -461,11 +830,18 @@ sub do_create_account :Local {
 
     # Create the new user in the database
     eval {
-        $c->model('DBEncy::Ency::User')->create({
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
+            "Creating new user: $username with roles: $roles");
+
+        $c->model('DBEncy::User')->create({
             username    => $username,
             password    => $hashed_password,
             first_name  => $first_name,
             last_name   => $last_name,
+            email       => $email,
+            roles       => $roles,
+            active      => 1,
+            created_at  => \'NOW()',
         });
     };
 

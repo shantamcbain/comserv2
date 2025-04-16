@@ -1,0 +1,186 @@
+[% PageVersion = 'user/profile.tt,v 0.01 2024/05/31 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'User Profile' %]
+
+<div class="user-profile-container">
+    <div class="profile-header">
+        <h1>User Profile</h1>
+        <p class="profile-subtitle">View and manage your account information</p>
+    </div>
+    
+    <div class="profile-content">
+        <div class="profile-section">
+            <h2>Account Information</h2>
+            <div class="profile-info">
+                <div class="info-group">
+                    <label>Username:</label>
+                    <span>[% user.username %]</span>
+                </div>
+                
+                <div class="info-group">
+                    <label>Name:</label>
+                    <span>[% user.first_name %] [% user.last_name %]</span>
+                </div>
+                
+                <div class="info-group">
+                    <label>Email:</label>
+                    <span>[% user.email %]</span>
+                </div>
+                
+                <div class="info-group">
+                    <label>Roles:</label>
+                    <span>
+                        [% IF user.roles.size %]
+                            [% FOREACH role IN user.roles %]
+                                <span class="role-badge">[% role %]</span>
+                            [% END %]
+                        [% ELSE %]
+                            <span class="role-badge">normal</span>
+                        [% END %]
+                    </span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="profile-actions">
+            <a href="[% c.uri_for('/user/settings') %]" class="action-button">Edit Profile</a>
+            <a href="[% c.uri_for('/user/change_password') %]" class="action-button">Change Password</a>
+        </div>
+        
+        <div class="profile-section">
+            <h2>Recent Activity</h2>
+            <p class="no-activity">No recent activity to display.</p>
+        </div>
+    </div>
+</div>
+
+<style>
+    .user-profile-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+    }
+    
+    .profile-header {
+        margin-bottom: 30px;
+        text-align: center;
+    }
+    
+    .profile-header h1 {
+        color: #333;
+        margin-bottom: 5px;
+    }
+    
+    .profile-subtitle {
+        color: #666;
+        font-size: 1.1em;
+    }
+    
+    .profile-content {
+        background-color: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        padding: 25px;
+    }
+    
+    .profile-section {
+        margin-bottom: 30px;
+    }
+    
+    .profile-section h2 {
+        color: #0066cc;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 10px;
+        margin-top: 0;
+    }
+    
+    .profile-info {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 15px;
+        margin-top: 20px;
+    }
+    
+    .info-group {
+        display: flex;
+        align-items: baseline;
+    }
+    
+    .info-group label {
+        font-weight: bold;
+        width: 100px;
+        color: #555;
+    }
+    
+    .info-group span {
+        color: #333;
+        flex: 1;
+    }
+    
+    .role-badge {
+        display: inline-block;
+        background-color: #0066cc;
+        color: white;
+        padding: 3px 10px;
+        border-radius: 15px;
+        font-size: 0.8em;
+        margin-right: 5px;
+        text-transform: capitalize;
+    }
+    
+    .profile-actions {
+        display: flex;
+        gap: 15px;
+        margin: 25px 0;
+    }
+    
+    .action-button {
+        display: inline-block;
+        background-color: #0066cc;
+        color: white;
+        padding: 10px 20px;
+        border-radius: 5px;
+        text-decoration: none;
+        font-weight: bold;
+        transition: background-color 0.2s;
+    }
+    
+    .action-button:hover {
+        background-color: #0055aa;
+    }
+    
+    .no-activity {
+        color: #666;
+        font-style: italic;
+        padding: 10px 0;
+    }
+    
+    /* Mobile responsiveness */
+    @media (max-width: 768px) {
+        .profile-info {
+            grid-template-columns: 1fr;
+        }
+        
+        .info-group {
+            flex-direction: column;
+        }
+        
+        .info-group label {
+            width: 100%;
+            margin-bottom: 5px;
+        }
+        
+        .profile-actions {
+            flex-direction: column;
+        }
+        
+        .action-button {
+            width: 100%;
+            text-align: center;
+        }
+    }
+</style>

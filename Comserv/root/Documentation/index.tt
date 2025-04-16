@@ -1,455 +1,161 @@
-[% PageVersion = 'Documentation/index.tt,v 1.0 2025/03/03 shanta Exp shanta ' %]
+[% PageVersion = 'Documentation/index.tt,v 1.6 2025/04/08 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
+<head>
+    <link rel="stylesheet" href="[% c.uri_for('/static/css/components/documentation.css') %]">
+</head>
+[%# Determine user role for display %]
+[% SET display_role = 'Guest' %]
+[% IF c.session.roles %]
+    [% IF c.session.roles.grep('admin').size %]
+        [% SET display_role = 'Administrator' %]
+    [% ELSIF c.session.roles.grep('developer').size %]
+        [% SET display_role = 'Developer' %]
+    [% ELSIF c.session.roles.grep('editor').size %]
+        [% SET display_role = 'Editor' %]
+    [% ELSIF c.session.roles.grep('user').size %]
+        [% SET display_role = 'User' %]
+    [% END %]
+[% END %]
 
-<div class="documentation-index">
-    <h1>Documentation Center</h1>
+[% IF c.session.debug_mode == 1 %]
+<div class="debug-info">
+    <h3>Debug Information</h3>
+    <p>User Role from Controller: [% user_role %]</p>
+    <p>Display Role from Template: [% display_role %]</p>
+    <p>Session Roles: [% c.session.roles.join(', ') IF c.session.roles %]</p>
+    <p>Debug Message: [% debug_msg %]</p>
+    <p>Categories Available:</p>
+    <ul>
+        <li>user_guides: [% categories.user_guides ? 'Yes' : 'No' %]</li>
+        <li>tutorials: [% categories.tutorials ? 'Yes' : 'No' %]</li>
+        <li>site_specific: [% categories.site_specific ? 'Yes' : 'No' %]</li>
+        <li>admin_guides: [% categories.admin_guides ? 'Yes' : 'No' %]</li>
+        <li>proxmox: [% categories.proxmox ? 'Yes' : 'No' %]</li>
+        <li>controllers: [% categories.controllers ? 'Yes' : 'No' %]</li>
+        <li>models: [% categories.models ? 'Yes' : 'No' %]</li>
+        <li>changelog: [% categories.changelog ? 'Yes' : 'No' %]</li>
+        <li>general: [% categories.general ? 'Yes' : 'No' %]</li>
+    </ul>
     
-    <p>Welcome to the Documentation Center. Here you can find all available documentation for the Comserv system.</p>
-    
-    <div class="documentation-list">
-        [% IF sorted_page_names.size > 0 %]
-            <h2>Available Documentation <button id="toggle-available-docs" class="toggle-button">Show/Hide</button></h2>
-            <div id="available-docs-container" class="collapsible-content">
-                <ul class="documentation-pages">
-                    [% FOREACH page_name IN sorted_page_names %]
-                        [% page = structured_pages.$page_name %]
-                        <li class="documentation-page">
-                            <a href="[% page.url %]" class="documentation-link">
-                                [% page.title %]
-                            </a>
-                        </li>
-                    [% END %]
-                </ul>
-            </div>
-            <script>
-                document.getElementById('toggle-available-docs').addEventListener('click', function() {
-                    var container = document.getElementById('available-docs-container');
-                    if (container.style.display === 'none') {
-                        container.style.display = 'block';
-                        this.textContent = 'Hide';
-                    } else {
-                        container.style.display = 'none';
-                        this.textContent = 'Show';
-                    }
-                });
-            </script>
+    <h4>Controller Documentation Files:</h4>
+    <ul>
+        [% IF categories.controllers && categories.controllers.pages.size > 0 %]
+            [% FOREACH page_name IN categories.controllers.pages.sort %]
+                <li>[% page_name %] - [% structured_pages.$page_name ? 'Found' : 'Not Found' %]</li>
+            [% END %]
         [% ELSE %]
-            <p class="no-documentation">No documentation pages found.</p>
+            <li>No controller documentation files found.</li>
         [% END %]
-    </div>
+    </ul>
     
-    <div class="documentation-sections">
-        <h2>Documentation Sections</h2>
-        <div class="section-grid">
-            <div class="section-card">
-                <h3>User Guides</h3>
-                <ul>
-                    <li><a href="[% c.uri_for('/Documentation/getting_started') %]">Getting Started</a></li>
-                    <li><a href="[% c.uri_for('/Documentation/user_manual') %]">User Manual</a></li>
-                </ul>
-            </div>
-            
-            <div class="section-card">
-                <h3>Administration</h3>
-                <ul>
-                    <li><a href="[% c.uri_for('/Documentation/admin') %]">Admin Module</a></li>
-                    <li><a href="[% c.uri_for('/Documentation/theme_system') %]">Theme System</a></li>
-                </ul>
-            </div>
-            
-            <div class="section-card">
-                <h3>Technical Documentation</h3>
-                <ul>
-                    <li><a href="[% c.uri_for('/Documentation/system_overview') %]">System Overview</a></li>
-                    <li><a href="[% c.uri_for('/Documentation/architecture') %]">Architecture</a></li>
-                    <li><a href="[% c.uri_for('/Documentation/documentation_workflow') %]"><strong>Documentation Workflow</strong></a> <span class="new-badge">New!</span></li>
-                </ul>
-            </div>
-        </div>
-    </div>
-    
-    <div class="documentation-resources">
-        <h2>Resources</h2>
-        <ul>
-            <li><a href="[% c.uri_for('/Documentation/completed_items.json') %]">Completed Items JSON</a> - List of completed development tasks</li>
-        </ul>
-    </div>
-
-    <div class="documentation-help">
-        <h2>Need Help?</h2>
-        <p>If you can't find the documentation you're looking for, please contact the system administrator.</p>
-    </div>
+    <h4>Model Documentation Files:</h4>
+    <ul>
+        [% IF categories.models && categories.models.pages.size > 0 %]
+            [% FOREACH page_name IN categories.models.pages.sort %]
+                <li>[% page_name %] - [% structured_pages.$page_name ? 'Found' : 'Not Found' %]</li>
+            [% END %]
+        [% ELSE %]
+            <li>No model documentation files found.</li>
+        [% END %]
+    </ul>
 </div>
-
-<style>
-    .documentation-index {
-        max-width: 900px;
-        margin: 0 auto;
-        padding: 20px;
-        font-family: Arial, sans-serif;
-    }
-    
-    .documentation-list {
-        margin: 20px 0;
-        padding: 15px;
-        background-color: #f5f5f5;
-        border-radius: 5px;
-    }
-    
-    .documentation-pages {
-        list-style-type: none;
-        padding: 0;
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-        gap: 15px;
-    }
-    
-    .documentation-page {
-        padding: 10px;
-        background-color: #fff;
-        border-radius: 3px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    }
-    
-    .documentation-link {
-        display: block;
-        color: #0066cc;
-        text-decoration: none;
-        font-weight: bold;
-    }
-    
-    .documentation-link:hover {
-        text-decoration: underline;
-    }
-    
-    .section-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-        gap: 20px;
-        margin-top: 15px;
-    }
-    
-    .section-card {
-        background-color: #fff;
-        border-radius: 5px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        padding: 15px;
-    }
-    
-    .section-card h3 {
-        color: #0066cc;
-        margin-top: 0;
-        border-bottom: 1px solid #eee;
-        padding-bottom: 8px;
-    }
-    
-    .section-card ul {
-        list-style-type: none;
-        padding-left: 0;
-    }
-    
-    .section-card li {
-        margin-bottom: 8px;
-    }
-    
-    .section-card a {
-        color: #333;
-        text-decoration: none;
-    }
-    
-    .section-card a:hover {
-        color: #0066cc;
-        text-decoration: underline;
-    }
-    
-    .documentation-resources,
-    .documentation-help {
-        margin-top: 30px;
-        padding: 15px;
-        border-radius: 3px;
-    }
-
-    .documentation-resources {
-        background-color: #f6ffed;
-        border-left: 4px solid #52c41a;
-    }
-
-    .documentation-help {
-        background-color: #e6f7ff;
-        border-left: 4px solid #1890ff;
-    }
-
-    .documentation-resources ul {
-        list-style-type: none;
-        padding-left: 0;
-    }
-
-    .documentation-resources li {
-        margin-bottom: 8px;
-    }
-    
-    .no-documentation {
-        color: #999;
-        font-style: italic;
-    }
-    
-    h1 {
-        color: #333;
-        border-bottom: 2px solid #eee;
-        padding-bottom: 10px;
-    }
-    
-    h2 {
-        color: #0066cc;
-        margin-top: 25px;
-    }
-</style>[% PageVersion = 'Documentation/index.tt,v 1.0 2024/05/30 shanta Exp shanta ' %]
-[% IF c.session.debug_mode == 1 %]
-    [% PageVersion %]
 [% END %]
-
-[% META title = 'Documentation Index' %]
 
 <div class="documentation-container">
-    <h1>Comserv Documentation</h1>
-    
-    <p>Welcome to the Comserv documentation. This section provides comprehensive information about the system, its features, and how to use them effectively.</p>
-    
-    <div class="documentation-grid">
-        <div class="documentation-card">
-            <h2>System Documentation</h2>
-            <ul>
-                <li><a href="/Documentation/system_overview">System Overview</a></li>
-                <li><a href="/Documentation/architecture">Architecture</a></li>
-                <li><a href="/Documentation/installation">Installation Guide</a></li>
-                <li><a href="/Documentation/configuration">Configuration</a></li>
-            </ul>
+    <header class="doc-header">
+        <h1>Comserv Documentation</h1>
+        <div class="user-context">
+            <span class="context-item"><strong>Site:</strong> [% site_name || 'Comserv' %]</span>
+            <span class="context-item"><strong>Role:</strong> [% display_role %]</span>
         </div>
-        
-        <div class="documentation-card">
-            <h2>User Guides</h2>
-            <ul>
-                <li><a href="/Documentation/user_guide">User Guide</a></li>
-                <li><a href="/Documentation/admin_guide">Administrator Guide</a></li>
-                <li><a href="/Documentation/site_management">Site Management</a></li>
-                <li><a href="/Documentation/content_management">Content Management</a></li>
-            </ul>
-        </div>
-        
-        <div class="documentation-card">
-            <h2>Developer Documentation</h2>
-            <ul>
-                <li><a href="/Documentation/api_reference">API Reference</a></li>
-                <li><a href="/Documentation/database_schema">Database Schema</a></li>
-                <li><a href="/Documentation/coding_standards">Coding Standards</a></li>
-                <li><a href="/Documentation/theme_system">Theme System</a></li>
-            </ul>
-        </div>
-        
-        <div class="documentation-card">
-            <h2>Tutorials</h2>
-            <ul>
-                <li><a href="/Documentation/getting_started">Getting Started</a></li>
-                <li><a href="/Documentation/creating_sites">Creating Sites</a></li>
-                <li><a href="/Documentation/custom_themes">Creating Custom Themes</a></li>
-                <li><a href="/Documentation/extending">Extending Comserv</a></li>
-            </ul>
-        </div>
-    </div>
-    
-    <h2>Recent Updates <button id="toggle-updates" class="toggle-button">Show/Hide</button></h2>
-    <div id="recent-updates-container" class="collapsible-content">
-        [% IF completed_items.size > 0 %]
-            <ul class="recent-updates">
-                [% FOREACH item IN completed_items %]
-                    <li>
-                        <span class="update-date">[% item.date_created %]</span>
-                        <span class="update-item">[% item.item %]</span>
-                        [% IF item.commit %]
-                            <span class="update-commit">Commit: [% item.commit %]</span>
-                        [% END %]
-                    </li>
-                [% END %]
-            </ul>
-        [% ELSE %]
-            <p>No recent updates found.</p>
-        [% END %]
-    </div>
+    </header>
+    <p class="intro">Comprehensive guides and resources for the Comserv system, tailored to your role and site.</p>
 
-    <script>
-        document.getElementById('toggle-updates').addEventListener('click', function() {
-            var container = document.getElementById('recent-updates-container');
-            if (container.style.display === 'none') {
-                container.style.display = 'block';
-                this.textContent = 'Hide';
-            } else {
-                container.style.display = 'none';
-                this.textContent = 'Show';
-            }
-        });
-    </script>
+[%# User-facing sections %]
+[% INCLUDE 'Documentation/user_docs.tt' %]
+[% INCLUDE 'Documentation/tutorials.tt' %]
+[% INCLUDE 'Documentation/site_specific.tt' %]
 
-    <h2>All Documentation Pages</h2>
-    <div class="all-documentation">
-        [% IF documentation_pages.size > 0 %]
-            <ul class="documentation-list">
-                [% FOREACH page IN documentation_pages.keys.sort %]
-                    <li><a href="/Documentation/[% page %]">[% page.replace('_', ' ').ucfirst %]</a></li>
-                [% END %]
-            </ul>
-        [% ELSE %]
-            <p>No additional documentation pages found.</p>
-        [% END %]
-    </div>
+[%# Admin-only sections %]
+[% # Use the is_admin flag passed from the controller %]
+[% IF is_admin %]
+    [% # Debug output %]
+    [% IF c.session.debug_mode == 1 %]
+        <div class="debug-info">
+            <p>Admin sections visible: user_role=[% user_role %], session roles=[% c.session.roles.join(',') IF c.session.roles %]</p>
+        </div>
+    [% END %]
+    [% INCLUDE 'Documentation/admin_guides.tt' %]
+    [% INCLUDE 'Documentation/proxmox.tt' %]
+    [% INCLUDE 'Documentation/controllers.tt' %]
+    [% INCLUDE 'Documentation/models.tt' %]
+    [% INCLUDE 'Documentation/changelog.tt' %]
+    [% INCLUDE 'Documentation/all_docs.tt' %]
+[% END %]
 
-    <h2>All Documentation Pages</h2>
-    <div class="all-documentation">
-        [% IF documentation_pages.size > 0 %]
-            <ul class="documentation-list">
-                [% FOREACH page IN documentation_pages.keys.sort %]
-                    <li><a href="/Documentation/[% page %]">[% page.replace('_', ' ').ucfirst %]</a></li>
-                [% END %]
-            </ul>
-        [% ELSE %]
-            <p>No additional documentation pages found.</p>
-        [% END %]
-    </div>
+[%# Admin/Developer/Debug sections %]
+[% IF display_role == 'Administrator' || display_role == 'Developer' || c.session.debug_mode == 1 %]
+    [% INCLUDE 'Documentation/system_info.tt' %]
+[% END %]
+
+[% INCLUDE 'Documentation/recent_updates.tt' %]
 </div>
 
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.section-toggle').forEach(header => {
+            header.addEventListener('click', function() {
+                this.classList.toggle('expanded');
+                // Find the next .section-content element within the same section
+                const section = this.closest('.doc-section');
+                const content = section.querySelector('.section-content');
+                
+                if (content.classList.contains('expanded')) {
+                    content.style.maxHeight = '0';
+                    content.classList.remove('expanded');
+                } else {
+                    content.style.maxHeight = content.scrollHeight + 'px';
+                    content.classList.add('expanded');
+                }
+            });
+        });
+        
+        // Initialize all expanded sections
+        document.querySelectorAll('.section-content.expanded').forEach(content => {
+            content.style.maxHeight = content.scrollHeight + 'px';
+        });
+    });
+
+    function showFileType(evt, fileType) {
+        var contents = document.getElementsByClassName('section-content');
+        for (var i = 0; i < contents.length; i++) {
+            contents[i].style.display = 'none';
+            contents[i].classList.remove('active');
+        }
+        var tabs = document.getElementsByClassName('file-type-tab');
+        for (var i = 0; i < tabs.length; i++) {
+            tabs[i].classList.remove('active');
+        }
+        var activeContent = document.getElementById(fileType);
+        activeContent.style.display = 'grid';
+        activeContent.classList.add('active');
+        activeContent.style.maxHeight = activeContent.scrollHeight + 'px';
+        evt.currentTarget.classList.add('active');
+    }
+</script>
+
 <style>
+    /* Your existing CSS unchanged */
     .documentation-container {
         max-width: 1200px;
         margin: 0 auto;
         padding: 20px;
+        font-family: Arial, sans-serif;
+        background: #f8f9fa;
     }
     
-    .documentation-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-        gap: 20px;
-        margin: 30px 0;
-    }
-    
-    .documentation-card {
-        background-color: #f8f9fa;
-        border-radius: 5px;
-        padding: 20px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    
-    .documentation-card h2 {
-        margin-top: 0;
-        border-bottom: 1px solid #ddd;
-        padding-bottom: 10px;
-    }
-    
-    .documentation-card ul {
-        list-style-type: none;
-        padding-left: 0;
-    }
-    
-    .documentation-card li {
-        margin-bottom: 10px;
-    }
-    
-    .recent-updates {
-        list-style-type: none;
-        padding-left: 0;
-    }
-    
-    .recent-updates li {
-        margin-bottom: 15px;
-        padding: 10px;
-        background-color: #f8f9fa;
-        border-radius: 5px;
-        border-left: 4px solid #4CAF50;
-    }
 
-    .update-date {
-        display: inline-block;
-        background-color: #e9ecef;
-        padding: 3px 8px;
-        border-radius: 3px;
-        margin-right: 10px;
-        font-size: 0.9em;
-        font-weight: bold;
-    }
-
-    .update-item {
-        display: block;
-        margin: 5px 0;
-        font-size: 1.1em;
-    }
-
-    .update-commit {
-        display: block;
-        font-family: monospace;
-        background-color: #f1f1f1;
-        padding: 5px;
-        margin-top: 5px;
-        border-radius: 3px;
-        font-size: 0.9em;
-    }
-
-    .toggle-button {
-        background-color: #4CAF50;
-        color: white;
-        border: none;
-        padding: 5px 10px;
-        text-align: center;
-        text-decoration: none;
-        display: inline-block;
-        font-size: 14px;
-        margin-left: 10px;
-        cursor: pointer;
-        border-radius: 4px;
-    }
-
-    .collapsible-content {
-        max-height: 500px;
-        overflow-y: auto;
-        transition: max-height 0.3s ease-out;
-    }
-
-    .new-badge {
-        background-color: #ff5722;
-        color: white;
-        font-size: 0.7em;
-        padding: 2px 5px;
-        border-radius: 3px;
-        margin-left: 5px;
-        font-weight: bold;
-        vertical-align: middle;
-    }
-
-    .all-documentation {
-        margin-top: 20px;
-    }
-
-    .documentation-list {
-        list-style-type: none;
-        padding: 0;
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-        gap: 10px;
-    }
-
-    .documentation-list li {
-        background-color: #f8f9fa;
-        padding: 10px 15px;
-        border-radius: 5px;
-        transition: background-color 0.2s;
-    }
-
-    .documentation-list li:hover {
-        background-color: #e9ecef;
-    }
-
-    .documentation-list a {
-        text-decoration: none;
-        color: #333;
-        display: block;
-    }
+    /* ... rest of your CSS ... */
 </style>

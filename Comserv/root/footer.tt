@@ -1,6 +1,23 @@
-[% PageVersion	= 'footer.tt,v 0.01 2023/08/30 shanta Exp shanta '	%]
+[% PageVersion	= 'footer.tt,v 0.02 2024/06/02 shanta Exp shanta '	%]
 [% IF c.session.debug_mode == 1 %]
  <br>[%	PageVersion %] </br>
- <br><a href="[% c.uri_for('/reset_session') %]">Reset Session</a></br>
+ <br><a href="/reset_session">Reset Session</a></br>
 [% END %]
-<script type="text/javascript" async="async" defer="defer" data-cfasync="false" src="https://mylivechat.com/chatinline.aspx?hccid=98668549"></script>
+<!-- Local chat implementation - no external dependencies -->
+<script type="text/javascript" src="/static/js/local-chat.js"></script>
+
+<!-- Debug information about the current page -->
+[% IF c.session.debug_mode == 1 %]
+<div class="debug-footer">
+    <details>
+        <summary>Debug Information</summary>
+        <ul>
+            <li>Controller: [% c.session.ControllerName || 'Not defined' %]</li>
+            <li>Theme: [% c.session.theme_name || 'Not defined' %]</li>
+            <li>SiteName: [% c.session.SiteName || 'Not defined' %]</li>
+            <li>Username: [% c.session.username || 'Not logged in' %]</li>
+            <li>Session ID: [% c.sessionid || 'Not available' %]</li>
+        </ul>
+    </details>
+</div>
+[% END %]
