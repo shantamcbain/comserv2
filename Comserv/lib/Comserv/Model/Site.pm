@@ -37,19 +37,51 @@ sub get_all_sites {
     );
 
     my @sites;
+    my $result;
+
     try {
+        # Try to get the site resultset
         my $site_rs = $self->schema->resultset('Site');
+
+        $self->logging->log_with_details(
+            $c, 'info', __FILE__, __LINE__, 'get_all_sites',
+            "Successfully got resultset"
+        );
+
+        # Get all sites
         @sites = $site_rs->all;
+
+        $self->logging->log_with_details(
+            $c, 'info', __FILE__, __LINE__, 'get_all_sites',
+            "Retrieved " . scalar(@sites) . " sites"
+        );
+
+        # Log each site for debugging
+        foreach my $site (@sites) {
+            $self->logging->log_with_details(
+                $c, 'info', __FILE__, __LINE__, 'get_all_sites',
+                "Site: ID=" . $site->id . ", Name=" . $site->name
+            );
+        }
+
+        # Store the array reference of sites
+        $result = \@sites;
+
+        # Log the reference type for debugging
+        $self->logging->log_with_details(
+            $c, 'info', __FILE__, __LINE__, 'get_all_sites',
+            "Returning reference type: " . ref($result) . " with " . scalar(@$result) . " elements"
+        );
     } catch {
         my $error = $_;
         $self->logging->log_with_details(
             $c, 'error', __FILE__, __LINE__, 'get_all_sites',
             "Error fetching sites: $error"
         );
-        return [];
+        $result = [];
     };
 
-    return \@sites;
+    return $result || [];
 }
 
 sub get_site_details {
@@ -91,23 +123,32 @@ sub get_site_details_by_name {
         "Getting site details for name: $site_name"
     );
 
+    my $result;
+
     try {
         my $site = $self->schema->resultset('Site')->find({ name => $site_name });
-        return $site if $site;
 
-        $self->logging->log_with_details(
-            $c, 'warn', __FILE__, __LINE__, 'get_site_details_by_name',
-            "Site not found for name: $site_name"
-        );
-        return;
+        if ($site) {
+            $self->logging->log_with_details(
+                $c, 'info', __FILE__, __LINE__, 'get_site_details_by_name',
+                "Found site: ID=" . $site->id . ", Name=" . $site->name
+            );
+            $result = $site;
+        } else {
+            $self->logging->log_with_details(
+                $c, 'warn', __FILE__, __LINE__, 'get_site_details_by_name',
+                "Site not found for name: $site_name"
+            );
+        }
     } catch {
         my $error = $_;
         $self->logging->log_with_details(
             $c, 'error', __FILE__, __LINE__, 'get_site_details_by_name',
             "Error fetching site details: $error"
         );
-        return;
     };
+
+    return $result;
 }
 
 sub get_site_domain {
