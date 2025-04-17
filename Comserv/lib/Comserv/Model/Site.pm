@@ -338,8 +338,9 @@ sub delete_site {
 
 sub get_site_details_by_name {
     my ($self, $c, $site_name) = @_;
-    print " in get_site_details_by_name Site name: $site_name\n";
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_site_details_by_name', "Site name: $site_name");
+    # Push debug message to stash as requested
+    $c->stash->{debug_msg} = "Looking up site details for: $site_name";
 
     my $site;
     try {

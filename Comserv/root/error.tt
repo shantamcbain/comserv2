@@ -21,6 +21,26 @@
             <p>[% action_required %]</p>
         </div>
         [% END %]
+        
+        [% IF setup_instructions %]
+        <div class="setup-instructions">
+            <h3>Setup Instructions:</h3>
+            <p>To install Docker and set up Nginx Proxy Manager:</p>
+            <ol>
+                <li>Go to the <a href="[% c.uri_for('/proxymanager/setup_infrastructure') %]">Infrastructure Setup</a> page</li>
+                <li>Click the "Install Docker" button and wait for the installation to complete</li>
+                <li>Once Docker is installed, click the "Install NPM" button</li>
+                <li>After installation, you can access the NPM admin interface at <a href="http://localhost:81" target="_blank">http://localhost:81</a></li>
+                <li>Log in with the default credentials (admin\@example.com / changeme)</li>
+                <li>Generate an API key in the NPM admin interface</li>
+                <li>Update the API key in your configuration file</li>
+            </ol>
+            
+            <div class="warning">
+                <p>You may need to log out and log back in after Docker installation for group changes to take effect.</p>
+            </div>
+        </div>
+        [% END %]
 
         [% IF technical_details && c.session.debug_mode %]
         <div class="technical-details">

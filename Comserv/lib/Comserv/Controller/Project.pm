@@ -102,8 +102,17 @@ sub  create_project :Local :Args(0) {
         $parent_id = undef;
     }
 
+    # Get group_of_poster safely
+    my $group_of_poster = 'general';  # Default value
+    if ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && defined $c->session->{roles}->[0]) {
+        $group_of_poster = $c->session->{roles}->[0];
+    } else {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_project',
+            "No roles found in session, using default group 'general'");
+    }
+
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_project',
-        "Parent ID: " . (defined $parent_id ? $parent_id : 'undef'));
+        "Parent ID: " . (defined $parent_id ? $parent_id : 'undef') . ", Group of poster: $group_of_poster");
 
     my $project = eval {
         $project_rs->create({
@@ -121,7 +130,7 @@ sub  create_project :Local :Args(0) {
             comments => $form_data->{comments},
             username_of_poster => $username,
             parent_id => $parent_id,
-            group_of_poster => $c->session->{roles}->[0],
+            group_of_poster => $group_of_poster,
             date_time_posted => $date_time_posted->ymd . ' ' . $date_time_posted->hms,
             record_id => 0  # Set to 0 instead of undef
         });
