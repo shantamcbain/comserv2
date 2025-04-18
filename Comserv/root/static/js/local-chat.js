@@ -1,9 +1,28 @@
 /**
- * Local Chat Implementation
- * A simple chat widget that works without external dependencies
+ * Live Chat Implementation
+ * A chat widget that connects to the server API
  */
 
 (function() {
+    // Configuration
+    const config = {
+        apiEndpoints: {
+            sendMessage: '/chat/send_message',
+            getMessages: '/chat/get_messages'
+        },
+        pollInterval: 5000, // How often to check for new messages (ms)
+        maxRetries: 3,      // Max retries for failed API calls
+    };
+    
+    // State
+    let state = {
+        lastMessageId: 0,
+        isPolling: false,
+        retryCount: 0,
+        pollTimer: null,
+        isOpen: false
+    };
+    
     // Create chat widget elements
     function createChatWidget() {
         // Create main container
@@ -45,9 +64,16 @@
         chatInput.innerHTML = '<textarea id="message-input" placeholder="Type your message..."></textarea>' +
                              '<button id="send-message">Send</button>';
         
+        // Create status indicator
+        const statusIndicator = document.createElement('div');
+        statusIndicator.id = 'chat-status';
+        statusIndicator.className = 'chat-status';
+        statusIndicator.textContent = 'Connected';
+        
         // Assemble the chat panel
         chatPanel.appendChild(chatHeader);
         chatPanel.appendChild(chatMessages);
+        chatPanel.appendChild(statusIndicator);
         chatPanel.appendChild(chatInput);
         
         // Add everything to the container
@@ -59,13 +85,11 @@
         
         // Add event listeners
         chatButton.addEventListener('click', function() {
-            chatPanel.style.display = 'block';
-            chatButton.style.display = 'none';
+            openChat();
         });
         
         document.getElementById('close-chat').addEventListener('click', function() {
-            chatPanel.style.display = 'none';
-            chatButton.style.display = 'block';
+            closeChat();
         });
         
         document.getElementById('send-message').addEventListener('click', sendMessage);
@@ -77,34 +101,164 @@
         });
     }
     
+    // Open chat panel and start polling
+    function openChat() {
+        const chatPanel = document.getElementById('chat-panel');
+        const chatButton = document.getElementById('chat-button');
+        
+        chatPanel.style.display = 'flex';
+        chatButton.style.display = 'none';
+        state.isOpen = true;
+        
+        // Start polling for messages
+        startPolling();
+        
+        // Load existing messages
+        fetchMessages();
+    }
+    
+    // Close chat panel and stop polling
+    function closeChat() {
+        const chatPanel = document.getElementById('chat-panel');
+        const chatButton = document.getElementById('chat-button');
+        
+        chatPanel.style.display = 'none';
+        chatButton.style.display = 'flex';
+        state.isOpen = false;
+        
+        // Stop polling
+        stopPolling();
+    }
+    
+    // Start polling for new messages
+    function startPolling() {
+        if (!state.isPolling) {
+            state.isPolling = true;
+            state.pollTimer = setInterval(fetchMessages, config.pollInterval);
+        }
+    }
+    
+    // Stop polling for new messages
+    function stopPolling() {
+        if (state.isPolling) {
+            clearInterval(state.pollTimer);
+            state.isPolling = false;
+        }
+    }
+    
+    // Fetch messages from the server
+    function fetchMessages() {
+        const statusIndicator = document.getElementById('chat-status');
+        statusIndicator.textContent = 'Connecting...';
+        
+        fetch(config.apiEndpoints.getMessages + '?last_id=' + state.lastMessageId)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    // Reset retry counter on success
+                    state.retryCount = 0;
+                    
+                    // Update status
+                    statusIndicator.textContent = 'Connected';
+                    statusIndicator.className = 'chat-status connected';
+                    
+                    // Process new messages
+                    if (data.messages && data.messages.length > 0) {
+                        data.messages.forEach(msg => {
+                            const className = msg.is_system_message ? 'system-message' : 'user-message';
+                            addMessage(msg.message, className);
+                            
+                            // Update last message ID
+                            if (msg.id > state.lastMessageId) {
+                                state.lastMessageId = msg.id;
+                            }
+                        });
+                    }
+                } else {
+                    console.error('Error fetching messages:', data.error);
+                    statusIndicator.textContent = 'Connection error';
+                    statusIndicator.className = 'chat-status error';
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching messages:', error);
+                statusIndicator.textContent = 'Connection error';
+                statusIndicator.className = 'chat-status error';
+                
+                // Retry logic
+                state.retryCount++;
+                if (state.retryCount > config.maxRetries) {
+                    stopPolling();
+                    statusIndicator.textContent = 'Connection failed';
+                }
+            });
+    }
+    
     // Function to send a message
     function sendMessage() {
         const messageInput = document.getElementById('message-input');
+        const statusIndicator = document.getElementById('chat-status');
         const message = messageInput.value.trim();
         
         if (message) {
-            // Add user message to chat
+            // Add user message to chat immediately for better UX
             addMessage(message, 'user-message');
             
             // Clear input
             messageInput.value = '';
             
-            // Simulate response (in a real implementation, this would send to a server)
-            setTimeout(function() {
-                addMessage('Thank you for your message. Our team will review it and get back to you soon.', 'system-message');
-            }, 1000);
+            // Update status
+            statusIndicator.textContent = 'Sending...';
             
-            // In a real implementation, you would send the message to your server here
-            console.log('Message sent (would be sent to server):', message);
+            // Send to server
+            const formData = new FormData();
+            formData.append('message', message);
             
-            // Store in local storage for demo purposes
-            const messages = JSON.parse(localStorage.getItem('chatMessages') || '[]');
-            messages.push({
-                text: message,
-                sender: 'user',
-                timestamp: new Date().toISOString()
+            fetch(config.apiEndpoints.sendMessage, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    // Message sent successfully
+                    statusIndicator.textContent = 'Message sent';
+                    statusIndicator.className = 'chat-status connected';
+                    
+                    // Update last message ID if provided
+                    if (data.message_id && data.message_id > state.lastMessageId) {
+                        state.lastMessageId = data.message_id;
+                    }
+                    
+                    // Fetch any new messages (including potential auto-responses)
+                    setTimeout(fetchMessages, 1000);
+                } else {
+                    console.error('Error sending message:', data.error);
+                    statusIndicator.textContent = 'Failed to send';
+                    statusIndicator.className = 'chat-status error';
+                    
+                    // Show error in chat
+                    addMessage('Error sending message. Please try again.', 'error-message');
+                }
+            })
+            .catch(error => {
+                console.error('Error sending message:', error);
+                statusIndicator.textContent = 'Failed to send';
+                statusIndicator.className = 'chat-status error';
+                
+                // Show error in chat
+                addMessage('Error sending message. Please try again.', 'error-message');
             });
-            localStorage.setItem('chatMessages', JSON.stringify(messages));
         }
     }
     
@@ -127,12 +281,12 @@
                 bottom: 20px;
                 right: 20px;
                 z-index: 1000;
-                font-family: Arial, sans-serif;
+                font-family: inherit;
             }
             
             .chat-button {
                 background-color: var(--primary-color, #007bff);
-                color: white;
+                color: var(--text-on-primary, white);
                 border: none;
                 border-radius: 50px;
                 padding: 10px 20px;
@@ -140,6 +294,7 @@
                 display: flex;
                 align-items: center;
                 box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                font-family: inherit;
             }
             
             .chat-icon {
@@ -150,16 +305,17 @@
             .chat-panel {
                 width: 300px;
                 height: 400px;
-                background-color: white;
+                background-color: var(--background-color, white);
                 border-radius: 10px;
                 box-shadow: 0 5px 15px rgba(0,0,0,0.2);
                 display: flex;
                 flex-direction: column;
+                font-family: inherit;
             }
             
             .chat-header {
                 background-color: var(--primary-color, #007bff);
-                color: white;
+                color: var(--text-on-primary, white);
                 padding: 10px 15px;
                 border-top-left-radius: 10px;
                 border-top-right-radius: 10px;
@@ -198,15 +354,42 @@
             
             .system-message {
                 background-color: #e9ecef;
+                color: #212529;
                 align-self: flex-start;
                 margin-right: auto;
+                border-bottom-left-radius: 5px;
             }
             
             .user-message {
                 background-color: var(--primary-color, #007bff);
-                color: white;
+                color: var(--text-on-primary, white);
                 align-self: flex-end;
                 margin-left: auto;
+                border-bottom-right-radius: 5px;
+            }
+            
+            .error-message {
+                background-color: #f8d7da;
+                color: #721c24;
+                align-self: center;
+                margin: 5px auto;
+                font-size: 0.9em;
+            }
+            
+            .chat-status {
+                padding: 5px 10px;
+                font-size: 0.8em;
+                text-align: center;
+                background-color: #f8f9fa;
+                border-top: 1px solid #dee2e6;
+            }
+            
+            .chat-status.connected {
+                color: #28a745;
+            }
+            
+            .chat-status.error {
+                color: #dc3545;
             }
             
             .chat-input {
@@ -227,11 +410,22 @@
             
             #send-message {
                 background-color: var(--primary-color, #007bff);
-                color: white;
+                color: var(--text-on-primary, white);
                 border: none;
                 border-radius: 4px;
                 padding: 8px 15px;
                 cursor: pointer;
+                font-family: inherit;
+            }
+            
+            #send-message:hover {
+                background-color: var(--primary-color-dark, #0069d9);
+                color: var(--text-on-primary, white);
+            }
+            
+            #send-message:disabled {
+                background-color: #6c757d;
+                cursor: not-allowed;
             }
         `;
         document.head.appendChild(style);
