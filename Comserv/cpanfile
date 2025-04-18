@@ -22,6 +22,9 @@ requires 'SQL::Translator';
 requires 'JSON';
 requires 'Config::JSON';
 
+# YAML handling
+requires 'YAML::XS';
+
 # Template Toolkit and plugins
 requires 'Template';
 requires 'Template::Plugin::DateTime';
