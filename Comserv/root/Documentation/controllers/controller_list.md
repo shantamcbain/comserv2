@@ -20,6 +20,7 @@ This document lists all controllers in the Comserv application and their documen
 | ENCY | ❌ Missing | `/lib/Comserv/Controller/ENCY.pm` |
 | File | ❌ Missing | `/lib/Comserv/Controller/File.pm` |
 | Forager | ❌ Missing | `/lib/Comserv/Controller/Forager.pm` |
+| HelpDesk | ✅ Documented | `/lib/Comserv/Controller/HelpDesk.pm` |
 | Hosting | ❌ Missing | `/lib/Comserv/Controller/Hosting.pm` |
 | Log | ❌ Missing | `/lib/Comserv/Controller/Log.pm` |
 | Mail | ❌ Missing | `/lib/Comserv/Controller/Mail.pm` |

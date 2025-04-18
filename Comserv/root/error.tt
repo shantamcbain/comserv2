@@ -49,10 +49,21 @@
         </div>
         [% END %]
 
-        [% IF debug_msg %]
+        [% IF debug_msg.defined || debug_msg_str.defined %]
         <div class="debug-message">
             <h3>Debug Message:</h3>
-            <p>[% debug_msg %]</p>
+            [% IF debug_msg.size && debug_msg.0.defined %]
+                <!-- Handle debug_msg as an array -->
+                [% FOREACH msg IN debug_msg %]
+                    <p>[% msg %]</p>
+                [% END %]
+            [% ELSIF debug_msg_str.defined %]
+                <!-- Handle debug_msg_str as a string -->
+                <p>[% debug_msg_str %]</p>
+            [% ELSE %]
+                <!-- Handle debug_msg as a string (legacy) -->
+                <p>[% debug_msg %]</p>
+            [% END %]
         </div>
         [% END %]
 

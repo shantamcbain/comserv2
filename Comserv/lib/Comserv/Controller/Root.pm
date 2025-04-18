@@ -895,12 +895,20 @@ sub default :Path {
     
     $c->response->status(404);
     $c->stash(
-        template => 'CSC/error/not_found.tt',
-        error_message => "The page you requested could not be found: /$path",
+        template => 'error.tt',
+        error_title => 'Page Not Found',
+        error_msg => "The page you requested could not be found: /$path",
         requested_path => $path,
-        debug_message => "Using Catalyst's built-in proxy configuration. Test URL: " . 
+        debug_msg => "Page not found: /$path",
+        technical_details => "Using Catalyst's built-in proxy configuration. Test URL: " . 
                          $c->uri_for('/test')
     );
+    
+    # Initialize debug_msg array if it doesn't exist
+    $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
+    
+    # Add the debug message to the array
+    push @{$c->stash->{debug_msg}}, "Page not found: /$path";
 }
 
 __PACKAGE__->meta->make_immutable;
