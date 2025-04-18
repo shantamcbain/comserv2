@@ -1633,15 +1633,15 @@ sub check_infrastructure_status {
     return $status;
 }
 
-sub install_docker :Local :Args(0) {
+sub install_docker_api :Local :Args(0) {
     my ($self, $c) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'install_docker',
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'install_docker_api',
         "Docker installation requested via " . $c->req->method);
     
     # Check if user is logged in and has proxy management privileges
     my $root_controller = $c->controller('Root');
     unless ($root_controller->user_exists($c) && $self->has_proxy_rights($c)) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'install_docker',
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'install_docker_api',
             "Unauthorized Docker installation attempt by user: " . ($c->session->{username} || 'none'));
         $c->response->status(403);
         $c->stash(
@@ -2158,16 +2158,16 @@ NPM_CONFIG
 }
 
 # Method to render the AJAX test page
-sub setup_infrastructure :Local :Args(0) {
+sub setup_infrastructure_api :Local :Args(0) {
     my ($self, $c) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_infrastructure',
-        "Infrastructure setup page accessed");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_infrastructure_api',
+        "Infrastructure setup API accessed");
     
     # Check if user is logged in and has proxy management privileges
     my $root_controller = $c->controller('Root');
     unless ($root_controller->user_exists($c) && $self->has_proxy_rights($c)) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'setup_infrastructure',
-            "Unauthorized access attempt to infrastructure setup by user: " . ($c->session->{username} || 'none'));
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'setup_infrastructure_api',
+            "Unauthorized access attempt to infrastructure setup API by user: " . ($c->session->{username} || 'none'));
         
         # Redirect to access denied page
         $c->response->status(403);
