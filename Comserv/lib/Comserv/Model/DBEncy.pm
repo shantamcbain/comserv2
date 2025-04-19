@@ -12,9 +12,19 @@ my $json_text;
 {
     local $/; # Enable 'slurp' mode
     
-    # Use the absolute path to the db_config.json file
-    my $config_path = "/home/shanta/PycharmProjects/comserv2/Comserv/db_config.json";
-    warn "DBEncy: Loading database config from: $config_path";
+    # Use environment variable or find the config file relative to the application root
+    my $config_path;
+    
+    # First try environment variable
+    if ($ENV{COMSERV_CONFIG_PATH}) {
+        $config_path = "$ENV{COMSERV_CONFIG_PATH}/db_config.json";
+        warn "DBEncy: Using config path from environment: $config_path";
+    } else {
+        # Try to find the application root directory
+        my $app_root = Catalyst::Utils::home('Comserv');
+        $config_path = "$app_root/db_config.json";
+        warn "DBEncy: Using config path from app root: $config_path";
+    }
     
     # Add logging for debugging
     if (-e $config_path) {
