@@ -1,32 +1,6 @@
-[% ViewVersion = 'v 0.01 2024/01/01 setup/DefalutDbi.ttml'  %]
-[% IF data.debug == 1 %]
- <p>[%	ViewVersion %] </p>
- Using DBI to connect to MySQL
- [% END %]
-[% MYSQLPW        = data.mysqlpw  %]
+[%# DefaultDBI.tt - Get DBI from the application context %]
+[%# This file replaces the old DefaultDBI.tt that was setting up DBI directly %]
+[%# Now we get the DBI from the Catalyst application context %]
 
-[%# IF $ENV{'SERVER_NAME'} == 'shanta.computersystemconsulting.ca' %]
-[%#$ USE DBI( data_source = 'dbi:mysql:forager',
-                username = 'shanta',
-                password =  'herbsrox2' )
-    %]
-[%# ELSE %]
-
-
-[% USE DBIE = DBI( data_source = 'dbi:mysql:ency;host=localhost',
-            username    = 'shanta_forager',
-            password    = 'UA=nPF8*m+T#',
-            debug       = 2 )
-%]
-
-[% c.stash.dbi_ency = DBIE %]
-[% USE DBIF = DBI( data_source = 'dbi:mysql:shanta_forager;host=localhost',
-            username    = 'shanta_forager',
-            password    = 'UA=nPF8*m+T#',
-            debug       = 2 )
-%]
-
-[% c.stash.dbi_forager = DBIF %]
-
- [%# END %]
- [%# PUvPVZFU0neoHD5x%]
+[%# No need to set up DBI here as it's handled by the application %]
+[%# The DBI connection is available through c.stash.dbi or c.model('DB') %]

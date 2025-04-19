@@ -39,30 +39,24 @@
             </div>
                     <ul>
       <!-- populate from Page_tb -->
-       [% FOREACH link = c.stash.dbi.query("SELECT * FROM page_tb
-	                                  WHERE  menu = 'Main'
-	                                  AND (sitename =  '$SiteName' OR sitename =  'All')
-	                                  ORDER BY link_order
-	                                  ")%]
-
-	       <a href="&amp;page=[% link.page_code %]" name="Contact" target="[% link.target %]"
-              title=" [% linkview_.name %] "><font   class="LeftSideBarNavStyle">[% link.view_name %]</font></a>
-     [% IF c.session.group == 'admin' %]
-        <a href="/edit_link?link_id=[% link.record_id %]">Edit/Delete</a>
-        [% END %]
-
-
-	[% END %]30
+       [% IF main_pages.defined %]
+           [% FOREACH link IN main_pages %]
+	           <a href="&amp;page=[% link.page_code %]" name="Contact" target="[% link.target %]"
+                  title=" [% linkview_.name %] "><font   class="LeftSideBarNavStyle">[% link.view_name %]</font></a>
+               [% IF c.session.group == 'admin' %]
+                  <a href="/edit_link?link_id=[% link.record_id %]">Edit/Delete</a>
+               [% END %]
+	       [% END %]
+       [% END %]
 	      <!-- populate from links_tb -->
-	  [% FOREACH link = c.stash.dbi.query("SELECT * FROM internal_links_tb
-	                                  WHERE  category = 'Main_links'
-	                                  AND (sitename =  '$SiteName' OR sitename =  'All')
-	                                  ORDER BY link_order
-	                                  ")%]
-
-	       <a href="[% link.url %]?site=[% SiteName %]&amp;[% link.view_name %]" name="Contact" target="[% link.target %]" title=" [% link.name %] "><font   class="LeftSideBarNavStyle">[% link.name %]</font ></a>
-<a href="/edit_link/[% link.record_id %]">Edit/Delete</a>
-	[% END %]
+       [% IF main_links.defined %]
+	       [% FOREACH link IN main_links %]
+	           <a href="[% link.url %]?site=[% SiteName %]&amp;[% link.view_name %]" name="Contact" target="[% link.target %]" title=" [% link.name %] "><font   class="LeftSideBarNavStyle">[% link.name %]</font ></a>
+               [% IF c.session.group == 'admin' %]
+                  <a href="/edit_link/[% link.record_id %]">Edit/Delete</a>
+               [% END %]
+	       [% END %]
+       [% END %]
        </ul>[% IF c.session.main_links.size %]
     [% FOREACH link IN c.session.main_links %]
         <a href="site=[% SiteName %]&amp;page=[% link.page_code %]" name="Contact" target="[% link.target %]" title=" [% link.view_name %] "><font class="LeftSideBarNavStyle">[% link.view_name %]</font></a>

@@ -404,7 +404,7 @@ sub auto :Private {
         my $uri = $c->uri_for($path, @_);
         return $uri;
     };
-
+    
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Starting auto action with temporary uri_no_port helper");
 
     # Track application start
@@ -432,8 +432,53 @@ sub auto :Private {
 
     # Perform general setup tasks
     $self->setup_debug_mode($c);
+    
+    # Test database connections if in debug mode
+    if ($c->session->{debug_mode}) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Testing database connections in debug mode");
+        
+        # Add database connection status to debug messages
+        my $debug_msg = $c->stash->{debug_msg} ||= [];
+        push @$debug_msg, "Database connection check initiated. See logs for details.";
+        
+        # Test connections using the test_connection methods we added
+        eval {
+            if ($c->model('DBEncy')->test_connection($c)) {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "DBEncy connection successful");
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto', "DBEncy connection error: $@");
+        }
+        
+        eval {
+            if ($c->model('DBForager')->test_connection($c)) {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "DBForager connection successful");
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto', "DBForager connection error: $@");
+        }
+    }
+    
     $self->setup_site($c);
     $self->set_theme($c);
+    
+    # Try to populate navigation data if the controller is available
+    # This is done in a way that doesn't require explicit loading of the Navigation controller
+    eval {
+        # Check if the Navigation controller exists by trying to load it
+        require Comserv::Controller::Navigation;
+        
+        # If we get here, the controller exists, so try to use it
+        my $navigation = $c->controller('Navigation');
+        if ($navigation) {
+            $navigation->populate_navigation_data($c);
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Navigation data populated");
+        }
+    };
+    # Don't log errors here - if the controller isn't available, that's fine
+    
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Completed general setup tasks");
 
     # Call the index action only for the root path
