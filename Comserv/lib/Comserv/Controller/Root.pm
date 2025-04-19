@@ -481,32 +481,73 @@ sub send_email {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
         "Attempting to send email to: " . $params->{to} . " with subject: " . $params->{subject});
 
-    # Use Email::Simple and Email::Sender::Simple for basic email functionality
+    # First try to use the Mail model which gets SMTP config from the database
     eval {
-        require Email::Simple;
-        require Email::Sender::Simple;
-        Email::Sender::Simple->import(qw(sendmail));
-
-        my $email = Email::Simple->create(
-            header => [
-                To      => $params->{to},
-                From    => $params->{from} || 'noreply@computersystemconsulting.ca',
-                Subject => $params->{subject},
-            ],
-            body => $params->{body},
+        # Use the Mail model to send the email
+        $c->model('Mail')->send_email(
+            $c,
+            $params->{to},
+            $params->{subject},
+            $params->{body}
         );
-
-        sendmail($email);
+        
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
-            "Email sent successfully to: " . $params->{to});
+            "Email sent successfully to: " . $params->{to} . " using Mail model");
         return 1;
     };
-
-    if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email',
-            "Failed to send email: $@");
-        return 0;
+    
+    my $mail_model_error = $@;
+    
+    # If Mail model fails, try fallback method with direct Email::Sender
+    if ($mail_model_error) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'send_email',
+            "Mail model failed: $mail_model_error. Trying fallback method.");
+            
+        # Try to use a fallback SMTP configuration
+        eval {
+            require Email::Simple;
+            require Email::Sender::Simple;
+            require Email::Sender::Transport::SMTP;
+            Email::Sender::Simple->import(qw(sendmail));
+            
+            my $email = Email::Simple->create(
+                header => [
+                    To      => $params->{to},
+                    From    => $params->{from} || 'noreply@computersystemconsulting.ca',
+                    Subject => $params->{subject},
+                ],
+                body => $params->{body},
+            );
+            
+            # Try to use a fallback SMTP configuration
+            # This assumes you have a working SMTP server somewhere
+            my $transport = Email::Sender::Transport::SMTP->new({
+                host => 'smtp.gmail.com',  # Replace with a working SMTP server
+                port => 587,
+                ssl => 'starttls',
+                sasl_username => 'your-email@gmail.com',  # Replace with actual credentials
+                sasl_password => 'your-app-password',     # Replace with actual credentials
+            });
+            
+            sendmail($email, { transport => $transport });
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
+                "Email sent successfully to: " . $params->{to} . " using fallback method");
+            return 1;
+        };
+        
+        if ($@) {
+            # Both methods failed
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email',
+                "All email sending methods failed. Mail model error: $mail_model_error, Fallback error: $@");
+                
+            # Add to debug messages
+            push @{$c->stash->{debug_msg}}, "Email sending failed: $@";
+            return 0;
+        }
     }
+    
+    return 1;
 }
 
 sub setup_site {
@@ -609,12 +650,27 @@ sub setup_site {
                                "This is a configuration error that needs to be fixed for proper site operation."
                 };
 
-                if ($self->send_email($c, $email_params)) {
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site',
-                        "Sent admin notification email about domain error: $error_type for $domain");
-                } else {
+                # Try to send email but don't let it block the application if it fails
+                eval {
+                    if ($self->send_email($c, $email_params)) {
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site',
+                            "Sent admin notification email about domain error: $error_type for $domain");
+                    } else {
+                        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'setup_site',
+                            "Failed to send admin email notification about domain error: $error_type for $domain");
+                        
+                        # Add to debug messages
+                        push @{$c->stash->{debug_msg}}, "Failed to send admin notification email. Check SMTP configuration.";
+                    }
+                };
+                
+                # Log any errors from the email sending attempt but continue processing
+                if ($@) {
                     $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'setup_site',
-                        "Failed to send admin email notification about domain error: $error_type for $domain");
+                        "Exception while sending admin email notification: $@");
+                    
+                    # Add to debug messages
+                    push @{$c->stash->{debug_msg}}, "Email error: $@";
                 }
             }
 
@@ -804,13 +860,7 @@ sub accounts :Path('/accounts') :Args(0) {
 # Special route for hosting
 
 
-sub default :Path {
-    my ( $self, $c ) = @_;
-    my $requested_path = $c->req->path;
-    $c->stash->{error_msg} = "The page you requested could not be found: /$requested_path. <br><a href=\"/mcoop\" style=\"color: #006633; font-weight: bold;\">Return to Landing Page</a>";
-    $c->stash->{template} = 'error.tt';
-    $c->response->status(404);
-}
+# This default method has been merged with the one at line 889
 
 # Documentation routes are now handled directly by the Documentation controller
 # See Comserv::Controller::Documentation
@@ -889,15 +939,22 @@ sub end : ActionClass('RenderView') {}
 sub default :Path {
     my ($self, $c) = @_;
     
+    # Get the requested path
+    my $requested_path = $c->req->path;
     my $path = join('/', @{$c->req->args});
-    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'default', 
-        "Page not found: /$path");
     
+    # Log the 404 error
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'default', 
+        "Page not found: /$requested_path");
+    
+    # Set response status to 404
     $c->response->status(404);
+    
+    # Set up the error page
     $c->stash(
         template => 'error.tt',
         error_title => 'Page Not Found',
-        error_msg => "The page you requested could not be found: /$path",
+        error_msg => "The page you requested could not be found: /$requested_path. <br><a href=\"/mcoop\" style=\"color: #006633; font-weight: bold;\">Return to Landing Page</a>",
         requested_path => $path,
         debug_msg => "Page not found: /$path",
         technical_details => "Using Catalyst's built-in proxy configuration. Test URL: " . 
