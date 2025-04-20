@@ -42,6 +42,10 @@
                     <p>Username: [% c.session.username || 'Not logged in' %]</p>
                     <p>Session roles: [% c.session.roles.join(', ') || 'None' %]</p>
                     <p>Is admin: [% c.session.roles.grep('^admin$').size ? 'Yes' : 'No' %]</p>
+                    <p>Server: [% c.req.env.SERVER_NAME || 'unknown' %]</p>
+                    <p>Request method: [% c.req.method %]</p>
+                    <p>Show password form: [% show_password_form ? 'Yes' : 'No' %]</p>
+                    <p>Show credentials form param: [% c.req.params.show_credentials_form ? 'Yes' : 'No' %]</p>
                 </div>
             [% END %]
             
@@ -75,8 +79,8 @@
             [% END %]
             
             [% UNLESS output %]
-                [% # Always show the credentials form when confirming restart %]
-                [% IF show_password_form || (c.request.params.confirm && (!c.request.params.sudo_username || !c.request.params.sudo_password)) %]
+                [% # Always show the credentials form when confirming restart or when explicitly requested %]
+                [% IF show_password_form || c.request.params.show_credentials_form || (c.request.params.confirm && (!c.request.params.sudo_username || !c.request.params.sudo_password)) %]
                     <div class="alert alert-info">
                         <strong>Credentials Required:</strong> Please enter your system username and password with sudo privileges to restart the Starman server.
                     </div>
@@ -90,8 +94,8 @@
                                 <input type="hidden" name="confirm" value="1">
                                 <div class="form-group mb-3">
                                     <label for="sudo_username">Username:</label>
-                                    <input type="text" class="form-control" id="sudo_username" name="sudo_username" value="[% c.session.username || '' %]" required autofocus>
-                                    <small class="form-text text-muted">Enter the system username with sudo privileges.</small>
+                                    <input type="text" class="form-control" id="sudo_username" name="sudo_username" value="[% c.request.params.sudo_username || c.session.username || 'www-data' %]" required autofocus>
+                                    <small class="form-text text-muted">Enter the system username with sudo privileges (usually www-data for production servers).</small>
                                 </div>
                                 <div class="form-group mb-3">
                                     <label for="sudo_password">Password:</label>
@@ -131,6 +135,7 @@
                             
                             <form method="POST" action="[% c.uri_for('/admin/restart_starman') %]">
                                 <input type="hidden" name="confirm" value="1">
+                                <input type="hidden" name="show_credentials_form" value="1">
                                 <button type="submit" class="btn btn-primary">
                                     <i class="fas fa-sync"></i> Yes, Restart Starman Server
                                 </button>

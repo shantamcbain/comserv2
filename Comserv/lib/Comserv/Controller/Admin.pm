@@ -1139,10 +1139,12 @@ sub restart_starman :Path('/admin/restart_starman') :Args(0) {
         my $sudo_username = $c->request->params->{sudo_username};
         my $sudo_password = $c->request->params->{sudo_password};
         
-        # If this is the first attempt (no username or password provided yet), show the form
-        if ((!$sudo_username || !$sudo_password) && $c->request->method eq 'POST' && $c->request->params->{confirm}) {
+        # Always show the credentials form on the first confirmation step
+        # This ensures the form is displayed on both workstation and production
+        if ((!$sudo_username || !$sudo_password || $c->request->params->{show_credentials_form}) && 
+            $c->request->method eq 'POST' && $c->request->params->{confirm}) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', 
-                "Missing username or password, showing credentials form");
+                "Showing credentials form for Starman restart");
             $c->stash->{show_password_form} = 1;
             $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
             push @{$c->stash->{debug_msg}}, "Displaying credentials form for Starman restart";
@@ -1247,9 +1249,20 @@ sub restart_starman :Path('/admin/restart_starman') :Args(0) {
         # This is a GET request or no confirmation, just show the confirmation page
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', 
             "Displaying restart Starman confirmation page");
+        
+        # Log the request method and parameters for debugging
+        my $req_method = $c->request->method;
+        my $params = $c->request->params;
+        my $params_str = join(', ', map { "$_ => " . ($params->{$_} || 'undef') } keys %$params);
+        
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'restart_starman', 
+            "Request method: $req_method, Parameters: $params_str");
+        
         # Ensure debug_msg is an array reference before pushing
         $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
         push @{$c->stash->{debug_msg}}, "Displaying restart Starman confirmation page";
+        push @{$c->stash->{debug_msg}}, "Request method: $req_method";
+        push @{$c->stash->{debug_msg}}, "Request parameters: $params_str";
     }
     
     # Set the template
