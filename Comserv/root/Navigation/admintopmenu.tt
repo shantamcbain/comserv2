@@ -12,7 +12,10 @@
     <span class="submenu-header"><a href="/admin" class="dropbtn"><i class="icon-admin"></i>Admin</a></span>
     <div class="submenu">
         <a href='/admin/view_log'><i class="icon-log"></i>View Log</a>
+        <a href="/admin/git_pull"><i class="icon-log"></i>Git Pull</a>
+        <a href='/ProxyManager'><i class="icon-log"></i>Proxy Manager</a>
         <a href="/log"><i class="icon-log"></i>Open Log</a>
+
     </div>
 </div>
 
@@ -167,6 +170,7 @@
     <div class="submenu">
         <a href="/log"><i class="icon-log"></i>Logging System</a>
         <a href="/admin/view_log"><i class="icon-view"></i>View Application Log</a>
+        <a href="/admin/git_pull"><i class="icon-git"></i>Pull from Git Repository</a>
     </div>
 </div>
 
@@ -247,6 +251,14 @@
     <span class="submenu-header"><a href="/admin"><i class="icon-link"></i>System Links</a></span>
     <div class="submenu">
         <a href="/admin/edit_admin_notes"><i class="icon-edit"></i>Edit Admin Notes</a>
+        
+        <!-- System Management -->
+        <div class="submenu-section">
+            <span class="submenu-section-title">System Management</span>
+            <a href="/admin/git_pull"><i class="icon-git"></i>Pull from Git Repository</a>
+            <a href="/admin/view_log"><i class="icon-log"></i>View Application Log</a>
+            <a href="/admin/theme"><i class="icon-theme"></i>Theme Management</a>
+        </div>
         
         <!-- Dynamic Links -->
         <div class="submenu-section">

@@ -64,7 +64,7 @@
                     <li>View and respond to support tickets</li>
                     <li>Manage knowledge base articles</li>
                     <li>Monitor system status</li>
-                    <li><a href="/mcoop/server-room-plan" style="font-weight: bold; color: #006633;">Server Infrastructure</a></li>
+                    <li><a href="/MCoop/server-room-plan" style="font-weight: bold; color: #006633;">Server Infrastructure</a></li>
                 </ul>
             </div>
 
@@ -74,7 +74,7 @@
                     <div class="admin-card">
                         <h4>Infrastructure</h4>
                         <ul>
-                            <li><a href="/mcoop/server-room-plan">Server Infrastructure</a></li>
+                            <li><a href="/MCoop/server-room-plan">Server Infrastructure</a></li>
                             <li><a href="#">Network Management</a></li>
                             <li><a href="#">Backup & Recovery</a></li>
                         </ul>

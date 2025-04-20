@@ -121,6 +121,22 @@ sub server_room_plan_hyphen :Path('/MCoop/server-room-plan') :Args(0) {
     $c->forward('server_room_plan');
 }
 
+# Handle lowercase mcoop URLs for better compatibility
+sub server_room_plan_hyphen_lowercase :Path('/mcoop/server-room-plan') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'server_room_plan_hyphen_lowercase', 'Lowercase mcoop URL accessed');
+    $c->forward('server_room_plan');
+}
+
+# Handle lowercase mcoop URLs with underscore for better compatibility
+sub server_room_plan_underscore_lowercase :Path('/mcoop/server_room_plan') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'server_room_plan_underscore_lowercase', 'Lowercase mcoop URL with underscore accessed');
+    $c->forward('server_room_plan');
+}
+
+
+
 # Catch-all for any other MCoop paths
 sub default :Private {
     my ($self, $c) = @_;

@@ -829,11 +829,12 @@ sub do_create_account :Local {
     }
 
     # Create the new user in the database
+    my $new_user;
     eval {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
             "Creating new user: $username with roles: $roles");
 
-        $c->model('DBEncy::User')->create({
+        $new_user = $c->model('DBEncy::User')->create({
             username    => $username,
             password    => $hashed_password,
             first_name  => $first_name,
@@ -847,6 +848,9 @@ sub do_create_account :Local {
 
     if ($@) {
         # Handle any database errors
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_create_account',
+            "Error creating user: $@");
+            
         $c->stash(
             error_msg => "An error occurred while creating the account: $@",
             template  => 'user/create_account.tt',
@@ -854,7 +858,113 @@ sub do_create_account :Local {
         return;
     }
 
-    # Redirect to the login page on success
+    # Get email configuration from the stash (set by site_setup in Root.pm)
+    # These variables are set in Root.pm's site_setup method for each site
+    my $mail_from = $c->stash->{mail_from}; 
+    my $mail_replyto = $c->stash->{mail_replyto};
+    
+    # Log the email configuration for debugging
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
+        "Email configuration - From: " . ($mail_from || 'undefined') . 
+        ", Reply-To: " . ($mail_replyto || 'undefined'));
+    
+    # Send email notification to the user if we have a valid email address
+    if ($email && $email =~ /\@/) {
+        eval {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
+                "Sending welcome email to new user: $email");
+                
+            # Use default values if site configuration is missing
+            my $from_address = $mail_from || 'noreply@computersystemconsulting.ca';
+            my $reply_to = $mail_replyto || 'helpdesk@computersystemconsulting.ca';
+            
+            $c->stash->{email} = {
+                to       => $email,
+                from     => $from_address,
+                reply_to => $reply_to,
+                subject  => 'Welcome to Comserv - Account Created',
+                template => 'email/account_created.tt',
+                template_vars => {
+                    username   => $username,
+                    first_name => $first_name,
+                    last_name  => $last_name,
+                    email      => $email,
+                    site_name  => $c->stash->{ScriptDisplayName} || 'Comserv',
+                },
+            };
+            
+            # Send the email
+            $c->forward($c->view('Email::Template'));
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
+                "Welcome email sent successfully to: $email");
+        };
+    } else {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
+            "Cannot send welcome email: Invalid or missing user email address");
+    }
+    
+    if ($@) {
+        # Log email error but continue (don't block account creation if email fails)
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_create_account',
+            "Error sending welcome email: $@");
+    }
+    
+    # Get the admin email from the stash (set by site_setup in Root.pm)
+    # This variable is set in Root.pm's site_setup method for each site
+    my $mail_to_admin = $c->stash->{mail_to_admin};
+    
+    # Log the admin email for debugging
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
+        "Admin email: " . ($mail_to_admin || 'undefined'));
+    
+    # Send notification to admin if we have a valid admin email
+    if ($mail_to_admin && $mail_to_admin =~ /\@/) {
+        eval {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
+                "Sending admin notification about new user to: $mail_to_admin");
+                
+            # Format the current timestamp
+            my $timestamp = scalar localtime;
+            
+            # Use default values if site configuration is missing
+            my $from_address = $mail_from || 'noreply@computersystemconsulting.ca';
+                
+            $c->stash->{email} = {
+                to       => $mail_to_admin,
+                from     => $from_address,
+                subject  => 'Comserv - New User Account Created',
+                template => 'email/admin_account_notification.tt',
+                template_vars => {
+                    username   => $username,
+                    first_name => $first_name,
+                    last_name  => $last_name,
+                    email      => $email,
+                    roles      => $roles,
+                    created_at => $timestamp,
+                    site_name  => $c->stash->{ScriptDisplayName} || 'Comserv',
+                },
+            };
+            
+            # Send the email
+            $c->forward($c->view('Email::Template'));
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
+                "Admin notification email sent successfully to: $mail_to_admin");
+        };
+    } else {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
+            "Cannot send admin notification: Invalid or missing admin email address");
+    }
+    
+    if ($@) {
+        # Log email error but continue
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_create_account',
+            "Error sending admin notification email: $@");
+    }
+
+    # Set success message and redirect to the login page
+    $c->flash->{success_msg} = "Your account has been created successfully. You can now log in.";
     $c->response->redirect($c->uri_for('/user/login'));
 }
 sub list_users :Local :Args(0) {

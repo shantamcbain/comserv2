@@ -1,6 +1,6 @@
 # MCoop Module Documentation
 
-**Last Updated:** April 1, 2025
+**Last Updated:** April 17, 2025
 **Author:** Shanta
 **Status:** Active
 
@@ -19,7 +19,8 @@ The Server Room Plan feature provides a detailed proposal for the Monashee Coop'
 - Common practices in server room implementation
 - Recommendations for short-term and long-term solutions
 
-**Access URL:** `/mcoop/server_room_plan` or `/mcoop/server-room-plan`  
+**Access URL:** `/MCoop/server_room_plan` or `/MCoop/server-room-plan` (case-sensitive)  
+**Alternative URLs:** `/mcoop/server_room_plan` or `/mcoop/server-room-plan` (lowercase also supported)  
 **Required Role:** Administrator  
 **Template:** `coop/server_room_plan.tt`
 
@@ -46,18 +47,19 @@ This feature provides an overview and management interface for services offered 
 The MCoop module is implemented in `Comserv/lib/Comserv/Controller/MCoop.pm` with the following key methods:
 
 ```perl
-# Main index method
-sub index :Path :Args(0) {
+# Main index method - chained version
+sub index :Chained('base') :PathPart('') :Args(0) {
     my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 'Enter MCoop index method');
 
-    # Set theme and other configuration
-    $c->session->{"theme_mcoop"} = "mcoop";
-    $c->session->{theme_name} = "mcoop";
-    $c->session->{"theme_" . lc("MCOOP")} = "mcoop";
-    $c->model('ThemeConfig')->set_site_theme($c, "MCOOP", "mcoop");
+    # Set mail server
+    $c->session->{MailServer} = "http://webmail.computersystemconsulting.ca";
 
-    # Site information is retrieved from the site table in Root.pm
-    $c->stash->{main_website} = "https://monasheecoop.ca";
+    # Generate theme CSS if needed
+    $c->model('ThemeConfig')->generate_all_theme_css($c);
+
+    # Make sure we're using the correct case for the site name
+    $c->model('ThemeConfig')->set_site_theme($c, "MCoop", "mcoop");
 
     # Use the standard debug message system
     if ($c->session->{debug_mode}) {
@@ -65,34 +67,63 @@ sub index :Path :Args(0) {
         push @{$c->stash->{debug_msg}}, "MCoop controller index view - Using mcoop theme";
     }
 
-    $c->stash->{debug_mode} = $c->session->{debug_mode} || 0;
+    # Set template and forward to view
     $c->stash(template => 'coop/index.tt');
     $c->forward($c->view('TT'));
 }
 
-# Server room plan method
-sub server_room_plan :Path('server_room_plan') :Args(0) {
+# Server room plan base method (chained)
+sub server_room_plan_base :Chained('base') :PathPart('server_room_plan') :CaptureArgs(0) {
     my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'server_room_plan_base', 'Enter server_room_plan_base method');
 
-    # Set theme and help messages
-    $c->stash->{theme_name} = "mcoop";
+    # Set up common elements for server room plan pages
     $c->stash->{help_message} = "This is the server room proposal for the Monashee Coop transition team.";
     $c->stash->{account_message} = "For more information or to provide feedback, please contact the IT department.";
+}
 
-    $c->stash->{debug_mode} = $c->session->{debug_mode} || 0;
+# Main server room plan page (chained)
+sub server_room_plan :Chained('server_room_plan_base') :PathPart('') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'server_room_plan', 'Enter server_room_plan method');
+
+    # Use the standard debug message system
+    if ($c->session->{debug_mode}) {
+        $c->stash->{debug_msg} = [] unless defined $c->stash->{debug_msg};
+        push @{$c->stash->{debug_msg}}, "MCoop controller server_room_plan view - Template: coop/server_room_plan.tt";
+    }
+
+    # Set template and forward to view
     $c->stash(template => 'coop/server_room_plan.tt');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'server_room_plan', 'Set template to coop/server_room_plan.tt');
     $c->forward($c->view('TT'));
 }
 
-# Compatibility method for hyphenated URLs
-sub server_room_plan_hyphen :Path('server-room-plan') :Args(0) {
+# Direct access to server_room_plan (non-chained)
+sub direct_server_room_plan :Path('/MCoop/server_room_plan') :Args(0) {
     my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'direct_server_room_plan', 'Direct server_room_plan method called');
     $c->forward('server_room_plan');
 }
 
-# Method with underscore for Root controller compatibility
-sub server_room_plan_underscore :Path('/mcoop/server_room_plan') :Args(0) {
+# Handle the hyphenated version (uppercase)
+sub server_room_plan_hyphen :Path('/MCoop/server-room-plan') :Args(0) {
     my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'server_room_plan_hyphen', 'Enter server_room_plan_hyphen method');
+    $c->forward('server_room_plan');
+}
+
+# Handle lowercase mcoop URLs with hyphen
+sub server_room_plan_hyphen_lowercase :Path('/mcoop/server-room-plan') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'server_room_plan_hyphen_lowercase', 'Lowercase mcoop URL accessed');
+    $c->forward('server_room_plan');
+}
+
+# Handle lowercase mcoop URLs with underscore
+sub server_room_plan_underscore_lowercase :Path('/mcoop/server_room_plan') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'server_room_plan_underscore_lowercase', 'Lowercase mcoop URL with underscore accessed');
     $c->forward('server_room_plan');
 }
 ```
@@ -159,4 +190,5 @@ Planned enhancements for the MCoop module include:
 
 - [MCoop Admin Menu Restriction](changelog/2025-04-mcoop-admin-menu-restriction.md)
 - [MCoop Server Room Plan Implementation](changelog/2025-04-mcoop-server-room-plan.md)
+- [MCoop URL Case Sensitivity Fix](changelog/2025-04-13-mcoop-url-case-fix.md)
 - [Theme System Implementation](theme_system_implementation.md)

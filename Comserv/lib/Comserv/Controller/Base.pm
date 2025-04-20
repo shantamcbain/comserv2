@@ -16,6 +16,8 @@ sub stash_message {
     $c->stash(error_messages => $current_error_messages);
 }
 
+
+
 __PACKAGE__->meta->make_immutable;
 
 1;

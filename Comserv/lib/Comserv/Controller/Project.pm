@@ -102,8 +102,17 @@ sub  create_project :Local :Args(0) {
         $parent_id = undef;
     }
 
+    # Get group_of_poster safely
+    my $group_of_poster = 'general';  # Default value
+    if ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && defined $c->session->{roles}->[0]) {
+        $group_of_poster = $c->session->{roles}->[0];
+    } else {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_project',
+            "No roles found in session, using default group 'general'");
+    }
+
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_project',
-        "Parent ID: " . (defined $parent_id ? $parent_id : 'undef'));
+        "Parent ID: " . (defined $parent_id ? $parent_id : 'undef') . ", Group of poster: $group_of_poster");
 
     my $project = eval {
         $project_rs->create({
@@ -121,7 +130,7 @@ sub  create_project :Local :Args(0) {
             comments => $form_data->{comments},
             username_of_poster => $username,
             parent_id => $parent_id,
-            group_of_poster => $c->session->{roles}->[0],
+            group_of_poster => $group_of_poster,
             date_time_posted => $date_time_posted->ymd . ' ' . $date_time_posted->hms,
             record_id => 0  # Set to 0 instead of undef
         });
@@ -160,15 +169,45 @@ sub  create_project :Local :Args(0) {
 
 sub project :Path('project') :Args(0) {
     my ( $self, $c ) = @_;
+    
+    # Log the start of the project action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'project', 'Starting project action');
+    
+    # Get filter parameters from query string
+    my $role_filter = $c->request->query_parameters->{role} || '';
+    my $project_filter = $c->request->query_parameters->{project_id} || '';
+    my $priority_filter = $c->request->query_parameters->{priority} || '';
+    
+    # Log the filter parameters
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'project', 
+        "Filter parameters - Role: $role_filter, Project: $project_filter, Priority: $priority_filter");
 
     # Use the existing method to fetch projects with sub-projects
     my $projects = $self->fetch_projects_with_subprojects($c);
+    
+    # Enhance project data with additional fields needed for filtering
+    $projects = $self->enhance_project_data($c, $projects);
 
-    $c->stash->{projects} = $projects;
-
+    # Add the projects and filter info to the stash
     $c->stash(
-        template => 'todo/project.tt'
+        projects => $projects,
+        role_filter => $role_filter,
+        project_filter => $project_filter,
+        priority_filter => $priority_filter,
+        template => 'todo/project.tt', # Use the original template
+        template_timestamp => time(), # Add a timestamp to force template reload
+        success_message => 'Project priority display has been updated. All projects without a priority are now shown as Medium priority.',
+        additional_css => ['/static/css/components/project-cards.css?v=' . time()], # Add timestamp to force CSS reload
+        use_fluid_container => 1, # Use fluid container for better card layout
+        debug_mode => 1 # Enable debug mode to see template version
     );
+    
+    # Log that we're using the project cards CSS
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'project', 
+        "Loading bootstrap cards CSS and project cards CSS with timestamp: " . time());
+
+    # Log completion of the project action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'project', 'Completed project action');
 
     $c->forward($c->view('TT'));
 }
@@ -267,6 +306,9 @@ sub details :Path('details') :Args(0) {
     $c->forward($c->view('TT'));
 }
 
+# This enhance_project_data implementation has been moved to line 482
+# See the implementation there
+
 sub fetch_projects_with_subprojects :Private {
     my ($self, $c) = @_;
     # Log the start of the project-fetching subroutine
@@ -319,6 +361,12 @@ sub fetch_projects_with_subprojects :Private {
             id => $project->id,
             name => $project->name,
             parent_id => $project->parent_id,
+            status => $project->status || 1, # Default to 'New' status
+            start_date => $project->start_date,
+            end_date => $project->end_date,
+            developer_name => $project->developer_name || '',
+            client_name => $project->client_name || '',
+            priority => 2, # Default to medium priority since field doesn't exist
             sub_projects => []
         };
 
@@ -345,6 +393,12 @@ sub fetch_projects_with_subprojects :Private {
                 id => $subproject1->id,
                 name => $subproject1->name,
                 parent_id => $subproject1->parent_id,
+                status => $subproject1->status || 1, # Default to 'New' status
+                start_date => $subproject1->start_date,
+                end_date => $subproject1->end_date,
+                developer_name => $subproject1->developer_name || '',
+                client_name => $subproject1->client_name || '',
+                priority => 2, # Default to medium priority since field doesn't exist
                 sub_projects => []
             };
 
@@ -371,6 +425,12 @@ sub fetch_projects_with_subprojects :Private {
                     id => $subproject2->id,
                     name => $subproject2->name,
                     parent_id => $subproject2->parent_id,
+                    status => $subproject2->status || 1, # Default to 'New' status
+                    start_date => $subproject2->start_date,
+                    end_date => $subproject2->end_date,
+                    developer_name => $subproject2->developer_name || '',
+                    client_name => $subproject2->client_name || '',
+                    priority => 2, # Default to medium priority since field doesn't exist
                     sub_projects => [] # Empty array, we don't go deeper
                 };
             }
@@ -389,6 +449,42 @@ sub fetch_projects_with_subprojects :Private {
 
     return \@projects;
 }
+
+# Enhance project data with additional fields needed for filtering
+sub enhance_project_data :Private {
+    my ($self, $c, $projects) = @_;
+    
+    # Log the start of the enhance_project_data method
+    $self->logging->log_with_details(
+        $c, 'info', __FILE__, __LINE__, 'enhance_project_data',
+        'Enhancing project data for filtering'
+    );
+    
+    # Process each project to ensure it has all required fields
+    foreach my $project (@$projects) {
+        # Set default values for any missing fields
+        $project->{priority} = $project->{priority} || 2; # Default to medium priority
+        $project->{status} = $project->{status} || 1; # Default to new status
+        $project->{developer_name} = $project->{developer_name} || '';
+        $project->{client_name} = $project->{client_name} || '';
+        
+        # Process sub-projects recursively
+        if ($project->{sub_projects} && @{$project->{sub_projects}}) {
+            $self->enhance_project_data($c, $project->{sub_projects});
+        }
+    }
+    
+    # Log completion of the enhance_project_data method
+    $self->logging->log_with_details(
+        $c, 'info', __FILE__, __LINE__, 'enhance_project_data',
+        'Completed enhancing project data for filtering'
+    );
+    
+    return $projects;
+}
+
+# This build_project_tree implementation has been moved to line 672
+# See the implementation there
 
 sub editproject :Path('editproject') :Args(0) {
     my ( $self, $c ) = @_;

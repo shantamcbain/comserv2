@@ -1,14 +1,17 @@
 
-[% PageVersion = 'pagetop.tt,v 0.023.0 2025/04/09 shanta Exp shanta ' %]
-[%# PageVersion = 'pagetop.tt,v 0.022.1 2025/04/01 shanta Exp shanta ' %]
+<!-- File: /home/shanta/PycharmProjects/comserv/Comserv/root/pagetop.tt -->
+[% PageVersion = 'pagetop.tt,v 0.024.0 2025/05/31 shanta Exp shanta ' %]
+[%# PageVersion = 'pagetop.tt,v 0.023.0 2025/04/09 shanta Exp shanta ' %]
 
 [% SET roles = c.session.roles || [] %]
 [% SET is_admin = roles.grep('admin').size > 0 ? 1 : 0 %]
 
 [% IF is_admin || c.session.debug_mode == 1 %]
 <div class="server-info" style="background-color: #e9ecef; border-bottom: 1px solid #dee2e6; padding: 5px 10px; font-size: 12px; text-align: right; color: #495057;">
-    Server: <strong>[% c.req.uri.host %]</strong> | 
-    IP: <strong>[% c.req.address %]</strong>
+    Domain: <strong>[% c.req.uri.host %]</strong> | 
+    Client IP: <strong>[% c.req.address %]</strong> | 
+    Server: <strong>[% server_hostname %]</strong> | 
+    Server IP: <strong>[% server_ip %]</strong>
     [% IF c.session.debug_mode == 1 %] | [% PageVersion %][% END %]
 </div>
 [% END %]

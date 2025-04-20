@@ -1,0 +1,62 @@
+[% META title = 'Request Proxy Management Access' %]
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4>Request Proxy Management Access</h4>
+                </div>
+                <div class="card-body">
+                    [% IF debug_msg %]
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> [% debug_msg %]
+                    </div>
+                    [% END %]
+                    
+                    <p>You are requesting access to the Proxy Manager as <strong>[% username %]</strong>.</p>
+                    <p>Current roles: <span class="badge bg-secondary">[% roles %]</span></p>
+                    
+                    <form method="POST" action="[% c.uri_for('/proxy_manager/request_access') %]">
+                        <div class="mb-3">
+                            <label for="reason" class="form-label">Reason for Access Request:</label>
+                            <textarea class="form-control" id="reason" name="reason" rows="3" required></textarea>
+                            <div class="form-text">Please explain why you need access to the Proxy Manager.</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="duration" class="form-label">Access Duration:</label>
+                            <select class="form-select" id="duration" name="duration">
+                                <option value="temporary">Temporary (1-24 hours)</option>
+                                <option value="project">Project-based (until completion)</option>
+                                <option value="permanent">Permanent (requires admin approval)</option>
+                            </select>
+                        </div>
+                        
+                        [% IF demo_mode %]
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="grant_demo_access" name="grant_demo_access" value="1">
+                            <label class="form-check-label" for="grant_demo_access">
+                                Grant temporary access immediately (DEMO MODE ONLY)
+                            </label>
+                            <div class="form-text text-warning">
+                                <i class="fas fa-exclamation-triangle"></i> 
+                                This option is only available in development mode for testing purposes.
+                                In production, access requests require admin approval.
+                            </div>
+                        </div>
+                        [% END %]
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="[% c.uri_for('/proxy_manager') %]" class="btn btn-secondary me-md-2">Cancel</a>
+                            <button type="submit" class="btn btn-primary">Submit Request</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="card-footer text-muted">
+                    <small>Access requests are logged and reviewed by administrators.</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

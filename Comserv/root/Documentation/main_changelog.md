@@ -4,6 +4,11 @@ This document tracks major changes to the Comserv system.
 
 ## 2025
 
+### May 2025
+
+- **[Server IP Display Enhancement](changelog/2025-05-31-server-ip-display.md)** - Added server hostname and IP address display to help administrators verify which server is handling requests (May 31, 2025)
+- **[Documentation Structure Simplification](changelog/2025-05-30-documentation-structure-simplification.md)** - Simplified documentation structure for easier maintenance (May 30, 2025)
+
 ### April 2025
 
 - **[Pagetop Server Information Display](changelog/2025-04-pagetop-hostname-display.md)** - Added server and IP information display to help administrators identify which server they are connected to (April 9, 2025)

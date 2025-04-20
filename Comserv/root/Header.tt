@@ -96,7 +96,10 @@
     <!-- Fix for icons to respect theme colors -->
     <link rel="stylesheet" type="text/css" href="/static/css/icon-fix.css">
 
-    <!-- No external dependencies - using vanilla JavaScript -->
+    <!-- jQuery for AJAX functionality -->
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    
+    <!-- JavaScript dependencies -->
     <script src="/static/js/sub-menu.js"></script>
     <script src="/static/js/menu.js"></script>
     <script language="javascript" type="text/javascript">

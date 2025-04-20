@@ -5,6 +5,12 @@ All notable changes to the Comserv project will be documented in this file.
 ## [Unreleased]
 
 ### Fixed
+- MCoop URL case sensitivity issue
+  - Fixed "page not found" error when accessing `/mcoop/server-room-plan`
+  - Updated links in admin home page to use correct case (`/MCoop/server-room-plan`)
+  - Added route handlers for lowercase URLs in MCoop controller
+  - Updated documentation to reflect URL case sensitivity requirements
+  - Created detailed changelog entry for the fix
 - Documentation display and markdown rendering
   - Fixed markdown content display in documentation viewer
   - Added dedicated CSS for markdown viewer (markdown-viewer.css)

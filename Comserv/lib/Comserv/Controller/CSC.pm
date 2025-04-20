@@ -91,6 +91,67 @@ sub hosting_via_voip :Path('/CSC/hosting_via_voip') :Args(0) {
     $c->forward($c->view('TT'));
 }
 
+# Email test form
+sub email_test :Local :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'email_test', "Email test form requested");
+    
+    # If this is a form submission, process it
+    if ($c->req->method eq 'POST') {
+        my $to = $c->req->params->{to};
+        my $subject = $c->req->params->{subject} || 'Test Email from Comserv';
+        my $message = $c->req->params->{message} || 'This is a test email from the Comserv system.';
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'email_test', 
+            "Attempting to send test email to: $to with subject: $subject");
+        
+        # Get email configuration from the stash (set by site_setup in Root.pm)
+        my $mail_from = $c->stash->{mail_from};
+        my $mail_replyto = $c->stash->{mail_replyto};
+        
+        # Log the email configuration for debugging
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'email_test',
+            "Email configuration - From: " . ($mail_from || 'undefined') . 
+            ", Reply-To: " . ($mail_replyto || 'undefined'));
+        
+        eval {
+            # Use default values if site configuration is missing
+            my $from_address = $mail_from || 'noreply@computersystemconsulting.ca';
+            my $reply_to = $mail_replyto || 'helpdesk@computersystemconsulting.ca';
+            
+            $c->stash->{email} = {
+                to       => $to,
+                from     => $from_address,
+                reply_to => $reply_to,
+                subject  => $subject,
+                body     => $message,
+            };
+            
+            # Send the email
+            $c->forward($c->view('Email::Template'));
+            
+            # Set success message
+            $c->flash->{success_msg} = "Test email sent successfully to $to";
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'email_test',
+                "Test email sent successfully to: $to");
+        };
+        
+        if ($@) {
+            # Log email error
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'email_test',
+                "Error sending test email: $@");
+            $c->flash->{error_msg} = "Error sending email: $@";
+        }
+        
+        # Redirect to avoid form resubmission
+        $c->response->redirect($c->uri_for('/CSC/email_test'));
+        return;
+    }
+    
+    # Display the email test form
+    $c->stash(template => 'CSC/email_test.tt');
+}
+
 # Catch-all for any other CSC paths
 sub default :Private {
     my ($self, $c) = @_;

@@ -1,9 +1,10 @@
-[% PageVersion	= 'footer.tt,v 0.02 2024/06/02 shanta Exp shanta '	%]
+cm[% PageVersion	= 'footer.tt,v 0.03 2024/08/31 shanta Exp shanta '	%]
 [% IF c.session.debug_mode == 1 %]
  <br>[%	PageVersion %] </br>
  <br><a href="/reset_session">Reset Session</a></br>
 [% END %]
-<!-- Local chat implementation - no external dependencies -->
+
+<!-- Live chat implementation -->
 <script type="text/javascript" src="/static/js/local-chat.js"></script>
 
 <!-- Debug information about the current page -->

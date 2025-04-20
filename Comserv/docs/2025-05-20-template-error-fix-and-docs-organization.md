@@ -1,5 +1,6 @@
 # Template Error Fix and Documentation Organization
 
+**File:** /home/shanta/PycharmProjects/comserv/Comserv/docs/2025-05-20-template-error-fix-and-docs-organization.md  
 **Date:** May 20, 2025  
 **Author:** System Administrator  
 **Status:** Implemented

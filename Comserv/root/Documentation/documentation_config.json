@@ -5,21 +5,21 @@
       "description": "Documentation for end users of the system",
       "roles": ["normal", "editor", "admin", "developer"],
       "site_specific": false,
-      "pages": ["getting_started", "account_management", "customizing_profile", "login_authentication", "mcoop_user_guide", "mcoop_getting_started"]
+      "pages": ["getting_started", "account_management", "customizing_profile", "login_authentication", "mcoop_user_guide", "mcoop_getting_started", "Projects"]
     },
     "admin_guides": {
       "title": "Administrator Guides",
       "description": "Documentation for system administrators",
       "roles": ["admin", "developer"],
       "site_specific": false,
-      "pages": ["admin_guide", "user_management", "documentation_role_access", "documentation_system_guide", "proxy_troubleshooting"]
+      "pages": ["admin_guide", "user_management", "documentation_role_access", "documentation_system_guide", "proxy_troubleshooting", "2025-04-git-pull-functionality"]
     },
     "developer_guides": {
       "title": "Developer Documentation",
       "description": "Documentation for developers",
       "roles": ["developer"],
       "site_specific": false,
-      "pages": ["api_reference", "authentication_system", "template_system", "troubleshooting", "navigation_system", "theme_system_implementation", "proxy_troubleshooting"]
+      "pages": ["api_reference", "authentication_system", "template_system", "troubleshooting", "navigation_system", "theme_system_implementation", "proxy_troubleshooting", "documentation_migration_guide"]
     },
     "tutorials": {
       "title": "Tutorials",
@@ -40,14 +40,14 @@
       "description": "Documentation for specific system modules",
       "roles": ["admin", "developer"],
       "site_specific": false,
-      "pages": ["mcoop_module", "todo_system", "todo_edit_functionality", "todo_filtering_and_views", "enhanced_todo_navigation", "project_selection_log_creation", "fix_project_selection_todo_filtering"]
+      "pages": ["mcoop_module", "todo_system", "todo_edit_functionality", "todo_filtering_and_views", "enhanced_todo_navigation", "project_selection_log_creation", "fix_project_selection_todo_filtering", "Projects"]
     },
     "controllers": {
       "title": "Controller Documentation",
       "description": "Documentation for system controllers",
       "roles": ["admin", "developer"],
       "site_specific": false,
-      "pages": ["Documentation_Controller", "Root", "User", "Site", "controller_list", "fix_project_edit_form", "fix_project_edit_button"]
+      "pages": ["Documentation_Controller", "Root", "User", "Site", "controller_list", "fix_project_edit_form", "fix_project_edit_button", "Projects", "HostingSignup"]
     },
     "models": {
       "title": "Model Documentation",
@@ -61,7 +61,7 @@
       "description": "System changes and updates",
       "roles": ["admin", "developer"],
       "site_specific": false,
-      "pages": ["main_changelog", "2025-04-pagetop-hostname-display", "2024-08-proxmox-debug-msg-fix", "2024-07-project-id-fix", "2024-06-project-edit-fix", "2024-07-proxmox-controller-fixes", "2024-06-15-login-redirect-fix", "2025-04-navigation-improvements", "2025-04-documentation-display-fix", "2025-04-mcoop-admin-menu-restriction", "2025-04-documentation-admin-visibility-fix"]
+      "pages": ["main_changelog", "2025-05-31-server-ip-display", "2025-04-git-pull-functionality", "2025-04-pagetop-hostname-display", "2024-08-proxmox-debug-msg-fix", "2024-07-project-id-fix", "2024-06-project-edit-fix", "2024-07-proxmox-controller-fixes", "2024-06-15-login-redirect-fix", "2025-04-navigation-improvements", "2025-04-documentation-display-fix", "2025-04-mcoop-admin-menu-restriction", "2025-04-documentation-admin-visibility-fix", "2025-05-30-documentation-structure-simplification", "2025-08-18-project-cards-css-fix", "2025-04-12-hosting-signup-implementation"]
     },
     "proxmox": {
       "title": "Proxmox Documentation",
@@ -75,13 +75,25 @@
       "description": "Documentation about the documentation system itself",
       "roles": ["admin", "developer"],
       "site_specific": false,
-      "pages": ["Documentation", "Documentation_System", "Documentation_Controller", "Documentation_Management", "documentation_system_guide", "documentation_guide", "documentation_config_guide"]
+      "pages": ["Documentation", "Documentation_System", "Documentation_Controller", "Documentation_Management", "documentation_system_guide", "documentation_guide", "documentation_config_guide", "documentation_migration_guide", "documentation_template", "documentation_index_adaptation"]
+    },
+    "templates": {
+      "title": "Template Documentation",
+      "description": "Documentation for system templates",
+      "roles": ["admin", "developer"],
+      "site_specific": false,
+      "pages": ["hosting_signup_templates", "documentation_template"]
     }
   },
   "default_paths": {
+    "HostingSignup": "Documentation/controllers/HostingSignup.md",
+    "hosting_signup_templates": "Documentation/templates/hosting_signup_templates.md",
+    "2025-04-12-hosting-signup-implementation": "Documentation/changelog/2025-04-12-hosting-signup-implementation.md",
     "getting_started": "Documentation/roles/normal/getting_started.md",
     "admin_guide": "Documentation/roles/admin/admin_guide.md",
     "user_management": "Documentation/roles/admin/user_management.md",
+    "2025-05-31-server-ip-display": "Documentation/changelog/2025-05-31-server-ip-display.md",
+    "2025-04-git-pull-functionality": "Documentation/changelog/2025-04-git-pull-functionality.md",
     "api_reference": "Documentation/roles/developer/api_reference.md",
     "authentication_system": "Documentation/developer/authentication_system.md",
     "template_system": "Documentation/developer/template_system.md",
@@ -137,6 +149,12 @@
     "Documentation_Workflow": "Documentation/Documentation_Workflow.md",
     "documentation_system_guide": "Documentation/roles/admin/documentation_system_guide.md",
     "documentation_guide": "Documentation/sites/mcoop/documentation_guide.md",
-    "documentation_config_guide": "Documentation/documentation_config_guide.md"
+    "documentation_config_guide": "Documentation/documentation_config_guide.md",
+    "2025-05-30-documentation-structure-simplification": "Documentation/changelog/2025-05-30-documentation-structure-simplification.md",
+    "documentation_migration_guide": "Documentation/docs/developer/documentation_migration_guide.md",
+    "documentation_template": "Documentation/docs/templates/documentation_template.md",
+    "documentation_index_adaptation": "Documentation/docs/developer/documentation_index_adaptation.md",
+    "Projects": "Documentation/Projects.tt",
+    "2025-08-18-project-cards-css-fix": "Documentation/changelog/2025-08-18-project-cards-css-fix.md"
   }
 }

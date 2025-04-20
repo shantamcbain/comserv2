@@ -56,55 +56,55 @@ sub BUILD {
 # Get singleton instance
 sub instance {
     my ($class) = @_;
-    
+
     unless (defined $instance) {
         $instance = $class->new();
     }
-    
+
     return $instance;
 }
 
 # Load configuration from JSON file
 sub load_config {
     my ($self) = @_;
-    
+
     my $config_file = File::Spec->catfile('root', 'Documentation', 'config', 'documentation_config.json');
-    
+
     try {
         # Read the JSON file
         open my $fh, '<:encoding(UTF-8)', $config_file or die "Cannot open $config_file: $!";
         my $json_content = do { local $/; <$fh> };
         close $fh;
-        
+
         # Parse the JSON content
         my $config = decode_json($json_content);
-        
+
         # Store categories
         $self->{categories} = $config->{categories} || {};
-        
+
         # Store pages
         $self->{pages} = $config->{pages} || [];
-        
+
         # Index pages by ID
         foreach my $page (@{$self->{pages}}) {
             $self->{pages_by_id}->{$page->{id}} = $page;
-            
+
             # Index pages by category
             foreach my $category (@{$page->{categories}}) {
                 $self->{pages_by_category}->{$category} ||= [];
                 push @{$self->{pages_by_category}->{$category}}, $page;
             }
-            
+
             # Index pages by site
             my $site = $page->{site} || 'all';
             $self->{pages_by_site}->{$site} ||= [];
             push @{$self->{pages_by_site}->{$site}}, $page;
         }
-        
+
         Comserv::Util::Logging::log_to_file(
-            "Loaded documentation configuration: " . 
-            scalar(keys %{$self->{categories}}) . " categories, " . 
-            scalar(@{$self->{pages}}) . " pages",
+            "Loaded documentation configuration: " .
+                scalar(keys %{$self->{categories}}) . " categories, " .
+                scalar(@{$self->{pages}}) . " pages",
             undef, 'INFO'
         );
     } catch {
@@ -148,36 +148,36 @@ sub get_pages_by_category {
 # Get pages by site
 sub get_pages_by_site {
     my ($self, $site) = @_;
-    
+
     # If site is not specified, return all pages
     return $self->{pages} unless $site;
-    
+
     # Return pages for the specified site and pages for all sites
     my @pages = ();
-    
+
     # Add pages for all sites
     if (exists $self->{pages_by_site}->{all}) {
         push @pages, @{$self->{pages_by_site}->{all}};
     }
-    
+
     # Add pages for the specified site
     if (exists $self->{pages_by_site}->{$site}) {
         push @pages, @{$self->{pages_by_site}->{$site}};
     }
-    
+
     return \@pages;
 }
 
 # Filter pages by role
 sub filter_pages_by_role {
     my ($self, $pages, $role) = @_;
-    
+
     # If role is not specified, return all pages
     return $pages unless $role;
-    
+
     # Filter pages by role
     my @filtered_pages = ();
-    
+
     foreach my $page (@$pages) {
         # Check if the user has the required role
         my $has_role = 0;
@@ -187,21 +187,21 @@ sub filter_pages_by_role {
                 last;
             }
         }
-        
+
         # Add page if user has the required role
         push @filtered_pages, $page if $has_role;
     }
-    
+
     return \@filtered_pages;
 }
 
 # Get filtered pages by site and role
 sub get_filtered_pages {
     my ($self, $site, $role) = @_;
-    
+
     # Get pages for the site
     my $pages = $self->get_pages_by_site($site);
-    
+
     # Filter pages by role
     return $self->filter_pages_by_role($pages, $role);
 }
@@ -209,16 +209,16 @@ sub get_filtered_pages {
 # Get filtered categories by role
 sub get_filtered_categories {
     my ($self, $role) = @_;
-    
+
     # If role is not specified, return all categories
     return $self->{categories} unless $role;
-    
+
     # Filter categories by role
     my %filtered_categories = ();
-    
+
     foreach my $category_key (keys %{$self->{categories}}) {
         my $category = $self->{categories}->{$category_key};
-        
+
         # Check if the user has the required role
         my $has_role = 0;
         foreach my $category_role (@{$category->{roles}}) {
@@ -227,28 +227,28 @@ sub get_filtered_categories {
                 last;
             }
         }
-        
+
         # Add category if user has the required role
         $filtered_categories{$category_key} = $category if $has_role;
     }
-    
+
     return \%filtered_categories;
 }
 
 # Reload configuration from JSON file
 sub reload_config {
     my ($self) = @_;
-    
+
     # Clear existing data
     $self->{categories} = {};
     $self->{pages} = [];
     $self->{pages_by_id} = {};
     $self->{pages_by_category} = {};
     $self->{pages_by_site} = {};
-    
+
     # Load configuration
     $self->load_config();
-    
+
     return 1;
 }
 

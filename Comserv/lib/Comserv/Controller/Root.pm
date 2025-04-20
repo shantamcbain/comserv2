@@ -7,6 +7,7 @@ use DateTime;
 use JSON;
 use URI;
 use Comserv::Util::Logging;
+use Comserv::Util::SystemInfo;
 
 # Configure static file serving
 __PACKAGE__->config(
@@ -24,6 +25,71 @@ has 'logging' => (
 sub user_exists {
     my ($self, $c) = @_;
     return ($c->session->{username} && $c->session->{user_id}) ? 1 : 0;
+}
+
+# Add check_user_roles method
+sub check_user_roles {
+    my ($self, $c, $role) = @_;
+    
+    # First check if the user exists
+    return 0 unless $self->user_exists($c);
+    
+    # Get roles from session
+    my $roles = $c->session->{roles};
+    
+    # Log the role check for debugging
+    my $roles_debug = 'none';
+    if (defined $roles) {
+        if (ref($roles) eq 'ARRAY') {
+            $roles_debug = join(', ', @$roles);
+        } else {
+            $roles_debug = $roles;
+        }
+    }
+    
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'check_user_roles',
+        "Checking if user has role: $role, User roles: $roles_debug");
+    
+    # Check if the user has the admin role in the session
+    if ($role eq 'admin') {
+        # For admin role, check if user is in the admin group or has admin privileges
+        return 1 if $c->session->{is_admin};
+        
+        # Check roles array
+        if (ref($roles) eq 'ARRAY') {
+            foreach my $user_role (@$roles) {
+                return 1 if lc($user_role) eq 'admin';
+            }
+        }
+        # Check roles string
+        elsif (defined $roles && !ref($roles)) {
+            return 1 if $roles =~ /\badmin\b/i;
+        }
+        
+        # Check user_groups
+        my $user_groups = $c->session->{user_groups};
+        if (ref($user_groups) eq 'ARRAY') {
+            foreach my $group (@$user_groups) {
+                return 1 if lc($group) eq 'admin';
+            }
+        }
+        elsif (defined $user_groups && !ref($user_groups)) {
+            return 1 if $user_groups =~ /\badmin\b/i;
+        }
+    }
+    
+    # For other roles, check if the role is in the user's roles
+    if (ref($roles) eq 'ARRAY') {
+        foreach my $user_role (@$roles) {
+            return 1 if lc($user_role) eq lc($role);
+        }
+    }
+    elsif (defined $roles && !ref($roles)) {
+        return 1 if $roles =~ /\b$role\b/i;
+    }
+    
+    # Role not found
+    return 0;
 }
 
 # Flag to track if application start has been recorded
@@ -338,7 +404,7 @@ sub auto :Private {
         my $uri = $c->uri_for($path, @_);
         return $uri;
     };
-
+    
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Starting auto action with temporary uri_no_port helper");
 
     # Track application start
@@ -357,10 +423,62 @@ sub auto :Private {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Generated all theme CSS files");
     }
 
+    # Get server information
+    my $system_info = Comserv::Util::SystemInfo::get_system_info();
+    $c->stash->{server_hostname} = $system_info->{hostname};
+    $c->stash->{server_ip} = $system_info->{ip};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', 
+        "Server info - Hostname: $system_info->{hostname}, IP: $system_info->{ip}");
+
     # Perform general setup tasks
     $self->setup_debug_mode($c);
+    
+    # Test database connections if in debug mode
+    if ($c->session->{debug_mode}) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Testing database connections in debug mode");
+        
+        # Add database connection status to debug messages
+        my $debug_msg = $c->stash->{debug_msg} ||= [];
+        push @$debug_msg, "Database connection check initiated. See logs for details.";
+        
+        # Test connections using the test_connection methods we added
+        eval {
+            if ($c->model('DBEncy')->test_connection($c)) {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "DBEncy connection successful");
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto', "DBEncy connection error: $@");
+        }
+        
+        eval {
+            if ($c->model('DBForager')->test_connection($c)) {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "DBForager connection successful");
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto', "DBForager connection error: $@");
+        }
+    }
+    
     $self->setup_site($c);
     $self->set_theme($c);
+    
+    # Try to populate navigation data if the controller is available
+    # This is done in a way that doesn't require explicit loading of the Navigation controller
+    eval {
+        # Check if the Navigation controller exists by trying to load it
+        require Comserv::Controller::Navigation;
+        
+        # If we get here, the controller exists, so try to use it
+        my $navigation = $c->controller('Navigation');
+        if ($navigation) {
+            $navigation->populate_navigation_data($c);
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Navigation data populated");
+        }
+    };
+    # Don't log errors here - if the controller isn't available, that's fine
+    
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Completed general setup tasks");
 
     # Call the index action only for the root path
@@ -408,32 +526,73 @@ sub send_email {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
         "Attempting to send email to: " . $params->{to} . " with subject: " . $params->{subject});
 
-    # Use Email::Simple and Email::Sender::Simple for basic email functionality
+    # First try to use the Mail model which gets SMTP config from the database
     eval {
-        require Email::Simple;
-        require Email::Sender::Simple;
-        Email::Sender::Simple->import(qw(sendmail));
-
-        my $email = Email::Simple->create(
-            header => [
-                To      => $params->{to},
-                From    => $params->{from} || 'noreply@computersystemconsulting.ca',
-                Subject => $params->{subject},
-            ],
-            body => $params->{body},
+        # Use the Mail model to send the email
+        $c->model('Mail')->send_email(
+            $c,
+            $params->{to},
+            $params->{subject},
+            $params->{body}
         );
-
-        sendmail($email);
+        
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
-            "Email sent successfully to: " . $params->{to});
+            "Email sent successfully to: " . $params->{to} . " using Mail model");
         return 1;
     };
-
-    if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email',
-            "Failed to send email: $@");
-        return 0;
+    
+    my $mail_model_error = $@;
+    
+    # If Mail model fails, try fallback method with direct Email::Sender
+    if ($mail_model_error) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'send_email',
+            "Mail model failed: $mail_model_error. Trying fallback method.");
+            
+        # Try to use a fallback SMTP configuration
+        eval {
+            require Email::Simple;
+            require Email::Sender::Simple;
+            require Email::Sender::Transport::SMTP;
+            Email::Sender::Simple->import(qw(sendmail));
+            
+            my $email = Email::Simple->create(
+                header => [
+                    To      => $params->{to},
+                    From    => $params->{from} || 'noreply@computersystemconsulting.ca',
+                    Subject => $params->{subject},
+                ],
+                body => $params->{body},
+            );
+            
+            # Try to use a fallback SMTP configuration
+            # This assumes you have a working SMTP server somewhere
+            my $transport = Email::Sender::Transport::SMTP->new({
+                host => 'smtp.gmail.com',  # Replace with a working SMTP server
+                port => 587,
+                ssl => 'starttls',
+                sasl_username => 'your-email@gmail.com',  # Replace with actual credentials
+                sasl_password => 'your-app-password',     # Replace with actual credentials
+            });
+            
+            sendmail($email, { transport => $transport });
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
+                "Email sent successfully to: " . $params->{to} . " using fallback method");
+            return 1;
+        };
+        
+        if ($@) {
+            # Both methods failed
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email',
+                "All email sending methods failed. Mail model error: $mail_model_error, Fallback error: $@");
+                
+            # Add to debug messages
+            push @{$c->stash->{debug_msg}}, "Email sending failed: $@";
+            return 0;
+        }
     }
+    
+    return 1;
 }
 
 sub setup_site {
@@ -536,12 +695,27 @@ sub setup_site {
                                "This is a configuration error that needs to be fixed for proper site operation."
                 };
 
-                if ($self->send_email($c, $email_params)) {
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site',
-                        "Sent admin notification email about domain error: $error_type for $domain");
-                } else {
+                # Try to send email but don't let it block the application if it fails
+                eval {
+                    if ($self->send_email($c, $email_params)) {
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site',
+                            "Sent admin notification email about domain error: $error_type for $domain");
+                    } else {
+                        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'setup_site',
+                            "Failed to send admin email notification about domain error: $error_type for $domain");
+                        
+                        # Add to debug messages
+                        push @{$c->stash->{debug_msg}}, "Failed to send admin notification email. Check SMTP configuration.";
+                    }
+                };
+                
+                # Log any errors from the email sending attempt but continue processing
+                if ($@) {
                     $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'setup_site',
-                        "Failed to send admin email notification about domain error: $error_type for $domain");
+                        "Exception while sending admin email notification: $@");
+                    
+                    # Add to debug messages
+                    push @{$c->stash->{debug_msg}}, "Email error: $@";
                 }
             }
 
@@ -731,13 +905,7 @@ sub accounts :Path('/accounts') :Args(0) {
 # Special route for hosting
 
 
-sub default :Path {
-    my ( $self, $c ) = @_;
-    my $requested_path = $c->req->path;
-    $c->stash->{error_msg} = "The page you requested could not be found: /$requested_path. <br><a href=\"/mcoop\" style=\"color: #006633; font-weight: bold;\">Return to Landing Page</a>";
-    $c->stash->{template} = 'error.tt';
-    $c->response->status(404);
-}
+# This default method has been merged with the one at line 889
 
 # Documentation routes are now handled directly by the Documentation controller
 # See Comserv::Controller::Documentation
@@ -752,6 +920,34 @@ sub proxmox :Path('proxmox') :Args(0) {
     my ( $self, $c ) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'proxmox', "Forwarding to Proxmox controller");
     $c->forward('Comserv::Controller::Proxmox', 'index');
+}
+
+# Handle both lowercase and uppercase versions of the route
+sub proxymanager :Path('proxymanager') :Args(0) {
+    my ( $self, $c ) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'proxymanager', "Forwarding to ProxyManager controller (lowercase)");
+    $c->forward('Comserv::Controller::ProxyManager', 'index');
+}
+
+# Handle uppercase version of the route
+sub ProxyManager :Path('ProxyManager') :Args(0) {
+    my ( $self, $c ) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ProxyManager', "Forwarding to ProxyManager controller (uppercase)");
+    $c->forward('Comserv::Controller::ProxyManager', 'index');
+}
+
+# Handle lowercase version of the route
+sub hosting :Path('hosting') :Args(0) {
+    my ( $self, $c ) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'hosting', "Forwarding to Hosting controller (lowercase)");
+    $c->forward('Comserv::Controller::Hosting', 'index');
+}
+
+# Handle uppercase version of the route
+sub Hosting :Path('Hosting') :Args(0) {
+    my ( $self, $c ) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'Hosting', "Forwarding to Hosting controller (uppercase)");
+    $c->forward('Comserv::Controller::Hosting', 'index');
 }
 
 
@@ -783,6 +979,39 @@ sub reset_session :Global {
 
 
 sub end : ActionClass('RenderView') {}
+
+# Default action for handling 404 errors
+sub default :Path {
+    my ($self, $c) = @_;
+    
+    # Get the requested path
+    my $requested_path = $c->req->path;
+    my $path = join('/', @{$c->req->args});
+    
+    # Log the 404 error
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'default', 
+        "Page not found: /$requested_path");
+    
+    # Set response status to 404
+    $c->response->status(404);
+    
+    # Set up the error page
+    $c->stash(
+        template => 'error.tt',
+        error_title => 'Page Not Found',
+        error_msg => "The page you requested could not be found: /$requested_path. <br><a href=\"/mcoop\" style=\"color: #006633; font-weight: bold;\">Return to Landing Page</a>",
+        requested_path => $path,
+        debug_msg => "Page not found: /$path",
+        technical_details => "Using Catalyst's built-in proxy configuration. Test URL: " . 
+                         $c->uri_for('/test')
+    );
+    
+    # Initialize debug_msg array if it doesn't exist
+    $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
+    
+    # Add the debug message to the array
+    push @{$c->stash->{debug_msg}}, "Page not found: /$path";
+}
 
 __PACKAGE__->meta->make_immutable;
 

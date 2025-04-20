@@ -1,4 +1,5 @@
-[% PageVersion	= 'CSC/CSC.tt,v 0.01 2023/08/30 shanta Exp shanta '	%]
+[% META title = 'Computer Systems Consulting' %]
+[% PageVersion = 'CSC/CSC.tt,v 0.02 2025/04/12 shanta Exp shanta ' %]
 [% debug %]
 [% IF c.session.debug_mode == 1 %]
  [%	PageVersion %]
@@ -27,6 +28,7 @@
 <li><a href='/hosting'>Website hosting</a></li>
 <li> <a href='http://www.computersystemconsulting.ca/domains'>Register your domain with us.</a></li>
 <li> Check out our <a href='http://demo.computersystemconsulting.ca' target='_blank'>Demo</a> </li>
+<li> <a href='/CSC/email_test'><strong>Email Test Form</strong></a> - Test the email functionality</li>
 <li>
 <h1>Join our VOIP services</h1>
 <p> <a href='/voip'>Learn more</a>

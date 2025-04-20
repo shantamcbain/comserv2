@@ -102,6 +102,10 @@ __PACKAGE__->config(
                         password => 'password',  # Proxmox password - CHANGE THIS TO YOUR ACTUAL PASSWORD
                         realm => 'pam',  # Proxmox authentication realm
                     },
+                    'Model::NPM' => {
+                        # NPM configuration is loaded dynamically from environment-specific config files
+                        # See Comserv::Controller::NPM for implementation details
+                    },
                 );
 
 sub psgi_app {
@@ -120,11 +124,67 @@ sub psgi_app {
                 }
 
                 # Explicitly load controllers to ensure they're available
+                use Comserv::Controller::WeaverBeck;
                 use Comserv::Controller::ProxmoxServers;
                 use Comserv::Controller::Proxmox;
+                use Comserv::Controller::NPM;
+                use Comserv::Controller::ProxyManager;
+                use Comserv::Controller::Hosting;
                 use Comserv::Controller::BMaster;
                 use Comserv::Controller::ENCY;
                 use Comserv::Controller::Apiary;
+                
+                # Auto-fix for missing modules - attempt to load modules with fallbacks
+                # This ensures the application works even if modules are missing
+                
+                # First, try to load email modules
+                my $email_modules_loaded = 1;
+                eval {
+                    require Comserv::View::Email;
+                    require Comserv::View::Email::Template;
+                };
+                if ($@) {
+                    warn "Warning: Could not load Comserv email view modules: $@\n";
+                    warn "Email functionality may not work correctly.\n";
+                    $email_modules_loaded = 0;
+                    
+                    # Try to auto-install the modules if we're in development mode
+                    if ($ENV{CATALYST_DEBUG}) {
+                        warn "Attempting to auto-install email modules...\n";
+                        eval {
+                            require App::cpanminus;
+                            my $local_lib = __PACKAGE__->path_to('local');
+                            system("cpanm --local-lib=$local_lib --notest Catalyst::View::Email Catalyst::View::Email::Template");
+                            
+                            # Try loading again after installation
+                            require Comserv::View::Email;
+                            require Comserv::View::Email::Template;
+                            $email_modules_loaded = 1;
+                        };
+                        if ($@) {
+                            warn "Auto-installation failed: $@\n";
+                            warn "Email functionality will be limited.\n";
+                        }
+                    }
+                }
+                
+                # Check for session store modules
+                my $session_modules_loaded = 1;
+                eval {
+                    require Catalyst::Plugin::Session::Store::File;
+                };
+                if ($@) {
+                    warn "Warning: Could not load session store modules: $@\n";
+                    warn "Using fallback session storage mechanism.\n";
+                    $session_modules_loaded = 0;
+                    
+                    # Configure to use Cookie store as fallback
+                    __PACKAGE__->config(
+                        'Plugin::Session' => {
+                            storage => 'Cookie',
+                        }
+                    );
+                }
 
                 
                 __PACKAGE__->setup();

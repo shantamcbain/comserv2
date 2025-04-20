@@ -12,6 +12,15 @@
   --table-header-bg: #f2f2f2;
   --warning-color: #ff0000;
   --success-color: #009900;
+  --info-color: #17a2b8;
+  --light-color: #f8f9fa;
+  --text-muted-color: #6c757d;
+  
+  /* Spacing variables */
+  --spacing-small: 0.5rem;
+  --spacing-medium: 1rem;
+  --spacing-large: 2rem;
+  --container-width: 1200px;
   
   /* Typography */
   --header-font: Verdana, Helvetica, sans-serif;

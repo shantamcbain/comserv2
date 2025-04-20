@@ -1,0 +1,195 @@
+[% META title = 'Chat Admin' %]
+
+<div class="container">
+    <h1>Chat Admin Interface</h1>
+    
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h2>Chat Messages</h2>
+                </div>
+                <div class="card-body">
+                    <div id="chat-admin-messages">
+                        [% IF messages.size > 0 %]
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>User</th>
+                                        <th>Domain</th>
+                                        <th>Site</th>
+                                        <th>Message</th>
+                                        <th>Time</th>
+                                        <th>Status</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    [% FOREACH msg IN messages %]
+                                    <tr class="[% IF !msg.is_read %]table-warning[% END %]">
+                                        <td>[% msg.id %]</td>
+                                        <td>[% msg.username %]</td>
+                                        <td>[% msg.domain || 'Unknown' %]</td>
+                                        <td>[% msg.site_name || 'Unknown' %]</td>
+                                        <td>[% msg.message %]</td>
+                                        <td>[% msg.timestamp %]</td>
+                                        <td>
+                                            [% IF msg.is_read %]
+                                                <span class="badge bg-success">Read</span>
+                                            [% ELSE %]
+                                                <span class="badge bg-warning">Unread</span>
+                                            [% END %]
+                                        </td>
+                                        <td>
+                                            [% UNLESS msg.is_system_message %]
+                                            <button class="btn btn-sm btn-primary respond-btn" 
+                                                    data-username="[% msg.username %]"
+                                                    data-message="[% msg.message %]"
+                                                    data-domain="[% msg.domain %]"
+                                                    data-site="[% msg.site_name %]">
+                                                Respond
+                                            </button>
+                                            [% END %]
+                                        </td>
+                                    </tr>
+                                    [% END %]
+                                </tbody>
+                            </table>
+                        [% ELSE %]
+                            <div class="alert alert-info">No chat messages yet.</div>
+                        [% END %]
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Respond to User</h3>
+                </div>
+                <div class="card-body">
+                    <form id="response-form">
+                        <div class="mb-3">
+                            <label for="to-username" class="form-label">To User</label>
+                            <input type="text" class="form-control" id="to-username" readonly>
+                        </div>
+                        <div class="mb-3 row">
+                            <div class="col-md-6">
+                                <label for="user-domain" class="form-label">Domain</label>
+                                <input type="text" class="form-control" id="user-domain" readonly>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="user-site" class="form-label">Site</label>
+                                <input type="text" class="form-control" id="user-site" readonly>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="original-message" class="form-label">Original Message</label>
+                            <textarea class="form-control" id="original-message" rows="2" readonly></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="response-message" class="form-label">Your Response</label>
+                            <textarea class="form-control" id="response-message" rows="4" required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Send Response</button>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h3>Quick Responses</h3>
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        <button class="list-group-item list-group-item-action quick-response">
+                            Thank you for your message. I'll look into this and get back to you shortly.
+                        </button>
+                        <button class="list-group-item list-group-item-action quick-response">
+                            Could you please provide more details about the issue you're experiencing?
+                        </button>
+                        <button class="list-group-item list-group-item-action quick-response">
+                            I've resolved your issue. Please let me know if you need anything else.
+                        </button>
+                        <button class="list-group-item list-group-item-action quick-response">
+                            This issue requires further investigation. We'll contact you within 24 hours.
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle respond button clicks
+    document.querySelectorAll('.respond-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const username = this.getAttribute('data-username');
+            const message = this.getAttribute('data-message');
+            const domain = this.getAttribute('data-domain') || 'Unknown';
+            const site = this.getAttribute('data-site') || 'Unknown';
+            
+            document.getElementById('to-username').value = username;
+            document.getElementById('original-message').value = message;
+            document.getElementById('user-domain').value = domain;
+            document.getElementById('user-site').value = site;
+            document.getElementById('response-message').focus();
+        });
+    });
+    
+    // Handle quick responses
+    document.querySelectorAll('.quick-response').forEach(button => {
+        button.addEventListener('click', function() {
+            document.getElementById('response-message').value = this.textContent.trim();
+        });
+    });
+    
+    // Handle form submission
+    document.getElementById('response-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const toUsername = document.getElementById('to-username').value;
+        const responseMessage = document.getElementById('response-message').value;
+        
+        if (!toUsername || !responseMessage) {
+            alert('Please select a user and enter a response message.');
+            return;
+        }
+        
+        // Create form data
+        const formData = new FormData();
+        formData.append('to_username', toUsername);
+        formData.append('message', responseMessage);
+        
+        // Send response
+        fetch('/chat/respond', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Response sent successfully!');
+                document.getElementById('response-message').value = '';
+                // Reload the page to show the updated message list
+                window.location.reload();
+            } else {
+                alert('Error sending response: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while sending the response.');
+        });
+    });
+    
+    // Auto-refresh the page every 30 seconds to show new messages
+    setInterval(function() {
+        window.location.reload();
+    }, 30000);
+});
+</script>
