@@ -902,8 +902,20 @@ sub git_pull :Path('/admin/git_pull') :Args(0) {
     push @{$c->stash->{debug_msg}}, "User: $username";
     push @{$c->stash->{debug_msg}}, "Roles: " . Dumper($roles);
     
-    # Check if the user has the admin role
-    unless ($c->user_exists && grep { $_ eq 'admin' } @{$c->session->{roles}}) {
+    # Check if the user has the admin role in the session
+    my $is_admin = 0;
+    
+    # Check if the user has admin role in the session
+    if (defined $c->session->{roles} && ref($c->session->{roles}) eq 'ARRAY') {
+        $is_admin = grep { $_ eq 'admin' } @{$c->session->{roles}};
+    }
+    
+    # Log the admin check
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
+        "Admin check result: " . ($is_admin ? 'Yes' : 'No'));
+    push @{$c->stash->{debug_msg}}, "Admin check result: " . ($is_admin ? 'Yes' : 'No');
+    
+    unless ($is_admin) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_pull', 
             "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest'));
         $c->stash->{error_msg} = "You must be an admin to perform this action. Please contact your administrator.";
@@ -1021,6 +1033,139 @@ sub git_pull :Path('/admin/git_pull') :Args(0) {
     
     # Set the template
     $c->stash->{template} = 'admin/git_pull.tt';
+    
+    # Forward to the view
+    $c->forward($c->view('TT'));
+}
+
+=head2 restart_starman
+
+Restart the Starman server
+
+=cut
+
+sub restart_starman :Path('/admin/restart_starman') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Debug logging for restart_starman action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', "Starting restart_starman action");
+    
+    # Log user information for debugging
+    my $username = $c->user_exists ? $c->user->username : 'Guest';
+    my $roles = $c->session->{roles} || [];
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', 
+        "User: $username, Roles: " . Dumper($roles));
+    
+    # Initialize debug messages array
+    # Make sure debug_msg is an array reference
+    if (!defined $c->stash->{debug_msg}) {
+        $c->stash->{debug_msg} = [];
+    } elsif (!ref($c->stash->{debug_msg}) || ref($c->stash->{debug_msg}) ne 'ARRAY') {
+        # If debug_msg exists but is not an array reference, convert it to an array
+        my $original_msg = $c->stash->{debug_msg};
+        $c->stash->{debug_msg} = [];
+        push @{$c->stash->{debug_msg}}, $original_msg if $original_msg;
+    }
+    
+    # Add debug messages to the stash
+    push @{$c->stash->{debug_msg}}, "User: $username";
+    push @{$c->stash->{debug_msg}}, "Roles: " . Dumper($roles);
+    
+    # Check if the user has the admin role in the session
+    my $is_admin = 0;
+    
+    # Check if the user has admin role in the session
+    if (defined $c->session->{roles} && ref($c->session->{roles}) eq 'ARRAY') {
+        $is_admin = grep { $_ eq 'admin' } @{$c->session->{roles}};
+    }
+    
+    # Log the admin check
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', 
+        "Admin check result: " . ($is_admin ? 'Yes' : 'No'));
+    push @{$c->stash->{debug_msg}}, "Admin check result: " . ($is_admin ? 'Yes' : 'No');
+    
+    unless ($is_admin) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'restart_starman', 
+            "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest'));
+        $c->stash->{error_msg} = "You must be an admin to perform this action. Please contact your administrator.";
+        $c->stash->{template} = 'admin/restart_starman.tt';
+        $c->forward($c->view('TT'));
+        return;
+    }
+    
+    # Initialize output and error variables
+    my $output = '';
+    my $error = '';
+    
+    # If this is a POST request, perform the restart
+    if ($c->request->method eq 'POST' && $c->request->params->{confirm}) {
+        # Log the restart attempt
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', 
+            "Attempting to restart Starman server");
+        
+        # Ensure debug_msg is an array reference before pushing
+        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
+        push @{$c->stash->{debug_msg}}, "Attempting to restart Starman server";
+        
+        # Execute the systemctl command to restart Starman
+        my $restart_command = "sudo systemctl restart starman 2>&1";
+        $output = qx{$restart_command};
+        my $exit_code = $? >> 8;
+        
+        if ($exit_code == 0) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', 
+                "Starman server restarted successfully");
+            $c->stash->{success_msg} = "Starman server restarted successfully.";
+            
+            # Check the status of the service
+            my $status_command = "sudo systemctl status starman 2>&1";
+            my $status_output = qx{$status_command};
+            my $status_exit_code = $? >> 8;
+            
+            if ($status_exit_code == 0) {
+                $output .= "\n\nService Status:\n" . $status_output;
+                
+                # Check if the service is active
+                if ($status_output =~ /Active: active/) {
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', 
+                        "Starman service is active");
+                    $c->stash->{success_msg} .= " Service is active and running.";
+                } else {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'restart_starman', 
+                        "Starman service may not be active after restart");
+                    $c->stash->{warning_msg} = "Service restart command executed, but the service may not be active. Please check the output for details.";
+                }
+            } else {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'restart_starman', 
+                    "Could not get Starman service status after restart");
+                $c->stash->{warning_msg} = "Service restart command executed, but could not verify service status.";
+            }
+        } else {
+            $error = "Error restarting Starman server: $output";
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'restart_starman', $error);
+            $c->stash->{error_msg} = $error;
+        }
+        
+        # Add the output to the stash
+        $c->stash->{output} = $output;
+        
+        # Add debug messages to the stash
+        # Ensure debug_msg is an array reference before pushing
+        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
+        push @{$c->stash->{debug_msg}}, "Restart command executed";
+        push @{$c->stash->{debug_msg}}, "Output: $output" if $output;
+        push @{$c->stash->{debug_msg}}, "Error: $error" if $error;
+    } else {
+        # This is a GET request or no confirmation, just show the confirmation page
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', 
+            "Displaying restart Starman confirmation page");
+        # Ensure debug_msg is an array reference before pushing
+        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
+        push @{$c->stash->{debug_msg}}, "Displaying restart Starman confirmation page";
+    }
+    
+    # Set the template
+    $c->stash->{template} = 'admin/restart_starman.tt';
     
     # Forward to the view
     $c->forward($c->view('TT'));
