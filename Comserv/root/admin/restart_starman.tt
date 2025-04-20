@@ -21,6 +21,11 @@
         <div class="col-md-12">
             <h1>Restart Starman Server</h1>
             
+            <!-- User status banner -->
+            <div class="alert alert-info mb-4">
+                <strong>Welcome [% c.session.username || 'Guest' %][% IF c.session.roles.grep('^admin$').size %] Administrator[% END %] to Computer System Consulting!</strong>
+            </div>
+            
             [% IF debug_msg || c.session.debug_mode == 1 %]
                 <div class="alert alert-info">
                     <strong>Debug Information:</strong>
@@ -29,8 +34,12 @@
                             <p>[% msg %]</p>
                         [% END %]
                     [% END %]
-                    <p>User exists: [% c.user_exists ? 'Yes' : 'No' %]</p>
-                    <p>Username: [% c.user.username || 'Not logged in' %]</p>
+                    <p>Using Catalyst's built-in proxy configuration. Test URL: http://workstation.local:3000/test</p>
+                    <p>User: [% c.session.username || 'Guest' %]</p>
+                    <p>Roles: [% c.session.roles.join(', ') || 'None' %]</p>
+                    <p>Admin check result: [% c.session.roles.grep('^admin$').size ? 'Yes' : 'No' %]</p>
+                    <p>User exists: [% c.session.username && c.session.user_id ? 'Yes' : 'No' %]</p>
+                    <p>Username: [% c.session.username || 'Not logged in' %]</p>
                     <p>Session roles: [% c.session.roles.join(', ') || 'None' %]</p>
                     <p>Is admin: [% c.session.roles.grep('^admin$').size ? 'Yes' : 'No' %]</p>
                 </div>
@@ -66,38 +75,72 @@
             [% END %]
             
             [% UNLESS output %]
-                <div class="alert alert-warning">
-                    <strong>Warning:</strong> This action will restart the Starman server. 
-                    The application will be temporarily unavailable during the restart.
-                </div>
-                
-                <div class="card">
-                    <div class="card-header bg-primary text-white">
-                        <h3 class="mb-0">Confirm Starman Restart</h3>
+                [% # Always show the credentials form when confirming restart %]
+                [% IF show_password_form || (c.request.params.confirm && (!c.request.params.sudo_username || !c.request.params.sudo_password)) %]
+                    <div class="alert alert-info">
+                        <strong>Credentials Required:</strong> Please enter your system username and password with sudo privileges to restart the Starman server.
                     </div>
-                    <div class="card-body">
-                        <p>
-                            Restarting the Starman server will:
-                        </p>
-                        <ul>
-                            <li>Temporarily interrupt service to all users</li>
-                            <li>Apply any configuration changes</li>
-                            <li>Reload the application code</li>
-                        </ul>
-                        
-                        <p>Are you sure you want to proceed?</p>
-                        
-                        <form method="POST" action="[% c.uri_for('/admin/restart_starman') %]">
-                            <input type="hidden" name="confirm" value="1">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-sync"></i> Yes, Restart Starman Server
-                            </button>
-                            <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">
-                                <i class="fas fa-times"></i> Cancel
-                            </a>
-                        </form>
+                    
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h3 class="mb-0">Enter System Credentials</h3>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" action="[% c.uri_for('/admin/restart_starman') %]">
+                                <input type="hidden" name="confirm" value="1">
+                                <div class="form-group mb-3">
+                                    <label for="sudo_username">Username:</label>
+                                    <input type="text" class="form-control" id="sudo_username" name="sudo_username" value="[% c.session.username || '' %]" required autofocus>
+                                    <small class="form-text text-muted">Enter the system username with sudo privileges.</small>
+                                </div>
+                                <div class="form-group mb-3">
+                                    <label for="sudo_password">Password:</label>
+                                    <input type="password" class="form-control" id="sudo_password" name="sudo_password" required>
+                                    <small class="form-text text-muted">Your password will not be stored and is only used for this restart operation.</small>
+                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-sync"></i> Restart Starman Server
+                                </button>
+                                <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">
+                                    <i class="fas fa-times"></i> Cancel
+                                </a>
+                            </form>
+                        </div>
                     </div>
-                </div>
+                [% ELSE %]
+                    <div class="alert alert-warning">
+                        <strong>Warning:</strong> This action will restart the Starman server. 
+                        The application will be temporarily unavailable during the restart.
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h3 class="mb-0">Confirm Starman Restart</h3>
+                        </div>
+                        <div class="card-body">
+                            <p>
+                                Restarting the Starman server will:
+                            </p>
+                            <ul>
+                                <li>Temporarily interrupt service to all users</li>
+                                <li>Apply any configuration changes</li>
+                                <li>Reload the application code</li>
+                            </ul>
+                            
+                            <p>Are you sure you want to proceed?</p>
+                            
+                            <form method="POST" action="[% c.uri_for('/admin/restart_starman') %]">
+                                <input type="hidden" name="confirm" value="1">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-sync"></i> Yes, Restart Starman Server
+                                </button>
+                                <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">
+                                    <i class="fas fa-times"></i> Cancel
+                                </a>
+                            </form>
+                        </div>
+                    </div>
+                [% END %]
             [% ELSE %]
                 <div class="mt-4">
                     <a href="[% c.uri_for('/admin/restart_starman') %]" class="btn btn-primary">

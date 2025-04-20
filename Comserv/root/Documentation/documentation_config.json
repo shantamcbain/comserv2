@@ -61,7 +61,7 @@
       "description": "System changes and updates",
       "roles": ["admin", "developer"],
       "site_specific": false,
-      "pages": ["main_changelog", "2025-05-31-server-ip-display", "2025-04-git-pull-functionality", "2025-04-pagetop-hostname-display", "2024-08-proxmox-debug-msg-fix", "2024-07-project-id-fix", "2024-06-project-edit-fix", "2024-07-proxmox-controller-fixes", "2024-06-15-login-redirect-fix", "2025-04-navigation-improvements", "2025-04-documentation-display-fix", "2025-04-mcoop-admin-menu-restriction", "2025-04-documentation-admin-visibility-fix", "2025-05-30-documentation-structure-simplification", "2025-08-18-project-cards-css-fix", "2025-04-12-hosting-signup-implementation"]
+      "pages": ["main_changelog", "2025-05-31-server-ip-display", "2025-04-git-pull-functionality", "2025-04-pagetop-hostname-display", "2024-08-proxmox-debug-msg-fix", "2024-07-project-id-fix", "2024-06-project-edit-fix", "2024-07-proxmox-controller-fixes", "2024-06-15-login-redirect-fix", "2025-04-navigation-improvements", "2025-04-documentation-display-fix", "2025-04-mcoop-admin-menu-restriction", "2025-04-documentation-admin-visibility-fix", "2025-05-30-documentation-structure-simplification", "2025-08-18-project-cards-css-fix", "2025-04-12-hosting-signup-implementation", "2025-09-15-sudo-password-configuration", "2025-09-10-restart-starman-functionality"]
     },
     "proxmox": {
       "title": "Proxmox Documentation",
@@ -155,6 +155,8 @@
     "documentation_template": "Documentation/docs/templates/documentation_template.md",
     "documentation_index_adaptation": "Documentation/docs/developer/documentation_index_adaptation.md",
     "Projects": "Documentation/Projects.tt",
-    "2025-08-18-project-cards-css-fix": "Documentation/changelog/2025-08-18-project-cards-css-fix.md"
+    "2025-08-18-project-cards-css-fix": "Documentation/changelog/2025-08-18-project-cards-css-fix.md",
+    "2025-09-15-sudo-password-configuration": "Documentation/changelog/2025-09-15-sudo-password-configuration.md",
+    "2025-09-10-restart-starman-functionality": "Documentation/changelog/2025-09-10-restart-starman-functionality.md"
   }
 }

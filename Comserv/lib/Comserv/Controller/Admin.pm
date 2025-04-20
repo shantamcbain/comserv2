@@ -1051,10 +1051,11 @@ sub restart_starman :Path('/admin/restart_starman') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', "Starting restart_starman action");
     
     # Log user information for debugging
-    my $username = $c->user_exists ? $c->user->username : 'Guest';
+    my $username = $c->session->{username} || 'Guest';
     my $roles = $c->session->{roles} || [];
+    my $roles_str = ref($roles) eq 'ARRAY' ? join(', ', @$roles) : 'none';
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', 
-        "User: $username, Roles: " . Dumper($roles));
+        "User: $username, Roles: $roles_str");
     
     # Initialize debug messages array
     # Make sure debug_msg is an array reference
@@ -1079,10 +1080,37 @@ sub restart_starman :Path('/admin/restart_starman') :Args(0) {
         $is_admin = grep { $_ eq 'admin' } @{$c->session->{roles}};
     }
     
+    # Also check if user is logged in and has user_id
+    my $user_exists = ($c->session->{username} && $c->session->{user_id}) ? 1 : 0;
+    push @{$c->stash->{debug_msg}}, "User exists: " . ($user_exists ? 'Yes' : 'No');
+    push @{$c->stash->{debug_msg}}, "Username: " . ($c->session->{username} || 'Not logged in');
+    push @{$c->stash->{debug_msg}}, "Session roles: " . (join(', ', @{$c->session->{roles}}) || 'None');
+    push @{$c->stash->{debug_msg}}, "Is admin: " . ($is_admin ? 'Yes' : 'No');
+    
     # Log the admin check
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', 
         "Admin check result: " . ($is_admin ? 'Yes' : 'No'));
     push @{$c->stash->{debug_msg}}, "Admin check result: " . ($is_admin ? 'Yes' : 'No');
+    
+    # If user has 'admin' in roles array, they are an admin
+    if (defined $c->session->{roles} && ref($c->session->{roles}) eq 'ARRAY') {
+        foreach my $role (@{$c->session->{roles}}) {
+            if (lc($role) eq 'admin') {
+                $is_admin = 1;
+                last;
+            }
+        }
+    }
+    
+    # Also check if is_admin flag is set in session
+    if ($c->session->{is_admin}) {
+        $is_admin = 1;
+    }
+    
+    # Log the final admin check after all checks
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', 
+        "Final admin check result: " . ($is_admin ? 'Yes' : 'No'));
+    push @{$c->stash->{debug_msg}}, "Final admin check result: " . ($is_admin ? 'Yes' : 'No');
     
     unless ($is_admin) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'restart_starman', 
@@ -1107,8 +1135,62 @@ sub restart_starman :Path('/admin/restart_starman') :Args(0) {
         $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
         push @{$c->stash->{debug_msg}}, "Attempting to restart Starman server";
         
-        # Execute the systemctl command to restart Starman
-        my $restart_command = "sudo systemctl restart starman 2>&1";
+        # Check if we have username and password from the form
+        my $sudo_username = $c->request->params->{sudo_username};
+        my $sudo_password = $c->request->params->{sudo_password};
+        
+        # If this is the first attempt (no username or password provided yet), show the form
+        if ((!$sudo_username || !$sudo_password) && $c->request->method eq 'POST' && $c->request->params->{confirm}) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', 
+                "Missing username or password, showing credentials form");
+            $c->stash->{show_password_form} = 1;
+            $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
+            push @{$c->stash->{debug_msg}}, "Displaying credentials form for Starman restart";
+            push @{$c->stash->{debug_msg}}, "Username provided: " . ($sudo_username ? 'Yes' : 'No');
+            push @{$c->stash->{debug_msg}}, "Password provided: " . ($sudo_password ? 'Yes' : 'No');
+            $c->stash->{template} = 'admin/restart_starman.tt';
+            $c->forward($c->view('TT'));
+            return;
+        }
+        
+        # If we have username and password from the form, use them
+        my $restart_command;
+        if ($sudo_username && $sudo_password) {
+            # Escape single quotes in the username and password to prevent command injection
+            $sudo_username =~ s/'/'\\''/g;
+            $sudo_password =~ s/'/'\\''/g;
+            
+            # Use sudo -u to run the command as the specified user
+            $restart_command = "echo '$sudo_password' | sudo -S -u $sudo_username systemctl restart starman 2>&1";
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', 
+                "Using username and password from form");
+            
+            # Log the username being used (but not the password)
+            push @{$c->stash->{debug_msg}}, "Using username: $sudo_username";
+            
+            # Clear the password from the request parameters for security
+            delete $c->request->params->{sudo_password};
+        }
+        # Otherwise, try to use the environment variables
+        elsif (defined $ENV{SUDO_USERNAME} && defined $ENV{SUDO_PASSWORD}) {
+            $restart_command = "echo \$SUDO_PASSWORD | sudo -S -u \$SUDO_USERNAME systemctl restart starman 2>&1";
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', 
+                "Using SUDO_USERNAME and SUDO_PASSWORD environment variables");
+        }
+        # If neither is available, show an error
+        else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'restart_starman', 
+                "Missing username or password and environment variables are not set");
+            $c->stash->{error_msg} = "Error: Please enter both your username and password to restart the Starman server.";
+            $c->stash->{show_password_form} = 1;
+            $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
+            push @{$c->stash->{debug_msg}}, "Missing credentials, showing form";
+            $c->stash->{template} = 'admin/restart_starman.tt';
+            $c->forward($c->view('TT'));
+            return;
+        }
+        
+        # Execute the restart command
         $output = qx{$restart_command};
         my $exit_code = $? >> 8;
         
@@ -1118,7 +1200,13 @@ sub restart_starman :Path('/admin/restart_starman') :Args(0) {
             $c->stash->{success_msg} = "Starman server restarted successfully.";
             
             # Check the status of the service
-            my $status_command = "sudo systemctl status starman 2>&1";
+            my $status_command;
+            if ($sudo_username && $sudo_password) {
+                # Username and password are already escaped above
+                $status_command = "echo '$sudo_password' | sudo -S -u $sudo_username systemctl status starman 2>&1";
+            } else {
+                $status_command = "echo \$SUDO_PASSWORD | sudo -S -u \$SUDO_USERNAME systemctl status starman 2>&1";
+            }
             my $status_output = qx{$status_command};
             my $status_exit_code = $? >> 8;
             
