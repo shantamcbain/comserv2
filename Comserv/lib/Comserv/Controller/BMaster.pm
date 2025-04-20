@@ -44,7 +44,10 @@ sub index :Path('/BMaster') :Args(0) {
 
     # Set up the template directly instead of forwarding
     $c->stash(template => 'BMaster/BMaster.tt');
-    $c->stash->{debug_msg} = "BMaster Module - Main Dashboard";
+    
+    # Ensure debug_msg is always an array
+    $c->stash->{debug_msg} = [] unless ref $c->stash->{debug_msg} eq 'ARRAY';
+    push @{$c->stash->{debug_msg}}, "BMaster Module - Main Dashboard";
 
     # Log the stash for debugging
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Template set to: " . $c->stash->{template});
@@ -65,7 +68,10 @@ sub chained_index :Chained('base') :PathPart('') :Args(0) {
 
         # Set the template
         $c->stash(template => 'BMaster/BMaster.tt');
-        $c->stash->{debug_msg} = "BMaster Module - Main Dashboard";
+        
+        # Ensure debug_msg is always an array
+        $c->stash->{debug_msg} = [] unless ref $c->stash->{debug_msg} eq 'ARRAY';
+        push @{$c->stash->{debug_msg}}, "BMaster Module - Main Dashboard";
 
         # No need to forward to the TT view here, let Catalyst handle it
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'chained_index', "BMaster chained_index method completed successfully");

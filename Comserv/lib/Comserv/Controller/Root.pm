@@ -728,7 +728,8 @@ sub setup_site {
             $c->stash->{action_required} = $action_required;
 
             # Add debug message that will be displayed to admins
-            $c->stash->{debug_msg} = "Domain Error ($error_type): $technical_details";
+            $c->stash->{debug_msg} = [] unless ref $c->stash->{debug_msg} eq 'ARRAY';
+            push @{$c->stash->{debug_msg}}, "Domain Error ($error_type): $technical_details";
 
             # Forward to the error template and stop processing
             $c->forward($c->view('TT'));
@@ -790,7 +791,8 @@ sub setup_site {
             $c->stash->{action_required} = "Please add this domain to the sitedomain table and associate it with the appropriate site.";
 
             # Add debug message that will be displayed to admins
-            $c->stash->{debug_msg} = "Domain '$domain' not found in sitedomain table. Please add it using the Site Administration interface.";
+            $c->stash->{debug_msg} = [] unless ref $c->stash->{debug_msg} eq 'ARRAY';
+            push @{$c->stash->{debug_msg}}, "Domain '$domain' not found in sitedomain table. Please add it using the Site Administration interface.";
 
             # Set flash error message to ensure it's displayed
             $c->flash->{error_msg} = "Domain Error: This domain ($domain) is not properly configured in the system.";
@@ -830,7 +832,9 @@ sub site_setup {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Test URL: $test_url");
     
     # Add to debug_msg for visibility in templates
-    $c->stash->{debug_msg} = "Using Catalyst's built-in proxy configuration. Test URL: $test_url";
+    # Ensure debug_msg is always an array
+    $c->stash->{debug_msg} = [] unless ref $c->stash->{debug_msg} eq 'ARRAY';
+    push @{$c->stash->{debug_msg}}, "Using Catalyst's built-in proxy configuration. Test URL: $test_url";
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Set default HostName: $default_hostname");
 
@@ -846,7 +850,10 @@ sub site_setup {
 
         # Add debug information
         push @{$c->stash->{debug_errors}}, "ERROR: No site found for SiteName: $SiteName";
-        $c->stash->{debug_msg} = "Using default site settings because no site was found for '$SiteName'";
+        
+        # Ensure debug_msg is always an array
+        $c->stash->{debug_msg} = [] unless ref $c->stash->{debug_msg} eq 'ARRAY';
+        push @{$c->stash->{debug_msg}}, "Using default site settings because no site was found for '$SiteName'";
 
         return;
     }

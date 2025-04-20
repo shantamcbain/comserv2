@@ -140,7 +140,9 @@ sub do_login :Local {
     }
     
     # Store the redirect path for debugging
-    $c->stash->{debug_msg} = "Redirect path: $redirect_path";
+    # Ensure debug_msg is always an array
+    $c->stash->{debug_msg} = [] unless ref $c->stash->{debug_msg} eq 'ARRAY';
+    push @{$c->stash->{debug_msg}}, "Redirect path: $redirect_path";
     $self->logging->log_with_details(
         $c, 'debug', __FILE__, __LINE__, 'do_login',
         "Final redirect path: $redirect_path"

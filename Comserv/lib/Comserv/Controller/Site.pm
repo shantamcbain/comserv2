@@ -111,7 +111,10 @@ sub index :Path :Args(0) {
     # Add messages to stash
     $c->stash->{help_message} = $help_message;
     $c->stash->{account_message} = $account_message;
-    $c->stash->{debug_msg} = "Site controller index view for $current_site_name";
+    
+    # Ensure debug_msg is always an array
+    $c->stash->{debug_msg} = [] unless ref $c->stash->{debug_msg} eq 'ARRAY';
+    push @{$c->stash->{debug_msg}}, "Site controller index view for $current_site_name";
 
     # Set the template to site/index.tt
     $c->stash(template => 'site/index.tt');

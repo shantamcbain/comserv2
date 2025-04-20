@@ -9,10 +9,11 @@
 <h3>Table of Contents</h3>
 <ul>
     <li><a href="#site_management">Site Management</a></li>
+    <li><a href="#system_management">System Management</a></li>
     <li><a href="#database_schema_management">Database Schema Management</a></li>
 </ul>
 
-<p>The Admin module provides a suite of tools for managing various aspects of the site, with a current focus on handling schema changes within the application.</p>
+<p>The Admin module provides a suite of tools for managing various aspects of the site, including site management, system operations, and database schema management.</p>
 
 <h3 id="site_management"><a href="#admin_module">Site Management</a></h3>
 
@@ -26,6 +27,60 @@
     <li><strong><a href="#access_logging">Access Logging</a></strong></li>
 </ul>
 
+<h3 id="system_management"><a href="#admin_module">System Management</a></h3>
+
+<p>The System Management section provides tools for managing the application server and codebase. It includes the following features:</p>
+
+<ul>
+    <li><strong><a href="#git_pull">Git Pull</a></strong>: Update the application codebase from the Git repository</li>
+    <li><strong><a href="#restart_starman">Restart Starman Server</a></strong>: Restart the Starman application server</li>
+    <li><strong><a href="#view_log">View Application Log</a></strong>: View the application's log files</li>
+    <li><strong><a href="#theme_management">Theme Management</a></strong>: Manage the application's visual themes</li>
+</ul>
+
+<h4 id="git_pull"><a href="#system_management">Git Pull</a></h4>
+
+<p>The Git Pull feature allows administrators to update the application codebase directly from the web interface. This is useful for applying updates without needing command-line access to the server.</p>
+
+<p><strong>How it works:</strong></p>
+<ol>
+    <li>Navigate to Admin Dashboard → System Management → Pull from Git Repository</li>
+    <li>Review the warning about potential conflicts with local changes</li>
+    <li>Click "Yes, Pull from Git" to confirm</li>
+    <li>The system will execute a git pull command and display the results</li>
+    <li>If successful, you'll see a success message and the output from Git</li>
+</ol>
+
+<p><strong>Security:</strong> This feature is only available to users with the 'admin' role in their session.</p>
+
+<h4 id="restart_starman"><a href="#system_management">Restart Starman Server</a></h4>
+
+<p>The Restart Starman Server feature allows administrators to restart the application server after updates or when troubleshooting issues. This is particularly useful after pulling new code from the Git repository.</p>
+
+<p><strong>How it works:</strong></p>
+<ol>
+    <li>Navigate to Admin Dashboard → System Management → Restart Starman Server</li>
+    <li>Review the warning about service interruption</li>
+    <li>Click "Yes, Restart Starman Server" to confirm</li>
+    <li>The system will execute the systemctl restart command for the Starman service</li>
+    <li>After the restart, the system will check the service status and display the results</li>
+</ol>
+
+<p><strong>Important notes:</strong></p>
+<ul>
+    <li>Restarting the server will temporarily interrupt service to all users</li>
+    <li>The restart process typically takes a few seconds</li>
+    <li>This feature requires that the web server user has sudo privileges to restart the Starman service</li>
+    <li>Only users with the 'admin' role in their session can access this feature</li>
+</ul>
+
+<p><strong>Typical workflow:</strong></p>
+<ol>
+    <li>Use the Git Pull feature to update the codebase</li>
+    <li>Use the Restart Starman Server feature to apply the changes</li>
+    <li>Check the application logs for any errors after restart</li>
+</ol>
+
 <h3 id="database_schema_management"><a href="#admin_module">Database Schema Management</a></h3>
 
 <p>The Database Schema Management section focuses on managing database schema changes from within the application. It includes the following features:</p>
@@ -35,11 +90,15 @@
     <ol>
         <li><strong>begin:</strong> Checks if the user is logged in and if they have the 'admin' role. If not, redirects to an error page.</li>
         <li><strong>index:</strong> Sets the Template Toolkit template to 'admin/index.tt' and forwards the request to the view.</li>
+        <li><strong>git_pull:</strong> Allows administrators to pull the latest changes from the Git repository. Checks if the user has admin privileges, then executes the git pull command and displays the results.</li>
+        <li><strong>restart_starman:</strong> Allows administrators to restart the Starman server. Checks if the user has admin privileges, then executes the systemctl restart command and displays the results.</li>
         <li><strong>edit_documentation:</strong> Sets the Template Toolkit template to 'admin/edit_documentation.tt'.</li>
         <li><strong>add_schema:</strong> Handles the addition of new schemas. If the request method is 'POST', retrieves the schema name and description from the form, runs the 'create_migration_script.pl' script, and checks if the script ran successfully.</li>
         <li><strong>migrate_schema:</strong> Handles the migration of schemas. If the request method is 'POST', runs the 'migrate_schema.pl' script.</li>
         <li><strong>toggle_debug:</strong> Toggles the 'CATALYST_DEBUG' environment variable and redirects to the admin index page.</li>
         <li><strong>get_table_info:</strong> Retrieves information about a specific table from the 'DBEncy' model. If the table exists, displays its schema. If the table does not exist, displays an error message.</li>
+        <li><strong>schema_manager:</strong> Provides an interface for managing database schemas, including viewing tables and their structures.</li>
+        <li><strong>manage_users:</strong> Provides an interface for managing users, including viewing, adding, and deleting users.</li>
     </ol>
     </li>
     <li><strong>Add New Schema:</strong> This feature allows you to add new schemas to the database. It works as follows:

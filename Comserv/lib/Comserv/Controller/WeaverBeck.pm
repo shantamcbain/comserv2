@@ -11,7 +11,7 @@ has 'logging' => (
 );
 
 # Set the namespace for this controller
-__PACKAGE__->config(namespace => 'weaverbeck');
+__PACKAGE__->config(namespace => 'WeaverBeck');
 
 sub auto :Private {
     my ($self, $c) = @_;
@@ -28,7 +28,7 @@ sub auto :Private {
 }
 
 # Main index action
-sub index :Path :Args(0) {
+sub index :Path('/WeaverBeck') :Args(0) {
     my ($self, $c) = @_;
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Entered WeaverBeck index method");
@@ -42,10 +42,14 @@ sub index :Path :Args(0) {
         template => 'weaverbeck/index.tt',
         title => 'WeaverBeck',
     );
+    
+    # Add detailed logging for debugging
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
+        "Using template: weaverbeck/index.tt");
 }
 
 # About page
-sub about :Local :Args(0) {
+sub about :Path('/WeaverBeck/about') :Args(0) {
     my ($self, $c) = @_;
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'about', "Entered WeaverBeck about method");
@@ -62,7 +66,7 @@ sub about :Local :Args(0) {
 }
 
 # Services page
-sub services :Local :Args(0) {
+sub services :Path('/WeaverBeck/services') :Args(0) {
     my ($self, $c) = @_;
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'services', "Entered WeaverBeck services method");
@@ -79,7 +83,7 @@ sub services :Local :Args(0) {
 }
 
 # Contact page
-sub contact :Local :Args(0) {
+sub contact :Path('/WeaverBeck/contact') :Args(0) {
     my ($self, $c) = @_;
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'contact', "Entered WeaverBeck contact method");
@@ -96,7 +100,7 @@ sub contact :Local :Args(0) {
 }
 
 # Process contact form
-sub process_contact :Path('process_contact') :Args(0) {
+sub process_contact :Path('/WeaverBeck/process_contact') :Args(0) {
     my ($self, $c) = @_;
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process_contact', "Processing WeaverBeck contact form");
