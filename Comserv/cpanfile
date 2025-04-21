@@ -103,3 +103,4 @@ requires 'Test::Pod::Coverage';
 requires 'Test::WWW::Mechanize::Catalyst';
 requires 'Catalyst::ScriptRunner';
 requires 'Log::Log4perl';
+requires 'Term::Size::Any';  # For terminal width detection
