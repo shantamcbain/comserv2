@@ -8,6 +8,9 @@
                     [% END %]
                     <a href="/HelpDesk"target=.blank'>HelpDesk</a>
                     <a href="/Documentation" target="_blank">Documentation</a>
+                    [% IF c.session.roles && c.session.roles.grep('^admin$').size %]
+                    <a href="/documentation/linux_commands" target="_blank"><i class="icon-terminal"></i>Linux Commands</a>
+                    [% END %]
                     <a href="/faq" target="_blank" ><font   class="LeftSideBarNavStyle">Our FAQ</font></a>
                     <a href="/KnowlegeBase" target="_blank" >Knowledge
                             base</a>

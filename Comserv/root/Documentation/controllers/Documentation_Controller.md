@@ -30,6 +30,10 @@ The controller provides the following routes:
 - `/Documentation/documentation_filename_issue` - Information about the filename/package mismatch issue
 - `/Documentation/logging_best_practices` - Best practices for logging
 - `/Documentation/ai_guidelines` - Guidelines for AI assistants
+- `/Documentation/controller_routing_guidelines` - Guidelines for controller routing
+- `/Documentation/controllers` - Documentation for controllers
+- `/Documentation/documentation_update_summary` - Summary of documentation updates
+- `/Documentation/linux_commands` - Linux Commands Reference (redirects to HelpDesk controller)
 
 ## Key Methods
 
@@ -102,3 +106,6 @@ The system supports multiple file types:
 - [Documentation Filename Issue](/Documentation/documentation_filename_issue)
 - [Logging Best Practices](/Documentation/logging_best_practices)
 - [AI Guidelines](/Documentation/ai_guidelines)
+- [Controller Routing Guidelines](/Documentation/controller_routing_guidelines)
+- [Controllers Documentation](/Documentation/controllers)
+- [Documentation Update Summary](/Documentation/documentation_update_summary)

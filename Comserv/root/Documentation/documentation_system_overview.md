@@ -23,6 +23,17 @@ The system supports both uppercase and lowercase routes:
 - `/Documentation/[page]` - View specific documentation page
 - `/documentation/[page]` - Alternative route for specific page
 
+### Special Routes
+
+- `/Documentation/documentation_system_overview` - This overview
+- `/Documentation/documentation_filename_issue` - Information about the filename/package mismatch issue
+- `/Documentation/logging_best_practices` - Best practices for logging
+- `/Documentation/ai_guidelines` - Guidelines for AI assistants
+- `/Documentation/controller_routing_guidelines` - Guidelines for controller routing
+- `/Documentation/controllers` - Documentation for controllers
+- `/Documentation/documentation_update_summary` - Summary of documentation updates
+- `/Documentation/linux_commands` - Linux Commands Reference (redirects to HelpDesk controller)
+
 ## Logging
 
 The documentation system uses comprehensive logging to track access and troubleshoot issues:
@@ -113,3 +124,13 @@ Example of correct naming:
 - Package: `Comserv::Controller::Documentation`
 
 For more details on a previous issue with filename mismatch, see [Documentation Filename Issue](/Documentation/documentation_filename_issue).
+
+## Related Documentation
+
+- [Documentation Filename Issue](/Documentation/documentation_filename_issue)
+- [Logging Best Practices](/Documentation/logging_best_practices)
+- [AI Guidelines](/Documentation/ai_guidelines)
+- [Controller Routing Guidelines](/Documentation/controller_routing_guidelines)
+- [Controllers Documentation](/Documentation/controllers)
+- [Documentation Update Summary](/Documentation/documentation_update_summary)
+- [Linux Commands Reference](/Documentation/linux_commands)

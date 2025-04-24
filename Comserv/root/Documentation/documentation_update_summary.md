@@ -72,9 +72,13 @@ We added new routes to the Documentation controller:
 1. `/Documentation/documentation_system_overview`
 2. `/Documentation/documentation_filename_issue`
 3. `/Documentation/logging_best_practices`
-4. `/Documentation/ai_assistants`
+4. `/Documentation/ai_guidelines`
+5. `/Documentation/controller_routing_guidelines`
+6. `/Documentation/controllers`
+7. `/Documentation/documentation_update_summary`
+8. `/Documentation/linux_commands` (redirects to HelpDesk controller)
 
-Each route uses proper logging with the `log_with_details` method to ensure comprehensive logging.
+Each route uses proper logging with the `log_with_details` method to ensure comprehensive logging and error handling.
 
 ## Next Steps
 

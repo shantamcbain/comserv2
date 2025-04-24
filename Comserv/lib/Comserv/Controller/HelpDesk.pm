@@ -201,16 +201,20 @@ sub linux_commands :Chained('base') :PathPart('kb/linux_commands') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'linux_commands', 
         "Starting linux_commands action");
     
+    # Include CSS and JavaScript enhancements
     $c->stash(
         template => 'CSC/HelpDesk/linux_commands.tt',
-        title => 'Linux Commands Reference'
+        title => 'Linux Commands Reference',
+        additional_css => ['/static/css/linux_commands.css'],
+        additional_js => ['/static/js/linux_commands.js']
     );
     
     # Push debug message to stash
-    push @{$c->stash->{debug_msg}}, "Linux Commands Reference loaded";
+    push @{$c->stash->{debug_msg}}, "Linux Commands Reference loaded with enhancements";
+    push @{$c->stash->{success_msg}}, "Command reference enhanced with copy-to-clipboard functionality";
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'linux_commands', 
-        "Completed linux_commands action");
+        "Completed linux_commands action with CSS and JS enhancements");
     
     # Explicitly forward to the TT view
     $c->forward($c->view('TT'));

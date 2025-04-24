@@ -1320,7 +1320,7 @@ sub view :Path('/Documentation') :Args(1) {
         $last_updated = $last_updated->strftime('%Y-%m-%d %H:%M:%S');
 
         # Pass the content to the markdown viewer template
-        $c->stash(
+        my $stash_data = {
             page_name => $page,
             page_title => $self->_format_title($page),
             markdown_content => $content,
@@ -1328,7 +1328,18 @@ sub view :Path('/Documentation') :Args(1) {
             user_role => $user_role,
             site_name => $site_name,
             template => 'Documentation/markdown_viewer.tt'
-        );
+        };
+        
+        # Add special CSS and JavaScript for Linux commands documentation
+        if ($page eq 'linux_commands') {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
+                "Loading special CSS and JS for Linux commands documentation");
+            
+            $stash_data->{additional_css} = ['/static/css/linux_commands.css'];
+            $stash_data->{additional_js} = ['/static/js/linux_commands.js'];
+        }
+        
+        $c->stash(%$stash_data);
         return;
     }
 
@@ -1390,6 +1401,123 @@ sub virtualmin_integration :Path('Virtualmin_Integration') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'virtualmin_integration',
         "Accessing Virtualmin Integration documentation");
     $c->stash(template => 'Documentation/Virtualmin_Integration.tt');
+    $c->forward($c->view('TT'));
+}
+
+# AI Guidelines
+sub ai_guidelines :Path('ai_guidelines') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ai_guidelines',
+        "Accessing AI Guidelines documentation");
+    
+    # Check if the markdown file exists
+    my $md_file = $c->path_to('root', 'Documentation', 'AI_Guidelines.md');
+    
+    if (-e $md_file) {
+        # Read the markdown file
+        open my $fh, '<:encoding(UTF-8)', $md_file or die "Cannot open $md_file: $!";
+        my $content = do { local $/; <$fh> };
+        close $fh;
+        
+        # Pass the content to the template
+        $c->stash(
+            markdown_content => $content,
+            template => 'Documentation/markdown_viewer.tt',
+            title => 'AI Assistant Guidelines'
+        );
+    } else {
+        # If the file doesn't exist, show an error
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'ai_guidelines',
+            "Documentation file 'AI_Guidelines.md' not found");
+        $c->stash(
+            error_msg => "Documentation file 'AI_Guidelines.md' not found",
+            template => 'Documentation/error.tt'
+        );
+    }
+    
+    $c->forward($c->view('TT'));
+}
+
+# Linux Commands Reference - redirects to HelpDesk controller
+sub linux_commands :Path('linux_commands') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'linux_commands',
+        "Redirecting to HelpDesk linux_commands documentation");
+    
+    # Redirect to the HelpDesk controller's linux_commands route
+    $c->response->redirect($c->uri_for('/HelpDesk/kb/linux_commands'));
+    $c->detach();
+}
+
+# Controller routing guidelines
+sub controller_routing_guidelines :Path('controller_routing_guidelines') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'controller_routing_guidelines',
+        "Accessing controller routing guidelines");
+    
+    # Check if the markdown file exists
+    my $md_file = $c->path_to('root', 'Documentation', 'controller_routing_guidelines.md');
+    
+    if (-e $md_file) {
+        # Read the markdown file
+        open my $fh, '<:encoding(UTF-8)', $md_file or die "Cannot open $md_file: $!";
+        my $content = do { local $/; <$fh> };
+        close $fh;
+        
+        # Pass the content to the template
+        $c->stash(
+            markdown_content => $content,
+            template => 'Documentation/markdown_viewer.tt',
+            title => 'Controller Routing Guidelines'
+        );
+    } else {
+        # If the file doesn't exist, show an error
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'controller_routing_guidelines',
+            "Documentation file 'controller_routing_guidelines.md' not found");
+        $c->stash(
+            error_msg => "Documentation file 'controller_routing_guidelines.md' not found",
+            template => 'Documentation/error.tt'
+        );
+    }
+    
+    $c->forward($c->view('TT'));
+}
+
+# Controllers documentation
+sub controllers_documentation :Path('controllers') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'controllers_documentation',
+        "Accessing controllers documentation index");
+    
+    # Check if the markdown file exists
+    my $md_file = $c->path_to('root', 'Documentation', 'controllers', 'index.md');
+    
+    if (-e $md_file) {
+        # Read the markdown file
+        open my $fh, '<:encoding(UTF-8)', $md_file or die "Cannot open $md_file: $!";
+        my $content = do { local $/; <$fh> };
+        close $fh;
+        
+        # Pass the content to the template
+        $c->stash(
+            markdown_content => $content,
+            template => 'Documentation/markdown_viewer.tt',
+            title => 'Controllers Documentation'
+        );
+    } else {
+        # If the file doesn't exist, show an error
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'controllers_documentation',
+            "Documentation file 'controllers/index.md' not found");
+        $c->stash(
+            error_msg => "Documentation file 'controllers/index.md' not found",
+            template => 'Documentation/error.tt'
+        );
+    }
+    
     $c->forward($c->view('TT'));
 }
 

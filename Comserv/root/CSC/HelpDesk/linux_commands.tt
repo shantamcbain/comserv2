@@ -1,5 +1,5 @@
 [% META title = 'Linux Commands Reference' %]
-[% PageVersion = 'CSC/HelpDesk/linux_commands.tt,v 1.0 2025/05/31 shanta Exp shanta ' %]
+[% PageVersion = 'CSC/HelpDesk/linux_commands.tt,v 1.1 2025/06/15 shanta Exp shanta ' %]
 
 [% IF c.session.debug_mode == 1 %]
  <br>[% PageVersion %]</br>
@@ -12,6 +12,13 @@
      </ul>
    </div>
  [% END %]
+[% END %]
+
+[% # Include additional CSS files if specified %]
+[% IF additional_css %]
+    [% FOREACH css_file IN additional_css %]
+        <link rel="stylesheet" href="[% css_file %]">
+    [% END %]
 [% END %]
 
 <div class="helpdesk-container">
@@ -1197,3 +1204,10 @@
         }
     }
 </style>
+
+[% # Include additional JavaScript files if specified %]
+[% IF additional_js %]
+    [% FOREACH js_file IN additional_js %]
+        <script src="[% js_file %]"></script>
+    [% END %]
+[% END %]
