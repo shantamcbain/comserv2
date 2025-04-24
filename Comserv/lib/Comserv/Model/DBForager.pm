@@ -2,84 +2,40 @@ package Comserv::Model::DBForager;
 
 use strict;
 
-use JSON;
+use JSON;  # Add this line-*`
 use base 'Catalyst::Model::DBIC::Schema';
-use Catalyst::Utils;
-use Sys::Hostname;
-use Socket;
-use Data::Dumper;
+
+use FindBin;
+use File::Spec;
 
 # Load the database configuration from db_config.json
+my $config_file = File::Spec->catfile($FindBin::Bin, '..', 'db_config.json');
 my $json_text;
 {
     local $/; # Enable 'slurp' mode
-    
-    # Use environment variable or find the config file relative to the application root
-    my $config_path;
-    
-    # First try environment variable
-    if ($ENV{COMSERV_CONFIG_PATH}) {
-        $config_path = "$ENV{COMSERV_CONFIG_PATH}/db_config.json";
-        warn "DBForager: Using config path from environment: $config_path";
-    } else {
-        # Try to find the application root directory
-        my $app_root = Catalyst::Utils::home('Comserv');
-        $config_path = "$app_root/db_config.json";
-        warn "DBForager: Using config path from app root: $config_path";
-    }
-    
-    # Add logging for debugging
-    if (-e $config_path) {
-        warn "DBForager: Config file exists at: $config_path";
-    } else {
-        warn "DBForager: Config file NOT FOUND at: $config_path";
-        die "Could not find db_config.json at $config_path";
-    }
-    
-    open my $fh, "<", $config_path or die "Could not open $config_path: $!";
+    open my $fh, "<", $config_file or die "Could not open $config_file: $!";
     $json_text = <$fh>;
     close $fh;
 }
 my $config = decode_json($json_text);
-warn "DBForager: Database config loaded. Host: $config->{shanta_forager}->{host}, Database: $config->{shanta_forager}->{database}";
 
-# Add more detailed logging for debugging
-warn "DBForager: Database connection details:";
-warn "  Host: $config->{shanta_forager}->{host}";
-warn "  Database: $config->{shanta_forager}->{database}";
-warn "  Username: $config->{shanta_forager}->{username}";
-warn "  Port: $config->{shanta_forager}->{port}";
+# Print the configuration for debugging
+print "DBForager Configuration:\n";
+print "Host: $config->{shanta_forager}->{host}\n";
+print "Database: $config->{shanta_forager}->{database}\n";
+print "Username: $config->{shanta_forager}->{username}\n";
 
-# Create the DSN string explicitly with additional options
-my $dsn = "DBI:mysql:database=$config->{shanta_forager}->{database};host=$config->{shanta_forager}->{host};port=$config->{shanta_forager}->{port};mysql_connect_timeout=10;mysql_read_timeout=30;mysql_write_timeout=30;mysql_ssl=0;mysql_local_infile=1";
-warn "DBForager: Using DSN: $dsn";
-
+# Set the schema_class and connect_info attributes
 __PACKAGE__->config(
     schema_class => 'Comserv::Model::Schema::Forager',
-    connect_info => [
-        # Use array form to ensure DSN is used exactly as specified
-        $dsn,
-        $config->{shanta_forager}->{username},
-        $config->{shanta_forager}->{password},
-        {
-            mysql_enable_utf8 => 1,
-            on_connect_do => [
-                "SET NAMES 'utf8'",
-                "SET CHARACTER SET 'utf8'"
-            ],
-            # Add connection debugging
-            RaiseError => 1,
-            PrintError => 1,
-            AutoCommit => 1,
-            # Add MySQL-specific connection options
-            mysql_local_infile => 1,
-            mysql_enable_utf8mb4 => 1,
-            # Force using TCP/IP instead of socket
-            mysql_socket => '',
-            # Disable hostname resolution
-            mysql_host_is_ip => 1
-        }
-    ]
+    connect_info => {
+        dsn => "dbi:$config->{shanta_forager}->{db_type}:dbname=$config->{shanta_forager}->{database};host=$config->{shanta_forager}->{host};port=$config->{shanta_forager}->{port}",
+        user => $config->{shanta_forager}->{username},
+        password => $config->{shanta_forager}->{password},
+        mysql_enable_utf8 => 1,
+        on_connect_do => ["SET NAMES 'utf8'", "SET CHARACTER SET 'utf8'"],
+        quote_char => '`',
+    }
 );
 sub list_tables {
     my $self = shift;
@@ -95,7 +51,7 @@ sub get_herbal_data {
         { 'botanical_name' => { '!=' => '' } },
         { order_by => 'botanical_name' }
     );
-    return [$dbforager->all];
+    return [$dbforager->all]
 
 }
 # Get herbs with bee forage information
@@ -127,7 +83,7 @@ sub get_herbs_with_apis {
         { 'apis' => { '!=' => undef, '!=' => '' } },  # Check for non-empty apis field
         { order_by => 'botanical_name' }
     );
-    return [$herbs_with_apis->all];
+    return [$herbs_with_apis->all]
 }
 sub get_herb_by_id {
     my ($self, $id) = @_;
@@ -220,152 +176,4 @@ sub trim {
     my $s = shift;
     $s =~ s/^\s+|\s+$//g;
     return $s;
-}
-
-# Test the database connection and log any errors
-sub test_connection {
-    my ($self, $c) = @_;
-    
-    # Get the logging utility
-    my $logging = $c ? $c->log : undef;
-    
-    # Get the current route if available
-    my $route = $c && $c->request ? $c->request->path : 'unknown_route';
-    
-    # Get hostname information for debugging
-    my $hostname = eval { Sys::Hostname::hostname() } || 'unknown';
-    my $ip_address = eval {
-        my $host = Sys::Hostname::hostname();
-        my $packed_ip = gethostbyname($host);
-        if ($packed_ip) {
-            return inet_ntoa($packed_ip);
-        }
-        return 'unknown';
-    } || 'unknown';
-    
-    # Log hostname information
-    if ($logging) {
-        $logging->info("DBForager: Connection test from hostname: $hostname ($ip_address) for route: $route");
-    }
-    
-    # Try direct DBI connection first for better error reporting
-    eval {
-        require DBI;
-        # Explicitly specify the host to avoid using localhost
-        my $direct_dsn = "DBI:mysql:database=$config->{shanta_forager}->{database};host=$config->{shanta_forager}->{host};port=$config->{shanta_forager}->{port};mysql_connect_timeout=5;mysql_ssl=0";
-        
-        if ($logging) {
-            $logging->info("DBForager: Attempting direct connection with DSN: $direct_dsn");
-            $logging->info("DBForager: Using username: $config->{shanta_forager}->{username}");
-            $logging->info("DBForager: Using host: $config->{shanta_forager}->{host}");
-        }
-        
-        my $direct_dbh = DBI->connect(
-            $direct_dsn,
-            $config->{shanta_forager}->{username},
-            $config->{shanta_forager}->{password},
-            { 
-                RaiseError => 0, 
-                PrintError => 0, 
-                AutoCommit => 1,
-                # Force TCP/IP connection
-                mysql_socket => '',
-                # Disable hostname resolution
-                mysql_host_is_ip => 1
-            }
-        );
-        
-        if ($direct_dbh) {
-            if ($logging) {
-                $logging->info("DBForager: Direct DBI connection successful for route: $route");
-            }
-            $direct_dbh->disconnect();
-        } else {
-            my $dbi_error = $DBI::errstr || 'Unknown error';
-            if ($logging) {
-                $logging->error("DBForager: Direct DBI connection failed: $dbi_error for route: $route");
-            }
-            
-            # Add to debug_errors if we have a context
-            if ($c && ref($c->stash) eq 'HASH') {
-                my $debug_errors = $c->stash->{debug_errors} ||= [];
-                push @$debug_errors, "DBForager: Direct DBI connection failed: $dbi_error for route: $route";
-                push @$debug_errors, "DBForager: Using DSN: $direct_dsn";
-                push @$debug_errors, "DBForager: Attempted to connect from: $hostname ($ip_address)";
-                push @$debug_errors, "DBForager: Attempted to connect to host: $config->{shanta_forager}->{host}";
-            }
-        }
-    };
-    
-    # Now try the standard DBIC connection
-    eval {
-        my $dbh = $self->schema->storage->dbh;
-        my $result = $dbh->selectrow_arrayref("SELECT 1");
-        
-        if ($result && $result->[0] == 1) {
-            # Connection successful
-            if ($logging) {
-                $logging->info("DBForager: Database connection test successful for route: $route");
-            }
-            
-            # Add to debug_msg if we have a context
-            if ($c && ref($c->stash) eq 'HASH') {
-                my $debug_msg = $c->stash->{debug_msg} ||= [];
-                push @$debug_msg, "DBForager: Database connection test successful for route: $route";
-                push @$debug_msg, "DBForager: Using DSN: $dsn";
-                push @$debug_msg, "DBForager: Connected from: $hostname ($ip_address)";
-                push @$debug_msg, "DBForager: Connected to host: $config->{shanta_forager}->{host}";
-            }
-            
-            return 1;
-        } else {
-            # Connection failed
-            if ($logging) {
-                $logging->error("DBForager: Database connection test failed - no result for route: $route");
-                $logging->error("DBForager: Using DSN: $dsn");
-                $logging->error("DBForager: Attempted to connect from: $hostname ($ip_address)");
-                $logging->error("DBForager: Attempted to connect to host: $config->{shanta_forager}->{host}");
-            }
-            
-            # Add to debug_errors if we have a context
-            if ($c && ref($c->stash) eq 'HASH') {
-                my $debug_errors = $c->stash->{debug_errors} ||= [];
-                push @$debug_errors, "DBForager: Database connection test failed - no result for route: $route";
-                push @$debug_errors, "DBForager: Using DSN: $dsn";
-                push @$debug_errors, "DBForager: Attempted to connect from: $hostname ($ip_address)";
-                push @$debug_errors, "DBForager: Attempted to connect to host: $config->{shanta_forager}->{host}";
-            }
-            
-            return 0;
-        }
-    };
-    
-    if ($@) {
-        # Connection error
-        my $error = $@;
-        
-        if ($logging) {
-            $logging->error("DBForager: Database connection error for route: $route");
-            $logging->error("DBForager: Error details: $error");
-            $logging->error("DBForager: Using DSN: $dsn");
-            $logging->error("DBForager: Attempted to connect from: $hostname ($ip_address)");
-            $logging->error("DBForager: Attempted to connect to host: $config->{shanta_forager}->{host}");
-        }
-        
-        # Add to debug_errors if we have a context
-        if ($c && ref($c->stash) eq 'HASH') {
-            my $debug_errors = $c->stash->{debug_errors} ||= [];
-            push @$debug_errors, "DBForager: Database connection error for route: $route";
-            push @$debug_errors, "DBForager: Error details: $error";
-            push @$debug_errors, "DBForager: Using DSN: $dsn";
-            push @$debug_errors, "DBForager: Attempted to connect from: $hostname ($ip_address)";
-            push @$debug_errors, "DBForager: Attempted to connect to host: $config->{shanta_forager}->{host}";
-            
-            # Add to success_msg to ensure it's displayed to the user
-            my $success_msg = $c->stash->{success_msg} ||= [];
-            push @$success_msg, "Database connection error. Please check the logs for details.";
-        }
-        
-        return 0;
-    }
 }

@@ -22,25 +22,78 @@ sub index :Path :Args(0) {
     # Log the current site name
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',"Got current site name $current_site_name");
 
+    # Check if the user is an admin
+    my $is_admin = 0;
+    if ($c->session->{roles}) {
+        foreach my $role (@{$c->session->{roles}}) {
+            if ($role eq 'admin') {
+                $is_admin = 1;
+                last;
+            }
+        }
+    }
+
+    # Log the user's admin status
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+        "User is " . ($is_admin ? "an admin" : "not an admin"));
+
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
 
-    # Create a new Comserv::Model::Site object
-    my $site_model = Comserv::Model::Site->new(schema => $schema);
+    # Create a simple array of site data for the template
+    my @site_data = ();
 
-    # Determine which sites to fetch based on the current site name
-    my $sites;
-    if (lc($current_site_name) eq 'csc') {
-        # If the current site is 'csc', fetch all sites
-        $sites = $site_model->get_all_sites($c);
+    # Only show sites if the user is an admin
+    if ($is_admin) {
+        # Determine which sites to show based on the current site
+        if (lc($current_site_name) eq 'csc') {
+            # If the current site is CSC, show all sites
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+                "User is an admin on CSC site, showing all sites");
+
+            # Directly query the database for all sites
+            my $site_rs = $schema->resultset('Site');
+            my @sites = $site_rs->all;
+
+            # Log the number of sites found
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+                "Found " . scalar(@sites) . " sites in the database");
+
+            # Convert the DBIx::Class objects to simple hashes
+            foreach my $site (@sites) {
+                push @site_data, {
+                    id => $site->id,
+                    name => $site->name
+                };
+            }
+        } else {
+            # If the current site is not CSC, show only the current site
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+                "User is an admin on non-CSC site, showing only the current site");
+
+            # Get the current site
+            my $site = $schema->resultset('Site')->find({ name => $current_site_name });
+
+            # Add the site to the array if it exists
+            if ($site) {
+                push @site_data, {
+                    id => $site->id,
+                    name => $site->name
+                };
+            }
+        }
     } else {
-        # Otherwise, fetch only the current site
-        my $site = $site_model->get_site_details_by_name($c, $current_site_name);
-        $sites = [$site] if $site;
+        # If the user is not an admin, don't show any sites
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+            "User is not an admin, not showing any sites");
     }
 
     # Pass the sites to the template
-    $c->stash->{sites} = $sites;
+    $c->stash->{sites} = \@site_data;
+
+    # Pass the admin status to the template
+    $c->stash->{is_admin} = $is_admin;
+    $c->stash->{is_csc} = (lc($current_site_name) eq 'csc') ? 1 : 0;
 
     # Add helpful context messages for users
     my $help_message = "You are currently in the HelpDesk support view of the main site.";

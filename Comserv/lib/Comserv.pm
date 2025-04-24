@@ -36,6 +36,27 @@ __PACKAGE__->log(Catalyst::Log->new(output => sub {
     $self->dispatchers->[0]->log(level => $level, message => $message);
 }));
 
+__PACKAGE__->config(
+    name => 'Comserv',
+    disable_component_resolution_regex_fallback => 1,
+    enable_catalyst_header => $ENV{CATALYST_HEADER} // 1,
+    encoding => 'UTF-8',
+    debug => $ENV{CATALYST_DEBUG} // 0,
+    default_view => 'TT',
+    use_request_uri_for_path => 1,  # Use the request URI for path matching
+    use_hash_path_suffix => 1,      # Use hash path suffix for better URL handling
+    'Plugin::Log::Dispatch' => {
+        dispatchers => [
+            {
+                class => 'Log::Dispatch::File',
+                min_level => 'debug',
+                filename => 'logs/application.log',
+                mode => 'append',
+                newline => 1,
+            },
+        ],
+    },
+);
                 __PACKAGE__->config(
                     name => 'Comserv',
                     disable_component_resolution_regex_fallback => 1,

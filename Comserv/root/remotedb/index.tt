@@ -1,0 +1,73 @@
+[% META title = 'Remote Database Management' %]
+
+<div class="container">
+    <h1>Remote Database Management</h1>
+    
+    [% IF c.flash.success_msg %]
+    <div class="alert alert-success">
+        [% c.flash.success_msg %]
+    </div>
+    [% END %]
+    
+    [% IF c.flash.error_msg %]
+    <div class="alert alert-danger">
+        [% c.flash.error_msg %]
+    </div>
+    [% END %]
+    
+    <div class="row mb-4">
+        <div class="col">
+            <a href="[% c.uri_for(c.controller('RemoteDB').action_for('add_connection')) %]" class="btn btn-primary">
+                Add New Remote Database Connection
+            </a>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h2>Configured Remote Connections</h2>
+        </div>
+        <div class="card-body">
+            [% IF connections.keys.size > 0 %]
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Connection Name</th>
+                            <th>Database Type</th>
+                            <th>Host</th>
+                            <th>Database</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        [% FOREACH conn_name IN connections.keys.sort %]
+                            [% SET conn = connections.$conn_name %]
+                            <tr>
+                                <td>[% conn_name %]</td>
+                                <td>[% conn.config.db_type %]</td>
+                                <td>[% conn.config.host %]:[% conn.config.port %]</td>
+                                <td>[% conn.config.database %]</td>
+                                <td>
+                                    <a href="[% c.uri_for(c.controller('RemoteDB').action_for('view'), [conn_name]) %]" class="btn btn-sm btn-info">
+                                        View Tables
+                                    </a>
+                                    <a href="[% c.uri_for(c.controller('RemoteDB').action_for('query'), [conn_name]) %]" class="btn btn-sm btn-secondary">
+                                        Run Query
+                                    </a>
+                                    <a href="[% c.uri_for(c.controller('RemoteDB').action_for('remove'), [conn_name]) %]" class="btn btn-sm btn-danger" 
+                                       onclick="return confirm('Are you sure you want to remove this connection?');">
+                                        Remove
+                                    </a>
+                                </td>
+                            </tr>
+                        [% END %]
+                    </tbody>
+                </table>
+            [% ELSE %]
+                <div class="alert alert-info">
+                    No remote database connections configured yet. Click the button above to add one.
+                </div>
+            [% END %]
+        </div>
+    </div>
+</div>

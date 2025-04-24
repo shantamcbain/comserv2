@@ -3,6 +3,18 @@
 <html>[% PageVersion = 'layout.tt,v 0.01 2023/08/30 shanta Exp shanta ' %]
 [%# DBI is now provided by the application context, no need to include DefaultDBI.tt %]
 [% INCLUDE 'setup/DefaultVariables.tt' %]
+    <!DOCTYPE html>
+    <html>[% PageVersion	= 'layout.tt,v 0.02 2024/05/01 shanta Exp shanta '	%]
+    [% TRY %]
+        [% INCLUDE 'setup/DefaultDBI.tt' %]
+    [% CATCH %]
+        [% # Silently ignore errors with DefaultDBI.tt %]
+    [% END %]
+    [% TRY %]
+        [% INCLUDE 'setup/DefaultVariables.tt' %]
+    [% CATCH %]
+        [% # Silently ignore errors with DefaultVariables.tt %]
+    [% END %]
 
 [% IF c.session.debug_mode == 1 %]
  [% PageVersion %]
