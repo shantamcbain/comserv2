@@ -189,6 +189,33 @@ sub kb :Chained('base') :PathPart('kb') :Args(0) {
     $c->forward($c->view('TT'));
 }
 
+=head2 linux_commands
+
+Linux Commands Reference page
+
+=cut
+
+sub linux_commands :Chained('base') :PathPart('kb/linux_commands') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'linux_commands', 
+        "Starting linux_commands action");
+    
+    $c->stash(
+        template => 'CSC/HelpDesk/linux_commands.tt',
+        title => 'Linux Commands Reference'
+    );
+    
+    # Push debug message to stash
+    push @{$c->stash->{debug_msg}}, "Linux Commands Reference loaded";
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'linux_commands', 
+        "Completed linux_commands action");
+    
+    # Explicitly forward to the TT view
+    $c->forward($c->view('TT'));
+}
+
 =head2 contact
 
 Contact Support page

@@ -1,0 +1,1199 @@
+[% META title = 'Linux Commands Reference' %]
+[% PageVersion = 'CSC/HelpDesk/linux_commands.tt,v 1.0 2025/05/31 shanta Exp shanta ' %]
+
+[% IF c.session.debug_mode == 1 %]
+ <br>[% PageVersion %]</br>
+ [% IF debug_msg.size %]
+   <div class="debug-message">
+     <ul>
+     [% FOREACH msg IN debug_msg %]
+       <li>[% msg %]</li>
+     [% END %]
+     </ul>
+   </div>
+ [% END %]
+[% END %]
+
+<div class="helpdesk-container">
+    <div class="kb-header">
+        <h1>Linux Commands Reference</h1>
+        <p class="kb-description">A comprehensive guide to common Linux commands for system administrators and developers.</p>
+        
+        <div class="kb-metadata">
+            <span class="kb-date">Last Updated: May 31, 2025</span>
+            <span class="kb-author">Author: Shanta</span>
+        </div>
+    </div>
+    
+    <div class="kb-navigation">
+        <h2>Quick Navigation</h2>
+        <ul class="nav-links">
+            <li><a href="#file-system">File System Commands</a></li>
+            <li><a href="#file-operations">File Operations</a></li>
+            <li><a href="#text-processing">Text Processing</a></li>
+            <li><a href="#system-info">System Information</a></li>
+            <li><a href="#process-management">Process Management</a></li>
+            <li><a href="#user-management">User Management</a></li>
+            <li><a href="#networking">Networking</a></li>
+            <li><a href="#package-management">Package Management</a></li>
+            <li><a href="#permissions">Permissions</a></li>
+            <li><a href="#compression">Compression</a></li>
+        </ul>
+    </div>
+    
+    <div class="kb-content">
+        <section id="file-system" class="command-section">
+            <h2>File System Commands</h2>
+            
+            <div class="command-card">
+                <h3>ls</h3>
+                <p class="command-description">List directory contents</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>ls</code>
+                        <p>List files and directories in the current directory</p>
+                    </div>
+                    <div class="example">
+                        <code>ls -l</code>
+                        <p>List in long format with permissions, owner, size, and date</p>
+                    </div>
+                    <div class="example">
+                        <code>ls -la</code>
+                        <p>List all files including hidden files (starting with .)</p>
+                    </div>
+                    <div class="example">
+                        <code>ls -lh</code>
+                        <p>List with human-readable file sizes (KB, MB, GB)</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>cd</h3>
+                <p class="command-description">Change directory</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>cd directory_name</code>
+                        <p>Change to specified directory</p>
+                    </div>
+                    <div class="example">
+                        <code>cd ..</code>
+                        <p>Move up one directory level</p>
+                    </div>
+                    <div class="example">
+                        <code>cd ~</code>
+                        <p>Change to home directory</p>
+                    </div>
+                    <div class="example">
+                        <code>cd -</code>
+                        <p>Change to previous directory</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>pwd</h3>
+                <p class="command-description">Print working directory</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>pwd</code>
+                        <p>Display the current directory path</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>mkdir</h3>
+                <p class="command-description">Make directory</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>mkdir directory_name</code>
+                        <p>Create a new directory</p>
+                    </div>
+                    <div class="example">
+                        <code>mkdir -p parent/child/grandchild</code>
+                        <p>Create nested directories (create parent directories as needed)</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>rmdir</h3>
+                <p class="command-description">Remove directory</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>rmdir directory_name</code>
+                        <p>Remove an empty directory</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>find</h3>
+                <p class="command-description">Search for files in a directory hierarchy</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>find /path -name "filename"</code>
+                        <p>Find files with exact name</p>
+                    </div>
+                    <div class="example">
+                        <code>find /path -name "*.txt"</code>
+                        <p>Find all .txt files</p>
+                    </div>
+                    <div class="example">
+                        <code>find /path -type f -mtime -7</code>
+                        <p>Find files modified in the last 7 days</p>
+                    </div>
+                    <div class="example">
+                        <code>find /path -type f -size +10M</code>
+                        <p>Find files larger than 10MB</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <section id="file-operations" class="command-section">
+            <h2>File Operations</h2>
+            
+            <div class="command-card">
+                <h3>cp</h3>
+                <p class="command-description">Copy files and directories</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>cp file1 file2</code>
+                        <p>Copy file1 to file2</p>
+                    </div>
+                    <div class="example">
+                        <code>cp -r dir1 dir2</code>
+                        <p>Copy directory dir1 to dir2 recursively</p>
+                    </div>
+                    <div class="example">
+                        <code>cp -i file1 file2</code>
+                        <p>Copy with confirmation before overwriting</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>mv</h3>
+                <p class="command-description">Move or rename files</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>mv file1 file2</code>
+                        <p>Rename file1 to file2</p>
+                    </div>
+                    <div class="example">
+                        <code>mv file1 /path/to/directory/</code>
+                        <p>Move file1 to specified directory</p>
+                    </div>
+                    <div class="example">
+                        <code>mv -i file1 file2</code>
+                        <p>Move with confirmation before overwriting</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>rm</h3>
+                <p class="command-description">Remove files or directories</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>rm filename</code>
+                        <p>Remove a file</p>
+                    </div>
+                    <div class="example">
+                        <code>rm -r directory</code>
+                        <p>Remove a directory and its contents recursively</p>
+                    </div>
+                    <div class="example">
+                        <code>rm -f filename</code>
+                        <p>Force removal without confirmation</p>
+                    </div>
+                    <div class="example">
+                        <code>rm -i filename</code>
+                        <p>Interactive removal with confirmation</p>
+                    </div>
+                </div>
+                <div class="command-warning">
+                    <strong>Warning:</strong> Be extremely careful with <code>rm -rf</code> as it can delete entire directories without confirmation.
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>touch</h3>
+                <p class="command-description">Create empty files or update timestamps</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>touch filename</code>
+                        <p>Create an empty file or update timestamp of existing file</p>
+                    </div>
+                    <div class="example">
+                        <code>touch -a filename</code>
+                        <p>Change only the access time</p>
+                    </div>
+                    <div class="example">
+                        <code>touch -m filename</code>
+                        <p>Change only the modification time</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <section id="text-processing" class="command-section">
+            <h2>Text Processing</h2>
+            
+            <div class="command-card">
+                <h3>cat</h3>
+                <p class="command-description">Concatenate and display file contents</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>cat filename</code>
+                        <p>Display file contents</p>
+                    </div>
+                    <div class="example">
+                        <code>cat file1 file2</code>
+                        <p>Concatenate and display multiple files</p>
+                    </div>
+                    <div class="example">
+                        <code>cat -n filename</code>
+                        <p>Display with line numbers</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>less</h3>
+                <p class="command-description">View file contents with pagination</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>less filename</code>
+                        <p>View file with pagination (use space to scroll, q to quit)</p>
+                    </div>
+                    <div class="example">
+                        <code>less -N filename</code>
+                        <p>View with line numbers</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>head</h3>
+                <p class="command-description">Display the beginning of a file</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>head filename</code>
+                        <p>Display first 10 lines of a file</p>
+                    </div>
+                    <div class="example">
+                        <code>head -n 20 filename</code>
+                        <p>Display first 20 lines of a file</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>tail</h3>
+                <p class="command-description">Display the end of a file</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>tail filename</code>
+                        <p>Display last 10 lines of a file</p>
+                    </div>
+                    <div class="example">
+                        <code>tail -n 20 filename</code>
+                        <p>Display last 20 lines of a file</p>
+                    </div>
+                    <div class="example">
+                        <code>tail -f filename</code>
+                        <p>Follow file updates in real-time (useful for log files)</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>grep</h3>
+                <p class="command-description">Search for patterns in files</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>grep "pattern" filename</code>
+                        <p>Search for pattern in file</p>
+                    </div>
+                    <div class="example">
+                        <code>grep -i "pattern" filename</code>
+                        <p>Case-insensitive search</p>
+                    </div>
+                    <div class="example">
+                        <code>grep -r "pattern" directory</code>
+                        <p>Recursive search in directory</p>
+                    </div>
+                    <div class="example">
+                        <code>grep -v "pattern" filename</code>
+                        <p>Show lines that do NOT match the pattern</p>
+                    </div>
+                    <div class="example">
+                        <code>grep -n "pattern" filename</code>
+                        <p>Show line numbers with matches</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>sed</h3>
+                <p class="command-description">Stream editor for filtering and transforming text</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>sed 's/old/new/' filename</code>
+                        <p>Replace first occurrence of 'old' with 'new' on each line</p>
+                    </div>
+                    <div class="example">
+                        <code>sed 's/old/new/g' filename</code>
+                        <p>Replace all occurrences of 'old' with 'new'</p>
+                    </div>
+                    <div class="example">
+                        <code>sed -i 's/old/new/g' filename</code>
+                        <p>Edit file in-place (save changes to file)</p>
+                    </div>
+                    <div class="example">
+                        <code>sed '5d' filename</code>
+                        <p>Delete line 5</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>awk</h3>
+                <p class="command-description">Pattern scanning and processing language</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>awk '{print $1}' filename</code>
+                        <p>Print first column of each line</p>
+                    </div>
+                    <div class="example">
+                        <code>awk -F: '{print $1}' /etc/passwd</code>
+                        <p>Print first column using : as field separator</p>
+                    </div>
+                    <div class="example">
+                        <code>awk '/pattern/ {print $0}' filename</code>
+                        <p>Print lines matching pattern</p>
+                    </div>
+                    <div class="example">
+                        <code>awk '{sum+=$1} END {print sum}' filename</code>
+                        <p>Sum values in first column</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <section id="system-info" class="command-section">
+            <h2>System Information</h2>
+            
+            <div class="command-card">
+                <h3>uname</h3>
+                <p class="command-description">Print system information</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>uname -a</code>
+                        <p>Print all system information</p>
+                    </div>
+                    <div class="example">
+                        <code>uname -r</code>
+                        <p>Print kernel release</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>df</h3>
+                <p class="command-description">Report file system disk space usage</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>df -h</code>
+                        <p>Show disk usage in human-readable format</p>
+                    </div>
+                    <div class="example">
+                        <code>df -i</code>
+                        <p>Show inode information</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>du</h3>
+                <p class="command-description">Estimate file space usage</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>du -h</code>
+                        <p>Show directory sizes in human-readable format</p>
+                    </div>
+                    <div class="example">
+                        <code>du -sh directory</code>
+                        <p>Show total size of a directory in human-readable format</p>
+                    </div>
+                    <div class="example">
+                        <code>du -h --max-depth=1</code>
+                        <p>Show sizes of directories one level deep</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>free</h3>
+                <p class="command-description">Display amount of free and used memory</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>free -h</code>
+                        <p>Show memory usage in human-readable format</p>
+                    </div>
+                    <div class="example">
+                        <code>free -m</code>
+                        <p>Show memory usage in megabytes</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>top</h3>
+                <p class="command-description">Display Linux processes</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>top</code>
+                        <p>Show real-time process information (press q to quit)</p>
+                    </div>
+                    <div class="example">
+                        <code>top -u username</code>
+                        <p>Show processes for specific user</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>htop</h3>
+                <p class="command-description">Interactive process viewer</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>htop</code>
+                        <p>Interactive process viewer with color (may need to be installed)</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <section id="process-management" class="command-section">
+            <h2>Process Management</h2>
+            
+            <div class="command-card">
+                <h3>ps</h3>
+                <p class="command-description">Report process status</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>ps</code>
+                        <p>Show current user's processes</p>
+                    </div>
+                    <div class="example">
+                        <code>ps aux</code>
+                        <p>Show all processes in BSD format</p>
+                    </div>
+                    <div class="example">
+                        <code>ps -ef</code>
+                        <p>Show all processes in full format</p>
+                    </div>
+                    <div class="example">
+                        <code>ps aux | grep process_name</code>
+                        <p>Find specific process</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>kill</h3>
+                <p class="command-description">Terminate processes</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>kill PID</code>
+                        <p>Terminate process with process ID</p>
+                    </div>
+                    <div class="example">
+                        <code>kill -9 PID</code>
+                        <p>Force terminate process (SIGKILL)</p>
+                    </div>
+                    <div class="example">
+                        <code>killall process_name</code>
+                        <p>Kill all processes with the given name</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>bg</h3>
+                <p class="command-description">Put jobs in background</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>bg</code>
+                        <p>Resume suspended job in background</p>
+                    </div>
+                    <div class="example">
+                        <code>bg %job_number</code>
+                        <p>Resume specific job in background</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>fg</h3>
+                <p class="command-description">Bring jobs to foreground</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>fg</code>
+                        <p>Bring most recent background job to foreground</p>
+                    </div>
+                    <div class="example">
+                        <code>fg %job_number</code>
+                        <p>Bring specific job to foreground</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>jobs</h3>
+                <p class="command-description">List active jobs</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>jobs</code>
+                        <p>List all jobs</p>
+                    </div>
+                    <div class="example">
+                        <code>jobs -l</code>
+                        <p>List jobs with process IDs</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>nohup</h3>
+                <p class="command-description">Run command immune to hangups</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>nohup command &</code>
+                        <p>Run command that continues after you log out</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <section id="user-management" class="command-section">
+            <h2>User Management</h2>
+            
+            <div class="command-card">
+                <h3>useradd</h3>
+                <p class="command-description">Create a new user</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>sudo useradd username</code>
+                        <p>Create a new user</p>
+                    </div>
+                    <div class="example">
+                        <code>sudo useradd -m -s /bin/bash username</code>
+                        <p>Create user with home directory and bash shell</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>usermod</h3>
+                <p class="command-description">Modify user account</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>sudo usermod -aG groupname username</code>
+                        <p>Add user to a group</p>
+                    </div>
+                    <div class="example">
+                        <code>sudo usermod -s /bin/bash username</code>
+                        <p>Change user's shell</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>userdel</h3>
+                <p class="command-description">Delete a user account</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>sudo userdel username</code>
+                        <p>Delete user account</p>
+                    </div>
+                    <div class="example">
+                        <code>sudo userdel -r username</code>
+                        <p>Delete user account and home directory</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>passwd</h3>
+                <p class="command-description">Change user password</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>passwd</code>
+                        <p>Change your own password</p>
+                    </div>
+                    <div class="example">
+                        <code>sudo passwd username</code>
+                        <p>Change another user's password</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>who</h3>
+                <p class="command-description">Show who is logged in</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>who</code>
+                        <p>Show who is logged in</p>
+                    </div>
+                    <div class="example">
+                        <code>who -a</code>
+                        <p>Show all information</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>id</h3>
+                <p class="command-description">Print user and group information</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>id</code>
+                        <p>Show current user's ID information</p>
+                    </div>
+                    <div class="example">
+                        <code>id username</code>
+                        <p>Show specific user's ID information</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <section id="networking" class="command-section">
+            <h2>Networking</h2>
+            
+            <div class="command-card">
+                <h3>ping</h3>
+                <p class="command-description">Send ICMP ECHO_REQUEST to network hosts</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>ping hostname</code>
+                        <p>Ping a host continuously (Ctrl+C to stop)</p>
+                    </div>
+                    <div class="example">
+                        <code>ping -c 4 hostname</code>
+                        <p>Ping a host 4 times</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>ifconfig</h3>
+                <p class="command-description">Configure network interface</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>ifconfig</code>
+                        <p>Display all network interfaces and IP addresses</p>
+                    </div>
+                    <div class="example">
+                        <code>ifconfig eth0</code>
+                        <p>Display specific interface</p>
+                    </div>
+                </div>
+                <div class="command-note">
+                    <strong>Note:</strong> On newer systems, <code>ip addr</code> is preferred over <code>ifconfig</code>.
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>ip</h3>
+                <p class="command-description">Show/manipulate routing, devices, policy routing and tunnels</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>ip addr</code>
+                        <p>Show IP addresses and network interfaces</p>
+                    </div>
+                    <div class="example">
+                        <code>ip link</code>
+                        <p>Show network interfaces</p>
+                    </div>
+                    <div class="example">
+                        <code>ip route</code>
+                        <p>Show routing table</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>netstat</h3>
+                <p class="command-description">Print network connections, routing tables, interface statistics</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>netstat -tuln</code>
+                        <p>Show all listening ports</p>
+                    </div>
+                    <div class="example">
+                        <code>netstat -an</code>
+                        <p>Show all connections</p>
+                    </div>
+                    <div class="example">
+                        <code>netstat -rn</code>
+                        <p>Show routing table</p>
+                    </div>
+                </div>
+                <div class="command-note">
+                    <strong>Note:</strong> On newer systems, <code>ss</code> is preferred over <code>netstat</code>.
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>ss</h3>
+                <p class="command-description">Another utility to investigate sockets</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>ss -tuln</code>
+                        <p>Show all listening ports</p>
+                    </div>
+                    <div class="example">
+                        <code>ss -ta</code>
+                        <p>Show all TCP sockets</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>wget</h3>
+                <p class="command-description">Non-interactive network downloader</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>wget URL</code>
+                        <p>Download file from URL</p>
+                    </div>
+                    <div class="example">
+                        <code>wget -O filename URL</code>
+                        <p>Download and save with specific filename</p>
+                    </div>
+                    <div class="example">
+                        <code>wget -c URL</code>
+                        <p>Continue interrupted download</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>curl</h3>
+                <p class="command-description">Transfer data from or to a server</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>curl URL</code>
+                        <p>Display the content of URL</p>
+                    </div>
+                    <div class="example">
+                        <code>curl -o filename URL</code>
+                        <p>Download and save with specific filename</p>
+                    </div>
+                    <div class="example">
+                        <code>curl -I URL</code>
+                        <p>Fetch HTTP headers only</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <section id="package-management" class="command-section">
+            <h2>Package Management</h2>
+            
+            <div class="command-card">
+                <h3>apt (Debian/Ubuntu)</h3>
+                <p class="command-description">Advanced Package Tool</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>sudo apt update</code>
+                        <p>Update package lists</p>
+                    </div>
+                    <div class="example">
+                        <code>sudo apt upgrade</code>
+                        <p>Upgrade installed packages</p>
+                    </div>
+                    <div class="example">
+                        <code>sudo apt install package_name</code>
+                        <p>Install a package</p>
+                    </div>
+                    <div class="example">
+                        <code>sudo apt remove package_name</code>
+                        <p>Remove a package</p>
+                    </div>
+                    <div class="example">
+                        <code>apt search keyword</code>
+                        <p>Search for packages</p>
+                    </div>
+                    <div class="example">
+                        <code>apt show package_name</code>
+                        <p>Show package details</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>yum (RHEL/CentOS/Fedora)</h3>
+                <p class="command-description">Yellowdog Updater Modified</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>sudo yum update</code>
+                        <p>Update package lists and upgrade packages</p>
+                    </div>
+                    <div class="example">
+                        <code>sudo yum install package_name</code>
+                        <p>Install a package</p>
+                    </div>
+                    <div class="example">
+                        <code>sudo yum remove package_name</code>
+                        <p>Remove a package</p>
+                    </div>
+                    <div class="example">
+                        <code>yum search keyword</code>
+                        <p>Search for packages</p>
+                    </div>
+                    <div class="example">
+                        <code>yum info package_name</code>
+                        <p>Show package details</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>dnf (Fedora/RHEL 8+)</h3>
+                <p class="command-description">Dandified YUM</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>sudo dnf update</code>
+                        <p>Update package lists and upgrade packages</p>
+                    </div>
+                    <div class="example">
+                        <code>sudo dnf install package_name</code>
+                        <p>Install a package</p>
+                    </div>
+                    <div class="example">
+                        <code>sudo dnf remove package_name</code>
+                        <p>Remove a package</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <section id="permissions" class="command-section">
+            <h2>Permissions</h2>
+            
+            <div class="command-card">
+                <h3>chmod</h3>
+                <p class="command-description">Change file mode bits</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>chmod 755 filename</code>
+                        <p>Set permissions to rwxr-xr-x</p>
+                    </div>
+                    <div class="example">
+                        <code>chmod +x filename</code>
+                        <p>Add execute permission for all users</p>
+                    </div>
+                    <div class="example">
+                        <code>chmod -R 755 directory</code>
+                        <p>Recursively change permissions</p>
+                    </div>
+                    <div class="example">
+                        <code>chmod u+w filename</code>
+                        <p>Add write permission for owner</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>chown</h3>
+                <p class="command-description">Change file owner and group</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>sudo chown user:group filename</code>
+                        <p>Change owner and group</p>
+                    </div>
+                    <div class="example">
+                        <code>sudo chown -R user:group directory</code>
+                        <p>Recursively change owner and group</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>chgrp</h3>
+                <p class="command-description">Change group ownership</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>sudo chgrp group filename</code>
+                        <p>Change group ownership</p>
+                    </div>
+                    <div class="example">
+                        <code>sudo chgrp -R group directory</code>
+                        <p>Recursively change group ownership</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <section id="compression" class="command-section">
+            <h2>Compression</h2>
+            
+            <div class="command-card">
+                <h3>tar</h3>
+                <p class="command-description">Tape archive</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>tar -cvf archive.tar files</code>
+                        <p>Create a tar archive</p>
+                    </div>
+                    <div class="example">
+                        <code>tar -xvf archive.tar</code>
+                        <p>Extract a tar archive</p>
+                    </div>
+                    <div class="example">
+                        <code>tar -czvf archive.tar.gz files</code>
+                        <p>Create a compressed tar archive (gzip)</p>
+                    </div>
+                    <div class="example">
+                        <code>tar -xzvf archive.tar.gz</code>
+                        <p>Extract a compressed tar archive (gzip)</p>
+                    </div>
+                    <div class="example">
+                        <code>tar -cjvf archive.tar.bz2 files</code>
+                        <p>Create a compressed tar archive (bzip2)</p>
+                    </div>
+                    <div class="example">
+                        <code>tar -xjvf archive.tar.bz2</code>
+                        <p>Extract a compressed tar archive (bzip2)</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>gzip</h3>
+                <p class="command-description">Compress or expand files</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>gzip filename</code>
+                        <p>Compress a file (creates filename.gz and removes original)</p>
+                    </div>
+                    <div class="example">
+                        <code>gzip -d filename.gz</code>
+                        <p>Decompress a file</p>
+                    </div>
+                    <div class="example">
+                        <code>gzip -k filename</code>
+                        <p>Compress a file but keep the original</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="command-card">
+                <h3>zip</h3>
+                <p class="command-description">Package and compress files</p>
+                <div class="command-examples">
+                    <div class="example">
+                        <code>zip archive.zip files</code>
+                        <p>Create a zip archive</p>
+                    </div>
+                    <div class="example">
+                        <code>zip -r archive.zip directory</code>
+                        <p>Create a zip archive of a directory</p>
+                    </div>
+                    <div class="example">
+                        <code>unzip archive.zip</code>
+                        <p>Extract a zip archive</p>
+                    </div>
+                    <div class="example">
+                        <code>unzip -l archive.zip</code>
+                        <p>List contents of a zip archive</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+    
+    <div class="kb-footer">
+        <p>This reference guide is maintained by the Computer System Consulting team. If you have suggestions for additions or corrections, please <a href="[% c.uri_for('/HelpDesk/contact') %]">contact us</a>.</p>
+    </div>
+</div>
+
+<style>
+    .helpdesk-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: var(--body-font, Arial, sans-serif);
+    }
+    
+    .kb-header {
+        margin-bottom: 30px;
+        border-bottom: 2px solid #eee;
+        padding-bottom: 20px;
+    }
+    
+    .kb-description {
+        font-size: 1.1em;
+        color: #555;
+        margin-bottom: 15px;
+    }
+    
+    .kb-metadata {
+        font-size: 0.9em;
+        color: #777;
+    }
+    
+    .kb-date, .kb-author {
+        margin-right: 20px;
+    }
+    
+    .kb-navigation {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 30px;
+    }
+    
+    .nav-links {
+        display: flex;
+        flex-wrap: wrap;
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+    
+    .nav-links li {
+        margin-right: 15px;
+        margin-bottom: 10px;
+    }
+    
+    .nav-links a {
+        color: #007bff;
+        text-decoration: none;
+        padding: 5px 10px;
+        border-radius: 3px;
+        background-color: #e9ecef;
+        display: inline-block;
+    }
+    
+    .nav-links a:hover {
+        background-color: #dee2e6;
+    }
+    
+    .command-section {
+        margin-bottom: 40px;
+    }
+    
+    .command-section h2 {
+        color: #343a40;
+        border-bottom: 1px solid #dee2e6;
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+    }
+    
+    .command-card {
+        background-color: #f8f9fa;
+        border-radius: 5px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    .command-card h3 {
+        color: #007bff;
+        margin-top: 0;
+        margin-bottom: 10px;
+        font-family: monospace;
+        font-size: 1.3em;
+    }
+    
+    .command-description {
+        color: #555;
+        margin-bottom: 15px;
+    }
+    
+    .command-examples {
+        background-color: #fff;
+        border-radius: 3px;
+        padding: 10px;
+    }
+    
+    .example {
+        margin-bottom: 15px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .example:last-child {
+        margin-bottom: 0;
+        padding-bottom: 0;
+        border-bottom: none;
+    }
+    
+    .example code {
+        display: block;
+        background-color: #f1f1f1;
+        padding: 8px 12px;
+        border-radius: 3px;
+        font-family: monospace;
+        margin-bottom: 5px;
+        color: #333;
+    }
+    
+    .example p {
+        margin: 5px 0 0 0;
+        color: #666;
+        font-size: 0.95em;
+    }
+    
+    .command-warning {
+        background-color: #fff3cd;
+        color: #856404;
+        padding: 10px;
+        border-radius: 3px;
+        margin-top: 15px;
+    }
+    
+    .command-note {
+        background-color: #d1ecf1;
+        color: #0c5460;
+        padding: 10px;
+        border-radius: 3px;
+        margin-top: 15px;
+    }
+    
+    .kb-footer {
+        margin-top: 40px;
+        padding-top: 20px;
+        border-top: 2px solid #eee;
+        color: #6c757d;
+        font-size: 0.9em;
+    }
+    
+    .debug-message {
+        background-color: #f8d7da;
+        color: #721c24;
+        padding: 10px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+    }
+    
+    @media (max-width: 768px) {
+        .nav-links li {
+            margin-right: 10px;
+            margin-bottom: 8px;
+        }
+        
+        .command-card {
+            padding: 15px;
+        }
+    }
+</style>

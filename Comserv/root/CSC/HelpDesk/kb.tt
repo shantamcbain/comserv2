@@ -81,6 +81,16 @@
                     <li><a href="#">Error Log Analysis</a></li>
                 </ul>
             </div>
+            
+            <div class="category-card">
+                <h3>System Administration</h3>
+                <p>Server and system administration guides</p>
+                <ul>
+                    <li><a href="[% c.uri_for('/HelpDesk/kb/linux_commands') %]">Linux Commands Reference</a></li>
+                    <li><a href="#">Server Maintenance Guide</a></li>
+                    <li><a href="#">Backup and Recovery</a></li>
+                </ul>
+            </div>
         </div>
     </div>
     
