@@ -134,3 +134,6 @@ For more details on a previous issue with filename mismatch, see [Documentation 
 - [Controllers Documentation](/Documentation/controllers)
 - [Documentation Update Summary](/Documentation/documentation_update_summary)
 - [Linux Commands Reference](/Documentation/linux_commands)
+- [Mail System Documentation](/Documentation/mail_system.md)
+- [Mail Configuration Guide](/Documentation/mail_configuration_guide.md)
+- [Mail Troubleshooting Guide](/Documentation/mail_troubleshooting.md)

@@ -28,6 +28,20 @@
       "site_specific": false,
       "pages": ["customizing_profile", "login_authentication", "mcoop_getting_started"]
     },
+    "mail_system": {
+      "title": "Mail System",
+      "description": "Documentation for the mail system",
+      "roles": ["admin", "developer"],
+      "site_specific": false,
+      "pages": ["MailSystem", "Mail", "HostingSignup_Mail"]
+    },
+    "ui_features": {
+      "title": "UI Features",
+      "description": "Documentation for UI features and components",
+      "roles": ["admin", "developer"],
+      "site_specific": false,
+      "pages": ["back_to_top"]
+    },
     "site_specific": {
       "title": "Site-Specific Documentation",
       "description": "Documentation specific to this site",
@@ -47,7 +61,7 @@
       "description": "Documentation for system controllers",
       "roles": ["admin", "developer"],
       "site_specific": false,
-      "pages": ["Documentation_Controller", "Root", "User", "Site", "controller_list", "fix_project_edit_form", "fix_project_edit_button", "Projects", "HostingSignup"]
+      "pages": ["Documentation_Controller", "Root", "User", "Site", "controller_list", "fix_project_edit_form", "fix_project_edit_button", "Projects", "HostingSignup", "HostingSignup_Mail", "Mail"]
     },
     "models": {
       "title": "Model Documentation",
@@ -88,6 +102,10 @@
   "default_paths": {
     "linux_commands": "Documentation/roles/admin/linux_commands.md",
     "HostingSignup": "Documentation/controllers/HostingSignup.md",
+    "HostingSignup_Mail": "Documentation/controllers/HostingSignup_Mail.md",
+    "Mail": "Documentation/controllers/Mail.md",
+    "MailSystem": "Documentation/MailSystem.md",
+    "back_to_top": "Documentation/features/back_to_top.md",
     "hosting_signup_templates": "Documentation/templates/hosting_signup_templates.md",
     "2025-04-12-hosting-signup-implementation": "Documentation/changelog/2025-04-12-hosting-signup-implementation.md",
     "getting_started": "Documentation/roles/normal/getting_started.md",
