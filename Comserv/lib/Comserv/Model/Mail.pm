@@ -37,25 +37,67 @@ sub send_email {
         return;
     }
 
-    my $email = Email::Simple->create(
-        header => [
-            To      => $to,
-            From    => $smtp_config->{from},
-            Subject => $subject,
-        ],
-        body => $body,
+    # Use Net::SMTP for more reliable email sending
+    require Net::SMTP;
+    require MIME::Lite;
+    require Authen::SASL;
+    
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
+        "Using Net::SMTP for email sending");
+    
+    # Create a MIME::Lite message
+    my $msg = MIME::Lite->new(
+        From    => $smtp_config->{from},
+        To      => $to,
+        Subject => $subject,
+        Type    => 'text/plain',
+        Data    => $body
     );
-
+    
     try {
-        sendmail($email, {
-            transport => Email::Sender::Transport::SMTP->new({
-                host => $smtp_config->{host},
-                port => $smtp_config->{port},
-                ssl  => $smtp_config->{ssl} // 0,
-                sasl_username => $smtp_config->{username},
-                sasl_password => $smtp_config->{password},
-            })
-        });
+        # Log SMTP settings for debugging
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
+            "SMTP settings: " . $smtp_config->{host} . ":" . $smtp_config->{port} . 
+            ", SSL: " . ($smtp_config->{ssl} // 'none'));
+        
+        # Connect to the SMTP server with debug enabled
+        my $smtp = Net::SMTP->new(
+            $smtp_config->{host},
+            Port => $smtp_config->{port},
+            Debug => 1,
+            Timeout => 30
+        );
+        
+        unless ($smtp) {
+            die "Could not connect to SMTP server " . $smtp_config->{host} . ":" . $smtp_config->{port} . ": $!";
+        }
+        
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
+            "Connected to SMTP server " . $smtp_config->{host} . ":" . $smtp_config->{port});
+        
+        # Start TLS if needed
+        my $ssl_setting = $smtp_config->{ssl} // '';
+        if ($ssl_setting eq 'starttls' || $ssl_setting eq '1') {
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
+                "Starting TLS");
+            $smtp->starttls() or die "STARTTLS failed: " . $smtp->message();
+        }
+        
+        # Authenticate if credentials are provided
+        if ($smtp_config->{username} && $smtp_config->{password}) {
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
+                "Authenticating as " . $smtp_config->{username});
+            $smtp->auth($smtp_config->{username}, $smtp_config->{password}) 
+                or die "Authentication failed: " . $smtp->message();
+        }
+        
+        # Send the email
+        $smtp->mail($smtp_config->{from}) or die "FROM failed: " . $smtp->message();
+        $smtp->to($to) or die "TO failed: " . $smtp->message();
+        $smtp->data() or die "DATA failed: " . $smtp->message();
+        $smtp->datasend($msg->as_string()) or die "DATASEND failed: " . $smtp->message();
+        $smtp->dataend() or die "DATAEND failed: " . $smtp->message();
+        $smtp->quit() or die "QUIT failed: " . $smtp->message();
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email', 
             "Email sent successfully to $to");
         return 1;
