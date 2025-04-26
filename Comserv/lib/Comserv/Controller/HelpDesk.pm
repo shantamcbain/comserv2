@@ -247,6 +247,44 @@ sub contact :Chained('base') :PathPart('contact') :Args(0) {
     $c->forward($c->view('TT'));
 }
 
+=head2 admin
+
+Admin page for HelpDesk management
+
+=cut
+
+sub admin :Chained('base') :PathPart('admin') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin', 
+        "Starting admin action");
+    
+    # Check if user has admin role
+    unless ($c->session->{roles} && grep { $_ eq 'admin' } @{$c->session->{roles}}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'admin', 
+            "Unauthorized access attempt to HelpDesk admin by user: " . ($c->user_exists ? $c->user->username : 'Guest'));
+        
+        # Redirect to main HelpDesk page with error message
+        $c->stash->{error_msg} = "You don't have permission to access the HelpDesk admin area.";
+        $c->detach('index');
+        return;
+    }
+    
+    $c->stash(
+        template => 'CSC/HelpDesk/admin.tt',
+        title => 'HelpDesk Administration'
+    );
+    
+    # Push debug message to stash
+    push @{$c->stash->{debug_msg}}, "HelpDesk admin page loaded";
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin', 
+        "Completed admin action");
+    
+    # Explicitly forward to the TT view
+    $c->forward($c->view('TT'));
+}
+
 =head2 default
 
 Fallback for HelpDesk URLs that don't match any actions
