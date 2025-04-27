@@ -29,7 +29,8 @@ print "Username: $config->{shanta_forager}->{username}\n";
 __PACKAGE__->config(
     schema_class => 'Comserv::Model::Schema::Forager',
     connect_info => {
-        dsn => "dbi:$config->{shanta_forager}->{db_type}:dbname=$config->{shanta_forager}->{database};host=$config->{shanta_forager}->{host};port=$config->{shanta_forager}->{port}",
+        # Fixed DSN format for MySQL - most common format
+        dsn => "dbi:mysql:database=$config->{shanta_forager}->{database};host=$config->{shanta_forager}->{host};port=$config->{shanta_forager}->{port}",
         user => $config->{shanta_forager}->{username},
         password => $config->{shanta_forager}->{password},
         mysql_enable_utf8 => 1,

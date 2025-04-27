@@ -30,7 +30,8 @@ print "Username: $config->{shanta_ency}->{username}\n";
 __PACKAGE__->config(
     schema_class => 'Comserv::Model::Schema::Ency',
     connect_info => {
-        dsn => "dbi:$config->{shanta_ency}->{db_type}:dbname=$config->{shanta_ency}->{database};host=$config->{shanta_ency}->{host};port=$config->{shanta_ency}->{port}",
+        # Fixed DSN format for MySQL - most common format
+        dsn => "dbi:mysql:database=$config->{shanta_ency}->{database};host=$config->{shanta_ency}->{host};port=$config->{shanta_ency}->{port}",
         user => $config->{shanta_ency}->{username},
         password => $config->{shanta_ency}->{password},
         mysql_enable_utf8 => 1,

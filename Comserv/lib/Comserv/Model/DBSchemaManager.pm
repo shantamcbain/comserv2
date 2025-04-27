@@ -99,7 +99,8 @@ sub get_table_columns {
 sub initialize_schema {
     my ($self, $config) = @_;
 
-    my $data_source_name = "DBI:$config->{db_type}:database=$config->{database};host=$config->{host};port=$config->{port}";
+    # Fixed DSN format for MySQL - most common format
+    my $data_source_name = "DBI:mysql:database=$config->{database};host=$config->{host};port=$config->{port}";
 
     my $database_handle = DBI->connect($data_source_name, $config->{username}, $config->{password},
         { RaiseError => 1, AutoCommit => 1 });

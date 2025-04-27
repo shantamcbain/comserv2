@@ -95,7 +95,8 @@ sub get_connection {
     
     # Otherwise, create a new connection
     my $config = $conn->{config};
-    my $dsn = "DBI:$config->{db_type}:database=$config->{database};host=$config->{host};port=$config->{port}";
+    # Fixed DSN format for MySQL - most common format
+    my $dsn = "DBI:mysql:database=$config->{database};host=$config->{host};port=$config->{port}";
     
     try {
         $conn->{dbh} = DBI->connect($dsn, $config->{username}, $config->{password}, {
