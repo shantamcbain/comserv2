@@ -308,6 +308,39 @@ sub process_signup :Path('process') :Args(0) {
             }
             push @{$c->stash->{debug_msg}}, "Signup successful";
             
+            # Create mail account using Virtualmin API
+            try {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process_signup', 
+                    "Creating mail account for " . $params->{email} . " on domain " . $params->{domain_name});
+                
+                my $mail_result = $c->model('Mail')->create_mail_account(
+                    $c, 
+                    $params->{email}, 
+                    $params->{password}, 
+                    $params->{domain_name}
+                );
+                
+                if ($mail_result) {
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process_signup', 
+                        "Mail account created successfully for " . $params->{email});
+                    push @{$c->stash->{debug_msg}}, "Mail account created successfully";
+                    
+                    # Send welcome email
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process_signup', 
+                        "Sending welcome email to " . $params->{email});
+                    
+                    $c->forward('Mail', 'send_welcome_email', [$user]);
+                } else {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'process_signup', 
+                        "Failed to create mail account for " . $params->{email});
+                    push @{$c->stash->{debug_msg}}, "Mail account creation failed, but signup was successful";
+                }
+            } catch {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'process_signup', 
+                    "Error creating mail account: $_");
+                push @{$c->stash->{debug_msg}}, "Error creating mail account: $_";
+            };
+            
             # Set up the success page
             $c->stash(
                 template => 'hosting/signup_success.tt',

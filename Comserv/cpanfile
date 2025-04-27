@@ -1,29 +1,25 @@
 requires 'Moose';
 requires 'namespace::autoclean';
 requires 'JSON::MaybeXS';
+requires 'Term::Menus';
 
 # System modules
 requires 'Socket';
 requires 'Sys::Hostname';
 requires 'MooseX::MarkAsMethods';
-requires 'DBD::mysql';
 requires 'Catalyst::Runtime' => '5.90130';
 requires 'Catalyst::Model';
 requires 'Catalyst::Restarter';
-requires 'DBI';
 requires 'DBIx::Class';
 requires 'DBIx::Class::Schema::Loader';
 requires 'DBIx::Class::TimeStamp';
 requires 'DBIx::Class::Migration';
 requires 'DBIx::Class::EncodedColumn';
 requires 'SQL::Translator';
-
-# JSON handling
+requires 'DBD::mysql';
+#json
 requires 'JSON';
 requires 'Config::JSON';
-
-# YAML handling
-requires 'YAML::XS';
 
 # Template Toolkit and plugins
 requires 'Template';
@@ -39,15 +35,11 @@ requires 'Catalyst::Plugin::ConfigLoader';
 requires 'Catalyst::Plugin::Static::Simple';
 requires 'Catalyst::Plugin::StackTrace';
 requires 'Catalyst::Plugin::Session';
-
-# Session storage - with fallback options
-# At least one of these should be installed for sessions to work
-recommends 'Catalyst::Plugin::Session::Store::FastMmap';
-recommends 'Catalyst::Plugin::Session::Store::File';
-recommends 'Catalyst::Plugin::Session::Store::Cookie';
-recommends 'Catalyst::Plugin::Session::Store::DBIC';
-recommends 'Catalyst::Plugin::Session::Store::Delegate';
-
+requires 'Catalyst::Plugin::Session::Store::FastMmap';
+requires 'Catalyst::Plugin::Session::Store::Delegate';
+requires 'Catalyst::Plugin::Session::Store::DBIC';
+requires 'Catalyst::Plugin::Session::Store::Cookie';
+requires 'Catalyst::Plugin::Session::Store::File';
 requires 'Catalyst::Plugin::Session::State::Cookie';
 requires 'Catalyst::Plugin::Authentication';
 requires 'Catalyst::Authentication::Store::DBIx::Class';
@@ -56,6 +48,7 @@ requires 'Catalyst::Plugin::Authorization::ACL';
 requires 'Catalyst::Plugin::Log::Dispatch';
 requires 'Log::Dispatch::Config';
 requires 'Catalyst::View::TT';
+requires 'Catalyst::Authentication::Store::DBIx::Class';
 # DateTime related
 requires 'DateTime';
 requires 'DateTime::Event::Recurrence';
@@ -65,27 +58,18 @@ requires 'DateTime::Format::ISO8601';
 # File handling
 requires 'File::Find';
 requires 'File::Basename';
+requires 'File::Slurp';
 
 # Cryptography and Security
 requires 'Digest::SHA';
 
-# Email handling - with more flexible version requirements
-requires 'Email::Abstract';
-requires 'Email::Address';
-requires 'Email::Date::Format';
-requires 'Email::MIME';
-requires 'Email::MIME::ContentType';
-requires 'Email::MIME::Encodings';
-requires 'Email::MessageID';
-requires 'Email::Sender::Simple';
-requires 'Email::Sender::Transport::SMTP';
+# Email handling
 requires 'Email::Simple';
 requires 'Email::Simple::Creator';
-requires 'Email::MIME::Creator';
-requires 'Catalyst::View::Email';
-requires 'Catalyst::View::Email::Template';
+requires 'Email::Sender::Simple';
 
 # Utility modules
+requires 'JSON';
 requires 'URI::Escape';
 requires 'Data::FormValidator';
 requires 'LWP::UserAgent';
@@ -103,4 +87,5 @@ requires 'Test::Pod::Coverage';
 requires 'Test::WWW::Mechanize::Catalyst';
 requires 'Catalyst::ScriptRunner';
 requires 'Log::Log4perl';
-requires 'Term::Size::Any';  # For terminal width detection
+requires 'Catalyst::ScriptRunner';
+requires 'local::lib';

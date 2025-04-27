@@ -5,6 +5,11 @@ use FindBin;
 BEGIN {
     $ENV{CATALYST_SCRIPT_GEN} = 40;
 
+    # Add the lib directory to @INC
+    use FindBin;
+    use lib "$FindBin::Bin/../lib";
+    use lib "$FindBin::Bin/..";
+
     # Install local::lib if not already installed
     eval { require local::lib; }; # Check if local::lib is loaded
     if ($@) { # $@ contains error message if require failed

@@ -527,67 +527,114 @@ sub send_email {
         "Attempting to send email to: " . $params->{to} . " with subject: " . $params->{subject});
 
     # First try to use the Mail model which gets SMTP config from the database
-    eval {
+    try {
         # Use the Mail model to send the email
-        $c->model('Mail')->send_email(
+        my $result = $c->model('Mail')->send_email(
             $c,
             $params->{to},
             $params->{subject},
-            $params->{body}
+            $params->{body},
+            $params->{site_id}
         );
         
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
-            "Email sent successfully to: " . $params->{to} . " using Mail model");
-        return 1;
-    };
-    
-    my $mail_model_error = $@;
-    
-    # If Mail model fails, try fallback method with direct Email::Sender
-    if ($mail_model_error) {
+        if ($result) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
+                "Email sent successfully to: " . $params->{to} . " using Mail model");
+            return 1;
+        } else {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'send_email',
+                "Mail model returned false. Trying fallback method.");
+        }
+    } catch {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'send_email',
-            "Mail model failed: $mail_model_error. Trying fallback method.");
+            "Mail model failed: $_. Trying fallback method.");
             
-        # Try to use a fallback SMTP configuration
-        eval {
-            require Email::Simple;
-            require Email::Sender::Simple;
-            require Email::Sender::Transport::SMTP;
-            Email::Sender::Simple->import(qw(sendmail));
-            
-            my $email = Email::Simple->create(
-                header => [
-                    To      => $params->{to},
-                    From    => $params->{from} || 'noreply@computersystemconsulting.ca',
-                    Subject => $params->{subject},
-                ],
-                body => $params->{body},
-            );
-            
-            # Try to use a fallback SMTP configuration
-            # This assumes you have a working SMTP server somewhere
-            my $transport = Email::Sender::Transport::SMTP->new({
-                host => 'smtp.gmail.com',  # Replace with a working SMTP server
-                port => 587,
-                ssl => 'starttls',
-                sasl_username => 'your-email@gmail.com',  # Replace with actual credentials
-                sasl_password => 'your-app-password',     # Replace with actual credentials
-            });
-            
-            sendmail($email, { transport => $transport });
+        # Try to use a fallback SMTP configuration with Net::SMTP
+        try {
+            require Net::SMTP;
+            require MIME::Lite;
+            require Authen::SASL;
             
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
-                "Email sent successfully to: " . $params->{to} . " using fallback method");
+                "Falling back to hardcoded email config using Net::SMTP");
+            
+            # Get fallback SMTP configuration from app config
+            my $smtp_host = $c->config->{FallbackSMTP}->{host} || '192.168.1.129';  # Use IP directly instead of hostname
+            my $smtp_port = $c->config->{FallbackSMTP}->{port} || 587;
+            my $smtp_user = $c->config->{FallbackSMTP}->{username} || 'noreply@computersystemconsulting.ca';
+            my $smtp_pass = $c->config->{FallbackSMTP}->{password} || '';
+            my $smtp_ssl  = $c->config->{FallbackSMTP}->{ssl} || 'starttls';
+            my $from_addr = $params->{from} || 'noreply@computersystemconsulting.ca';
+            
+            # Replace mail1.ht.home with IP if it's still in the config
+            if ($smtp_host eq 'mail1.ht.home') {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
+                    "Replacing mail1.ht.home with 192.168.1.129 in fallback SMTP");
+                $smtp_host = '192.168.1.129';
+            }
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
+                "Using fallback SMTP with Net::SMTP: $smtp_host:$smtp_port");
+            
+            # Create a MIME::Lite message
+            my $msg = MIME::Lite->new(
+                From    => $from_addr,
+                To      => $params->{to},
+                Subject => $params->{subject},
+                Type    => 'text/plain',
+                Data    => $params->{body}
+            );
+            
+            # Connect to the SMTP server with debug enabled
+            my $smtp = Net::SMTP->new(
+                $smtp_host,
+                Port => $smtp_port,
+                Debug => 1,
+                Timeout => 30
+            );
+            
+            unless ($smtp) {
+                die "Could not connect to SMTP server $smtp_host:$smtp_port: $!";
+            }
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
+                "Connected to SMTP server $smtp_host:$smtp_port");
+            
+            # Start TLS if needed
+            if ($smtp_ssl eq 'starttls') {
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
+                    "Starting TLS");
+                $smtp->starttls() or die "STARTTLS failed: " . $smtp->message();
+            }
+            
+            # Authenticate if credentials are provided
+            if ($smtp_user && $smtp_pass) {
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
+                    "Authenticating as $smtp_user");
+                $smtp->auth($smtp_user, $smtp_pass) or die "Authentication failed: " . $smtp->message();
+            }
+            
+            # Send the email
+            $smtp->mail($from_addr) or die "FROM failed: " . $smtp->message();
+            $smtp->to($params->{to}) or die "TO failed: " . $smtp->message();
+            $smtp->data() or die "DATA failed: " . $smtp->message();
+            $smtp->datasend($msg->as_string()) or die "DATASEND failed: " . $smtp->message();
+            $smtp->dataend() or die "DATAEND failed: " . $smtp->message();
+            $smtp->quit() or die "QUIT failed: " . $smtp->message();
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
+                "Email sent successfully to: " . $params->{to} . " using Net::SMTP fallback method");
+            
+            # Store success message in stash
+            $c->stash->{status_msg} = "Email sent successfully via Net::SMTP fallback method";
             return 1;
-        };
-        
-        if ($@) {
+        } catch {
             # Both methods failed
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email',
-                "All email sending methods failed. Mail model error: $mail_model_error, Fallback error: $@");
+                "All email sending methods failed. Fallback error: $_");
                 
             # Add to debug messages
-            push @{$c->stash->{debug_msg}}, "Email sending failed: $@";
+            $c->stash->{debug_msg} = "Email sending failed: $_";
             return 0;
         }
     }

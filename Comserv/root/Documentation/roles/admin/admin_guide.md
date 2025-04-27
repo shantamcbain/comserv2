@@ -74,6 +74,29 @@ Enable, disable, or configure individual modules:
 - Perform regular security audits
 - Configure proper backup procedures
 
+## System Maintenance
+
+### Restarting Starman Server
+
+The Comserv platform provides an admin interface to safely restart the Starman web server:
+
+1. Navigate to Admin > System > Restart Starman Server
+2. Review the warning about service interruption
+3. Confirm the restart operation
+4. Enter your system username and password when prompted
+5. Review the restart results and service status
+
+For detailed instructions, see the [Starman Restart Guide](starman_restart_guide.md).
+
+### Server Updates
+
+To update the application code from the Git repository:
+
+1. Navigate to Admin > System > Git Pull
+2. Review the changes that will be applied
+3. Confirm the update operation
+4. After a successful update, consider restarting the Starman server
+
 ## Troubleshooting
 
 ### Common Issues
@@ -82,6 +105,7 @@ Enable, disable, or configure individual modules:
 - **Performance Issues**: Review server resources, database optimization, and caching
 - **Email Delivery**: Verify SMTP settings and email server status
 - **Content Display**: Clear cache and check theme compatibility
+- **Server Errors**: Check application logs and consider restarting the Starman server
 
 ### System Logs
 

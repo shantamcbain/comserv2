@@ -1,6 +1,40 @@
-[%# DefaultDBI.tt - Get DBI from the application context %]
-[%# This file replaces the old DefaultDBI.tt that was setting up DBI directly %]
-[%# Now we get the DBI from the Catalyst application context %]
+[% ViewVersion = 'v 0.02 2024/05/01 setup/DefaultDBI.tt'  %]
+[% IF data.debug == 1 %]
+ <p>[% ViewVersion %] </p>
+ Using application database connection
+[% END %]
 
-[%# No need to set up DBI here as it's handled by the application %]
-[%# The DBI connection is available through c.stash.dbi or c.model('DB') %]
+[%# This file provides database access for templates through the application's models
+    instead of direct DBI connections. This ensures that all database connections
+    use the same configuration and credentials. %]
+
+[% MACRO get_data(model_name, method_name, params) BLOCK %]
+    [% # This macro allows templates to get data from models
+       # Usage: [% data = INCLUDE get_data('ModelName', 'method_name', {param1 => 'value1'}) %]
+
+       # Call the appropriate model method through the Catalyst context
+       result = c.model(model_name).$method_name(params);
+
+       # Return the result
+       result;
+    %]
+[% END %]
+
+[% MACRO execute_query(database, query) BLOCK %]
+    [% # This macro allows templates to execute custom queries through the RemoteDB model
+       # Usage: [% results = INCLUDE execute_query('DBName', 'SELECT * FROM table') %]
+
+       # Use the RemoteDB model to execute the query
+       IF database == 'ENCY' || database == 'ency';
+           results = c.model('DBEncy').schema.storage.dbh.selectall_arrayref(query, { Slice => {} });
+       ELSIF database == 'FORAGER' || database == 'forager';
+           results = c.model('DBForager').schema.storage.dbh.selectall_arrayref(query, { Slice => {} });
+       ELSE;
+           # For remote databases, use the RemoteDB model
+           results = c.model('RemoteDB').execute_query(c, database, query, []);
+       END;
+
+       # Return the results
+       results;
+    %]
+[% END %]

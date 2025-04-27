@@ -1,5 +1,19 @@
 {"completed_items":[
     {
+        "item":"Added Linux Commands Reference - Created comprehensive reference guide for common Linux commands in the HelpDesk Knowledge Base",
+        "status":"completed",
+        "commit":"linux_commands_reference",
+        "date_completed":"2025-05-31",
+        "date_created":"2025-05-31"
+    },
+    {
+        "item":"Added HelpDesk Documentation System - Created comprehensive documentation about accessing and using the documentation system through HelpDesk",
+        "status":"completed",
+        "commit":"helpdesk_documentation_system",
+        "date_completed":"2025-05-31",
+        "date_created":"2025-05-31"
+    },
+    {
         "item":"Added Restart Starman Functionality - Implemented admin interface for restarting the Starman server",
         "status":"completed",
         "commit":"restart_starman_functionality",

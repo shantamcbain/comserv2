@@ -189,6 +189,37 @@ sub kb :Chained('base') :PathPart('kb') :Args(0) {
     $c->forward($c->view('TT'));
 }
 
+=head2 linux_commands
+
+Linux Commands Reference page
+
+=cut
+
+sub linux_commands :Chained('base') :PathPart('kb/linux_commands') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'linux_commands', 
+        "Starting linux_commands action");
+    
+    # Include CSS and JavaScript enhancements
+    $c->stash(
+        template => 'CSC/HelpDesk/linux_commands.tt',
+        title => 'Linux Commands Reference',
+        additional_css => ['/static/css/linux_commands.css'],
+        additional_js => ['/static/js/linux_commands.js']
+    );
+    
+    # Push debug message to stash
+    push @{$c->stash->{debug_msg}}, "Linux Commands Reference loaded with enhancements";
+    push @{$c->stash->{success_msg}}, "Command reference enhanced with copy-to-clipboard functionality";
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'linux_commands', 
+        "Completed linux_commands action with CSS and JS enhancements");
+    
+    # Explicitly forward to the TT view
+    $c->forward($c->view('TT'));
+}
+
 =head2 contact
 
 Contact Support page
@@ -211,6 +242,44 @@ sub contact :Chained('base') :PathPart('contact') :Args(0) {
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'contact', 
         "Completed contact action");
+    
+    # Explicitly forward to the TT view
+    $c->forward($c->view('TT'));
+}
+
+=head2 admin
+
+Admin page for HelpDesk management
+
+=cut
+
+sub admin :Chained('base') :PathPart('admin') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin', 
+        "Starting admin action");
+    
+    # Check if user has admin role
+    unless ($c->session->{roles} && grep { $_ eq 'admin' } @{$c->session->{roles}}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'admin', 
+            "Unauthorized access attempt to HelpDesk admin by user: " . ($c->user_exists ? $c->user->username : 'Guest'));
+        
+        # Redirect to main HelpDesk page with error message
+        $c->stash->{error_msg} = "You don't have permission to access the HelpDesk admin area.";
+        $c->detach('index');
+        return;
+    }
+    
+    $c->stash(
+        template => 'CSC/HelpDesk/admin.tt',
+        title => 'HelpDesk Administration'
+    );
+    
+    # Push debug message to stash
+    push @{$c->stash->{debug_msg}}, "HelpDesk admin page loaded";
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin', 
+        "Completed admin action");
     
     # Explicitly forward to the TT view
     $c->forward($c->view('TT'));

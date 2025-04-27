@@ -63,7 +63,11 @@
         <a href="/documentation?category=tutorials"><i class="icon-tutorial"></i>Tutorials</a>
         <a href="/documentation?category=changelog"><i class="icon-changelog"></i>Changelog</a>
         [% IF c.session.roles.grep('admin').size || c.session.roles.grep('developer').size %]
-            <a href="/admin/edit_documentation"><i class="icon-edit"></i>Edit Documentation</a>
+            <div class="submenu-section">
+                <span class="submenu-section-title">Admin Resources</span>
+                <a href="/documentation/linux_commands"><i class="icon-terminal"></i>Linux Commands</a>
+                <a href="/admin/edit_documentation"><i class="icon-edit"></i>Edit Documentation</a>
+            </div>
         [% END %]
     </div>
 </div>

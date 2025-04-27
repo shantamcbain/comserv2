@@ -12,6 +12,13 @@
 <link rel="stylesheet" href="/static/css/documentation.css">
 <link rel="stylesheet" href="/static/css/markdown-viewer.css">
 
+<!-- Include additional CSS files if specified -->
+[% IF additional_css %]
+    [% FOREACH css_file IN additional_css %]
+        <link rel="stylesheet" href="[% css_file %]">
+    [% END %]
+[% END %]
+
 <div class="markdown-viewer">
     <div class="markdown-header">
         <h1>[% page_title %]</h1>
@@ -451,3 +458,10 @@
         text-decoration: underline;
     }
 </style>
+
+<!-- Include additional JavaScript files if specified -->
+[% IF additional_js %]
+    [% FOREACH js_file IN additional_js %]
+        <script src="[% js_file %]"></script>
+    [% END %]
+[% END %]
