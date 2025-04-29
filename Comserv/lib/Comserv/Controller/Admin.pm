@@ -374,6 +374,471 @@ sub delete_user :Path('/admin/delete_user') :Args(1) {
     $c->response->redirect($c->uri_for('/admin/users'));
 }
 
+=head2 network_devices
+
+Admin interface to manage network devices
+
+=cut
+
+sub network_devices :Path('/admin/network_devices') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Log the beginning of the network_devices action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'network_devices', "Starting network_devices action");
+
+    # Check if the user has admin role
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'network_devices', 'User does not have admin role');
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    # Get the selected site filter (if any)
+    my $site_filter = $c->req->param('site') || '';
+    
+    # Get all devices from the database
+    my @devices = ();
+    
+    # Try to fetch devices from the database if the table exists
+    eval {
+        my $search_params = {};
+        
+        # Add site filter if specified
+        if ($site_filter) {
+            $search_params->{site_name} = $site_filter;
+        }
+        
+        # Log the attempt to access the NetworkDevice table
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'network_devices', 
+            "Attempting to access NetworkDevice table with filter: " . ($site_filter || 'None'));
+        
+        @devices = $c->model('DBEncy')->schema->resultset('NetworkDevice')->search(
+            $search_params,
+            { order_by => { -asc => 'device_name' } }
+        );
+        
+        # Log success
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'network_devices', 
+            "Successfully retrieved " . scalar(@devices) . " devices from the database");
+    };
+    
+    # If there was an error (likely because the table doesn't exist yet)
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'network_devices', 
+            "Error fetching devices: $@. Table may not exist yet.");
+        
+        # Add sample devices for demonstration if the table doesn't exist
+        @devices = (
+            { 
+                id => 1, 
+                device_name => 'Main Router', 
+                ip_address => '192.168.1.1', 
+                mac_address => '00:11:22:33:44:55',
+                device_type => 'Router',
+                location => 'Server Room',
+                purpose => 'Main internet gateway',
+                notes => 'Cisco router providing internet access and firewall',
+                site_name => 'CSC'
+            },
+            { 
+                id => 2, 
+                device_name => 'Core Switch', 
+                ip_address => '192.168.1.2', 
+                mac_address => '00:11:22:33:44:56',
+                device_type => 'Switch',
+                location => 'Server Room',
+                purpose => 'Core network switch',
+                notes => 'Cisco Catalyst 9300 Series',
+                site_name => 'CSC'
+            },
+            { 
+                id => 3, 
+                device_name => 'Office AP', 
+                ip_address => '192.168.1.3', 
+                mac_address => '00:11:22:33:44:57',
+                device_type => 'Access Point',
+                location => 'Main Office',
+                purpose => 'Wireless access',
+                notes => 'Cisco Meraki MR Series',
+                site_name => 'CSC'
+            },
+            { 
+                id => 4, 
+                device_name => 'MCOOP Router', 
+                ip_address => '10.0.0.1', 
+                mac_address => '00:11:22:33:44:58',
+                device_type => 'Router',
+                location => 'MCOOP Office',
+                purpose => 'Main router for MCOOP',
+                notes => 'Ubiquiti EdgeRouter',
+                site_name => 'MCOOP'
+            },
+            { 
+                id => 5, 
+                device_name => 'MCOOP Switch', 
+                ip_address => '10.0.0.2', 
+                mac_address => '00:11:22:33:44:59',
+                device_type => 'Switch',
+                location => 'MCOOP Office',
+                purpose => 'Network switch for MCOOP',
+                notes => 'Ubiquiti EdgeSwitch',
+                site_name => 'MCOOP'
+            }
+        );
+        
+        # Filter by site if needed
+        if ($site_filter) {
+            @devices = grep { $_->{site_name} eq $site_filter } @devices;
+        }
+    }
+
+    # Get list of sites for the filter dropdown
+    my @sites = ();
+    eval {
+        @sites = $c->model('DBEncy::Site')->search(
+            {},
+            { order_by => { -asc => 'name' } }
+        );
+    };
+    
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'network_devices', 
+            "Error fetching sites: $@");
+        
+        # Add sample sites if we can't get them from the database
+        @sites = (
+            { id => 1, name => 'CSC' },
+            { id => 2, name => 'MCOOP' },
+            { id => 3, name => 'BMaster' }
+        );
+    }
+
+    # Use the standard debug message system
+    if ($c->session->{debug_mode}) {
+        $c->stash->{debug_msg} = [] unless defined $c->stash->{debug_msg};
+        push @{$c->stash->{debug_msg}}, "Admin controller network_devices view - Template: admin/network_devices.tt";
+        push @{$c->stash->{debug_msg}}, "Device count: " . scalar(@devices);
+        push @{$c->stash->{debug_msg}}, "Site filter: " . ($site_filter || 'None');
+    }
+
+    # Pass data to the template
+    $c->stash(
+        devices => \@devices,
+        sites => \@sites,
+        site_filter => $site_filter,
+        template => 'admin/network_devices.tt'
+    );
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'network_devices', 'Set template to admin/network_devices.tt');
+    $c->forward($c->view('TT'));
+}
+
+=head2 add_network_device
+
+Admin interface to add a new network device
+
+=cut
+
+sub add_network_device :Path('/admin/add_network_device') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_network_device', 'Enter add_network_device method');
+
+    # Check if the user has admin role
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'add_network_device', 'User does not have admin role');
+        $c->response->redirect($c->uri_for('/admin/network_devices'));
+        return;
+    }
+
+    # Get list of sites for the dropdown
+    my @sites = ();
+    eval {
+        @sites = $c->model('DBEncy::Site')->search(
+            {},
+            { order_by => { -asc => 'name' } }
+        );
+    };
+    
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'add_network_device', 
+            "Error fetching sites: $@");
+        
+        # Add sample sites if we can't get them from the database
+        @sites = (
+            { id => 1, name => 'CSC' },
+            { id => 2, name => 'MCOOP' },
+            { id => 3, name => 'BMaster' }
+        );
+    }
+
+    # If this is a form submission, process it
+    if ($c->req->method eq 'POST') {
+        # Retrieve the form data
+        my $device_name = $c->req->params->{device_name};
+        my $ip_address = $c->req->params->{ip_address};
+        my $mac_address = $c->req->params->{mac_address};
+        my $device_type = $c->req->params->{device_type};
+        my $location = $c->req->params->{location};
+        my $purpose = $c->req->params->{purpose};
+        my $notes = $c->req->params->{notes};
+        my $site_name = $c->req->params->{site_name};
+
+        # Log the device creation attempt
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_network_device',
+            "Device creation attempt for device: $device_name with IP: $ip_address, Site: $site_name");
+
+        # Ensure all required fields are filled
+        unless ($device_name && $ip_address && $site_name) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'add_network_device',
+                "Missing required fields for device creation");
+
+            $c->stash(
+                error_msg => 'Device name, IP address, and site are required',
+                sites => \@sites,
+                template => 'admin/add_network_device.tt',
+            );
+            $c->forward($c->view('TT'));
+            return;
+        }
+
+        # Create the new device
+        eval {
+            $c->model('DBEncy')->schema->resultset('NetworkDevice')->create({
+                device_name => $device_name,
+                ip_address => $ip_address,
+                mac_address => $mac_address,
+                device_type => $device_type,
+                location => $location,
+                purpose => $purpose,
+                notes => $notes,
+                site_name => $site_name,
+                created_at => \'NOW()',
+            });
+
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_network_device',
+                "Device created successfully: $device_name with IP: $ip_address, Site: $site_name");
+
+            # Set success message and redirect to device list
+            $c->flash->{success_msg} = "Device '$device_name' created successfully.";
+            $c->response->redirect($c->uri_for('/admin/network_devices', { site => $site_name }));
+            return;
+        };
+
+        if ($@) {
+            # Handle database errors
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_network_device',
+                "Error creating device: $@");
+
+            $c->stash(
+                error_msg => "Error creating device: $@",
+                sites => \@sites,
+                template => 'admin/add_network_device.tt',
+            );
+            $c->forward($c->view('TT'));
+            return;
+        }
+    }
+
+    # Display the add device form
+    $c->stash(
+        sites => \@sites,
+        template => 'admin/add_network_device.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
+=head2 edit_network_device
+
+Admin interface to edit a network device
+
+=cut
+
+sub edit_network_device :Path('/admin/edit_network_device') :Args(1) {
+    my ($self, $c, $device_id) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_network_device', "Enter edit_network_device method for device ID: $device_id");
+
+    # Check if the user has admin role
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'edit_network_device', 'User does not have admin role');
+        $c->response->redirect($c->uri_for('/admin/network_devices'));
+        return;
+    }
+
+    # Get list of sites for the dropdown
+    my @sites = ();
+    eval {
+        @sites = $c->model('DBEncy::Site')->search(
+            {},
+            { order_by => { -asc => 'name' } }
+        );
+    };
+    
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'edit_network_device', 
+            "Error fetching sites: $@");
+        
+        # Add sample sites if we can't get them from the database
+        @sites = (
+            { id => 1, name => 'CSC' },
+            { id => 2, name => 'MCOOP' },
+            { id => 3, name => 'BMaster' }
+        );
+    }
+
+    # Try to find the device
+    my $device;
+    eval {
+        $device = $c->model('DBEncy')->schema->resultset('NetworkDevice')->find($device_id);
+    };
+
+    # Handle errors or device not found
+    if ($@ || !$device) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'edit_network_device',
+            "Device not found with ID: $device_id or error: $@");
+            
+        $c->flash->{error_msg} = "Device not found.";
+        $c->response->redirect($c->uri_for('/admin/network_devices'));
+        return;
+    }
+
+    # If this is a form submission, process it
+    if ($c->req->method eq 'POST') {
+        # Retrieve the form data
+        my $device_name = $c->req->params->{device_name};
+        my $ip_address = $c->req->params->{ip_address};
+        my $mac_address = $c->req->params->{mac_address};
+        my $device_type = $c->req->params->{device_type};
+        my $location = $c->req->params->{location};
+        my $purpose = $c->req->params->{purpose};
+        my $notes = $c->req->params->{notes};
+        my $site_name = $c->req->params->{site_name};
+
+        # Log the device update attempt
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_network_device',
+            "Device update attempt for device: $device_name with IP: $ip_address, Site: $site_name");
+
+        # Ensure all required fields are filled
+        unless ($device_name && $ip_address && $site_name) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'edit_network_device',
+                "Missing required fields for device update");
+
+            $c->stash(
+                error_msg => 'Device name, IP address, and site are required',
+                device => $device,
+                sites => \@sites,
+                template => 'admin/edit_network_device.tt',
+            );
+            $c->forward($c->view('TT'));
+            return;
+        }
+
+        # Update the device
+        eval {
+            $device->update({
+                device_name => $device_name,
+                ip_address => $ip_address,
+                mac_address => $mac_address,
+                device_type => $device_type,
+                location => $location,
+                purpose => $purpose,
+                notes => $notes,
+                site_name => $site_name,
+                updated_at => \'NOW()',
+            });
+
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_network_device',
+                "Device updated successfully: $device_name with IP: $ip_address, Site: $site_name");
+
+            # Set success message and redirect to device list
+            $c->flash->{success_msg} = "Device '$device_name' updated successfully.";
+            $c->response->redirect($c->uri_for('/admin/network_devices', { site => $site_name }));
+            return;
+        };
+
+        if ($@) {
+            # Handle database errors
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_network_device',
+                "Error updating device: $@");
+
+            $c->stash(
+                error_msg => "Error updating device: $@",
+                device => $device,
+                sites => \@sites,
+                template => 'admin/edit_network_device.tt',
+            );
+            $c->forward($c->view('TT'));
+            return;
+        }
+    }
+
+    # Display the edit device form
+    $c->stash(
+        device => $device,
+        sites => \@sites,
+        template => 'admin/edit_network_device.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
+=head2 delete_network_device
+
+Admin interface to delete a network device
+
+=cut
+
+sub delete_network_device :Path('/admin/delete_network_device') :Args(1) {
+    my ($self, $c, $device_id) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete_network_device', "Enter delete_network_device method for device ID: $device_id");
+
+    # Check if the user has admin role
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'delete_network_device', 'User does not have admin role');
+        $c->response->redirect($c->uri_for('/admin/network_devices'));
+        return;
+    }
+
+    # Try to find the device
+    my $device;
+    eval {
+        $device = $c->model('DBEncy')->schema->resultset('NetworkDevice')->find($device_id);
+    };
+
+    # Handle errors or device not found
+    if ($@ || !$device) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'delete_network_device',
+            "Device not found with ID: $device_id or error: $@");
+            
+        $c->flash->{error_msg} = "Device not found.";
+        $c->response->redirect($c->uri_for('/admin/network_devices'));
+        return;
+    }
+
+    # Store device name and site for logging and redirection
+    my $device_name = $device->device_name;
+    my $site_name = $device->site_name;
+    
+    # Delete the device
+    eval {
+        $device->delete;
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete_network_device',
+            "Device deleted successfully: $device_name (ID: $device_id)");
+            
+        $c->flash->{success_msg} = "Device '$device_name' deleted successfully.";
+    };
+    
+    if ($@) {
+        # Handle any exceptions
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'delete_network_device',
+            "Exception when deleting device: $@");
+            
+        $c->flash->{error_msg} = "An error occurred while deleting the device: $@";
+    }
+    
+    # Redirect back to the device list page with the site filter if available
+    $c->response->redirect($c->uri_for('/admin/network_devices', { site => $site_name }));
+}
+
 sub map_table_to_result :Path('/Admin/map_table_to_result') :Args(0) {
     my ($self, $c) = @_;
 
@@ -973,6 +1438,8 @@ sub git_pull :Path('/admin/git_pull') :Args(0) {
         
         # Check if there are uncommitted changes
         my $has_changes = 0;
+        my $has_theme_mappings_changes = 0;
+        
         if ($git_status =~ /Changes not staged for commit|Changes to be committed|Untracked files/) {
             $has_changes = 1;
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_pull', 
@@ -980,6 +1447,46 @@ sub git_pull :Path('/admin/git_pull') :Args(0) {
             # Ensure debug_msg is an array reference before pushing
             $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
             push @{$c->stash->{debug_msg}}, "Warning: Repository has uncommitted changes";
+            
+            # Check specifically for theme_mappings.json changes
+            if ($git_status =~ /theme_mappings\.json/) {
+                $has_theme_mappings_changes = 1;
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
+                    "Detected changes to theme_mappings.json, will handle specially");
+                push @{$c->stash->{debug_msg}}, "Detected changes to theme_mappings.json, will handle specially";
+                
+                # Backup theme_mappings.json before proceeding
+                my $theme_mappings_path = "Comserv/root/static/config/theme_mappings.json";
+                my $backup_path = "Comserv/root/static/config/theme_mappings.json.bak";
+                
+                # Create a backup
+                my $cp_result = qx{cp $theme_mappings_path $backup_path 2>&1};
+                my $cp_exit_code = $? >> 8;
+                
+                if ($cp_exit_code == 0) {
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
+                        "Successfully backed up theme_mappings.json");
+                    push @{$c->stash->{debug_msg}}, "Successfully backed up theme_mappings.json";
+                } else {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_pull', 
+                        "Failed to backup theme_mappings.json: $cp_result");
+                    push @{$c->stash->{debug_msg}}, "Warning: Failed to backup theme_mappings.json: $cp_result";
+                }
+                
+                # Stash only theme_mappings.json changes
+                my $stash_result = qx{git stash push -m "Auto-stashed theme_mappings.json changes" -- $theme_mappings_path 2>&1};
+                my $stash_exit_code = $? >> 8;
+                
+                if ($stash_exit_code == 0) {
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
+                        "Successfully stashed theme_mappings.json changes: $stash_result");
+                    push @{$c->stash->{debug_msg}}, "Successfully stashed theme_mappings.json changes";
+                } else {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_pull', 
+                        "Failed to stash theme_mappings.json changes: $stash_result");
+                    push @{$c->stash->{debug_msg}}, "Warning: Failed to stash theme_mappings.json changes: $stash_result";
+                }
+            }
         }
         
         # Run git pull
@@ -1002,8 +1509,57 @@ sub git_pull :Path('/admin/git_pull') :Args(0) {
                 $c->stash->{success_msg} = "Git pull executed successfully. Updates were applied.";
             }
             
-            # Add a warning if there were uncommitted changes
-            if ($has_changes) {
+            # If we stashed theme_mappings.json changes, try to apply them back
+            if ($has_theme_mappings_changes) {
+                # Change back to the app root directory to apply stash
+                chdir($app_root) or do {
+                    $error = "Failed to change to directory $app_root to apply stash: $!";
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_pull', $error);
+                    push @{$c->stash->{debug_msg}}, "Error: $error";
+                    $c->stash->{warning_msg} = "Git pull succeeded but could not apply stashed theme_mappings.json changes. " .
+                        "Your changes are saved in the Git stash and can be applied manually.";
+                    chdir($current_dir);
+                    return;
+                };
+                
+                # Apply the stashed changes
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
+                    "Attempting to apply stashed theme_mappings.json changes");
+                push @{$c->stash->{debug_msg}}, "Attempting to apply stashed theme_mappings.json changes";
+                
+                # Try to apply the most recent stash
+                my $stash_apply_result = qx{git stash apply 2>&1};
+                my $stash_apply_exit_code = $? >> 8;
+                
+                if ($stash_apply_exit_code == 0) {
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
+                        "Successfully applied stashed theme_mappings.json changes");
+                    push @{$c->stash->{debug_msg}}, "Successfully applied stashed theme_mappings.json changes";
+                    $c->stash->{success_msg} .= " Your theme_mappings.json changes were preserved.";
+                    
+                    # Check for conflicts
+                    my $status_after_apply = qx{git status 2>&1};
+                    if ($status_after_apply =~ /both modified:.*theme_mappings\.json/) {
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_pull', 
+                            "Conflict detected when applying theme_mappings.json changes");
+                        push @{$c->stash->{debug_msg}}, "Conflict detected when applying theme_mappings.json changes";
+                        $c->stash->{warning_msg} = "There was a conflict when applying your theme_mappings.json changes. " .
+                            "A backup is available at Comserv/root/static/config/theme_mappings.json.bak";
+                    }
+                } else {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_pull', 
+                        "Failed to apply stashed theme_mappings.json changes: $stash_apply_result");
+                    push @{$c->stash->{debug_msg}}, "Warning: Failed to apply stashed theme_mappings.json changes: $stash_apply_result";
+                    $c->stash->{warning_msg} = "Git pull succeeded but could not apply stashed theme_mappings.json changes. " .
+                        "Your changes are saved in the Git stash and as a backup file at Comserv/root/static/config/theme_mappings.json.bak";
+                }
+                
+                # Change back to the original directory
+                chdir($current_dir);
+            }
+            
+            # Add a warning if there were other uncommitted changes
+            if ($has_changes && !$has_theme_mappings_changes) {
                 $c->stash->{warning_msg} = "Note: Your repository had uncommitted changes. " .
                     "You may need to resolve conflicts manually.";
             }
@@ -1011,6 +1567,12 @@ sub git_pull :Path('/admin/git_pull') :Args(0) {
             $error = "Error executing git pull: $output";
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_pull', $error);
             $c->stash->{error_msg} = $error;
+            
+            # If we stashed theme_mappings.json changes but the pull failed, let the user know
+            if ($has_theme_mappings_changes) {
+                $c->stash->{warning_msg} = "Your theme_mappings.json changes were stashed before the failed pull attempt. " .
+                    "They are saved in the Git stash and as a backup file at Comserv/root/static/config/theme_mappings.json.bak";
+            }
         }
         
         # Add the output to the stash
@@ -1048,7 +1610,10 @@ sub restart_starman :Path('/admin/restart_starman') :Args(0) {
     my ($self, $c) = @_;
     
     # Debug logging for restart_starman action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', "Starting restart_starman action");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', 
+        "Starting restart_starman action from " . $c->req->address . 
+        " with method " . $c->req->method . 
+        " to server " . $c->req->env->{SERVER_NAME});
     
     # Log user information for debugging
     my $username = $c->session->{username} || 'Guest';
@@ -1232,8 +1797,20 @@ sub restart_starman :Path('/admin/restart_starman') :Args(0) {
             }
         } else {
             $error = "Error restarting Starman server: $output";
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'restart_starman', $error);
-            $c->stash->{error_msg} = $error;
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'restart_starman', 
+                "Failed to restart Starman server. Exit code: " . ($? >> 8) . 
+                ", Error: $output, Command used: [REDACTED]");
+            
+            # Add detailed error information to debug_msg
+            push @{$c->stash->{debug_msg}}, "Exit code: " . ($? >> 8);
+            push @{$c->stash->{debug_msg}}, "Raw output: $output";
+            
+            # Set user-friendly error message
+            $c->stash->{error_msg} = "Failed to restart Starman server. Please check the network connection and try again.";
+            
+            # Add a suggestion to use network diagnostics
+            $c->stash->{warning_msg} = "If the problem persists, try using the <a href=\"" . 
+                $c->uri_for('/admin/network_diagnostics') . "\">Network Diagnostics</a> tool to troubleshoot connectivity issues.";
         }
         
         # Add the output to the stash
@@ -1270,6 +1847,471 @@ sub restart_starman :Path('/admin/restart_starman') :Args(0) {
     
     # Forward to the view
     $c->forward($c->view('TT'));
+}
+
+=head2 network_devices
+
+Admin interface to manage network devices
+
+=cut
+
+sub network_devices :Path('/admin/network_devices') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Log the beginning of the network_devices action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'network_devices', "Starting network_devices action");
+
+    # Check if the user has admin role
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'network_devices', 'User does not have admin role');
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    # Get the selected site filter (if any)
+    my $site_filter = $c->req->param('site') || '';
+    
+    # Get all devices from the database
+    my @devices = ();
+    
+    # Try to fetch devices from the database if the table exists
+    eval {
+        my $search_params = {};
+        
+        # Add site filter if specified
+        if ($site_filter) {
+            $search_params->{site_name} = $site_filter;
+        }
+        
+        # Log the attempt to access the NetworkDevice table
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'network_devices', 
+            "Attempting to access NetworkDevice table with filter: " . ($site_filter || 'None'));
+        
+        @devices = $c->model('DBEncy')->schema->resultset('NetworkDevice')->search(
+            $search_params,
+            { order_by => { -asc => 'device_name' } }
+        );
+        
+        # Log success
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'network_devices', 
+            "Successfully retrieved " . scalar(@devices) . " devices from the database");
+    };
+    
+    # If there was an error (likely because the table doesn't exist yet)
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'network_devices', 
+            "Error fetching devices: $@. Table may not exist yet.");
+        
+        # Add sample devices for demonstration if the table doesn't exist
+        @devices = (
+            { 
+                id => 1, 
+                device_name => 'Main Router', 
+                ip_address => '192.168.1.1', 
+                mac_address => '00:11:22:33:44:55',
+                device_type => 'Router',
+                location => 'Server Room',
+                purpose => 'Main internet gateway',
+                notes => 'Cisco router providing internet access and firewall',
+                site_name => 'CSC'
+            },
+            { 
+                id => 2, 
+                device_name => 'Core Switch', 
+                ip_address => '192.168.1.2', 
+                mac_address => '00:11:22:33:44:56',
+                device_type => 'Switch',
+                location => 'Server Room',
+                purpose => 'Core network switch',
+                notes => 'Cisco Catalyst 9300 Series',
+                site_name => 'CSC'
+            },
+            { 
+                id => 3, 
+                device_name => 'Office AP', 
+                ip_address => '192.168.1.3', 
+                mac_address => '00:11:22:33:44:57',
+                device_type => 'Access Point',
+                location => 'Main Office',
+                purpose => 'Wireless access',
+                notes => 'Cisco Meraki MR Series',
+                site_name => 'CSC'
+            },
+            { 
+                id => 4, 
+                device_name => 'MCOOP Router', 
+                ip_address => '10.0.0.1', 
+                mac_address => '00:11:22:33:44:58',
+                device_type => 'Router',
+                location => 'MCOOP Office',
+                purpose => 'Main router for MCOOP',
+                notes => 'Ubiquiti EdgeRouter',
+                site_name => 'MCOOP'
+            },
+            { 
+                id => 5, 
+                device_name => 'MCOOP Switch', 
+                ip_address => '10.0.0.2', 
+                mac_address => '00:11:22:33:44:59',
+                device_type => 'Switch',
+                location => 'MCOOP Office',
+                purpose => 'Network switch for MCOOP',
+                notes => 'Ubiquiti EdgeSwitch',
+                site_name => 'MCOOP'
+            }
+        );
+        
+        # Filter by site if needed
+        if ($site_filter) {
+            @devices = grep { $_->{site_name} eq $site_filter } @devices;
+        }
+    }
+
+    # Get list of sites for the filter dropdown
+    my @sites = ();
+    eval {
+        @sites = $c->model('DBEncy::Site')->search(
+            {},
+            { order_by => { -asc => 'name' } }
+        );
+    };
+    
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'network_devices', 
+            "Error fetching sites: $@");
+        
+        # Add sample sites if we can't get them from the database
+        @sites = (
+            { id => 1, name => 'CSC' },
+            { id => 2, name => 'MCOOP' },
+            { id => 3, name => 'BMaster' }
+        );
+    }
+
+    # Use the standard debug message system
+    if ($c->session->{debug_mode}) {
+        $c->stash->{debug_msg} = [] unless defined $c->stash->{debug_msg};
+        push @{$c->stash->{debug_msg}}, "Admin controller network_devices view - Template: admin/network_devices.tt";
+        push @{$c->stash->{debug_msg}}, "Device count: " . scalar(@devices);
+        push @{$c->stash->{debug_msg}}, "Site filter: " . ($site_filter || 'None');
+    }
+
+    # Pass data to the template
+    $c->stash(
+        devices => \@devices,
+        sites => \@sites,
+        site_filter => $site_filter,
+        template => 'admin/network_devices.tt'
+    );
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'network_devices', 'Set template to admin/network_devices.tt');
+    $c->forward($c->view('TT'));
+}
+
+=head2 add_network_device
+
+Admin interface to add a new network device
+
+=cut
+
+sub add_network_device :Path('/admin/add_network_device') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_network_device', 'Enter add_network_device method');
+
+    # Check if the user has admin role
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'add_network_device', 'User does not have admin role');
+        $c->response->redirect($c->uri_for('/admin/network_devices'));
+        return;
+    }
+
+    # Get list of sites for the dropdown
+    my @sites = ();
+    eval {
+        @sites = $c->model('DBEncy::Site')->search(
+            {},
+            { order_by => { -asc => 'name' } }
+        );
+    };
+    
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'add_network_device', 
+            "Error fetching sites: $@");
+        
+        # Add sample sites if we can't get them from the database
+        @sites = (
+            { id => 1, name => 'CSC' },
+            { id => 2, name => 'MCOOP' },
+            { id => 3, name => 'BMaster' }
+        );
+    }
+
+    # If this is a form submission, process it
+    if ($c->req->method eq 'POST') {
+        # Retrieve the form data
+        my $device_name = $c->req->params->{device_name};
+        my $ip_address = $c->req->params->{ip_address};
+        my $mac_address = $c->req->params->{mac_address};
+        my $device_type = $c->req->params->{device_type};
+        my $location = $c->req->params->{location};
+        my $purpose = $c->req->params->{purpose};
+        my $notes = $c->req->params->{notes};
+        my $site_name = $c->req->params->{site_name};
+
+        # Log the device creation attempt
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_network_device',
+            "Device creation attempt for device: $device_name with IP: $ip_address, Site: $site_name");
+
+        # Ensure all required fields are filled
+        unless ($device_name && $ip_address && $site_name) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'add_network_device',
+                "Missing required fields for device creation");
+
+            $c->stash(
+                error_msg => 'Device name, IP address, and site are required',
+                sites => \@sites,
+                template => 'admin/add_network_device.tt',
+            );
+            $c->forward($c->view('TT'));
+            return;
+        }
+
+        # Create the new device
+        eval {
+            $c->model('DBEncy')->schema->resultset('NetworkDevice')->create({
+                device_name => $device_name,
+                ip_address => $ip_address,
+                mac_address => $mac_address,
+                device_type => $device_type,
+                location => $location,
+                purpose => $purpose,
+                notes => $notes,
+                site_name => $site_name,
+                created_at => \'NOW()',
+            });
+
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_network_device',
+                "Device created successfully: $device_name with IP: $ip_address, Site: $site_name");
+
+            # Set success message and redirect to device list
+            $c->flash->{success_msg} = "Device '$device_name' created successfully.";
+            $c->response->redirect($c->uri_for('/admin/network_devices', { site => $site_name }));
+            return;
+        };
+
+        if ($@) {
+            # Handle database errors
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_network_device',
+                "Error creating device: $@");
+
+            $c->stash(
+                error_msg => "Error creating device: $@",
+                sites => \@sites,
+                template => 'admin/add_network_device.tt',
+            );
+            $c->forward($c->view('TT'));
+            return;
+        }
+    }
+
+    # Display the add device form
+    $c->stash(
+        sites => \@sites,
+        template => 'admin/add_network_device.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
+=head2 edit_network_device
+
+Admin interface to edit a network device
+
+=cut
+
+sub edit_network_device :Path('/admin/edit_network_device') :Args(1) {
+    my ($self, $c, $device_id) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_network_device', "Enter edit_network_device method for device ID: $device_id");
+
+    # Check if the user has admin role
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'edit_network_device', 'User does not have admin role');
+        $c->response->redirect($c->uri_for('/admin/network_devices'));
+        return;
+    }
+
+    # Get list of sites for the dropdown
+    my @sites = ();
+    eval {
+        @sites = $c->model('DBEncy::Site')->search(
+            {},
+            { order_by => { -asc => 'name' } }
+        );
+    };
+    
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'edit_network_device', 
+            "Error fetching sites: $@");
+        
+        # Add sample sites if we can't get them from the database
+        @sites = (
+            { id => 1, name => 'CSC' },
+            { id => 2, name => 'MCOOP' },
+            { id => 3, name => 'BMaster' }
+        );
+    }
+
+    # Try to find the device
+    my $device;
+    eval {
+        $device = $c->model('DBEncy')->resultset('NetworkDevice')->find($device_id);
+    };
+
+    # Handle errors or device not found
+    if ($@ || !$device) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'edit_network_device',
+            "Device not found with ID: $device_id or error: $@");
+            
+        $c->flash->{error_msg} = "Device not found.";
+        $c->response->redirect($c->uri_for('/admin/network_devices'));
+        return;
+    }
+
+    # If this is a form submission, process it
+    if ($c->req->method eq 'POST') {
+        # Retrieve the form data
+        my $device_name = $c->req->params->{device_name};
+        my $ip_address = $c->req->params->{ip_address};
+        my $mac_address = $c->req->params->{mac_address};
+        my $device_type = $c->req->params->{device_type};
+        my $location = $c->req->params->{location};
+        my $purpose = $c->req->params->{purpose};
+        my $notes = $c->req->params->{notes};
+        my $site_name = $c->req->params->{site_name};
+
+        # Log the device update attempt
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_network_device',
+            "Device update attempt for device: $device_name with IP: $ip_address, Site: $site_name");
+
+        # Ensure all required fields are filled
+        unless ($device_name && $ip_address && $site_name) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'edit_network_device',
+                "Missing required fields for device update");
+
+            $c->stash(
+                error_msg => 'Device name, IP address, and site are required',
+                device => $device,
+                sites => \@sites,
+                template => 'admin/edit_network_device.tt',
+            );
+            $c->forward($c->view('TT'));
+            return;
+        }
+
+        # Update the device
+        eval {
+            $device->update({
+                device_name => $device_name,
+                ip_address => $ip_address,
+                mac_address => $mac_address,
+                device_type => $device_type,
+                location => $location,
+                purpose => $purpose,
+                notes => $notes,
+                site_name => $site_name,
+                updated_at => \'NOW()',
+            });
+
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_network_device',
+                "Device updated successfully: $device_name with IP: $ip_address, Site: $site_name");
+
+            # Set success message and redirect to device list
+            $c->flash->{success_msg} = "Device '$device_name' updated successfully.";
+            $c->response->redirect($c->uri_for('/admin/network_devices', { site => $site_name }));
+            return;
+        };
+
+        if ($@) {
+            # Handle database errors
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_network_device',
+                "Error updating device: $@");
+
+            $c->stash(
+                error_msg => "Error updating device: $@",
+                device => $device,
+                sites => \@sites,
+                template => 'admin/edit_network_device.tt',
+            );
+            $c->forward($c->view('TT'));
+            return;
+        }
+    }
+
+    # Display the edit device form
+    $c->stash(
+        device => $device,
+        sites => \@sites,
+        template => 'admin/edit_network_device.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
+=head2 delete_network_device
+
+Admin interface to delete a network device
+
+=cut
+
+sub delete_network_device :Path('/admin/delete_network_device') :Args(1) {
+    my ($self, $c, $device_id) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete_network_device', "Enter delete_network_device method for device ID: $device_id");
+
+    # Check if the user has admin role
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'delete_network_device', 'User does not have admin role');
+        $c->response->redirect($c->uri_for('/admin/network_devices'));
+        return;
+    }
+
+    # Try to find the device
+    my $device;
+    eval {
+        $device = $c->model('DBEncy')->resultset('NetworkDevice')->find($device_id);
+    };
+
+    # Handle errors or device not found
+    if ($@ || !$device) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'delete_network_device',
+            "Device not found with ID: $device_id or error: $@");
+            
+        $c->flash->{error_msg} = "Device not found.";
+        $c->response->redirect($c->uri_for('/admin/network_devices'));
+        return;
+    }
+
+    # Store device name and site for logging and redirection
+    my $device_name = $device->device_name;
+    my $site_name = $device->site_name;
+    
+    # Delete the device
+    eval {
+        $device->delete;
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete_network_device',
+            "Device deleted successfully: $device_name (ID: $device_id)");
+            
+        $c->flash->{success_msg} = "Device '$device_name' deleted successfully.";
+    };
+    
+    if ($@) {
+        # Handle any exceptions
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'delete_network_device',
+            "Exception when deleting device: $@");
+            
+        $c->flash->{error_msg} = "An error occurred while deleting the device: $@";
+    }
+    
+    # Redirect back to the device list page with the site filter if available
+    $c->response->redirect($c->uri_for('/admin/network_devices', { site => $site_name }));
 }
 
 __PACKAGE__->meta->make_immutable;

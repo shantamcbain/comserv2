@@ -1,5 +1,5 @@
 [% META title = 'Computer Systems Consulting' %]
-[% PageVersion = 'CSC/CSC.tt,v 0.02 2025/04/12 shanta Exp shanta ' %]
+[% PageVersion = 'CSC/CSC.tt,v 0.03 2025/04/29 shanta Exp shanta ' %]
 [% debug %]
 [% IF c.session.debug_mode == 1 %]
  [%	PageVersion %]
@@ -36,11 +36,11 @@
 </li>
 </ul>
 <h2>Crypto currency</h2>
-<p>BitCoin and other coins are in the news a lot lately. The air is filled with. Wallets. Exchanges. <a href='https://computersystemconsulting.ca/cgi-bin/index.cgi?site=CSC&amp;page=MigratingToCrypto' target='_blank'>Join us in that adventure.</a> of fingerling it out.</p>
+<p>BitCoin and other coins are in the news a lot lately. The air is filled with. Wallets. Exchanges. <a href='https://computersystemconsulting.ca/MigratingToCrypto' target='_blank'>Join us in that adventure.</a> of fingerling it out.</p>
 <strong>
 New</strong>Pay for your services with us. Two BitCoin exchanges
 </p>
-<h2> <a href='http://computersystemconsultig.ca:5000/vpn' target='_blank' name='Our VPN Services'>vpn </a></h2>
+<h2> <a href='/vpn' target='_blank' name='Our VPN Services'>vpn </a></h2>
 <p>We now offer several choices of Virtual Private Network option. Click the VPN link on the left for more information.</p>
 
 

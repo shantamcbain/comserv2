@@ -1,21 +1,17 @@
-Fix database connection DSN format and add documentation
+[Documentation] Add comprehensive AI development guidelines and JSON storage pattern documentation
 
-This commit fixes database connection issues by correcting the DSN (Data Source Name) format in multiple database model files. The changes ensure proper MySQL connectivity throughout the application.
+- Created AI_DEVELOPMENT_GUIDELINES.md with detailed instructions for AI assistants
+- Updated AI_Guidelines.md to reference the new development guidelines
+- Added documentation about the JSON to MySQL transition pattern
+- Created network_map_json_storage.md to document the NetworkMap JSON storage approach
 
-Changes include:
+These documentation updates ensure that AI assistants will:
+1. Follow existing code patterns and directory structures
+2. Reuse existing components rather than creating duplicates
+3. Understand the JSON storage pattern used for prototyping
+4. Maintain consistency with the established codebase
 
-1. Fixed DSN format in DBEncy.pm to use the correct MySQL connection string format
-2. Fixed DSN format in DBForager.pm for consistency
-3. Fixed DSN format in RemoteDB.pm to ensure proper remote database connections
-4. Fixed DSN format in DBSchemaManager.pm for schema initialization
-5. Added db_type field to database configurations in db_config.json
-6. Added remote_connections section to db_config.json for remote database access
-7. Added comprehensive documentation on database connection configuration
-
-The primary issue was that the DSN string was missing the proper database driver prefix, causing errors like:
-"Can't connect to data source 'dbi::dbname=ency;host=localhost;port=3306' because I can't work out what driver to use"
-
-The correct format for MySQL connections is now used consistently:
-"dbi:mysql:database=DATABASE_NAME;host=HOST;port=PORT"
-
-This fix ensures that all database models in the application can properly connect to their respective databases.
+Related files:
+- Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.md
+- Comserv/root/Documentation/AI_Guidelines.md
+- Comserv/root/Documentation/developer/network_map_json_storage.md

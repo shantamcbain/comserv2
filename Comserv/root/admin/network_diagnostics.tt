@@ -1,0 +1,224 @@
+[% META title = 'Network Diagnostics' %]
+<!-- File: /home/shanta/PycharmProjects/comserv2/Comserv/root/admin/network_diagnostics.tt -->
+[% PageVersion = 'admin/network_diagnostics.tt,v 0.01 2025/04/27 shanta Exp shanta ' %]
+
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<!-- Quick Navigation -->
+<div class="quick-nav">
+    <a href="[% c.uri_for('/admin') %]" class="btn btn-sm btn-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Admin Dashboard
+    </a>
+    <a href="[% c.uri_for('/admin/restart_starman') %]" class="btn btn-sm btn-primary">
+        <i class="fas fa-sync"></i> Restart Starman
+    </a>
+    <a href="[% c.uri_for('/admin/git_pull') %]" class="btn btn-sm btn-info">
+        <i class="fas fa-code-branch"></i> Git Pull
+    </a>
+</div>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>Network Diagnostics</h1>
+            
+            <!-- User status banner -->
+            <div class="alert alert-info mb-4">
+                <strong>Welcome [% c.session.username || 'Guest' %][% IF c.session.roles.grep('^admin$').size %] Administrator[% END %] to Computer System Consulting!</strong>
+            </div>
+            
+            [% IF debug_msg || c.session.debug_mode == 1 %]
+                <div class="alert alert-info">
+                    <strong>Debug Information:</strong>
+                    [% IF debug_msg %]
+                        [% FOREACH msg IN debug_msg %]
+                            <p>[% msg %]</p>
+                        [% END %]
+                    [% END %]
+                    <p>User: [% c.session.username || 'Guest' %]</p>
+                    <p>Roles: [% c.session.roles.join(', ') || 'None' %]</p>
+                    <p>Admin check result: [% c.session.roles.grep('^admin$').size ? 'Yes' : 'No' %]</p>
+                </div>
+            [% END %]
+            
+            [% IF error_msg %]
+                <div class="alert alert-danger">
+                    <strong>Error:</strong> [% error_msg %]
+                </div>
+            [% END %]
+            
+            [% IF success_msg %]
+                <div class="alert alert-success">
+                    <strong>Success:</strong> [% success_msg %]
+                </div>
+            [% END %]
+            
+            [% IF warning_msg %]
+                <div class="alert alert-warning">
+                    <strong>Warning:</strong> [% warning_msg %]
+                </div>
+            [% END %]
+            
+            <!-- Network Diagnostics Tools -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h3 class="mb-0">Ping Host</h3>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" action="[% c.uri_for('/admin/network_diagnostics/ping') %]">
+                                <div class="form-group mb-3">
+                                    <label for="host">Hostname or IP Address:</label>
+                                    <input type="text" class="form-control" id="host" name="host" value="[% ping_host || 'comservproduction1' %]" required>
+                                    <small class="form-text text-muted">Enter a hostname or IP address to ping</small>
+                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-exchange-alt"></i> Ping Host
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h3 class="mb-0">DNS Lookup (dig)</h3>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" action="[% c.uri_for('/admin/network_diagnostics/dig') %]">
+                                <div class="form-group mb-3">
+                                    <label for="host">Hostname:</label>
+                                    <input type="text" class="form-control" id="host" name="host" value="[% dig_host || 'computersystemconsulting.ca' %]" required>
+                                    <small class="form-text text-muted">Enter a hostname to perform DNS lookup</small>
+                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-search"></i> Lookup DNS
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h3 class="mb-0">Add Hosts File Entry</h3>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" action="[% c.uri_for('/admin/network_diagnostics/add_hosts_entry') %]">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="form-group mb-3">
+                                            <label for="ip">IP Address:</label>
+                                            <input type="text" class="form-control" id="ip" name="ip" placeholder="192.168.1.126" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group mb-3">
+                                            <label for="hostname">Hostname:</label>
+                                            <input type="text" class="form-control" id="hostname" name="hostname" placeholder="comservproduction1" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group mb-3">
+                                            <label for="sudo_password">Sudo Password:</label>
+                                            <input type="password" class="form-control" id="sudo_password" name="sudo_password" required>
+                                            <small class="form-text text-muted">Required to modify hosts file</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-plus"></i> Add Hosts Entry
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- System Information -->
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header bg-info text-white">
+                            <h3 class="mb-0">System Information</h3>
+                        </div>
+                        <div class="card-body">
+                            <h4>Hostname</h4>
+                            <pre class="command-output">[% hostname | html %]</pre>
+                            
+                            <h4>IP Configuration</h4>
+                            <pre class="command-output">[% ip_info | html %]</pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header bg-info text-white">
+                            <h3 class="mb-0">Hosts File</h3>
+                        </div>
+                        <div class="card-body">
+                            <pre class="command-output">[% hosts_file | html %]</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Ping Results -->
+            [% IF ping_result %]
+                <div class="card mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h3 class="mb-0">Ping Results for [% ping_host | html %]</h3>
+                    </div>
+                    <div class="card-body">
+                        <pre class="command-output">[% ping_result | html %]</pre>
+                    </div>
+                </div>
+            [% END %]
+            
+            <!-- DNS Lookup Results -->
+            [% IF dig_result %]
+                <div class="card mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h3 class="mb-0">DNS Lookup Results for [% dig_host | html %]</h3>
+                    </div>
+                    <div class="card-body">
+                        <pre class="command-output">[% dig_result | html %]</pre>
+                    </div>
+                </div>
+            [% END %]
+        </div>
+    </div>
+</div>
+
+<style>
+    .command-output {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 4px;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        max-height: 400px;
+        overflow-y: auto;
+        font-family: monospace;
+        margin: 0;
+    }
+    .quick-nav {
+        margin-bottom: 15px;
+        padding: 10px 0;
+        border-bottom: 1px solid #eee;
+    }
+    .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+        line-height: 1.5;
+        border-radius: 0.2rem;
+    }
+</style>
