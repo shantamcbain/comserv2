@@ -51,6 +51,15 @@ __PACKAGE__->add_columns(
         size => 100,
         is_nullable => 0,
     },
+    network_id => {
+        data_type => 'varchar',
+        size => 100,
+        is_nullable => 1,
+    },
+    services => {
+        data_type => 'text',
+        is_nullable => 1,
+    },
     created_at => {
         data_type => 'datetime',
         is_nullable => 1,
@@ -121,6 +130,15 @@ sub columns_info {
             data_type => 'varchar',
             size => 100,
             is_nullable => 0,
+        },
+        network_id => {
+            data_type => 'varchar',
+            size => 100,
+            is_nullable => 1,
+        },
+        services => {
+            data_type => 'text',
+            is_nullable => 1,
         },
         created_at => {
             data_type => 'datetime',

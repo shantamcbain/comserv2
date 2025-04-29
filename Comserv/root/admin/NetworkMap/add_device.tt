@@ -1,0 +1,115 @@
+[% META title = 'Add Device to Network Map' %]
+
+<div class="container">
+    <h1>Add Device to Network Map</h1>
+    
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h2>Device Information</h2>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="[% c.uri_for('/admin/NetworkMap/add_device') %]">
+                        <div class="form-group row">
+                            <label for="device_name" class="col-sm-2 col-form-label">Device Name:</label>
+                            <div class="col-sm-10">
+                                <input type="text" class="form-control" id="device_name" name="device_name" required>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group row">
+                            <label for="ip_address" class="col-sm-2 col-form-label">IP Address:</label>
+                            <div class="col-sm-10">
+                                <input type="text" class="form-control" id="ip_address" name="ip_address" required>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group row">
+                            <label for="mac_address" class="col-sm-2 col-form-label">MAC Address:</label>
+                            <div class="col-sm-10">
+                                <input type="text" class="form-control" id="mac_address" name="mac_address">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group row">
+                            <label for="network" class="col-sm-2 col-form-label">Network:</label>
+                            <div class="col-sm-10">
+                                <select class="form-control" id="network" name="network" required>
+                                    <option value="">Select Network</option>
+                                    [% FOREACH network_id IN networks.keys.sort %]
+                                        <option value="[% network_id %]">[% networks.$network_id.name %] ([% networks.$network_id.cidr %])</option>
+                                    [% END %]
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group row">
+                            <label for="device_type" class="col-sm-2 col-form-label">Device Type:</label>
+                            <div class="col-sm-10">
+                                <select class="form-control" id="device_type" name="device_type" required>
+                                    <option value="">Select Type</option>
+                                    <option value="Router">Router</option>
+                                    <option value="Switch">Switch</option>
+                                    <option value="Access Point">Access Point</option>
+                                    <option value="Server">Server</option>
+                                    <option value="Workstation">Workstation</option>
+                                    <option value="Printer">Printer</option>
+                                    <option value="IoT Device">IoT Device</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group row">
+                            <label for="site_name" class="col-sm-2 col-form-label">Site:</label>
+                            <div class="col-sm-10">
+                                <select class="form-control" id="site_name" name="site_name" required>
+                                    <option value="">Select Site</option>
+                                    [% FOREACH site IN sites %]
+                                        <option value="[% site.name %]">[% site.name %]</option>
+                                    [% END %]
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group row">
+                            <label for="location" class="col-sm-2 col-form-label">Location:</label>
+                            <div class="col-sm-10">
+                                <input type="text" class="form-control" id="location" name="location">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group row">
+                            <label for="purpose" class="col-sm-2 col-form-label">Purpose:</label>
+                            <div class="col-sm-10">
+                                <input type="text" class="form-control" id="purpose" name="purpose">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group row">
+                            <label for="services" class="col-sm-2 col-form-label">Services:</label>
+                            <div class="col-sm-10">
+                                <input type="text" class="form-control" id="services" name="services" placeholder="Comma-separated list (e.g., DHCP, DNS, HTTP)">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group row">
+                            <label for="notes" class="col-sm-2 col-form-label">Notes:</label>
+                            <div class="col-sm-10">
+                                <textarea class="form-control" id="notes" name="notes" rows="3"></textarea>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group row">
+                            <div class="col-sm-10 offset-sm-2">
+                                <button type="submit" class="btn btn-primary">Add Device</button>
+                                <a href="[% c.uri_for('/admin/NetworkMap') %]" class="btn btn-secondary">Cancel</a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

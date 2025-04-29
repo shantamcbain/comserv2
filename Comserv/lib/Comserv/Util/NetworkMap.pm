@@ -7,6 +7,7 @@ use File::Slurp;
 use Net::CIDR;
 use Comserv::Util::Logging;
 use Data::Dumper;
+use Try::Tiny;
 
 # Create a singleton instance of the logging utility
 has 'logging' => (
@@ -29,6 +30,10 @@ Comserv::Util::NetworkMap - Network mapping and IP address management
 This module provides functions for managing a network map, including
 tracking IP addresses, their purposes, and network information.
 
+This utility uses JSON storage for prototyping and can be migrated to a 
+database model in the future. It follows the JSON storage pattern described
+in the network_map_json_storage.md documentation.
+
 =head1 METHODS
 
 =head2 _config
@@ -41,6 +46,17 @@ has '_config' => (
     is => 'rw',
     lazy => 1,
     builder => '_load_config'
+);
+
+# Database connection for future use
+has 'schema' => (
+    is => 'ro',
+    lazy => 1,
+    default => sub {
+        my ($self) = @_;
+        # This will be used when we migrate to database storage
+        return undef;
+    }
 );
 
 =head2 _load_config
@@ -179,7 +195,7 @@ Adds a new device to the map
 =cut
 
 sub add_device {
-    my ($self, $device_name, $ip, $network, $type, $description, $services) = @_;
+    my ($self, $device_name, $ip, $mac, $network, $type, $location, $purpose, $notes, $site_name, $services) = @_;
     
     # Check if network exists
     if ($network && !exists $self->_config->{networks}->{$network}) {
@@ -198,9 +214,13 @@ sub add_device {
     # Add or update the device
     $self->_config->{devices}->{$device_name} = {
         ip => $ip,
+        mac => $mac || '',
         network => $network,
         type => $type,
-        description => $description,
+        location => $location || '',
+        purpose => $purpose || '',
+        notes => $notes || '',
+        site_name => $site_name || 'Default',
         services => $services || [],
         added_date => scalar(localtime)
     };
@@ -414,6 +434,158 @@ sub format_network_map_text {
     }
     
     return $text;
+}
+
+=head2 get_device_for_db
+
+Converts a device from JSON format to database format
+
+=cut
+
+sub get_device_for_db {
+    my ($self, $device_name) = @_;
+    
+    my $device = $self->get_device($device_name);
+    return unless $device;
+    
+    return {
+        device_name => $device_name,
+        ip_address => $device->{ip},
+        mac_address => $device->{mac},
+        device_type => $device->{type},
+        location => $device->{location},
+        purpose => $device->{purpose},
+        notes => $device->{notes},
+        site_name => $device->{site_name},
+        created_at => $device->{added_date},
+        updated_at => scalar(localtime)
+    };
+}
+
+=head2 get_all_devices_for_db
+
+Returns all devices in database format
+
+=cut
+
+sub get_all_devices_for_db {
+    my ($self) = @_;
+    my @devices = ();
+    
+    foreach my $device_name (keys %{$self->_config->{devices}}) {
+        push @devices, {
+            device_name => $device_name,
+            %{$self->get_device_for_db($device_name)}
+        };
+    }
+    
+    return \@devices;
+}
+
+=head2 import_from_db
+
+Imports devices from the database into JSON storage
+
+=cut
+
+sub import_from_db {
+    my ($self, $schema) = @_;
+    
+    return 0 unless $schema;
+    
+    try {
+        my @db_devices = $schema->resultset('NetworkDevice')->search({});
+        
+        foreach my $db_device (@db_devices) {
+            my $device_name = $db_device->device_name;
+            my $network_id = lc(substr($db_device->site_name, 0, 3)) . '_net';
+            
+            # Add network if it doesn't exist
+            unless (exists $self->_config->{networks}->{$network_id}) {
+                $self->add_network(
+                    $network_id,
+                    $db_device->site_name . ' Network',
+                    '192.168.0.0/24', # Default CIDR
+                    'Network for ' . $db_device->site_name
+                );
+            }
+            
+            # Add the device
+            $self->_config->{devices}->{$device_name} = {
+                ip => $db_device->ip_address,
+                mac => $db_device->mac_address || '',
+                network => $network_id,
+                type => $db_device->device_type || 'Unknown',
+                location => $db_device->location || '',
+                purpose => $db_device->purpose || '',
+                notes => $db_device->notes || '',
+                site_name => $db_device->site_name,
+                services => [],
+                added_date => $db_device->created_at ? $db_device->created_at->strftime('%a %b %d %H:%M:%S %Y') : scalar(localtime)
+            };
+        }
+        
+        return $self->_save_config();
+    } catch {
+        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'import_from_db', "Error importing from database: $_");
+        return 0;
+    };
+}
+
+=head2 export_to_db
+
+Exports devices from JSON storage to the database
+
+=cut
+
+sub export_to_db {
+    my ($self, $schema) = @_;
+    
+    return 0 unless $schema;
+    
+    try {
+        my $devices = $self->get_devices();
+        
+        foreach my $device_name (keys %$devices) {
+            my $device = $devices->{$device_name};
+            
+            # Check if device exists in DB
+            my $db_device = $schema->resultset('NetworkDevice')->find({ device_name => $device_name });
+            
+            if ($db_device) {
+                # Update existing device
+                $db_device->update({
+                    ip_address => $device->{ip},
+                    mac_address => $device->{mac},
+                    device_type => $device->{type},
+                    location => $device->{location},
+                    purpose => $device->{purpose},
+                    notes => $device->{notes},
+                    site_name => $device->{site_name},
+                    updated_at => \'NOW()'
+                });
+            } else {
+                # Create new device
+                $schema->resultset('NetworkDevice')->create({
+                    device_name => $device_name,
+                    ip_address => $device->{ip},
+                    mac_address => $device->{mac},
+                    device_type => $device->{type},
+                    location => $device->{location},
+                    purpose => $device->{purpose},
+                    notes => $device->{notes},
+                    site_name => $device->{site_name},
+                    created_at => \'NOW()',
+                    updated_at => \'NOW()'
+                });
+            }
+        }
+        
+        return 1;
+    } catch {
+        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'export_to_db', "Error exporting to database: $_");
+        return 0;
+    };
 }
 
 # Make the class immutable for better performance
