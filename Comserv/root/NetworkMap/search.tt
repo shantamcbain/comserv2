@@ -1,0 +1,216 @@
+[% META title = 'Search Network Map' %]
+[% PageVersion = 'NetworkMap/search.tt,v 0.01 2025/04/20 shanta Exp shanta ' %]
+
+[% IF c.session.debug_mode == 1 %]
+ <br>[% PageVersion %]</br>
+ [% IF debug_msg.size %]
+   <div class="debug-message">
+     <ul>
+     [% FOREACH msg IN debug_msg %]
+       <li>[% msg %]</li>
+     [% END %]
+     </ul>
+   </div>
+ [% END %]
+[% END %]
+
+<div class="network-map-container">
+    <h1>Search Results</h1>
+    
+    <div class="network-map-actions">
+        <div class="action-buttons">
+            <a href="[% c.uri_for('/NetworkMap') %]" class="btn btn-secondary">Back to Network Map</a>
+        </div>
+        
+        <div class="search-form">
+            <form action="[% c.uri_for('/NetworkMap/search') %]" method="get">
+                <div class="input-group">
+                    <input type="text" name="q" class="form-control" placeholder="Search devices..." value="[% query | html %]">
+                    <div class="input-group-append">
+                        <button type="submit" class="btn btn-primary">Search</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    [% IF query %]
+        <div class="search-results">
+            <h2>Search Results for: "[% query | html %]"</h2>
+            
+            [% IF results.keys.size %]
+                <p>Found [% results.keys.size %] matching devices.</p>
+                
+                <table class="device-table">
+                    <tr>
+                        <th>Name</th>
+                        <th>IP Address</th>
+                        <th>Network</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                        <th>Actions</th>
+                    </tr>
+                    
+                    [% FOREACH device_name IN results.keys.sort %]
+                        [% device = results.$device_name %]
+                        [% network_name = networks.$device.network.name || 'Unknown' %]
+                        <tr>
+                            <td>[% device_name | html %]</td>
+                            <td>[% device.ip | html %]</td>
+                            <td>[% network_name | html %]</td>
+                            <td>[% device.type | html %]</td>
+                            <td>[% device.description | truncate(50) | html %]</td>
+                            <td>
+                                <a href="[% c.uri_for('/NetworkMap/view_device', device_name) %]" class="btn btn-sm btn-info">View</a>
+                                <a href="[% c.uri_for('/NetworkMap/remove_device', device_name) %]" class="btn btn-sm btn-danger">Remove</a>
+                            </td>
+                        </tr>
+                    [% END %]
+                </table>
+            [% ELSE %]
+                <div class="no-results">
+                    <p>No devices found matching your search criteria.</p>
+                    <p>Try using different keywords or check your spelling.</p>
+                </div>
+            [% END %]
+        </div>
+    [% ELSE %]
+        <div class="search-instructions">
+            <h2>Search Instructions</h2>
+            <p>Enter a search term to find devices by:</p>
+            <ul>
+                <li>Device name</li>
+                <li>IP address</li>
+                <li>Description</li>
+            </ul>
+            <p>Examples: "server", "192.168", "firewall"</p>
+        </div>
+    [% END %]
+</div>
+
+<style>
+    .network-map-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .network-map-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+    
+    .action-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 10px;
+    }
+    
+    .search-form {
+        min-width: 300px;
+        margin-bottom: 10px;
+    }
+    
+    .btn {
+        display: inline-block;
+        padding: 8px 16px;
+        text-decoration: none;
+        border-radius: 4px;
+        font-weight: 500;
+    }
+    
+    .btn-sm {
+        padding: 4px 8px;
+        font-size: 14px;
+    }
+    
+    .btn-primary {
+        background-color: #007bff;
+        color: white;
+    }
+    
+    .btn-secondary {
+        background-color: #6c757d;
+        color: white;
+    }
+    
+    .btn-info {
+        background-color: #17a2b8;
+        color: white;
+    }
+    
+    .btn-danger {
+        background-color: #dc3545;
+        color: white;
+    }
+    
+    .search-results h2, .search-instructions h2 {
+        margin-top: 0;
+        margin-bottom: 15px;
+        color: #343a40;
+        font-size: 1.5rem;
+        border-bottom: 1px solid #dee2e6;
+        padding-bottom: 10px;
+    }
+    
+    .device-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+    }
+    
+    .device-table th {
+        background-color: #f8f9fa;
+        text-align: left;
+        padding: 10px;
+        border-bottom: 2px solid #dee2e6;
+    }
+    
+    .device-table td {
+        padding: 10px;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .device-table tr:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .no-results, .search-instructions {
+        background-color: #f8f9fa;
+        padding: 20px;
+        border-radius: 5px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-top: 20px;
+    }
+    
+    .no-results p, .search-instructions p {
+        margin-top: 0;
+    }
+    
+    .input-group {
+        display: flex;
+    }
+    
+    .form-control {
+        flex: 1;
+        padding: 8px;
+        border: 1px solid #ced4da;
+        border-radius: 4px 0 0 4px;
+    }
+    
+    .input-group-append .btn {
+        border-radius: 0 4px 4px 0;
+    }
+    
+    .debug-message {
+        background-color: #f8d7da;
+        color: #721c24;
+        padding: 10px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+    }
+</style>
