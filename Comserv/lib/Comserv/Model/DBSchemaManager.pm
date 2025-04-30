@@ -14,6 +14,7 @@ use Try::Tiny;
 use Log::Log4perl qw(:easy);
 use Comserv::Model::DBEncy;
 use Data::Dumper;
+use Catalyst::Utils;  # For path_to
 
 # Define an attribute 'logging' using Moose
 has 'logging' => (
@@ -21,19 +22,36 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance }
 );
 
-print Dumper(\@INC);
-
 # Initialize logger
 Log::Log4perl->easy_init($DEBUG);
 
 # Load the database configuration from db_config.json
+my $config_file;
 my $json_text;
-{
+
+# Try to load the config file using Catalyst::Utils if the application is initialized
+eval {
+    $config_file = Catalyst::Utils::path_to('db_config.json');
+};
+
+# Fallback to FindBin if Catalyst::Utils fails (during application initialization)
+if ($@ || !defined $config_file) {
+    $config_file = "$FindBin::Bin/../db_config.json";
+    warn "Using FindBin fallback for config file: $config_file";
+}
+
+# Load the configuration file
+eval {
     local $/;    # Enable 'slurp' mode
-    open my $fh, "<", "$FindBin::Bin/../db_config.json" or die "Could not open db_config.json: $!";
+    open my $fh, "<", $config_file or die "Could not open $config_file: $!";
     $json_text = <$fh>;
     close $fh;
+};
+
+if ($@) {
+    die "Error loading config file $config_file: $@";
 }
+
 my $config = decode_json($json_text);
 
 # List tables in the appropriate database
@@ -120,10 +138,33 @@ sub initialize_schema {
 # Helper to get appropriate schema file
 sub get_schema_file {
     my ($self, $database_type) = @_;
-
-    return $FindBin::Bin . "/../sql/schema_mysql.sql" if $database_type eq 'mysql';
-    return $FindBin::Bin . "/../sql/schema_sqlite.sql" if $database_type eq 'SQLite';
-    die "Unsupported database type: $database_type";
+    
+    my $schema_file;
+    
+    # Try to use Catalyst::Utils first
+    eval {
+        if ($database_type eq 'mysql') {
+            $schema_file = Catalyst::Utils::path_to('sql', 'schema_mysql.sql');
+        } elsif ($database_type eq 'SQLite') {
+            $schema_file = Catalyst::Utils::path_to('sql', 'schema_sqlite.sql');
+        } else {
+            die "Unsupported database type: $database_type";
+        }
+    };
+    
+    # Fallback to FindBin if Catalyst::Utils fails
+    if ($@ || !defined $schema_file) {
+        if ($database_type eq 'mysql') {
+            $schema_file = $FindBin::Bin . "/../sql/schema_mysql.sql";
+        } elsif ($database_type eq 'SQLite') {
+            $schema_file = $FindBin::Bin . "/../sql/schema_sqlite.sql";
+        } else {
+            die "Unsupported database type: $database_type";
+        }
+        warn "Using FindBin fallback for schema file: $schema_file";
+    }
+    
+    return $schema_file;
 }
 
 # Other methods remain unchanged...

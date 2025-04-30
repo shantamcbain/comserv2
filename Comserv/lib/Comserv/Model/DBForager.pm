@@ -1,22 +1,40 @@
 package Comserv::Model::DBForager;
 
 use strict;
-
-use JSON;  # Add this line-*`
+use JSON;
 use base 'Catalyst::Model::DBIC::Schema';
-
-use FindBin;
-use File::Spec;
+use Catalyst::Utils;  # For path_to
+use Data::Dumper;
 
 # Load the database configuration from db_config.json
-my $config_file = File::Spec->catfile($FindBin::Bin, '..', 'db_config.json');
+my $config_file;
 my $json_text;
-{
+
+# Try to load the config file using Catalyst::Utils if the application is initialized
+eval {
+    $config_file = Catalyst::Utils::path_to('db_config.json');
+};
+
+# Fallback to FindBin if Catalyst::Utils fails (during application initialization)
+if ($@ || !defined $config_file) {
+    use FindBin;
+    use File::Spec;
+    $config_file = File::Spec->catfile($FindBin::Bin, '..', 'db_config.json');
+    warn "Using FindBin fallback for config file: $config_file";
+}
+
+# Load the configuration file
+eval {
     local $/; # Enable 'slurp' mode
     open my $fh, "<", $config_file or die "Could not open $config_file: $!";
     $json_text = <$fh>;
     close $fh;
+};
+
+if ($@) {
+    die "Error loading config file $config_file: $@";
 }
+
 my $config = decode_json($json_text);
 
 # Print the configuration for debugging

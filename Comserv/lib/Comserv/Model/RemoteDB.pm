@@ -10,6 +10,7 @@ use Try::Tiny;
 use Data::Dumper;
 use JSON;
 use Comserv::Util::Logging;
+use Catalyst::Utils;  # For path_to
 
 extends 'Catalyst::Model';
 
@@ -34,7 +35,19 @@ sub BUILD {
     # Load the database configuration
     my $config;
     try {
-        my $config_file = File::Spec->catfile($FindBin::Bin, '..', 'db_config.json');
+        my $config_file;
+        
+        # Try to load the config file using Catalyst::Utils if the application is initialized
+        eval {
+            $config_file = Catalyst::Utils::path_to('db_config.json');
+        };
+        
+        # Fallback to FindBin if Catalyst::Utils fails (during application initialization)
+        if ($@ || !defined $config_file) {
+            $config_file = File::Spec->catfile($FindBin::Bin, '..', 'db_config.json');
+            warn "Using FindBin fallback for config file: $config_file";
+        }
+        
         local $/;
         open my $fh, "<", $config_file or die "Could not open $config_file: $!";
         my $json_text = <$fh>;
