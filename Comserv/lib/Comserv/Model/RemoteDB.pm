@@ -44,7 +44,33 @@ sub BUILD {
         
         # Fallback to FindBin if Catalyst::Utils fails (during application initialization)
         if ($@ || !defined $config_file) {
-            $config_file = File::Spec->catfile($FindBin::Bin, '..', 'db_config.json');
+            use File::Basename;
+            
+            # Get the application root directory (one level up from script or lib)
+            my $bin_dir = $FindBin::Bin;
+            my $app_root;
+            
+            # If we're in a script directory, go up one level to find app root
+            if ($bin_dir =~ /\/script$/) {
+                $app_root = dirname($bin_dir);
+            }
+            # If we're somewhere else, try to find the app root
+            else {
+                # Check if we're already in the app root
+                if (-f "$bin_dir/db_config.json") {
+                    $app_root = $bin_dir;
+                }
+                # Otherwise, try one level up
+                elsif (-f dirname($bin_dir) . "/db_config.json") {
+                    $app_root = dirname($bin_dir);
+                }
+                # If all else fails, assume we're in lib and need to go up one level
+                else {
+                    $app_root = dirname($bin_dir);
+                }
+            }
+            
+            $config_file = "$app_root/db_config.json";
             warn "Using FindBin fallback for config file: $config_file";
         }
         
