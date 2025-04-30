@@ -105,7 +105,7 @@
         <div class="map-section">
             <h2 class="section-title"><i class="icon-network"></i> Network Management</h2>
             <div class="map-links">
-                <a href="/admin/NetworkMap" class="map-link"><i class="icon-network"></i> Network Devices</a>
+                <a href="/admin/network_devices" class="map-link"><i class="icon-network"></i> Network Devices</a>
                 <a href="/NetworkMap/by_service" class="map-link"><i class="icon-service"></i> View by Service</a>
                 <a href="/NetworkMap/by_network" class="map-link"><i class="icon-network"></i> View by Network</a>
                 <a href="/NetworkMap/by_type" class="map-link"><i class="icon-type"></i> View by Type</a>

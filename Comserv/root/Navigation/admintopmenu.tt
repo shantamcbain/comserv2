@@ -212,7 +212,7 @@
                 <!-- Network Management -->
                 <div class="submenu-section">
                     <span class="submenu-section-title">Network Management</span>
-                    <a href="/admin/NetworkMap"><i class="icon-network"></i>Network Devices</a>
+                    <a href="/admin/network_devices"><i class="icon-network"></i>Network Devices</a>
                 </div>
             </div>
         </div>

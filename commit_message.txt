@@ -1,17 +1,12 @@
-[Documentation] Add comprehensive AI development guidelines and JSON storage pattern documentation
+[Cleanup] Remove unnecessary files from application root
 
-- Created AI_DEVELOPMENT_GUIDELINES.md with detailed instructions for AI assistants
-- Updated AI_Guidelines.md to reference the new development guidelines
-- Added documentation about the JSON to MySQL transition pattern
-- Created network_map_json_storage.md to document the NetworkMap JSON storage approach
+- Removed all "Formatting title from:" files that were incorrectly created
+- Removed all "Added ... to ... category" files that were incorrectly created
+- Cleaned up empty directory entries that were created without permission
+- No functional changes to the application code
 
-These documentation updates ensure that AI assistants will:
-1. Follow existing code patterns and directory structures
-2. Reuse existing components rather than creating duplicates
-3. Understand the JSON storage pattern used for prototyping
-4. Maintain consistency with the established codebase
+These files were created by an AI assistant without proper permission and
+were cluttering the application root directory. This cleanup improves the
+repository organization and makes it easier to navigate the codebase.
 
-Related files:
-- Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.md
-- Comserv/root/Documentation/AI_Guidelines.md
-- Comserv/root/Documentation/developer/network_map_json_storage.md
+This change is ready for deployment to the production server.

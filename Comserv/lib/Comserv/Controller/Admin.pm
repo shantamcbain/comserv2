@@ -27,12 +27,16 @@ sub begin : Private {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', 
         "Request path: $path");
 
+    # Special handling for network_devices route is no longer needed
+    # as we now have NetworkDevicesRouter.pm to handle this route
+
     # Check if the user is logged in
     if (!$c->user_exists) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', 
             "User is not logged in, redirecting to login page");
-        # If the user isn't logged in, call the index method
-        $self->index($c);
+        # If the user isn't logged in, redirect to the login page with return_to parameter
+        my $current_path = $c->req->path;
+        $c->response->redirect($c->uri_for('/user/login', { return_to => "/$current_path" }));
         return;
     }
     
@@ -51,17 +55,29 @@ sub begin : Private {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', 
                 "User $username has admin role, proceeding with request");
         } else {
-            # User is not an admin, call the index method
+            # User is not an admin, redirect to the login page with a message
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'begin', 
-                "User $username does not have admin role, redirecting to admin index");
-            $self->index($c);
+                "User $username does not have admin role, redirecting to login page");
+            
+            # Store the error message in flash
+            $c->flash->{error_msg} = "You need administrator privileges to access this page. Please log in with an admin account.";
+            
+            # Redirect to the login page with return_to parameter
+            my $current_path = $c->req->path;
+            $c->response->redirect($c->uri_for('/user/login', { return_to => "/$current_path" }));
             return;
         }
     } else {
-        # Roles is not defined or not an array, call the index method
+        # Roles is not defined or not an array, redirect to login page
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'begin', 
-            "User $username has invalid roles format, redirecting to admin index");
-        $self->index($c);
+            "User $username has invalid roles format, redirecting to login page");
+        
+        # Store the error message in flash
+        $c->flash->{error_msg} = "Your session has invalid role information. Please log in again.";
+        
+        # Redirect to the login page with return_to parameter
+        my $current_path = $c->req->path;
+        $c->response->redirect($c->uri_for('/user/login', { return_to => "/$current_path" }));
         return;
     }
 }
@@ -78,6 +94,18 @@ sub index :Path :Args(0) {
 
     # Forward to the view
     $c->forward($c->view('TT'));
+}
+
+# This method is no longer needed as we now have NetworkDevicesRouter.pm
+# Keeping it here for backward compatibility
+sub network_devices_forward :Path('/admin/network_devices_old') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'network_devices_forward', 
+        "Forwarding to NetworkDevices controller");
+    
+    # Detach to the NetworkDevices controller
+    $c->detach('/admin/network_devices/network_devices');
 }
 
 # This method has been moved to Path('/admin/git_pull')
@@ -2312,6 +2340,23 @@ sub delete_network_device :Path('/admin/delete_network_device') :Args(1) {
     
     # Redirect back to the device list page with the site filter if available
     $c->response->redirect($c->uri_for('/admin/network_devices', { site => $site_name }));
+}
+
+=head2 networkmap_redirect
+
+Handles requests to /admin/networkmap and redirects to the proper capitalized URL.
+This is a fallback to ensure users can access the NetworkMap regardless of URL case.
+
+=cut
+
+sub networkmap_redirect :Path('networkmap') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'networkmap_redirect', 
+        "Redirecting from /admin/networkmap to /admin/NetworkMap");
+    
+    # Redirect to the uppercase version
+    $c->response->redirect($c->uri_for('/admin/NetworkMap'));
 }
 
 __PACKAGE__->meta->make_immutable;

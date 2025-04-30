@@ -12,24 +12,85 @@ sub logging {
     return Comserv::Util::Logging->instance();
 }
 
+# Begin method to check if the user has admin role
+sub begin : Private {
+    my ($self, $c) = @_;
+    
+    # Add detailed logging
+    my $username = $c->user_exists ? $c->user->username : 'Guest';
+    my $path = $c->req->path;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', 
+        "NetworkDevices controller begin method called for user: $username, Path: $path");
+    
+    # Check if the user is logged in
+    if (!$c->user_exists) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', 
+            "User is not logged in, redirecting to login page");
+        # If the user isn't logged in, redirect to the login page with return_to parameter
+        my $current_path = $c->req->path;
+        $c->response->redirect($c->uri_for('/user/login', { return_to => "/$current_path" }));
+        return;
+    }
+    
+    # Fetch the roles from the session
+    my $roles = $c->session->{roles};
+    
+    # Check if roles is defined and is an array reference
+    if (defined $roles && ref $roles eq 'ARRAY') {
+        # Check if the user has the 'admin' role
+        if (grep { $_ eq 'admin' } @$roles) {
+            # User is an admin, proceed with the request
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', 
+                "User $username has admin role, proceeding with request");
+        } else {
+            # User is not an admin, redirect to the login page with a message
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'begin', 
+                "User $username does not have admin role, redirecting to login page");
+            
+            # Store the error message in flash
+            $c->flash->{error_msg} = "You need administrator privileges to access this page. Please log in with an admin account.";
+            
+            # Redirect to the login page with return_to parameter
+            my $current_path = $c->req->path;
+            $c->response->redirect($c->uri_for('/user/login', { return_to => "/$current_path" }));
+            return;
+        }
+    } else {
+        # Roles is not defined or not an array, redirect to login page
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'begin', 
+            "User $username has invalid roles format, redirecting to login page");
+        
+        # Store the error message in flash
+        $c->flash->{error_msg} = "Your session has invalid role information. Please log in again.";
+        
+        # Redirect to the login page with return_to parameter
+        my $current_path = $c->req->path;
+        $c->response->redirect($c->uri_for('/user/login', { return_to => "/$current_path" }));
+        return;
+    }
+}
+
+# Index action to ensure the controller is loaded
+sub index :Path :Auth :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "NetworkDevices controller index method called");
+    $c->forward('network_devices');
+}
+
 =head2 network_devices
 
 Admin interface to manage network devices
 
 =cut
 
-sub network_devices :Path('/admin/network_devices') :Args(0) {
+sub network_devices :Path('/admin/network_devices') :Auth('/admin/network_devices') :Args(0) {
     my ($self, $c) = @_;
 
     # Log the beginning of the network_devices action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'network_devices', "Starting network_devices action");
 
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'network_devices', 'User does not have admin role');
-        $c->response->redirect($c->uri_for('/'));
-        return;
-    }
+    # Admin role check is now handled in the begin method
 
     # Get the selected site filter (if any)
     my $site_filter = $c->req->param('site') || '';
@@ -177,16 +238,11 @@ Admin interface to add a new network device
 
 =cut
 
-sub add_network_device :Path('/admin/add_network_device') :Args(0) {
+sub add_network_device :Path('/admin/add_network_device') :Auth('/admin/add_network_device') :Args(0) {
     my ($self, $c) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_network_device', 'Enter add_network_device method');
 
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'add_network_device', 'User does not have admin role');
-        $c->response->redirect($c->uri_for('/admin/network_devices'));
-        return;
-    }
+    # Admin role check is now handled in the begin method
 
     # Get list of sites for the dropdown
     my @sites = ();
@@ -291,16 +347,11 @@ Admin interface to edit a network device
 
 =cut
 
-sub edit_network_device :Path('/admin/edit_network_device') :Args(1) {
+sub edit_network_device :Path('/admin/edit_network_device') :Auth('/admin/edit_network_device') :Args(1) {
     my ($self, $c, $device_id) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_network_device', "Enter edit_network_device method for device ID: $device_id");
 
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'edit_network_device', 'User does not have admin role');
-        $c->response->redirect($c->uri_for('/admin/network_devices'));
-        return;
-    }
+    # Admin role check is now handled in the begin method
 
     # Get list of sites for the dropdown
     my @sites = ();
@@ -424,16 +475,11 @@ Admin interface to delete a network device
 
 =cut
 
-sub delete_network_device :Path('/admin/delete_network_device') :Args(1) {
+sub delete_network_device :Path('/admin/delete_network_device') :Auth('/admin/delete_network_device') :Args(1) {
     my ($self, $c, $device_id) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete_network_device', "Enter delete_network_device method for device ID: $device_id");
 
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'delete_network_device', 'User does not have admin role');
-        $c->response->redirect($c->uri_for('/admin/network_devices'));
-        return;
-    }
+    # Admin role check is now handled in the begin method
 
     # Try to find the device
     my $device;
