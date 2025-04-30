@@ -1,0 +1,320 @@
+[% PageVersion = 'admin_map.tt,v 0.1 2025/10/15 shanta Exp shanta ' %]
+[% META title = 'Administrative Map' %]
+
+[% IF debug == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="admin-map-container">
+    <h1>Administrative System Map</h1>
+    <p class="map-description">This map provides access to all administrative functions in the system.</p>
+
+    <div class="admin-map">
+        <!-- User Management Section -->
+        <div class="map-section">
+            <h2 class="section-title"><i class="icon-user"></i> User Management</h2>
+            <div class="map-links">
+                <a href="/user/list_users" class="map-link"><i class="icon-user-list"></i> List All Users</a>
+                <a href="/admin/users" class="map-link"><i class="icon-user-admin"></i> User Administration</a>
+                <a href="/user/add_user" class="map-link"><i class="icon-add"></i> Add New User</a>
+                <a href="/user/roles" class="map-link"><i class="icon-roles"></i> User Roles</a>
+                <a href="/user/permissions" class="map-link"><i class="icon-permissions"></i> User Permissions</a>
+                <a href="/user/profile" class="map-link"><i class="icon-profile"></i> User Profiles</a>
+                <a href="/user/settings" class="map-link"><i class="icon-settings"></i> User Settings</a>
+                <a href="/user/activity" class="map-link"><i class="icon-activity"></i> User Activity</a>
+            </div>
+        </div>
+
+        <!-- System Setup Section -->
+        <div class="map-section">
+            <h2 class="section-title"><i class="icon-setup"></i> System Setup</h2>
+            <div class="map-links">
+                <a href="/site" class="map-link"><i class="icon-domain"></i> Site Setup</a>
+                <a href="/site/add_site_form" class="map-link"><i class="icon-add"></i> Add Site</a>
+                <a href="/site/list_domains" class="map-link"><i class="icon-domain"></i> All Sites</a>
+                <a href="/css_form" class="map-link"><i class="icon-css"></i> CSS Settings</a>
+                <a href="/display_schema" class="map-link"><i class="icon-schema"></i> Database Schema</a>
+                <a href="/mail/add_mail_config_form" class="map-link"><i class="icon-mail-config"></i> Mail Configuration</a>
+                <a href="/admin/theme" class="map-link"><i class="icon-theme"></i> Theme Management</a>
+            </div>
+        </div>
+
+        <!-- Project Management Section -->
+        <div class="map-section">
+            <h2 class="section-title"><i class="icon-file"></i> Project Management</h2>
+            <div class="map-links">
+                <a href="/project" class="map-link"><i class="icon-list"></i> View All Projects</a>
+                <a href="/project/addproject" class="map-link"><i class="icon-add"></i> Add New Project</a>
+                <a href="/project/reports" class="map-link"><i class="icon-report"></i> Project Reports</a>
+                <a href="/project/categories" class="map-link"><i class="icon-category"></i> Project Categories</a>
+            </div>
+        </div>
+
+        <!-- Documentation Section -->
+        <div class="map-section">
+            <h2 class="section-title"><i class="icon-documentation"></i> Documentation</h2>
+            <div class="map-links">
+                <a href="/documentation" class="map-link"><i class="icon-list"></i> All Documentation</a>
+                <a href="/documentation?category=user_guides" class="map-link"><i class="icon-user-guide"></i> User Guides</a>
+                <a href="/documentation?category=admin_guides" class="map-link"><i class="icon-admin-guide"></i> Admin Guides</a>
+                <a href="/documentation?category=tutorials" class="map-link"><i class="icon-tutorial"></i> Tutorials</a>
+                <a href="/documentation?category=changelog" class="map-link"><i class="icon-changelog"></i> Changelog</a>
+                <a href="/documentation/linux_commands" class="map-link"><i class="icon-terminal"></i> Linux Commands</a>
+                <a href="/admin/edit_documentation" class="map-link"><i class="icon-edit"></i> Edit Documentation</a>
+            </div>
+        </div>
+
+        <!-- ToDo System Section -->
+        <div class="map-section">
+            <h2 class="section-title"><i class="icon-todo"></i> ToDo System</h2>
+            <div class="map-links">
+                <a href="/todo" class="map-link"><i class="icon-todo"></i> All Todos</a>
+                <a href="/todo/addtodo" class="map-link"><i class="icon-add"></i> Add New Todo</a>
+                <a href="/todo?filter=day" class="map-link"><i class="icon-day"></i> Today's Todos</a>
+                <a href="/todo?filter=week" class="map-link"><i class="icon-week"></i> This Week's Todos</a>
+                <a href="/todo?filter=month" class="map-link"><i class="icon-month"></i> This Month's Todos</a>
+                <a href="/todo/day" class="map-link"><i class="icon-day"></i> Day View</a>
+                <a href="/todo/week" class="map-link"><i class="icon-week"></i> Week View</a>
+                <a href="/todo/month" class="map-link"><i class="icon-month"></i> Month View</a>
+                <a href="/todo/display_tables" class="map-link"><i class="icon-tables"></i> ToDo Tables</a>
+            </div>
+        </div>
+
+        <!-- File Management Section -->
+        <div class="map-section">
+            <h2 class="section-title"><i class="icon-file"></i> File Management</h2>
+            <div class="map-links">
+                <a href="/file" class="map-link"><i class="icon-file"></i> File Dashboard</a>
+                <a href="/file/upload_file" class="map-link"><i class="icon-upload"></i> Upload a File</a>
+                <a href="/file/files" class="map-link"><i class="icon-file"></i> Files in Database</a>
+                <a href="/file/search_and_insert" class="map-link"><i class="icon-search"></i> Search Files</a>
+            </div>
+        </div>
+
+        <!-- Logging Section -->
+        <div class="map-section">
+            <h2 class="section-title"><i class="icon-log"></i> Logging</h2>
+            <div class="map-links">
+                <a href="/log" class="map-link"><i class="icon-log"></i> Logging System</a>
+                <a href="/admin/view_log" class="map-link"><i class="icon-view"></i> View Application Log</a>
+                <a href="/admin/git_pull" class="map-link"><i class="icon-git"></i> Pull from Git Repository</a>
+            </div>
+        </div>
+
+        <!-- Network Management Section -->
+        <div class="map-section">
+            <h2 class="section-title"><i class="icon-network"></i> Network Management</h2>
+            <div class="map-links">
+                <a href="/admin/NetworkMap" class="map-link"><i class="icon-network"></i> Network Devices</a>
+                <a href="/NetworkMap/by_service" class="map-link"><i class="icon-service"></i> View by Service</a>
+                <a href="/NetworkMap/by_network" class="map-link"><i class="icon-network"></i> View by Network</a>
+                <a href="/NetworkMap/by_type" class="map-link"><i class="icon-type"></i> View by Type</a>
+                <a href="/NetworkMap/add_device" class="map-link"><i class="icon-add"></i> Add Device</a>
+            </div>
+        </div>
+
+        <!-- MCOOP Admin Section -->
+        <div class="map-section">
+            <h2 class="section-title"><i class="icon-mcoop"></i> MCOOP Admin</h2>
+            <div class="map-links">
+                <a href="/mcoop" class="map-link"><i class="icon-home"></i> MCOOP Home</a>
+                <a href="/mcoop/server-room-plan" class="map-link"><i class="icon-server"></i> Server Room Plan</a>
+                <a href="/mcoop/network" class="map-link"><i class="icon-network"></i> Network Infrastructure</a>
+                <a href="/mcoop/services" class="map-link"><i class="icon-service"></i> COOP Services</a>
+                <a href="/mcoop/admin/infrastructure" class="map-link"><i class="icon-infrastructure"></i> Infrastructure Management</a>
+                <a href="/mcoop/admin/reports" class="map-link"><i class="icon-report"></i> COOP Reports</a>
+                <a href="/mcoop/admin/planning" class="map-link"><i class="icon-planning"></i> Strategic Planning</a>
+            </div>
+        </div>
+
+        <!-- System Management Section -->
+        <div class="map-section">
+            <h2 class="section-title"><i class="icon-system"></i> System Management</h2>
+            <div class="map-links">
+                <a href="/admin/edit_admin_notes" class="map-link"><i class="icon-edit"></i> Edit Admin Notes</a>
+                <a href="/admin/git_pull" class="map-link"><i class="icon-git"></i> Pull from Git Repository</a>
+                <a href="/admin/view_log" class="map-link"><i class="icon-log"></i> View Application Log</a>
+                <a href="/admin/theme" class="map-link"><i class="icon-theme"></i> Theme Management</a>
+                <a href="/ProxyManager" class="map-link"><i class="icon-proxy"></i> Proxy Manager</a>
+            </div>
+        </div>
+
+        <!-- Dynamic Admin Links Section -->
+        <div class="map-section">
+            <h2 class="section-title"><i class="icon-link"></i> Admin Links</h2>
+            <div class="map-links">
+                [% FOREACH link = c.stash.dbi.query("SELECT * FROM page_tb WHERE (menu = 'Admin' AND status = 2) AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
+                    <a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=[% link.page_code %]" class="map-link" name="Contact" target="[% link.target %]" title="[% link.view_name %]"><i class="icon-link"></i> [% link.view_name %]</a>
+                [% END %]
+            </div>
+        </div>
+
+        <!-- TTML Links Section -->
+        <div class="map-section">
+            <h2 class="section-title"><i class="icon-link"></i> TTML Links</h2>
+            <div class="map-links">
+                [% FOREACH link = c.stash.dbi.query("SELECT * FROM internal_links_tb WHERE category = 'Admin_links' AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
+                    <a href="[% link.url %]?site=[% SiteName %]&amp;[% session_string %]&amp;[% link.view_name %]" class="map-link" name="Contact" target="[% link.target %]" title="[% link.name %]"><i class="icon-link"></i> [% link.name %]</a>
+                [% END %]
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add CSS for the admin map -->
+<style>
+.admin-map-container {
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: Arial, sans-serif;
+}
+
+.map-description {
+    margin-bottom: 30px;
+    font-size: 16px;
+    color: #555;
+}
+
+.admin-map {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: flex-start;
+}
+
+.map-section {
+    flex: 1 1 300px;
+    max-width: 400px;
+    margin-bottom: 30px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.section-title {
+    background-color: #3a5a78;
+    color: white;
+    margin: 0;
+    padding: 15px;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+}
+
+.section-title i {
+    margin-right: 10px;
+}
+
+.map-links {
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+}
+
+.map-link {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    color: #333;
+    text-decoration: none;
+    border-bottom: 1px solid #eee;
+    transition: background-color 0.2s;
+}
+
+.map-link:hover {
+    background-color: #e9ecef;
+    color: #0056b3;
+}
+
+.map-link i {
+    margin-right: 10px;
+    color: #3a5a78;
+    width: 20px;
+    text-align: center;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .admin-map {
+        flex-direction: column;
+    }
+    
+    .map-section {
+        max-width: 100%;
+    }
+}
+
+/* Ensure dropdowns don't go off-screen */
+.map-links {
+    position: relative;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+/* Ensure content doesn't get hidden behind chat */
+@media (min-width: 992px) {
+    .admin-map-container {
+        margin-right: 320px; /* Adjust based on chat width */
+    }
+}
+
+/* Tooltip for links that might be cut off */
+.map-link {
+    position: relative;
+}
+
+.map-link:hover::after {
+    content: attr(title);
+    position: absolute;
+    left: 0;
+    top: 100%;
+    background: #333;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+    z-index: 1000;
+    white-space: nowrap;
+}
+
+/* Smart positioning for dropdowns */
+.map-link:hover::after {
+    left: auto;
+    right: auto;
+}
+
+/* If near right edge, show tooltip to the left */
+@media (min-width: 768px) {
+    .map-section:nth-child(3n) .map-link:hover::after,
+    .map-section:nth-child(3n-1) .map-link:hover::after {
+        right: 0;
+        left: auto;
+    }
+}
+</style>
+
+<script>
+// JavaScript to handle smart positioning of tooltips
+document.addEventListener('DOMContentLoaded', function() {
+    const mapLinks = document.querySelectorAll('.map-link');
+    
+    mapLinks.forEach(link => {
+        link.addEventListener('mouseenter', function(e) {
+            // Get the link's position
+            const rect = this.getBoundingClientRect();
+            const windowWidth = window.innerWidth;
+            
+            // Get the tooltip (the ::after pseudo-element)
+            const tooltip = window.getComputedStyle(this, '::after');
+            
+            // If the link is near the right edge of the screen
+            if (rect.right + 200 > windowWidth) { // 200px is an estimated tooltip width
+                this.classList.add('tooltip-left');
+            } else {
+                this.classList.remove('tooltip-left');
+            }
+        });
+    });
+});
+</script>

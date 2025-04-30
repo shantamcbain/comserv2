@@ -1,4 +1,5 @@
 /* Navigation styles */
+/* Admin menu specific styles are in admin-menu.css */
 nav {
   background-color: var(--nav-bg);
 }
