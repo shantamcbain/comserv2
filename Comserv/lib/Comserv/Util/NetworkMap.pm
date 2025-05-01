@@ -18,8 +18,49 @@ has 'logging' => (
 # Configuration file path
 has '_config_file' => (
     is => 'ro',
-    default => '/home/shanta/PycharmProjects/comserv2/Comserv/config/network_map.json'
+    lazy => 1,
+    builder => '_build_config_file'
 );
+
+# Build the configuration file path
+sub _build_config_file {
+    my ($self) = @_;
+    
+    # Try to use Catalyst path_to if available
+    eval {
+        require Catalyst::Utils;
+        return Catalyst::Utils::path_to('config/network_map.json');
+    };
+    
+    # Fallback to environment variable
+    if ($@ || !defined $ENV{CATALYST_HOME}) {
+        if ($ENV{COMSERV_CONFIG_PATH}) {
+            require File::Spec;
+            return File::Spec->catfile($ENV{COMSERV_CONFIG_PATH}, 'network_map.json');
+        }
+    }
+    
+    # Fallback to FindBin
+    require FindBin;
+    require File::Spec;
+    
+    # Try multiple possible locations
+    my @possible_paths = (
+        File::Spec->catfile($FindBin::Bin, 'config', 'network_map.json'),
+        File::Spec->catfile($FindBin::Bin, '..', 'config', 'network_map.json'),
+        '/opt/comserv/Comserv/config/network_map.json',
+        '/etc/comserv/network_map.json'
+    );
+    
+    foreach my $path (@possible_paths) {
+        if (-f $path) {
+            return $path;
+        }
+    }
+    
+    # Default fallback
+    return File::Spec->catfile($FindBin::Bin, '..', 'config', 'network_map.json');
+}
 
 =head1 NAME
 
