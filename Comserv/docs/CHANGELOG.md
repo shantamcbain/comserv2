@@ -16,6 +16,11 @@
 - Added proper import for Fcntl constants (O_WRONLY, O_APPEND, O_CREAT)
 - Enhanced debug logging in the `edit_documentation` method
 
+#### Dependency Management
+- Identified issue with `Net::CIDR` module not being automatically installed despite being listed in cpanfile
+- Manual installation was required to resolve "Can't locate Net/CIDR.pm" error
+- **TODO**: Fix cpanfile dependency resolution in a future update
+
 ### Added
 - Added comprehensive documentation for bug fixes
 - Created technical documentation for developers
