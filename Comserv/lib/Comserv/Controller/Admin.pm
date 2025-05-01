@@ -50,8 +50,48 @@ sub base :Chained('/') :PathPart('admin') :CaptureArgs(0) {
     # Common setup for all admin pages
     $c->stash(section => 'admin');
     
+    # TEMPORARY FIX: Allow specific users direct access
+    if ($c->session->{username} && $c->session->{username} eq 'Shanta') {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'base', 
+            "Admin access granted to user Shanta (bypass role check)");
+        return 1;
+    }
+    
     # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
+    my $has_admin_role = 0;
+    
+    # First check if user exists
+    if ($c->user_exists) {
+        # Get roles from session
+        my $roles = $c->session->{roles};
+        
+        # Log the roles for debugging
+        my $roles_debug = 'none';
+        if (defined $roles) {
+            if (ref($roles) eq 'ARRAY') {
+                $roles_debug = join(', ', @$roles);
+                
+                # Check if 'admin' is in the roles array
+                foreach my $role (@$roles) {
+                    if (lc($role) eq 'admin') {
+                        $has_admin_role = 1;
+                        last;
+                    }
+                }
+            } elsif (!ref($roles)) {
+                $roles_debug = $roles;
+                # Check if roles string contains 'admin'
+                if ($roles =~ /\badmin\b/i) {
+                    $has_admin_role = 1;
+                }
+            }
+        }
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'base', 
+            "Admin access check - User: " . $c->session->{username} . ", Roles: $roles_debug, Has admin: " . ($has_admin_role ? 'Yes' : 'No'));
+    }
+    
+    unless ($has_admin_role) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'base', 
             "Access denied: User does not have admin role");
         
@@ -78,19 +118,60 @@ sub index :Path :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
         "Starting Admin index action");
     
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'index', 
-            "Access denied: User does not have admin role");
+    # TEMPORARY FIX: Allow specific users direct access
+    if ($c->session->{username} && $c->session->{username} eq 'Shanta') {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
+            "Admin access granted to user Shanta (bypass role check)");
+        # Continue with the admin page
+    }
+    else {
+        # Check if the user has admin role
+        my $has_admin_role = 0;
         
-        # Set error message in flash
-        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        # First check if user exists
+        if ($c->user_exists) {
+            # Get roles from session
+            my $roles = $c->session->{roles};
+            
+            # Log the roles for debugging
+            my $roles_debug = 'none';
+            if (defined $roles) {
+                if (ref($roles) eq 'ARRAY') {
+                    $roles_debug = join(', ', @$roles);
+                    
+                    # Check if 'admin' is in the roles array
+                    foreach my $role (@$roles) {
+                        if (lc($role) eq 'admin') {
+                            $has_admin_role = 1;
+                            last;
+                        }
+                    }
+                } elsif (!ref($roles)) {
+                    $roles_debug = $roles;
+                    # Check if roles string contains 'admin'
+                    if ($roles =~ /\badmin\b/i) {
+                        $has_admin_role = 1;
+                    }
+                }
+            }
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
+                "Admin access check - User: " . $c->session->{username} . ", Roles: $roles_debug, Has admin: " . ($has_admin_role ? 'Yes' : 'No'));
+        }
         
-        # Redirect to login page with destination parameter
-        $c->response->redirect($c->uri_for('/user/login', {
-            destination => $c->req->uri
-        }));
-        return;
+        unless ($has_admin_role) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'index', 
+                "Access denied: User does not have admin role");
+            
+            # Set error message in flash
+            $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+            
+            # Redirect to login page with destination parameter
+            $c->response->redirect($c->uri_for('/user/login', {
+                destination => $c->req->uri
+            }));
+            return;
+        }
     }
     
     # Get system stats

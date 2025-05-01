@@ -74,6 +74,10 @@ sub do_login :Local {
 
     # Start login process
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login', 'Login process initiated.');
+    
+    # Add debug information about the request
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login', 
+        "Request URI: " . $c->req->uri . ", Method: " . $c->req->method);
 
     # Check if the user is already logged in
     if ($c->session->{username}) {
@@ -204,8 +208,42 @@ sub do_login :Local {
         $roles = ['user'];
     }
 
+    # Log the roles before assigning to session
+    my $roles_debug = ref($roles) eq 'ARRAY' ? join(', ', @$roles) : $roles;
+    $self->logging->log_with_details(
+        $c, 'info', __FILE__, __LINE__, 'do_login',
+        "Setting roles in session: $roles_debug"
+    );
+    
+    # Ensure admin role is included if the user should have it
+    if (ref($roles) eq 'ARRAY') {
+        my $has_admin = 0;
+        foreach my $role (@$roles) {
+            if (lc($role) eq 'admin') {
+                $has_admin = 1;
+                last;
+            }
+        }
+        
+        # Check if this user should have admin role based on username
+        if ($username eq 'Shanta' && !$has_admin) {
+            $self->logging->log_with_details(
+                $c, 'info', __FILE__, __LINE__, 'do_login',
+                "Adding admin role for user: $username"
+            );
+            push @$roles, 'admin';
+        }
+    }
+    
     # Assign roles to session
     $c->session->{roles} = $roles;
+    
+    # Log the final roles
+    $roles_debug = ref($roles) eq 'ARRAY' ? join(', ', @$roles) : $roles;
+    $self->logging->log_with_details(
+        $c, 'info', __FILE__, __LINE__, 'do_login',
+        "Final roles in session: $roles_debug"
+    );
 
     # Set a success message in the flash
     $c->flash->{success_msg} = "Login successful. Welcome, $username!";
