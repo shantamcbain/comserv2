@@ -17,12 +17,41 @@ eval {
     $config_file = Catalyst::Utils::path_to('db_config.json');
 };
 
+# Check for environment variable configuration path
+if ($@ || !defined $config_file) {
+    if ($ENV{COMSERV_CONFIG_PATH}) {
+        use File::Spec;
+        $config_file = File::Spec->catfile($ENV{COMSERV_CONFIG_PATH}, 'db_config.json');
+        warn "Using environment variable path for config file: $config_file";
+    }
+}
+
 # Fallback to FindBin if Catalyst::Utils fails (during application initialization)
 if ($@ || !defined $config_file) {
     use FindBin;
     use File::Spec;
-    $config_file = File::Spec->catfile($FindBin::Bin, '..', 'db_config.json');
-    warn "Using FindBin fallback for config file: $config_file";
+    
+    # Try multiple possible locations
+    my @possible_paths = (
+        File::Spec->catfile($FindBin::Bin, 'db_config.json'),         # In the same directory as the script
+        File::Spec->catfile($FindBin::Bin, '..', 'db_config.json'),   # One level up from the script
+        '/opt/comserv/db_config.json',                                # In the /opt/comserv directory
+        '/etc/comserv/db_config.json'                                 # In the /etc/comserv directory
+    );
+    
+    foreach my $path (@possible_paths) {
+        if (-f $path) {
+            $config_file = $path;
+            warn "Found config file at: $config_file";
+            last;
+        }
+    }
+    
+    # If still not found, use the default path but warn about it
+    if (!defined $config_file || !-f $config_file) {
+        $config_file = File::Spec->catfile($FindBin::Bin, '..', 'db_config.json');
+        warn "Using FindBin fallback for config file: $config_file (file may not exist)";
+    }
 }
 
 # Load the configuration file
@@ -36,7 +65,7 @@ eval {
 if ($@) {
     my $error_message = "Error loading config file $config_file: $@";
     warn $error_message;
-
+    
     # Provide more helpful error message with instructions
     die "$error_message\n\n" .
         "Please ensure db_config.json exists in one of these locations:\n" .
@@ -46,10 +75,6 @@ if ($@) {
         "4. In /etc/comserv/db_config.json\n\n" .
         "You can create the file by copying the example from DB_CONFIG_README.md\n" .
         "or by setting COMSERV_CONFIG_PATH to point to the directory containing your config file.\n";
- }
-
- my $config = decode_json($json_text);
-
 }
 
 my $config = decode_json($json_text);
