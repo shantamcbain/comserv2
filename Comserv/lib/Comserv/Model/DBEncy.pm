@@ -34,7 +34,22 @@ eval {
 };
 
 if ($@) {
-    die "Error loading config file $config_file: $@";
+    my $error_message = "Error loading config file $config_file: $@";
+    warn $error_message;
+
+    # Provide more helpful error message with instructions
+    die "$error_message\n\n" .
+        "Please ensure db_config.json exists in one of these locations:\n" .
+        "1. In the directory specified by COMSERV_CONFIG_PATH environment variable\n" .
+        "2. In the Comserv application root directory\n" .
+        "3. In /opt/comserv/db_config.json\n" .
+        "4. In /etc/comserv/db_config.json\n\n" .
+        "You can create the file by copying the example from DB_CONFIG_README.md\n" .
+        "or by setting COMSERV_CONFIG_PATH to point to the directory containing your config file.\n";
+ }
+
+ my $config = decode_json($json_text);
+
 }
 
 my $config = decode_json($json_text);
