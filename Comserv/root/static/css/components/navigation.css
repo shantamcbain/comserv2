@@ -73,6 +73,14 @@ nav {
   z-index: 1;
 }
 
+/* Add a class for right-aligned submenus */
+.horizontal-dropdown:last-child .submenu,
+.horizontal-dropdown:nth-last-child(2) .submenu,
+.horizontal-dropdown:nth-last-child(3) .submenu {
+  left: auto;
+  right: 100%;
+}
+
 .submenu a {
   color: var(--text-color);
   padding: var(--spacing-small) var(--spacing-medium);
