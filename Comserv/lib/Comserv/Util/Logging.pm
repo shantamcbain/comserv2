@@ -244,8 +244,34 @@ sub log_error {
 # Log a message to a file (defaults to the global log file)
 sub log_to_file {
     my ($message, $file_path, $level) = @_;
-    $file_path //= $LOG_FILE || File::Spec->catfile($FindBin::Bin, '..', 'logs', 'application.log');
-    $level    //= 'INFO';
+    
+    # CRITICAL FIX: Ensure we always use a proper log file path
+    # If no file_path is provided or it's undefined, use the global log file
+    # This prevents creating files with the message as the filename
+    if (!defined $file_path || $file_path eq '') {
+        # Use the global log file if it's defined, otherwise create a default path
+        $file_path = $LOG_FILE;
+        
+        # If global log file is not defined yet, create a default path
+        if (!defined $file_path) {
+            my $log_dir = $ENV{'COMSERV_LOG_DIR'} 
+                ? $ENV{'COMSERV_LOG_DIR'} 
+                : File::Spec->catdir($FindBin::Bin, '..', 'logs');
+                
+            # Create the log directory if it doesn't exist
+            unless (-d $log_dir) {
+                eval { make_path($log_dir) };
+                if ($@) {
+                    _print_log("[ERROR] Failed to create log directory $log_dir: $@");
+                    return;
+                }
+            }
+            
+            $file_path = File::Spec->catfile($log_dir, 'application.log');
+        }
+    }
+    
+    $level //= 'INFO';
 
     # Check file size before writing to ensure we don't exceed max size
     if (defined $LOG_FILE && $file_path eq $LOG_FILE && -e $file_path) {
@@ -258,8 +284,37 @@ sub log_to_file {
 
     # Declare $file with 'my' to fix the scoping issue
     my $file;
+    
+    # CRITICAL FIX: Check if the file path is a directory
+    if (-d $file_path) {
+        _print_log("ERROR: File path is a directory: $file_path");
+        
+        # Use a default log file instead
+        $file_path = File::Spec->catfile($ENV{'COMSERV_LOG_DIR'} || 
+            File::Spec->catdir($FindBin::Bin, '..', 'logs'), 'application.log');
+    }
+    
+    # CRITICAL FIX: Check if the file path contains invalid characters
+    if ($file_path =~ /[\n\r]/) {
+        _print_log("ERROR: File path contains invalid characters: $file_path");
+        
+        # Use a default log file instead
+        $file_path = File::Spec->catfile($ENV{'COMSERV_LOG_DIR'} || 
+            File::Spec->catdir($FindBin::Bin, '..', 'logs'), 'application.log');
+    }
+    
+    # CRITICAL FIX: Ensure the file path is a valid file path
+    # If it doesn't contain a directory separator, it's probably not a valid file path
+    if ($file_path !~ /[\/\\]/) {
+        _print_log("ERROR: File path does not appear to be a valid path: $file_path");
+        
+        # Use a default log file instead
+        $file_path = File::Spec->catfile($ENV{'COMSERV_LOG_DIR'} || 
+            File::Spec->catdir($FindBin::Bin, '..', 'logs'), 'application.log');
+    }
+    
     unless (open $file, '>>', $file_path) {
-        _print_log("Failed to open file: $file_path\n");
+        _print_log("Failed to open file: $file_path - $!");
         return;
     }
 

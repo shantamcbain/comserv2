@@ -4,6 +4,8 @@ use namespace::autoclean;
 use Comserv::Util::Logging;
 use File::Find;
 use File::Basename;
+use File::Spec;
+use FindBin;
 use Time::Piece;
 use Comserv::Controller::Documentation::ScanMethods qw(_scan_directories _categorize_pages);
 
@@ -877,8 +879,10 @@ sub _has_site_specific_docs {
 sub _format_title {
     my ($self, $page_name) = @_;
 
-    # Log the input for debugging
-    $self->logging->log_to_file("Formatting title from: $page_name", undef, 'DEBUG');
+    # Use the standard logging method without specifying a file path
+    # This ensures logs go to the application log file
+    $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_format_title',
+        "Formatting title from: $page_name");
 
     # Convert underscores and hyphens to spaces
     my $title = $page_name;
@@ -900,8 +904,9 @@ sub _format_title {
     $title =~ s/\bDbi\b/DBI/g;
     $title =~ s/\bEncy\b/ENCY/g;
 
-    # Log the output for debugging
-    $self->logging->log_to_file("Formatted title result: $title", undef, 'DEBUG');
+    # Log the output for debugging using the standard logging method
+    $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_format_title',
+        "Formatted title result: $title");
 
     return $title;
 }

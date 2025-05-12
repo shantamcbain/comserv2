@@ -12,6 +12,7 @@ use MIME::Base64;
 use File::Slurp;
 use File::Basename;
 use File::Path qw(make_path);
+use File::Copy;
 use Digest::SHA qw(sha256_hex);
 
 BEGIN { extends 'Catalyst::Controller'; }
@@ -1174,6 +1175,146 @@ sub network_devices_forward :Path('/admin/network_devices_old') :Args(0) {
 # sub delete_network_device :Path('/admin/delete_network_device') :Args(1) {
 #     # Implementation removed to avoid duplication
 # }
+
+# Git pull functionality
+sub git_pull :Path('/admin/git_pull') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
+        "Starting git_pull action");
+    
+    # Check if the user has admin role
+    unless ($c->user_exists && ($c->check_user_roles('admin') || $c->session->{username} eq 'Shanta')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_pull', 
+            "Access denied: User does not have admin role");
+        
+        # Set error message in flash
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        
+        # Redirect to login page with destination parameter
+        $c->response->redirect($c->uri_for('/user/login', {
+            destination => $c->req->uri
+        }));
+        return;
+    }
+    
+    # Check if this is a POST request (user confirmed the git pull)
+    if ($c->req->method eq 'POST' && $c->req->param('confirm')) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
+            "Git pull confirmed, executing");
+        
+        # Execute the git pull operation
+        my ($success, $output, $warning) = $self->execute_git_pull($c);
+        
+        # Store the results in stash for the template
+        $c->stash(
+            output => $output,
+            success_msg => $success ? "Git pull completed successfully." : undef,
+            error_msg => $success ? undef : "Git pull failed. See output for details.",
+            warning_msg => $warning
+        );
+    }
+    
+    # Use the standard debug message system
+    if ($c->session->{debug_mode}) {
+        push @{$c->stash->{debug_msg}}, "Admin controller git_pull view - Template: admin/git_pull.tt";
+    }
+    
+    # Set the template
+    $c->stash(template => 'admin/git_pull.tt');
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
+        "Completed git_pull action");
+}
+
+# Execute the git pull operation
+sub execute_git_pull {
+    my ($self, $c) = @_;
+    my $output = '';
+    my $warning = undef;
+    my $success = 0;
+    
+    # Path to the theme_mappings.json file
+    my $theme_mappings_path = $c->path_to('root', 'static', 'config', 'theme_mappings.json');
+    my $backup_path = "$theme_mappings_path.bak";
+    
+    # Check if theme_mappings.json exists
+    my $theme_mappings_exists = -e $theme_mappings_path;
+    
+    try {
+        # Backup theme_mappings.json if it exists
+        if ($theme_mappings_exists) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_git_pull', 
+                "Backing up theme_mappings.json");
+            copy($theme_mappings_path, $backup_path) or die "Failed to backup theme_mappings.json: $!";
+            $output .= "Backed up theme_mappings.json to $backup_path\n";
+        }
+        
+        # Check if there are local changes to theme_mappings.json
+        my $has_local_changes = 0;
+        if ($theme_mappings_exists) {
+            my $git_status = `git -C ${\$c->path_to()} status --porcelain root/static/config/theme_mappings.json`;
+            $has_local_changes = $git_status =~ /^\s*[AM]\s+root\/static\/config\/theme_mappings\.json/m;
+            
+            if ($has_local_changes) {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_git_pull', 
+                    "Local changes detected in theme_mappings.json");
+                $output .= "Local changes detected in theme_mappings.json\n";
+                
+                # Stash the changes
+                my $stash_output = `git -C ${\$c->path_to()} stash push -- root/static/config/theme_mappings.json 2>&1`;
+                $output .= "Stashed changes: $stash_output\n";
+            }
+        }
+        
+        # Execute git pull
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_git_pull', 
+            "Executing git pull");
+        my $pull_output = `git -C ${\$c->path_to()} pull 2>&1`;
+        $output .= "Git pull output:\n$pull_output\n";
+        
+        # Check if pull was successful
+        if ($pull_output =~ /Already up to date|Fast-forward|Updating/) {
+            $success = 1;
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_git_pull', 
+                "Git pull failed: $pull_output");
+            return (0, $output, "Git pull failed. See output for details.");
+        }
+        
+        # Apply stashed changes if needed
+        if ($has_local_changes) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_git_pull', 
+                "Applying stashed changes");
+            my $stash_apply_output = `git -C ${\$c->path_to()} stash pop 2>&1`;
+            $output .= "Applied stashed changes:\n$stash_apply_output\n";
+            
+            # Check for conflicts
+            if ($stash_apply_output =~ /CONFLICT|error:/) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'execute_git_pull', 
+                    "Conflicts detected when applying stashed changes");
+                $warning = "Conflicts detected when applying stashed changes. You may need to manually resolve them.";
+                
+                # Restore from backup
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_git_pull', 
+                    "Restoring theme_mappings.json from backup");
+                copy($backup_path, $theme_mappings_path) or die "Failed to restore from backup: $!";
+                $output .= "Restored theme_mappings.json from backup due to conflicts\n";
+            }
+        }
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_git_pull', 
+            "Git pull completed successfully");
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_git_pull', 
+            "Error during git pull: $error");
+        $output .= "Error: $error\n";
+        return (0, $output, undef);
+    };
+    
+    return ($success, $output, $warning);
+}
 
 =head1 AUTHOR
 
