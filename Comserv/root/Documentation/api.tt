@@ -1,0 +1,370 @@
+[% META 
+   title = "API Documentation"
+   description = "Comprehensive API reference for the Comserv system"
+   roles = "normal,editor,admin,developer"
+   category = "developer_guides"
+%]
+
+<div class="doc-page">
+    <h1>Comserv API Documentation</h1>
+    
+    <div class="doc-section">
+        <h2 class="section-toggle expanded">API Overview</h2>
+        <div class="section-content expanded">
+            <p>
+                The Comserv API provides programmatic access to system functionality, allowing developers to:
+            </p>
+            <ul>
+                <li>Retrieve and manipulate data</li>
+                <li>Integrate with external systems</li>
+                <li>Extend platform functionality</li>
+                <li>Automate workflows</li>
+                <li>Build custom interfaces</li>
+            </ul>
+            
+            <div class="note-box">
+                <strong>Note:</strong> API access requires authentication and appropriate permissions. Contact your system administrator for API credentials.
+            </div>
+        </div>
+    </div>
+    
+    <div class="doc-section">
+        <h2 class="section-toggle expanded">Authentication</h2>
+        <div class="section-content expanded">
+            <h3>Obtaining API Credentials</h3>
+            <ol>
+                <li>Navigate to Admin > Developer > API Credentials</li>
+                <li>Click "Generate New API Key"</li>
+                <li>Name your application and select appropriate scopes</li>
+                <li>Store the generated client_id and client_secret securely</li>
+            </ol>
+            
+            <h3>Authentication Methods</h3>
+            <p>The API supports two authentication methods:</p>
+            
+            <h4>OAuth 2.0 (Recommended)</h4>
+            <pre class="code-block">
+POST /api/v1/oauth/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=client_credentials&
+client_id=YOUR_CLIENT_ID&
+client_secret=YOUR_CLIENT_SECRET
+            </pre>
+            
+            <p>Response:</p>
+            <pre class="code-block">
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "scope": "read write"
+}
+            </pre>
+            
+            <p>Use the access token in subsequent requests:</p>
+            <pre class="code-block">
+GET /api/v1/users
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+            </pre>
+            
+            <h4>API Key (Simple)</h4>
+            <p>Include your API key in the request header:</p>
+            <pre class="code-block">
+GET /api/v1/users
+X-API-Key: YOUR_API_KEY
+            </pre>
+        </div>
+    </div>
+    
+    <div class="doc-section">
+        <h2 class="section-toggle expanded">Core Endpoints</h2>
+        <div class="section-content expanded">
+            <h3>Users</h3>
+            
+            <h4>List Users</h4>
+            <pre class="code-block">
+GET /api/v1/users
+            </pre>
+            
+            <p>Query parameters:</p>
+            <ul>
+                <li><code>page</code>: Page number (default: 1)</li>
+                <li><code>limit</code>: Results per page (default: 20, max: 100)</li>
+                <li><code>role</code>: Filter by role (optional)</li>
+                <li><code>status</code>: Filter by status (optional)</li>
+            </ul>
+            
+            <p>Response:</p>
+            <pre class="code-block">
+{
+  "data": [
+    {
+      "id": 1,
+      "username": "johndoe",
+      "email": "john@example.com",
+      "role": "editor",
+      "status": "active",
+      "created_at": "2023-01-15T08:30:00Z",
+      "last_login": "2023-05-20T14:22:10Z"
+    },
+    ...
+  ],
+  "meta": {
+    "current_page": 1,
+    "total_pages": 5,
+    "total_count": 98
+  }
+}
+            </pre>
+            
+            <h4>Get User</h4>
+            <pre class="code-block">
+GET /api/v1/users/{id}
+            </pre>
+            
+            <p>Response:</p>
+            <pre class="code-block">
+{
+  "id": 1,
+  "username": "johndoe",
+  "email": "john@example.com",
+  "role": "editor",
+  "status": "active",
+  "created_at": "2023-01-15T08:30:00Z",
+  "last_login": "2023-05-20T14:22:10Z",
+  "profile": {
+    "first_name": "John",
+    "last_name": "Doe",
+    "phone": "+1234567890",
+    "bio": "System editor and content manager"
+  }
+}
+            </pre>
+            
+            <h4>Create User</h4>
+            <pre class="code-block">
+POST /api/v1/users
+Content-Type: application/json
+
+{
+  "username": "newuser",
+  "email": "newuser@example.com",
+  "password": "securepassword",
+  "role": "normal",
+  "profile": {
+    "first_name": "New",
+    "last_name": "User"
+  }
+}
+            </pre>
+            
+            <p>Response:</p>
+            <pre class="code-block">
+{
+  "id": 99,
+  "username": "newuser",
+  "email": "newuser@example.com",
+  "role": "normal",
+  "status": "active",
+  "created_at": "2023-05-21T10:15:30Z"
+}
+            </pre>
+            
+            <h3>Documents</h3>
+            
+            <h4>List Documents</h4>
+            <pre class="code-block">
+GET /api/v1/documents
+            </pre>
+            
+            <p>Query parameters:</p>
+            <ul>
+                <li><code>page</code>: Page number (default: 1)</li>
+                <li><code>limit</code>: Results per page (default: 20, max: 100)</li>
+                <li><code>category</code>: Filter by category (optional)</li>
+                <li><code>status</code>: Filter by status (optional)</li>
+            </ul>
+            
+            <p>Response:</p>
+            <pre class="code-block">
+{
+  "data": [
+    {
+      "id": 1,
+      "title": "Annual Report 2023",
+      "category": "reports",
+      "status": "published",
+      "created_at": "2023-03-15T08:30:00Z",
+      "updated_at": "2023-03-16T14:22:10Z",
+      "author_id": 5
+    },
+    ...
+  ],
+  "meta": {
+    "current_page": 1,
+    "total_pages": 8,
+    "total_count": 156
+  }
+}
+            </pre>
+        </div>
+    </div>
+    
+    <div class="doc-section">
+        <h2 class="section-toggle expanded">Error Handling</h2>
+        <div class="section-content expanded">
+            <p>The API uses standard HTTP status codes and returns detailed error information:</p>
+            
+            <pre class="code-block">
+{
+  "error": {
+    "code": "invalid_request",
+    "message": "The request is missing a required parameter",
+    "details": "The 'email' field is required"
+  }
+}
+            </pre>
+            
+            <p>Common error codes:</p>
+            <ul>
+                <li><code>invalid_request</code>: Missing or invalid parameters</li>
+                <li><code>authentication_failed</code>: Invalid credentials</li>
+                <li><code>permission_denied</code>: Insufficient permissions</li>
+                <li><code>resource_not_found</code>: Requested resource doesn't exist</li>
+                <li><code>rate_limit_exceeded</code>: Too many requests</li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="doc-section">
+        <h2 class="section-toggle expanded">Rate Limiting</h2>
+        <div class="section-content expanded">
+            <p>API requests are subject to rate limiting:</p>
+            <ul>
+                <li>100 requests per minute for standard API keys</li>
+                <li>300 requests per minute for premium API keys</li>
+            </ul>
+            
+            <p>Rate limit headers are included in all responses:</p>
+            <pre class="code-block">
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 95
+X-RateLimit-Reset: 1621612345
+            </pre>
+        </div>
+    </div>
+    
+    <div class="doc-section">
+        <h2 class="section-toggle expanded">Webhooks</h2>
+        <div class="section-content expanded">
+            <h3>Configuring Webhooks</h3>
+            <ol>
+                <li>Go to Admin > Developer > Webhooks</li>
+                <li>Click "Add Webhook"</li>
+                <li>Enter the destination URL</li>
+                <li>Select events to subscribe to</li>
+                <li>Set a secret key for signature verification</li>
+            </ol>
+            
+            <h3>Event Types</h3>
+            <ul>
+                <li><code>user.created</code>: New user registration</li>
+                <li><code>user.updated</code>: User profile update</li>
+                <li><code>document.created</code>: New document created</li>
+                <li><code>document.updated</code>: Document updated</li>
+                <li><code>document.published</code>: Document published</li>
+            </ul>
+            
+            <h3>Webhook Payload</h3>
+            <pre class="code-block">
+{
+  "event": "document.published",
+  "timestamp": "2023-05-21T15:32:10Z",
+  "data": {
+    "id": 42,
+    "title": "New Policy Document",
+    "category": "policies",
+    "status": "published",
+    "author_id": 5
+  }
+}
+            </pre>
+            
+            <h3>Signature Verification</h3>
+            <p>
+                Each webhook includes an <code>X-Webhook-Signature</code> header containing an HMAC-SHA256 signature. 
+                Verify this signature using your webhook secret to ensure the request is authentic.
+            </p>
+        </div>
+    </div>
+    
+    <div class="doc-section">
+        <h2 class="section-toggle expanded">SDKs and Libraries</h2>
+        <div class="section-content expanded">
+            <p>Official client libraries:</p>
+            <ul>
+                <li><a href="https://github.com/comserv/comserv-js">JavaScript SDK</a></li>
+                <li><a href="https://github.com/comserv/comserv-python">Python SDK</a></li>
+                <li><a href="https://github.com/comserv/comserv-php">PHP SDK</a></li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="doc-section">
+        <h2 class="section-toggle expanded">API Versioning</h2>
+        <div class="section-content expanded">
+            <p>
+                The API uses versioning in the URL path (e.g., <code>/api/v1/</code>). When breaking changes are introduced, 
+                a new version will be released. We maintain backward compatibility for at least 12 months after a new version is released.
+            </p>
+        </div>
+    </div>
+    
+    <div class="doc-section">
+        <h2 class="section-toggle expanded">Related Documentation</h2>
+        <div class="section-content expanded">
+            <ul>
+                <li><a href="[% c.uri_for('/Documentation/proxmox/api') %]">Proxmox API Documentation</a> - Documentation for the Proxmox VE API integration</li>
+                <li><a href="[% c.uri_for('/Documentation/api_reference') %]">Detailed API Reference</a> - Complete reference with all endpoints and parameters</li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="doc-section">
+        <h2 class="section-toggle expanded">Support and Feedback</h2>
+        <div class="section-content expanded">
+            <p>For API support:</p>
+            <ul>
+                <li>Check the developer forums</li>
+                <li>Submit issues on GitHub</li>
+                <li>Contact api-support@comserv.example.com</li>
+            </ul>
+            <p>We welcome feedback and feature requests for the API.</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.section-toggle').forEach(header => {
+            header.addEventListener('click', function() {
+                this.classList.toggle('expanded');
+                const content = this.nextElementSibling;
+                
+                if (content.classList.contains('expanded')) {
+                    content.classList.remove('expanded');
+                    content.style.maxHeight = '0';
+                } else {
+                    content.classList.add('expanded');
+                    content.style.maxHeight = content.scrollHeight + 'px';
+                }
+            });
+        });
+        
+        // Initialize all expanded sections
+        document.querySelectorAll('.section-content.expanded').forEach(content => {
+            content.style.maxHeight = content.scrollHeight + 'px';
+        });
+    });
+</script>

@@ -4,6 +4,13 @@
 
 The Comserv application integrates with Proxmox Virtual Environment (Proxmox VE) to provide VM management capabilities directly from the Comserv interface. This integration allows administrators to view, create, and manage virtual machines hosted on Proxmox servers.
 
+## Command Reference Documentation
+
+For detailed command-line operations in Proxmox VE, refer to these resources:
+
+- [Proxmox Command Reference](../../docs/proxmox_commands.md) - Comprehensive list of CLI commands for managing all aspects of Proxmox VE
+- [Proxmox IP Configuration Guide](../../docs/proxmox_ip_configuration.md) - Detailed guide for configuring IP addresses in Proxmox VE
+
 ## Architecture
 
 The Proxmox integration consists of the following components:

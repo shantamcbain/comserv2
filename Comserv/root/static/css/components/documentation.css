@@ -130,7 +130,7 @@ h1 {
     font-size: 0.9em;
 }
 
-.site-badge, .file-type-badge, .role-badge, .admin-badge {
+.site-badge, .file-type-badge, .role-badge, .admin-badge, .developer-badge {
     display: inline-block;
     padding: 3px 8px;
     border-radius: 3px;
@@ -149,6 +149,11 @@ h1 {
 
 .role-badge, .admin-badge {
     background: #dc3545;
+    color: #fff;
+}
+
+.developer-badge {
+    background: #6610f2;
     color: #fff;
 }
 

@@ -2,14 +2,17 @@
 
 ## Overview
 
-The Network Diagnostics Tool provides administrators with a set of utilities to diagnose and resolve network connectivity issues between servers in the Comserv environment. This tool is particularly useful when troubleshooting connection problems with production servers.
+The Network Diagnostics Tool provides administrators with a comprehensive view of the server environment, including network connectivity, system information, and virtualization details. This tool is designed to help administrators manage servers and VMs in the server room, ensuring new VMs can be created without interfering with existing systems.
 
 ## Features
 
-1. **Ping Test**: Verify basic connectivity to remote hosts
-2. **DNS Lookup**: Check DNS resolution for hostnames
-3. **Hosts File Management**: Add entries to the local hosts file
-4. **System Information**: View local network configuration
+1. **Network Map Integration**: View and manage network devices and networks
+2. **Ping Test**: Verify basic connectivity to remote hosts
+3. **DNS Lookup**: Check DNS resolution for hostnames
+4. **Hosts File Management**: Add entries to the local hosts file with network validation
+5. **Basic System Information**: View local network configuration
+6. **Detailed System Information**: View comprehensive system and network details
+7. **VM & Container Information**: View details about virtual machines, Docker containers, and Kubernetes resources
 
 ## Access
 
@@ -49,6 +52,67 @@ To check if a hostname resolves correctly:
 3. Enter the hostname to check
 4. Review the results in the "ANSWER SECTION"
 
+### Viewing Detailed System Information
+
+To view comprehensive system information:
+
+1. Navigate to `/admin/network_diagnostics`
+2. Click the "Detailed System Info" button in the quick navigation bar
+3. Review the various sections including:
+   - Basic System Information (hostname, kernel, OS)
+   - Resource Usage (disk, memory)
+   - Network Configuration (IP, routing, DNS)
+   - Network Status (connections, hosts file)
+
+### Viewing VM and Container Information
+
+To view information about virtual machines and containers:
+
+1. Navigate to `/admin/network_diagnostics`
+2. Click the "VM & Container Info" button in the quick navigation bar
+3. Review the various sections including:
+   - Network Map Overview (networks and devices)
+   - Virtual Machine Status (KVM/QEMU VMs)
+   - Docker Containers and Images
+   - Kubernetes Nodes, Pods, and Services
+
+### Working with Network Map Data
+
+The Network Diagnostics Tool integrates with the NetworkMap JSON storage:
+
+1. View networks and devices in the Network Map section
+2. When adding hosts file entries, select the appropriate network
+3. The system will warn you if an IP or hostname already exists in the network map
+
+## Implementation Details
+
+### Templates
+
+The Network Diagnostics Tool uses the following templates:
+
+- `admin/network_diagnostics.tt` - Main diagnostics dashboard
+- `admin/network_diagnostics_system_info.tt` - Detailed system information
+- `admin/network_diagnostics_vm_info.tt` - VM and container information
+- `admin/error.tt` - Error display for unauthorized access
+
+### CSS
+
+Styles for the Network Diagnostics Tool are defined in:
+
+- `/static/css/admin.css` - Admin-specific styles including network diagnostics
+
+### Controller
+
+The main controller is `Comserv::Controller::Admin::NetworkDiagnostics` with these key methods:
+
+- `index` - Main dashboard display
+- `ping_host` - Ping a remote host
+- `dig_host` - Perform DNS lookup
+- `add_hosts_entry` - Add entry to hosts file
+- `system_info` - Display detailed system information
+- `vm_info` - Display VM and container information
+- `_load_network_map` - Helper to load network map data from JSON
+
 ## Logging
 
 The Network Diagnostics Tool uses comprehensive logging to track all operations:
@@ -66,6 +130,7 @@ All network diagnostic operations are logged to the application log with appropr
 - Sudo password is required for operations that modify system files
 - Input validation is performed to prevent command injection
 - Passwords are never logged or stored
+- Command execution is done safely to prevent shell injection
 
 ## Related Documentation
 
