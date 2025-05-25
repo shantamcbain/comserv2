@@ -8,11 +8,8 @@
 
 <nav>
     <a href="#schema-prerequisites">Prerequisites</a> |
-
     <a href="#schema-installation">Installation</a>
 </nav>
-
-
 
 <h3 id="schema-prerequisites"><a href="#schema-top">Back to top</a> </h3>
 <p>Before you begin, make sure you have the following:</p>
@@ -23,7 +20,6 @@
 </ul>
 
 <h3 id="schema-installation"><a href="#schema-top">Back to top</a></h3>
-
 
 <h1 id="schemam-top">Database Schema Management Guide</h1>
 

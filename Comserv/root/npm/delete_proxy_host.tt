@@ -1,0 +1,40 @@
+[% META title = 'Delete NPM Proxy Host' %]
+
+<div class="container">
+    <h1>Delete NPM Proxy Host</h1>
+    
+    <div class="mb-4">
+        <a href="[% c.uri_for('/npm/proxy-hosts') %]" class="btn btn-secondary">
+            <i class="fa fa-arrow-left"></i> Back to Proxy Hosts
+        </a>
+    </div>
+    
+    [% IF error_message %]
+    <div class="alert alert-danger">
+        [% error_message %]
+    </div>
+    [% END %]
+    
+    <div class="card">
+        <div class="card-header">
+            <h2>Confirm Deletion</h2>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-warning">
+                <strong>Warning!</strong> You are about to delete the following proxy host:
+                <ul>
+                    <li><strong>ID:</strong> [% proxy_host.id %]</li>
+                    <li><strong>Domain Names:</strong> [% domain_names %]</li>
+                    <li><strong>Forward Target:</strong> [% proxy_host.forward_scheme %]://[% proxy_host.forward_host %]:[% proxy_host.forward_port %]</li>
+                </ul>
+                <p>This action cannot be undone. Are you sure you want to proceed?</p>
+            </div>
+            
+            <form method="post" action="[% c.uri_for('/npm/delete-proxy-host', proxy_host_id) %]">
+                <input type="hidden" name="confirm" value="yes">
+                <button type="submit" class="btn btn-danger">Yes, Delete Proxy Host</button>
+                <a href="[% c.uri_for('/npm/proxy-hosts') %]" class="btn btn-secondary">Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>

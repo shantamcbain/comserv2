@@ -1,0 +1,139 @@
+[% META title = 'Theme Details' %]
+
+<h1>Theme: [% theme.name %]</h1>
+
+[% IF message %]
+<div class="success-message">
+    [% message %]
+</div>
+[% END %]
+
+[% IF error %]
+<div class="error-message">
+    [% error %]
+</div>
+[% END %]
+
+<div class="theme-details">
+    <p><strong>Description:</strong> [% theme.description %]</p>
+    <p><strong>Base Theme:</strong> [% theme.base_theme %]</p>
+    <p><strong>Active:</strong> [% theme.is_active ? 'Yes' : 'No' %]</p>
+</div>
+
+<h2>Sites Using This Theme</h2>
+
+[% IF sites_using_theme.size %]
+<ul>
+    [% FOREACH site_theme IN sites_using_theme %]
+    <li>[% site_theme.site.name %] [% IF site_theme.is_customized %](Customized)[% END %]</li>
+    [% END %]
+</ul>
+[% ELSE %]
+<p>No sites are currently using this theme.</p>
+[% END %]
+
+<h2>Theme Variables</h2>
+
+<div class="theme-preview" style="
+    background-color: [% variables.'background-color' %];
+    color: [% variables.'text-color' %];
+    padding: 20px;
+    border: 1px solid [% variables.'border-color' %];
+    margin-bottom: 20px;
+">
+    <h3 style="color: [% variables.'text-color' %];">Theme Preview</h3>
+    <p>This is a sample text in the theme's colors.</p>
+    <a href="#" style="color: [% variables.'link-color' %];">Sample Link</a>
+    <div style="margin-top: 10px;">
+        <button style="
+            background-color: [% variables.'button-bg' %];
+            color: [% variables.'button-text' %];
+            border: 1px solid [% variables.'button-border' %];
+            padding: 5px 10px;
+        ">Sample Button</button>
+    </div>
+</div>
+
+<form id="theme-variables-form">
+    <input type="hidden" name="theme_id" value="[% theme.id %]">
+    
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Variable</th>
+                <th>Value</th>
+                <th>Preview</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            [% FOREACH var_name IN variables.keys.sort %]
+            <tr>
+                <td>--[% var_name %]</td>
+                <td>
+                    <input type="text" name="[% var_name %]" value="[% variables.$var_name %]" 
+                           id="var-[% var_name %]" [% IF var_name.match('color$') %]data-color="true"[% END %]>
+                </td>
+                <td>
+                    [% IF var_name.match('color$') %]
+                    <div style="width: 30px; height: 30px; background-color: [% variables.$var_name %]; border: 1px solid #ccc;"></div>
+                    [% ELSE %]
+                    <span style="font-family: [% IF var_name.match('font$') %][% variables.$var_name %][% ELSE %]inherit[% END %];">
+                        [% IF var_name.match('size') %]<span style="font-size: [% variables.$var_name %];">Sample</span>[% END %]
+                    </span>
+                    [% END %]
+                </td>
+                <td>
+                    <button type="button" class="update-variable" data-var="[% var_name %]">Update</button>
+                </td>
+            </tr>
+            [% END %]
+        </tbody>
+    </table>
+</form>
+
+<div class="button-group">
+    <a href="[% c.uri_for('/admin/theme/preview', { theme_id = theme.id }) %]" class="button" target="_blank">Full Preview</a>
+    <a href="[% c.uri_for('/admin/theme') %]" class="button">Back to Themes</a>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Add color pickers to color inputs
+    document.querySelectorAll('input[data-color="true"]').forEach(function(input) {
+        input.type = 'color';
+    });
+    
+    // Handle variable updates
+    document.querySelectorAll('.update-variable').forEach(function(button) {
+        button.addEventListener('click', function() {
+            var varName = this.getAttribute('data-var');
+            var varValue = document.getElementById('var-' + varName).value;
+            var themeId = document.querySelector('input[name="theme_id"]').value;
+            
+            // Send AJAX request to update the variable
+            fetch('[% c.uri_for("/admin/theme/update_variable") %]', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'theme_id=' + themeId + '&variable_name=' + varName + '&variable_value=' + encodeURIComponent(varValue)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Variable updated successfully');
+                    // Refresh the page to see the changes
+                    window.location.reload();
+                } else {
+                    alert('Failed to update variable: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while updating the variable');
+            });
+        });
+    });
+});
+</script>

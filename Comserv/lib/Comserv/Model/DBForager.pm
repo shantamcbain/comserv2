@@ -5,25 +5,46 @@ use strict;
 use JSON;  # Add this line-*`
 use base 'Catalyst::Model::DBIC::Schema';
 
+use FindBin;
+use File::Spec;
+
 # Load the database configuration from db_config.json
+my $config_file = File::Spec->catfile($FindBin::Bin, '..', 'db_config.json');
 my $json_text;
 {
     local $/; # Enable 'slurp' mode
-    open my $fh, "<", "db_config.json" or die "Could not open db_config.json: $!";
+    open my $fh, "<", $config_file or die "Could not open $config_file: $!";
     $json_text = <$fh>;
     close $fh;
 }
 my $config = decode_json($json_text);
 
+# Print the configuration for debugging
+print "DBForager Configuration:\n";
+print "Host: $config->{shanta_forager}->{host}\n";
+print "Database: $config->{shanta_forager}->{database}\n";
+print "Username: $config->{shanta_forager}->{username}\n";
+
 # Set the schema_class and connect_info attributes
 __PACKAGE__->config(
     schema_class => 'Comserv::Model::Schema::Forager',
     connect_info => {
-        dsn => "dbi:mysql:dbname=$config->{shanta_forager}->{database};host=$config->{shanta_forager}->{host};port=$config->{shanta_forager}->{port}",
+        dsn => "dbi:$config->{shanta_forager}->{db_type}:dbname=$config->{shanta_forager}->{database};host=$config->{shanta_forager}->{host};port=$config->{shanta_forager}->{port}",
         user => $config->{shanta_forager}->{username},
         password => $config->{shanta_forager}->{password},
+        mysql_enable_utf8 => 1,
+        on_connect_do => ["SET NAMES 'utf8'", "SET CHARACTER SET 'utf8'"],
+        quote_char => '`',
     }
 );
+sub list_tables {
+    my $self = shift;
+
+    # Perform a database-specific query to get the list of tables
+    return $self->schema->storage->dbh->selectcol_arrayref(
+        "SHOW TABLES"  # MySQL-specific; adapt for other databases
+    );
+}
 sub get_herbal_data {
     my ($self) = @_;
     my $dbforager = $self->schema->resultset('Herb')->search(
@@ -33,7 +54,28 @@ sub get_herbal_data {
     return [$dbforager->all]
 
 }
-# In Comserv::Model::DBForager
+# Get herbs with bee forage information
+sub get_bee_forage_plants {
+    my ($self) = @_;
+
+    # Search for herbs that have apis, nectar, or pollen information
+    my $bee_plants = $self->schema->resultset('Herb')->search(
+        {
+            -or => [
+                'apis' => { '!=' => '', '!=' => undef },
+                'nectar' => { '!=' => '', '!=' => undef },
+                'pollen' => { '!=' => '', '!=' => undef }
+            ]
+        },
+        {
+            order_by => 'botanical_name',
+            columns => [qw(record_id botanical_name common_names apis nectar pollen image)]
+        }
+    );
+
+    return [$bee_plants->all];
+}
+
 # In Comserv::Model::DBForager
 sub get_herbs_with_apis {
     my ($self) = @_;

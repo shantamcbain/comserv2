@@ -1,4 +1,4 @@
-[% PageVersion = 'Navigation/TopDropListMember.tt,v 0.01 2024/01/01hanta Exp shanta ' %]
+[% PageVersion = 'Navigation/TopDropListMember.tt,v 0.02 2024/01/17 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [%# PageVersion %]
     [%# "Debugging HostName: " _ HostName %]
@@ -10,28 +10,20 @@
             <div class="dropdown-content">
                 <a href="/membership">Membership Information</a>
                 <a href="/applymembership">Apply for Membership</a>
-   [% FOREACH link = c.stash.dbi.query("SELECT * FROM internal_links_tb
-                                  WHERE  category = 'Member_links'
-                                   AND (sitename =  '$SiteName')
-                                  ORDER BY link_order
-                                  ")%]
-
-
-       <a href="[% link.url %]?site=[% SiteName %]&amp;[% session_string %]&amp;[% link.view_name %]" name="Contact" target="[% link.target %]" title=" [% link.name %] ">[% link.name %]</a>
-
- 	  [% END %]
- [% FOREACH link = c.stash.dbi.query("SELECT * FROM page_tb
-	                                  WHERE  menu = 'member'
-	                                  AND share  = 2
-	                                  AND (sitename =  '$SiteName' )
-	                                  ORDER BY link_order
-	                                  ")%]
-
-	    <a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=[% link.page_code %]" name="Contact" target="[% link.target %]" title=" [% linkview_.name %] ">[% link.view_name %]</a>
-         [% IF c.session.group == 'admin' %]
-        <a href="/edit_link?link_id=[% link.id %]">Edit/Delete</a>
-        [% END %]
-       	 [% END %]
+   [% IF member_links.defined %]
+       [% FOREACH link IN member_links %]
+           <a href="[% link.url %]?site=[% SiteName %]&amp;[% session_string %]&amp;[% link.view_name %]" name="Contact" target="[% link.target %]" title=" [% link.name %] ">[% link.name %]</a>
+       [% END %]
+    [% END %]
+    
+    [% IF member_pages.defined %]
+       [% FOREACH link IN member_pages %]
+           <a href="/page?site=[% SiteName %]&amp;session=[% session_string %]&amp;page=[% link.page_code %]" name="Contact" target="[% link.target %]" title=" [% link.view_name %] ">[% link.view_name %]</a>
+           [% IF c.session.group == 'admin' %]
+               <a href="/edit_link?link_id=[% link.id %]">Edit/Delete</a>
+           [% END %]
+       [% END %]
+    [% END %]
                 <!-- Add more member options -->
                 [% IF c.session.member_links.size %]
                     [% FOREACH link IN c.session.member_links %]
@@ -44,5 +36,7 @@
                 [% IF c.session.group == 'admin' %]
                     <a href="/add_link?menu=member">Add</a>
                 [% END %]
+                <!-- Link to the list of herbs -->
+                <a href="/ENCY/BotanicalNameView">List of Herbs</a>
             </div>
         </li>

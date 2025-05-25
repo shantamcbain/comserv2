@@ -1,0 +1,88 @@
+[% META title = 'Add Remote Database Connection' %]
+
+<div class="container">
+    <h1>Add Remote Database Connection</h1>
+    
+    [% IF error_msg %]
+    <div class="alert alert-danger">
+        [% error_msg %]
+    </div>
+    [% END %]
+    
+    <div class="card">
+        <div class="card-header">
+            <h2>Connection Details</h2>
+        </div>
+        <div class="card-body">
+            <form method="post" action="[% c.uri_for(c.controller('RemoteDB').action_for('add_connection')) %]">
+                <div class="form-group row mb-3">
+                    <label for="conn_name" class="col-sm-3 col-form-label">Connection Name:</label>
+                    <div class="col-sm-9">
+                        <input type="text" class="form-control" id="conn_name" name="conn_name" 
+                               value="[% form_data.conn_name %]" required>
+                        <small class="form-text text-muted">A unique name to identify this connection</small>
+                    </div>
+                </div>
+                
+                <div class="form-group row mb-3">
+                    <label for="db_type" class="col-sm-3 col-form-label">Database Type:</label>
+                    <div class="col-sm-9">
+                        <select class="form-control" id="db_type" name="db_type" required>
+                            <option value="">Select Database Type</option>
+                            [% FOREACH type IN db_types %]
+                                <option value="[% type %]" [% IF form_data.db_type == type %]selected[% END %]>[% type %]</option>
+                            [% END %]
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group row mb-3">
+                    <label for="host" class="col-sm-3 col-form-label">Host:</label>
+                    <div class="col-sm-9">
+                        <input type="text" class="form-control" id="host" name="host" 
+                               value="[% form_data.host || 'localhost' %]" required>
+                    </div>
+                </div>
+                
+                <div class="form-group row mb-3">
+                    <label for="port" class="col-sm-3 col-form-label">Port:</label>
+                    <div class="col-sm-9">
+                        <input type="number" class="form-control" id="port" name="port" 
+                               value="[% form_data.port || '3306' %]" required>
+                    </div>
+                </div>
+                
+                <div class="form-group row mb-3">
+                    <label for="database" class="col-sm-3 col-form-label">Database Name:</label>
+                    <div class="col-sm-9">
+                        <input type="text" class="form-control" id="database" name="database" 
+                               value="[% form_data.database %]" required>
+                    </div>
+                </div>
+                
+                <div class="form-group row mb-3">
+                    <label for="username" class="col-sm-3 col-form-label">Username:</label>
+                    <div class="col-sm-9">
+                        <input type="text" class="form-control" id="username" name="username" 
+                               value="[% form_data.username %]" required>
+                    </div>
+                </div>
+                
+                <div class="form-group row mb-3">
+                    <label for="password" class="col-sm-3 col-form-label">Password:</label>
+                    <div class="col-sm-9">
+                        <input type="password" class="form-control" id="password" name="password" 
+                               value="[% form_data.password %]" required>
+                    </div>
+                </div>
+                
+                <div class="form-group row">
+                    <div class="col-sm-9 offset-sm-3">
+                        <button type="submit" class="btn btn-primary">Add Connection</button>
+                        <a href="[% c.uri_for(c.controller('RemoteDB').action_for('index')) %]" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

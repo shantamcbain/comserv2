@@ -4,18 +4,6 @@ use namespace::autoclean;
 use Config::JSON;
 use FindBin '$Bin';
 use Catalyst::Runtime 5.80;
-use Catalyst qw/
-    ConfigLoader
-    Static::Simple
-    StackTrace
-    Session
-    Session::Store::File
-    Session::State::Cookie
-    Authentication
-    Authorization::Roles
-    Log::Dispatch
-    Authorization::ACL
-/;
 use Comserv::Util::Logging;
 
 extends 'Catalyst';
@@ -54,7 +42,7 @@ __PACKAGE__->config(
             {
                 class => 'Log::Dispatch::File',
                 min_level => 'debug',
-                filename => 'logs/application.log',
+                filename => '/logs/application.log',
                 mode => 'append',
                 newline => 1,
             },
@@ -66,7 +54,7 @@ __PACKAGE__->config(
 sub setup {
     my $self = shift;
     $self->next::method(@_);
-    $self->log->debug("Template paths: " . join(", ", @{$self->config->{'View::TT'}->{INCLUDE_PATH}}));
+    $logging->log_with_details($self, __FILE__, __LINE__, "Template paths: " . join(", ", @{$self->config->{'View::TT'}->{INCLUDE_PATH}}));
     $logging->log_with_details($self, __FILE__, __LINE__, "Initializing Comserv application");
 }
 
@@ -90,7 +78,7 @@ __PACKAGE__->setup();
 # Call the initialize_db.pl script during application startup
 BEGIN {
     my $script_path = "$FindBin::Bin/../script/initialize_db.pl";
-    #$self->log->debug("Initializing database with script: $script_path");
+    #$logging->log_with_details($self, __FILE__, __LINE__, "Initializing database with script: $script_path");
     unless (-x $script_path) {
         die "Failed to initialize database: $script_path is not executable";
     }
@@ -131,25 +119,5 @@ sub schema_needs_update {
     return $self->{schema_needs_update};
 }
 
-=encoding utf8
-=head1 NAME
-Comserv - Catalyst based application
-
-=head1 SYNOPSIS
-    script/comserv_server.pl
-
-=head1 DESCRIPTION
-[enter your description here]
-
-=head1 SEE ALSO
-L<Comserv::Controller::Root>, L<Catalyst>
-
-=head1 AUTHOR
-Shanta McBain
-
-=head1 LICENSE
-This library is free software. You can redistribute it and/or modify
-it under the same terms as Perl itself.
-=cut
 
 1;

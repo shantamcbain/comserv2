@@ -1,110 +1,25 @@
+/* Theme: apis */
+:root {
+  --accent-color: #FFB900;
+  --background-color: #FFF8E1;
+  --border-color: #FFD54F;
+  --footer-bg: #FFE082;
+  --footer-text-color: #2C2C2C;
+  --header-bg: #FFE082;
+  --link-color: #B88A00;
+  --link-hover-color: #805F00;
+  --nav-bg: #FFE082;
+  --nav-link-color: #2C2C2C;
+  --nav-text: #2C2C2C;
+  --primary-color: #FFF8E1;
+  --secondary-color: #FFE8B8;
+  --success-color: #27ae60;
+  --table-header-bg: #FFE082;
+  --text-color: #2C2C2C;
+  --warning-color: #f39c12;
+}
 
 body {
-  font-family: Verdana, Helvetica, sans-serif;
-  background-image : url("../images/BMaster/honey2.jpg");
-  font-size: 20px;
-  color: black;
-  background-color: #ccffff;
-}
-header {
-    /* Site Greeting */
+  background-image: url('images/BMaster/honey2.jpg');
 }
 
-h1 {
-    /* Site Greeting */
-}
-
-/* Debug Information */
-.debug-content {
-
-}
-/* Main Menu */
-nav {
-    background-color: #ccffff;
-}
-
-.horizontal-menu {
-    display: flex;
-    list-style-type: none;
-    margin: 0;
-    padding: 0;
-}
-
-.horizontal-dropdown {
-    position: relative;
-    display: inline-block;
-}
-
-.dropbtn {
-    display: inline-block;
-    color: black;
-    text-align: center;
-    padding: 14px 16px;
-    text-decoration: none;
-}
-
-.dropdown-content {
-    display: none;
-    position: absolute;
-    background-color: #f9f9f9;
-    min-width: 160px;
-    box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
-    z-index: 1;
-}
-
-.dropdown-content a {
-    color: black;
-    padding: 12px 16px;
-    text-decoration: none;
-    display: block;
-    text-align: left;
-}
-
-.horizontal-dropdown:hover .dropdown-content {
-    display: block;
-}
-
-/* Submenu Styles */
-.submenu-item {
-    position: relative;
-}
-
-.submenu-header {
-    font-weight: bold;
-}
-
-.submenu {
-    display: none;
-    position: absolute;
-    top: 0;
-    left: 100%;
-    min-width: 160px;
-    background-color: #f9f9f9;
-    box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
-    z-index: 1;
-}
-
-.submenu a {
-    color: black;
-    padding: 12px 16px;
-    text-decoration: none;
-    display: block;
-    text-align: left;
-}
-
-.submenu-item:hover .submenu {
-    display: block;
-}
-.calendar-date {
-    border: 1px solid black;
-    padding: 5px;
-    text-align: center;
-    width: 14.28%; /* 100% divided by 7 (number of days in a week) */
-
-}
-.event-box {
-    border: 1px solid black;
-    padding: 5px;
-    margin: 5px 0;
-    text-align: center;
-}

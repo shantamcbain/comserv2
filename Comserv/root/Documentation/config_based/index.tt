@@ -1,0 +1,122 @@
+[% META title = 'Documentation' %]
+
+<div class="documentation-container">
+    <h1><i class="fas fa-book"></i> Documentation</h1>
+    
+    <div class="user-context">
+        <div class="site-info">
+            <span class="label">Site:</span>
+            <span class="value">[% site_name %]</span>
+        </div>
+        <div class="role-info">
+            <span class="label">User Role:</span>
+            <span class="value">[% user_role %]</span>
+        </div>
+        [% IF user_role == 'admin' || user_role == 'developer' || c.session.debug_mode == 1 %]
+        <div class="admin-actions">
+            <a href="[% c.uri_for('/Documentation/ConfigBased/reload') %]" class="refresh-button">
+                <i class="fas fa-sync-alt"></i> Reload Configuration
+            </a>
+            <a href="[% c.uri_for('/Documentation/Config') %]" class="config-button">
+                <i class="fas fa-cogs"></i> Manage Configuration
+            </a>
+            [% IF c.session.debug_mode == 1 %]
+                <a href="[% c.uri_for('/toggle_debug_mode', { value => 0, return_url => c.req.uri }) %]" class="debug-mode-button active">
+                    <i class="fas fa-toggle-on"></i> Debug Mode: ON
+                </a>
+            [% ELSE %]
+                <a href="[% c.uri_for('/toggle_debug_mode', { value => 1, return_url => c.req.uri }) %]" class="debug-mode-button">
+                    <i class="fas fa-toggle-off"></i> Debug Mode: OFF
+                </a>
+            [% END %]
+        </div>
+        [% END %]
+    </div>
+
+    [% IF status_msg %]
+    <div class="status-message success">
+        <i class="fas fa-check-circle"></i> [% status_msg %]
+    </div>
+    [% END %]
+    
+    [% IF c.session.debug_mode == 1 && debug_msg.size > 0 %]
+    <div class="debug-messages">
+        <h3><i class="fas fa-bug"></i> Debug Messages</h3>
+        <ul>
+            [% FOREACH msg IN debug_msg %]
+                <li>[% msg %]</li>
+            [% END %]
+        </ul>
+    </div>
+    [% END %]
+
+    <p class="intro">Welcome to the documentation. Here you'll find information about the system, its features, and how to use them.</p>
+
+    <div class="documentation-grid">
+        <!-- Recent Updates Section -->
+        [% IF completed_items.size > 0 %]
+        <div class="recent-updates-section">
+            <h2 class="section-toggle expanded"><i class="fas fa-history"></i> Recent Updates</h2>
+            <div class="section-content expanded">
+                <ul class="recent-updates">
+                    [% FOREACH item IN completed_items.slice(0, 4) %]
+                        <li>
+                            <span class="update-date">[% item.date_created %]</span>
+                            <span class="update-title">[% item.title %]</span>
+                            <span class="update-description">[% item.description %]</span>
+                        </li>
+                    [% END %]
+                </ul>
+                [% IF completed_items.size > 5 %]
+                    <a href="[% c.uri_for('/Documentation/completed') %]" class="view-all-link">View All Updates</a>
+                [% END %]
+            </div>
+        </div>
+        [% END %]
+        
+        <!-- Loop through categories in display_order -->
+        [% FOREACH category_key IN categories.keys.sort_by(categories.$item.display_order) %]
+            [% SET category = categories.$category_key %]
+            
+            <!-- Skip categories with no pages unless they're predefined -->
+            [% NEXT IF category.pages.size == 0 && category_key != 'user_guides' && category_key != 'admin_guides' && category_key != 'developer_guides' && category_key != 'tutorials' && category_key != 'site_specific' && category_key != 'modules' %]
+            
+            <div class="documentation-section [% IF category_key == 'site_specific' %]site-specific-section[% END %]">
+                <h2 class="section-toggle expanded"><i class="[% category.icon %]"></i> [% category.title %]</h2>
+                <p>[% category.description %]</p>
+                <div class="section-grid expanded">
+                    [% IF category.pages.size > 0 %]
+                        [% FOREACH page_id IN category.pages %]
+                            [% IF structured_pages.$page_id %]
+                                [% page = structured_pages.$page_id %]
+                                <a href="[% page.url %]" class="documentation-card">
+                                    <h3>[% page.title %]</h3>
+                                    <p>[% page.description || 'Documentation for Comserv functionality.' %]</p>
+                                    [% IF page.site != 'all' %]
+                                        <span class="site-badge">[% page.site %]</span>
+                                    [% END %]
+                                </a>
+                            [% END %]
+                        [% END %]
+                    [% ELSE %]
+                        <div class="no-docs">No documentation available in this category.</div>
+                    [% END %]
+                </div>
+            </div>
+        [% END %]
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Toggle sections
+        const toggles = document.querySelectorAll('.section-toggle');
+        toggles.forEach(toggle => {
+            toggle.addEventListener('click', function() {
+                this.classList.toggle('expanded');
+                const content = this.nextElementSibling.nextElementSibling;
+                content.classList.toggle('expanded');
+            });
+        });
+    });
+</script>

@@ -20,8 +20,7 @@
 <h2 id="patch-format">Patch Format</h2>
 <p>When providing code returns, always use the `+-` patch format to prevent overwriting existing functions. This ensures that changes are clear and maintainable.</p>
 
-<h2 id="placeholders">Placeholders in Code Returns</h2>
-<p>Placeholders should never be used in code returns. Always provide complete code snippets without placeholders to ensure clarity and accuracy in code sharing.</p>
+
 
 <h2 id="catalyst-coding-standards">Catalyst Coding Standards</h2>
 <p>Follow these standards when coding in Catalyst:</p>

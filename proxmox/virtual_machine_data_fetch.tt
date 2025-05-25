@@ -1,0 +1,18 @@
+[% BLOCK virtual_machine_data_fetch %]
+function fetchVirtualMachineData(url) {
+    return fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            initializeVirtualMachineTable(data.virtual_machines);
+        })
+        .catch(error => {
+            console.error('Error fetching virtual machine data:', error);
+            // Handle the error, e.g., display a user-friendly message
+        });
+}
+
+function initializeVirtualMachineTable(virtualMachines) {
+    // Code to initialize the virtual machine table with the fetched data
+    console.log('Initializing virtual machine table:', virtualMachines);
+}
+[% END %]

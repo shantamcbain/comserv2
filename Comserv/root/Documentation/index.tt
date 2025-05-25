@@ -1,0 +1,162 @@
+<!-- File: /home/shanta/PycharmProjects/comserv/Comserv/root/Documentation/index.tt -->
+[% PageVersion = 'Documentation/index.tt,v 1.6 2025/04/08 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+<head>
+    <link rel="stylesheet" href="[% c.uri_for('/static/css/components/documentation.css') %]">
+</head>
+[%# Determine user role for display %]
+[% SET display_role = 'Guest' %]
+[% IF c.session.roles %]
+    [% IF c.session.roles.grep('admin').size %]
+        [% SET display_role = 'Administrator' %]
+    [% ELSIF c.session.roles.grep('developer').size %]
+        [% SET display_role = 'Developer' %]
+    [% ELSIF c.session.roles.grep('editor').size %]
+        [% SET display_role = 'Editor' %]
+    [% ELSIF c.session.roles.grep('user').size %]
+        [% SET display_role = 'User' %]
+    [% END %]
+[% END %]
+
+[% IF c.session.debug_mode == 1 %]
+<div class="debug-info">
+    <h3>Debug Information</h3>
+    <p>User Role from Controller: [% user_role %]</p>
+    <p>Display Role from Template: [% display_role %]</p>
+    <p>Session Roles: [% c.session.roles.join(', ') IF c.session.roles %]</p>
+    <p>Debug Message: [% debug_msg %]</p>
+    <p>Categories Available:</p>
+    <ul>
+        <li>user_guides: [% categories.user_guides ? 'Yes' : 'No' %]</li>
+        <li>tutorials: [% categories.tutorials ? 'Yes' : 'No' %]</li>
+        <li>site_specific: [% categories.site_specific ? 'Yes' : 'No' %]</li>
+        <li>admin_guides: [% categories.admin_guides ? 'Yes' : 'No' %]</li>
+        <li>proxmox: [% categories.proxmox ? 'Yes' : 'No' %]</li>
+        <li>controllers: [% categories.controllers ? 'Yes' : 'No' %]</li>
+        <li>models: [% categories.models ? 'Yes' : 'No' %]</li>
+        <li>changelog: [% categories.changelog ? 'Yes' : 'No' %]</li>
+        <li>general: [% categories.general ? 'Yes' : 'No' %]</li>
+    </ul>
+    
+    <h4>Controller Documentation Files:</h4>
+    <ul>
+        [% IF categories.controllers && categories.controllers.pages.size > 0 %]
+            [% FOREACH page_name IN categories.controllers.pages.sort %]
+                <li>[% page_name %] - [% structured_pages.$page_name ? 'Found' : 'Not Found' %]</li>
+            [% END %]
+        [% ELSE %]
+            <li>No controller documentation files found.</li>
+        [% END %]
+    </ul>
+    
+    <h4>Model Documentation Files:</h4>
+    <ul>
+        [% IF categories.models && categories.models.pages.size > 0 %]
+            [% FOREACH page_name IN categories.models.pages.sort %]
+                <li>[% page_name %] - [% structured_pages.$page_name ? 'Found' : 'Not Found' %]</li>
+            [% END %]
+        [% ELSE %]
+            <li>No model documentation files found.</li>
+        [% END %]
+    </ul>
+</div>
+[% END %]
+
+<div class="documentation-container">
+    <header class="doc-header">
+        <h1>Comserv Documentation</h1>
+        <div class="user-context">
+            <span class="context-item"><strong>Site:</strong> [% site_name || 'Comserv' %]</span>
+            <span class="context-item"><strong>Role:</strong> [% display_role %]</span>
+        </div>
+    </header>
+    <p class="intro">Comprehensive guides and resources for the Comserv system, tailored to your role and site.</p>
+
+[%# User-facing sections %]
+[% INCLUDE 'Documentation/user_docs.tt' %]
+[% INCLUDE 'Documentation/tutorials.tt' %]
+[% INCLUDE 'Documentation/site_specific.tt' %]
+
+[%# Admin-only sections %]
+[% # Use the is_admin flag passed from the controller %]
+[% IF is_admin %]
+    [% # Debug output %]
+    [% IF c.session.debug_mode == 1 %]
+        <div class="debug-info">
+            <p>Admin sections visible: user_role=[% user_role %], session roles=[% c.session.roles.join(',') IF c.session.roles %]</p>
+        </div>
+    [% END %]
+    [% INCLUDE 'Documentation/admin_guides.tt' %]
+    [% INCLUDE 'Documentation/proxmox.tt' %]
+    [% INCLUDE 'Documentation/controllers.tt' %]
+    [% INCLUDE 'Documentation/models.tt' %]
+    [% INCLUDE 'Documentation/changelog.tt' %]
+    [% INCLUDE 'Documentation/all_docs.tt' %]
+[% END %]
+
+[%# Admin/Developer/Debug sections %]
+[% IF display_role == 'Administrator' || display_role == 'Developer' || c.session.debug_mode == 1 %]
+    [% INCLUDE 'Documentation/system_info.tt' %]
+[% END %]
+
+[% INCLUDE 'Documentation/recent_updates.tt' %]
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.section-toggle').forEach(header => {
+            header.addEventListener('click', function() {
+                this.classList.toggle('expanded');
+                // Find the next .section-content element within the same section
+                const section = this.closest('.doc-section');
+                const content = section.querySelector('.section-content');
+                
+                if (content.classList.contains('expanded')) {
+                    content.style.maxHeight = '0';
+                    content.classList.remove('expanded');
+                } else {
+                    content.style.maxHeight = content.scrollHeight + 'px';
+                    content.classList.add('expanded');
+                }
+            });
+        });
+        
+        // Initialize all expanded sections
+        document.querySelectorAll('.section-content.expanded').forEach(content => {
+            content.style.maxHeight = content.scrollHeight + 'px';
+        });
+    });
+
+    function showFileType(evt, fileType) {
+        var contents = document.getElementsByClassName('section-content');
+        for (var i = 0; i < contents.length; i++) {
+            contents[i].style.display = 'none';
+            contents[i].classList.remove('active');
+        }
+        var tabs = document.getElementsByClassName('file-type-tab');
+        for (var i = 0; i < tabs.length; i++) {
+            tabs[i].classList.remove('active');
+        }
+        var activeContent = document.getElementById(fileType);
+        activeContent.style.display = 'grid';
+        activeContent.classList.add('active');
+        activeContent.style.maxHeight = activeContent.scrollHeight + 'px';
+        evt.currentTarget.classList.add('active');
+    }
+</script>
+
+<style>
+    /* Your existing CSS unchanged */
+    .documentation-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+        background: #f8f9fa;
+    }
+    
+
+    /* ... rest of your CSS ... */
+</style>

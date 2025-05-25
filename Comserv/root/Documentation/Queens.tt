@@ -3,7 +3,7 @@
     [% PageVersion %]
 [% END %]
 
-<h1 id="top">Queen Management System</h1>
+<h1 id="BMaster_top">Queen Management System</h1>
 
 <p>Our queen management system is designed to manage the lifecycle of the queen bees in our apiary. Here are the key activities and their timelines:</p>
 

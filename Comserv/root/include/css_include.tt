@@ -1,0 +1,17 @@
+<!-- CSS Include Helper -->
+<!-- Include base CSS -->
+<link rel="stylesheet" href="/static/css/base.css">
+
+<!-- Include theme CSS based on site setting -->
+[% SET site_theme = c.model('DBEncy')->resultset('Site')->find({ name => c.session.SiteName }).theme || 'default' %]
+<link rel="stylesheet" href="/static/css/themes/[% site_theme %].css">
+
+<!-- Include site-specific CSS for backward compatibility -->
+<link rel="stylesheet" href="/static/css/[% c.session.SiteName %]style.css">
+
+<!-- Include additional CSS files -->
+[% IF additional_css %]
+  [% FOREACH css_file IN additional_css %]
+    <link rel="stylesheet" href="[% css_file %]">
+  [% END %]
+[% END %]

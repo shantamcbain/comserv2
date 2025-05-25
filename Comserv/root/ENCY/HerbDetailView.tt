@@ -1,30 +1,202 @@
+
+[% IF c.session.roles == 'admin' %]
+    <a href="[% c.uri_for('/ENCY/edit_herb', herb.record_id) %]">Edit Herb</a>
+[% END %]
+[% IF c.session.roles == 'admin' %]
+    <a href="[% c.uri_for('/ENCY/edit_herb', herb.record_id) %]">Edit Herb</a>
+[% END %]
+
 <h1>[% herb.botanical_name %]</h1>
-<p>Common Names: [% herb.common_names %]</p>
-<img src="[% herb.image %]" WIDTH="300" HEIGHT="325" />
-<p>Pollinator Forage [% herb.apis %]
-<p>Nectar [% herb.nectar %]</p>
-<p>Pollen [% herb.pollen %]</p>
-<p>key name [% herb.key_name %] </p>
-<p>Idententifing Character [% herb.ident_character %] </p>
-<p>Stem[% herb.stem %]</p>
-    <p>Leaves[% herb.leaves %] </p>
-<p>Flowers [% herb.flowers %]</p>
-<p>Fruit [% herb.fruit %] </p>
-<p>Taste [% herb.taste %] </p>
-<p>Odour [% herb.odour %] </p>
-<p>Root [% herb.root %] </p>
-<p>Distribution [% herb.distribution %] </p>
-<p>Medical Uses [% herb.medical_uses%] </p>
-<p>Constituents [% herb.constituents %] </p>
-<p>Solvents [% herb.solvents %] </p>
-<p>Dosage [% herb.dosage %]  </p>
-<p>administration [% herb.administration %]  </p>
-<p>Formulas [% herb.formulas %]  </p>
-<p>Contra Indications [% herb.contra_indications %]  </p>
-<p>Chinese [% herb.chinese %]  </p>
-<p>Veterinary [% herb.vetrinary %]  </p>
-<p> [% herb.cultivation %]  </p>
-<p>Harvest [% herb.harvest %] </p>
-<p>Non Med [% herb.non_med %]</p>
-<p>History [% herb.history %] </p>
-<p>Reference [% herb.reference %]</p>
+<table>
+    <tr>
+        <th colspan="2"><h2>Naming</h2></th>
+    </tr>
+    <tr>
+        <td>Botanical Name:</td>
+        <td>[% herb.botanical_name %]</td>
+    </tr>
+    <tr>
+        <td>Common Names:</td>
+        <td>[% herb.common_names %]</td>
+    </tr>
+    <tr>
+        <td>Key Name:</td>
+        <td>[% herb.key_name %]</td>
+    </tr>
+    <tr>
+        <td>Parts Used:</td>
+        <td>[% herb.parts_used %]</td>
+    </tr>
+    <tr>
+        <td>Sister Plants:</td>
+        <td>[% herb.sister_plants %]</td>
+    </tr>
+    <tr>
+        <td>Comments:</td>
+        <td>[% herb.comments %]</td>
+    </tr>
+
+    <tr>
+        <th colspan="2"><h2>Characteristics</h2></th>
+    </tr>
+    <tr>
+        <td>Identifying Character:</td>
+        <td>[% herb.ident_character %]</td>
+    </tr>
+    <tr>
+        <td>Stem:</td>
+        <td>[% herb.stem %]</td>
+    </tr>
+    <tr>
+        <td>Leaves:</td>
+        <td>[% herb.leaves %]</td>
+    </tr>
+    <tr>
+        <td>Flowers:</td>
+        <td>[% herb.flowers %]</td>
+    </tr>
+    <tr>
+        <td>Fruit:</td>
+        <td>[% herb.fruit %]</td>
+    </tr>
+    <tr>
+        <td>Taste:</td>
+        <td>[% herb.taste %]</td>
+    </tr>
+    <tr>
+        <td>Odour:</td>
+        <td>[% herb.odour %]</td>
+    </tr>
+    <tr>
+        <td>Root:</td>
+        <td>[% herb.root %]</td>
+    </tr>
+    <tr>
+        <td>Image URL:</td>
+        <td><img src="[% herb.image %]" width="300" height="325" /></td>
+    </tr>
+
+    <tr>
+        <th colspan="2"><h2>Distribution</h2></th>
+    </tr>
+    <tr>
+        <td>Distribution:</td>
+        <td>[% herb.distribution %]</td>
+    </tr>
+    <tr>
+        <td>Cultivation:</td>
+        <td>[% herb.cultivation %]</td>
+    </tr>
+    <tr>
+        <td>Harvest:</td>
+        <td>[% herb.harvest %]</td>
+    </tr>
+
+    <tr>
+        <th colspan="2"><h2>Medical</h2></th>
+    </tr>
+    <tr>
+        <td>Therapeutic Action:</td>
+        <td>[% herb.therapeutic_action %]</td>
+    </tr>
+    <tr>
+        <td>Medical Uses:</td>
+        <td>[% herb.medical_uses %]</td>
+    </tr>
+    <tr>
+        <td>Constituents:</td>
+        <td>[% herb.constituents %]</td>
+    </tr>
+    <tr>
+        <td>Solvents:</td>
+        <td>[% herb.solvents %]</td>
+    </tr>
+    <tr>
+        <td>Dosage:</td>
+        <td>[% herb.dosage %]</td>
+    </tr>
+    <tr>
+        <td>Administration:</td>
+        <td>[% herb.administration %]</td>
+    </tr>
+    <tr>
+        <td>Formulas:</td>
+        <td>[% herb.formulas %]</td>
+    </tr>
+    <tr>
+        <td>Contra Indications:</td>
+        <td>[% herb.contra_indications %]</td>
+    </tr>
+    <tr>
+        <td>Preparation:</td>
+        <td>[% herb.preparation %]</td>
+    </tr>
+    <tr>
+        <td>Chinese:</td>
+        <td>[% herb.chinese %]</td>
+    </tr>
+    <tr>
+        <td>Veterinary:</td>
+        <td>[% herb.vetrinary %]</td>
+    </tr>
+    <tr>
+        <td>Homeopathic:</td>
+        <td>[% herb.homiopathic %]</td>
+    </tr>
+
+    <tr>
+        <th colspan="2"><h2>Pollination and Pollinators</h2></th>
+    </tr>
+    <tr>
+        <td>Apis:</td>
+        <td>[% herb.apis %]</td>
+    </tr>
+    <tr>
+        <td>Pollinator:</td>
+        <td>[% herb.pollinator %]</td>
+    </tr>
+    <tr>
+        <td>Pollen:</td>
+        <td>[% herb.pollen %]</td>
+    </tr>
+    <tr>
+        <td>Pollen Notes:</td>
+        <td>[% herb.pollennotes %]</td>
+    </tr>
+    <tr>
+        <td>Nectar:</td>
+        <td>[% herb.nectar %]</td>
+    </tr>
+    <tr>
+        <td>Nectar Notes:</td>
+        <td>[% herb.nectarnotes %]</td>
+    </tr>
+
+    <tr>
+        <th colspan="2"><h2>Other</h2></th>
+    </tr>
+    <tr>
+        <td>Non-Medical Uses:</td>
+        <td>[% herb.non_med %]</td>
+    </tr>
+    <tr>
+        <td>Culinary Uses:</td>
+        <td>[% herb.culinary %]</td>
+    </tr>
+    <tr>
+        <td>History:</td>
+        <td>[% herb.history %]</td>
+    </tr>
+    <tr>
+        <td>Reference:</td>
+        <td>[% herb.reference %]</td>
+    </tr>
+    <tr>
+        <td>URL:</td>
+        <td><a href="[% herb.url %]">[% herb.url %]</a></td>
+    </tr>
+    <tr>
+        <td>Share:</td>
+        <td>[% herb.share %]</td>
+    </tr>
+</table>

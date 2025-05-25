@@ -1,13 +1,74 @@
-[% PageVersion  = 'todo/details.tt,v 0.1 2023/12/07 Shanta Exp Shanta'; %]
+
+[% PageVersion  = 'todo/details.tt,v 0.05 2025/04/01 Shanta Exp Shanta'; %]
+[%# PageVersion  = 'todo/details.tt,v 0.1 2023/12/07 Shanta Exp Shanta'; %]
 [% IF debug_mode == 1 %]
-    <p>Error: [% error_msg %]</p>
+
     [% PageVersion %]
 [% END %]
 
+<style>
+    .action-buttons {
+        margin: 20px 0;
+        display: flex;
+        gap: 10px;
+    }
+
+    .action-buttons button {
+        padding: 8px 15px;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+    }
+
+    .action-buttons button:hover {
+        background-color: #45a049;
+    }
+
+    .return-nav {
+        margin-bottom: 20px;
+        display: flex;
+        gap: 10px;
+    }
+
+    .return-button {
+        padding: 8px 15px;
+        background-color: #2196F3;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+        text-decoration: none;
+        display: inline-block;
+    }
+
+    .return-button:hover {
+        background-color: #0b7dda;
+    }
+</style>
+
 <h1>Record Details View.</h1>
-<!-- Button to return to the previous page -->
-<button type="button" onclick="window.history.back();">Return</button>
-    <p>Record ID: [% record.get_column('record_id') %]</p>
+
+<!-- Return navigation buttons -->
+<div class="return-nav">
+    <a href="/todo" class="return-button">Return to List View</a>
+    <a href="/todo/day" class="return-button">Return to Day View</a>
+    <a href="/todo/week" class="return-button">Return to Week View</a>
+    <a href="/todo/month" class="return-button">Return to Month View</a>
+    <button type="button" class="return-button" onclick="window.history.back();">Return to Previous Page</button>
+</div>
+
+<p>Record ID: [% record.get_column('record_id') %]</p>
+
+<!-- Display the accumulated time for the todo record -->
+<div>
+    <label for="accumulative_time_display">Accumulated Time:</label>
+    <span id="accumulative_time_display">[% accumulative_time %]</span>
+</div>
+
 <form action="/todo/modify/[% record.get_column('record_id') %]" method="post">
     <div>
         <label for="sitename">Site Name:</label>
@@ -88,15 +149,29 @@
     </div>
 </form>
 
-<div>
-
-<form action="/log/log_form" method="POST" target="_blank">
-    <input type="hidden" name="record_id" value="[% record.get_column('record_id') %]">
-    <button type="submit">Add Log</button>
-</form>
-         <form action="/todo/details" method="POST">
-             <input type="hidden" name="record_id" value="[% record.get_column('record_id') %]">
-          <button type="submit">Details</button>
-        </form></div>
-<!-- Button to return to the previous page -->
-<button type="button" onclick="window.history.back();">Return</button>
+<div class="action-buttons">
+    <form action="/log/log_form" method="POST" target="_blank">
+        <input type="hidden" name="todo_record_id" value="[% record.get_column('record_id') %]">
+        <input type="hidden" name="site_name" value="[% record.get_column('sitename') %]">
+        <input type="hidden" name="start_date" value="[% record.get_column('start_date') %]">
+        <input type="hidden" name="due_date" value="[% record.get_column('due_date') %]">
+        <input type="hidden" name="abstract" value="[% record.get_column('subject') %]">
+        <input type="hidden" name="details" value="[% record.get_column('description') %]">
+        <input type="hidden" name="priority" value="[% record.get_column('priority') %]">
+        <input type="hidden" name="status" value="[% record.get_column('status') %]">
+        <input type="hidden" name="comments" value="[% record.get_column('comments') %]">
+        <button type="submit">Add Log Entry</button>
+    </form>
+    <form action="/todo/edit/[% record.get_column('record_id') %]" method="POST">
+        <input type="hidden" name="record_id" value="[% record.get_column('record_id') %]">
+        <button type="submit">Edit Todo</button>
+    </form>
+</div>
+<!-- Return navigation buttons -->
+<div class="return-nav">
+    <a href="/todo" class="return-button">Return to List View</a>
+    <a href="/todo/day" class="return-button">Return to Day View</a>
+    <a href="/todo/week" class="return-button">Return to Week View</a>
+    <a href="/todo/month" class="return-button">Return to Month View</a>
+    <button type="button" class="return-button" onclick="window.history.back();">Return to Previous Page</button>
+</div>

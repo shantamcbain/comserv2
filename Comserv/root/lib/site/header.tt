@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1">
+   <title>[% template.title or site.title or "Comserv" %]</title>
+
+   <!-- Load theme CSS -->
+   [% IF theme_name %]
+   <link rel="stylesheet" href="/static/css/themes/[% theme_name %].css" type="text/css" />
+   [% ELSE %]
+   <link rel="stylesheet" href="/static/css/themes/default.css" type="text/css" />
+   [% END %]
+
+   <!-- Load menu CSS -->
+   <link rel="stylesheet" href="[% menu_css %]" type="text/css" />
+   
+   <!-- Load other CSS -->
+   <link rel="stylesheet" href="[% other_css %]" type="text/css" />
+
+   <!-- Load JavaScript -->
+   <script src="[% jquery_js %]"></script>
+   <script src="[% bootstrap_js %]"></script>
+   <script src="[% site_js %]"></script>
+</head>
+<body>
+   <header>
+       <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+           <div class="container">
+               <a class="navbar-brand" href="[% c.uri_for('/') %]">[% site.title %]</a>
+               <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                   <span class="navbar-toggler-icon"></span>
+               </button>
+               <div class="collapse navbar-collapse" id="navbarNav">
+                   <ul class="navbar-nav">
+                       [% INCLUDE 'site/menu.tt' %]
+                   </ul>
+               </div>
+           </div>
+       </nav>
+   </header>
+</body>
+</html>

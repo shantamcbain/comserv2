@@ -1,0 +1,123 @@
+/* Layout styles */
+.container {
+  width: 100%;
+  max-width: var(--container-width);
+  margin: 0 auto;
+  padding: 0 var(--spacing-medium);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0 -var(--spacing-small);
+}
+
+.col {
+  flex: 1;
+  padding: 0 var(--spacing-small);
+}
+
+/* Specific column widths */
+.col-25 {
+  flex: 0 0 25%;
+  max-width: 25%;
+  padding: 0 var(--spacing-small);
+}
+
+.col-33 {
+  flex: 0 0 33.333333%;
+  max-width: 33.333333%;
+  padding: 0 var(--spacing-small);
+}
+
+.col-50 {
+  flex: 0 0 50%;
+  max-width: 50%;
+  padding: 0 var(--spacing-small);
+}
+
+.col-66 {
+  flex: 0 0 66.666666%;
+  max-width: 66.666666%;
+  padding: 0 var(--spacing-small);
+}
+
+.col-75 {
+  flex: 0 0 75%;
+  max-width: 75%;
+  padding: 0 var(--spacing-small);
+}
+
+.col-100 {
+  flex: 0 0 100%;
+  max-width: 100%;
+  padding: 0 var(--spacing-small);
+}
+
+/* Header */
+.site-header {
+  background-color: var(--primary-color);
+  padding: var(--spacing-medium) 0;
+  margin-bottom: var(--spacing-large);
+}
+
+/* Footer */
+.site-footer {
+  background-color: var(--secondary-color);
+  padding: var(--spacing-large) 0;
+  margin-top: var(--spacing-large);
+}
+
+/* Main content */
+.main-content {
+  padding: var(--spacing-medium) 0;
+}
+
+/* Sidebar */
+.sidebar {
+  background-color: rgba(0, 0, 0, 0.05);
+  padding: var(--spacing-medium);
+  border-radius: 4px;
+}
+
+/* Left Side Bar */
+.LeftNavTableStyle {
+  background: var(--secondary-color);
+  width: 100%;
+  border: 0;
+}
+
+.NavtableHeaderCellStyle {
+  background: var(--accent-color);
+  color: var(--text-color);
+  vertical-align: top;
+  text-align: center;
+  padding: var(--spacing-small);
+}
+
+.NavtableCellStyle {
+  font-family: var(--body-font);
+  font-size: var(--font-size-small);
+  color: var(--text-color);
+  vertical-align: top;
+  text-align: left;
+  padding: var(--spacing-small);
+}
+
+/* Responsive layout */
+@media (max-width: 768px) {
+  .row {
+    flex-direction: column;
+  }
+  
+  .col,
+  .col-25,
+  .col-33,
+  .col-50,
+  .col-66,
+  .col-75,
+  .col-100 {
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+}

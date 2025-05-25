@@ -3,30 +3,54 @@
   [% PageVersion %]
 
 [% END %]
+<!-- Display error message if it exists -->
+[% IF c.stash.error_msg %]
+    <p class="error">[% c.stash.error_msg %]</p>
+[% END %]
+[% IF errors.general %]
+    <p class="error">[% errors.general %]</p>
+[% END %]
 
-<!-- root/src/register.tt2 -->
 <form method="post" action="/user/do_create_account">
-    <label for="username">Username</label>
+    <label for="username" class="[% IF errors.username %]error-label[% END %]">Username</label>
     <input type="text" id="username" name="username" value="[% username | html %]"><br>
+    [% IF errors.username %]
+        <span class="error">[% errors.username %]</span><br>
+    [% END %]
 
-    <label for="password">Password</label>
-    <input type="password" id="password" name="password">
-<br>
-    <label for="password_confirm">Confirm Password</label>
-    <input type="password" id="password_confirm" name="password_confirm">
-<br>
-    <label for="email">Email</label>
-    <input type="email" id="email" name="email" value="[% email | html %]">
-<br>
- <br>
+    <label for="password" class="[% IF errors.password %]error-label[% END %]">Password</label>
+    <input type="password" id="password" name="password"><br>
+
+    <label for="password_confirm" class="[% IF errors.password %]error-label[% END %]">Confirm Password</label>
+    <input type="password" id="password_confirm" name="password_confirm"><br>
+    [% IF errors.password %]
+        <span class="error">[% errors.password %]</span><br>
+    [% END %]
+
+    <label for="email" class="[% IF errors.email %]error-label[% END %]">Email</label>
+    <input type="email" id="email" name="email" value="[% email | html %]"><br>
+    [% IF errors.email %]
+        <span class="error">[% errors.email %]</span><br>
+    [% END %]
+
     <label for="first_name">First Name</label>
-    <input type="test" id="first_name" name="firstname" value="[% firatename | html %]">
-    <br>
+    <input type="text" id="first_name" name="first_name" value="[% first_name | html %]"><br>
+
     <label for="last_name">Last Name</label>
-    <input type="last_name" id="last_name" name="last_name" value="[% last_name | html %]">
-<br>
-<br>   <input type="submit" value="Register">
-   </form>
+    <input type="text" id="last_name" name="last_name" value="[% last_name | html %]"><br>
+
+    <input type="submit" value="Register">
+</form>
+
+<style>
+    .error {
+        color: red;
+        font-weight: bold;
+    }
+    .error-label {
+        color: red;
+    }
+</style>
 
 <!-- Display the error message if it exists -->
 [% IF error_msg %]

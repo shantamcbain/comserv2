@@ -1,0 +1,126 @@
+[% PageVersion	= 'CSC/hosting_via_voip.tt,v 0.01 2023/08/30 shanta Exp shanta '	%]
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+ [%	PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+	[%# INCLUDE 'debug.tt' %]
+[% END %]
+
+
+<A NAME="PageTop"></A>
+
+
+<body style="font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f5f5f5; color: #333;">
+    <!-- Header Section -->
+    <section style="text-align: center; padding: 40px 20px; background-color: #2c3e50; color: white;">
+        <h1 style="margin: 0; font-size: 36px;">Cloud Hosting Pricing</h1>
+        <p style="font-size: 18px;">Reliable, scalable hosting solutions for every need</p>
+    </section>
+
+    <!-- Pricing Table Section -->
+    <section style="max-width: 1200px; margin: 40px auto; padding: 0 20px; display: flex; flex-wrap: wrap; justify-content: center; gap: 20px;">
+        <!-- Starter Hosting -->
+        <div style="flex: 1; min-width: 250px; background-color: white; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); padding: 20px; text-align: center;">
+            <h2 style="color: #2980b9; margin: 0 0 10px;">Starter Hosting</h2>
+            <p style="font-size: 28px; font-weight: bold; margin: 0;">$35<span style="font-size: 16px;">/month</span></p>
+            <ul style="list-style: none; padding: 0; text-align: left; font-size: 14px; line-height: 1.6;">
+                <li>1 cPanel account (or Virtualmin GPL unlimited domains)</li>
+                <li>1 vCPU, 2 GB RAM, 20 GB SSD</li>
+                <li>1 TB bandwidth</li>
+                <li>Daily backups (local)</li>
+                <li>Free SSL (Let’s Encrypt)</li>
+                <li>Email/ticket support</li>
+                <li>Optional cloud bursting (additional cost)</li>
+            </ul>
+            <a href="/hosting_signup" style="display: inline-block; background-color: #2980b9; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-top: 20px; text-decoration: none;">Sign Up Now</a>
+        </div>
+
+        <!-- Business Hosting -->
+        <div style="flex: 1; min-width: 250px; background-color: white; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); padding: 20px; text-align: center;">
+            <h2 style="color: #2980b9; margin: 0 0 10px;">Business Hosting</h2>
+            <p style="font-size: 28px; font-weight: bold; margin: 0;">$75<span style="font-size: 16px;">/month</span></p>
+            <ul style="list-style: none; padding: 0; text-align: left; font-size: 14px; line-height: 1.6;">
+                <li>Up to 5 cPanel accounts (or Virtualmin Pro 10 domains)</li>
+                <li>2 vCPU, 4 GB RAM, 50 GB SSD</li>
+                <li>2 TB bandwidth</li>
+                <li>Daily backups + weekly off-site</li>
+                <li>Free SSL + basic DDoS protection</li>
+                <li>24/7 support (email + chat)</li>
+                <li>Optional cloud bursting</li>
+            </ul>
+            <a href="/contact" style="display: inline-block; background-color: #2980b9; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-top: 20px; text-decoration: none;">Contact Sales</a>
+        </div>
+
+        <!-- Pro Hosting -->
+        <div style="flex: 1; min-width: 250px; background-color: white; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); padding: 20px; text-align: center;">
+            <h2 style="color: #2980b9; margin: 0 0 10px;">Pro Hosting</h2>
+            <p style="font-size: 28px; font-weight: bold; margin: 0;">$125<span style="font-size: 16px;">/month</span></p>
+            <ul style="list-style: none; padding: 0; text-align: left; font-size: 14px; line-height: 1.6;">
+                <li>Up to 30 cPanel accounts (or Virtualmin Pro unlimited domains)</li>
+                <li>4 vCPU, 8 GB RAM, 100 GB SSD</li>
+                <li>5 TB bandwidth</li>
+                <li>Daily backups + weekly off-site + snapshots</li>
+                <li>Free SSL, advanced DDoS protection, CDN integration</li>
+                <li>Priority support (chat + phone)</li>
+                <li>Optional cloud bursting</li>
+            </ul>
+            <a href="/contact" style="display: inline-block; background-color: #2980b9; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-top: 20px; text-decoration: none;">Contact Sales</a>
+        </div>
+
+        <!-- Enterprise Hosting -->
+        <div style="flex: 1; min-width: 250px; background-color: white; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); padding: 20px; text-align: center;">
+            <h2 style="color: #2980b9; margin: 0 0 10px;">Enterprise Hosting</h2>
+            <p style="font-size: 28px; font-weight: bold; margin: 0;">$195<span style="font-size: 16px;">/month</span></p>
+            <ul style="list-style: none; padding: 0; text-align: left; font-size: 14px; line-height: 1.6;">
+                <li>Up to 100 cPanel accounts (or Virtualmin Pro unlimited)</li>
+                <li>8 vCPU, 16 GB RAM, 200 GB SSD</li>
+                <li>10 TB bandwidth</li>
+                <li>Daily backups + real-time snapshots</li>
+                <li>Free SSL, premium DDoS protection, dedicated IP</li>
+                <li>Dedicated support + account manager</li>
+                <li>Cloud bursting included (up to 2 TB extra bandwidth)</li>
+            </ul>
+            <a href="/contact" style="display: inline-block; background-color: #2980b9; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-top: 20px; text-decoration: none;">Contact Sales</a>
+        </div>
+    </section>
+
+    <!-- Add-Ons Section -->
+    <section style="max-width: 800px; margin: 40px auto; padding: 0 20px;">
+        <h2 style="text-align: center; color: #2c3e50; margin-bottom: 20px;">Additional Options</h2>
+        <table style="width: 100%; border-collapse: collapse; background-color: white; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+            <tr style="background-color: #ecf0f1;">
+                <th style="padding: 15px; text-align: left; font-size: 16px;">Add-On</th>
+                <th style="padding: 15px; text-align: left; font-size: 16px;">Price</th>
+            </tr>
+            <tr>
+                <td style="padding: 15px; border-bottom: 1px solid #ddd;">Extra cPanel accounts</td>
+                <td style="padding: 15px; border-bottom: 1px solid #ddd;">$0.75/account</td>
+            </tr>
+            <tr>
+                <td style="padding: 15px; border-bottom: 1px solid #ddd;">Virtualmin Pro upgrade</td>
+                <td style="padding: 15px; border-bottom: 1px solid #ddd;">$19–$49/month</td>
+            </tr>
+            <tr>
+                <td style="padding: 15px; border-bottom: 1px solid #ddd;">Additional bandwidth</td>
+                <td style="padding: 15px; border-bottom: 1px solid #ddd;">$10/TB</td>
+            </tr>
+            <tr>
+                <td style="padding: 15px; border-bottom: 1px solid #ddd;">Extra SSD storage</td>
+                <td style="padding: 15px; border-bottom: 1px solid #ddd;">$0.20/GB</td>
+            </tr>
+            <tr>
+                <td style="padding: 15px; border-bottom: 1px solid #ddd;">Cloud bursting (Starter–Pro)</td>
+                <td style="padding: 15px; border-bottom: 1px solid #ddd;">$10/TB + $5/node</td>
+            </tr>
+            <tr>
+                <td style="padding: 15px;">Managed services</td>
+                <td style="padding: 15px;">$25/month</td>
+            </tr>
+        </table>
+    </section>
+
+    <!-- Footer Section -->
+    <section style="text-align: center; padding: 20px; background-color: #2c3e50; color: white;">
+        <p style="margin: 0;">Need help choosing a plan? <a href="/contact" style="color: #2980b9; text-decoration: none;">Contact Us</a></p>
+    </section>
+</body>

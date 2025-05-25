@@ -12,20 +12,30 @@
  [% FOREACH site_domain IN domains %]
     <li>
         [% site_domain.domain %]
+  <form action="/site/delete_domain" method="post">
+    <input type="hidden" name="domain_id" value="[% site_domain.id %]">
+    <input type="hidden" name="site_id" value="[% site.id %]">
+    <input type="submit" value="Delete">
+</form>
   <form action="/site/edit_domain/[% site_domain.id %]" method="post">
     <input type="hidden" name="site_id" value="[% site_domain.site_id %]">
     <input type="submit" value="Edit">
 </form
     </li>
 [% END %]
+[% IF new_domain %]
+    <li>[% new_domain.domain %]</li>
+[% END %]
     </ul>
 
-    <form action="/site/add_domain" method="post">
-        <input type="hidden" name="site_id" value="[% site.id %]">
-        <input type="text" name="new_domain" placeholder="Add new domain">
-        <input type="submit" value="Add">
-    </form>
-    <form method="POST" action="/site/modify?id=[% site.id %]"><br>
+<form method="POST" action="[% c.uri_for('/site/add_domain_post') %]">
+    <input type="hidden" name="site_id" value="[% site.id %]">
+    <label for="domain">Domain:</label>
+    <input type="text" id="domain" name="domain" required><br>
+    <input type="submit" value="Add Domain">
+</form>
+
+<form method="POST" action="/site/modify?id=[% site.id %]"><br>
         <label for="name">Name:</label>
         <input type="text" id="name" name="name" value="[% site.name %]"><br>
         <label for="description">Description:</label>

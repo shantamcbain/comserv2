@@ -1,44 +1,82 @@
-[% PageVersion = 'Documentation/Instalation.tt,v 0.01 2024/01/28 Shanta Exp shanta ' %]
-[% IF c.session.debug_mode == 1 %]
-[% END %]
+<h1>Installation Guide</h1>
 
+<nav>
+    <a href="#prerequisites">Prerequisites</a> |
+    <a href="#workstation">Workstation Setup</a> |
+    <a href="#production">Production Server Setup</a> |
+    <a href="#perlbrew">Perlbrew Installation</a> |
+    <a href="#module-installation">Module Installation</a>
+</nav>
 
-<h2>Detailed steps for the process of installing the software:</h2>
+<h2 id="module-installation">Automated Setup with install_comserv.pl</h2>
+<h3>Running the Installation Script</h3>
 <ol>
-    <li>
-1. **Create a GitHub repository**
-        <ul>
- <li>- Sign in to your GitHub account.   </li>
- <li>- Click on the '+' icon at the top right corner and select   'New repository'.   </li>
- <li>- Name your repository and provide a description.   </li>
- <li>- Choose whether the repository should be public or private.   </li>
- <li>- Initialize the repository with a README file, if necessary.   </li>
- <li>- Click on 'Create repository'.
-        </ul>
+    <li><strong>Download the installation script:</strong>
+        <pre><code>curl -O https://raw.githubusercontent.com/comserv2/Comserv/main/install_comserv.pl</code></pre>
     </li>
-<li>2. **Create a strata to replace the old catalyst repository with the new one**
-    <ul>
-<li>- Clone the new repository to your local machine using the command `git clone  &lt;repository_url &lt;`.</li>
- <li>   - Navigate to the cloned repository's directory.
-    <li>- Create a new branch for the strata using the command `git checkout -b  &lt;branch_name &lt;`.</li>
-    <li>    - Make the necessary changes to replace the old catalyst repository.</li>
-    <li>    - Stage the changes using the command `git add .`.</li>
-    <li>    - Commit the changes using the command `git commit -m " &lt;commit_message &lt;"`.</li>
-            <li> - Push the changes to the remote repository using the command `git push origin  &lt;branch_name &lt;`.</li>
-                           </ul>
-</li>
-              <li>  3. **Update the repository on the production server**
-                         <ul>
-                <li>- SSH into the production server.</li>
-               <li> - Navigate to the directory where the repository is located.</li>
-                <li>- Pull the latest changes from the remote repository using the command `git pull origin master`.</li>
-  </ul>  </li>
- <li>               4. **Update the database for the new version**
-                            <ul>
-                <li>- Backup the current database.</li>
-               <li> - Run the necessary SQL scripts to update the database schema.
-                <li>- Test the new version of the application with the updated database.</li>
-               <li> - If everything works as expected, commit the database changes.</li>  </ul>
-                                </li>
+    <li><strong>Make the script executable:</strong>
+        <pre><code>chmod +x install_comserv.pl</code></pre>
+    </li>
+    <li><strong>Run the script:</strong>
+        <pre><code>./install_comserv.pl</code></pre>
+        Follow the prompts to input your database connection details when prompted.
+    </li>
+    <li><strong>Verify the setup was successful:</strong>
+        <pre><code>perl -MModule::Name -e 'print $Module::Name::VERSION'</code></pre>
+        Replace <code>Module::Name</code> with the module you wish to verify.
+    </li>
+
+<h3>Installing Perl on Windows</h3>
+<ol>
+    <li><strong>Ensure Strawberry Perl is installed:</strong>
+        Download and install from:
+        <pre><code>https://strawberryperl.com/</code></pre>
+    </li>
+    <li><strong>Run the `install_comserv.pl` script:</strong>
+        Open Command Prompt and execute:
+        <pre><code>perl install_comserv.pl</code></pre>
+        Follow the prompts to input appropriate database connection details.
+    </li>
 </ol>
-               <p>Remember to always test each step in a safe environment before applying them to the production server.</p>
+    </ol>
+<h3>Installing Module Dependencies</h3>
+    <li><strong>Use the correct Perl version:</strong>
+        The `install_comserv.pl` script automatically configures the proper Perl version for you.
+    </li>
+    <li><strong>Ensure PATH includes Perlbrew's bin:</strong>
+        Ensure `~/perl5/perlbrew/bin` and
+`~/perl5/perlbrew/perls/perl-5.40.0/bin` are included.
+`/home/comserv/perl5/perlbrew/perls/perl-5.40.0/bin` are included.
+    </li>
+
+    <li><strong>Set up user-level modules:</strong>
+        Local module management is handled automatically by the `install_comserv.pl` script.
+        Ensure you follow the input prompts during setup for best results.
+    </li>
+
+    <li><strong>Check Perl library paths:</strong>
+        <pre><code>perl -e 'print join "\n", @INC'</code></pre>
+        Verify paths like
+`/home/comserv/perl5/perlbrew/perls/perl-5.40.0/lib/site_perl/5.40.0` are
+listed.
+    </li>
+
+    <li><strong>Install Dependencies:</strong>
+        The `install_comserv.pl` script automatically handles all required dependency installations.
+    </li>
+    <li>Create a directory for Comserv:
+        <pre><code>mkdir /path/to/Comserv</code></pre>
+    </li>
+    <li>Clone the repository into the created directory:
+        <pre><code>git clone git@github.com:comserv2/Comserv.git
+/path/to/Comserv</code></pre>
+    <li>Navigate to the cloned directory:
+        <pre><code>cd /path/to/Comserv</code></pre>
+    <li>Install required modules using cpanfile:
+        <pre><code>cpanm --installdeps .</code></pre>
+    </li>
+    <li>Verify installations (e.g., of Module::Name):
+        <pre><code>perl -MModule::Name -e 'print
+$Module::Name::VERSION'</code></pre>
+    </li>
+</ol>

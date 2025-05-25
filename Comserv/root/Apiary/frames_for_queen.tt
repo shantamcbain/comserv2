@@ -1,0 +1,42 @@
+[% META title = 'Frames for Queen ' _ queen_tag_number %]
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>Frames for Queen [% queen_tag_number %]</h1>
+            
+            [% IF frames && frames.size > 0 %]
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Frame ID</th>
+                            <th>Date Added</th>
+                            <th>Frame Type</th>
+                            <th>Status</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        [% FOREACH frame IN frames %]
+                            <tr>
+                                <td>[% frame.frame_id %]</td>
+                                <td>[% frame.date_added %]</td>
+                                <td>[% frame.frame_type %]</td>
+                                <td>[% frame.status %]</td>
+                                <td>[% frame.notes %]</td>
+                            </tr>
+                        [% END %]
+                    </tbody>
+                </table>
+            [% ELSE %]
+                <div class="alert alert-info">
+                    No frames found for this queen.
+                </div>
+            [% END %]
+            
+            <div class="mt-4">
+                <a href="/Apiary/QueenRearing" class="btn btn-primary">Back to Queen Rearing</a>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,4 +1,5 @@
-[% PageVersion	= 'CSC/CSC.tt,v 0.01 2023/08/30 shanta Exp shanta '	%]
+[% META title = 'Computer Systems Consulting' %]
+[% PageVersion = 'CSC/CSC.tt,v 0.02 2025/04/12 shanta Exp shanta ' %]
 [% debug %]
 [% IF c.session.debug_mode == 1 %]
  [%	PageVersion %]
@@ -11,7 +12,10 @@
 
 
 <A NAME="PageTop"></A>
-
+[% IF c.session.Domain == "demo.computersystemconsulting.ca" || c.session.Domain == "demo.local" %]
+    <!-- Include `3d/index.tt` only for the specified domains -->
+    [% INCLUDE "CSC/demo.tt" %]
+[% ELSE %]
 <table>
 <tr>
 	<td>
@@ -21,12 +25,13 @@
 <p>We are in the need of Perl programmers and graphic designers. Be sure to check the jobs link in the top links.
 <p> Services provided: Click The product link in the main links group.
 <ul>
-<li><a href='http://www.computersystemconsulting.ca/whmcs/cart.php'>Website hosting</a> </li>
-<li> <a href='http://www.computersystemconsulting.ca/whmcs/cart.php?a=add&amp;domain=register' target='_blank'>Register your domain with us.</a></li>
+<li><a href='/hosting'>Website hosting</a></li>
+<li> <a href='http://www.computersystemconsulting.ca/domains'>Register your domain with us.</a></li>
 <li> Check out our <a href='http://demo.computersystemconsulting.ca' target='_blank'>Demo</a> </li>
+<li> <a href='/CSC/email_test'><strong>Email Test Form</strong></a> - Test the email functionality</li>
 <li>
 <h1>Join our VOIP services</h1>
-<p> <a href='http://computersystemconsulting.ca:5000/voip' name='Contact' target='_blank' title=' '>Learn more</a>
+<p> <a href='/voip'>Learn more</a>
 <li>We now offer over 1000 new communities to our phone options. Get one from your target community.</li>
 </li>
 </ul>
@@ -44,3 +49,4 @@ New</strong>Pay for your services with us. Two BitCoin exchanges
 
 </td></tr>
 </table>
+[% END %]

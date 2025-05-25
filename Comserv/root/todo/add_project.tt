@@ -4,7 +4,6 @@
     [% PageVersion %]
 [% END %]
 
-
 <h1>Add Project</h1>
 
 <!-- Display the error message if there is one -->
@@ -12,27 +11,16 @@
     <p class="error">[% error_message %]</p>
 [% END %]
 
-
 <form method="POST" action="/project/create_project">
-    <label for="sitename">Site Name:</label><br>
-<select id="sitename" name="sitename" required>
-    [% FOREACH site IN sites %]
-
-        <option value="[% site.name %]" [% IF site.id == form_data.sitename OR site.id == session.sitename %]selected[% END %]>[% site.name %]</option>
-
+    [% IF form_data.parent_id %]
+    <input type="hidden" name="parent_id" value="[% form_data.parent_id %]">
     [% END %]
-</select>
-<button type="button" onclick="openAddSiteForm()">Add Site</button><br>
+  [% INCLUDE "todo/site_list.tt" %]<br>
 
     <label for="name">Project Name:</label><br>
     <input type="text" id="name" name="name" value="[% form_data.name %]" required><br>
-<label for="parent_id">Parent Project:</label><br>
-<select id="parent_id" name="parent_id">
-    <option value="">None</option> <!-- Change this line -->
-    [% FOREACH project IN projects %]
-        <option value="[% project.id %]">[% project.name %]</option>
-    [% END %]
-</select><br>
+
+[% INCLUDE "todo/project_list.tt" projects=projects selected_project_id=form_data.parent_id %]<br>
 
     <label for="description">Description:</label><br>
     <textarea id="description" name="description" required>[% form_data.description %]</textarea><br>

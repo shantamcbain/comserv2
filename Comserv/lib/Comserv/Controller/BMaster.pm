@@ -3,213 +3,224 @@ use Moose;
 use namespace::autoclean;
 use DateTime;
 use DateTime::Event::Recurrence;
-use Comserv::Model::BMasterModel;
+use Comserv::Model::BMaster;
+use Comserv::Model::ApiaryModel;
 use Comserv::Model::DBForager;
+use Comserv::Util::Logging;
+use Data::Dumper;
+
+has 'logging' => (
+    is => 'ro',
+    default => sub { Comserv::Util::Logging->instance }
+);
+
+has 'apiary_model' => (
+    is => 'ro',
+    default => sub { Comserv::Model::ApiaryModel->new }
+);
+
 BEGIN { extends 'Catalyst::Controller'; }
+
 sub base :Chained('/') :PathPart('BMaster') :CaptureArgs(0) {
     my ($self, $c) = @_;
     # This will be the root of the chained actions
     # You can put common setup code here if needed
 }
-sub index :Chained('base') :Path('') :Args(0) {
 
+sub index :Path('/BMaster') :Args(0) {
     my ( $self, $c ) = @_;
+
+    # Initialize debug_errors array
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+
+    # Add detailed logging
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "BMaster direct index method called");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Request path: " . $c->req->path);
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Request URI: " . $c->req->uri);
+
+    push @{$c->stash->{debug_errors}}, "BMaster direct index method called";
+    push @{$c->stash->{debug_errors}}, "Request path: " . $c->req->path;
+    push @{$c->stash->{debug_errors}}, "Request URI: " . $c->req->uri;
+
+    # Set up the template directly instead of forwarding
     $c->stash(template => 'BMaster/BMaster.tt');
-    $c->forward($c->view('TT'));
+    
+    # Ensure debug_msg is always an array
+    $c->stash->{debug_msg} = [] unless ref $c->stash->{debug_msg} eq 'ARRAY';
+    push @{$c->stash->{debug_msg}}, "BMaster Module - Main Dashboard";
+
+    # Log the stash for debugging
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Template set to: " . $c->stash->{template});
 }
 
-# In the BMaster controller
-sub bee_pasture :Chained('base') :PathPart('bee_pasture') :Args(0) {
-    my ($self, $c) = @_;
+sub chained_index :Chained('base') :PathPart('') :Args(0) {
+    my ( $self, $c ) = @_;
 
-    # Use the DBForager model to fetch all the records from the herb table where the apis field has a value
-    my @plants = @{$c->model('DBForager')->get_herbs_with_apis};
+    # Initialize debug_errors array
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
 
-    # Pass the fetched records to the view
-    $c->stash->{herbal_data} = \@plants;
+    # Add detailed logging
+    eval {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'chained_index', "BMaster chained_index method called");
+        push @{$c->stash->{debug_errors}}, "BMaster chained_index method called";
 
-    # Set the template
-    $c->stash->{template} = 'ENCY/BeePastureView.tt';
-}
-sub generate_month_dates {
-    my ($year, $month, $number_of_grafts) = @_;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'chained_index', "Setting template to BMaster/BMaster.tt");
 
-    my $dt = DateTime->new(
-        year  => $year,
-        month => $month,
-        day   => 1,
-    );
+        # Set the template
+        $c->stash(template => 'BMaster/BMaster.tt');
+        
+        # Ensure debug_msg is always an array
+        $c->stash->{debug_msg} = [] unless ref $c->stash->{debug_msg} eq 'ARRAY';
+        push @{$c->stash->{debug_msg}}, "BMaster Module - Main Dashboard";
 
-    # Get the first day of the week for the first day of the month
-    my $first_day_of_week = $dt->day_of_week;
-
-    # Subtract the first day of the week from the first day of the month to get the first Sunday of the view
-    $dt->subtract(days => $first_day_of_week % 7);
-
-    my @dates;
-
-    # Calculate the total number of days required for all grafts
-    my $total_days = $number_of_grafts * 21;
-
-    # Calculate the number of weeks required to cover all these days
-    my $total_weeks = int(($total_days + 6) / 7);  # Add 6 before dividing to round up
-
-    # Generate the dates for the current month's view
-    for (1..($total_weeks * 7)) {  # Multiply by 7 to get the total number of days
-        push @dates, $dt->clone;
-        $dt->add(days => 1);
-    }
-
-    return \@dates;
-}
-sub add_graft :Chained('base') :PathPart('add_graft') :Args(0) {
-    my ($self, $c) = @_;
-
-    if ($c->request->method eq 'POST') {
-        my $first_graft_date = $c->request->params->{first_graft_date};
-        my $days_of_egg_laying = $c->request->params->{days_of_egg_laying};
-        my $number_of_grafts = $c->request->params->{number_of_grafts};
-
-        # Convert the graft date string to a DateTime object
-        my ($year, $month, $day) = split /-/, $first_graft_date;
-        my $graft_date = DateTime->new(
-            year  => $year,
-            month => $month,
-            day   => $day,
-        );
-
-        # Calculate the dates for each graft and store them in an array
-        my @graft_dates;
-        for my $i (0..$number_of_grafts-1) {
-            my $graft_date_clone = $graft_date->clone;  # The first graft is on the date submitted, subsequent grafts are 10 days before the queen pull date
-
-            my $return_brood_date = $graft_date_clone->clone->add(days => 3);  # Return brood event is 3 days after each graft day
-            my $queen_mated_and_start_laying_date = $graft_date_clone->clone->add(days => 20);  # Queen Mated and Start Laying event is 20 days after each graft day
-            my $queen_pull_date = $queen_mated_and_start_laying_date->clone->add(days => $days_of_egg_laying);  # Queen pull date is days_of_egg_laying days after the queen starts laying
-            my $cell_up_date = $graft_date_clone->clone->add(days => 10);  # Cell Up event is 10 days after the graft date
-
-            push @graft_dates, { graft_date => $graft_date_clone, event_name => "Graft " . ($i + 1), graft_number => $i + 1 };  # Append the graft number to the event name
-            push @graft_dates, { graft_date => $return_brood_date, event_name => "Return Brood " . ($i + 1), graft_number => $i + 1 };  # Append the graft number to the event name
-            push @graft_dates, { graft_date => $cell_up_date, event_name => "Cell Up " . ($i + 1), graft_number => $i + 1 };  # Append the graft number to the event name
-            push @graft_dates, { graft_date => $queen_mated_and_start_laying_date, event_name => "Queen Mated and Start Laying " . ($i + 1), graft_number => $i + 1 };  # Append the graft number to the event name
-            push @graft_dates, { graft_date => $queen_pull_date, event_name => "Queen Pull " . ($i + 1), graft_number => $i + 1 };  # Append the graft number to the event name
-
-            # Update the graft date for the next iteration
-            $graft_date = $queen_pull_date->clone->subtract(days => 10);
-        }
-
-        # Store the graft dates in the session
-        $c->session->{graft_dates} = \@graft_dates;
-        $c->session->{first_graft_date} = $first_graft_date;
-        $c->session->{days_of_egg_laying} = $days_of_egg_laying;
-        $c->session->{number_of_grafts} = $number_of_grafts;
-        # Redirect to the queens page
-        $c->response->redirect($c->uri_for($self->action_for('queens')));
-    } else {
-        $c->response->redirect($c->uri_for($self->action_for('index')));
+        # No need to forward to the TT view here, let Catalyst handle it
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'chained_index', "BMaster chained_index method completed successfully");
+    };
+    if ($@) {
+        # Log any errors
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'chained_index', "Error in BMaster chained_index method: $@");
+        push @{$c->stash->{debug_errors}}, "Error in BMaster chained_index method: $@";
     }
 }
-sub frames :Chained('base') :PathPart('frames') :Args(1) {
-    my ( $self, $c, $queen_tag_number ) = @_;
 
-    # Get the frames for the given queen
-    my $frames = $c->model('BMaster')->get_frames_for_queen($queen_tag_number);
+# Route for Bee Pasture
+sub bee_pasture :Path('/BMaster/bee_pasture') :Args(0) {
+    my ($self, $c) = @_;
 
-    # Set the TT template to use
-    $c->stash->{template} = 'BMaster/frames.tt';
-    $c->stash->{frames} = $frames;
-}
-sub api_frames :Chained('base') :PathPart('api/frames') :Args(0) {
-    my ( $self, $c ) = @_;
+    # Initialize debug_errors array
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
 
-    # Fetch the data for the frames
-    my $data = $c->model('BMaster')->get_frames_data();
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'bee_pasture', "BMaster bee_pasture method called");
+    push @{$c->stash->{debug_errors}}, "BMaster bee_pasture method called";
 
-    # Set the response body to the JSON representation of the data
-    $c->response->body( $c->stash->{json}->($data) );
-}
-sub products :Chained('base') :PathPath('products') :Args(0) {
-    my ( $self, $c ) = @_;
-    $c->stash(template => 'BMaster/products.tt');
+    # Redirect to the ENCY BeePastureView
+    $c->response->redirect('/ENCY/BeePastureView');
 }
 
-sub yards :Chained('base') :PathPart('yards') :Args(0) {
-    my ( $self, $c ) = @_;
+# Route for Apiary Management System
+sub apiary :Path('/BMaster/apiary') :Args(0) {
+    my ($self, $c) = @_;
 
-    # Get the yards
-    my $yards = $c->model('BMaster')->get_yards();
+    # Initialize debug_errors array
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
 
-    # Set the TT template to use
-    $c->stash->{template} = 'BMaster/yards.tt';
-    $c->stash->{yards} = $yards;
-}
-# Define an action for each link in BMaster.tt
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'apiary', "BMaster apiary method called");
+    push @{$c->stash->{debug_errors}}, "BMaster apiary method called";
 
-sub apiary :Chained('base') :PathPart('apiary') :Args(0){
-    my ( $self, $c ) = @_;
-    $c->log->debug('Entered apiary');
-    # Set the TT template to use
-    $c->stash->{template} = 'BMaster/apiary.tt';
-    $c->forward($c->view('TT'));
+    # Redirect to the Apiary controller
+    $c->response->redirect('/Apiary');
 }
 
-sub queens :Chained('base') :PathPart('Queens') :Args(0) {
-    my ( $self, $c ) = @_;
+# Route for Queen Rearing System
+sub queens :Path('/BMaster/Queens') :Args(0) {
+    my ($self, $c) = @_;
 
-    my $dt = DateTime->now; # current date
-    my $month = $dt->month; # current month
-    my $year = $dt->year; # current year
+    # Initialize debug_errors array
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
 
-    # Retrieve the form data and graft dates from the session
-    my $first_graft_date = $c->session->{first_graft_date};
-    my $days_of_egg_laying = $c->session->{days_of_egg_laying};
-    my $number_of_grafts = $c->session->{number_of_grafts};
-    my $graft_dates_hashes = $c->session->{graft_dates};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'queens', "BMaster queens method called");
+    push @{$c->stash->{debug_errors}}, "BMaster queens method called";
 
-    # Get all the dates for the current month's view
-    my $dates = generate_month_dates($year, $month, $number_of_grafts);
+    # Redirect to the Queen Rearing page
+    $c->response->redirect('/Apiary/QueenRearing');
+}
 
-    # Flatten the graft_dates array into a single array of hash references
-    my @graft_dates = map { { graft_date => $_->{graft_date}, event_name => $_->{event_name} } } @$graft_dates_hashes;
+# Route for Hive Management
+sub hive :Path('/BMaster/hive') :Args(0) {
+    my ($self, $c) = @_;
 
-    # Pass the dates, today's date, graft dates, and form data to the template
+    # Initialize debug_errors array
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'hive', "BMaster hive method called");
+    push @{$c->stash->{debug_errors}}, "BMaster hive method called";
+
+    # Redirect to the Hive Management page
+    $c->response->redirect('/Apiary/HiveManagement');
+}
+
+# Route for Bee Health
+sub beehealth :Path('/BMaster/beehealth') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Initialize debug_errors array
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'beehealth', "BMaster beehealth method called");
+    push @{$c->stash->{debug_errors}}, "BMaster beehealth method called";
+
+    # Redirect to the Bee Health page
+    $c->response->redirect('/Apiary/BeeHealth');
+}
+
+# Placeholder routes for sections that don't have dedicated pages yet
+sub honey :Path('/BMaster/honey') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Initialize debug_errors array
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'honey', "BMaster honey method called");
+    push @{$c->stash->{debug_errors}}, "BMaster honey method called";
+
+    # Set up a placeholder page
     $c->stash(
-        dates => $dates,
-        today => $dt,
-        graft_dates => \@graft_dates,
-        first_graft_date => $first_graft_date,
-        days_of_egg_laying => $days_of_egg_laying,
-        number_of_grafts => $number_of_grafts,
-        template => 'BMaster/Queens.tt',
+        title => 'Honey Production',
+        message => 'The Honey Production system is currently under development. Please check back soon.',
+        template => 'BMaster/placeholder.tt',
+        debug_msg => "Honey Production - Under Development"
     );
 }
 
-sub hive :Chained('base') :PathPart('hive') :Args(0){
-    my ( $self, $c ) = @_;
-    $c->stash->{template} = 'BMaster/hive.tt';
+sub environment :Path('/BMaster/environment') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Initialize debug_errors array
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'environment', "BMaster environment method called");
+    push @{$c->stash->{debug_errors}}, "BMaster environment method called";
+
+    # Set up a placeholder page
+    $c->stash(
+        title => 'Environmental Considerations',
+        message => 'The Environmental Considerations system is currently under development. Please check back soon.',
+        template => 'BMaster/placeholder.tt',
+        debug_msg => "Environmental Considerations - Under Development"
+    );
 }
 
-sub honey :Chained('base') :PathPart('honey') :Args(0){
-    my ( $self, $c ) = @_;
-    $c->stash->{template} = 'BMaster/honey.tt';
+sub education :Path('/BMaster/education') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Initialize debug_errors array
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'education', "BMaster education method called");
+    push @{$c->stash->{debug_errors}}, "BMaster education method called";
+
+    # Set up a placeholder page
+    $c->stash(
+        title => 'Education and Collaboration',
+        message => 'The Education and Collaboration system is currently under development. Please check back soon.',
+        template => 'BMaster/placeholder.tt',
+        debug_msg => "Education and Collaboration - Under Development"
+    );
 }
 
-sub beehealth :Chained('base') :PathPart('beehealth') :Args(0){
-    my ( $self, $c ) = @_;
-    $c->stash->{template} = 'BMaster/beehealth.tt';
+# Default action to handle any undefined routes
+sub default :Path :Args {
+    my ($self, $c) = @_;
+
+    # Initialize debug_errors array
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'default', "BMaster default method called for path: " . $c->req->path);
+    push @{$c->stash->{debug_errors}}, "BMaster default method called for path: " . $c->req->path;
+
+    # Redirect to the BMaster index page
+    $c->response->redirect('/BMaster');
+    $c->detach();
 }
-
-sub environment :Chained('base') :PathPart('environment') :Args(0){
-    my ( $self, $c ) = @_;
-    $c->stash->{template} = 'BMaster/environment.tt';
-}
-
-sub education :Chained('base') :PathPart('education') :Args(0){
-    my ( $self, $c ) = @_;
-    $c->stash->{template} = 'BMaster/education.tt';
-}
-
-
-__PACKAGE__->meta->make_immutable;
 
 1;

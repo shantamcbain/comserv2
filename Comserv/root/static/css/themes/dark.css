@@ -1,0 +1,15 @@
+/* Theme: dark */
+:root {
+  --accent-color: #6200ee;
+  --background-color: #121212;
+  --border-color: #333333;
+  --link-color: #bb86fc;
+  --link-hover-color: #3700b3;
+  --primary-color: #1a1a1a;
+  --secondary-color: #2c2c2c;
+  --success-color: #4caf50;
+  --table-header-bg: #2c2c2c;
+  --text-color: #e0e0e0;
+  --warning-color: #ff9800;
+}
+
