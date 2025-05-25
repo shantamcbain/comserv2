@@ -15,3 +15,8 @@ Comserv/comserv.psgi
 /.idea/inspectionProfiles/profiles_settings.xml
 /.idea/vcs.xml
 /.idea/perl5local.xml
+/.idea/.gitignore
+/.idea/comserv2.iml
+/.idea/externalDependencies.xml
+/.idea/git_toolbox_blame.xml
+/main.py
