@@ -2,6 +2,11 @@
 
 This document provides an overview of the Proxmox VE (Virtual Environment) API endpoints used in the Comserv application. The Proxmox VE API is a RESTful API that provides a wide range of endpoints for managing virtual machines, containers, nodes, storage, and more.
 
+## Related Documentation
+
+- [Proxmox Command Reference](proxmox_commands.md) - Comprehensive list of CLI commands for managing Proxmox VE
+- [Proxmox IP Configuration Guide](proxmox_ip_configuration.md) - Detailed guide for configuring IP addresses in Proxmox
+
 ## API Base URL
 
 The Proxmox VE API is accessible via HTTPS on port 8006:

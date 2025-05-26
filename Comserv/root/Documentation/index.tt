@@ -73,11 +73,32 @@
         </div>
     </header>
     <p class="intro">Comprehensive guides and resources for the Comserv system, tailored to your role and site.</p>
+    
+    [% IF is_admin %]
+    <!-- Quick Access Links for Admins -->
+    <div class="quick-access-links">
+        <h2>Quick Access for Administrators</h2>
+        <div class="quick-links-grid">
+            <a href="[% c.uri_for('/Documentation/proxmox_commands.tt') %]" class="quick-link-card">
+                <h3>Proxmox Command Reference</h3>
+                <p>Essential commands for managing Proxmox VE environments</p>
+                <span class="admin-badge">Admin Only</span>
+            </a>
+            <a href="[% c.uri_for('/Documentation/api') %]" class="quick-link-card">
+                <h3>API Documentation</h3>
+                <p>Comprehensive API reference and usage guide</p>
+                <span class="admin-badge">Admin Only</span>
+            </a>
+            <!-- Add more quick links here as needed -->
+        </div>
+    </div>
+    [% END %]
 
 [%# User-facing sections %]
 [% INCLUDE 'Documentation/user_docs.tt' %]
 [% INCLUDE 'Documentation/tutorials.tt' %]
 [% INCLUDE 'Documentation/site_specific.tt' %]
+[% INCLUDE 'Documentation/developer_guides.tt' %]
 
 [%# Admin-only sections %]
 [% # Use the is_admin flag passed from the controller %]
@@ -157,6 +178,80 @@
         background: #f8f9fa;
     }
     
+    /* Quick Access Links styling */
+    .quick-access-links {
+        margin: 20px 0 30px;
+        padding: 15px;
+        background-color: #e3f2fd;
+        border-radius: 8px;
+        border-left: 5px solid #2196F3;
+    }
+    
+    .quick-access-links h2 {
+        color: #0d47a1;
+        margin-top: 0;
+        font-size: 1.4em;
+    }
+    
+    .quick-links-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 15px;
+    }
+    
+    .quick-link-card {
+        display: block;
+        padding: 15px;
+        background-color: white;
+        border-radius: 6px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        text-decoration: none;
+        color: #333;
+        transition: transform 0.2s, box-shadow 0.2s;
+        border-left: 4px solid #2196F3;
+    }
+    
+    .quick-link-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .quick-link-card h3 {
+        margin-top: 0;
+        color: #1565c0;
+        font-size: 1.2em;
+    }
+    
+    .quick-link-card p {
+        margin-bottom: 10px;
+        color: #555;
+    }
+    
+    .admin-badge {
+        display: inline-block;
+        background-color: #f44336;
+        color: white;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 0.8em;
+        font-weight: bold;
+    }
+    
+    /* Featured documentation styling */
+    .featured-docs {
+        margin-bottom: 20px;
+    }
+    
+    .doc-card.featured {
+        border-left: 4px solid #E91E63;
+        background-color: #f5f5f5;
+        box-shadow: 0 3px 6px rgba(0,0,0,0.16);
+    }
+    
+    .doc-card.featured h3 {
+        color: #E91E63;
+        font-size: 1.2em;
+    }
 
     /* ... rest of your CSS ... */
 </style>

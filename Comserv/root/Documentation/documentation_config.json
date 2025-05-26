@@ -5,7 +5,7 @@
       "description": "Documentation for end users of the system",
       "roles": ["normal", "editor", "admin", "developer"],
       "site_specific": false,
-      "pages": ["getting_started", "account_management", "customizing_profile", "login_authentication", "mcoop_user_guide", "mcoop_getting_started", "Projects"]
+      "pages": ["getting_started", "account_management", "customizing_profile", "login_authentication", "mcoop_user_guide", "mcoop_getting_started", "Projects", "Documentation_System"]
     },
     "admin_guides": {
       "title": "Administrator Guides",
@@ -17,9 +17,9 @@
     "developer_guides": {
       "title": "Developer Documentation",
       "description": "Documentation for developers",
-      "roles": ["developer"],
+      "roles": ["developer", "admin"],
       "site_specific": false,
-      "pages": ["api_reference", "authentication_system", "template_system", "troubleshooting", "navigation_system", "theme_system_implementation", "proxy_troubleshooting", "documentation_migration_guide"]
+      "pages": ["api", "api_reference", "authentication_system", "template_system", "troubleshooting", "navigation_system", "theme_system_implementation", "proxy_troubleshooting", "documentation_migration_guide"]
     },
     "tutorials": {
       "title": "Tutorials",
@@ -75,7 +75,7 @@
       "description": "System changes and updates",
       "roles": ["admin", "developer"],
       "site_specific": false,
-      "pages": ["main_changelog", "2025-05-31-server-ip-display", "2025-04-git-pull-functionality", "2025-04-pagetop-hostname-display", "2024-08-proxmox-debug-msg-fix", "2024-07-project-id-fix", "2024-06-project-edit-fix", "2024-07-proxmox-controller-fixes", "2024-06-15-login-redirect-fix", "2025-04-navigation-improvements", "2025-04-documentation-display-fix", "2025-04-mcoop-admin-menu-restriction", "2025-04-documentation-admin-visibility-fix", "2025-05-30-documentation-structure-simplification", "2025-08-18-project-cards-css-fix", "2025-04-12-hosting-signup-implementation", "2025-09-15-sudo-password-configuration", "2025-09-10-restart-starman-functionality", "2024-06-21-linux-commands-documentation"]
+      "pages": ["main_changelog", "2025-05-31-server-ip-display", "2025-04-git-pull-functionality", "2025-04-pagetop-hostname-display", "2024-08-proxmox-debug-msg-fix", "2024-07-project-id-fix", "2024-06-project-edit-fix", "2024-07-proxmox-controller-fixes", "2024-06-15-login-redirect-fix", "2025-04-navigation-improvements", "2025-04-documentation-display-fix", "2025-04-mcoop-admin-menu-restriction", "2025-04-documentation-admin-visibility-fix", "2025-05-30-documentation-structure-simplification", "2025-08-18-project-cards-css-fix", "2025-04-12-hosting-signup-implementation", "2025-09-15-sudo-password-configuration", "2025-09-10-restart-starman-functionality", "2024-06-21-linux-commands-documentation", "2025-10-01-documentation-migration-to-tt", "2025-10-15-documentation-access-fixes"]
     },
     "proxmox": {
       "title": "Proxmox Documentation",
@@ -89,7 +89,7 @@
       "description": "Documentation about the documentation system itself",
       "roles": ["admin", "developer"],
       "site_specific": false,
-      "pages": ["Documentation", "Documentation_System", "Documentation_Controller", "Documentation_Management", "documentation_system_guide", "documentation_guide", "documentation_config_guide", "documentation_migration_guide", "documentation_template", "documentation_index_adaptation"]
+      "pages": ["Documentation", "Documentation_System", "Documentation_Controller", "Documentation_Management", "documentation_system_guide", "documentation_guide", "documentation_config_guide", "documentation_migration_guide", "documentation_template", "documentation_index_adaptation", "documentation_migration_to_tt", "documentation_tt_template"]
     },
     "templates": {
       "title": "Template Documentation",
@@ -122,7 +122,7 @@
     "site_guide": "Documentation/sites/mcoop/site_guide.md",
     "member_resources": "Documentation/sites/mcoop/member_resources.md",
     "documentation_system": "Documentation/documentation_system.md",
-    "account_management": "Documentation/roles/normal/account_management.md",
+    "account_management": "Documentation/roles/normal/account_management.tt",
     "customizing_profile": "Documentation/tutorials/customizing_profile.md",
     "login_authentication": "Documentation/tutorials/login_authentication.md",
     "mcoop_user_guide": "Documentation/roles/normal/mcoop_user_guide.md",
@@ -177,6 +177,11 @@
     "2025-08-18-project-cards-css-fix": "Documentation/changelog/2025-08-18-project-cards-css-fix.md",
     "2025-09-15-sudo-password-configuration": "Documentation/changelog/2025-09-15-sudo-password-configuration.md",
     "2025-09-10-restart-starman-functionality": "Documentation/changelog/2025-09-10-restart-starman-functionality.md",
-    "2024-06-21-linux-commands-documentation": "Documentation/changelog/2024-06-21-linux-commands-documentation.md"
+    "2024-06-21-linux-commands-documentation": "Documentation/changelog/2024-06-21-linux-commands-documentation.md",
+    "documentation_migration_to_tt": "Documentation/documentation_migration_to_tt.tt",
+    "documentation_tt_template": "Documentation/documentation_tt_template.tt",
+    "2025-10-01-documentation-migration-to-tt": "Documentation/changelog/2025-10-01-documentation-migration-to-tt.tt",
+    "2025-10-15-documentation-access-fixes": "Documentation/changelog/2025-10-15-documentation-access-fixes.tt",
+    "api": "Documentation/api.tt"
   }
 }

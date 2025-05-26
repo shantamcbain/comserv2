@@ -1,0 +1,335 @@
+[% META 
+   title = "Proxmox VE Command Reference"
+   description = "Comprehensive list of command-line operations for managing Proxmox VE environments"
+   roles = "admin,developer"
+   category = "proxmox"
+%]
+
+<div class="doc-page">
+    <h1>Proxmox VE Command Reference</h1>
+    
+    <div class="doc-section">
+        <h2 class="section-toggle expanded">VM Configuration Management</h2>
+        <div class="section-content expanded">
+            <h3>Reading VM Configuration</h3>
+            <p>To view the complete configuration of a VM, use the <code>qm config</code> command:</p>
+            
+            <pre class="code-block">
+# Show VM configuration
+qm config &lt;vmid&gt;
+
+# Example for VM with ID 100
+qm config 100
+            </pre>
+            
+            <p>This command displays all configuration parameters for the specified VM, including:</p>
+            <ul>
+                <li>CPU and memory settings</li>
+                <li>Disk configurations</li>
+                <li>Network interfaces</li>
+                <li>IP address settings (if configured via QEMU guest agent)</li>
+                <li>Boot options</li>
+                <li>Other VM parameters</li>
+            </ul>
+            
+            <p>Example output:</p>
+            <pre class="code-block">
+boot: order=scsi0;net0
+cores: 2
+memory: 2048
+name: web-server
+net0: virtio=AA:BB:CC:DD:EE:FF,bridge=vmbr0
+ipconfig0: ip=192.168.1.100/24,gw=192.168.1.1
+scsi0: local-lvm:vm-100-disk-0,size=32G
+scsihw: virtio-scsi-pci
+            </pre>
+            
+            <h3>Reading VM IP Configuration</h3>
+            <p>If the VM has the QEMU guest agent installed and running, you can get detailed network information:</p>
+            
+            <pre class="code-block">
+# Get VM agent information
+qm agent &lt;vmid&gt; info
+
+# Get VM network interfaces
+qm agent &lt;vmid&gt; network-get-interfaces
+
+# Example for VM with ID 100
+qm agent 100 network-get-interfaces
+            </pre>
+            
+            <p>Example output:</p>
+            <pre class="code-block">
+[
+  {
+    "name": "lo",
+    "ip-addresses": [
+      {
+        "ip-address": "127.0.0.1",
+        "prefix": 8,
+        "ip-address-type": "ipv4"
+      }
+    ]
+  },
+  {
+    "name": "eth0",
+    "ip-addresses": [
+      {
+        "ip-address": "192.168.1.100",
+        "prefix": 24,
+        "ip-address-type": "ipv4"
+      }
+    ],
+    "hardware-address": "AA:BB:CC:DD:EE:FF"
+  }
+]
+            </pre>
+        </div>
+    </div>
+    
+    <div class="doc-section">
+        <h2 class="section-toggle expanded">Modifying VM IP Address</h2>
+        <div class="section-content expanded">
+            <h3>Setting IP Address for VMs</h3>
+            <p>To change the IP address of a VM, use the <code>qm set</code> command with the <code>--ipconfig</code> option:</p>
+            
+            <pre class="code-block">
+# Set static IP for the first network interface
+qm set &lt;vmid&gt; --ipconfig0 ip=192.168.1.100/24,gw=192.168.1.1
+
+# Example for VM with ID 100
+qm set 100 --ipconfig0 ip=192.168.1.100/24,gw=192.168.1.1
+            </pre>
+            
+            <p>For multiple network interfaces, use the corresponding ipconfig parameter:</p>
+            
+            <pre class="code-block">
+# Set static IP for the second network interface
+qm set &lt;vmid&gt; --ipconfig1 ip=10.10.10.100/24
+
+# Example for VM with ID 100
+qm set 100 --ipconfig1 ip=10.10.10.100/24
+            </pre>
+            
+            <h3>Setting DHCP for a VM</h3>
+            <p>To configure a VM to use DHCP instead of a static IP:</p>
+            
+            <pre class="code-block">
+# Set DHCP for the first network interface
+qm set &lt;vmid&gt; --ipconfig0 ip=dhcp
+
+# Example for VM with ID 100
+qm set 100 --ipconfig0 ip=dhcp
+            </pre>
+            
+            <div class="note-box">
+                <strong>Note:</strong> IP configuration changes require the QEMU guest agent to be installed and running in the VM. The changes will be applied the next time the VM boots.
+            </div>
+            
+            <h3>Applying IP Changes to a Running VM</h3>
+            <p>After changing the IP configuration, you need to reboot the VM to apply the changes:</p>
+            
+            <pre class="code-block">
+# Reboot the VM to apply changes
+qm reboot &lt;vmid&gt;
+
+# Example for VM with ID 100
+qm reboot 100
+            </pre>
+            
+            <h3>Verifying IP Configuration Changes</h3>
+            <p>After the VM reboots, you can verify the new IP configuration:</p>
+            
+            <pre class="code-block">
+# Check VM configuration
+qm config &lt;vmid&gt;
+
+# Check network interfaces via guest agent
+qm agent &lt;vmid&gt; network-get-interfaces
+            </pre>
+        </div>
+    </div>
+    
+    <div class="doc-section">
+        <h2 class="section-toggle expanded">Container IP Address Management</h2>
+        <div class="section-content expanded">
+            <h3>Reading Container Configuration</h3>
+            <p>To view the complete configuration of a container, use the <code>pct config</code> command:</p>
+            
+            <pre class="code-block">
+# Show container configuration
+pct config &lt;ctid&gt;
+
+# Example for container with ID 100
+pct config 100
+            </pre>
+            
+            <p>Example output:</p>
+            <pre class="code-block">
+arch: amd64
+cores: 1
+hostname: container1
+memory: 512
+net0: name=eth0,bridge=vmbr0,ip=192.168.1.101/24,gw=192.168.1.1
+rootfs: local-lvm:vm-100-disk-0,size=8G
+            </pre>
+            
+            <h3>Modifying Container IP Address</h3>
+            <p>To change the IP address of an existing container:</p>
+            
+            <pre class="code-block">
+# Change to static IP
+pct set &lt;ctid&gt; --net0 name=eth0,bridge=vmbr0,ip=192.168.1.102/24,gw=192.168.1.1
+
+# Example for container with ID 101
+pct set 101 --net0 name=eth0,bridge=vmbr0,ip=192.168.1.102/24,gw=192.168.1.1
+            </pre>
+            
+            <h3>Setting DHCP for a Container</h3>
+            <p>To configure a container to use DHCP instead of a static IP:</p>
+            
+            <pre class="code-block">
+# Change to DHCP
+pct set &lt;ctid&gt; --net0 name=eth0,bridge=vmbr0,ip=dhcp
+
+# Example for container with ID 100
+pct set 100 --net0 name=eth0,bridge=vmbr0,ip=dhcp
+            </pre>
+            
+            <h3>Applying IP Changes to a Container</h3>
+            <p>After changing the IP configuration, you need to restart the container to apply the changes:</p>
+            
+            <pre class="code-block">
+# Apply changes by restarting the container
+pct restart &lt;ctid&gt;
+
+# Example for container with ID 101
+pct restart 101
+            </pre>
+            
+            <h3>Verifying Container IP Configuration</h3>
+            <p>After the container restarts, you can verify the new IP configuration:</p>
+            
+            <pre class="code-block">
+# Check container configuration
+pct config &lt;ctid&gt;
+
+# Enter the container to check network configuration
+pct enter &lt;ctid&gt;
+
+# Inside the container, check IP configuration
+ip addr show
+            </pre>
+        </div>
+    </div>
+    
+    <div class="doc-section">
+        <h2 class="section-toggle expanded">Advanced IP Configuration</h2>
+        <div class="section-content expanded">
+            <h3>Adding Multiple Network Interfaces</h3>
+            <p>For VMs with multiple network interfaces:</p>
+            
+            <pre class="code-block">
+# Add a second network interface to a VM
+qm set &lt;vmid&gt; --net1 virtio,bridge=vmbr0
+
+# Configure IP for the second interface
+qm set &lt;vmid&gt; --ipconfig1 ip=10.10.10.100/24
+            </pre>
+            
+            <p>For containers with multiple network interfaces:</p>
+            
+            <pre class="code-block">
+# Add a second network interface to a container
+pct set &lt;ctid&gt; --net1 name=eth1,bridge=vmbr1,ip=10.10.10.101/24
+
+# Add a third network interface without IP (to be configured inside the container)
+pct set &lt;ctid&gt; --net2 name=eth2,bridge=vmbr0,ip=manual
+            </pre>
+            
+            <h3>Using Cloud-Init for VM IP Configuration</h3>
+            <p>For VMs created from Cloud-Init templates, you can set the IP address using Cloud-Init:</p>
+            
+            <pre class="code-block">
+# Set Cloud-Init IP configuration
+qm set &lt;vmid&gt; --ipconfig0 ip=192.168.1.100/24,gw=192.168.1.1
+
+# Set Cloud-Init DNS servers
+qm set &lt;vmid&gt; --nameserver 8.8.8.8
+
+# Set Cloud-Init search domain
+qm set &lt;vmid&gt; --searchdomain example.com
+            </pre>
+        </div>
+    </div>
+    
+    <div class="doc-section">
+        <h2 class="section-toggle expanded">Troubleshooting IP Configuration</h2>
+        <div class="section-content expanded">
+            <h3>Common Issues and Solutions</h3>
+            
+            <h4>VM IP Configuration Not Applied</h4>
+            <ul>
+                <li>Ensure the QEMU guest agent is installed and running in the VM</li>
+                <li>Verify the VM has been rebooted after configuration changes</li>
+                <li>Check that the network interface exists in the VM</li>
+            </ul>
+            
+            <pre class="code-block">
+# Check if guest agent is enabled in VM configuration
+qm config &lt;vmid&gt; | grep agent
+
+# Enable guest agent if not already enabled
+qm set &lt;vmid&gt; --agent enabled=1
+
+# Inside the VM (for Debian/Ubuntu)
+apt update
+apt install qemu-guest-agent
+systemctl enable qemu-guest-agent
+systemctl start qemu-guest-agent
+            </pre>
+            
+            <h4>Container IP Configuration Not Applied</h4>
+            <ul>
+                <li>Ensure the container has been restarted after configuration changes</li>
+                <li>Verify the network interface exists in the container</li>
+                <li>Check that the bridge interface exists on the host</li>
+            </ul>
+            
+            <pre class="code-block">
+# Check bridge interfaces on the host
+ip addr show | grep vmbr
+
+# Check container network configuration
+pct config &lt;ctid&gt; | grep net
+
+# Restart container to apply changes
+pct restart &lt;ctid&gt;
+            </pre>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.section-toggle').forEach(header => {
+            header.addEventListener('click', function() {
+                this.classList.toggle('expanded');
+                const content = this.nextElementSibling;
+                
+                if (content.classList.contains('expanded')) {
+                    content.classList.remove('expanded');
+                    content.style.maxHeight = '0';
+                } else {
+                    content.classList.add('expanded');
+                    content.style.maxHeight = content.scrollHeight + 'px';
+                }
+            });
+        });
+        
+        // Initialize all expanded sections
+        document.querySelectorAll('.section-content.expanded').forEach(content => {
+            content.style.maxHeight = content.scrollHeight + 'px';
+        });
+    });
+</script>

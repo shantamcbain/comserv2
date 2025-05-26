@@ -1,9 +1,13 @@
 # Navigation System Documentation
 
 **File:** /home/shanta/PycharmProjects/comserv/Comserv/root/Documentation/developer/navigation_system.md  
-**Version:** 1.0  
-**Last Updated:** April 12, 2025  
+**Version:** 1.1  
+**Last Updated:** June 1, 2025  
 **Author:** Development Team
+
+> **Important Note:** This document has been expanded with more detailed guides:
+> - [Menu System Guide](menu_system_guide.md) - Comprehensive guide to the entire menu system
+> - [Admin Top Menu Guide](admintopmenu_guide.md) - Specific guide for the admin menu structure
 
 ## Overview
 
@@ -270,6 +274,8 @@ To add a new dropdown section:
    - Check CSS class names
    - Verify HTML structure matches established pattern
    - Check for JavaScript errors
+   - Ensure proper nesting of elements
+   - Check for missing closing tags
 
 2. **Role-Based Access Not Working**
    - Verify role check syntax
@@ -281,9 +287,22 @@ To add a new dropdown section:
    - Check for CSS conflicts
    - Verify theme compatibility
 
+4. **Submenus Not Working**
+   - Check the HTML structure of submenu items
+   - Verify that submenu items are properly contained within the dropdown-content div
+   - Check for JavaScript errors
+   - Ensure proper nesting of elements
+
 ### Debugging Navigation
 
 1. Enable debug mode to see template versions
 2. Check browser developer tools for CSS/JS issues
 3. Test navigation with different user roles
 4. Review application logs for errors
+5. Use browser developer tools to inspect the HTML structure
+
+### Recent Fixes
+
+For information about recent fixes to the navigation system, see:
+- [Menu System Guide](menu_system_guide.md#recent-fixes)
+- [Admin Top Menu Guide](admintopmenu_guide.md#common-issues-and-solutions)

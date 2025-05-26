@@ -38,7 +38,7 @@ This document lists all controllers in the Comserv application and their documen
 | Todo | ❌ Missing | `/lib/Comserv/Controller/Todo.pm` |
 | USBM | ❌ Missing | `/lib/Comserv/Controller/USBM.pm` |
 | User | ✅ Documented | `/lib/Comserv/Controller/User.pm` |
-| Ve7tit | ❌ Missing | `/lib/Comserv/Controller/Ve7tit.pm` |
+| Ve7tit | ✅ Documented | `/lib/Comserv/Controller/Ve7tit.pm` |
 | Voip | ❌ Missing | `/lib/Comserv/Controller/Voip.pm` |
 | WorkShop | ❌ Missing | `/lib/Comserv/Controller/WorkShop.pm` |
 

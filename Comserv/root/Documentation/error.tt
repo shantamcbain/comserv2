@@ -35,6 +35,16 @@
                 <span class="label">User Role:</span>
                 <span class="value">[% user_role || 'normal' %]</span>
             </div>
+            <div class="session-info">
+                <span class="label">Username:</span>
+                <span class="value">[% c.session.username || 'Not logged in' %]</span>
+            </div>
+            [% IF c.session.roles %]
+            <div class="session-roles-info">
+                <span class="label">Session Roles:</span>
+                <span class="value">[% c.session.roles.join(', ') %]</span>
+            </div>
+            [% END %]
         </div>
 
         [% IF c.session.debug_mode == 1 || user_role == 'admin' || user_role == 'developer' %]
@@ -181,18 +191,20 @@
     
     .user-context {
         display: flex;
+        flex-direction: column;
         justify-content: center;
-        gap: 20px;
+        gap: 10px;
         margin: 20px 0;
-        padding: 10px;
+        padding: 15px;
         background-color: #f0f7ff;
         border-radius: 5px;
         font-size: 0.9em;
     }
 
-    .site-info, .role-info {
+    .site-info, .role-info, .session-info, .session-roles-info {
         display: flex;
         align-items: center;
+        padding: 5px 0;
     }
 
     .label {

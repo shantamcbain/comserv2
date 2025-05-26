@@ -10,6 +10,7 @@ use Try::Tiny;
 use Data::Dumper;
 use JSON;
 use Comserv::Util::Logging;
+use Catalyst::Utils;  # For path_to
 
 extends 'Catalyst::Model';
 
@@ -34,7 +35,45 @@ sub BUILD {
     # Load the database configuration
     my $config;
     try {
-        my $config_file = File::Spec->catfile($FindBin::Bin, '..', 'db_config.json');
+        my $config_file;
+        
+        # Try to load the config file using Catalyst::Utils if the application is initialized
+        eval {
+            $config_file = Catalyst::Utils::path_to('db_config.json');
+        };
+        
+        # Fallback to FindBin if Catalyst::Utils fails (during application initialization)
+        if ($@ || !defined $config_file) {
+            use File::Basename;
+            
+            # Get the application root directory (one level up from script or lib)
+            my $bin_dir = $FindBin::Bin;
+            my $app_root;
+            
+            # If we're in a script directory, go up one level to find app root
+            if ($bin_dir =~ /\/script$/) {
+                $app_root = dirname($bin_dir);
+            }
+            # If we're somewhere else, try to find the app root
+            else {
+                # Check if we're already in the app root
+                if (-f "$bin_dir/db_config.json") {
+                    $app_root = $bin_dir;
+                }
+                # Otherwise, try one level up
+                elsif (-f dirname($bin_dir) . "/db_config.json") {
+                    $app_root = dirname($bin_dir);
+                }
+                # If all else fails, assume we're in lib and need to go up one level
+                else {
+                    $app_root = dirname($bin_dir);
+                }
+            }
+            
+            $config_file = "$app_root/db_config.json";
+            warn "Using FindBin fallback for config file: $config_file";
+        }
+        
         local $/;
         open my $fh, "<", $config_file or die "Could not open $config_file: $!";
         my $json_text = <$fh>;
@@ -95,7 +134,8 @@ sub get_connection {
     
     # Otherwise, create a new connection
     my $config = $conn->{config};
-    my $dsn = "DBI:$config->{db_type}:database=$config->{database};host=$config->{host};port=$config->{port}";
+    # Fixed DSN format for MySQL - most common format
+    my $dsn = "DBI:mysql:database=$config->{database};host=$config->{host};port=$config->{port}";
     
     try {
         $conn->{dbh} = DBI->connect($dsn, $config->{username}, $config->{password}, {

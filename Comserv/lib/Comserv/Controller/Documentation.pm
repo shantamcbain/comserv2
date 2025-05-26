@@ -4,6 +4,8 @@ use namespace::autoclean;
 use Comserv::Util::Logging;
 use File::Find;
 use File::Basename;
+use File::Spec;
+use FindBin;
 use Time::Piece;
 use Comserv::Controller::Documentation::ScanMethods qw(_scan_directories _categorize_pages);
 
@@ -197,10 +199,26 @@ sub BUILD {
 
                 # Process metadata
                 my $title = $self->_format_title($filename);
+                
+                # Determine appropriate roles based on path
+                my @roles = ('normal', 'editor', 'admin', 'developer'); # Default - accessible to all
+                
+                # Restrict access for admin-specific paths
+                if ($rel_path =~ m{/roles/admin/} || 
+                    $rel_path =~ m{/proxmox/} ||
+                    $rel_path =~ m{/controllers/} ||
+                    $rel_path =~ m{/models/}) {
+                    @roles = ('admin', 'developer');
+                }
+                # Restrict access for developer-specific paths
+                elsif ($rel_path =~ m{/roles/developer/}) {
+                    @roles = ('developer', 'admin');
+                }
+                
                 my %meta = (
                     path => $rel_path,
                     site => 'all',
-                    roles => ['normal', 'editor', 'admin', 'developer'],
+                    roles => \@roles,
                     file_type => ($filename =~ /\.tt$/i) ? 'template' :
                                  ($filename =~ /\.md$/i) ? 'markdown' : 'other',
                     title => $title,
@@ -298,8 +316,9 @@ sub BUILD {
             elsif ($key =~ /^(todo|project|task)/i) {
                 $category = 'modules';
             }
-            elsif ($key =~ /^(proxmox)/i) {
+            elsif ($key =~ /^(proxmox)/i || $key =~ /^(proxmox_commands)$/i) {
                 $category = 'proxmox';
+                $logger->log_to_file("Categorized as proxmox: $key", undef, 'DEBUG');
             }
 
             # Add to appropriate category if it exists
@@ -558,8 +577,12 @@ sub index :Path('/Documentation') :Args(0) {
 
     # First check session roles (this works even if user is not fully authenticated)
     if ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && @{$c->session->{roles}}) {
+        # Log all roles for debugging
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
+            "Session roles: " . join(", ", @{$c->session->{roles}}));
+            
         # If user has multiple roles, prioritize admin role
-        if (grep { $_ eq 'admin' } @{$c->session->{roles}}) {
+        if (grep { lc($_) eq 'admin' } @{$c->session->{roles}}) {
             $user_role = 'admin';
             $is_admin = 1;
         } else {
@@ -572,9 +595,20 @@ sub index :Path('/Documentation') :Args(0) {
     # If no role found in session but user exists, try to get role from user object
     elsif ($c->user_exists) {
         $user_role = $c->user->role || 'normal';
-        $is_admin = 1 if $user_role eq 'admin';
+        $is_admin = 1 if lc($user_role) eq 'admin';
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
             "User role determined from user object: $user_role, is_admin: $is_admin");
+    }
+    
+    # Special case for site CSC - ensure admin role is recognized
+    if ($c->stash->{SiteName} && $c->stash->{SiteName} eq 'CSC') {
+        # Check if user should have admin privileges on this site
+        if ($c->session->{username} && ($c->session->{username} eq 'Shanta' || $c->session->{username} eq 'admin')) {
+            $user_role = 'admin';
+            $is_admin = 1;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
+                "Admin role granted for CSC site user: " . $c->session->{username});
+        }
     }
 
     # Log the final role determination
@@ -637,13 +671,22 @@ sub index :Path('/Documentation') :Args(0) {
                         last;
                     }
                 }
-                # Special case for normal role
+                # Special case for normal role - any authenticated user can access normal content
                 elsif ($role eq 'normal' && $user_role) {
                     $has_role = 1;
+                    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
+                        "Normal role access granted for user with role $user_role");
                     last;
                 }
             }
         }
+        
+        # Log access decision
+        if (!$has_role) {
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
+                "Access denied to page $page_name for user with role $user_role");
+        }
+        
         next unless $has_role;
 
         # Add to filtered pages
@@ -707,9 +750,11 @@ sub index :Path('/Documentation') :Args(0) {
                         last;
                     }
                 }
-                # Special case for normal role
+                # Special case for normal role - any authenticated user can access normal content
                 elsif ($role eq 'normal' && $user_role) {
                     $has_role = 1;
+                    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
+                        "Normal role access granted to category $category_key for user with role $user_role");
                     last;
                 }
             }
@@ -717,7 +762,13 @@ sub index :Path('/Documentation') :Args(0) {
 
         # Log role access decision
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
-            "Category $category_key access: " . ($has_role ? "granted" : "denied"));
+            "Category $category_key access: " . ($has_role ? "granted" : "denied") . " for user with role $user_role");
+        
+        if (!$has_role) {
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
+                "Access denied to category $category_key for user with role $user_role");
+        }
+        
         next unless $has_role;
 
         # Skip site-specific categories if not relevant to this site
@@ -877,8 +928,10 @@ sub _has_site_specific_docs {
 sub _format_title {
     my ($self, $page_name) = @_;
 
-    # Log the input for debugging
-    $self->logging->log_to_file("Formatting title from: $page_name", undef, 'DEBUG');
+    # Use the standard logging method without specifying a file path
+    # This ensures logs go to the application log file
+    $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_format_title',
+        "Formatting title from: $page_name");
 
     # Convert underscores and hyphens to spaces
     my $title = $page_name;
@@ -900,8 +953,9 @@ sub _format_title {
     $title =~ s/\bDbi\b/DBI/g;
     $title =~ s/\bEncy\b/ENCY/g;
 
-    # Log the output for debugging
-    $self->logging->log_to_file("Formatted title result: $title", undef, 'DEBUG');
+    # Log the output for debugging using the standard logging method
+    $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_format_title',
+        "Formatted title result: $title");
 
     return $title;
 }
@@ -1196,12 +1250,20 @@ sub view :Path('/Documentation') :Args(1) {
 
     # Get the current user's role
     my $user_role = 'normal';  # Default to normal user
+    my $is_admin = 0;  # Flag to track if user has admin role
+    
+    # First check if user is authenticated
     if ($c->user_exists) {
         # Check if roles are stored in session
         if ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && @{$c->session->{roles}}) {
+            # Log all roles for debugging
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'view', 
+                "Session roles: " . join(", ", @{$c->session->{roles}}));
+            
             # If user has multiple roles, prioritize admin role
-            if (grep { $_ eq 'admin' } @{$c->session->{roles}}) {
+            if (grep { lc($_) eq 'admin' } @{$c->session->{roles}}) {
                 $user_role = 'admin';
+                $is_admin = 1;
             } else {
                 # Otherwise use the first role
                 $user_role = $c->session->{roles}->[0];
@@ -1209,11 +1271,25 @@ sub view :Path('/Documentation') :Args(1) {
         } else {
             # Fallback to user->role if available
             $user_role = $c->user->role || 'normal';
+            $is_admin = 1 if lc($user_role) eq 'admin';
         }
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'view', "User role determined: $user_role");
+        
+        # Special case for site CSC - ensure admin role is recognized
+        if ($c->stash->{SiteName} && $c->stash->{SiteName} eq 'CSC') {
+            # Check if user should have admin privileges on this site
+            if ($c->session->{username} && ($c->session->{username} eq 'Shanta' || $c->session->{username} eq 'admin')) {
+                $user_role = 'admin';
+                $is_admin = 1;
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view', 
+                    "Admin role granted for CSC site user: " . $c->session->{username});
+            }
+        }
+        
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'view', 
+            "User role determined: $user_role, is_admin: $is_admin, site: " . ($c->stash->{SiteName} || 'default'));
     }
     # Add admin check for Proxmox docs
-    if ($page =~ /^Proxmox/ && !$c->check_user_roles('admin')) {
+    if (($page =~ /^Proxmox/ || $page =~ /^proxmox_commands$/) && !$c->check_user_roles('admin')) {
         $c->response->redirect($c->uri_for('/access_denied'));
         return;
     }
@@ -1231,7 +1307,12 @@ sub view :Path('/Documentation') :Args(1) {
         my $metadata = $pages->{$page};
 
         # Admins can access all documentation regardless of site or role restrictions
-        if ($user_role ne 'admin') {
+        if ($is_admin) {
+            # Log admin access to documentation
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
+                "Admin access granted to documentation: $page (user: " . ($c->session->{username} || 'unknown') . 
+                ", site: " . ($site_name || 'default') . ")");
+        } else {
             # Check site-specific access for non-admins
             if ($metadata->{site} ne 'all' && $metadata->{site} ne $site_name) {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view',
@@ -1239,6 +1320,8 @@ sub view :Path('/Documentation') :Args(1) {
 
                 $c->stash(
                     error_msg => "You don't have permission to view this documentation page. It's specific to the '$metadata->{site}' site.",
+                    user_role => $user_role,
+                    site_name => $site_name,
                     template => 'Documentation/error.tt'
                 );
                 return $c->forward($c->view('TT'));
@@ -1247,31 +1330,73 @@ sub view :Path('/Documentation') :Args(1) {
             # Check role-based access for non-admins
             my $has_role = 0;
             foreach my $role (@{$metadata->{roles}}) {
-                if ($role eq $user_role || ($role eq 'normal' && $user_role)) {
+                # Check for exact role match
+                if (lc($role) eq lc($user_role)) {
                     $has_role = 1;
+                    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'view',
+                        "Role match: user role $user_role matches required role $role for page $page");
+                    last;
+                }
+                # Special case for normal role - any authenticated user can access normal content
+                elsif (lc($role) eq 'normal' && $user_role) {
+                    $has_role = 1;
+                    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'view',
+                        "Normal role access granted to page $page for user with role $user_role");
                     last;
                 }
             }
 
             unless ($has_role) {
+                # Log detailed information about the access denial
+                my $roles_str = join(', ', @{$metadata->{roles}});
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view',
-                    "Access denied to role-protected documentation: $page (user role: $user_role)");
+                    "Access denied to role-protected documentation: $page (user role: $user_role, username: " . 
+                    ($c->session->{username} || 'unknown') . ", site: " . ($site_name || 'default') . 
+                    ", required roles: $roles_str)");
+
+                # Log session roles for debugging
+                if ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY') {
+                    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'view',
+                        "Session roles: " . join(", ", @{$c->session->{roles}}));
+                }
 
                 $c->stash(
                     error_msg => "You don't have permission to view this documentation page. It requires higher privileges.",
+                    user_role => $user_role,
+                    site_name => $site_name,
+                    required_roles => $roles_str,
                     template => 'Documentation/error.tt'
                 );
                 return $c->forward($c->view('TT'));
             }
-        } else {
-            # Log admin access to documentation
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
-                "Admin access granted to documentation: $page");
         }
     }
 
     # First check if it's a direct file request (with extension)
     if ($page =~ /\./) {
+        # Special handling for .tt files - process them through the template engine
+        if ($page =~ /\.tt$/i) {
+            my $template_path = "Documentation/$page";
+            my $full_path = $c->path_to('root', $template_path);
+            
+            if (-e $full_path && !-d $full_path) {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
+                    "Processing template file: $template_path");
+                
+                # Set the template and additional context
+                $c->stash(
+                    template => $template_path,
+                    user_role => $user_role,
+                    site_name => $site_name,
+                    display_role => $user_role eq 'admin' ? 'Administrator' : 
+                                   $user_role eq 'developer' ? 'Developer' : 
+                                   $user_role eq 'editor' ? 'Editor' : 'User'
+                );
+                return;
+            }
+        }
+        
+        # Handle other file types as static files
         my $file_path = "Documentation/$page";
         my $full_path = $c->path_to('root', $file_path);
 
@@ -1379,7 +1504,107 @@ sub view :Path('/Documentation') :Args(1) {
                     site_name => $site_name
                 );
             } else {
-                # Log the error
+                # Check if there's a default path defined in the documentation_config.json file
+                my $config_file = $c->path_to('root', 'Documentation', 'documentation_config.json');
+                my $default_path = undef;
+                
+                if (-e $config_file) {
+                    # Read the JSON file
+                    eval {
+                        open my $fh, '<:encoding(UTF-8)', $config_file or die "Cannot open $config_file: $!";
+                        my $json_content = do { local $/; <$fh> };
+                        close $fh;
+                        
+                        # Parse the JSON content
+                        require JSON;
+                        my $config = JSON::decode_json($json_content);
+                        
+                        # Check if there's a default path for this page
+                        if ($config->{default_paths} && $config->{default_paths}{$page}) {
+                            $default_path = $config->{default_paths}{$page};
+                            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
+                                "Found default path for $page: $default_path");
+                        }
+                    };
+                    if ($@) {
+                        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'view',
+                            "Error loading documentation_config.json: $@");
+                    }
+                }
+                
+                # If a default path is defined, try to use it
+                if ($default_path) {
+                    my $full_default_path = $c->path_to('root', $default_path);
+                    
+                    if (-e $full_default_path) {
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
+                            "Using default path for $page: $default_path");
+                            
+                        # Determine file type based on extension
+                        if ($default_path =~ /\.md$/i) {
+                            # Read the markdown file
+                            open my $fh, '<:encoding(UTF-8)', $full_default_path or die "Cannot open $full_default_path: $!";
+                            my $content = do { local $/; <$fh> };
+                            close $fh;
+                            
+                            # Get file modification time
+                            my $mtime = (stat($full_default_path))[9];
+                            my $last_updated = localtime($mtime);
+                            $last_updated = $last_updated->strftime('%Y-%m-%d %H:%M:%S');
+                            
+                            # Pass the content to the markdown viewer template
+                            $c->stash(
+                                page_name => $page,
+                                page_title => $self->_format_title($page),
+                                markdown_content => $content,
+                                last_updated => $last_updated,
+                                user_role => $user_role,
+                                site_name => $site_name,
+                                template => 'Documentation/markdown_viewer.tt'
+                            );
+                            return;
+                        } elsif ($default_path =~ /\.tt$/i) {
+                            # Set the template
+                            $c->stash(
+                                template => $default_path,
+                                user_role => $user_role,
+                                site_name => $site_name
+                            );
+                            return;
+                        } else {
+                            # Handle other file types as static files
+                            open my $fh, '<:raw', $full_default_path or die "Cannot open $full_default_path: $!";
+                            my $content = do { local $/; <$fh> };
+                            close $fh;
+                            
+                            # Determine content type based on file extension
+                            my $content_type = 'text/plain';  # Default
+                            if ($default_path =~ /\.json$/i) {
+                                $content_type = 'application/json';
+                            } elsif ($default_path =~ /\.html?$/i) {
+                                $content_type = 'text/html';
+                            } elsif ($default_path =~ /\.css$/i) {
+                                $content_type = 'text/css';
+                            } elsif ($default_path =~ /\.js$/i) {
+                                $content_type = 'application/javascript';
+                            } elsif ($default_path =~ /\.pdf$/i) {
+                                $content_type = 'application/pdf';
+                            } elsif ($default_path =~ /\.(jpe?g|png|gif)$/i) {
+                                $content_type = 'image/' . lc($1);
+                            }
+                            
+                            # Set the response
+                            $c->response->content_type($content_type);
+                            $c->response->body($content);
+                            return;
+                        }
+                    } else {
+                        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'view',
+                            "Default path for $page not found: $default_path");
+                    }
+                }
+                
+                # If we get here, the page was not found
                 $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'view',
                     "Documentation page not found: $page (user role: $user_role, site: $site_name)");
 

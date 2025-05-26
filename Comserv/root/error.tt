@@ -48,6 +48,17 @@
             <p>[% technical_details %]</p>
         </div>
         [% END %]
+        
+        [% IF available_equipment && available_equipment.size > 0 %]
+        <div class="available-equipment">
+            <h3>Available Equipment Pages:</h3>
+            <ul>
+                [% FOREACH equip IN available_equipment %]
+                <li><a href="/ve7tit/equipment/[% equip %]">[% equip %]</a></li>
+                [% END %]
+            </ul>
+        </div>
+        [% END %]
 
         [% IF debug_msg.defined || debug_msg_str.defined %]
         <div class="debug-message">
@@ -151,6 +162,28 @@
     }
 
     .debug-errors li {
+        margin-bottom: 5px;
+    }
+    
+    .available-equipment {
+        background-color: #d1ecf1;
+        padding: 15px;
+        border-left: 4px solid #17a2b8;
+        margin-top: 20px;
+    }
+    
+    .available-equipment h3 {
+        color: #0c5460;
+        margin-top: 0;
+    }
+    
+    .available-equipment ul {
+        columns: 2;
+        -webkit-columns: 2;
+        -moz-columns: 2;
+    }
+    
+    .available-equipment li {
         margin-bottom: 5px;
     }
 
