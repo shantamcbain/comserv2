@@ -166,4 +166,4 @@ push @{$c->stash->{debug_msg}}, "Debug message";
 - [HelpDesk Controller Documentation](controllers/HelpDesk.md)
 - [FAQ Controller Documentation](controllers/FAQ.md)
 - [Documentation System Guide](documentation_config_guide.md)
-- [Mail System Documentation](MailSystem.md)
+- [Mail System Documentation](MailSystem.tt)

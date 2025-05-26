@@ -846,6 +846,21 @@ sub index :Path('/Documentation') :Args(0) {
     $c->forward($c->view('TT'));
 }
 # Admin documentation
+# Legacy documentation route - serves the original ComservDocumentation.tt template
+sub comserv_documentation :Path('ComservDocumentation') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Log access to legacy documentation
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'comserv_documentation', 
+        "Accessing legacy ComservDocumentation template");
+    
+    # Set template to the legacy documentation file
+    $c->stash(template => 'Documentation/ComservDocumentation.tt');
+    
+    # Forward to the TT view
+    $c->forward($c->view('TT'));
+}
+
 sub admin :Path('admin') :Args(0) {
     my ($self, $c) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin', "Accessing admin documentation");
