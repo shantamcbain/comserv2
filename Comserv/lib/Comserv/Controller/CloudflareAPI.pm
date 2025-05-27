@@ -3,7 +3,7 @@ use Moose;
 use namespace::autoclean;
 use JSON;
 use Try::Tiny;
-use IPC::Run3;
+use Comserv::Util::CloudflareManager;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -581,43 +581,34 @@ sub _get_user_sites {
     return @sites;
 }
 
-# Call the CloudflareManager.py module
+# CloudflareManager instance
+has 'cloudflare_manager' => (
+    is => 'ro',
+    lazy => 1,
+    default => sub {
+        return Comserv::Util::CloudflareManager->new();
+    }
+);
+
+# Call the CloudflareManager module
 sub _call_cloudflare_manager {
     my ($self, $method, @args) = @_;
     
-    # Prepare the command
-    my $script_path = $ENV{CATALYST_HOME} . "/lib/Comserv/CloudflareManager.py";
-    my $python_cmd = "python3";
-    
-    # Prepare the Python code to execute
-    my $python_code = qq{
-import sys
-sys.path.append("$ENV{CATALYST_HOME}/lib")
-from Comserv.CloudflareManager import CloudflareRoleManager
-
-try:
-    manager = CloudflareRoleManager()
-    result = manager.$method(@{[join(',', map { "'$_'" } @args)]})
-    import json
-    print(json.dumps({"success": True, "result": result}))
-except Exception as e:
-    import json
-    print(json.dumps({"success": False, "error": str(e)}))
-};
-    
-    # Execute the Python code
-    my ($stdout, $stderr);
     try {
-        run3([$python_cmd, '-c', $python_code], \undef, \$stdout, \$stderr);
+        # Call the method on the CloudflareManager instance
+        my $result = $self->cloudflare_manager->$method(@args);
         
-        # Parse the JSON response
-        my $result = decode_json($stdout);
-        return $result;
+        # Return success with the result
+        return {
+            success => 1,
+            result => $result
+        };
     }
     catch {
         # Handle errors
         return {
-            error => "Failed to execute CloudflareManager: $_\nSTDERR: $stderr"
+            success => 0,
+            error => "Failed to execute CloudflareManager: $_"
         };
     };
 }
