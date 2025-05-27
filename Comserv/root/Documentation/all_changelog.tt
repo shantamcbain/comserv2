@@ -1,0 +1,192 @@
+[% META title = 'All Documentation Changelog' %]
+[% PageVersion = 'Documentation/all_changelog.tt,v 0.01 2025/04/08 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<h1>All Documentation Changelog</h1>
+<p>Complete history of documentation updates and changes.</p>
+
+<div class="back-link">
+    <a href="[% c.uri_for('/Documentation') %]">← Back to Documentation Home</a>
+</div>
+
+[% # Get all changelog pages from the structured_pages hash %]
+[% changelog_pages = [] %]
+[% FOREACH page_name IN structured_pages.keys %]
+    [% # Check if the page is in the changelog directory %]
+    [% IF structured_pages.$page_name.path.match('Documentation/changelog/') %]
+        [% changelog_pages.push(page_name) %]
+    [% END %]
+[% END %]
+
+[% # Sort changelog pages by date in the filename (if available) %]
+[% date_sorted_pages = [] %]
+[% FOREACH page_name IN changelog_pages %]
+    [% # Extract date from filename if it exists (format: YYYY-MM-DD) %]
+    [% date_match = page_name.match('(\d{4}-\d{2}(-\d{2})?)') %]
+    
+    [% # Ensure we have a sortable date format %]
+    [% IF date_match %]
+        [% # Normalize date format to ensure proper sorting %]
+        [% sort_date = date_match.0 %]
+        [% # If we only have YYYY-MM, add -01 for the day to ensure proper sorting %]
+        [% IF sort_date.length == 7 %]
+            [% sort_date = sort_date _ '-01' %]
+        [% END %]
+        [% # Ensure no spaces or other characters that might affect sorting %]
+        [% sort_date = sort_date.replace(' ', '') %]
+    [% ELSE %]
+        [% # For files without dates, use a very old date to sort them last %]
+        [% sort_date = '0000-00-00' %]
+    [% END %]
+    
+    [% date_sorted_pages.push({ 
+        name => page_name, 
+        sort_key => sort_date,
+        display_date => date_match ? date_match.0 : 'Recent'
+    }) %]
+[% END %]
+
+[% # Sort by the extracted date in reverse order (newest first) %]
+[% # Use a numerical sort for dates to ensure proper ordering %]
+[% date_sorted_pages = date_sorted_pages.sort('sort_key').reverse %]
+
+[% IF date_sorted_pages.size > 0 %]
+<div class="all-changelog-container">
+    [% FOREACH page_info IN date_sorted_pages %]
+        [% page_name = page_info.name %]
+        [% page = structured_pages.$page_name %]
+        [% # Use the display date we calculated earlier %]
+        [% changelog_date = page_info.display_date %]
+        [% # Replace hyphens with slashes for better display %]
+        [% changelog_date = changelog_date.replace('-', '/') %]
+        <div class="changelog-entry">
+            <h2>[% page.title %]</h2>
+            <div class="changelog-meta">
+                <span class="date">[% changelog_date %]</span>
+                [% IF page.author %]<span class="author">by [% page.author %]</span>[% END %]
+            </div>
+            <p class="description">[% page.description || 'System change documentation.' %]</p>
+            <div class="entry-badges">
+                [% IF page.file_type %]<span class="file-type-badge [% page.file_type %]">[% page.file_type %]</span>[% END %]
+                <span class="role-badge">Admin Only</span>
+            </div>
+            <a href="[% page.url %]" class="read-more-button">Read full details</a>
+        </div>
+    [% END %]
+</div>
+[% ELSE %]
+<p>No changelog entries available.</p>
+[% END %]
+
+<style>
+    .all-changelog-container {
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+    
+    .changelog-entry {
+        background-color: #f8f9fa;
+        border-left: 4px solid #0066cc;
+        padding: 20px;
+        margin-bottom: 25px;
+        border-radius: 0 4px 4px 0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .changelog-entry h2 {
+        margin-top: 0;
+        color: #333;
+        font-size: 1.5em;
+    }
+    
+    .changelog-meta {
+        color: #666;
+        font-size: 0.9em;
+        margin-bottom: 15px;
+    }
+    
+    .changelog-meta .date {
+        font-weight: bold;
+        margin-right: 10px;
+    }
+    
+    .changelog-meta .author {
+        font-style: italic;
+    }
+    
+    .description {
+        margin-bottom: 15px;
+        line-height: 1.5;
+    }
+    
+    .entry-badges {
+        margin-bottom: 15px;
+    }
+    
+    .file-type-badge, .role-badge {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 0.8em;
+        margin-right: 8px;
+    }
+    
+    .file-type-badge {
+        background-color: #e9ecef;
+        color: #495057;
+    }
+    
+    .file-type-badge.template {
+        background-color: #d1ecf1;
+        color: #0c5460;
+    }
+    
+    .file-type-badge.markdown {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    
+    .role-badge {
+        background-color: #f44336;
+        color: white;
+    }
+    
+    .read-more-button {
+        display: inline-block;
+        background-color: #0066cc;
+        color: white;
+        padding: 8px 15px;
+        border-radius: 4px;
+        text-decoration: none;
+        font-size: 14px;
+        transition: background-color 0.3s;
+    }
+    
+    .read-more-button:hover {
+        background-color: #0055aa;
+        text-decoration: none;
+        color: white;
+    }
+    
+    .back-link {
+        margin-bottom: 20px;
+    }
+    
+    .back-link a {
+        display: inline-block;
+        padding: 8px 15px;
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        color: #495057;
+        text-decoration: none;
+        transition: all 0.3s;
+    }
+    
+    .back-link a:hover {
+        background-color: #e9ecef;
+        color: #212529;
+    }
+</style>

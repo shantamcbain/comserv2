@@ -35,6 +35,7 @@
                 <a href="/css_form" class="map-link"><i class="icon-css"></i> CSS Settings</a>
                 <a href="/display_schema" class="map-link"><i class="icon-schema"></i> Database Schema</a>
                 <a href="/mail/add_mail_config_form" class="map-link"><i class="icon-mail-config"></i> Mail Configuration</a>
+                <a href="/api_credentials" class="map-link"><i class="icon-key"></i> API Credentials</a>
                 <a href="/admin/theme" class="map-link"><i class="icon-theme"></i> Theme Management</a>
             </div>
         </div>
@@ -136,6 +137,7 @@
                 <a href="/admin/view_log" class="map-link"><i class="icon-log"></i> View Application Log</a>
                 <a href="/admin/theme" class="map-link"><i class="icon-theme"></i> Theme Management</a>
                 <a href="/ProxyManager" class="map-link"><i class="icon-proxy"></i> Proxy Manager</a>
+                <a href="/api_credentials" class="map-link"><i class="icon-key"></i> API Credentials Management</a>
             </div>
         </div>
 

@@ -1,8 +1,8 @@
 [% IF categories.proxmox %]
 <section class="doc-section admin-only">
-    <h2 class="section-toggle expanded">Proxmox Documentation</h2>
+    <h2 class="section-toggle">Proxmox Documentation</h2>
     <p>Guides for Proxmox virtualization. <span class="admin-badge">Admin Only</span></p>
-    <div class="section-content expanded">
+    <div class="section-content">
         <!-- Featured Proxmox Documentation -->
         <div class="featured-docs">
             <a href="[% c.uri_for('/Documentation/proxmox_commands.tt') %]" class="doc-card featured">

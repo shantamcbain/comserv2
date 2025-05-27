@@ -1,8 +1,8 @@
 [% IF categories.developer_guides %]
 <section class="doc-section developer-only">
-    <h2 class="section-toggle expanded">Developer Documentation</h2>
+    <h2 class="section-toggle">Developer Documentation</h2>
     <p>Resources for system developers. <span class="developer-badge">Developer Resources</span></p>
-    <div class="section-content expanded">
+    <div class="section-content">
         [% FOREACH page_name IN categories.developer_guides.pages.sort %]
             [% IF structured_pages.$page_name %]
                 [% page = structured_pages.$page_name %]

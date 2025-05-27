@@ -31,6 +31,10 @@
     <div class="doc-section">
         <h2 class="section-toggle expanded">Authentication</h2>
         <div class="section-content expanded">
+            <div class="admin-action">
+                <p><strong>Administrator Action:</strong> You can manage API credentials through the <a href="[% c.uri_for('/api_credentials') %]">API Credentials Management</a> interface. See the <a href="[% c.uri_for('/Documentation/api_credentials') %]">API Credentials Documentation</a> for more details.</p>
+            </div>
+            
             <h3>Obtaining API Credentials</h3>
             <ol>
                 <li>Navigate to Admin > Developer > API Credentials</li>

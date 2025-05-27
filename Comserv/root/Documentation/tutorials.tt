@@ -1,8 +1,8 @@
 [% IF categories.tutorials %]
 <section class="doc-section">
-    <h2 class="section-toggle expanded">Tutorials</h2>
+    <h2 class="section-toggle">Tutorials</h2>
     <p>Step-by-step instructions for common tasks.</p>
-    <div class="section-content expanded">
+    <div class="section-content">
         [% FOREACH page_name IN categories.tutorials.pages.sort %]
             [% IF structured_pages.$page_name %]
                 [% page = structured_pages.$page_name %]

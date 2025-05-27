@@ -40,6 +40,23 @@
         <li>general: [% categories.general ? 'Yes' : 'No' %]</li>
     </ul>
     
+    <h4>Changelog Entries:</h4>
+    <ul>
+        [% IF categories.changelog && categories.changelog.pages.size > 0 %]
+            [% FOREACH page_name IN categories.changelog.pages.sort.reverse %]
+                [% page = structured_pages.$page_name %]
+                <li>
+                    [% page_name %] - 
+                    Title: [% page.title %], 
+                    Description: [% page.description %], 
+                    Date: [% page.date %]
+                </li>
+            [% END %]
+        [% ELSE %]
+            <li>No changelog entries found.</li>
+        [% END %]
+    </ul>
+    
     <h4>Controller Documentation Files:</h4>
     <ul>
         [% IF categories.controllers && categories.controllers.pages.size > 0 %]
@@ -89,6 +106,11 @@
                 <p>Comprehensive API reference and usage guide</p>
                 <span class="admin-badge">Admin Only</span>
             </a>
+            <a href="[% c.uri_for('/api_credentials') %]" class="quick-link-card">
+                <h3>API Credentials Management</h3>
+                <p>Manage credentials for external service integrations</p>
+                <span class="admin-badge">Admin Only</span>
+            </a>
             <!-- Add more quick links here as needed -->
         </div>
     </div>
@@ -122,8 +144,136 @@
     [% INCLUDE 'Documentation/system_info.tt' %]
 [% END %]
 
-[% INCLUDE 'Documentation/recent_updates.tt' %]
+[% # Recent Updates Section with direct changelog entries %]
+<section class="doc-section">
+    <h2 class="section-toggle">Recent Updates</h2>
+    <div class="section-content">
+        <div class="changelog-header">
+            <h3>Latest changes and improvements to the system</h3>
+            <a href="[% c.uri_for('/Documentation/all_changelog') %]" class="view-all-link">View All Documentation</a>
+        </div>
+        
+        [% # Get all changelog pages from the structured_pages hash %]
+        [% changelog_pages = [] %]
+        [% FOREACH page_name IN structured_pages.keys %]
+            [% # Check if the page is in the changelog directory %]
+            [% IF structured_pages.$page_name.path.match('Documentation/changelog/') %]
+                [% changelog_pages.push(page_name) %]
+            [% END %]
+        [% END %]
+        
+        [% # Sort changelog pages by date in the filename (if available) %]
+        [% date_sorted_pages = [] %]
+        [% FOREACH page_name IN changelog_pages %]
+            [% # Extract date from filename if it exists (format: YYYY-MM-DD) %]
+            [% date_match = page_name.match('(\d{4}-\d{2}(-\d{2})?)') %]
+            [% sort_key = date_match ? date_match.0 : page_name %]
+            [% date_sorted_pages.push({ name => page_name, sort_key => sort_key }) %]
+        [% END %]
+        
+        [% # Sort by the extracted date in reverse order (newest first) %]
+        [% date_sorted_pages = date_sorted_pages.sort('sort_key').reverse %]
+        
+        [% # Display only the 5 most recent entries %]
+        [% recent_count = 0 %]
+        [% FOREACH page_info IN date_sorted_pages %]
+            [% LAST IF recent_count >= 5 %]
+            [% page_name = page_info.name %]
+            [% page = structured_pages.$page_name %]
+            [% recent_count = recent_count + 1 %]
+            
+            [% # Extract date from filename if it exists (format: YYYY-MM-DD) %]
+            [% date_match = page_name.match('(\d{4}-\d{2}(-\d{2})?)') %]
+            [% changelog_date = date_match ? date_match.0 : 'Recent' %]
+            [% # Replace hyphens with slashes for better display %]
+            [% changelog_date = changelog_date.replace('-', '/') %]
+            
+            <div class="changelog-summary">
+                <h3>[% page.title %]</h3>
+                <div class="changelog-meta">
+                    <span class="date">[% changelog_date %]</span>
+                    [% IF page.author %]<span class="author">by [% page.author %]</span>[% END %]
+                </div>
+                <p>[% page.description || 'System update' %]</p>
+                <a href="[% page.url %]" class="read-more">Read full details</a>
+            </div>
+        [% END %]
+        
+        [% IF recent_count == 0 %]
+            <p>No recent updates available.</p>
+        [% END %]
+    </div>
+</section>
 </div>
+
+<style>
+    /* Recent Updates Section Styles */
+    .changelog-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .changelog-header h3 {
+        margin: 0;
+        color: #333;
+    }
+    
+    .view-all-link {
+        background-color: #0066cc;
+        color: white;
+        padding: 8px 15px;
+        border-radius: 4px;
+        text-decoration: none;
+        font-size: 14px;
+        transition: background-color 0.3s;
+    }
+    
+    .view-all-link:hover {
+        background-color: #0055aa;
+        text-decoration: none;
+        color: white;
+    }
+    
+    .changelog-summary {
+        background-color: #f8f9fa;
+        border-left: 4px solid #0066cc;
+        padding: 15px;
+        margin-bottom: 20px;
+        border-radius: 0 4px 4px 0;
+    }
+    
+    .changelog-summary h3 {
+        margin-top: 0;
+        color: #333;
+    }
+    
+    .changelog-meta {
+        color: #666;
+        font-size: 0.9em;
+        margin-bottom: 10px;
+    }
+    
+    .changelog-meta .date {
+        font-weight: bold;
+        margin-right: 10px;
+    }
+    
+    .read-more {
+        display: inline-block;
+        margin-top: 10px;
+        color: #0066cc;
+        text-decoration: none;
+        font-weight: bold;
+    }
+    
+    .read-more:hover {
+        text-decoration: underline;
+    }
+</style>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -144,9 +294,9 @@
             });
         });
         
-        // Initialize all expanded sections
-        document.querySelectorAll('.section-content.expanded').forEach(content => {
-            content.style.maxHeight = content.scrollHeight + 'px';
+        // Initialize all sections as closed by default
+        document.querySelectorAll('.section-content').forEach(content => {
+            content.style.maxHeight = '0';
         });
     });
 

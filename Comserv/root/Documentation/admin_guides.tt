@@ -1,8 +1,8 @@
 [% IF categories.admin_guides %]
 <section class="doc-section admin-only">
-    <h2 class="section-toggle expanded">Administrator Guides</h2>
+    <h2 class="section-toggle">Administrator Guides</h2>
     <p>Resources for system administrators. <span class="admin-badge">Admin Only</span></p>
-    <div class="section-content expanded">
+    <div class="section-content">
         [% FOREACH page_name IN categories.admin_guides.pages.sort %]
             [% IF structured_pages.$page_name %]
                 [% page = structured_pages.$page_name %]

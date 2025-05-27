@@ -1644,6 +1644,157 @@ sub virtualmin_integration :Path('Virtualmin_Integration') :Args(0) {
     $c->forward($c->view('TT'));
 }
 
+# All Changelog page
+sub all_changelog :Path('all_changelog') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'all_changelog',
+        "Accessing All Changelog documentation");
+    
+    # Get the current user's role
+    my $user_role = 'normal';  # Default to normal user
+    my $is_admin = 0;  # Flag to track if user has admin role
+    
+    # First check session roles
+    if ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && @{$c->session->{roles}}) {
+        # If user has multiple roles, prioritize admin role
+        if (grep { lc($_) eq 'admin' } @{$c->session->{roles}}) {
+            $user_role = 'admin';
+            $is_admin = 1;
+        } else {
+            # Otherwise use the first role
+            $user_role = $c->session->{roles}->[0];
+        }
+    }
+    # If no role found in session but user exists, try to get role from user object
+    elsif ($c->user_exists) {
+        $user_role = $c->user->role || 'normal';
+        $is_admin = 1 if lc($user_role) eq 'admin';
+    }
+    
+    # Get the current site name
+    my $site_name = $c->stash->{SiteName} || 'default';
+    
+    # Get all documentation pages
+    my $pages = $self->documentation_pages;
+    
+    # Filter pages based on user role and site
+    my %filtered_pages;
+    foreach my $page_name (keys %$pages) {
+        my $metadata = $pages->{$page_name};
+        
+        # Skip if this is site-specific documentation for a different site
+        # But allow admins to see all site-specific documentation
+        if ($metadata->{site} ne 'all' && $metadata->{site} ne $site_name) {
+            # Only skip for non-admins
+            next unless $is_admin;
+        }
+        
+        # Skip if the user doesn't have the required role
+        # But always include for admins
+        my $has_role = $is_admin; # Admins can see everything
+        
+        unless ($has_role) {
+            foreach my $role (@{$metadata->{roles}}) {
+                # Check if role matches user_role
+                if ($role eq $user_role) {
+                    $has_role = 1;
+                    last;
+                }
+                # Check session roles
+                elsif ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY') {
+                    if (grep { $_ eq $role } @{$c->session->{roles}}) {
+                        $has_role = 1;
+                        last;
+                    }
+                }
+                # Special case for normal role - any authenticated user can access normal content
+                elsif ($role eq 'normal' && $user_role) {
+                    $has_role = 1;
+                    last;
+                }
+            }
+        }
+        
+        next unless $has_role;
+        
+        # Add to filtered pages
+        $filtered_pages{$page_name} = $metadata;
+    }
+    
+    # Create a structured list of documentation pages with metadata
+    my $structured_pages = {};
+    foreach my $page_name (keys %filtered_pages) {
+        my $metadata = $filtered_pages{$page_name};
+        my $path = $metadata->{path};
+        my $title = $self->_format_title($page_name);
+        
+        # Always use the view action with the page name as parameter
+        my $url = $c->uri_for($self->action_for('view'), [$page_name]);
+        
+        $structured_pages->{$page_name} = {
+            title => $title,
+            path => $path,
+            url => $url,
+            site => $metadata->{site},
+            roles => $metadata->{roles},
+            file_type => $metadata->{file_type},
+            description => $metadata->{description},
+            date => $metadata->{date} || '',
+            author => $metadata->{author} || '',
+        };
+    }
+    
+    # Get categories filtered by user role
+    my %filtered_categories;
+    foreach my $category_key (keys %{$self->documentation_categories}) {
+        my $category = $self->documentation_categories->{$category_key};
+        
+        # Skip if the user doesn't have the required role
+        # But always include for admins
+        my $has_role = $is_admin; # Admins can see everything
+        
+        unless ($has_role) {
+            foreach my $role (@{$category->{roles}}) {
+                # Check if role matches user_role or is in session roles
+                if ($role eq $user_role) {
+                    $has_role = 1;
+                    last;
+                }
+                # Check session roles
+                elsif ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY') {
+                    if (grep { $_ eq $role } @{$c->session->{roles}}) {
+                        $has_role = 1;
+                        last;
+                    }
+                }
+                # Special case for normal role - any authenticated user can access normal content
+                elsif ($role eq 'normal' && $user_role) {
+                    $has_role = 1;
+                    last;
+                }
+            }
+        }
+        
+        next unless $has_role;
+        
+        # Add to filtered categories
+        $filtered_categories{$category_key} = $category;
+    }
+    
+    # Set the template and stash variables
+    $c->stash(
+        template => 'Documentation/all_changelog.tt',
+        structured_pages => $structured_pages,
+        categories => \%filtered_categories,
+        user_role => $user_role,
+        is_admin => $is_admin,
+        site_name => $site_name,
+        title => 'All Documentation Changelog',
+    );
+    
+    $c->forward($c->view('TT'));
+}
+
 # AI Guidelines
 sub ai_guidelines :Path('ai_guidelines') :Args(0) {
     my ($self, $c) = @_;

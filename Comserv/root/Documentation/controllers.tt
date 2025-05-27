@@ -1,8 +1,8 @@
 [% IF categories.controllers %]
 <section class="doc-section admin-only">
-    <h2 class="section-toggle expanded">Controller Documentation</h2>
+    <h2 class="section-toggle">Controller Documentation</h2>
     <p>Technical details for system controllers. <span class="admin-badge">Admin Only</span></p>
-    <div class="section-content expanded">
+    <div class="section-content">
         <a href="[% c.uri_for('/Documentation/controllers/index') %]" class="doc-card special-card">
             <h3>All Controllers</h3>
             <p>View a complete list of all controllers in the system.</p>
