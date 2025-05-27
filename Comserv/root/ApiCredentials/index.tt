@@ -49,7 +49,10 @@
                         <a href="[% c.uri_for('/Documentation/api_credentials') %]#cloudflare" target="_blank">Internal Documentation</a> | 
                         <a href="https://developers.cloudflare.com/api/" target="_blank">Cloudflare API Documentation</a>
                     </p>
-                    <p><a href="[% c.uri_for('/Documentation/api_credentials') %]#cloudflare" target="_blank" class="btn btn-sm btn-info">How to obtain these credentials</a></p>
+                    <div class="service-actions">
+                        <a href="[% c.uri_for('/Documentation/api_credentials') %]#cloudflare" target="_blank" class="btn btn-sm btn-info">How to obtain these credentials</a>
+                        <a href="[% c.uri_for('/cloudflareapi') %]" class="btn btn-sm btn-success">Go to DNS Management</a>
+                    </div>
                 </div>
                 [% ELSIF service_name == 'opnsense' %]
                 <div class="service-description">
@@ -209,6 +212,14 @@
         </ol>
         
         <p>For more detailed information, check out the <a href="[% c.uri_for('/Documentation/api_credentials') %]" class="btn btn-primary" target="_blank">Complete API Credentials Documentation</a> or contact the system administrator.</p>
+        
+        <div class="related-tools">
+            <h5>Related Tools:</h5>
+            <ul class="tools-list">
+                <li><a href="[% c.uri_for('/cloudflareapi') %]"><i class="icon-dns"></i> Cloudflare DNS Management</a></li>
+                <li><a href="[% c.uri_for('/admin/servers') %]"><i class="icon-server"></i> Server Management</a></li>
+            </ul>
+        </div>
         
         <div class="documentation-links">
             <h5>Quick Documentation Links:</h5>

@@ -1,0 +1,570 @@
+[% PageVersion = 'cloudflare/dns_records.tt,v 0.01 2025/06/01 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="dns-records-container">
+    <h1>DNS Records for [% domain %]</h1>
+    
+    <div class="actions-bar">
+        <a href="[% c.uri_for('/cloudflareapi') %]" class="btn btn-secondary">
+            <i class="icon-back"></i> Back to Domains
+        </a>
+        <button id="add-record-btn" class="btn btn-primary">
+            <i class="icon-add"></i> Add DNS Record
+        </button>
+        <button id="purge-cache-btn" class="btn btn-warning">
+            <i class="icon-refresh"></i> Purge Cache
+        </button>
+    </div>
+    
+    <div id="add-record-form" class="record-form" style="display: none;">
+        <h2>Add DNS Record</h2>
+        <form id="dns-form">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="record-type">Type:</label>
+                    <select id="record-type" name="type" required>
+                        <option value="A">A</option>
+                        <option value="AAAA">AAAA</option>
+                        <option value="CNAME">CNAME</option>
+                        <option value="TXT">TXT</option>
+                        <option value="MX">MX</option>
+                        <option value="NS">NS</option>
+                        <option value="SRV">SRV</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="record-name">Name:</label>
+                    <input type="text" id="record-name" name="name" placeholder="e.g., www" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="record-content">Content:</label>
+                    <input type="text" id="record-content" name="content" placeholder="e.g., 192.168.1.1" required>
+                </div>
+                <div class="form-group">
+                    <label for="record-ttl">TTL:</label>
+                    <select id="record-ttl" name="ttl">
+                        <option value="1">Automatic</option>
+                        <option value="60">1 minute</option>
+                        <option value="300">5 minutes</option>
+                        <option value="1800">30 minutes</option>
+                        <option value="3600">1 hour</option>
+                        <option value="86400">1 day</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group checkbox-group">
+                    <input type="checkbox" id="record-proxied" name="proxied">
+                    <label for="record-proxied">Proxied</label>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" id="cancel-add" class="btn btn-secondary">Cancel</button>
+                <button type="submit" class="btn btn-primary">Add Record</button>
+            </div>
+        </form>
+    </div>
+    
+    <div id="edit-record-form" class="record-form" style="display: none;">
+        <h2>Edit DNS Record</h2>
+        <form id="edit-dns-form">
+            <input type="hidden" id="edit-record-id" name="record_id">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="edit-record-type">Type:</label>
+                    <select id="edit-record-type" name="type" required>
+                        <option value="A">A</option>
+                        <option value="AAAA">AAAA</option>
+                        <option value="CNAME">CNAME</option>
+                        <option value="TXT">TXT</option>
+                        <option value="MX">MX</option>
+                        <option value="NS">NS</option>
+                        <option value="SRV">SRV</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="edit-record-name">Name:</label>
+                    <input type="text" id="edit-record-name" name="name" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="edit-record-content">Content:</label>
+                    <input type="text" id="edit-record-content" name="content" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit-record-ttl">TTL:</label>
+                    <select id="edit-record-ttl" name="ttl">
+                        <option value="1">Automatic</option>
+                        <option value="60">1 minute</option>
+                        <option value="300">5 minutes</option>
+                        <option value="1800">30 minutes</option>
+                        <option value="3600">1 hour</option>
+                        <option value="86400">1 day</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group checkbox-group">
+                    <input type="checkbox" id="edit-record-proxied" name="proxied">
+                    <label for="edit-record-proxied">Proxied</label>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" id="cancel-edit" class="btn btn-secondary">Cancel</button>
+                <button type="submit" class="btn btn-primary">Update Record</button>
+            </div>
+        </form>
+    </div>
+    
+    <div class="records-table-container">
+        <table id="dns-records-table" class="records-table">
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Name</th>
+                    <th>Content</th>
+                    <th>TTL</th>
+                    <th>Proxied</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="records-body">
+                <!-- Records will be loaded here via JavaScript -->
+                <tr class="loading-row">
+                    <td colspan="6">Loading DNS records...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // Domain from the server
+    const domain = "[% domain %]";
+    
+    // API endpoints
+    const apiEndpoints = {
+        list: "/cloudflareapi/dns/" + domain,
+        create: "/cloudflareapi/dns/create",
+        update: "/cloudflareapi/dns/update",
+        delete: "/cloudflareapi/dns/delete",
+        purge: "/cloudflareapi/cache/purge"
+    };
+    
+    // DOM elements
+    const recordsTable = document.getElementById("records-body");
+    const addRecordBtn = document.getElementById("add-record-btn");
+    const addRecordForm = document.getElementById("add-record-form");
+    const editRecordForm = document.getElementById("edit-record-form");
+    const cancelAddBtn = document.getElementById("cancel-add");
+    const cancelEditBtn = document.getElementById("cancel-edit");
+    const purgeBtn = document.getElementById("purge-cache-btn");
+    
+    // Event listeners
+    document.addEventListener("DOMContentLoaded", loadRecords);
+    addRecordBtn.addEventListener("click", showAddForm);
+    cancelAddBtn.addEventListener("click", hideAddForm);
+    cancelEditBtn.addEventListener("click", hideEditForm);
+    purgeBtn.addEventListener("click", purgeCache);
+    
+    document.getElementById("dns-form").addEventListener("submit", function(e) {
+        e.preventDefault();
+        addRecord();
+    });
+    
+    document.getElementById("edit-dns-form").addEventListener("submit", function(e) {
+        e.preventDefault();
+        updateRecord();
+    });
+    
+    // Functions
+    function loadRecords() {
+        fetch(apiEndpoints.list)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    displayRecords(data.records);
+                } else {
+                    showError("Failed to load DNS records: " + (data.message || data.error || "Unknown error"));
+                }
+            })
+            .catch(error => {
+                showError("Error loading DNS records: " + error.message);
+            });
+    }
+    
+    function displayRecords(records) {
+        if (!records || records.length === 0) {
+            recordsTable.innerHTML = `
+                <tr class="empty-row">
+                    <td colspan="6">No DNS records found for this domain.</td>
+                </tr>
+            `;
+            return;
+        }
+        
+        let html = "";
+        records.forEach(record => {
+            html += `
+                <tr data-id="${record.id}" data-record='${JSON.stringify(record)}'>
+                    <td class="record-type">${record.type}</td>
+                    <td class="record-name">${record.name}</td>
+                    <td class="record-content">${record.content}</td>
+                    <td class="record-ttl">${formatTTL(record.ttl)}</td>
+                    <td class="record-proxied">${record.proxied ? "Yes" : "No"}</td>
+                    <td class="record-actions">
+                        <button class="btn btn-sm btn-edit" onclick="editRecord('${record.id}')">Edit</button>
+                        <button class="btn btn-sm btn-delete" onclick="deleteRecord('${record.id}')">Delete</button>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        recordsTable.innerHTML = html;
+    }
+    
+    function formatTTL(ttl) {
+        if (ttl === 1) return "Auto";
+        if (ttl < 60) return ttl + " seconds";
+        if (ttl < 3600) return Math.floor(ttl / 60) + " minutes";
+        if (ttl < 86400) return Math.floor(ttl / 3600) + " hours";
+        return Math.floor(ttl / 86400) + " days";
+    }
+    
+    function showAddForm() {
+        addRecordForm.style.display = "block";
+        document.getElementById("record-name").focus();
+    }
+    
+    function hideAddForm() {
+        addRecordForm.style.display = "none";
+        document.getElementById("dns-form").reset();
+    }
+    
+    function hideEditForm() {
+        editRecordForm.style.display = "none";
+        document.getElementById("edit-dns-form").reset();
+    }
+    
+    function addRecord() {
+        const form = document.getElementById("dns-form");
+        const formData = new FormData(form);
+        formData.append("domain", domain);
+        
+        // Convert to JSON
+        const data = {};
+        formData.forEach((value, key) => {
+            if (key === "proxied") {
+                data[key] = true;
+            } else {
+                data[key] = value;
+            }
+        });
+        
+        if (!formData.has("proxied")) {
+            data.proxied = false;
+        }
+        
+        fetch(apiEndpoints.create, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(data),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showSuccess("DNS record added successfully");
+                hideAddForm();
+                loadRecords();
+            } else {
+                showError("Failed to add DNS record: " + (data.message || data.error || "Unknown error"));
+            }
+        })
+        .catch(error => {
+            showError("Error adding DNS record: " + error.message);
+        });
+    }
+    
+    function editRecord(recordId) {
+        const recordRow = document.querySelector(`tr[data-id="${recordId}"]`);
+        const record = JSON.parse(recordRow.getAttribute("data-record"));
+        
+        document.getElementById("edit-record-id").value = record.id;
+        document.getElementById("edit-record-type").value = record.type;
+        document.getElementById("edit-record-name").value = record.name;
+        document.getElementById("edit-record-content").value = record.content;
+        document.getElementById("edit-record-ttl").value = record.ttl;
+        document.getElementById("edit-record-proxied").checked = record.proxied;
+        
+        editRecordForm.style.display = "block";
+        document.getElementById("edit-record-name").focus();
+    }
+    
+    function updateRecord() {
+        const form = document.getElementById("edit-dns-form");
+        const formData = new FormData(form);
+        formData.append("domain", domain);
+        
+        // Convert to JSON
+        const data = {};
+        formData.forEach((value, key) => {
+            if (key === "proxied") {
+                data[key] = true;
+            } else {
+                data[key] = value;
+            }
+        });
+        
+        if (!formData.has("proxied")) {
+            data.proxied = false;
+        }
+        
+        fetch(apiEndpoints.update, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(data),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showSuccess("DNS record updated successfully");
+                hideEditForm();
+                loadRecords();
+            } else {
+                showError("Failed to update DNS record: " + (data.message || data.error || "Unknown error"));
+            }
+        })
+        .catch(error => {
+            showError("Error updating DNS record: " + error.message);
+        });
+    }
+    
+    function deleteRecord(recordId) {
+        if (!confirm("Are you sure you want to delete this DNS record?")) {
+            return;
+        }
+        
+        fetch(apiEndpoints.delete, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                domain: domain,
+                record_id: recordId
+            }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showSuccess("DNS record deleted successfully");
+                loadRecords();
+            } else {
+                showError("Failed to delete DNS record: " + (data.message || data.error || "Unknown error"));
+            }
+        })
+        .catch(error => {
+            showError("Error deleting DNS record: " + error.message);
+        });
+    }
+    
+    function purgeCache() {
+        if (!confirm("Are you sure you want to purge the cache for this domain?")) {
+            return;
+        }
+        
+        fetch(apiEndpoints.purge, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                domain: domain
+            }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showSuccess("Cache purged successfully");
+            } else {
+                showError("Failed to purge cache: " + (data.message || data.error || "Unknown error"));
+            }
+        })
+        .catch(error => {
+            showError("Error purging cache: " + error.message);
+        });
+    }
+    
+    function showSuccess(message) {
+        alert(message); // Replace with a better notification system
+    }
+    
+    function showError(message) {
+        alert("Error: " + message); // Replace with a better notification system
+    }
+</script>
+
+<style>
+    .dns-records-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .actions-bar {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+    
+    .btn {
+        display: inline-block;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        text-decoration: none;
+        font-weight: 500;
+        text-align: center;
+    }
+    
+    .btn-primary {
+        background-color: #007bff;
+        color: white;
+        border: none;
+    }
+    
+    .btn-secondary {
+        background-color: #6c757d;
+        color: white;
+        border: none;
+    }
+    
+    .btn-warning {
+        background-color: #ffc107;
+        color: #212529;
+        border: none;
+    }
+    
+    .btn-sm {
+        padding: 4px 8px;
+        font-size: 0.875rem;
+    }
+    
+    .btn-edit {
+        background-color: #17a2b8;
+        color: white;
+    }
+    
+    .btn-delete {
+        background-color: #dc3545;
+        color: white;
+    }
+    
+    .record-form {
+        background-color: #f8f9fa;
+        padding: 20px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+        border: 1px solid #dee2e6;
+    }
+    
+    .form-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        margin-bottom: 15px;
+    }
+    
+    .form-group {
+        flex: 1;
+        min-width: 200px;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 500;
+    }
+    
+    .form-group input,
+    .form-group select {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+    }
+    
+    .checkbox-group {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    
+    .checkbox-group input {
+        width: auto;
+    }
+    
+    .form-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 20px;
+    }
+    
+    .records-table-container {
+        overflow-x: auto;
+    }
+    
+    .records-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+    }
+    
+    .records-table th,
+    .records-table td {
+        padding: 12px 15px;
+        text-align: left;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .records-table th {
+        background-color: #f8f9fa;
+        font-weight: 600;
+    }
+    
+    .records-table tr:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .loading-row td,
+    .empty-row td {
+        text-align: center;
+        padding: 30px;
+        color: #6c757d;
+    }
+    
+    .record-actions {
+        display: flex;
+        gap: 5px;
+    }
+    
+    @media (max-width: 768px) {
+        .form-row {
+            flex-direction: column;
+        }
+        
+        .form-group {
+            min-width: 100%;
+        }
+    }
+</style>

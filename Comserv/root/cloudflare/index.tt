@@ -1,0 +1,197 @@
+[% PageVersion = 'cloudflare/index.tt,v 0.01 2025/06/01 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="cloudflare-dashboard">
+    <h1>Cloudflare DNS Management</h1>
+    
+    <div class="dashboard-intro">
+        <p>Welcome to the Cloudflare DNS Management interface. This tool allows you to manage DNS records for your domains through Cloudflare.</p>
+        
+        <div class="admin-actions">
+            <a href="[% c.uri_for('/ApiCredentials') %]" class="btn btn-info">
+                <i class="icon-key"></i> Manage API Credentials
+            </a>
+            <p class="admin-note">Note: You need to configure your Cloudflare API credentials before using this tool.</p>
+        </div>
+    </div>
+    
+    <div class="domain-selection">
+        <h2>Select a Domain</h2>
+        
+        [% IF sites && sites.size %]
+            <div class="site-list">
+                [% FOREACH site IN sites %]
+                    <div class="site-card">
+                        <h3>[% site.name %]</h3>
+                        <div class="domain-list">
+                            [% IF site.domains && site.domains.size %]
+                                <ul>
+                                [% FOREACH domain IN site.domains %]
+                                    <li>
+                                        <a href="[% c.uri_for('/cloudflareapi/dns/' _ domain.domain) %]" class="domain-link">
+                                            [% domain.domain %]
+                                        </a>
+                                    </li>
+                                [% END %]
+                                </ul>
+                            [% ELSE %]
+                                <p class="no-domains">No domains configured for this site.</p>
+                            [% END %]
+                        </div>
+                    </div>
+                [% END %]
+            </div>
+        [% ELSE %]
+            <div class="no-sites-message">
+                <p>No sites available. Please contact your administrator to set up sites and domains.</p>
+            </div>
+        [% END %]
+    </div>
+    
+    <div class="manual-domain-entry">
+        <h2>Enter Domain Manually</h2>
+        <form action="[% c.uri_for('/cloudflareapi/dns') %]" method="GET" class="domain-form">
+            <div class="form-group">
+                <label for="domain">Domain:</label>
+                <input type="text" id="domain" name="domain" placeholder="example.com" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Manage DNS</button>
+        </form>
+    </div>
+</div>
+
+<style>
+    .cloudflare-dashboard {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .dashboard-intro {
+        margin-bottom: 30px;
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        border-left: 4px solid #007bff;
+    }
+    
+    .admin-actions {
+        margin-top: 15px;
+        padding: 10px;
+        background-color: #e9ecef;
+        border-radius: 5px;
+        border: 1px solid #dee2e6;
+    }
+    
+    .admin-note {
+        margin-top: 10px;
+        font-size: 0.9em;
+        color: #6c757d;
+        font-style: italic;
+    }
+    
+    .btn-info {
+        background-color: #17a2b8;
+        color: white;
+        border: none;
+    }
+    
+    .site-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .site-card {
+        flex: 1 0 300px;
+        max-width: 400px;
+        border: 1px solid #dee2e6;
+        border-radius: 5px;
+        padding: 15px;
+        background-color: #fff;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    .site-card h3 {
+        margin-top: 0;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #eee;
+        color: #343a40;
+    }
+    
+    .domain-list ul {
+        list-style-type: none;
+        padding-left: 0;
+    }
+    
+    .domain-list li {
+        margin-bottom: 8px;
+    }
+    
+    .domain-link {
+        display: block;
+        padding: 8px 12px;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+        color: #007bff;
+        text-decoration: none;
+        transition: background-color 0.2s;
+    }
+    
+    .domain-link:hover {
+        background-color: #e9ecef;
+        text-decoration: none;
+    }
+    
+    .no-domains, .no-sites-message {
+        color: #6c757d;
+        font-style: italic;
+    }
+    
+    .manual-domain-entry {
+        margin-top: 40px;
+        padding: 20px;
+        background-color: #f8f9fa;
+        border-radius: 5px;
+    }
+    
+    .domain-form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        align-items: flex-end;
+    }
+    
+    .form-group {
+        flex: 1;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+    }
+    
+    .form-group input {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+    }
+    
+    .btn-primary {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    
+    .btn-primary:hover {
+        background-color: #0069d9;
+    }
+</style>

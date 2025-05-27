@@ -1,0 +1,23 @@
+{
+  "cloudflare": {
+    "api_token": "YOUR_TOKEN",
+    "account_id": "YOUR_ACCOUNT_ID",
+    "email": "admin@example.com"
+  },
+  "roles": {
+    "admin": {
+      "permissions": ["dns:edit", "zone:edit", "ssl:edit", "cache:edit"]
+    },
+    "developer": {
+      "permissions": ["dns:edit", "cache:edit"]
+    },
+    "editor": {
+      "permissions": ["dns:edit"]
+    }
+  },
+  "site_specific_permissions": {
+    "beemaster.ca": {
+      "editor": ["dns:edit", "cache:edit"]
+    }
+  }
+}
