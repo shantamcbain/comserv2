@@ -50,6 +50,56 @@
         [% END %]
     </div>
     
+    <!-- SiteName Domain Mappings Section -->
+    <div class="sitename-mappings">
+        <h2>SiteName Domain Mappings</h2>
+        
+        [% IF site_names && site_names.size %]
+            <div class="sitename-list">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Site Name</th>
+                            <th>Domain</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        [% FOREACH sitename IN site_names %]
+                            <tr>
+                                <td>[% sitename.name %]</td>
+                                <td>
+                                    [% IF sitename.all_domains && sitename.all_domains.size %]
+                                        <ul class="domain-list-compact">
+                                            [% FOREACH domain IN sitename.all_domains %]
+                                                <li>[% domain %]</li>
+                                            [% END %]
+                                        </ul>
+                                    [% ELSE %]
+                                        <span class="no-domain">No domain configured</span>
+                                    [% END %]
+                                </td>
+                                <td>
+                                    [% IF sitename.domain %]
+                                        <a href="[% c.uri_for('/cloudflareapi/dns/' _ sitename.domain) %]" class="btn btn-sm btn-primary">
+                                            Manage DNS
+                                        </a>
+                                    [% ELSE %]
+                                        <span class="btn btn-sm btn-secondary disabled">Manage DNS</span>
+                                    [% END %]
+                                </td>
+                            </tr>
+                        [% END %]
+                    </tbody>
+                </table>
+            </div>
+        [% ELSE %]
+            <div class="no-sitenames-message">
+                <p>No SiteName domain mappings available. Please contact your administrator to set up site names and domains.</p>
+            </div>
+        [% END %]
+    </div>
+    
     <div class="manual-domain-entry">
         <h2>Enter Domain Manually</h2>
         <form action="[% c.uri_for('/cloudflareapi/dns') %]" method="GET" class="domain-form">
@@ -193,5 +243,79 @@
     
     .btn-primary:hover {
         background-color: #0069d9;
+    }
+    
+    /* SiteName Mappings Styles */
+    .sitename-mappings {
+        margin-top: 40px;
+        margin-bottom: 30px;
+    }
+    
+    .sitename-list {
+        background-color: #fff;
+        border-radius: 5px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        overflow: hidden;
+    }
+    
+    .table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 0;
+    }
+    
+    .table th, .table td {
+        padding: 12px 15px;
+        text-align: left;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .table th {
+        background-color: #f8f9fa;
+        font-weight: bold;
+        color: #343a40;
+    }
+    
+    .table-striped tbody tr:nth-of-type(odd) {
+        background-color: rgba(0,0,0,0.02);
+    }
+    
+    .no-domain {
+        color: #6c757d;
+        font-style: italic;
+    }
+    
+    .domain-list-compact {
+        list-style-type: none;
+        padding-left: 0;
+        margin-bottom: 0;
+    }
+    
+    .domain-list-compact li {
+        margin-bottom: 4px;
+        padding: 2px 0;
+    }
+    
+    .btn-sm {
+        padding: 4px 8px;
+        font-size: 0.875rem;
+    }
+    
+    .btn-secondary {
+        background-color: #6c757d;
+        color: white;
+    }
+    
+    .disabled {
+        opacity: 0.65;
+        cursor: not-allowed;
+    }
+    
+    .no-sitenames-message {
+        padding: 20px;
+        background-color: #f8f9fa;
+        border-radius: 5px;
+        color: #6c757d;
+        font-style: italic;
     }
 </style>

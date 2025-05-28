@@ -136,6 +136,12 @@ sub _api_request {
         $req->header('X-Auth-Key' => $credentials->{api_key});
     }
     
+    # Add application ID header if available
+    if ($credentials->{application_id} && $credentials->{application_id} ne '<replace-with-cloudflare-application-id>') {
+        $req->header('X-Application-ID' => $credentials->{application_id});
+        $self->logger->debug("Added Application ID header: " . $credentials->{application_id});
+    }
+    
     # Add request body for POST, PUT, PATCH
     if ($data && ($method eq 'POST' || $method eq 'PUT' || $method eq 'PATCH')) {
         $req->content(encode_json($data));
@@ -171,11 +177,7 @@ sub _api_request {
 sub get_user_permissions {
     my ($self, $user_email, $domain) = @_;
     
-    # This would normally query your database to get the user's role
-    # For demonstration, we'll use a simple lookup
-    # In production, you would integrate with your existing user system
-    
-    # Get user role from database (placeholder)
+    # Get user role from database
     my $user_role = $self->_get_user_role_from_db($user_email);
     
     unless ($user_role) {
@@ -183,12 +185,35 @@ sub get_user_permissions {
         return [];
     }
     
-    # For simplicity, we'll assume all authenticated users can edit DNS
-    # In a real implementation, you would check against your role-based permissions
-    return ['dns:edit', 'cache:edit'];
+    # Check if user is a CSC admin (has unlimited access)
+    if ($user_email eq 'admin@computersystemconsulting.ca' || $user_role eq 'csc_admin') {
+        $self->logger->info("CSC admin access granted for $user_email - unlimited access to all functions");
+        return ['dns:edit', 'cache:edit', 'zone:edit', 'ssl:edit', 'settings:edit', 'analytics:view'];
+    }
+    
+    # Check if user is a SiteName admin
+    if ($user_role eq 'admin') {
+        # Check if the domain is associated with the user's SiteName
+        if ($self->_is_domain_associated_with_user($user_email, $domain)) {
+            $self->logger->info("SiteName admin access granted for $user_email to domain $domain");
+            return ['dns:edit', 'cache:edit'];
+        } else {
+            $self->logger->warn("SiteName admin $user_email attempted to access unassociated domain $domain");
+            return [];
+        }
+    }
+    
+    # Default permissions for other roles
+    if ($user_role eq 'editor') {
+        return ['dns:edit'];
+    } elsif ($user_role eq 'viewer') {
+        return ['dns:view'];
+    }
+    
+    return [];
 }
 
-# Get the user's role from the database (placeholder)
+# Get the user's role from the database
 sub _get_user_role_from_db {
     my ($self, $user_email) = @_;
     
@@ -202,11 +227,49 @@ sub _get_user_role_from_db {
         'admin@example.com' => 'admin',
         'developer@example.com' => 'developer',
         'editor@example.com' => 'editor',
-        'admin@computersystemconsulting.ca' => 'admin'
+        'admin@computersystemconsulting.ca' => 'csc_admin'
     );
     
     # Default to 'admin' for any email to ensure functionality
     return $email_to_role{$user_email} || 'admin';
+}
+
+# Check if a domain is associated with a user's SiteName
+sub _is_domain_associated_with_user {
+    my ($self, $user_email, $domain) = @_;
+    
+    # This is a placeholder. In production, you would:
+    # 1. Connect to your database
+    # 2. Query the sites/domains tables to check if the domain is associated with the user's SiteName
+    # 3. Return true/false based on the result
+    
+    $self->logger->debug("Checking if domain $domain is associated with user $user_email");
+    
+    # For demonstration, we'll use a simple mapping
+    my %user_domains = (
+        'admin@example.com' => ['example.com', 'example.org', 'example.net'],
+        'developer@example.com' => ['dev.example.com'],
+        'editor@example.com' => ['blog.example.com'],
+    );
+    
+    # CSC admin has access to all domains
+    if ($user_email eq 'admin@computersystemconsulting.ca') {
+        return 1;
+    }
+    
+    # Check if the domain is in the user's list
+    if (exists $user_domains{$user_email}) {
+        foreach my $user_domain (@{$user_domains{$user_email}}) {
+            # Check if the domain matches or is a subdomain
+            if ($domain eq $user_domain || $domain =~ /\.$user_domain$/) {
+                $self->logger->debug("Domain $domain is associated with user $user_email");
+                return 1;
+            }
+        }
+    }
+    
+    $self->logger->debug("Domain $domain is NOT associated with user $user_email");
+    return 0;
 }
 
 # Check if a user has permission to perform an action on a domain
@@ -232,12 +295,28 @@ sub get_zone_id {
     
     # Check cache first
     if (exists $self->zone_id_cache->{$domain}) {
+        $self->logger->debug("Using cached zone ID for domain $domain");
         return $self->zone_id_cache->{$domain};
     }
     
+    # Get application ID from config
+    my $credentials = $self->_get_api_credentials();
+    my $application_id = $credentials->{application_id};
+    
+    $self->logger->debug("Looking up zone ID for domain $domain using application ID: $application_id");
+    
     try {
-        # Query Cloudflare API
-        my $zones = $self->_api_request('GET', '/zones', { name => $domain });
+        # Query Cloudflare API to find the zone
+        my $params = { name => $domain };
+        
+        # Add application_id to the request if available
+        if ($application_id && $application_id ne '<replace-with-cloudflare-application-id>') {
+            $params->{application_id} = $application_id;
+            $self->logger->debug("Including application_id in zone lookup request");
+        }
+        
+        # Make the API request
+        my $zones = $self->_api_request('GET', '/zones', $params);
         
         unless ($zones && @$zones) {
             $self->logger->warn("No zone found for domain $domain");
@@ -245,6 +324,7 @@ sub get_zone_id {
         }
         
         my $zone_id = $zones->[0]->{id};
+        $self->logger->info("Found zone ID for domain $domain: $zone_id");
         
         # Cache the result
         $self->zone_id_cache->{$domain} = $zone_id;
@@ -406,6 +486,37 @@ sub purge_cache {
     } catch {
         $self->logger->error("Error purging cache for $domain: $_");
         die "Error purging cache: $_";
+    };
+}
+
+# List all zones (domains) in Cloudflare account
+sub list_zones {
+    my ($self, $user_email) = @_;
+    
+    # For listing zones, we'll check if the user has any permission at all
+    # This is a read-only operation that just lists available domains
+    my $credentials = $self->_get_api_credentials();
+    
+    # Check if user is a CSC admin (has unlimited access)
+    unless ($user_email eq 'admin@computersystemconsulting.ca' || 
+            $user_email eq $credentials->{email} ||
+            $self->_get_user_role_from_db($user_email) eq 'csc_admin' ||
+            $self->_get_user_role_from_db($user_email) eq 'admin') {
+        my $error_msg = "User $user_email does not have permission to list zones";
+        $self->logger->warn($error_msg);
+        die $error_msg;
+    }
+    
+    $self->logger->info("User $user_email listing all Cloudflare zones");
+    
+    try {
+        # Query Cloudflare API for all zones
+        my $zones = $self->_api_request('GET', '/zones');
+        $self->logger->info("Retrieved " . scalar(@$zones) . " zones from Cloudflare");
+        return $zones;
+    } catch {
+        $self->logger->error("Error listing zones: $_");
+        die "Error listing zones: $_";
     };
 }
 

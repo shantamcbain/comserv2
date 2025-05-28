@@ -246,5 +246,8 @@
     "csc": "csc",
     "bmaster": "apis",
     "mcoop": "mcoop"
+  },
+  "component_styles": {
+    "api_credentials": "api_credentials.css"
   }
 }

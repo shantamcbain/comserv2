@@ -1,8 +1,8 @@
 {
   "cloudflare": {
-    "api_token": "YOUR_TOKEN",
-    "account_id": "YOUR_ACCOUNT_ID",
-    "email": "admin@example.com"
+    "api_token": "Y589fee264de80c4a1f2ac27b77718e96",
+    "account_id": "589fee264de80c4a1f2ac27b77718e96",
+    "email": "shantamcbain@gmail.com"
   },
   "roles": {
     "admin": {

@@ -4,8 +4,19 @@ use namespace::autoclean;
 use JSON;
 use Try::Tiny;
 use Comserv::Util::CloudflareManager;
+use Comserv::Model::Sitename;
 
 BEGIN { extends 'Catalyst::Controller'; }
+
+# Schema attribute
+has 'schema' => (
+    is => 'ro',
+    lazy => 1,
+    default => sub {
+        my $self = shift;
+        return Comserv->model('DBEncy')->schema;
+    }
+);
 
 =head1 NAME
 
@@ -89,18 +100,94 @@ sub index :Path :Args(0) {
     
     # Get sites the user has access to - with error handling
     my @sites = ();
+    my $cloudflare_domains = {};
     
     try {
         @sites = $self->_get_user_sites($c);
         $c->log->debug("Retrieved " . scalar(@sites) . " sites for Cloudflare dashboard");
+        
+        # Get Cloudflare domains
+        $cloudflare_domains = $self->_get_cloudflare_domains($c);
+        $c->log->debug("Retrieved " . scalar(keys %$cloudflare_domains) . " Cloudflare domains");
     } catch {
         my $error = $_;
-        $c->log->error("Error getting sites for Cloudflare dashboard: $error");
+        $c->log->error("Error getting sites or Cloudflare domains: $error");
+    };
+    
+    # Prepare site data with domain information
+    my @site_data = ();
+    foreach my $site (@sites) {
+        my $site_id = $site->id;
+        my $site_name = $site->name;
+        my @domains = ();
+        
+        # Get domains for this site
+        try {
+            my $domain_rs = $site->domains;
+            while (my $domain = $domain_rs->next) {
+                my $domain_name = $domain->domain;
+                my $is_on_cloudflare = exists $cloudflare_domains->{$domain_name} ? 1 : 0;
+                
+                push @domains, {
+                    domain => $domain_name,
+                    is_on_cloudflare => $is_on_cloudflare,
+                    zone_id => $cloudflare_domains->{$domain_name} || '',
+                };
+            }
+        } catch {
+            my $error = $_;
+            $c->log->error("Error getting domains for site $site_name: $error");
+        };
+        
+        push @site_data, {
+            id => $site_id,
+            name => $site_name,
+            domains => \@domains,
+            has_cloudflare_domains => scalar(grep { $_->{is_on_cloudflare} } @domains) > 0,
+        };
+    }
+    
+    # Get all site names from the session and site table
+    my @site_names = ();
+    try {
+        # Get the current site name from the session
+        my $current_site_name = $c->session->{SiteName};
+        $c->log->debug("Current site name from session: " . ($current_site_name || 'not set'));
+        
+        # Get all sites from the database
+        my $sites_rs = $self->schema->resultset('Site');
+        my @all_sites = $sites_rs->all;
+        
+        foreach my $site (@all_sites) {
+            my $site_id = $site->id;
+            my $site_name = $site->name;
+            
+            # Get domains for this site
+            my @domains = ();
+            my $domain_rs = $site->domains;
+            
+            while (my $domain = $domain_rs->next) {
+                push @domains, $domain->domain;
+            }
+            
+            push @site_names, {
+                id => $site_id,
+                name => $site_name,
+                domain => (scalar(@domains) > 0) ? $domains[0] : '',
+                all_domains => \@domains,
+            };
+        }
+        
+        $c->log->debug("Retrieved " . scalar(@site_names) . " site names with their domains");
+    } catch {
+        my $error = $_;
+        $c->log->error("Error getting site names: $error");
     };
     
     $c->stash(
         template => 'cloudflare/index.tt',
-        sites => \@sites,
+        sites => \@site_data,
+        site_names => \@site_names,
         page_title => 'Cloudflare DNS Management',
     );
 }
@@ -579,6 +666,43 @@ sub _get_user_sites {
     }
     
     return @sites;
+}
+
+# Get all domains registered in Cloudflare
+sub _get_cloudflare_domains {
+    my ($self, $c) = @_;
+    
+    my %domains = ();
+    
+    # Get user email - from Catalyst user object or session
+    my $user_email;
+    if ($c->user_exists) {
+        $user_email = $c->user->email;
+    } elsif ($c->session->{email}) {
+        $user_email = $c->session->{email};
+    } else {
+        # Default email if none found
+        $user_email = 'admin@computersystemconsulting.ca';
+    }
+    
+    try {
+        # Call the CloudflareManager to list zones
+        my $zones = $self->_call_cloudflare_manager('list_zones', $user_email);
+        
+        if ($zones && $zones->{success} && $zones->{result}) {
+            foreach my $zone (@{$zones->{result}}) {
+                $domains{$zone->{name}} = $zone->{id};
+                $c->log->debug("Found Cloudflare domain: " . $zone->{name} . " with zone ID: " . $zone->{id});
+            }
+        } else {
+            $c->log->warn("No Cloudflare zones found or error in response");
+        }
+    } catch {
+        my $error = $_;
+        $c->log->error("Error getting Cloudflare domains: $error");
+    };
+    
+    return \%domains;
 }
 
 # CloudflareManager instance

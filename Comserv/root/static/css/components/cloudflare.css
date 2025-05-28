@@ -1,4 +1,18 @@
-/* Cloudflare DNS Management Styles */
+/* 
+ * Cloudflare DNS Management Styles
+ * 
+ * This stylesheet contains all the styles for the Cloudflare DNS Management interface.
+ * It includes styles for:
+ * - Site and domain listing
+ * - Cloudflare domain highlighting
+ * - DNS record management interface
+ * - Modal forms for creating and editing DNS records
+ *
+ * Updated: 2025-07-15
+ * - Added styles for Cloudflare domain badges
+ * - Added visual distinction between Cloudflare and non-Cloudflare domains
+ * - Improved responsive design for mobile devices
+ */
 
 .cloudflare-container {
     max-width: 1200px;
@@ -59,9 +73,49 @@
     border-bottom: none;
 }
 
+.domain-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
 .domain-name {
     font-weight: 500;
     color: var(--text-color);
+}
+
+.cloudflare-domain {
+    background-color: rgba(var(--primary-rgb), 0.05);
+    border-radius: var(--border-radius-sm);
+    padding: 8px 12px;
+    margin: 4px 0;
+    border-left: 3px solid var(--primary-color);
+}
+
+.cloudflare-badge {
+    display: inline-block;
+    background-color: #f38020; /* Cloudflare orange */
+    color: white;
+    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: var(--border-radius-sm);
+    margin-top: 4px;
+}
+
+.non-cloudflare-badge {
+    display: inline-block;
+    background-color: var(--text-muted);
+    color: var(--card-bg);
+    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: var(--border-radius-sm);
+    margin-top: 4px;
+}
+
+.no-domains {
+    color: var(--text-muted);
+    padding: 10px 0;
+    font-style: italic;
 }
 
 /* DNS records container styles */
