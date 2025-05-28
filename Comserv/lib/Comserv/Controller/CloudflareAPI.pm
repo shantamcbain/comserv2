@@ -121,11 +121,14 @@ sub index :Path :Args(0) {
         my $site_name = $site->name;
         my @domains = ();
         
-        # Get domains for this site
+        # Get domains for this site from the SiteDomain table
         try {
-            my $domain_rs = $site->domains;
-            while (my $domain = $domain_rs->next) {
-                my $domain_name = $domain->domain;
+            my $domain_rs = $self->schema->resultset('SiteDomain')->search({
+                site_id => $site_id
+            });
+            
+            while (my $domain_record = $domain_rs->next) {
+                my $domain_name = $domain_record->domain;
                 my $is_on_cloudflare = exists $cloudflare_domains->{$domain_name} ? 1 : 0;
                 
                 push @domains, {
@@ -147,42 +150,9 @@ sub index :Path :Args(0) {
         };
     }
     
-    # Get all site names from the session and site table
-    my @site_names = ();
-    try {
-        # Get the current site name from the session
-        my $current_site_name = $c->session->{SiteName};
-        $c->log->debug("Current site name from session: " . ($current_site_name || 'not set'));
-        
-        # Get all sites from the database
-        my $sites_rs = $self->schema->resultset('Site');
-        my @all_sites = $sites_rs->all;
-        
-        foreach my $site (@all_sites) {
-            my $site_id = $site->id;
-            my $site_name = $site->name;
-            
-            # Get domains for this site
-            my @domains = ();
-            my $domain_rs = $site->domains;
-            
-            while (my $domain = $domain_rs->next) {
-                push @domains, $domain->domain;
-            }
-            
-            push @site_names, {
-                id => $site_id,
-                name => $site_name,
-                domain => (scalar(@domains) > 0) ? $domains[0] : '',
-                all_domains => \@domains,
-            };
-        }
-        
-        $c->log->debug("Retrieved " . scalar(@site_names) . " site names with their domains");
-    } catch {
-        my $error = $_;
-        $c->log->error("Error getting site names: $error");
-    };
+    # We'll reuse the site_data we already prepared
+    my @site_names = @site_data;
+    $c->log->debug("Using " . scalar(@site_names) . " sites with their domains for SiteName display");
     
     $c->stash(
         template => 'cloudflare/index.tt',

@@ -55,43 +55,32 @@
         <h2>SiteName Domain Mappings</h2>
         
         [% IF site_names && site_names.size %]
-            <div class="sitename-list">
-                <table class="table table-striped">
-                    <thead>
-                        <tr>
-                            <th>Site Name</th>
-                            <th>Domain</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        [% FOREACH sitename IN site_names %]
-                            <tr>
-                                <td>[% sitename.name %]</td>
-                                <td>
-                                    [% IF sitename.all_domains && sitename.all_domains.size %]
-                                        <ul class="domain-list-compact">
-                                            [% FOREACH domain IN sitename.all_domains %]
-                                                <li>[% domain %]</li>
-                                            [% END %]
-                                        </ul>
-                                    [% ELSE %]
-                                        <span class="no-domain">No domain configured</span>
-                                    [% END %]
-                                </td>
-                                <td>
-                                    [% IF sitename.domain %]
-                                        <a href="[% c.uri_for('/cloudflareapi/dns/' _ sitename.domain) %]" class="btn btn-sm btn-primary">
-                                            Manage DNS
-                                        </a>
-                                    [% ELSE %]
-                                        <span class="btn btn-sm btn-secondary disabled">Manage DNS</span>
-                                    [% END %]
-                                </td>
-                            </tr>
-                        [% END %]
-                    </tbody>
-                </table>
+            <div class="sitename-grid">
+                [% FOREACH sitename IN site_names %]
+                    <div class="sitename-card">
+                        <h3>[% sitename.name %]</h3>
+                        <div class="domain-list">
+                            [% IF sitename.domains && sitename.domains.size %]
+                                <ul>
+                                [% FOREACH domain IN sitename.domains %]
+                                    <li>
+                                        [% IF domain.is_on_cloudflare %]
+                                            <a href="[% c.uri_for('/cloudflareapi/dns/' _ domain.domain) %]" class="domain-link cloudflare-domain">
+                                                [% domain.domain %]
+                                                <span class="cloudflare-badge">Cloudflare</span>
+                                            </a>
+                                        [% ELSE %]
+                                            <span class="domain-text">[% domain.domain %]</span>
+                                        [% END %]
+                                    </li>
+                                [% END %]
+                                </ul>
+                            [% ELSE %]
+                                <p class="no-domains">No domains configured for this site.</p>
+                            [% END %]
+                        </div>
+                    </div>
+                [% END %]
             </div>
         [% ELSE %]
             <div class="no-sitenames-message">
@@ -251,49 +240,92 @@
         margin-bottom: 30px;
     }
     
-    .sitename-list {
-        background-color: #fff;
+    .sitename-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .sitename-card {
+        flex: 1 0 300px;
+        max-width: 400px;
+        border: 1px solid #dee2e6;
         border-radius: 5px;
+        padding: 15px;
+        background-color: #fff;
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        overflow: hidden;
     }
     
-    .table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-bottom: 0;
-    }
-    
-    .table th, .table td {
-        padding: 12px 15px;
-        text-align: left;
+    .sitename-card h3 {
+        margin-top: 0;
+        padding-bottom: 10px;
         border-bottom: 1px solid #eee;
-    }
-    
-    .table th {
-        background-color: #f8f9fa;
-        font-weight: bold;
         color: #343a40;
     }
     
-    .table-striped tbody tr:nth-of-type(odd) {
-        background-color: rgba(0,0,0,0.02);
+    .domain-list ul {
+        list-style-type: none;
+        padding-left: 0;
     }
     
-    .no-domain {
+    .domain-list li {
+        margin-bottom: 8px;
+    }
+    
+    .domain-link {
+        display: block;
+        padding: 8px 12px;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+        color: #007bff;
+        text-decoration: none;
+        transition: background-color 0.2s;
+        position: relative;
+    }
+    
+    .domain-link:hover {
+        background-color: #e9ecef;
+        text-decoration: none;
+    }
+    
+    .domain-text {
+        display: block;
+        padding: 8px 12px;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+        color: #6c757d;
+    }
+    
+    .cloudflare-domain {
+        background-color: #f4f9ff;
+        border: 1px solid #cce5ff;
+    }
+    
+    .cloudflare-domain:hover {
+        background-color: #e6f2ff;
+    }
+    
+    .cloudflare-badge {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        font-size: 0.7rem;
+        background-color: #007bff;
+        color: white;
+        padding: 2px 6px;
+        border-radius: 10px;
+    }
+    
+    .no-domains, .no-sitenames-message {
         color: #6c757d;
         font-style: italic;
     }
     
-    .domain-list-compact {
-        list-style-type: none;
-        padding-left: 0;
-        margin-bottom: 0;
-    }
-    
-    .domain-list-compact li {
-        margin-bottom: 4px;
-        padding: 2px 0;
+    .no-sitenames-message {
+        padding: 20px;
+        background-color: #f8f9fa;
+        border-radius: 5px;
     }
     
     .btn-sm {
@@ -309,13 +341,5 @@
     .disabled {
         opacity: 0.65;
         cursor: not-allowed;
-    }
-    
-    .no-sitenames-message {
-        padding: 20px;
-        background-color: #f8f9fa;
-        border-radius: 5px;
-        color: #6c757d;
-        font-style: italic;
     }
 </style>
