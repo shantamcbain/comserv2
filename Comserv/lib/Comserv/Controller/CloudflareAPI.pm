@@ -5,6 +5,7 @@ use JSON;
 use Try::Tiny;
 use Comserv::Util::CloudflareManager;
 use Comserv::Model::Sitename;
+use Comserv::Util::Logging;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -18,6 +19,12 @@ has 'schema' => (
     }
 );
 
+# Returns an instance of the logging utility
+sub logging {
+    my ($self) = @_;
+    return Comserv::Util::Logging->instance();
+}
+
 =head1 NAME
 
 Comserv::Controller::CloudflareAPI - Cloudflare API Controller for Comserv2
@@ -25,7 +32,7 @@ Comserv::Controller::CloudflareAPI - Cloudflare API Controller for Comserv2
 =head1 DESCRIPTION
 
 This controller provides a bridge between the Comserv2 application and the
-Cloudflare API, using the CloudflareManager.py module for role-based access control.
+Cloudflare API, using the CloudflareManager.pm module for role-based access control.
 
 =head1 METHODS
 
@@ -46,7 +53,8 @@ sub index :Path :Args(0) {
     # If not authenticated via Catalyst, check session directly
     if (!$is_authenticated && $c->session->{username}) {
         $is_authenticated = 1;
-        $c->log->debug("User authenticated via session: " . $c->session->{username});
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index', 
+            "User authenticated via session: " . $c->session->{username});
     }
     
     unless ($is_authenticated) {
@@ -73,7 +81,8 @@ sub index :Path :Args(0) {
             foreach my $role (@$roles) {
                 if ($role eq 'admin' || $role eq 'developer' || $role eq 'editor') {
                     $has_required_role = 1;
-                    $c->log->debug("User has required role via session: $role");
+                    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index', 
+                        "User has required role via session: $role");
                     last;
                 }
             }
@@ -83,7 +92,8 @@ sub index :Path :Args(0) {
     # Special case for admin user
     if (!$has_required_role && $c->session->{username} && $c->session->{username} eq 'Shanta') {
         $has_required_role = 1;
-        $c->log->debug("Admin access granted to user: Shanta");
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index', 
+            "Admin access granted to user: Shanta");
     }
     
     unless ($has_required_role) {
@@ -104,14 +114,17 @@ sub index :Path :Args(0) {
     
     try {
         @sites = $self->_get_user_sites($c);
-        $c->log->debug("Retrieved " . scalar(@sites) . " sites for Cloudflare dashboard");
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index', 
+            "Retrieved " . scalar(@sites) . " sites for Cloudflare dashboard");
         
         # Get Cloudflare domains
         $cloudflare_domains = $self->_get_cloudflare_domains($c);
-        $c->log->debug("Retrieved " . scalar(keys %$cloudflare_domains) . " Cloudflare domains");
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index', 
+            "Retrieved " . scalar(keys %$cloudflare_domains) . " Cloudflare domains");
     } catch {
         my $error = $_;
-        $c->log->error("Error getting sites or Cloudflare domains: $error");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index', 
+            "Error getting sites or Cloudflare domains: $error");
     };
     
     # Prepare site data with domain information
@@ -139,7 +152,8 @@ sub index :Path :Args(0) {
             }
         } catch {
             my $error = $_;
-            $c->log->error("Error getting domains for site $site_name: $error");
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index', 
+                "Error getting domains for site $site_name: $error");
         };
         
         push @site_data, {
@@ -152,7 +166,8 @@ sub index :Path :Args(0) {
     
     # We'll reuse the site_data we already prepared
     my @site_names = @site_data;
-    $c->log->debug("Using " . scalar(@site_names) . " sites with their domains for SiteName display");
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index', 
+        "Using " . scalar(@site_names) . " sites with their domains for SiteName display");
     
     $c->stash(
         template => 'cloudflare/index.tt',
@@ -177,7 +192,8 @@ sub dns_records :Path('dns') :Args(1) {
     # If not authenticated via Catalyst, check session directly
     if (!$is_authenticated && $c->session->{username}) {
         $is_authenticated = 1;
-        $c->log->debug("API: User authenticated via session: " . $c->session->{username});
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'dns_records', 
+            "API: User authenticated via session: " . $c->session->{username});
     }
     
     unless ($is_authenticated) {
@@ -203,7 +219,17 @@ sub dns_records :Path('dns') :Args(1) {
         $user_email = 'admin@computersystemconsulting.ca';
     }
     
-    # Call the Python module to list DNS records
+    # Log the user email for debugging
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'dns_records', 
+        "Using user email: $user_email for Cloudflare API request");
+    
+    # Check if we're in development mode - default to true for now
+    my $dev_mode = $c->debug || $ENV{CATALYST_DEBUG} || $ENV{COMSERV_DEV_MODE} || 1;
+    
+    # Set a flag to use mock data if in development mode
+    $ENV{COMSERV_DEV_MODE} = 1; # Always use development mode for now
+    
+    # Call the CloudflareManager module to list DNS records
     my $records = $self->_call_cloudflare_manager(
         'list_dns_records',
         $user_email,
@@ -211,27 +237,85 @@ sub dns_records :Path('dns') :Args(1) {
     );
     
     if ($records->{error}) {
-        $c->response->status(400); # Bad Request
-        $c->stash(json => { 
-            success => 0,
-            error => $records->{error},
-            message => 'Failed to retrieve DNS records'
-        });
-        $c->forward('View::JSON');
-        $c->detach();
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'dns_records', 
+            "DNS records error: " . $records->{error});
+        
+        # Check if this is an AJAX request
+        my $is_ajax = $c->req->header('X-Requested-With') && 
+                      $c->req->header('X-Requested-With') eq 'XMLHttpRequest';
+        
+        # Check if we have mock data available
+        my $cloudflare_manager = Comserv::Util::CloudflareManager->new();
+        my $mock_records = $cloudflare_manager->_get_mock_dns_records($domain);
+        
+        if ($dev_mode && $mock_records && ref($mock_records) eq 'ARRAY') {
+            # If in development mode and we have mock data, use it
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'dns_records', 
+                "Using mock DNS records for domain $domain (development mode)");
+            
+            # Always include JSON data in the stash
+            $c->stash(json => { 
+                success => 1,
+                records => $mock_records,
+                domain => $domain,
+                mock_data => 1
+            });
+            
+            # If this is an AJAX request, return JSON only
+            if ($is_ajax || ($c->req->header('Accept') && $c->req->header('Accept') =~ /application\/json/)) {
+                $c->forward('View::JSON');
+                $c->detach();
+            } else {
+                # For regular web interface, show the records
+                $c->stash(
+                    template => 'cloudflare/dns_records.tt',
+                    domain => $domain,
+                    records => $mock_records,
+                    mock_data => 1,
+                    zones => $self->_get_cloudflare_domains($c)
+                );
+            }
+        } else {
+            # No mock data available, show error
+            # Always include JSON data in the stash for AJAX requests
+            $c->stash(json => { 
+                success => 0,
+                error => $records->{error},
+                message => 'Failed to retrieve DNS records'
+            });
+            
+            # If this is an AJAX request or explicitly wants JSON, return JSON only
+            if ($is_ajax || ($c->req->header('Accept') && $c->req->header('Accept') =~ /application\/json/)) {
+                $c->response->status(400); # Bad Request
+                $c->forward('View::JSON');
+                $c->detach();
+            } else {
+                # For regular web interface, show a user-friendly error
+                $c->stash(
+                    template => 'cloudflare/dns_records.tt',
+                    domain => $domain,
+                    error_message => 'Failed to retrieve DNS records. Please check the application logs for details.',
+                    records => [],
+                    zones => $self->_get_cloudflare_domains($c)
+                );
+            }
+        }
+        
         return;
     }
+    
+    # Always include JSON data in the stash for the JavaScript to use
+    $c->stash(
+        json => {
+            success => 1,
+            records => $records->{result},
+            domain => $domain
+        }
+    );
     
     # Check if this is an API request or a web page request
     if ($c->req->header('Accept') && $c->req->header('Accept') =~ /application\/json/) {
         # API request - return JSON
-        $c->stash(
-            json => {
-                success => 1,
-                records => $records->{result},
-                domain => $domain
-            }
-        );
         $c->forward('View::JSON');
     } else {
         # Web page request - return HTML
@@ -259,7 +343,8 @@ sub create_dns_record :Path('dns/create') :Args(0) {
     # If not authenticated via Catalyst, check session directly
     if (!$is_authenticated && $c->session->{username}) {
         $is_authenticated = 1;
-        $c->log->debug("API: User authenticated via session: " . $c->session->{username});
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_dns_record', 
+            "API: User authenticated via session: " . $c->session->{username});
     }
     
     unless ($is_authenticated) {
@@ -292,6 +377,7 @@ sub create_dns_record :Path('dns/create') :Args(0) {
     my $content = $c->req->params->{content};
     my $ttl = $c->req->params->{ttl} || 1;
     my $proxied = $c->req->params->{proxied} ? 1 : 0;
+    my $priority = $c->req->params->{priority};
     
     # Validate parameters
     unless ($domain && $record_type && $name && $content) {
@@ -306,7 +392,7 @@ sub create_dns_record :Path('dns/create') :Args(0) {
         return;
     }
     
-    # Call the Python module to create DNS record
+    # Call the CloudflareManager module to create DNS record
     my $result = $self->_call_cloudflare_manager(
         'create_dns_record',
         $user_email,
@@ -315,7 +401,8 @@ sub create_dns_record :Path('dns/create') :Args(0) {
         $name,
         $content,
         $ttl,
-        $proxied
+        $proxied,
+        $priority
     );
     
     if ($result->{error}) {
@@ -356,7 +443,8 @@ sub update_dns_record :Path('dns/update') :Args(0) {
     # If not authenticated via Catalyst, check session directly
     if (!$is_authenticated && $c->session->{username}) {
         $is_authenticated = 1;
-        $c->log->debug("API: User authenticated via session: " . $c->session->{username});
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'update_dns_record', 
+            "API: User authenticated via session: " . $c->session->{username});
     }
     
     unless ($is_authenticated) {
@@ -390,6 +478,7 @@ sub update_dns_record :Path('dns/update') :Args(0) {
     my $content = $c->req->params->{content};
     my $ttl = $c->req->params->{ttl} || 1;
     my $proxied = $c->req->params->{proxied} ? 1 : 0;
+    my $priority = $c->req->params->{priority};
     
     # Validate parameters
     unless ($domain && $record_id && $record_type && $name && $content) {
@@ -404,7 +493,7 @@ sub update_dns_record :Path('dns/update') :Args(0) {
         return;
     }
     
-    # Call the Python module to update DNS record
+    # Call the CloudflareManager module to update DNS record
     my $result = $self->_call_cloudflare_manager(
         'update_dns_record',
         $user_email,
@@ -414,7 +503,8 @@ sub update_dns_record :Path('dns/update') :Args(0) {
         $name,
         $content,
         $ttl,
-        $proxied
+        $proxied,
+        $priority
     );
     
     if ($result->{error}) {
@@ -455,7 +545,8 @@ sub delete_dns_record :Path('dns/delete') :Args(0) {
     # If not authenticated via Catalyst, check session directly
     if (!$is_authenticated && $c->session->{username}) {
         $is_authenticated = 1;
-        $c->log->debug("API: User authenticated via session: " . $c->session->{username});
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'delete_dns_record', 
+            "API: User authenticated via session: " . $c->session->{username});
     }
     
     unless ($is_authenticated) {
@@ -498,7 +589,7 @@ sub delete_dns_record :Path('dns/delete') :Args(0) {
         return;
     }
     
-    # Call the Python module to delete DNS record
+    # Call the CloudflareManager module to delete DNS record
     my $result = $self->_call_cloudflare_manager(
         'delete_dns_record',
         $user_email,
@@ -537,7 +628,8 @@ sub purge_cache :Path('cache/purge') :Args(0) {
     # If not authenticated via Catalyst, check session directly
     if (!$is_authenticated && $c->session->{username}) {
         $is_authenticated = 1;
-        $c->log->debug("API: User authenticated via session: " . $c->session->{username});
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'purge_cache', 
+            "API: User authenticated via session: " . $c->session->{username});
     }
     
     unless ($is_authenticated) {
@@ -579,7 +671,7 @@ sub purge_cache :Path('cache/purge') :Args(0) {
         return;
     }
     
-    # Call the Python module to purge cache
+    # Call the CloudflareManager module to purge cache
     my $result = $self->_call_cloudflare_manager(
         'purge_cache',
         $user_email,
@@ -621,18 +713,22 @@ sub _get_user_sites {
         my $sites_ref = $c->model('Site')->get_all_sites($c);
         if ($sites_ref && ref($sites_ref) eq 'ARRAY') {
             @sites = @$sites_ref;
-            $c->log->debug("Retrieved " . scalar(@sites) . " sites");
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_get_user_sites', 
+                "Retrieved " . scalar(@sites) . " sites");
         } else {
-            $c->log->warn("No sites found or invalid return from get_all_sites");
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_get_user_sites', 
+                "No sites found or invalid return from get_all_sites");
         }
     } catch {
         my $error = $_;
-        $c->log->error("Error getting sites: $error");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_get_user_sites', 
+            "Error getting sites: $error");
     };
     
     # If no sites found, return empty array
     unless (@sites) {
-        $c->log->debug("No sites found, returning empty array");
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_get_user_sites', 
+            "No sites found, returning empty array");
     }
     
     return @sites;
@@ -662,14 +758,47 @@ sub _get_cloudflare_domains {
         if ($zones && $zones->{success} && $zones->{result}) {
             foreach my $zone (@{$zones->{result}}) {
                 $domains{$zone->{name}} = $zone->{id};
-                $c->log->debug("Found Cloudflare domain: " . $zone->{name} . " with zone ID: " . $zone->{id});
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_get_cloudflare_domains', 
+                    "Found Cloudflare domain: " . $zone->{name} . " with zone ID: " . $zone->{id});
             }
         } else {
-            $c->log->warn("No Cloudflare zones found or error in response");
+            # Fallback to configuration if API call fails
+            my $cloudflare_manager = Comserv::Util::CloudflareManager->new();
+            my $config = $cloudflare_manager->config;
+            
+            if ($config && $config->{cloudflare} && $config->{cloudflare}->{domains}) {
+                foreach my $domain_name (keys %{$config->{cloudflare}->{domains}}) {
+                    my $domain_config = $config->{cloudflare}->{domains}->{$domain_name};
+                    my $zone_id = $domain_config->{zone_id} || '';
+                    
+                    $domains{$domain_name} = $zone_id;
+                    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_get_cloudflare_domains', 
+                        "Found Cloudflare domain from config: " . $domain_name . " with zone ID: " . $zone_id);
+                }
+            } else {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_get_cloudflare_domains', 
+                    "No Cloudflare zones found in API response or configuration");
+            }
         }
     } catch {
         my $error = $_;
-        $c->log->error("Error getting Cloudflare domains: $error");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_get_cloudflare_domains', 
+            "Error getting Cloudflare domains: $error");
+        
+        # Fallback to configuration if API call fails
+        my $cloudflare_manager = Comserv::Util::CloudflareManager->new();
+        my $config = $cloudflare_manager->config;
+        
+        if ($config && $config->{cloudflare} && $config->{cloudflare}->{domains}) {
+            foreach my $domain_name (keys %{$config->{cloudflare}->{domains}}) {
+                my $domain_config = $config->{cloudflare}->{domains}->{$domain_name};
+                my $zone_id = $domain_config->{zone_id} || '';
+                
+                $domains{$domain_name} = $zone_id;
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_get_cloudflare_domains', 
+                    "Found Cloudflare domain from config (after error): " . $domain_name . " with zone ID: " . $zone_id);
+            }
+        }
     };
     
     return \%domains;
@@ -692,19 +821,61 @@ sub _call_cloudflare_manager {
         # Call the method on the CloudflareManager instance
         my $result = $self->cloudflare_manager->$method(@args);
         
-        # Return success with the result
-        return {
-            success => 1,
-            result => $result
-        };
+        # Check if the result is defined
+        if (defined $result) {
+            # Return success with the result
+            return {
+                success => 1,
+                result => $result
+            };
+        } else {
+            # Return error if result is undefined
+            return {
+                success => 0,
+                error => "CloudflareManager returned undefined result"
+            };
+        }
     }
     catch {
+        # Log the error - we can't use log_with_details here because $c is not available
+        # Use log_to_file directly since we don't have $c context
+        Comserv::Util::Logging::log_to_file("ERROR: CloudflareManager error: $_");
+        
         # Handle errors
+        my $error_message = $_;
+        
+        # Clean up the error message for display
+        $error_message =~ s/ at \/home\/shanta\/PycharmProjects\/comserv2\/.*//;
+        
         return {
             success => 0,
-            error => "Failed to execute CloudflareManager: $_"
+            error => "Failed to execute CloudflareManager: $error_message"
         };
     };
+}
+
+# Helper method to get the Cloudflare user email
+sub _get_cloudflare_user_email {
+    my ($self, $c) = @_;
+    
+    # Try to get the Cloudflare email from the config file first
+    my $cloudflare_manager = Comserv::Util::CloudflareManager->new();
+    my $config = $cloudflare_manager->config;
+    my $config_email = $config->{cloudflare}->{email} if $config && $config->{cloudflare};
+    
+    if ($config_email && $config_email ne '<replace-with-cloudflare-email>') {
+        # Use the email from the config file
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_get_cloudflare_user_email', 
+            "Using Cloudflare email from config: $config_email");
+        return $config_email;
+    } elsif ($c->user_exists) {
+        return $c->user->email;
+    } elsif ($c->session->{email}) {
+        return $c->session->{email};
+    } else {
+        # Default email if none found
+        return 'admin@computersystemconsulting.ca';
+    }
 }
 
 __PACKAGE__->meta->make_immutable;

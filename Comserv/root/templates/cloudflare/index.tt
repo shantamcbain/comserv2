@@ -364,16 +364,23 @@ $(document).ready(function() {
     
     // Load DNS records for a domain
     function loadDnsRecords(domain) {
+        // Show loading message
+        $('#dns-records-body').html('<tr><td colspan="6" class="text-center">Loading DNS records...</td></tr>');
+        
         $.ajax({
             url: '[% c.uri_for("/cloudflareapi/dns") %]/' + domain,
             type: 'GET',
+            dataType: 'json',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
             success: function(response) {
                 if (response.success) {
                     const records = response.records;
                     let html = '';
                     
-                    if (records.length === 0) {
-                        html = '<tr><td colspan="6">No DNS records found</td></tr>';
+                    if (!records || records.length === 0) {
+                        html = '<tr><td colspan="6" class="text-center">No DNS records found</td></tr>';
                     } else {
                         records.forEach(function(record) {
                             html += `
@@ -401,11 +408,40 @@ $(document).ready(function() {
                     
                     $('#dns-records-body').html(html);
                 } else {
-                    alert('Error: ' + response.error);
+                    // Show error in the table
+                    const errorMessage = response.error || response.message || 'Unknown error';
+                    $('#dns-records-body').html(`
+                        <tr>
+                            <td colspan="6" class="text-center text-danger">
+                                <strong>Error:</strong> ${errorMessage}
+                            </td>
+                        </tr>
+                    `);
+                    console.error('Error loading DNS records:', errorMessage);
                 }
             },
             error: function(xhr, status, error) {
-                alert('Error: ' + error);
+                // Try to parse the error response
+                let errorMessage = 'Error loading DNS records: ' + error;
+                try {
+                    const errorResponse = JSON.parse(xhr.responseText);
+                    if (errorResponse && (errorResponse.error || errorResponse.message)) {
+                        errorMessage = 'Error: ' + (errorResponse.error || errorResponse.message);
+                    }
+                } catch (e) {
+                    // If parsing fails, use the status text
+                    errorMessage = 'Error loading DNS records: HTTP error! Status: ' + xhr.status;
+                }
+                
+                // Show error in the table
+                $('#dns-records-body').html(`
+                    <tr>
+                        <td colspan="6" class="text-center text-danger">
+                            <strong>${errorMessage}</strong>
+                        </td>
+                    </tr>
+                `);
+                console.error('AJAX Error:', xhr.responseText);
             }
         });
     }

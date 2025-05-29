@@ -30,9 +30,14 @@
                                 <ul>
                                 [% FOREACH domain IN site.domains %]
                                     <li>
-                                        <a href="[% c.uri_for('/cloudflareapi/dns/' _ domain.domain) %]" class="domain-link">
-                                            [% domain.domain %]
-                                        </a>
+                                        [% IF domain.is_on_cloudflare %]
+                                            <a href="[% c.uri_for('/cloudflareapi/dns/' _ domain.domain) %]" class="domain-link cloudflare-domain">
+                                                [% domain.domain %]
+                                                <span class="cloudflare-badge">Cloudflare</span>
+                                            </a>
+                                        [% ELSE %]
+                                            <span class="domain-text">[% domain.domain %]</span>
+                                        [% END %]
                                     </li>
                                 [% END %]
                                 </ul>

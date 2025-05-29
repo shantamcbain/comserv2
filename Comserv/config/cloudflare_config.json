@@ -1,7 +1,6 @@
 {
   "cloudflare": {
-    "api_token": "Y589fee264de80c4a1f2ac27b77718e96",
-    "account_id": "589fee264de80c4a1f2ac27b77718e96",
+    "api_token": "cXPhJ9FFvNI6XcV7Xf-TxVI_IDC2zdlVPePa_n5w",
     "email": "shantamcbain@gmail.com"
   },
   "roles": {
@@ -13,11 +12,21 @@
     },
     "editor": {
       "permissions": ["dns:edit"]
+    },
+    "csc_admin": {
+      "permissions": ["dns:edit", "zone:edit", "ssl:edit", "cache:edit", "settings:edit", "analytics:view"]
     }
   },
   "site_specific_permissions": {
     "beemaster.ca": {
       "editor": ["dns:edit", "cache:edit"]
+    },
+    "computersystemconsulting.ca": {
+      "editor": ["dns:edit", "cache:edit"],
+      "admin": ["dns:edit", "zone:edit", "ssl:edit", "cache:edit"]
     }
+  },
+  "user_domains": {
+    "shantamcbain@gmail.com": ["computersystemconsulting.ca", "beemaster.ca"]
   }
 }
