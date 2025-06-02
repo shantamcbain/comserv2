@@ -9,7 +9,32 @@ use Config::General;
 use File::Temp qw(tempfile);
 use IPC::Run3 qw(run3);
 use Path::Tiny qw(path);
-use YAML::XS qw(LoadFile DumpFile);
+# Use flexible YAML loading with fallback options
+BEGIN {
+    my $yaml_module;
+    for my $module (qw(YAML::XS YAML::Syck YAML::Tiny YAML)) {
+        eval "require $module";
+        if (!$@) {
+            $yaml_module = $module;
+            last;
+        }
+    }
+    
+    if ($yaml_module) {
+        if ($yaml_module eq 'YAML::XS') {
+            eval "use YAML::XS qw(LoadFile DumpFile)";
+        } elsif ($yaml_module eq 'YAML::Syck') {
+            eval "use YAML::Syck qw(LoadFile DumpFile)";
+        } elsif ($yaml_module eq 'YAML::Tiny') {
+            eval "use YAML::Tiny";
+            # YAML::Tiny has different interface, we'll handle this in methods
+        } else {
+            eval "use YAML qw(LoadFile DumpFile)";
+        }
+    } else {
+        die "No YAML module available. Please install YAML::XS, YAML::Syck, YAML::Tiny, or YAML";
+    }
+}
 
 BEGIN { extends 'Catalyst::Controller'; }
 

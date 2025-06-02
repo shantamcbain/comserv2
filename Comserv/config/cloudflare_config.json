@@ -1,32 +1,112 @@
 {
-  "cloudflare": {
-    "api_token": "cXPhJ9FFvNI6XcV7Xf-TxVI_IDC2zdlVPePa_n5w",
-    "email": "shantamcbain@gmail.com"
-  },
-  "roles": {
-    "admin": {
-      "permissions": ["dns:edit", "zone:edit", "ssl:edit", "cache:edit"]
-    },
-    "developer": {
-      "permissions": ["dns:edit", "cache:edit"]
-    },
-    "editor": {
-      "permissions": ["dns:edit"]
-    },
-    "csc_admin": {
-      "permissions": ["dns:edit", "zone:edit", "ssl:edit", "cache:edit", "settings:edit", "analytics:view"]
-    }
-  },
-  "site_specific_permissions": {
-    "beemaster.ca": {
-      "editor": ["dns:edit", "cache:edit"]
-    },
-    "computersystemconsulting.ca": {
-      "editor": ["dns:edit", "cache:edit"],
-      "admin": ["dns:edit", "zone:edit", "ssl:edit", "cache:edit"]
-    }
-  },
-  "user_domains": {
-    "shantamcbain@gmail.com": ["computersystemconsulting.ca", "beemaster.ca"]
-  }
+   "site_specific_permissions" : {
+      "computersystemconsulting.ca" : {
+         "editor" : [
+            "dns:edit",
+            "cache:edit"
+         ],
+         "admin" : [
+            "dns:edit",
+            "zone:edit",
+            "ssl:edit",
+            "cache:edit"
+         ]
+      },
+      "beemaster.ca" : {
+         "editor" : [
+            "dns:edit",
+            "cache:edit"
+         ]
+      }
+   },
+   "cloudflare" : {
+      "email" : "shantamcbain@gmail.com",
+      "application_id" : "comserv2",
+      "api_token" : "cXPhJ9FFvNI6XcV7Xf-TxVI_IDC2zdlVPePa_n5w",
+      "domains" : {
+         "computersystemconsulting.ca" : {
+            "zone_id" : "ac8700ca0e7abcdf1fdd332fc9498303"
+         },
+         "countrystores.ca" : {
+            "zone_id" : "7dcf8e5a6562507932563e1d4a0961e8"
+         },
+         "helpfullearth.com" : {
+            "zone_id" : "46907ece536c3a29af9bcf572bcb0006"
+         },
+         "beemaster.ca" : {
+            "zone_id" : "8915be6236b32dda66e5178678473108"
+         },
+         "ve7tit.com" : {
+            "zone_id" : "d087dfce513fdd60253557bf1b722a64"
+         },
+         "forager.com" : {
+            "zone_id" : "663cc8f00a2ff34b946d0738250a0bf7"
+         },
+         "shamanbotanicals.ca" : {
+            "zone_id" : "93ee6bc562b976ca2bf133833a4eadd7"
+         },
+         "altpowerstore.com" : {
+            "zone_id" : "d164989ec381b03b792f18f9f99dbc78"
+         },
+         "weaverbeck.com" : {
+            "zone_id" : "8d22e1069fad1d205b6fb71ce159ccda"
+         },
+         "grindrodbc.com" : {
+            "zone_id" : "e54ba74d66dfe2a7fc92754bcd2ffee4"
+         },
+         "skyefarm.com" : {
+            "zone_id" : "a272f0881f058e12ea5cd4aa939e6855"
+         },
+         "usbm.ca" : {
+            "zone_id" : "e75d5e45aab9d926ae878928c6fbd49c"
+         }
+      }
+   },
+   "user_domains" : {
+      "shanta@computersystemconsulting.ca" : [
+         "usbm.ca",
+         "skyefarm.com",
+         "grindrodbc.com",
+         "weaverbeck.com",
+         "altpowerstore.com",
+         "shamanbotanicals.ca",
+         "forager.com",
+         "beemaster.ca",
+         "ve7tit.com",
+         "helpfullearth.com",
+         "countrystores.ca",
+         "computersystemconsulting.ca"
+      ]
+   },
+   "roles" : {
+      "admin" : {
+         "permissions" : [
+            "dns:edit",
+            "zone:edit",
+            "ssl:edit",
+            "cache:edit"
+         ]
+      },
+      "csc_admin" : {
+         "permissions" : [
+            "dns:edit",
+            "zone:edit",
+            "ssl:edit",
+            "cache:edit",
+            "settings:edit",
+            "analytics:view"
+         ]
+      },
+      "developer" : {
+         "permissions" : [
+            "dns:edit",
+            "cache:edit"
+         ]
+      },
+      "editor" : {
+         "permissions" : [
+            "dns:edit"
+         ]
+      }
+   }
 }

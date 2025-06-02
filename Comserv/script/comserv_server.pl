@@ -4,6 +4,27 @@ use FindBin;
 
 BEGIN {
     $ENV{CATALYST_SCRIPT_GEN} = 40;
+    
+    # Ensure we're using the correct Perl version via perlbrew
+    my $required_perl_version = "perl-5.40.0";
+    my $current_perl = $^X;
+    
+    # Check if we're already using the correct perlbrew Perl
+    if ($current_perl !~ /perlbrew.*\Q$required_perl_version\E/) {
+        # Try to find and use the correct perlbrew Perl
+        my $perlbrew_perl = "$ENV{HOME}/perl5/perlbrew/perls/$required_perl_version/bin/perl";
+        
+        if (-x $perlbrew_perl) {
+            print "Switching to perlbrew Perl $required_perl_version...\n";
+            # Re-execute with the correct Perl version
+            exec($perlbrew_perl, $0, @ARGV);
+            exit;
+        } else {
+            warn "Warning: $required_perl_version not found via perlbrew at $perlbrew_perl\n";
+            warn "Please install it with: perlbrew install $required_perl_version\n";
+            warn "Continuing with current Perl version, but some modules may not work correctly.\n";
+        }
+    }
 
     # Add the lib directory to @INC
     use FindBin;
@@ -26,6 +47,43 @@ BEGIN {
     use lib "$FindBin::Bin/../local/lib/perl5";
     $ENV{PERL5LIB} = "$FindBin::Bin/../local/lib/perl5:$ENV{PERL5LIB}";
     $ENV{PATH} = "$FindBin::Bin/../local/bin:$ENV{PATH}";
+    
+    # Add architecture-specific paths early
+    use Config;
+    my $archname = $Config{archname};
+    my $version = $Config{version};
+    
+    # Add all possible architecture paths to @INC
+    use lib "$FindBin::Bin/../local/lib/perl5/$archname";
+    use lib "$FindBin::Bin/../local/lib/perl5/$version/$archname";
+    use lib "$FindBin::Bin/../local/lib/perl5/$version";
+    
+    # Also add the actual installed architecture path (for systems where archname differs)
+    # This handles cases where the actual installed path uses a different architecture name
+    my @arch_paths = (
+        "$FindBin::Bin/../local/lib/perl5/x86_64-linux-gnu-thread-multi",
+        "$FindBin::Bin/../local/lib/perl5/auto",
+        "$FindBin::Bin/../local/lib/perl5/site_perl",
+        "$FindBin::Bin/../local/lib/perl5/site_perl/$version",
+        "$FindBin::Bin/../local/lib/perl5/site_perl/$version/$archname"
+    );
+    
+    foreach my $path (@arch_paths) {
+        if (-d $path) {
+            unshift @INC, $path;
+        }
+    }
+    
+    # Debug: Print the paths being added
+    if ($ENV{CATALYST_DEBUG}) {
+        print "Debug: Adding architecture paths to \@INC:\n";
+        print "  $FindBin::Bin/../local/lib/perl5/$archname\n";
+        print "  $FindBin::Bin/../local/lib/perl5/$version/$archname\n";
+        print "  $FindBin::Bin/../local/lib/perl5/$version\n";
+        foreach my $path (@arch_paths) {
+            print "  $path\n" if -d $path;
+        }
+    }
 }
 
 # Ensure the local directory exists
@@ -50,6 +108,14 @@ if (-e $cpanfile_path) {
     # Install all dependencies from cpanfile first
     print "Installing all dependencies from cpanfile...\n";
     my $cpanfile_result = system("cpanm --local-lib=$FindBin::Bin/../local --installdeps $FindBin::Bin/..");
+    
+    # Force reinstall XS modules to ensure they're compiled with current Perl version
+    print "Force reinstalling XS modules to ensure compatibility...\n";
+    my @xs_modules = ('YAML::XS', 'JSON::XS');
+    foreach my $xs_module (@xs_modules) {
+        print "Force reinstalling $xs_module...\n";
+        system("cpanm --local-lib=$FindBin::Bin/../local --force --reinstall $xs_module");
+    }
     
     # If there were issues with cpanfile installation, try installing critical modules individually
     if ($cpanfile_result != 0) {
@@ -95,7 +161,13 @@ if (-e $cpanfile_path) {
             "Catalyst::Plugin::Session",
             "Catalyst::Plugin::Authentication",
             "DBIx::Class",
-            "Template"
+            "Template",
+            
+            # Network modules
+            "Net::CIDR",
+            
+            # YAML modules
+            "YAML::XS"
         );
         
         my @failed_modules = ();
@@ -139,6 +211,13 @@ if (-e $cpanfile_path) {
     # Add the newly installed modules' path to @INC
     unshift @INC, "$FindBin::Bin/../local/lib/perl5";
     
+    # Also add architecture-specific paths
+    use Config;
+    my $archname = $Config{archname};
+    my $version = $Config{version};
+    unshift @INC, "$FindBin::Bin/../local/lib/perl5/$archname" if -d "$FindBin::Bin/../local/lib/perl5/$archname";
+    unshift @INC, "$FindBin::Bin/../local/lib/perl5/x86_64-linux-gnu-thread-multi" if -d "$FindBin::Bin/../local/lib/perl5/x86_64-linux-gnu-thread-multi";
+    
     print "Installation complete. New modules are now available.\n";
 } else {
     warn "cpanfile not found at $cpanfile_path. Skipping dependency installation.\n";
@@ -156,6 +235,12 @@ if ($@) {
 
     # Add the newly installed module's path to @INC
     unshift @INC, "$FindBin::Bin/../local/lib/perl5";
+    
+    # Also add architecture-specific paths
+    use Config;
+    my $archname = $Config{archname};
+    unshift @INC, "$FindBin::Bin/../local/lib/perl5/$archname" if -d "$FindBin::Bin/../local/lib/perl5/$archname";
+    unshift @INC, "$FindBin::Bin/../local/lib/perl5/x86_64-linux-gnu-thread-multi" if -d "$FindBin::Bin/../local/lib/perl5/x86_64-linux-gnu-thread-multi";
 
     # Restart the script to ensure the newly installed module is properly loaded
     print "Restarting script to load the newly installed module...\n";
@@ -172,60 +257,88 @@ if ($@) {
     die "Failed to load Catalyst::ScriptRunner even after installation: $@\nPlease install it manually.\n";
 }
 
-# Check if email-related modules are properly loaded
-eval {
-    require Catalyst::View::Email;
-    require Catalyst::View::Email::Template;
-    require Email::MIME;
-    require Email::Sender::Simple;
-};
-if ($@) {
-    warn "Warning: Some email modules could not be loaded: $@\n";
-    warn "Email functionality may not work correctly.\n";
-    warn "Installing missing email modules...\n";
-    
-    # Extract the specific modules that failed to load from the error message
-    my @missing_modules = ();
-    if ($@ =~ /Can't locate (.*?)\.pm/) {
-        my $missing_module = $1;
-        $missing_module =~ s|/|::|g;
-        push @missing_modules, $missing_module;
+# Check for all required modules before starting Catalyst
+my @required_modules = (
+    'YAML::XS',
+    'Net::CIDR',
+    'Email::MIME',
+    'Email::Sender::Simple',
+    'Catalyst::View::Email',
+    'Catalyst::View::Email::Template'
+);
+
+my @missing_modules = ();
+my $need_restart = 0;
+
+# Ensure local lib paths are in @INC before checking modules (already done in BEGIN block)
+# Architecture-specific paths are also already added in BEGIN block
+
+# Check if we've already tried installing modules (to prevent infinite loops)
+my $install_marker = "$FindBin::Bin/../local/.modules_installed";
+my $already_tried_install = -e $install_marker;
+
+# Special handling for YAML modules with fallback options
+my $yaml_module_loaded = 0;
+my @yaml_alternatives = ('YAML::XS', 'YAML::Syck', 'YAML::Tiny', 'YAML');
+
+foreach my $yaml_module (@yaml_alternatives) {
+    eval "require $yaml_module";
+    if (!$@) {
+        print "Debug: Successfully loaded YAML module: $yaml_module\n" if $ENV{CATALYST_DEBUG};
+        $yaml_module_loaded = 1;
+        last;
+    } else {
+        print "Debug: Failed to load $yaml_module: $@\n" if $ENV{CATALYST_DEBUG};
     }
-    
-    # If we couldn't extract specific modules, install all email modules
-    if (!@missing_modules) {
-        @missing_modules = (
-            "Email::Abstract",
-            "Email::Address",
-            "Email::Date::Format",
-            "Email::MIME", 
-            "Email::MIME::ContentType",
-            "Email::MIME::Encodings",
-            "Email::MessageID",
-            "Email::Sender::Simple",
-            "Email::Sender::Transport::SMTP",
-            "Email::Simple",
-            "Email::Simple::Creator",
-            "Email::MIME::Creator",
-            "Catalyst::View::Email",
-            "Catalyst::View::Email::Template"
-        );
+}
+
+if (!$yaml_module_loaded && !$already_tried_install) {
+    print "No YAML module found, will install YAML::XS and fallbacks...\n";
+    push @missing_modules, 'YAML::XS', 'YAML::Tiny';
+}
+
+# Check other required modules
+my @other_modules = grep { $_ ne 'YAML::XS' } @required_modules;
+foreach my $module (@other_modules) {
+    eval "require $module";
+    if ($@) {
+        print "Debug: Failed to load $module: $@\n" if $ENV{CATALYST_DEBUG};
+        push @missing_modules, $module unless $already_tried_install;
+    } else {
+        print "Debug: Successfully loaded $module\n" if $ENV{CATALYST_DEBUG};
     }
+}
+
+if (@missing_modules && !$already_tried_install) {
+    print "Installing missing modules: " . join(', ', @missing_modules) . "\n";
     
-    # Install only the missing modules
-    print "Installing " . scalar(@missing_modules) . " missing email modules...\n";
     foreach my $module (@missing_modules) {
         print "Installing $module...\n";
         my $result = system("cpanm --local-lib=$FindBin::Bin/../local --force $module");
         if ($result != 0) {
-            warn "Failed to install $module. Email functionality may be limited.\n";
+            warn "Failed to install $module. Some functionality may be limited.\n";
         } else {
             print "Successfully installed $module\n";
+            $need_restart = 1;
         }
     }
     
-    # Add the newly installed modules' path to @INC
-    unshift @INC, "$FindBin::Bin/../local/lib/perl5";
+    if ($need_restart) {
+        # Create marker file to prevent infinite loops
+        open my $fh, '>', $install_marker or warn "Could not create install marker: $!";
+        close $fh if $fh;
+        
+        # Restart the script to ensure the newly installed modules are properly loaded
+        print "Restarting script to load the newly installed modules...\n";
+        exec($^X, $0, @ARGV);
+        exit;
+    }
+} elsif (@missing_modules && $already_tried_install) {
+    # We've already tried installing, but modules are still missing
+    # Continue anyway but warn about missing functionality
+    warn "Warning: The following modules are still missing after installation attempt: " . 
+         join(', ', @missing_modules) . "\n";
+    warn "Some functionality may be limited.\n";
 }
 
 Catalyst::ScriptRunner->run('Comserv', 'Server');

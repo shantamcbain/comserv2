@@ -1,4 +1,4 @@
-[% PageVersion = 'cloudflare/dns_records.tt,v 0.02 2025/06/15 shanta Exp shanta ' %]
+[% PageVersion = 'cloudflare/dns_records.tt,v 0.02 2025/05/25 shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -176,9 +176,13 @@
 <div class="dns-records-container">
     <h1>DNS Records for [% domain %]</h1>
     
-    [% IF mock_data %]
+    [% IF is_subdomain %]
     <div class="alert alert-info">
-        <strong>Development Mode:</strong> Using mock DNS records. Changes will not affect the actual domain.
+        <strong>Subdomain:</strong> This is a subdomain of [% parent_domain %]. DNS records are managed through the parent domain zone. 
+        [% IF records.size == 0 %]
+        <p>No specific DNS records found for this subdomain. You may need to create them or check the parent domain for wildcard records.</p>
+        <p><a href="[% c.uri_for('/cloudflareapi/dns/' _ parent_domain) %]" class="btn btn-sm btn-primary">View Parent Domain Records</a></p>
+        [% END %]
     </div>
     [% END %]
     
@@ -448,19 +452,6 @@
                 const data = result.data;
                 if (data.success) {
                     displayRecords(data.records);
-                    
-                    // Show a message if using mock data
-                    if (data.mock_data) {
-                        const mockDataAlert = document.createElement('div');
-                        mockDataAlert.className = 'alert alert-info';
-                        mockDataAlert.innerHTML = '<strong>Development Mode:</strong> Using mock DNS records. Changes will not affect the actual domain.';
-                        
-                        // Insert after the h1 element
-                        const h1 = document.querySelector('.dns-records-container h1');
-                        if (h1 && h1.nextElementSibling) {
-                            h1.parentNode.insertBefore(mockDataAlert, h1.nextElementSibling);
-                        }
-                    }
                 } else {
                     showError("Failed to load DNS records: " + (data.message || data.error || "Unknown error"));
                 }

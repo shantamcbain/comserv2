@@ -1,350 +1,394 @@
-[% PageVersion = 'cloudflare/index.tt,v 0.01 2025/06/01 shanta Exp shanta ' %]
-[% IF debug_mode == 1 %]
+[% META
+   title = "Cloudflare DNS Management"
+   description = "Cloudflare DNS Management interface for managing DNS records across all zones"
+   roles = "admin,developer"
+   category = "infrastructure"
+%]
+
+[% PageVersion = 'cloudflare/index.tt,v 1.1 2025/01/15 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
-<div class="cloudflare-dashboard">
+<link rel="stylesheet" href="[% c.uri_for('/static/css/components/cloudflare.css') %]">
+
+<!-- Temporary inline styles for testing -->
+<style>
+.cloudflare-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: Arial, sans-serif;
+}
+
+.zone-card, .site-card {
+    background-color: #ffffff;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.zone-card:hover, .site-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.zone-grid, .site-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.btn {
+    display: inline-block;
+    padding: 8px 16px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.btn:hover {
+    background-color: #0056b3;
+    text-decoration: none;
+    color: white;
+}
+
+.btn-primary {
+    background-color: #007bff;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+}
+
+.btn-info {
+    background-color: #17a2b8;
+}
+
+.cloudflare-badge {
+    background-color: #f38020;
+    color: white;
+    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 8px;
+}
+
+.dns-records-container {
+    display: none;
+}
+
+.alert {
+    padding: 12px 15px;
+    margin-bottom: 20px;
+    border-radius: 4px;
+}
+
+.alert-success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.alert-danger {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.role-badge {
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-weight: bold;
+    margin-left: 10px;
+}
+
+.role-badge.csc-admin {
+    background-color: #28a745;
+    color: white;
+}
+
+.role-badge.regular-admin {
+    background-color: #17a2b8;
+    color: white;
+}
+</style>
+
+<div class="cloudflare-container">
     <h1>Cloudflare DNS Management</h1>
     
-    <div class="dashboard-intro">
-        <p>Welcome to the Cloudflare DNS Management interface. This tool allows you to manage DNS records for your domains through Cloudflare.</p>
+    [% IF success_message %]
+    <div class="alert alert-success">
+        [% success_message %]
+    </div>
+    [% END %]
+    
+    [% IF error_message %]
+    <div class="alert alert-danger">
+        [% error_message %]
+    </div>
+    [% END %]
+    
+    <div class="admin-actions">
+        <a href="/cloudflareapi/update_domains" class="btn btn-primary update-domains-btn">
+            <i class="fa fa-sync-alt"></i> Update Domains from Cloudflare
+        </a>
+    </div>
+    
+    <!-- Debug info - remove in production -->
+    <div class="debug-info">
+        <p><strong>Debug Info:</strong> If you can see this message but not the button above, there might be a CSS issue.</p>
+        <p>Direct link: <a href="/cloudflareapi/update_domains">/cloudflareapi/update_domains</a></p>
+        [% IF c.session.debug_mode == 1 %]
+            <p><strong>User Email:</strong> [% user_email || 'Not available' %]</p>
+            <p><strong>User SiteName:</strong> [% user_sitename || 'Not available' %]</p>
+            <p><strong>User Role:</strong> [% is_csc_admin ? 'CSC Admin' : 'SiteName Admin' %]</p>
+            <p><strong>Available Zones:</strong> [% cloudflare_zones.size %]</p>
+            <p><strong>Available Sites:</strong> [% sites.size %]</p>
+        [% END %]
+    </div>
+    
+    <div class="cloudflare-zones-section">
+        <h2>Cloudflare Zones 
+            [% IF is_csc_admin %]
+                <span class="role-badge csc-admin">CSC Admin</span>
+            [% ELSE %]
+                <span class="role-badge regular-admin">Site Admin</span>
+            [% END %]
+        </h2>
+        [% IF is_csc_admin %]
+            <p class="description">As a CSC administrator, you can see all Cloudflare zones and manage DNS records for any domain.</p>
+        [% ELSE %]
+            <p class="description">This section shows Cloudflare zones for domains associated with your SiteName ([% user_sitename || 'Unknown' %]). You can manage DNS records for these domains.</p>
+        [% END %]
         
-        <div class="admin-actions">
-            <a href="[% c.uri_for('/ApiCredentials') %]" class="btn btn-info">
-                <i class="icon-key"></i> Manage API Credentials
-            </a>
-            <p class="admin-note">Note: You need to configure your Cloudflare API credentials before using this tool.</p>
+        <div class="zone-grid">
+            [% IF cloudflare_zones.size > 0 %]
+                [% FOREACH zone IN cloudflare_zones %]
+                    <div class="zone-card" data-zone-id="[% zone.id %]">
+                        <div class="zone-info">
+                            <h3 class="zone-name">[% zone.name %]</h3>
+                            <span class="cloudflare-badge" title="This domain is registered in Cloudflare">
+                                <i class="fa fa-cloud"></i> Cloudflare Zone
+                            </span>
+                            [% IF zone.status %]
+                                <span class="zone-status [% zone.status %]">[% zone.status | ucfirst %]</span>
+                            [% END %]
+                        </div>
+                        <div class="zone-actions">
+                            <button class="btn btn-primary view-dns-btn" data-domain="[% zone.name %]">Manage DNS</button>
+                        </div>
+                    </div>
+                [% END %]
+            [% ELSE %]
+                <div class="no-zones">
+                    [% IF is_csc_admin %]
+                        <em>No Cloudflare zones found. Please check your Cloudflare account or API credentials.</em>
+                    [% ELSE %]
+                        <em>No Cloudflare zones available for your SiteName ([% user_sitename || 'Unknown' %]). Contact your administrator if you need access to additional domains.</em>
+                    [% END %]
+                </div>
+            [% END %]
         </div>
     </div>
     
-    <div class="domain-selection">
-        <h2>Select a Domain</h2>
+    <div class="site-selector">
+        <h2>Sites and Domains</h2>
+        <p class="description">This section shows all sites in the application and their associated domains. Domains registered in Cloudflare are highlighted and can be managed.</p>
         
-        [% IF sites && sites.size %]
-            <div class="site-list">
-                [% FOREACH site IN sites %]
-                    <div class="site-card">
-                        <h3>[% site.name %]</h3>
-                        <div class="domain-list">
-                            [% IF site.domains && site.domains.size %]
-                                <ul>
-                                [% FOREACH domain IN site.domains %]
-                                    <li>
+        <div class="site-grid">
+            [% FOREACH site IN sites %]
+                <div class="site-card">
+                    <h3>[% site.name %]</h3>
+                    <div class="domains">
+                        [% IF site.domains && site.domains.size %]
+                            [% FOREACH domain IN site.domains %]
+                                <div class="domain-item [% IF domain.is_on_cloudflare %]cloudflare-domain[% END %]">
+                                    <div class="domain-info">
+                                        <span class="domain-name">[% domain.domain %]</span>
                                         [% IF domain.is_on_cloudflare %]
-                                            <a href="[% c.uri_for('/cloudflareapi/dns/' _ domain.domain) %]" class="domain-link cloudflare-domain">
-                                                [% domain.domain %]
-                                                <span class="cloudflare-badge">Cloudflare</span>
-                                            </a>
+                                            <span class="cloudflare-badge">
+                                                <i class="fa fa-cloud"></i> Cloudflare
+                                            </span>
                                         [% ELSE %]
-                                            <span class="domain-text">[% domain.domain %]</span>
+                                            <span class="non-cloudflare-badge">Not on Cloudflare</span>
                                         [% END %]
-                                    </li>
-                                [% END %]
-                                </ul>
-                            [% ELSE %]
-                                <p class="no-domains">No domains configured for this site.</p>
+                                    </div>
+                                    [% IF domain.is_on_cloudflare %]
+                                        <button class="btn btn-primary view-dns-btn" data-domain="[% domain.domain %]">Manage DNS</button>
+                                    [% END %]
+                                </div>
                             [% END %]
-                        </div>
+                        [% ELSE %]
+                            <p class="no-domains">No domains configured for this site.</p>
+                        [% END %]
                     </div>
-                [% END %]
-            </div>
-        [% ELSE %]
-            <div class="no-sites-message">
-                <p>No sites available. Please contact your administrator to set up sites and domains.</p>
-            </div>
-        [% END %]
+                </div>
+            [% END %]
+        </div>
     </div>
     
-    <!-- SiteName Domain Mappings Section -->
-    <div class="sitename-mappings">
-        <h2>SiteName Domain Mappings</h2>
-        
-        [% IF site_names && site_names.size %]
-            <div class="sitename-grid">
-                [% FOREACH sitename IN site_names %]
-                    <div class="sitename-card">
-                        <h3>[% sitename.name %]</h3>
-                        <div class="domain-list">
-                            [% IF sitename.domains && sitename.domains.size %]
-                                <ul>
-                                [% FOREACH domain IN sitename.domains %]
-                                    <li>
-                                        [% IF domain.is_on_cloudflare %]
-                                            <a href="[% c.uri_for('/cloudflareapi/dns/' _ domain.domain) %]" class="domain-link cloudflare-domain">
-                                                [% domain.domain %]
-                                                <span class="cloudflare-badge">Cloudflare</span>
-                                            </a>
-                                        [% ELSE %]
-                                            <span class="domain-text">[% domain.domain %]</span>
-                                        [% END %]
-                                    </li>
-                                [% END %]
-                                </ul>
-                            [% ELSE %]
-                                <p class="no-domains">No domains configured for this site.</p>
-                            [% END %]
-                        </div>
-                    </div>
-                [% END %]
-            </div>
-        [% ELSE %]
-            <div class="no-sitenames-message">
-                <p>No SiteName domain mappings available. Please contact your administrator to set up site names and domains.</p>
-            </div>
-        [% END %]
-    </div>
     
-    <div class="manual-domain-entry">
-        <h2>Enter Domain Manually</h2>
-        <form action="[% c.uri_for('/cloudflareapi/dns') %]" method="GET" class="domain-form">
-            <div class="form-group">
-                <label for="domain">Domain:</label>
-                <input type="text" id="domain" name="domain" placeholder="example.com" required>
+    <div class="dns-records-container">
+        <div class="dns-header">
+            <h2>DNS Records for <span id="current-domain"></span></h2>
+            <div class="dns-actions">
+                <button id="back-to-sites-btn" class="btn btn-secondary">Back to Sites</button>
+                <button id="add-record-btn" class="btn btn-primary">Add Record</button>
+                <button id="refresh-records-btn" class="btn btn-info">Refresh</button>
             </div>
-            <button type="submit" class="btn btn-primary">Manage DNS</button>
-        </form>
+        </div>
+        
+        <div id="dns-records-loading" class="loading-message" style="display: none;">
+            <p>Loading DNS records...</p>
+        </div>
+        
+        <div class="dns-records-table">
+            <table id="dns-records-table">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Name</th>
+                        <th>Content</th>
+                        <th>TTL</th>
+                        <th>Priority</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="dns-records-tbody">
+                    <!-- DNS records will be loaded here via AJAX -->
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
-<style>
-    .cloudflare-dashboard {
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 20px;
+<script>
+$(document).ready(function() {
+    let currentDomain = '';
+    
+    // Debug information
+    console.log("Cloudflare DNS Management UI initialized");
+    console.log("Available zones: [% cloudflare_zones.size %]");
+    
+    // Add confirmation dialog for the update domains button
+    $('.update-domains-btn').click(function(e) {
+        e.preventDefault();
+        if (confirm('This will sync all domains from Cloudflare. This may take a few moments. Continue?')) {
+            window.location.href = $(this).attr('href');
+        }
+    });
+    
+    // View DNS records for a domain
+    $(document).on('click', '.view-dns-btn', function() {
+        const domain = $(this).data('domain');
+        currentDomain = domain;
+        $('#current-domain').text(domain);
+        
+        // Log the domain being viewed
+        console.log("Viewing DNS records for domain:", domain);
+        
+        // Load DNS records
+        loadDnsRecords(domain);
+        
+        // Show DNS records container
+        $('.site-selector').hide();
+        $('.cloudflare-zones-section').hide();
+        $('.dns-records-container').show();
+    });
+    
+    // Back to sites button
+    $('#back-to-sites-btn').click(function() {
+        $('.dns-records-container').hide();
+        $('.site-selector').show();
+        $('.cloudflare-zones-section').show();
+    });
+    
+    // Add record button
+    $('#add-record-btn').click(function() {
+        // TODO: Implement add record functionality
+        alert('Add record functionality will be implemented in the next update.');
+    });
+    
+    // Refresh records button
+    $('#refresh-records-btn').click(function() {
+        if (currentDomain) {
+            loadDnsRecords(currentDomain);
+        }
+    });
+    
+    // Function to load DNS records via AJAX
+    function loadDnsRecords(domain) {
+        $('#dns-records-loading').show();
+        $('#dns-records-table').hide();
+        
+        $.ajax({
+            url: '/cloudflareapi/dns_records',
+            method: 'GET',
+            data: { domain: domain },
+            dataType: 'json',
+            success: function(response) {
+                $('#dns-records-loading').hide();
+                $('#dns-records-table').show();
+                
+                if (response.success && response.records) {
+                    populateDnsRecordsTable(response.records);
+                } else {
+                    $('#dns-records-tbody').html('<tr><td colspan="6">Error loading DNS records: ' + (response.error || 'Unknown error') + '</td></tr>');
+                }
+            },
+            error: function(xhr, status, error) {
+                $('#dns-records-loading').hide();
+                $('#dns-records-table').show();
+                $('#dns-records-tbody').html('<tr><td colspan="6">Error loading DNS records: ' + error + '</td></tr>');
+                console.error('Error loading DNS records:', error);
+            }
+        });
     }
     
-    .dashboard-intro {
-        margin-bottom: 30px;
-        background-color: #f8f9fa;
-        padding: 15px;
-        border-radius: 5px;
-        border-left: 4px solid #007bff;
+    // Function to populate the DNS records table
+    function populateDnsRecordsTable(records) {
+        const tbody = $('#dns-records-tbody');
+        tbody.empty();
+        
+        if (records.length === 0) {
+            tbody.html('<tr><td colspan="6">No DNS records found for this domain.</td></tr>');
+            return;
+        }
+        
+        records.forEach(function(record) {
+            const row = $('<tr>');
+            row.append('<td>' + record.type + '</td>');
+            row.append('<td>' + record.name + '</td>');
+            row.append('<td>' + record.content + '</td>');
+            row.append('<td>' + record.ttl + '</td>');
+            row.append('<td>' + (record.priority || '-') + '</td>');
+            row.append('<td><button class="btn btn-sm btn-warning edit-record-btn" data-record-id="' + record.id + '">Edit</button> <button class="btn btn-sm btn-danger delete-record-btn" data-record-id="' + record.id + '">Delete</button></td>');
+            tbody.append(row);
+        });
     }
     
-    .admin-actions {
-        margin-top: 15px;
-        padding: 10px;
-        background-color: #e9ecef;
-        border-radius: 5px;
-        border: 1px solid #dee2e6;
-    }
+    // Edit record button (placeholder)
+    $(document).on('click', '.edit-record-btn', function() {
+        const recordId = $(this).data('record-id');
+        alert('Edit record functionality will be implemented in the next update. Record ID: ' + recordId);
+    });
     
-    .admin-note {
-        margin-top: 10px;
-        font-size: 0.9em;
-        color: #6c757d;
-        font-style: italic;
-    }
-    
-    .btn-info {
-        background-color: #17a2b8;
-        color: white;
-        border: none;
-    }
-    
-    .site-list {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 20px;
-        margin-bottom: 30px;
-    }
-    
-    .site-card {
-        flex: 1 0 300px;
-        max-width: 400px;
-        border: 1px solid #dee2e6;
-        border-radius: 5px;
-        padding: 15px;
-        background-color: #fff;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    }
-    
-    .site-card h3 {
-        margin-top: 0;
-        padding-bottom: 10px;
-        border-bottom: 1px solid #eee;
-        color: #343a40;
-    }
-    
-    .domain-list ul {
-        list-style-type: none;
-        padding-left: 0;
-    }
-    
-    .domain-list li {
-        margin-bottom: 8px;
-    }
-    
-    .domain-link {
-        display: block;
-        padding: 8px 12px;
-        background-color: #f8f9fa;
-        border-radius: 4px;
-        color: #007bff;
-        text-decoration: none;
-        transition: background-color 0.2s;
-    }
-    
-    .domain-link:hover {
-        background-color: #e9ecef;
-        text-decoration: none;
-    }
-    
-    .no-domains, .no-sites-message {
-        color: #6c757d;
-        font-style: italic;
-    }
-    
-    .manual-domain-entry {
-        margin-top: 40px;
-        padding: 20px;
-        background-color: #f8f9fa;
-        border-radius: 5px;
-    }
-    
-    .domain-form {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 15px;
-        align-items: flex-end;
-    }
-    
-    .form-group {
-        flex: 1;
-    }
-    
-    .form-group label {
-        display: block;
-        margin-bottom: 5px;
-        font-weight: bold;
-    }
-    
-    .form-group input {
-        width: 100%;
-        padding: 8px 12px;
-        border: 1px solid #ced4da;
-        border-radius: 4px;
-    }
-    
-    .btn-primary {
-        background-color: #007bff;
-        color: white;
-        border: none;
-        padding: 8px 16px;
-        border-radius: 4px;
-        cursor: pointer;
-    }
-    
-    .btn-primary:hover {
-        background-color: #0069d9;
-    }
-    
-    /* SiteName Mappings Styles */
-    .sitename-mappings {
-        margin-top: 40px;
-        margin-bottom: 30px;
-    }
-    
-    .sitename-grid {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 20px;
-        margin-bottom: 30px;
-    }
-    
-    .sitename-card {
-        flex: 1 0 300px;
-        max-width: 400px;
-        border: 1px solid #dee2e6;
-        border-radius: 5px;
-        padding: 15px;
-        background-color: #fff;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    }
-    
-    .sitename-card h3 {
-        margin-top: 0;
-        padding-bottom: 10px;
-        border-bottom: 1px solid #eee;
-        color: #343a40;
-    }
-    
-    .domain-list ul {
-        list-style-type: none;
-        padding-left: 0;
-    }
-    
-    .domain-list li {
-        margin-bottom: 8px;
-    }
-    
-    .domain-link {
-        display: block;
-        padding: 8px 12px;
-        background-color: #f8f9fa;
-        border-radius: 4px;
-        color: #007bff;
-        text-decoration: none;
-        transition: background-color 0.2s;
-        position: relative;
-    }
-    
-    .domain-link:hover {
-        background-color: #e9ecef;
-        text-decoration: none;
-    }
-    
-    .domain-text {
-        display: block;
-        padding: 8px 12px;
-        background-color: #f8f9fa;
-        border-radius: 4px;
-        color: #6c757d;
-    }
-    
-    .cloudflare-domain {
-        background-color: #f4f9ff;
-        border: 1px solid #cce5ff;
-    }
-    
-    .cloudflare-domain:hover {
-        background-color: #e6f2ff;
-    }
-    
-    .cloudflare-badge {
-        position: absolute;
-        top: 8px;
-        right: 8px;
-        font-size: 0.7rem;
-        background-color: #007bff;
-        color: white;
-        padding: 2px 6px;
-        border-radius: 10px;
-    }
-    
-    .no-domains, .no-sitenames-message {
-        color: #6c757d;
-        font-style: italic;
-    }
-    
-    .no-sitenames-message {
-        padding: 20px;
-        background-color: #f8f9fa;
-        border-radius: 5px;
-    }
-    
-    .btn-sm {
-        padding: 4px 8px;
-        font-size: 0.875rem;
-    }
-    
-    .btn-secondary {
-        background-color: #6c757d;
-        color: white;
-    }
-    
-    .disabled {
-        opacity: 0.65;
-        cursor: not-allowed;
-    }
-</style>
+    // Delete record button (placeholder)
+    $(document).on('click', '.delete-record-btn', function() {
+        const recordId = $(this).data('record-id');
+        if (confirm('Are you sure you want to delete this DNS record?')) {
+            alert('Delete record functionality will be implemented in the next update. Record ID: ' + recordId);
+        }
+    });
+});
+</script>
