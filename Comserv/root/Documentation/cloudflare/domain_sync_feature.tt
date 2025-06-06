@@ -1,0 +1,105 @@
+[% META 
+   title = 'Cloudflare Domain Synchronization Feature'
+   date = '2025-07-15'
+   author = 'System Administrator'
+   status = 'Implemented'
+%]
+
+<div class="documentation-content">
+    <h1>Cloudflare Domain Synchronization Feature</h1>
+    
+    <div class="metadata">
+        <p><strong>Date:</strong> [% template.date %]</p>
+        <p><strong>Author:</strong> [% template.author %]</p>
+        <p><strong>Status:</strong> [% template.status %]</p>
+    </div>
+    
+    <h2>Overview</h2>
+    <p>
+        The Cloudflare Domain Synchronization feature allows administrators to update the local configuration 
+        with domains from Cloudflare. This ensures that the application always has an up-to-date list of 
+        domains managed by Cloudflare, even if changes were made directly in the Cloudflare dashboard.
+    </p>
+    
+    <h2>Features</h2>
+    <ul>
+        <li>One-click synchronization of domains from Cloudflare to local configuration</li>
+        <li>Automatic fallback to existing configuration when API access is restricted</li>
+        <li>Clear error messages with troubleshooting information</li>
+        <li>IP restriction detection and helpful guidance</li>
+    </ul>
+    
+    <h2>Usage</h2>
+    <ol>
+        <li>Log in as an administrator</li>
+        <li>Navigate to the Cloudflare DNS Management page (via Admin menu or directly at <code>/cloudflareapi</code>)</li>
+        <li>Click the "Update Domains from Cloudflare" button at the top of the page</li>
+        <li>Confirm the action when prompted</li>
+    </ol>
+    
+    <h2>Technical Implementation</h2>
+    <h3>Controller Endpoint</h3>
+    <p>
+        The feature is implemented as an endpoint in the CloudflareAPI controller:
+    </p>
+    <pre><code>sub update_domains :Path('update_domains') :Args(0) { ... }</code></pre>
+    <p>
+        This endpoint is accessible at <code>/cloudflareapi/update_domains</code> and handles:
+    </p>
+    <ul>
+        <li>Authentication and authorization checks</li>
+        <li>Calling the CloudflareManager to update domains</li>
+        <li>Displaying appropriate success/error messages</li>
+        <li>Supporting both web interface and API access</li>
+    </ul>
+    
+    <h3>CloudflareManager Method</h3>
+    <p>
+        The core functionality is implemented in the CloudflareManager module:
+    </p>
+    <pre><code>sub update_user_domains_from_cloudflare { ... }</code></pre>
+    <p>
+        This method:
+    </p>
+    <ul>
+        <li>Attempts to fetch domains from the Cloudflare API</li>
+        <li>Falls back to existing configuration if API access is restricted</li>
+        <li>Updates the configuration file with the domain information</li>
+        <li>Returns detailed information about the operation</li>
+    </ul>
+    
+    <h2>IP Restriction Handling</h2>
+    <p>
+        If your Cloudflare API token has IP restrictions that don't include your server's IP address, 
+        the system will:
+    </p>
+    <ol>
+        <li>Detect the IP restriction</li>
+        <li>Log informational messages instead of errors</li>
+        <li>Fall back to using existing configuration data</li>
+        <li>Display a helpful message with your server's IP address</li>
+    </ol>
+    
+    <h3>Resolving IP Restrictions</h3>
+    <p>
+        To allow direct API access, you can:
+    </p>
+    <ol>
+        <li>Log in to your Cloudflare dashboard</li>
+        <li>Go to "My Profile" > "API Tokens"</li>
+        <li>Edit your API token</li>
+        <li>Under "IP Address Filtering", add your server's IP address</li>
+        <li>Save the changes</li>
+    </ol>
+    <p>
+        Alternatively, you can create a new API token without IP restrictions, but this is less secure.
+    </p>
+    
+    <h2>Security Considerations</h2>
+    <ul>
+        <li>Only administrators can trigger the domain synchronization</li>
+        <li>The API token used for Cloudflare API access is kept secure in the configuration file</li>
+        <li>All actions are logged for audit purposes</li>
+        <li>IP restrictions on the Cloudflare API token are respected</li>
+    </ul>
+</div>

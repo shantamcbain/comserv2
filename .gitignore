@@ -67,3 +67,4 @@ Comserv/comserv.psgi
 /.codebuddy/summary.md
 /aimanager/__init__.py
 /aimanager/__init__.py
+/Comserv/config/api_credentials.json

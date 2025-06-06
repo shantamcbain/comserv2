@@ -1,0 +1,107 @@
+[% META title = 'Weaver Beck Family' %]
+[% PageVersion = 'WeaverBeck/index.tt,v 0.02 2025/04/12 shanta Exp shanta ' %]
+
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [% # Use the standard debug message system %]
+    [% IF debug_msg.defined && debug_msg.size > 0 %]
+        <div class="debug-messages">
+            [% FOREACH msg IN debug_msg %]
+                <p class="debug">Debug: [% msg %]</p>
+            [% END %]
+        </div>
+    [% END %]
+[% END %]
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h2 class="card-title">Welcome to the Weaver Beck Family Home Page</h2>
+                </div>
+                <div class="card-body">
+                    <p class="lead">This is the central hub for the Weaver Beck family members' personal pages.</p>
+
+                    <div class="alert alert-info">
+                        <h4 class="alert-heading">Family Portal</h4>
+                        <p>Welcome to our family website! Here you can access individual family members' pages and stay connected with our activities and updates.</p>
+                    </div>
+
+                    <h3>Family Members</h3>
+                    <div class="row mb-4">
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h5 class="card-title">John Weaver Beck</h5>
+                                    <p class="card-text">Family patriarch and historian.</p>
+                                    <a href="#" class="btn btn-outline-primary">Visit Page</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h5 class="card-title">Mary Weaver Beck</h5>
+                                    <p class="card-text">Family matriarch and gardening enthusiast.</p>
+                                    <a href="#" class="btn btn-outline-primary">Visit Page</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h5 class="card-title">James Weaver Beck</h5>
+                                    <p class="card-text">Eldest son and technology expert.</p>
+                                    <a href="#" class="btn btn-outline-primary">Visit Page</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3>Family Features</h3>
+                    <ul class="list-group mb-4">
+                        <li class="list-group-item">Family photo galleries</li>
+                        <li class="list-group-item">Family event calendar</li>
+                        <li class="list-group-item">Family recipes collection</li>
+                        <li class="list-group-item">Family history archives</li>
+                        <li class="list-group-item">Private family messaging</li>
+                    </ul>
+
+                    <h3>Upcoming Family Events</h3>
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Event</th>
+                                    <th>Location</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>June 15, 2025</td>
+                                    <td>Annual Family Reunion</td>
+                                    <td>Weaver Beck Family Farm</td>
+                                </tr>
+                                <tr>
+                                    <td>July 4, 2025</td>
+                                    <td>Independence Day Celebration</td>
+                                    <td>City Park</td>
+                                </tr>
+                                <tr>
+                                    <td>August 12, 2025</td>
+                                    <td>Mary's Birthday Party</td>
+                                    <td>Family Home</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <p class="text-muted">For family website support, please contact admin@weaverbeck.com</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

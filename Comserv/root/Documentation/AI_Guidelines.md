@@ -4,6 +4,18 @@
 
 **WARNING TO ALL AI ASSISTANTS**: Never replace or modify existing files without explicit permission from the user. Always ask for confirmation before making changes to the codebase.
 
+## Development Guidelines
+
+For comprehensive development guidelines specific to the Comserv2 system, refer to:
+- [AI Development Guidelines](/Documentation/AI_DEVELOPMENT_GUIDELINES.md)
+
+These guidelines cover:
+- Following existing code patterns
+- Reusing existing components
+- Respecting directory structure
+- Maintaining naming conventions
+- Proper workflow for limited-prompt sessions
+
 ## Filename and Package Consistency
 
 When working with Perl modules in the Comserv system, ensure that filenames match their package declarations:
@@ -85,3 +97,24 @@ Follow these conventions for documentation files:
 - Include the category in the filename when appropriate
 
 Example: `user_guide_login.md`, `admin_installation.tt`
+
+## Data Storage Patterns
+
+### JSON to MySQL Transition Pattern
+
+The Comserv2 system uses a development pattern where:
+
+1. **Initial Implementation**: New features often start with JSON file storage
+   - Example: `NetworkMap.pm` uses JSON for storing network device information
+   - JSON files are typically stored in `Comserv/config/` directory
+   - This allows for rapid prototyping and iteration
+
+2. **Database Migration**: As features mature, data is migrated to MySQL
+   - Database models are created in `Comserv/lib/Comserv/Model/`
+   - Database configuration is managed via `db_config.json`
+   - The application supports multiple database connections
+
+When implementing new features:
+- Follow this pattern of starting with JSON if appropriate
+- Reuse existing JSON handling code (see `NetworkMap.pm` as an example)
+- Document the planned transition to database storage

@@ -1,0 +1,246 @@
+[% META title = 'Mail System Documentation' %]
+[% PageVersion = 'Documentation/MailSystem.tt,v 0.02 2024/05/25 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+[% PageVersion -%]
+[% END %]
+
+<h1 id="mail-top">Mail System Documentation</h1>
+
+<nav>
+    <a href="#mail-overview">Overview</a> |
+    <a href="#mail-components">Components</a> |
+    <a href="#mail-database">Database Structure</a> |
+    <a href="#mail-api-credentials">API Credentials</a> |
+    <a href="#mail-controller">Controller</a> |
+    <a href="#mail-model">Model</a> |
+    <a href="#mail-templates">Templates</a> |
+    <a href="#mail-workflow">Workflow</a> |
+    <a href="#mail-implementation">Implementation Details</a> |
+    <a href="#mail-security">Security Considerations</a> |
+    <a href="#mail-future">Future Enhancements</a>
+</nav>
+
+<h2 id="mail-overview">Overview</h2>
+<p>The Mail system in Comserv serves two primary functions:</p>
+<ol>
+    <li>Managing email communications within the application, including SMTP configuration and sending emails to users.</li>
+    <li>Automating mail domain provisioning (DKIM, SPF, MX, mailboxes) via integration with Virtualmin Pro, Cloudflare DNS, and OPNsense.</li>
+</ol>
+<p><a href="#mail-top">Back to top</a></p>
+
+<h2 id="mail-components">Components</h2>
+<p>The mail system consists of several integrated components:</p>
+<ul>
+    <li>Database tables for storing mail configuration</li>
+    <li>API integration with external services</li>
+    <li>Controller for handling mail-related actions</li>
+    <li>Model for business logic and API interactions</li>
+    <li>Templates for user interface</li>
+</ul>
+<p><a href="#mail-top">Back to top</a></p>
+
+<h2 id="mail-database">Database Structure</h2>
+<p>The mail system uses two primary database structures:</p>
+
+<h3>1. SiteConfig Table</h3>
+<p>Stores SMTP configuration for each site in key-value pairs:</p>
+<ul>
+    <li><strong>site_id</strong>: References the site</li>
+    <li><strong>config_key</strong>: Configuration key (e.g., smtp_host, smtp_port)</li>
+    <li><strong>config_value</strong>: Configuration value</li>
+</ul>
+
+<h3>2. mail_domains Table</h3>
+<p>Stores mail domain configuration linked to the sitedomain table:</p>
+
+<pre class="code">
+CREATE TABLE mail_domains (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  domain_id INT NOT NULL,
+  dkim_selector VARCHAR(255) NOT NULL DEFAULT 'mail',
+  dkim_public_key TEXT,
+  spf_record TEXT,
+  mx_records JSON,
+  dmarc_record TEXT,
+  status ENUM('pending', 'active', 'error') NOT NULL DEFAULT 'pending',
+  error_message TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (domain_id) REFERENCES sitedomain(id) ON DELETE CASCADE
+);
+</pre>
+
+<p>The table includes:</p>
+<ul>
+  <li><strong>id</strong>: Auto-increment primary key</li>
+  <li><strong>domain_id</strong>: Foreign key to sitedomain.id</li>
+  <li><strong>dkim_selector</strong>: The DKIM selector (e.g., 'mail')</li>
+  <li><strong>dkim_public_key</strong>: The DKIM TXT record</li>
+  <li><strong>spf_record</strong>: The SPF record (e.g., v=spf1 ip4:69.165.224.20 ip4:51.15.110.94 ~all)</li>
+  <li><strong>mx_records</strong>: JSON string for MX servers (e.g., [{"server":"mail.domain.com","priority":10}])</li>
+  <li><strong>dmarc_record</strong>: The DMARC record (e.g., v=DMARC1; p=quarantine; ...)</li>
+  <li><strong>status</strong>: Current status (pending, active, error)</li>
+  <li><strong>error_message</strong>: Error message if status is 'error'</li>
+  <li><strong>created_at, updated_at</strong>: Timestamps for record creation and updates</li>
+</ul>
+<p><a href="#mail-top">Back to top</a></p>
+
+<h2 id="mail-api-credentials">API Credentials Storage</h2>
+<p>API credentials for external services are stored in an untracked JSON file at <code>Comserv/config/api_credentials.json</code>. This file is excluded from version control via .gitignore.</p>
+
+<p>The file structure includes:</p>
+<pre class="code">
+{
+  "virtualmin": {
+    "host": "&lt;replace-with-virtualmin-host&gt;",
+    "username": "&lt;replace-with-virtualmin-username&gt;",
+    "password": "&lt;replace-with-virtualmin-password&gt;"
+  },
+  "cloudflare": {
+    "api_token": "&lt;replace-with-cloudflare-api-token&gt;",
+    "zone_id": "&lt;replace-with-cloudflare-zone-id&gt;",
+    "email": "&lt;replace-with-cloudflare-email&gt;"
+  },
+  "opnsense": {
+    "host": "&lt;replace-with-opnsense-host&gt;",
+    "api_key": "&lt;replace-with-opnsense-api-key&gt;",
+    "api_secret": "&lt;replace-with-opnsense-api-secret&gt;"
+  }
+}
+</pre>
+
+<p><strong>Note:</strong> Currently, the Virtualmin credentials are read from the application configuration (<code>$c->config->{Virtualmin}</code>) rather than this JSON file. Full integration with the JSON credential store is <em>yet to be implemented</em>.</p>
+<p><a href="#mail-top">Back to top</a></p>
+
+<h2 id="mail-controller">Controller</h2>
+<p>The <code>Comserv::Controller::Mail</code> module handles the routing and logic for mail-related actions:</p>
+<ul>
+    <li><strong>index</strong>: Provides a basic entry point for mail-related actions.</li>
+    <li><strong>send_welcome_email</strong>: Sends a welcome email to a new user using the configured SMTP settings.</li>
+    <li><strong>add_mail_config_form</strong>: Displays a form to add or update SMTP configuration settings.</li>
+    <li><strong>add_mail_config</strong>: Processes the form submission to store SMTP configuration in the database.</li>
+    <li><strong>create_mail_account</strong>: Creates a mail account using the Virtualmin API.</li>
+</ul>
+
+<p><strong>Note:</strong> The following controller methods are <em>yet to be implemented</em>:</p>
+<ul>
+    <li><strong>configure_domain_dns</strong>: Sets up DNS records (MX, SPF, DKIM, DMARC) for a domain.</li>
+    <li><strong>update_mail_domain_status</strong>: Updates the status of a mail domain configuration.</li>
+    <li><strong>list_mail_domains</strong>: Lists all mail domains with their configuration status.</li>
+</ul>
+<p><a href="#mail-top">Back to top</a></p>
+
+<h2 id="mail-model">Model</h2>
+<p>The <code>Comserv::Model::Mail</code> module provides methods for interacting with mail-related data and services:</p>
+<ul>
+    <li><strong>send_email</strong>: Sends an email using the SMTP configuration retrieved from the database.</li>
+    <li><strong>get_smtp_config</strong>: Retrieves SMTP configuration details for a specific site from the database.</li>
+    <li><strong>create_mail_account</strong>: Creates a mail account via the Virtualmin API.</li>
+</ul>
+
+<p><strong>Note:</strong> The following model methods are <em>yet to be implemented</em>:</p>
+<ul>
+    <li><strong>configure_cloudflare_dns</strong>: Sets up DNS records in Cloudflare.</li>
+    <li><strong>generate_dkim_keys</strong>: Generates DKIM key pairs for a domain.</li>
+    <li><strong>validate_dns_records</strong>: Validates that DNS records are properly configured.</li>
+    <li><strong>configure_opnsense_firewall</strong>: Configures OPNsense firewall rules for mail services.</li>
+</ul>
+
+<p>The <code>Comserv::Model::Schema::Ency::Result::MailDomain</code> module defines the ORM mapping for the mail_domains table, including all columns and relationships.</p>
+<p><a href="#mail-top">Back to top</a></p>
+
+<h2 id="mail-templates">Templates</h2>
+<p>The following templates are used in the Mail system:</p>
+<ul>
+    <li><strong>mail/add_mail_config_form.tt</strong>: The template for rendering the form to add or update SMTP configuration.</li>
+    <li><strong>mail/mail.index.tt</strong>: Main mail system interface.</li>
+    <li><strong>user/mail.tt</strong>: User-specific mail interface.</li>
+</ul>
+
+<p><strong>Note:</strong> The following templates are <em>yet to be implemented</em>:</p>
+<ul>
+    <li><strong>mail/domain_config_form.tt</strong>: Form for configuring mail domains.</li>
+    <li><strong>mail/domain_list.tt</strong>: List of configured mail domains with status.</li>
+    <li><strong>mail/domain_detail.tt</strong>: Detailed view of a mail domain configuration.</li>
+</ul>
+<p><a href="#mail-top">Back to top</a></p>
+
+<h2 id="mail-workflow">Workflow</h2>
+<p>The mail system supports two primary workflows:</p>
+
+<h3>1. Email Sending Workflow</h3>
+<ol>
+    <li>Configure SMTP settings for a site using the add_mail_config_form</li>
+    <li>Store SMTP configuration in the SiteConfig table</li>
+    <li>Send emails using the configured SMTP settings</li>
+</ol>
+
+<h3>2. Mail Domain Provisioning Workflow</h3>
+<p><strong>Note:</strong> This workflow is <em>partially implemented</em>:</p>
+<ol>
+    <li>Create a mail domain record in the mail_domains table (implemented)</li>
+    <li>Create mail accounts via Virtualmin API (implemented)</li>
+    <li>Generate DKIM keys for the domain (yet to be implemented)</li>
+    <li>Configure DNS records via Cloudflare API (yet to be implemented)</li>
+    <li>Configure firewall rules via OPNsense API (yet to be implemented)</li>
+    <li>Validate DNS configuration (yet to be implemented)</li>
+    <li>Update mail domain status (yet to be implemented)</li>
+</ol>
+<p><a href="#mail-top">Back to top</a></p>
+
+<h2 id="mail-implementation">Implementation Details</h2>
+
+<h3>Database Schema</h3>
+<p>The <code>mail_domains</code> table is created using the SQL file at <code>Comserv/sql/mail_domains.sql</code>. This can be applied to the database using:</p>
+
+<pre class="code">
+mysql -u root -p comserv < /home/shanta/PycharmProjects/comserv2/Comserv/sql/mail_domains.sql
+</pre>
+
+<p>Replace <code>root</code> with your MySQL username and <code>comserv</code> with your actual database name if different.</p>
+
+<h3>API Credentials Configuration</h3>
+<p>To configure the API credentials:</p>
+<ol>
+  <li>Edit the <code>/home/shanta/PycharmProjects/comserv2/Comserv/config/api_credentials.json</code> file</li>
+  <li>Replace all placeholder values with your actual API credentials</li>
+  <li>Ensure the file permissions are secure (e.g., <code>chmod 600 api_credentials.json</code>)</li>
+</ol>
+
+<p><strong>Note:</strong> The application currently reads Virtualmin credentials from the application configuration. Integration with the JSON credential store is <em>yet to be implemented</em>.</p>
+
+<h3>DBIx::Class Schema Updates</h3>
+<p>The DBIx::Class schema files define the ORM mapping for the mail_domains table:</p>
+
+<ul>
+  <li><code>Comserv/lib/Comserv/Model/Schema/Ency/Result/MailDomain.pm</code>: Defines the mail_domains table schema</li>
+  <li><code>Comserv/lib/Comserv/Model/Schema/Ency/Result/SiteDomain.pm</code>: Updated to include a has_one relationship to mail_domains</li>
+</ul>
+<p><a href="#mail-top">Back to top</a></p>
+
+<h2 id="mail-security">Security Considerations</h2>
+<p>The mail system implementation follows these security practices:</p>
+
+<ul>
+  <li>Sensitive API credentials are stored in an untracked JSON file (partially implemented)</li>
+  <li>SMTP passwords are stored in the database (consider encryption in future versions)</li>
+  <li>The API credentials file is excluded from version control via .gitignore</li>
+  <li>File permissions should be set to restrict access to the credentials file</li>
+  <li>SSL/TLS is supported for secure SMTP connections</li>
+</ul>
+<p><a href="#mail-top">Back to top</a></p>
+
+<h2 id="mail-future">Future Enhancements</h2>
+<p>Planned enhancements for the mail system include:</p>
+
+<ul>
+  <li>Complete implementation of the mail domain provisioning workflow</li>
+  <li>Moving all API credentials to the JSON credential store</li>
+  <li>Implementing a user interface for managing mail domains</li>
+  <li>Adding automated testing for the mail system components</li>
+  <li>Enhancing logging for mail system operations</li>
+  <li>Implementing encryption for sensitive credentials stored in the database</li>
+  <li>Adding support for email templates</li>
+  <li>Implementing email queue for reliable delivery</li>
+</ul>
+<p><a href="#mail-top">Back to top</a></p>

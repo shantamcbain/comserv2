@@ -1,5 +1,34 @@
 # Technical Changes Documentation
 
+## Dependency Management Issues
+
+### 1. Net::CIDR Module Installation
+
+The application requires the `Net::CIDR` Perl module for network address management in the `Comserv::Util::NetworkMap` module. Despite being correctly listed in the cpanfile, the module was not automatically installed during dependency resolution.
+
+**Issue:**
+```
+Can't locate Net/CIDR.pm in @INC (you may need to install the Net::CIDR module) (@INC entries checked: /opt/comserv/Comserv/lib /etc/perl /usr/local/lib/x86_64-linux-gnu/perl/5.38.2 /usr/local/share/perl/5.38.2 /usr/lib/x86_64-linux-gnu/perl5/5.38 /usr/share/perl5 /usr/lib/x86_64-linux-gnu/perl-base /usr/lib/x86_64-linux-gnu/perl/5.38 /usr/share/perl/5.38 /usr/local/lib/site_perl) at /opt/comserv/Comserv/lib/Comserv/Util/NetworkMap.pm line 7.
+```
+
+**Solution:**
+The module must be installed manually using:
+```
+sudo cpanm Net::CIDR
+```
+
+**Explanation:**
+1. The `comserv_server.pl` script runs without this module because it uses lazy loading - the NetworkMap module is only loaded when actually used
+2. Starman pre-loads all modules during initialization, causing it to fail immediately when the dependency is missing
+3. Perl applications don't automatically install missing dependencies at runtime for security and stability reasons
+
+**Future Fix Required:**
+The dependency management system needs to be reviewed to ensure all modules listed in cpanfile are properly installed during deployment. This could involve:
+1. Creating a deployment script that validates all dependencies are installed before starting the application
+2. Adding a pre-flight check to the Starman startup process
+3. Implementing a more robust dependency management system using Carton or a similar tool
+4. Adding clear documentation about required manual installation steps
+
 ## Proxmox Model Fixes
 
 ### 1. Duplicate Method Declarations

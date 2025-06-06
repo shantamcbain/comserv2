@@ -45,6 +45,12 @@
                 </div>
             [% END %]
             
+            [% IF warning_msg %]
+                <div class="alert alert-warning">
+                    <strong>Warning:</strong> [% warning_msg %]
+                </div>
+            [% END %]
+            
             [% IF output %]
                 <div class="card mb-4">
                     <div class="card-header bg-info text-white">
@@ -58,8 +64,17 @@
             
             [% UNLESS output %]
                 <div class="alert alert-warning">
-                    <strong>Warning:</strong> This action will pull the latest changes from the Git repository. 
-                    Make sure you don't have any uncommitted changes that you want to keep.
+                    <strong>Warning:</strong> This action will pull the latest changes from the Git repository.
+                </div>
+                
+                <div class="alert alert-info">
+                    <strong>Note:</strong> Changes to <code>theme_mappings.json</code> will be automatically handled:
+                    <ul>
+                        <li>Your local changes will be backed up</li>
+                        <li>Changes will be stashed before pulling</li>
+                        <li>After pulling, your changes will be reapplied</li>
+                        <li>If conflicts occur, you can restore from the backup</li>
+                    </ul>
                 </div>
                 
                 <div class="card">

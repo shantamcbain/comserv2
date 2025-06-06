@@ -1,8 +1,8 @@
 [% IF categories.user_guides %]
 <section class="doc-section">
-    <h2 class="section-toggle expanded">User Documentation</h2>
+    <h2 class="section-toggle">User Documentation</h2>
     <p>Essential guides for Comserv users.</p>
-    <div class="section-content expanded">
+    <div class="section-content">
         [% FOREACH page_name IN categories.user_guides.pages.sort %]
             [% IF structured_pages.$page_name %]
                 [% page = structured_pages.$page_name %]

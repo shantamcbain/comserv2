@@ -6,6 +6,7 @@ use JSON;
 use Try::Tiny;
 use Data::Dumper;
 use Comserv::Util::Logging;
+use Catalyst::Utils;  # For path_to
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -213,9 +214,12 @@ sub update_config_file {
     my ($self, $c, $conn_name, $conn_config) = @_;
     
     try {
+        # Get the path to the config file
+        my $config_file = $c->path_to('db_config.json');
+        
         # Read the current configuration
         local $/;
-        open my $fh, "<", "db_config.json" or die "Could not open db_config.json: $!";
+        open my $fh, "<", $config_file or die "Could not open $config_file: $!";
         my $json_text = <$fh>;
         close $fh;
         
@@ -228,7 +232,7 @@ sub update_config_file {
         $config->{remote_connections}{$conn_name} = $conn_config;
         
         # Write the updated configuration back to the file
-        open $fh, ">", "db_config.json" or die "Could not open db_config.json for writing: $!";
+        open $fh, ">", $config_file or die "Could not open $config_file for writing: $!";
         print $fh encode_json($config);
         close $fh;
         
@@ -245,9 +249,12 @@ sub remove_from_config {
     my ($self, $c, $conn_name) = @_;
     
     try {
+        # Get the path to the config file
+        my $config_file = $c->path_to('db_config.json');
+        
         # Read the current configuration
         local $/;
-        open my $fh, "<", "db_config.json" or die "Could not open db_config.json: $!";
+        open my $fh, "<", $config_file or die "Could not open $config_file: $!";
         my $json_text = <$fh>;
         close $fh;
         
@@ -259,7 +266,7 @@ sub remove_from_config {
         }
         
         # Write the updated configuration back to the file
-        open $fh, ">", "db_config.json" or die "Could not open db_config.json for writing: $!";
+        open $fh, ">", $config_file or die "Could not open $config_file for writing: $!";
         print $fh encode_json($config);
         close $fh;
         

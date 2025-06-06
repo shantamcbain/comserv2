@@ -1,10 +1,20 @@
+
 package Comserv::Controller::Admin;
+
+
 use Moose;
 use namespace::autoclean;
-use Data::Dumper;
-use Fcntl qw(:DEFAULT :flock);  # Import O_WRONLY, O_APPEND, O_CREAT constants
 use Comserv::Util::Logging;
-use Cwd;
+use Data::Dumper;
+use JSON;
+use Try::Tiny;
+use MIME::Base64;
+use File::Slurp;
+use File::Basename;
+use File::Path qw(make_path);
+use File::Copy;
+use Digest::SHA qw(sha256_hex);
+
 BEGIN { extends 'Catalyst::Controller'; }
 
 # Returns an instance of the logging utility
@@ -13,1264 +23,1310 @@ sub logging {
     return Comserv::Util::Logging->instance();
 }
 
+# Begin method to check if the user has admin role
 sub begin : Private {
-    my ( $self, $c ) = @_;
-
+    my ($self, $c) = @_;
+    
     # Add detailed logging
     my $username = $c->user_exists ? $c->user->username : 'Guest';
-    my $path = $c->req->path;
-    
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', 
-        "Admin controller begin method called for user: $username, Path: $path");
-
-    # Log the path for debugging
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', 
-        "Request path: $path");
-
-    # Check if the user is logged in
-    if (!$c->user_exists) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', 
-            "User is not logged in, redirecting to login page");
-        # If the user isn't logged in, call the index method
-        $self->index($c);
-        return;
-    }
+        "Admin controller begin method called by user: $username");
     
-    # Fetch the roles from the session
-    my $roles = $c->session->{roles};
+    # Initialize debug_msg array if it doesn't exist
+    $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
     
-    # Log the roles
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', 
-        "User roles: " . Dumper($roles));
+    # Add the debug message to the array
+    push @{$c->stash->{debug_msg}}, "Admin controller loaded successfully";
     
-    # Check if roles is defined and is an array reference
-    if (defined $roles && ref $roles eq 'ARRAY') {
-        # Check if the user has the 'admin' role
-        if (grep { $_ eq 'admin' } @$roles) {
-            # User is an admin, proceed with the request
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', 
-                "User $username has admin role, proceeding with request");
-        } else {
-            # User is not an admin, call the index method
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'begin', 
-                "User $username does not have admin role, redirecting to admin index");
-            $self->index($c);
-            return;
-        }
-    } else {
-        # Roles is not defined or not an array, call the index method
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'begin', 
-            "User $username has invalid roles format, redirecting to admin index");
-        $self->index($c);
-        return;
-    }
+    return 1; # Allow the request to proceed
 }
 
-# Main admin page
-sub index :Path :Args(0) {
-    my ( $self, $c ) = @_;
-
-    # Log the application's configured template path
-    $c->log->debug("Template path: " . $c->path_to('root'));
-
-    # Set the TT template to use.
-    $c->stash(template => 'admin/index.tt');
-
-    # Forward to the view
-    $c->forward($c->view('TT'));
-}
-
-# This method has been moved to Path('/admin/git_pull')
-
-# This method has been moved to Path('admin/edit_documentation')
-
-sub add_schema :Path('/add_schema') :Args(0) {
-    my ( $self, $c ) = @_;
-    # Debug logging for add_schema action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_schema', "Starting add_schema action");
-
-    # Initialize output variable
-    my $output = '';
-
-    if ( $c->request->method eq 'POST' ) {
-        my $migration = DBIx::Class::Migration->new(
-            schema_class => 'Comserv::Model::Schema::Ency',
-            target_dir   => $c->path_to('root', 'migrations')->stringify
-        );
-
-        my $schema_name        = $c->request->params->{schema_name} // '';
-        my $schema_description = $c->request->params->{schema_description} // '';
-
-        if ( $schema_name ne '' && $schema_description ne '' ) {
-            eval {
-                $migration->make_schema;
-                $c->stash(message => 'Migration script created successfully.');
-                $output = "Created migration script for schema: $schema_name";
-            };
-            if ($@) {
-                $c->stash(error_msg => 'Failed to create migration script: ' . $@);
-                $output = "Error: $@";
-            }
-        } else {
-            $c->stash(error_msg => 'Schema name and description cannot be empty.');
-            $output = "Error: Schema name and description cannot be empty.";
-        }
-
-        # Add the output to the stash so it can be displayed in the template
-        $c->stash(output => $output);
-    }
-
-    $c->stash(template => 'admin/add_schema.tt');
-    $c->forward($c->view('TT'));
-}
-
-sub schema_manager :Path('/admin/schema_manager') :Args(0) {
+# Base method for chained actions
+sub base :Chained('/') :PathPart('admin') :CaptureArgs(0) {
     my ($self, $c) = @_;
-
-    # Log the beginning of the schema_manager action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_manager', "Starting schema_manager action");
-
-    # Get the selected database (default to 'ENCY')
-    my $selected_db = $c->req->param('database') || 'ENCY';
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_manager', "Selected database: $selected_db");
-
-    # Determine the model to use
-    my $model = $selected_db eq 'FORAGER' ? 'DBForager' : 'DBEncy';
-
-    # Attempt to fetch list of tables from the selected model
-    my $tables;
-    eval {
-        # Corrected line to pass the selected database to list_tables
-        $tables = $c->model('DBSchemaManager')->list_tables($c, $selected_db);
-    };
-    if ($@) {
-        # Log the table retrieval error
-        $self->logging->log_with_details(
-            $c,
-            'error',
-            __FILE__,
-            __LINE__,
-            'schema_manager',
-            "Failed to list tables for database '$selected_db': $@"
-        );
-
-        # Set error message in stash and render error template
-        $c->stash(
-            error_msg => "Failed to list tables for database '$selected_db': $@",
-            template  => 'admin/SchemaManager.tt',
-        );
-        $c->forward($c->view('TT'));
-        return;
-    }
-
-    # Log successful table retrieval
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_manager', "Successfully retrieved tables for '$selected_db'");
-
-    # Pass data to the stash for rendering the SchemaManager template
-    $c->stash(
-        database  => $selected_db,
-        tables    => $tables,
-        template  => 'admin/SchemaManager.tt',
-    );
-
-    $c->forward($c->view('TT'));
-}
-
-=head2 manage_users
-
-Admin interface to manage users
-
-=cut
-
-sub manage_users :Path('/admin/users') :Args(0) {
-    my ($self, $c) = @_;
-
-    # Log the beginning of the manage_users action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'manage_users', "Starting manage_users action");
-
-    # Get all users from the database
-    my @users = $c->model('DBEncy::User')->search({}, {
-        order_by => { -asc => 'username' }
-    });
-
-    # Pass data to the stash for rendering the template
-    $c->stash(
-        users => \@users,
-        template => 'admin/manage_users.tt',
-    );
-
-    $c->forward($c->view('TT'));
-}
-
-=head2 add_user
-
-Admin interface to add a new user
-
-=cut
-
-sub add_user :Path('/admin/add_user') :Args(0) {
-    my ($self, $c) = @_;
-
-    # Log the beginning of the add_user action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_user', "Starting add_user action");
-
-    # If this is a form submission, process it
-    if ($c->req->method eq 'POST') {
-        # Retrieve the form data
-        my $username = $c->req->params->{username};
-        my $password = $c->req->params->{password};
-        my $password_confirm = $c->req->params->{password_confirm};
-        my $first_name = $c->req->params->{first_name};
-        my $last_name = $c->req->params->{last_name};
-        my $email = $c->req->params->{email};
-        my $roles = $c->req->params->{roles} || 'user';
-        my $active = $c->req->params->{active} ? 1 : 0;
-
-        # Log the user creation attempt
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_user',
-            "User creation attempt for username: $username with roles: $roles");
-
-        # Ensure all required fields are filled
-        unless ($username && $password && $password_confirm && $first_name && $last_name) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'add_user',
-                "Missing required fields for user creation");
-
-            $c->stash(
-                error_msg => 'All fields are required to create a user',
-                template => 'admin/add_user.tt',
-            );
-            $c->forward($c->view('TT'));
-            return;
-        }
-
-        # Check if the passwords match
-        if ($password ne $password_confirm) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'add_user',
-                "Passwords do not match for user creation");
-
-            $c->stash(
-                error_msg => 'Passwords do not match',
-                template => 'admin/add_user.tt',
-            );
-            $c->forward($c->view('TT'));
-            return;
-        }
-
-        # Check if the username already exists
-        my $existing_user = $c->model('DBEncy::User')->find({ username => $username });
-        if ($existing_user) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'add_user',
-                "Username already exists: $username");
-
-            $c->stash(
-                error_msg => 'Username already exists. Please choose another.',
-                template => 'admin/add_user.tt',
-            );
-            $c->forward($c->view('TT'));
-            return;
-        }
-
-        # Hash the password
-        my $hashed_password = Comserv::Controller::User->hash_password($password);
-
-        # Create the new user
-        eval {
-            $c->model('DBEncy::User')->create({
-                username => $username,
-                password => $hashed_password,
-                first_name => $first_name,
-                last_name => $last_name,
-                email => $email,
-                roles => $roles,
-                active => $active,
-                created_at => \'NOW()',
-            });
-
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_user',
-                "User created successfully: $username with roles: $roles");
-
-            # Set success message and redirect to user management
-            $c->flash->{success_msg} = "User '$username' created successfully.";
-            $c->response->redirect($c->uri_for('/admin/users'));
-            return;
-        };
-
-        if ($@) {
-            # Handle database errors
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_user',
-                "Error creating user: $@");
-
-            $c->stash(
-                error_msg => "Error creating user: $@",
-                template => 'admin/add_user.tt',
-            );
-            $c->forward($c->view('TT'));
-            return;
-        }
-    }
-
-    # Display the add user form
-    $c->stash(
-        template => 'admin/add_user.tt',
-    );
-    $c->forward($c->view('TT'));
-}
-
-=head2 delete_user
-
-Admin interface to delete a user
-
-=cut
-
-sub delete_user :Path('/admin/delete_user') :Args(1) {
-    my ($self, $c, $user_id) = @_;
-
-    # Log the beginning of the delete_user action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete_user', 
-        "Starting delete_user action for user ID: $user_id");
-
-    # Check if the user exists
-    my $user = $c->model('DBEncy::User')->find($user_id);
     
-    unless ($user) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'delete_user',
-            "User not found with ID: $user_id");
-            
-        $c->flash->{error_msg} = "User not found.";
-        $c->response->redirect($c->uri_for('/admin/users'));
-        return;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'base', 
+        "Starting Admin base action");
+    
+    # Common setup for all admin pages
+    $c->stash(section => 'admin');
+    
+    # TEMPORARY FIX: Allow specific users direct access
+    if ($c->session->{username} && $c->session->{username} eq 'Shanta') {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'base', 
+            "Admin access granted to user Shanta (bypass role check)");
+        return 1;
     }
     
-    # Store username for logging
-    my $username = $user->username;
+    # Check if the user has admin role
+    my $has_admin_role = 0;
     
-    # Delete the user
-    eval {
-        # Use the User model to delete the user
-        my $result = $c->model('User')->delete_user($user_id);
+    # First check if user exists
+    if ($c->user_exists) {
+        # Get roles from session
+        my $roles = $c->session->{roles};
         
-        if ($result eq "1") { # Success
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete_user',
-                "User deleted successfully: $username (ID: $user_id)");
+        # Log the roles for debugging
+        my $roles_debug = 'none';
+        if (defined $roles) {
+            if (ref($roles) eq 'ARRAY') {
+                $roles_debug = join(', ', @$roles);
                 
-            $c->flash->{success_msg} = "User '$username' deleted successfully.";
-        } else {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'delete_user',
-                "Error deleting user: $result");
-                
-            $c->flash->{error_msg} = "Error deleting user: $result";
+                # Check if 'admin' is in the roles array
+                foreach my $role (@$roles) {
+                    if (lc($role) eq 'admin') {
+                        $has_admin_role = 1;
+                        last;
+                    }
+                }
+            } elsif (!ref($roles)) {
+                $roles_debug = $roles;
+                # Check if roles string contains 'admin'
+                if ($roles =~ /\badmin\b/i) {
+                    $has_admin_role = 1;
+                }
+            }
         }
-    };
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'base', 
+            "Admin access check - User: " . $c->session->{username} . ", Roles: $roles_debug, Has admin: " . ($has_admin_role ? 'Yes' : 'No'));
+    }
     
-    if ($@) {
-        # Handle any exceptions
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'delete_user',
-            "Exception when deleting user: $@");
+    unless ($has_admin_role) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'base', 
+            "Access denied: User does not have admin role");
+        
+        # Set error message in flash
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        
+        # Redirect to login page with destination parameter
+        $c->response->redirect($c->uri_for('/user/login', {
+            destination => $c->req->uri
+        }));
+        return 0;
+    }
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'base', 
+        "Completed Admin base action");
+    
+    return 1;
+}
+
+# Admin dashboard
+sub index :Path :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
+        "Starting Admin index action");
+    
+    # TEMPORARY FIX: Allow specific users direct access
+    if ($c->session->{username} && $c->session->{username} eq 'Shanta') {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
+            "Admin access granted to user Shanta (bypass role check)");
+        # Continue with the admin page
+    }
+    else {
+        # Check if the user has admin role
+        my $has_admin_role = 0;
+        
+        # First check if user exists
+        if ($c->user_exists) {
+            # Get roles from session
+            my $roles = $c->session->{roles};
             
-        $c->flash->{error_msg} = "An error occurred while deleting the user: $@";
+            # Log the roles for debugging
+            my $roles_debug = 'none';
+            if (defined $roles) {
+                if (ref($roles) eq 'ARRAY') {
+                    $roles_debug = join(', ', @$roles);
+                    
+                    # Check if 'admin' is in the roles array
+                    foreach my $role (@$roles) {
+                        if (lc($role) eq 'admin') {
+                            $has_admin_role = 1;
+                            last;
+                        }
+                    }
+                } elsif (!ref($roles)) {
+                    $roles_debug = $roles;
+                    # Check if roles string contains 'admin'
+                    if ($roles =~ /\badmin\b/i) {
+                        $has_admin_role = 1;
+                    }
+                }
+            }
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
+                "Admin access check - User: " . $c->session->{username} . ", Roles: $roles_debug, Has admin: " . ($has_admin_role ? 'Yes' : 'No'));
+        }
+        
+        unless ($has_admin_role) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'index', 
+                "Access denied: User does not have admin role");
+            
+            # Set error message in flash
+            $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+            
+            # Redirect to login page with destination parameter
+            $c->response->redirect($c->uri_for('/user/login', {
+                destination => $c->req->uri
+            }));
+            return;
+        }
     }
     
-    # Redirect back to the user management page
-    $c->response->redirect($c->uri_for('/admin/users'));
-}
-
-sub map_table_to_result :Path('/Admin/map_table_to_result') :Args(0) {
-    my ($self, $c) = @_;
-
-    my $database = $c->req->param('database');
-    my $table    = $c->req->param('table');
-
-    # Check if the result file exists
-    my $result_file = "lib/Comserv/Model/Result/" . ucfirst($table) . ".pm";
-    my $file_exists = -e $result_file;
-
-    # Fetch table columns
-    my $columns = $c->model('DBSchemaManager')->get_table_columns($database, $table);
-
-    # Generate or update the result file based on the table schema
-    if (!$file_exists || $c->req->param('update')) {
-        $self->generate_result_file($table, $columns, $result_file);
-    } else {
-        # Here you could add logic to compare schema if both exist:
-        # my $existing_schema = $self->read_schema_from_file($result_file);
-        # my $current_schema = $columns;  # Assuming $columns represents current schema
-        # if ($self->schemas_differ($existing_schema, $current_schema)) {
-        #     # Log or display differences
-        #     # Optionally offer to normalize (update file or suggest database change)
-        # }
+    # Get system stats
+    my $stats = $self->get_system_stats($c);
+    
+    # Get recent user activity
+    my $recent_activity = $self->get_recent_activity($c);
+    
+    # Get system notifications
+    my $notifications = $self->get_system_notifications($c);
+    
+    # Use the standard debug message system
+    if ($c->session->{debug_mode}) {
+        push @{$c->stash->{debug_msg}}, "Admin controller index view - Template: admin/index.tt";
     }
-
-    $c->flash->{success} = "Result file for table '$table' has been successfully updated!";
-    $c->response->redirect('/Admin/schema_manager');
-}
-
-# Helper to generate or update a result file
-sub generate_result_file {
-    my ($self, $table, $columns, $file_path) = @_;
-
-    my $content = <<"EOF";
-package Comserv::Model::Result::${table};
-use base qw/DBIx::Class::Core/;
-
-__PACKAGE__->table('$table');
-
-# Define columns
-EOF
-
-    foreach my $column (@$columns) {
-        $content .= "__PACKAGE__->add_columns(q{$column->{name}});\n";
-    }
-
-    $content .= "\n1;\n";
-
-    # Write the file
-    open my $fh, '>', $file_path or die $!;
-    print $fh $content;
-    close $fh;
-}
-
-# Compare schema versions
-sub compare_schema :Path('compare_schema') :Args(0) {
-    my ($self, $c) = @_;
-    # Debug logging for compare_schema action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'compare_schema', "Starting compare_schema action");
-
-    my $migration = DBIx::Class::Migration->new(
-        schema_class => 'Comserv::Model::Schema::Ency',
-        target_dir   => $c->path_to('root', 'migrations')->stringify
+    
+    # Pass data to the template
+    $c->stash(
+        template => 'admin/index.tt',
+        stats => $stats,
+        recent_activity => $recent_activity,
+        notifications => $notifications
     );
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
+        "Completed Admin index action");
+}
 
-    my $current_version = $migration->version;
-    my $db_version;
-
-    eval {
-        $db_version = $migration->schema->resultset('dbix_class_schema_versions')->find({ version => { '!=' => '' } })->version;
+# Get system statistics for the admin dashboard
+sub get_system_stats {
+    my ($self, $c) = @_;
+    
+    my $stats = {
+        user_count => 0,
+        content_count => 0,
+        comment_count => 0,
+        disk_usage => '0 MB',
+        db_size => '0 MB',
+        uptime => '0 days',
     };
-
-    $db_version ||= '0';  # Default if no migrations have been run
-    my $changes = ( $current_version != $db_version )
-        ? "Schema version mismatch detected. Check migration scripts for changes from $db_version to $current_version."
-        : "No changes detected between schema and database.";
-
-    $c->stash(
-        current_version => $current_version,
-        db_version      => $db_version,
-        changes         => $changes,
-        template        => 'admin/compare_schema.tt'
-    );
-
-    $c->forward($c->view('TT'));
+    
+    # Try to get user count
+    eval {
+        $stats->{user_count} = $c->model('DBEncy::User')->count();
+    };
+    
+    # Try to get content count (pages, posts, etc.)
+    eval {
+        $stats->{content_count} = $c->model('DBEncy::Content')->count();
+    };
+    
+    # Try to get comment count
+    eval {
+        $stats->{comment_count} = $c->model('DBEncy::Comment')->count();
+    };
+    
+    # Get disk usage (this is a simplified example)
+    eval {
+        my $df_output = `df -h . | tail -1`;
+        if ($df_output =~ /(\d+)%/) {
+            $stats->{disk_usage} = "$1%";
+        }
+    };
+    
+    # Get database size (this would need to be customized for your DB)
+    eval {
+        # This is just a placeholder - you'd need to implement actual DB size checking
+        $stats->{db_size} = "Unknown";
+    };
+    
+    # Get system uptime
+    eval {
+        my $uptime_output = `uptime`;
+        if ($uptime_output =~ /up\s+(.*?),\s+\d+\s+users/) {
+            $stats->{uptime} = $1;
+        }
+    };
+    
+    return $stats;
 }
 
-# Migrate schema if changes are confirmed
-sub migrate_schema :Path('migrate_schema') :Args(0) {
+# Get recent user activity for the admin dashboard
+sub get_recent_activity {
     my ($self, $c) = @_;
-    # Debug logging for migrate_schema action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'migrate_schema', "Starting migrate_schema action");
-
-    if ( $c->request->method eq 'POST' ) {
-        my $migration = DBIx::Class::Migration->new(
-            schema_class => 'Comserv::Model::Schema::Ency',
-            target_dir   => $c->path_to('root', 'migrations')->stringify
+    
+    my @activity = ();
+    
+    # Try to get recent logins
+    eval {
+        my @logins = $c->model('DBEncy::UserLogin')->search(
+            {},
+            {
+                order_by => { -desc => 'login_time' },
+                rows => 5
+            }
         );
-
-        my $confirm = $c->request->params->{confirm};
-        if ($confirm) {
-            eval {
-                $migration->install;
-                $c->stash(message => 'Schema migration completed successfully.');
+        
+        foreach my $login (@logins) {
+            push @activity, {
+                type => 'login',
+                user => $login->user->username,
+                time => $login->login_time,
+                details => $login->ip_address
             };
-            if ($@) {
-                $c->stash(error_msg => "An error occurred during migration: $@");
+        }
+    };
+    
+    # Try to get recent content changes
+    eval {
+        my @changes = $c->model('DBEncy::ContentHistory')->search(
+            {},
+            {
+                order_by => { -desc => 'change_time' },
+                rows => 5
             }
-        } else {
-            $c->res->redirect($c->uri_for($self->action_for('compare_schema')));
-        }
-    }
-
-    $c->stash(
-        message   => $c->stash->{message} || '',
-        error_msg => $c->stash->{error_msg} || '',
-        template  => 'admin/migrate_schema.tt'
-    );
-
-    $c->forward($c->view('TT'));
-}
-
-# Edit documentation action
-sub edit_documentation :Path('/admin/edit_documentation') :Args(0) {
-    my ( $self, $c ) = @_;
-    # Debug logging for edit_documentation action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_documentation', "Starting edit_documentation action");
-
-    # Add debug message to stash
-    $c->stash(
-        debug_msg => "Edit documentation page loaded",
-        template => 'admin/edit_documentation.tt'
-    );
-
-    $c->forward($c->view('TT'));
-}
-
-# Run a script from the script directory
-sub run_script :Path('/admin/run_script') :Args(0) {
-    my ($self, $c) = @_;
-
-    # Debug logging for run_script action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'run_script', "Starting run_script action");
-
-    # Check if the user has the admin role
-    unless ($c->user_exists && grep { $_ eq 'admin' } @{$c->session->{roles}}) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'run_script', "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest'));
-        $c->flash->{error} = "You must be an admin to perform this action";
-        $c->response->redirect($c->uri_for('/'));
-        return;
-    }
-
-    # Get the script name from the request parameters
-    my $script_name = $c->request->params->{script};
-
-    # Validate the script name
-    unless ($script_name && $script_name =~ /^[\w\-\.]+\.pl$/) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'run_script', "Invalid script name: " . ($script_name || 'undefined'));
-        $c->flash->{error} = "Invalid script name";
-        $c->response->redirect($c->uri_for('/admin'));
-        return;
-    }
-
-    # Path to the script
-    my $script_path = $c->path_to('script', $script_name);
-
-    # Check if the script exists
-    unless (-e $script_path) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'run_script', "Script not found: $script_path");
-        $c->flash->{error} = "Script not found: $script_name";
-        $c->response->redirect($c->uri_for('/admin'));
-        return;
-    }
-
-    if ($c->request->method eq 'POST' && $c->request->params->{confirm}) {
-        # Execute the script
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'run_script', "Executing script: $script_path");
-        my $output = qx{perl $script_path 2>&1};
-        my $exit_code = $? >> 8;
-
-        if ($exit_code == 0) {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'run_script', "Script executed successfully. Output: $output");
-            $c->flash->{message} = "Script executed successfully. Output: $output";
-        } else {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'run_script', "Error executing script: $output");
-            $c->flash->{error} = "Error executing script: $output";
-        }
-
-        $c->response->redirect($c->uri_for('/admin'));
-        return;
-    }
-
-    # Display confirmation page
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'run_script', "Displaying confirmation page for script: $script_name");
-    $c->stash(
-        script_name => $script_name,
-        template => 'admin/run_script.tt',
-    );
-    $c->forward($c->view('TT'));
-}
-
-# Get table information
-sub view_log :Path('/admin/view_log') :Args(0) {
-    my ($self, $c) = @_;
-
-    # Debug logging for view_log action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view_log', "Starting view_log action");
-
-    # Check if we need to rotate the log
-    if ($c->request->params->{rotate} && $c->request->params->{rotate} eq '1') {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view_log', "Manual log rotation requested");
-
-        # Get the actual log file path
-        my $log_file;
-        if (defined $Comserv::Util::Logging::LOG_FILE) {
-            $log_file = $Comserv::Util::Logging::LOG_FILE;
-        } else {
-            $log_file = $c->path_to('logs', 'application.log');
-        }
-
-        # Check if the log file exists and is very large
-        if (-e $log_file) {
-            my $file_size = -s $log_file;
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view_log', "Log file size: $file_size bytes");
-
-            # Create archive directory if it doesn't exist
-            my ($volume, $directories, $filename) = File::Spec->splitpath($log_file);
-            my $archive_dir = File::Spec->catdir($directories, 'archive');
-            unless (-d $archive_dir) {
-                eval { make_path($archive_dir) };
-                if ($@) {
-                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'view_log', "Failed to create archive directory: $@");
-                    $c->flash->{error_msg} = "Failed to create archive directory: $@";
-                    $c->response->redirect($c->uri_for('/admin/view_log'));
-                    return;
-                }
-            }
-
-            # Generate timestamped filename for the archive
-            my $timestamp = strftime("%Y%m%d_%H%M%S", localtime);
-            my $archived_log = File::Spec->catfile($archive_dir, "${filename}_${timestamp}");
-
-            # Try to copy the log file to the archive
-            eval {
-                # Close the log file handle if it's open
-                if (defined $Comserv::Util::Logging::LOG_FH) {
-                    close $Comserv::Util::Logging::LOG_FH;
-                }
-
-                # Copy the log file to the archive
-                File::Copy::copy($log_file, $archived_log);
-
-                # Truncate the original log file
-                open my $fh, '>', $log_file or die "Cannot open log file for truncation: $!";
-                print $fh "Log file truncated at " . scalar(localtime) . "\n";
-                close $fh;
-
-                # Reopen the log file for appending
-                if (defined $Comserv::Util::Logging::LOG_FILE) {
-                    sysopen($Comserv::Util::Logging::LOG_FH, $Comserv::Util::Logging::LOG_FILE, O_WRONLY | O_APPEND | O_CREAT, 0644)
-                        or die "Cannot reopen log file after rotation: $!";
-                }
-
-                $c->flash->{success_msg} = "Log rotated successfully. Archived to: $archived_log";
-            };
-            if ($@) {
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'view_log', "Error rotating log: $@");
-                $c->flash->{error_msg} = "Error rotating log: $@";
-            }
-        } else {
-            $c->flash->{error_msg} = "Log file not found: $log_file";
-        }
-
-        # Redirect to avoid resubmission on refresh
-        $c->response->redirect($c->uri_for('/admin/view_log'));
-        return;
-    }
-
-    # Get the actual log file path from the Logging module
-    my $log_file;
-
-    # First try to get it from the global variable in Logging.pm
-    if (defined $Comserv::Util::Logging::LOG_FILE) {
-        $log_file = $Comserv::Util::Logging::LOG_FILE;
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view_log', "Using log file from Logging module: $log_file");
-    } else {
-        # Fall back to the default path
-        $log_file = $c->path_to('logs', 'application.log');
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view_log', "Using default log file path: $log_file");
-    }
-
-    # Check if the log file exists
-    unless (-e $log_file) {
-        $c->stash(
-            error_msg => "Log file not found: $log_file",
-            template  => 'admin/view_log.tt',
         );
-        $c->forward($c->view('TT'));
+        
+        foreach my $change (@changes) {
+            push @activity, {
+                type => 'content',
+                user => $change->user->username,
+                time => $change->change_time,
+                details => "Updated " . $change->content->title
+            };
+        }
+    };
+    
+    # Sort all activity by time (most recent first)
+    @activity = sort { $b->{time} cmp $a->{time} } @activity;
+    
+    # Limit to 10 items
+    if (scalar(@activity) > 10) {
+        @activity = @activity[0..9];
+    }
+    
+    return \@activity;
+}
+
+# Get system notifications for the admin dashboard
+sub get_system_notifications {
+    my ($self, $c) = @_;
+    
+    my @notifications = ();
+    
+    # Check for pending user registrations
+    eval {
+        my $pending_count = $c->model('DBEncy::User')->search({ status => 'pending' })->count();
+        if ($pending_count > 0) {
+            push @notifications, {
+                type => 'warning',
+                message => "$pending_count pending user registration(s) require approval",
+                link => $c->uri_for('/admin/users', { filter => 'pending' })
+            };
+        }
+    };
+    
+    # Check for low disk space
+    eval {
+        my $df_output = `df -h . | tail -1`;
+        if ($df_output =~ /(\d+)%/ && $1 > 90) {
+            push @notifications, {
+                type => 'danger',
+                message => "Disk space is critically low ($1% used)",
+                link => undef
+            };
+        }
+        elsif ($df_output =~ /(\d+)%/ && $1 > 80) {
+            push @notifications, {
+                type => 'warning',
+                message => "Disk space is running low ($1% used)",
+                link => undef
+            };
+        }
+    };
+    
+    # Check for pending comments
+    eval {
+        my $pending_count = $c->model('DBEncy::Comment')->search({ status => 'pending' })->count();
+        if ($pending_count > 0) {
+            push @notifications, {
+                type => 'info',
+                message => "$pending_count pending comment(s) require moderation",
+                link => $c->uri_for('/admin/comments', { filter => 'pending' })
+            };
+        }
+    };
+    
+    return \@notifications;
+}
+
+# Admin users management
+sub users :Path('/admin/users') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users', 
+        "Starting users action");
+    
+    # Check if the user has admin role
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'users', 
+            "Access denied: User does not have admin role");
+        
+        # Set error message in flash
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        
+        # Redirect to login page with destination parameter
+        $c->response->redirect($c->uri_for('/login', {
+            destination => $c->req->uri
+        }));
         return;
     }
+    
+    # Get filter parameter
+    my $filter = $c->req->param('filter') || 'all';
+    
+    # Get search parameter
+    my $search = $c->req->param('search') || '';
+    
+    # Get page parameter
+    my $page = $c->req->param('page') || 1;
+    my $users_per_page = 20;
+    
+    # Build search conditions
+    my $search_conditions = {};
+    
+    # Apply filter
+    if ($filter eq 'active') {
+        $search_conditions->{status} = 'active';
+    }
+    elsif ($filter eq 'pending') {
+        $search_conditions->{status} = 'pending';
+    }
+    elsif ($filter eq 'disabled') {
+        $search_conditions->{status} = 'disabled';
+    }
+    
+    # Apply search
+    if ($search) {
+        $search_conditions->{'-or'} = [
+            { username => { 'like', "%$search%" } },
+            { email => { 'like', "%$search%" } },
+            { first_name => { 'like', "%$search%" } },
+            { last_name => { 'like', "%$search%" } }
+        ];
+    }
+    
+    # Get users from database
+    my $users_rs = $c->model('DBEncy::User')->search(
+        $search_conditions,
+        {
+            order_by => { -asc => 'username' },
+            page => $page,
+            rows => $users_per_page
+        }
+    );
+    
+    # Get user roles
+    my %user_roles = ();
+    eval {
+        my @user_role_records = $c->model('DBEncy::UserRole')->search({});
+        foreach my $record (@user_role_records) {
+            push @{$user_roles{$record->user_id}}, $record->role->role;
+        }
+    };
+    
+    # Use the standard debug message system
+    if ($c->session->{debug_mode}) {
+        push @{$c->stash->{debug_msg}}, "Admin controller users view - Template: admin/users.tt";
+        push @{$c->stash->{debug_msg}}, "Filter: $filter, Search: $search, Page: $page";
+        push @{$c->stash->{debug_msg}}, "User count: " . $users_rs->pager->total_entries;
+    }
+    
+    # Pass data to the template
+    $c->stash(
+        template => 'admin/users.tt',
+        users => [ $users_rs->all ],
+        user_roles => \%user_roles,
+        filter => $filter,
+        search => $search,
+        pager => $users_rs->pager
+    );
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users', 
+        "Completed users action");
+}
 
-    # Get log file size
-    my $log_size_kb = Comserv::Util::Logging->get_log_file_size($log_file);
+# Admin content management
+sub content :Path('/admin/content') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'content', 
+        "Starting content action");
+    
+    # Check if the user has admin role
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'content', 
+            "Access denied: User does not have admin role");
+        
+        # Set error message in flash
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        
+        # Redirect to login page with destination parameter
+        $c->response->redirect($c->uri_for('/login', {
+            destination => $c->req->uri
+        }));
+        return;
+    }
+    
+    # Get filter parameter
+    my $filter = $c->req->param('filter') || 'all';
+    
+    # Get search parameter
+    my $search = $c->req->param('search') || '';
+    
+    # Get page parameter
+    my $page = $c->req->param('page') || 1;
+    my $items_per_page = 20;
+    
+    # Build search conditions
+    my $search_conditions = {};
+    
+    # Apply filter
+    if ($filter eq 'published') {
+        $search_conditions->{status} = 'published';
+    }
+    elsif ($filter eq 'draft') {
+        $search_conditions->{status} = 'draft';
+    }
+    elsif ($filter eq 'archived') {
+        $search_conditions->{status} = 'archived';
+    }
+    
+    # Apply search
+    if ($search) {
+        $search_conditions->{'-or'} = [
+            { title => { 'like', "%$search%" } },
+            { content => { 'like', "%$search%" } },
+            { 'author.username' => { 'like', "%$search%" } }
+        ];
+    }
+    
+    # Get content from database
+    my $content_rs = $c->model('DBEncy::Content')->search(
+        $search_conditions,
+        {
+            join => 'author',
+            order_by => { -desc => 'created_at' },
+            page => $page,
+            rows => $items_per_page
+        }
+    );
+    
+    # Use the standard debug message system
+    if ($c->session->{debug_mode}) {
+        push @{$c->stash->{debug_msg}}, "Admin controller content view - Template: admin/content.tt";
+        push @{$c->stash->{debug_msg}}, "Filter: $filter, Search: $search, Page: $page";
+        push @{$c->stash->{debug_msg}}, "Content count: " . $content_rs->pager->total_entries;
+    }
+    
+    # Pass data to the template
+    $c->stash(
+        template => 'admin/content.tt',
+        content_items => [ $content_rs->all ],
+        filter => $filter,
+        search => $search,
+        pager => $content_rs->pager
+    );
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'content', 
+        "Completed content action");
+}
 
-    # Get list of archived logs
-    my ($volume, $directories, $filename) = File::Spec->splitpath($log_file);
-    my $archive_dir = File::Spec->catdir($directories, 'archive');
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view_log', "Archive directory: $archive_dir");
-    my @archived_logs = ();
-
-    if (-d $archive_dir) {
-        opendir(my $dh, $archive_dir) or do {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'view_log', "Cannot open archive directory: $!");
-        };
-
-        if ($dh) {
-            # Get the base filename without path
-            my $base_filename = (File::Spec->splitpath($log_file))[2];
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view_log', "Base filename: $base_filename");
-
-            @archived_logs = map {
-                my $full_path = File::Spec->catfile($archive_dir, $_);
+# Admin settings
+sub settings :Path('/admin/settings') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'settings', 
+        "Starting settings action");
+    
+    # Check if the user has admin role
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'settings', 
+            "Access denied: User does not have admin role");
+        
+        # Set error message in flash
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        
+        # Redirect to login page with destination parameter
+        $c->response->redirect($c->uri_for('/login', {
+            destination => $c->req->uri
+        }));
+        return;
+    }
+    
+    # Handle form submission
+    if ($c->req->method eq 'POST') {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'settings', 
+            "Processing settings form submission");
+        
+        # Get form parameters
+        my $site_name = $c->req->param('site_name');
+        my $site_description = $c->req->param('site_description');
+        my $admin_email = $c->req->param('admin_email');
+        my $items_per_page = $c->req->param('items_per_page');
+        my $allow_comments = $c->req->param('allow_comments') ? 1 : 0;
+        my $moderate_comments = $c->req->param('moderate_comments') ? 1 : 0;
+        my $theme = $c->req->param('theme');
+        
+        # Validate inputs
+        my $errors = {};
+        
+        unless ($site_name) {
+            $errors->{site_name} = "Site name is required";
+        }
+        
+        unless ($admin_email && $admin_email =~ /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/) {
+            $errors->{admin_email} = "Valid admin email is required";
+        }
+        
+        unless ($items_per_page && $items_per_page =~ /^\d+$/ && $items_per_page > 0) {
+            $errors->{items_per_page} = "Items per page must be a positive number";
+        }
+        
+        # If there are validation errors, re-display the form
+        if (%$errors) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'settings', 
+                "Validation errors in settings form");
+            
+            $c->stash(
+                template => 'admin/settings.tt',
+                errors => $errors,
+                form_data => {
+                    site_name => $site_name,
+                    site_description => $site_description,
+                    admin_email => $admin_email,
+                    items_per_page => $items_per_page,
+                    allow_comments => $allow_comments,
+                    moderate_comments => $moderate_comments,
+                    theme => $theme
+                }
+            );
+            return;
+        }
+        
+        # Save settings to database
+        eval {
+            # Update site_name setting
+            $c->model('DBEncy::Setting')->update_or_create(
                 {
-                    name => $_,
-                    size => sprintf("%.2f KB", (-s $full_path) / 1024),
-                    date => scalar localtime((stat($full_path))[9]),
-                    is_chunk => ($_ =~ /_chunk\d+$/) ? 1 : 0
+                    name => 'site_name',
+                    value => $site_name
                 }
-            } grep { /^${base_filename}_\d{8}_\d{6}(_chunk\d+)?$/ } readdir($dh);
+            );
+            
+            # Update site_description setting
+            $c->model('DBEncy::Setting')->update_or_create(
+                {
+                    name => 'site_description',
+                    value => $site_description
+                }
+            );
+            
+            # Update admin_email setting
+            $c->model('DBEncy::Setting')->update_or_create(
+                {
+                    name => 'admin_email',
+                    value => $admin_email
+                }
+            );
+            
+            # Update items_per_page setting
+            $c->model('DBEncy::Setting')->update_or_create(
+                {
+                    name => 'items_per_page',
+                    value => $items_per_page
+                }
+            );
+            
+            # Update allow_comments setting
+            $c->model('DBEncy::Setting')->update_or_create(
+                {
+                    name => 'allow_comments',
+                    value => $allow_comments
+                }
+            );
+            
+            # Update moderate_comments setting
+            $c->model('DBEncy::Setting')->update_or_create(
+                {
+                    name => 'moderate_comments',
+                    value => $moderate_comments
+                }
+            );
+            
+            # Update theme setting
+            $c->model('DBEncy::Setting')->update_or_create(
+                {
+                    name => 'theme',
+                    value => $theme
+                }
+            );
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'settings', 
+                "Settings updated successfully");
+            
+            # Set success message and redirect
+            $c->flash->{success_msg} = "Settings updated successfully";
+            $c->response->redirect($c->uri_for('/admin/settings'));
+            return;
+        };
+        
+        # Handle database errors
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'settings', 
+                "Error updating settings: $@");
+            
+            $c->stash(
+                template => 'admin/settings.tt',
+                error_msg => "Error updating settings: $@",
+                form_data => {
+                    site_name => $site_name,
+                    site_description => $site_description,
+                    admin_email => $admin_email,
+                    items_per_page => $items_per_page,
+                    allow_comments => $allow_comments,
+                    moderate_comments => $moderate_comments,
+                    theme => $theme
+                }
+            );
+            return;
+        }
+    }
+    
+    # Get current settings from database
+    my %settings = ();
+    eval {
+        my @setting_records = $c->model('DBEncy::Setting')->search({});
+        foreach my $record (@setting_records) {
+            $settings{$record->name} = $record->value;
+        }
+    };
+    
+    # Get available themes
+    my @themes = ('default', 'dark', 'light', 'custom');
+    eval {
+        my $themes_dir = $c->path_to('root', 'static', 'themes');
+        if (-d $themes_dir) {
+            opendir(my $dh, $themes_dir) or die "Cannot open themes directory: $!";
+            @themes = grep { -d "$themes_dir/$_" && $_ !~ /^\./ } readdir($dh);
+            closedir($dh);
+        }
+    };
+    
+    # Use the standard debug message system
+    if ($c->session->{debug_mode}) {
+        push @{$c->stash->{debug_msg}}, "Admin controller settings view - Template: admin/settings.tt";
+        push @{$c->stash->{debug_msg}}, "Available themes: " . join(', ', @themes);
+    }
+    
+    # Pass data to the template
+    $c->stash(
+        template => 'admin/settings.tt',
+        settings => \%settings,
+        themes => \@themes
+    );
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'settings', 
+        "Completed settings action");
+}
+
+# Admin system information
+sub system_info :Path('/admin/system_info') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'system_info', 
+        "Starting system_info action");
+    
+    # Check if the user has admin role
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'system_info', 
+            "Access denied: User does not have admin role");
+        
+        # Set error message in flash
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        
+        # Redirect to login page with destination parameter
+        $c->response->redirect($c->uri_for('/login', {
+            destination => $c->req->uri
+        }));
+        return;
+    }
+    
+    # Get system information
+    my $system_info = $self->get_detailed_system_info($c);
+    
+    # Use the standard debug message system
+    if ($c->session->{debug_mode}) {
+        push @{$c->stash->{debug_msg}}, "Admin controller system_info view - Template: admin/system_info.tt";
+    }
+    
+    # Pass data to the template
+    $c->stash(
+        template => 'admin/system_info.tt',
+        system_info => $system_info
+    );
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'system_info', 
+        "Completed system_info action");
+}
+
+# Get detailed system information
+sub get_detailed_system_info {
+    my ($self, $c) = @_;
+    
+    my $info = {
+        perl_version => $],
+        catalyst_version => $Catalyst::VERSION,
+        server_software => $ENV{SERVER_SOFTWARE} || 'Unknown',
+        server_name => $ENV{SERVER_NAME} || 'Unknown',
+        server_protocol => $ENV{SERVER_PROTOCOL} || 'Unknown',
+        server_admin => $ENV{SERVER_ADMIN} || 'Unknown',
+        server_port => $ENV{SERVER_PORT} || 'Unknown',
+        document_root => $ENV{DOCUMENT_ROOT} || 'Unknown',
+        script_name => $ENV{SCRIPT_NAME} || 'Unknown',
+        request_uri => $ENV{REQUEST_URI} || 'Unknown',
+        request_method => $ENV{REQUEST_METHOD} || 'Unknown',
+        query_string => $ENV{QUERY_STRING} || 'Unknown',
+        remote_addr => $ENV{REMOTE_ADDR} || 'Unknown',
+        remote_port => $ENV{REMOTE_PORT} || 'Unknown',
+        remote_user => $ENV{REMOTE_USER} || 'Unknown',
+        http_user_agent => $ENV{HTTP_USER_AGENT} || 'Unknown',
+        http_referer => $ENV{HTTP_REFERER} || 'Unknown',
+        http_accept => $ENV{HTTP_ACCEPT} || 'Unknown',
+        http_accept_language => $ENV{HTTP_ACCEPT_LANGUAGE} || 'Unknown',
+        http_accept_encoding => $ENV{HTTP_ACCEPT_ENCODING} || 'Unknown',
+        http_connection => $ENV{HTTP_CONNECTION} || 'Unknown',
+        http_host => $ENV{HTTP_HOST} || 'Unknown',
+        https => $ENV{HTTPS} || 'Off',
+        gateway_interface => $ENV{GATEWAY_INTERFACE} || 'Unknown',
+        server_signature => $ENV{SERVER_SIGNATURE} || 'Unknown',
+        server_addr => $ENV{SERVER_ADDR} || 'Unknown',
+        path => $ENV{PATH} || 'Unknown',
+        system_uptime => 'Unknown',
+        system_load => 'Unknown',
+        memory_usage => 'Unknown',
+        disk_usage => 'Unknown',
+        database_info => 'Unknown',
+        installed_modules => []
+    };
+    
+    # Get system uptime
+    eval {
+        my $uptime_output = `uptime`;
+        chomp($uptime_output);
+        $info->{system_uptime} = $uptime_output;
+        
+        if ($uptime_output =~ /load average: ([\d.]+), ([\d.]+), ([\d.]+)/) {
+            $info->{system_load} = "$1 (1 min), $2 (5 min), $3 (15 min)";
+        }
+    };
+    
+    # Get memory usage
+    eval {
+        my $free_output = `free -h`;
+        my @lines = split(/\n/, $free_output);
+        if ($lines[1] =~ /Mem:\s+(\S+)\s+(\S+)\s+(\S+)/) {
+            $info->{memory_usage} = "Total: $1, Used: $2, Free: $3";
+        }
+    };
+    
+    # Get disk usage
+    eval {
+        my $df_output = `df -h .`;
+        my @lines = split(/\n/, $df_output);
+        if ($lines[1] =~ /(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)/) {
+            $info->{disk_usage} = "Filesystem: $1, Size: $2, Used: $3, Avail: $4, Use%: $5, Mounted on: $6";
+        }
+    };
+    
+    # Get database information
+    eval {
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        my $db_info = $dbh->get_info(17); # SQL_DBMS_NAME
+        my $db_version = $dbh->get_info(18); # SQL_DBMS_VER
+        $info->{database_info} = "$db_info version $db_version";
+    };
+    
+    # Get installed Perl modules
+    eval {
+        my @modules = ();
+        foreach my $module (sort keys %INC) {
+            next unless $module =~ /\.pm$/;
+            $module =~ s/\//::/g;
+            $module =~ s/\.pm$//;
+            
+            my $version = eval "\$${module}::VERSION" || 'Unknown';
+            push @modules, { name => $module, version => $version };
+        }
+        $info->{installed_modules} = \@modules;
+    };
+    
+    return $info;
+}
+
+# Admin logs viewer
+sub logs :Path('/admin/logs') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'logs', 
+        "Starting logs action");
+    
+    # Check if the user has admin role
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'logs', 
+            "Access denied: User does not have admin role");
+        
+        # Set error message in flash
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        
+        # Redirect to login page with destination parameter
+        $c->response->redirect($c->uri_for('/login', {
+            destination => $c->req->uri
+        }));
+        return;
+    }
+    
+    # Get log file parameter
+    my $log_file = $c->req->param('file') || 'catalyst.log';
+    
+    # Get available log files
+    my @log_files = ();
+    eval {
+        my $logs_dir = $c->path_to('logs');
+        if (-d $logs_dir) {
+            opendir(my $dh, $logs_dir) or die "Cannot open logs directory: $!";
+            @log_files = grep { -f "$logs_dir/$_" && $_ !~ /^\./ } readdir($dh);
+            closedir($dh);
+        }
+    };
+    
+    # Get log content
+    my $log_content = '';
+    eval {
+        my $log_path = $c->path_to('logs', $log_file);
+        if (-f $log_path) {
+            # Get the last 1000 lines of the log file
+            my $tail_output = `tail -n 1000 $log_path`;
+            $log_content = $tail_output;
+        }
+    };
+    
+    # Use the standard debug message system
+    if ($c->session->{debug_mode}) {
+        push @{$c->stash->{debug_msg}}, "Admin controller logs view - Template: admin/logs.tt";
+        push @{$c->stash->{debug_msg}}, "Log file: $log_file";
+        push @{$c->stash->{debug_msg}}, "Available log files: " . join(', ', @log_files);
+    }
+    
+    # Pass data to the template
+    $c->stash(
+        template => 'admin/logs.tt',
+        log_file => $log_file,
+        log_files => \@log_files,
+        log_content => $log_content
+    );
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'logs',
+        "Completed logs action");
+}
+
+# Admin backup and restore
+sub backup :Path('/admin/backup') :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'backup',
+        "Starting backup action");
+
+    # Check if the user has admin role
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'backup',
+            "Access denied: User does not have admin role");
+
+        $c->response->redirect($c->uri_for('/login', {
+            destination => $c->req->uri,
+            mid => $c->set_error_msg("You need to be an administrator to access this area.")
+        }));
+        return;
+    }
+
+    # Handle backup creation
+    if ($c->req->method eq 'POST' && $c->req->param('action') eq 'create_backup') {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'backup',
+            "Creating backup");
+
+        my $backup_type = $c->req->param('backup_type') || 'full';
+        my $backup_name = $c->req->param('backup_name') || 'backup_' . time();
+
+        # Create backup directory if it doesn't exist
+        my $backup_dir = $c->path_to('backups');
+        unless (-d $backup_dir) {
+            eval { make_path($backup_dir) };
+            if ($@) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'backup',
+                    "Error creating backup directory: $@");
+
+                $c->flash->{error_msg} = "Error creating backup directory: $@";
+                $c->response->redirect($c->uri_for('/admin/backup'));
+                return;
+            }
+        }
+
+        # Create backup
+        my $backup_file = "$backup_dir/$backup_name.tar.gz";
+        my $backup_command = '';
+
+        if ($backup_type eq 'full') {
+            # Full backup (files + database)
+            $backup_command = "tar -czf $backup_file --exclude='backups' --exclude='tmp' --exclude='logs/*.log' .";
+        }
+        elsif ($backup_type eq 'files') {
+            # Files only backup
+            $backup_command = "tar -czf $backup_file --exclude='backups' --exclude='tmp' --exclude='logs/*.log' --exclude='db' .";
+        }
+        elsif ($backup_type eq 'database') {
+            # Database only backup
+            # This is a simplified example - you'd need to customize for your database
+            $backup_command = "mysqldump -u username -p'password' database_name > $backup_dir/db_dump.sql && tar -czf $backup_file $backup_dir/db_dump.sql && rm $backup_dir/db_dump.sql";
+        }
+
+        # Execute backup command
+        my $result = system($backup_command);
+
+        if ($result == 0) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'backup',
+                "Backup created successfully: $backup_file");
+
+            $c->flash->{success_msg} = "Backup created successfully: $backup_name.tar.gz";
+        }
+        else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'backup',
+                "Error creating backup: $!");
+
+            $c->flash->{error_msg} = "Error creating backup: $!";
+        }
+
+        $c->response->redirect($c->uri_for('/admin/backup'));
+        return;
+    }
+
+    # Handle backup restoration
+    if ($c->req->method eq 'POST' && $c->req->param('action') eq 'restore_backup') {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'backup',
+            "Restoring backup");
+
+        my $backup_file = $c->req->param('backup_file');
+
+        unless ($backup_file) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'backup',
+                "No backup file selected for restoration");
+
+            $c->flash->{error_msg} = "No backup file selected for restoration";
+            $c->response->redirect($c->uri_for('/admin/backup'));
+            return;
+        }
+
+        # Validate backup file
+        my $backup_path = $c->path_to('backups', $backup_file);
+        unless (-f $backup_path) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'backup',
+                "Backup file not found: $backup_file");
+
+            $c->flash->{error_msg} = "Backup file not found: $backup_file";
+            $c->response->redirect($c->uri_for('/admin/backup'));
+            return;
+        }
+
+        # Create temporary directory for restoration
+        my $temp_dir = $c->path_to('tmp', 'restore_' . time());
+        eval { make_path($temp_dir) };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'backup',
+                "Error creating temporary directory: $@");
+
+            $c->flash->{error_msg} = "Error creating temporary directory: $@";
+            $c->response->redirect($c->uri_for('/admin/backup'));
+            return;
+        }
+
+        # Extract backup to temporary directory
+        my $extract_command = "tar -xzf $backup_path -C $temp_dir";
+        my $extract_result = system($extract_command);
+
+        if ($extract_result != 0) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'backup',
+                "Error extracting backup: $!");
+
+            $c->flash->{error_msg} = "Error extracting backup: $!";
+            $c->response->redirect($c->uri_for('/admin/backup'));
+            return;
+        }
+
+        # Restore database if database dump exists
+        if (-f "$temp_dir/db_dump.sql") {
+            # This is a simplified example - you'd need to customize for your database
+            my $db_restore_command = "mysql -u username -p'password' database_name < $temp_dir/db_dump.sql";
+            my $db_restore_result = system($db_restore_command);
+
+            if ($db_restore_result != 0) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'backup',
+                    "Error restoring database: $!");
+
+                $c->flash->{error_msg} = "Error restoring database: $!";
+                $c->response->redirect($c->uri_for('/admin/backup'));
+                return;
+            }
+        }
+
+        # Restore files
+        # This is a simplified example - you'd need to customize for your application
+        my $files_restore_command = "cp -R $temp_dir/* .";
+        my $files_restore_result = system($files_restore_command);
+
+        if ($files_restore_result != 0) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'backup',
+                "Error restoring files: $!");
+
+            $c->flash->{error_msg} = "Error restoring files: $!";
+            $c->response->redirect($c->uri_for('/admin/backup'));
+            return;
+        }
+
+        # Clean up temporary directory
+        my $cleanup_command = "rm -rf $temp_dir";
+        system($cleanup_command);
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'backup',
+            "Backup restored successfully: $backup_file");
+
+        $c->flash->{success_msg} = "Backup restored successfully: $backup_file";
+        $c->response->redirect($c->uri_for('/admin/backup'));
+        return;
+    }
+
+    # Get available backups
+    my @backups = ();
+    eval {
+        my $backup_dir = $c->path_to('backups');
+        if (-d $backup_dir) {
+            opendir(my $dh, $backup_dir) or die "Cannot open backups directory: $!";
+            @backups = grep { -f "$backup_dir/$_" && $_ =~ /\.tar\.gz$/ } readdir($dh);
             closedir($dh);
 
-            # Group chunks together by timestamp
-            my %log_groups;
-            foreach my $log (@archived_logs) {
-                my $timestamp;
-                if ($log->{name} =~ /^${base_filename}_(\d{8}_\d{6})(?:_chunk\d+)?$/) {
-                    $timestamp = $1;
-                } else {
-                    # Fallback for unexpected filenames
-                    $timestamp = $log->{name};
-                }
-
-                push @{$log_groups{$timestamp}}, $log;
-            }
-
-            # Sort timestamps in descending order (newest first)
-            my @sorted_timestamps = sort { $b cmp $a } keys %log_groups;
-
-            # Flatten the groups back into a list, with chunks grouped together
-            @archived_logs = ();
-            foreach my $timestamp (@sorted_timestamps) {
-                # Sort chunks within each timestamp group
-                my @sorted_logs = sort {
-                    # Extract chunk numbers for sorting
-                    my ($a_chunk) = ($a->{name} =~ /_chunk(\d+)$/);
-                    my ($b_chunk) = ($b->{name} =~ /_chunk(\d+)$/);
-
-                    # Non-chunks come first, then sort by chunk number
-                    if (!defined $a_chunk && defined $b_chunk) {
-                        return -1;
-                    } elsif (defined $a_chunk && !defined $b_chunk) {
-                        return 1;
-                    } elsif (defined $a_chunk && defined $b_chunk) {
-                        return $a_chunk <=> $b_chunk;
-                    } else {
-                        return $a->{name} cmp $b->{name};
-                    }
-                } @{$log_groups{$timestamp}};
-
-                push @archived_logs, @sorted_logs;
-            }
+            # Sort backups by modification time (newest first)
+            @backups = sort {
+                (stat("$backup_dir/$b"))[9] <=> (stat("$backup_dir/$a"))[9]
+            } @backups;
         }
+    };
+
+    # Use the standard debug message system
+    if ($c->session->{debug_mode}) {
+        push @{$c->stash->{debug_msg}}, "Admin controller backup view - Template: admin/backup.tt";
+        push @{$c->stash->{debug_msg}}, "Available backups: " . join(', ', @backups);
     }
 
-    # Read the log file (limit to last 1000 lines for performance)
-    my $log_content;
-    my @last_lines;
-
-    # Check if the file is too large to read into memory
-    my $file_size = -s $log_file;
-    if ($file_size > 10 * 1024 * 1024) { # If larger than 10MB
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view_log', "Log file is too large ($file_size bytes), reading only the last 1000 lines");
-
-        # Use tail-like approach to get the last 1000 lines
-        my @tail_lines;
-        my $line_count = 0;
-        my $buffer_size = 4096;
-        my $pos = $file_size;
-
-        open my $fh, '<', $log_file or die "Cannot open log file: $!";
-
-        while ($line_count < 1000 && $pos > 0) {
-            my $read_size = ($pos > $buffer_size) ? $buffer_size : $pos;
-            $pos -= $read_size;
-
-            seek($fh, $pos, 0);
-            my $buffer;
-            read($fh, $buffer, $read_size);
-
-            my @buffer_lines = split(/\n/, $buffer);
-            $line_count += scalar(@buffer_lines);
-
-            unshift @tail_lines, @buffer_lines;
-        }
-
-        close $fh;
-
-        # Take only the last 1000 lines
-        if (@tail_lines > 1000) {
-            @last_lines = @tail_lines[-1000 .. -1];
-        } else {
-            @last_lines = @tail_lines;
-        }
-
-        $log_content = join("\n", @last_lines);
-    } else {
-        # For smaller files, read the whole file
-        open my $fh, '<', $log_file or die "Cannot open log file: $!";
-        my @lines = <$fh>;
-        close $fh;
-
-        # Get the last 1000 lines (or all if fewer)
-        my $start_index = @lines > 1000 ? @lines - 1000 : 0;
-        @last_lines = @lines[$start_index .. $#lines];
-        $log_content = join('', @last_lines);
-    }
-
-    # Pass the log content and metadata to the template
+    # Pass data to the template
     $c->stash(
-        log_content   => $log_content,
-        log_size      => $log_size_kb,
-        max_log_size  => sprintf("%.2f", 500), # 500 KB max size (hardcoded to match Logging.pm)
-        archived_logs => \@archived_logs,
-        template      => 'admin/view_log.tt',
+        template => 'admin/backup.tt',
+        backups => \@backups
     );
 
-    $c->forward($c->view('TT'));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'backup',
+        "Completed backup action");
 }
 
-sub view_archived_log :Path('/admin/view_archived_log') :Args(1) {
-    my ($self, $c, $log_name) = @_;
+# Keeping it here for backward compatibility
+sub network_devices_forward :Path('/admin/network_devices_old') :Args(0) {
+    my ($self, $c) = @_;
 
-    # Validate log name to prevent directory traversal
-    unless ($log_name =~ /^application\.log_\d{8}_\d{6}$/) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'view_archived_log', "Invalid log name: $log_name");
-        $c->flash->{error_msg} = "Invalid log name";
-        $c->response->redirect($c->uri_for('/admin/view_log'));
-        return;
-    }
-
-    # Get the actual log file path from the Logging module
-    my $main_log_file;
-
-    if (defined $Comserv::Util::Logging::LOG_FILE) {
-        $main_log_file = $Comserv::Util::Logging::LOG_FILE;
-    } else {
-        $main_log_file = $c->path_to('logs', 'application.log');
-    }
-
-    my ($volume, $directories, $filename) = File::Spec->splitpath($main_log_file);
-    my $archive_dir = File::Spec->catdir($directories, 'archive');
-    my $log_file = File::Spec->catfile($archive_dir, $log_name);
-
-    # Check if the log file exists
-    unless (-e $log_file && -f $log_file) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'view_archived_log', "Archived log not found: $log_file");
-        $c->flash->{error_msg} = "Archived log not found";
-        $c->response->redirect($c->uri_for('/admin/view_log'));
-        return;
-    }
-
-    # Read the log file
-    my $log_content;
-    {
-        local $/; # Enable slurp mode
-        open my $fh, '<', $log_file or die "Cannot open log file: $!";
-        $log_content = <$fh>;
-        close $fh;
-    }
-
-    # Get log file size
-    my $log_size_kb = sprintf("%.2f", (-s $log_file) / 1024);
-
-    # Pass the log content to the template
-    $c->stash(
-        log_content => $log_content,
-        log_name    => $log_name,
-        log_size    => $log_size_kb,
-        template    => 'admin/view_archived_log.tt',
-    );
-
-    $c->forward($c->view('TT'));
+    # Redirect to the new network devices page
+    $c->response->redirect($c->uri_for('/admin/network_devices'));
 }
 
-=head2 git_pull
+# Commented out to avoid redefinition - this functionality is now in Admin::NetworkDevices
+# sub network_devices :Path('/admin/network_devices') :Args(0) {
+#     # Implementation removed to avoid duplication
+# }
 
-Pull the latest changes from the Git repository
+# Commented out to avoid redefinition - this functionality is now in Admin::NetworkDevices
+# sub add_network_device :Path('/admin/add_network_device') :Args(0) {
+#     # Implementation removed to avoid duplication
+# }
 
-=cut
+# Commented out to avoid redefinition - this functionality is now in Admin::NetworkDevices
+# sub edit_network_device :Path('/admin/edit_network_device') :Args(1) {
+#     # Implementation removed to avoid duplication
+# }
 
+# Commented out to avoid redefinition - this functionality is now in Admin::NetworkDevices
+# sub delete_network_device :Path('/admin/delete_network_device') :Args(1) {
+#     # Implementation removed to avoid duplication
+# }
+
+# Git pull functionality
 sub git_pull :Path('/admin/git_pull') :Args(0) {
     my ($self, $c) = @_;
     
-    # Debug logging for git_pull action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', "Starting git_pull action");
-    
-    # Log user information for debugging
-    my $username = $c->user_exists ? $c->user->username : 'Guest';
-    my $roles = $c->session->{roles} || [];
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
-        "User: $username, Roles: " . Dumper($roles));
+        "Starting git_pull action");
     
-    # Initialize debug messages array
-    # Make sure debug_msg is an array reference
-    if (!defined $c->stash->{debug_msg}) {
-        $c->stash->{debug_msg} = [];
-    } elsif (!ref($c->stash->{debug_msg}) || ref($c->stash->{debug_msg}) ne 'ARRAY') {
-        # If debug_msg exists but is not an array reference, convert it to an array
-        my $original_msg = $c->stash->{debug_msg};
-        $c->stash->{debug_msg} = [];
-        push @{$c->stash->{debug_msg}}, $original_msg if $original_msg;
-    }
-    
-    # Add debug messages to the stash
-    push @{$c->stash->{debug_msg}}, "User: $username";
-    push @{$c->stash->{debug_msg}}, "Roles: " . Dumper($roles);
-    
-    # Check if the user has the admin role in the session
-    my $is_admin = 0;
-    
-    # Check if the user has admin role in the session
-    if (defined $c->session->{roles} && ref($c->session->{roles}) eq 'ARRAY') {
-        $is_admin = grep { $_ eq 'admin' } @{$c->session->{roles}};
-    }
-    
-    # Log the admin check
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
-        "Admin check result: " . ($is_admin ? 'Yes' : 'No'));
-    push @{$c->stash->{debug_msg}}, "Admin check result: " . ($is_admin ? 'Yes' : 'No');
-    
-    unless ($is_admin) {
+    # Check if the user has admin role
+    unless ($c->user_exists && ($c->check_user_roles('admin') || $c->session->{username} eq 'Shanta')) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_pull', 
-            "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest'));
-        $c->stash->{error_msg} = "You must be an admin to perform this action. Please contact your administrator.";
-        $c->stash->{template} = 'admin/git_pull.tt';
-        $c->forward($c->view('TT'));
+            "Access denied: User does not have admin role");
+        
+        # Set error message in flash
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        
+        # Redirect to login page with destination parameter
+        $c->response->redirect($c->uri_for('/user/login', {
+            destination => $c->req->uri
+        }));
         return;
     }
     
-    # Initialize output and error variables
-    my $output = '';
-    my $error = '';
+    # Check if this is a POST request (user confirmed the git pull)
+    if ($c->req->method eq 'POST' && $c->req->param('confirm')) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
+            "Git pull confirmed, executing");
+        
+        # Execute the git pull operation
+        my ($success, $output, $warning) = $self->execute_git_pull($c);
+        
+        # Store the results in stash for the template
+        $c->stash(
+            output => $output,
+            success_msg => $success ? "Git pull completed successfully." : undef,
+            error_msg => $success ? undef : "Git pull failed. See output for details.",
+            warning_msg => $warning
+        );
+    }
     
-    # If this is a POST request, perform the git pull
-    if ($c->request->method eq 'POST' && $c->request->params->{confirm}) {
-        # Get the application root directory
-        my $app_root = $c->path_to('');
-        
-        # Log the directory where we're running git pull
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
-            "Running git pull in directory: $app_root");
-        # Ensure debug_msg is an array reference before pushing
-        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
-        push @{$c->stash->{debug_msg}}, "Running git pull in directory: $app_root";
-        
-        # Change to the application root directory
-        my $current_dir = getcwd();
-        chdir($app_root) or do {
-            $error = "Failed to change to directory $app_root: $!";
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_pull', $error);
-            $c->stash->{error_msg} = $error;
-            # Ensure debug_msg is an array reference before pushing
-            $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
-            push @{$c->stash->{debug_msg}}, "Error: $error";
-            $c->stash->{template} = 'admin/git_pull.tt';
-            $c->forward($c->view('TT'));
-            return;
-        };
-        
-        # Run git status first to check the repository state
-        my $git_status = qx{git status 2>&1};
-        my $status_exit_code = $? >> 8;
-        
-        if ($status_exit_code != 0) {
-            $error = "Error checking git status: $git_status";
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_pull', $error);
-            chdir($current_dir);
-            $c->stash->{error_msg} = $error;
-            # Ensure debug_msg is an array reference before pushing
-            $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
-            push @{$c->stash->{debug_msg}}, "Error: $error";
-            $c->stash->{template} = 'admin/git_pull.tt';
-            $c->forward($c->view('TT'));
-            return;
-        }
-        
-        # Check if there are uncommitted changes
-        my $has_changes = 0;
-        if ($git_status =~ /Changes not staged for commit|Changes to be committed|Untracked files/) {
-            $has_changes = 1;
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_pull', 
-                "Repository has uncommitted changes: $git_status");
-            # Ensure debug_msg is an array reference before pushing
-            $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
-            push @{$c->stash->{debug_msg}}, "Warning: Repository has uncommitted changes";
-        }
-        
-        # Run git pull
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
-            "Executing git pull");
-        $output = qx{git pull 2>&1};
-        my $exit_code = $? >> 8;
-        
-        # Change back to the original directory
-        chdir($current_dir);
-        
-        if ($exit_code == 0) {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
-                "Git pull executed successfully. Output: $output");
-                
-            # Check if there were any updates
-            if ($output =~ /Already up to date/) {
-                $c->stash->{success_msg} = "Repository is already up to date.";
-            } else {
-                $c->stash->{success_msg} = "Git pull executed successfully. Updates were applied.";
-            }
-            
-            # Add a warning if there were uncommitted changes
-            if ($has_changes) {
-                $c->stash->{warning_msg} = "Note: Your repository had uncommitted changes. " .
-                    "You may need to resolve conflicts manually.";
-            }
-        } else {
-            $error = "Error executing git pull: $output";
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'git_pull', $error);
-            $c->stash->{error_msg} = $error;
-        }
-        
-        # Add the output to the stash
-        $c->stash->{output} = $output;
-        
-        # Add debug messages to the stash
-        # Ensure debug_msg is an array reference before pushing
-        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
-        push @{$c->stash->{debug_msg}}, "Git pull command executed";
-        push @{$c->stash->{debug_msg}}, "Output: $output" if $output;
-        push @{$c->stash->{debug_msg}}, "Error: $error" if $error;
-    } else {
-        # This is a GET request or no confirmation, just show the confirmation page
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
-            "Displaying git pull confirmation page");
-        # Ensure debug_msg is an array reference before pushing
-        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
-        push @{$c->stash->{debug_msg}}, "Displaying git pull confirmation page";
+    # Use the standard debug message system
+    if ($c->session->{debug_mode}) {
+        push @{$c->stash->{debug_msg}}, "Admin controller git_pull view - Template: admin/git_pull.tt";
     }
     
     # Set the template
-    $c->stash->{template} = 'admin/git_pull.tt';
+    $c->stash(template => 'admin/git_pull.tt');
     
-    # Forward to the view
-    $c->forward($c->view('TT'));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
+        "Completed git_pull action");
 }
 
-=head2 restart_starman
+# Execute the git pull operation
+sub execute_git_pull {
+    my ($self, $c) = @_;
+    my $output = '';
+    my $warning = undef;
+    my $success = 0;
+    
+    # Path to the theme_mappings.json file
+    my $theme_mappings_path = $c->path_to('root', 'static', 'config', 'theme_mappings.json');
+    my $backup_path = "$theme_mappings_path.bak";
+    
+    # Check if theme_mappings.json exists
+    my $theme_mappings_exists = -e $theme_mappings_path;
+    
+    try {
+        # Backup theme_mappings.json if it exists
+        if ($theme_mappings_exists) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_git_pull', 
+                "Backing up theme_mappings.json");
+            copy($theme_mappings_path, $backup_path) or die "Failed to backup theme_mappings.json: $!";
+            $output .= "Backed up theme_mappings.json to $backup_path\n";
+        }
+        
+        # Check if there are local changes to theme_mappings.json
+        my $has_local_changes = 0;
+        if ($theme_mappings_exists) {
+            my $git_status = `git -C ${\$c->path_to()} status --porcelain root/static/config/theme_mappings.json`;
+            $has_local_changes = $git_status =~ /^\s*[AM]\s+root\/static\/config\/theme_mappings\.json/m;
+            
+            if ($has_local_changes) {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_git_pull', 
+                    "Local changes detected in theme_mappings.json");
+                $output .= "Local changes detected in theme_mappings.json\n";
+                
+                # Stash the changes
+                my $stash_output = `git -C ${\$c->path_to()} stash push -- root/static/config/theme_mappings.json 2>&1`;
+                $output .= "Stashed changes: $stash_output\n";
+            }
+        }
+        
+        # Execute git pull
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_git_pull', 
+            "Executing git pull");
+        my $pull_output = `git -C ${\$c->path_to()} pull 2>&1`;
+        $output .= "Git pull output:\n$pull_output\n";
+        
+        # Check if pull was successful
+        if ($pull_output =~ /Already up to date|Fast-forward|Updating/) {
+            $success = 1;
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_git_pull', 
+                "Git pull failed: $pull_output");
+            return (0, $output, "Git pull failed. See output for details.");
+        }
+        
+        # Apply stashed changes if needed
+        if ($has_local_changes) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_git_pull', 
+                "Applying stashed changes");
+            my $stash_apply_output = `git -C ${\$c->path_to()} stash pop 2>&1`;
+            $output .= "Applied stashed changes:\n$stash_apply_output\n";
+            
+            # Check for conflicts
+            if ($stash_apply_output =~ /CONFLICT|error:/) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'execute_git_pull', 
+                    "Conflicts detected when applying stashed changes");
+                $warning = "Conflicts detected when applying stashed changes. You may need to manually resolve them.";
+                
+                # Restore from backup
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_git_pull', 
+                    "Restoring theme_mappings.json from backup");
+                copy($backup_path, $theme_mappings_path) or die "Failed to restore from backup: $!";
+                $output .= "Restored theme_mappings.json from backup due to conflicts\n";
+            }
+        }
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_git_pull', 
+            "Git pull completed successfully");
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_git_pull', 
+            "Error during git pull: $error");
+        $output .= "Error: $error\n";
+        return (0, $output, undef);
+    };
+    
+    return ($success, $output, $warning);
+}
 
-Restart the Starman server
+=head1 AUTHOR
+
+Shanta McBain
+
+=head1 LICENSE
+
+This library is free software. You can redistribute it and/or modify
+it under the same terms as Perl itself.
 
 =cut
 
-sub restart_starman :Path('/admin/restart_starman') :Args(0) {
-    my ($self, $c) = @_;
-    
-    # Debug logging for restart_starman action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', "Starting restart_starman action");
-    
-    # Log user information for debugging
-    my $username = $c->session->{username} || 'Guest';
-    my $roles = $c->session->{roles} || [];
-    my $roles_str = ref($roles) eq 'ARRAY' ? join(', ', @$roles) : 'none';
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', 
-        "User: $username, Roles: $roles_str");
-    
-    # Initialize debug messages array
-    # Make sure debug_msg is an array reference
-    if (!defined $c->stash->{debug_msg}) {
-        $c->stash->{debug_msg} = [];
-    } elsif (!ref($c->stash->{debug_msg}) || ref($c->stash->{debug_msg}) ne 'ARRAY') {
-        # If debug_msg exists but is not an array reference, convert it to an array
-        my $original_msg = $c->stash->{debug_msg};
-        $c->stash->{debug_msg} = [];
-        push @{$c->stash->{debug_msg}}, $original_msg if $original_msg;
-    }
-    
-    # Add debug messages to the stash
-    push @{$c->stash->{debug_msg}}, "User: $username";
-    push @{$c->stash->{debug_msg}}, "Roles: " . Dumper($roles);
-    
-    # Check if the user has the admin role in the session
-    my $is_admin = 0;
-    
-    # Check if the user has admin role in the session
-    if (defined $c->session->{roles} && ref($c->session->{roles}) eq 'ARRAY') {
-        $is_admin = grep { $_ eq 'admin' } @{$c->session->{roles}};
-    }
-    
-    # Also check if user is logged in and has user_id
-    my $user_exists = ($c->session->{username} && $c->session->{user_id}) ? 1 : 0;
-    push @{$c->stash->{debug_msg}}, "User exists: " . ($user_exists ? 'Yes' : 'No');
-    push @{$c->stash->{debug_msg}}, "Username: " . ($c->session->{username} || 'Not logged in');
-    push @{$c->stash->{debug_msg}}, "Session roles: " . (join(', ', @{$c->session->{roles}}) || 'None');
-    push @{$c->stash->{debug_msg}}, "Is admin: " . ($is_admin ? 'Yes' : 'No');
-    
-    # Log the admin check
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', 
-        "Admin check result: " . ($is_admin ? 'Yes' : 'No'));
-    push @{$c->stash->{debug_msg}}, "Admin check result: " . ($is_admin ? 'Yes' : 'No');
-    
-    # If user has 'admin' in roles array, they are an admin
-    if (defined $c->session->{roles} && ref($c->session->{roles}) eq 'ARRAY') {
-        foreach my $role (@{$c->session->{roles}}) {
-            if (lc($role) eq 'admin') {
-                $is_admin = 1;
-                last;
-            }
-        }
-    }
-    
-    # Also check if is_admin flag is set in session
-    if ($c->session->{is_admin}) {
-        $is_admin = 1;
-    }
-    
-    # Log the final admin check after all checks
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', 
-        "Final admin check result: " . ($is_admin ? 'Yes' : 'No'));
-    push @{$c->stash->{debug_msg}}, "Final admin check result: " . ($is_admin ? 'Yes' : 'No');
-    
-    unless ($is_admin) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'restart_starman', 
-            "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest'));
-        $c->stash->{error_msg} = "You must be an admin to perform this action. Please contact your administrator.";
-        $c->stash->{template} = 'admin/restart_starman.tt';
-        $c->forward($c->view('TT'));
-        return;
-    }
-    
-    # Initialize output and error variables
-    my $output = '';
-    my $error = '';
-    
-    # If this is a POST request, perform the restart
-    if ($c->request->method eq 'POST' && $c->request->params->{confirm}) {
-        # Log the restart attempt
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', 
-            "Attempting to restart Starman server");
-        
-        # Ensure debug_msg is an array reference before pushing
-        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
-        push @{$c->stash->{debug_msg}}, "Attempting to restart Starman server";
-        
-        # Check if we have username and password from the form
-        my $sudo_username = $c->request->params->{sudo_username};
-        my $sudo_password = $c->request->params->{sudo_password};
-        
-        # Always show the credentials form on the first confirmation step
-        # This ensures the form is displayed on both workstation and production
-        if ((!$sudo_username || !$sudo_password || $c->request->params->{show_credentials_form}) && 
-            $c->request->method eq 'POST' && $c->request->params->{confirm}) {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', 
-                "Showing credentials form for Starman restart");
-            $c->stash->{show_password_form} = 1;
-            $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
-            push @{$c->stash->{debug_msg}}, "Displaying credentials form for Starman restart";
-            push @{$c->stash->{debug_msg}}, "Username provided: " . ($sudo_username ? 'Yes' : 'No');
-            push @{$c->stash->{debug_msg}}, "Password provided: " . ($sudo_password ? 'Yes' : 'No');
-            $c->stash->{template} = 'admin/restart_starman.tt';
-            $c->forward($c->view('TT'));
-            return;
-        }
-        
-        # If we have username and password from the form, use them
-        my $restart_command;
-        if ($sudo_username && $sudo_password) {
-            # Escape single quotes in the username and password to prevent command injection
-            $sudo_username =~ s/'/'\\''/g;
-            $sudo_password =~ s/'/'\\''/g;
-            
-            # Use sudo -u to run the command as the specified user
-            $restart_command = "echo '$sudo_password' | sudo -S -u $sudo_username systemctl restart starman 2>&1";
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', 
-                "Using username and password from form");
-            
-            # Log the username being used (but not the password)
-            push @{$c->stash->{debug_msg}}, "Using username: $sudo_username";
-            
-            # Clear the password from the request parameters for security
-            delete $c->request->params->{sudo_password};
-        }
-        # Otherwise, try to use the environment variables
-        elsif (defined $ENV{SUDO_USERNAME} && defined $ENV{SUDO_PASSWORD}) {
-            $restart_command = "echo \$SUDO_PASSWORD | sudo -S -u \$SUDO_USERNAME systemctl restart starman 2>&1";
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', 
-                "Using SUDO_USERNAME and SUDO_PASSWORD environment variables");
-        }
-        # If neither is available, show an error
-        else {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'restart_starman', 
-                "Missing username or password and environment variables are not set");
-            $c->stash->{error_msg} = "Error: Please enter both your username and password to restart the Starman server.";
-            $c->stash->{show_password_form} = 1;
-            $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
-            push @{$c->stash->{debug_msg}}, "Missing credentials, showing form";
-            $c->stash->{template} = 'admin/restart_starman.tt';
-            $c->forward($c->view('TT'));
-            return;
-        }
-        
-        # Execute the restart command
-        $output = qx{$restart_command};
-        my $exit_code = $? >> 8;
-        
-        if ($exit_code == 0) {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', 
-                "Starman server restarted successfully");
-            $c->stash->{success_msg} = "Starman server restarted successfully.";
-            
-            # Check the status of the service
-            my $status_command;
-            if ($sudo_username && $sudo_password) {
-                # Username and password are already escaped above
-                $status_command = "echo '$sudo_password' | sudo -S -u $sudo_username systemctl status starman 2>&1";
-            } else {
-                $status_command = "echo \$SUDO_PASSWORD | sudo -S -u \$SUDO_USERNAME systemctl status starman 2>&1";
-            }
-            my $status_output = qx{$status_command};
-            my $status_exit_code = $? >> 8;
-            
-            if ($status_exit_code == 0) {
-                $output .= "\n\nService Status:\n" . $status_output;
-                
-                # Check if the service is active
-                if ($status_output =~ /Active: active/) {
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', 
-                        "Starman service is active");
-                    $c->stash->{success_msg} .= " Service is active and running.";
-                } else {
-                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'restart_starman', 
-                        "Starman service may not be active after restart");
-                    $c->stash->{warning_msg} = "Service restart command executed, but the service may not be active. Please check the output for details.";
-                }
-            } else {
-                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'restart_starman', 
-                    "Could not get Starman service status after restart");
-                $c->stash->{warning_msg} = "Service restart command executed, but could not verify service status.";
-            }
-        } else {
-            $error = "Error restarting Starman server: $output";
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'restart_starman', $error);
-            $c->stash->{error_msg} = $error;
-        }
-        
-        # Add the output to the stash
-        $c->stash->{output} = $output;
-        
-        # Add debug messages to the stash
-        # Ensure debug_msg is an array reference before pushing
-        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
-        push @{$c->stash->{debug_msg}}, "Restart command executed";
-        push @{$c->stash->{debug_msg}}, "Output: $output" if $output;
-        push @{$c->stash->{debug_msg}}, "Error: $error" if $error;
-    } else {
-        # This is a GET request or no confirmation, just show the confirmation page
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', 
-            "Displaying restart Starman confirmation page");
-        
-        # Log the request method and parameters for debugging
-        my $req_method = $c->request->method;
-        my $params = $c->request->params;
-        my $params_str = join(', ', map { "$_ => " . ($params->{$_} || 'undef') } keys %$params);
-        
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'restart_starman', 
-            "Request method: $req_method, Parameters: $params_str");
-        
-        # Ensure debug_msg is an array reference before pushing
-        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
-        push @{$c->stash->{debug_msg}}, "Displaying restart Starman confirmation page";
-        push @{$c->stash->{debug_msg}}, "Request method: $req_method";
-        push @{$c->stash->{debug_msg}}, "Request parameters: $params_str";
-    }
-    
-    # Set the template
-    $c->stash->{template} = 'admin/restart_starman.tt';
-    
-    # Forward to the view
-    $c->forward($c->view('TT'));
-}
-
 __PACKAGE__->meta->make_immutable;
+
 1;

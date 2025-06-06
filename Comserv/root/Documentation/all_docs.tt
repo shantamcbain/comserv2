@@ -1,6 +1,6 @@
 [% IF categories.general && categories.general.pages.size > 0 %]
 <section class="doc-section admin-only">
-    <h2 class="section-toggle expanded">All Documentation Files</h2>
+    <h2 class="section-toggle">All Documentation Files</h2>
     <p>Complete list of all documentation files. <span class="admin-badge">Admin Only</span></p>
     <div class="file-type-tabs">
         <button class="file-type-tab active" onclick="showFileType(event, 'all-docs')">All Files</button>

@@ -185,6 +185,50 @@ sub details :Local {
         @site_domains = ();
     }
 
+    # Get Cloudflare domains to check if each domain is in Cloudflare
+    my $cloudflare_domains = {};
+    eval {
+        # Create a CloudflareAPI controller instance
+        my $cloudflare_controller = $c->controller('CloudflareAPI');
+        if ($cloudflare_controller) {
+            # Get the Cloudflare domains
+            $cloudflare_domains = $cloudflare_controller->_get_cloudflare_domains($c);
+        }
+    };
+    if ($@) {
+        $c->log->error("Error getting Cloudflare domains: $@");
+    }
+    
+    # Add is_on_cloudflare flag to each domain
+    foreach my $domain (@site_domains) {
+        my $domain_name = $domain->domain;
+        
+        # Skip local domains and development domains
+        if ($domain_name =~ /\.local$/ || $domain_name =~ /\.test$/ || $domain_name =~ /\.dev$/ || 
+            $domain_name =~ /^localhost/ || $domain_name =~ /^127\.0\.0\.1/) {
+            $domain->{is_on_cloudflare} = 0;
+            next;
+        }
+        
+        my $is_on_cloudflare = exists $cloudflare_domains->{$domain_name} ? 1 : 0;
+        
+        # If not directly found, check if it's a subdomain of a Cloudflare zone
+        if (!$is_on_cloudflare) {
+            foreach my $cf_domain (keys %$cloudflare_domains) {
+                if ($domain_name =~ /\.\Q$cf_domain\E$/) {
+                    $is_on_cloudflare = 1;
+                    last;
+                }
+            }
+        }
+        
+        # Add the flag to the domain object
+        $domain->{is_on_cloudflare} = $is_on_cloudflare;
+        
+        # Log the domain status
+        $c->log->debug("Domain $domain_name is " . ($is_on_cloudflare ? "on" : "not on") . " Cloudflare");
+    }
+    
     # Pass the site and domains to the template
     $c->stash->{site} = $site;
     $c->stash->{domains} = \@site_domains;

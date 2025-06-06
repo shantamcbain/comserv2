@@ -27,17 +27,32 @@ sub get_internal_links {
     
     # Use eval to catch any database errors
     eval {
-        # Get the database handle from the DBEncy model
-        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        # Try to use the DBIx::Class API first
+        my $rs = $c->model('DBEncy')->resultset('InternalLinksTb')->search({
+            category => $category,
+            sitename => [ $site_name, 'All' ]
+        }, {
+            order_by => { -asc => 'link_order' }
+        });
         
-        # Prepare and execute the query
-        my $query = "SELECT * FROM internal_links_tb WHERE category = ? AND (sitename = ? OR sitename = 'All') ORDER BY link_order";
-        my $sth = $dbh->prepare($query);
-        $sth->execute($category, $site_name);
+        while (my $row = $rs->next) {
+            push @results, { $row->get_columns };
+        }
         
-        # Fetch all results
-        while (my $row = $sth->fetchrow_hashref) {
-            push @results, $row;
+        # If no results and we might need to fall back to direct SQL
+        if (!@results) {
+            # Get the database handle from the DBEncy model
+            my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+            
+            # Prepare and execute the query
+            my $query = "SELECT * FROM internal_links_tb WHERE category = ? AND (sitename = ? OR sitename = 'All') ORDER BY link_order";
+            my $sth = $dbh->prepare($query);
+            $sth->execute($category, $site_name);
+            
+            # Fetch all results
+            while (my $row = $sth->fetchrow_hashref) {
+                push @results, $row;
+            }
         }
         
         $c->log->debug("Found " . scalar(@results) . " internal links");
@@ -62,17 +77,33 @@ sub get_pages {
     
     # Use eval to catch any database errors
     eval {
-        # Get the database handle from the DBEncy model
-        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        # Try to use the DBIx::Class API first
+        my $rs = $c->model('DBEncy')->resultset('PageTb')->search({
+            menu => $menu,
+            status => $status,
+            sitename => [ $site_name, 'All' ]
+        }, {
+            order_by => { -asc => 'link_order' }
+        });
         
-        # Prepare and execute the query
-        my $query = "SELECT * FROM page_tb WHERE menu = ? AND status = ? AND (sitename = ? OR sitename = 'All') ORDER BY link_order";
-        my $sth = $dbh->prepare($query);
-        $sth->execute($menu, $status, $site_name);
+        while (my $row = $rs->next) {
+            push @results, { $row->get_columns };
+        }
         
-        # Fetch all results
-        while (my $row = $sth->fetchrow_hashref) {
-            push @results, $row;
+        # If no results and we might need to fall back to direct SQL
+        if (!@results) {
+            # Get the database handle from the DBEncy model
+            my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+            
+            # Prepare and execute the query
+            my $query = "SELECT * FROM page_tb WHERE menu = ? AND status = ? AND (sitename = ? OR sitename = 'All') ORDER BY link_order";
+            my $sth = $dbh->prepare($query);
+            $sth->execute($menu, $status, $site_name);
+            
+            # Fetch all results
+            while (my $row = $sth->fetchrow_hashref) {
+                push @results, $row;
+            }
         }
         
         $c->log->debug("Found " . scalar(@results) . " pages");
@@ -95,17 +126,33 @@ sub get_admin_pages {
     
     # Use eval to catch any database errors
     eval {
-        # Get the database handle from the DBEncy model
-        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        # Try to use the DBIx::Class API first
+        my $rs = $c->model('DBEncy')->resultset('PageTb')->search({
+            menu => 'Admin',
+            status => 2,
+            sitename => [ $site_name, 'All' ]
+        }, {
+            order_by => { -asc => 'link_order' }
+        });
         
-        # Prepare and execute the query
-        my $query = "SELECT * FROM page_tb WHERE (menu = 'Admin' AND status = 2) AND (sitename = ? OR sitename = 'All') ORDER BY link_order";
-        my $sth = $dbh->prepare($query);
-        $sth->execute($site_name);
+        while (my $row = $rs->next) {
+            push @results, { $row->get_columns };
+        }
         
-        # Fetch all results
-        while (my $row = $sth->fetchrow_hashref) {
-            push @results, $row;
+        # If no results and we might need to fall back to direct SQL
+        if (!@results) {
+            # Get the database handle from the DBEncy model
+            my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+            
+            # Prepare and execute the query
+            my $query = "SELECT * FROM page_tb WHERE (menu = 'Admin' AND status = 2) AND (sitename = ? OR sitename = 'All') ORDER BY link_order";
+            my $sth = $dbh->prepare($query);
+            $sth->execute($site_name);
+            
+            # Fetch all results
+            while (my $row = $sth->fetchrow_hashref) {
+                push @results, $row;
+            }
         }
         
         $c->log->debug("Found " . scalar(@results) . " admin pages");
@@ -128,17 +175,32 @@ sub get_admin_links {
     
     # Use eval to catch any database errors
     eval {
-        # Get the database handle from the DBEncy model
-        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        # Try to use the DBIx::Class API first
+        my $rs = $c->model('DBEncy')->resultset('InternalLinksTb')->search({
+            category => 'Admin_links',
+            sitename => [ $site_name, 'All' ]
+        }, {
+            order_by => { -asc => 'link_order' }
+        });
         
-        # Prepare and execute the query
-        my $query = "SELECT * FROM internal_links_tb WHERE category = 'Admin_links' AND (sitename = ? OR sitename = 'All') ORDER BY link_order";
-        my $sth = $dbh->prepare($query);
-        $sth->execute($site_name);
+        while (my $row = $rs->next) {
+            push @results, { $row->get_columns };
+        }
         
-        # Fetch all results
-        while (my $row = $sth->fetchrow_hashref) {
-            push @results, $row;
+        # If no results and we might need to fall back to direct SQL
+        if (!@results) {
+            # Get the database handle from the DBEncy model
+            my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+            
+            # Prepare and execute the query
+            my $query = "SELECT * FROM internal_links_tb WHERE category = 'Admin_links' AND (sitename = ? OR sitename = 'All') ORDER BY link_order";
+            my $sth = $dbh->prepare($query);
+            $sth->execute($site_name);
+            
+            # Fetch all results
+            while (my $row = $sth->fetchrow_hashref) {
+                push @results, $row;
+            }
         }
         
         $c->log->debug("Found " . scalar(@results) . " admin links");
@@ -158,6 +220,72 @@ sub populate_navigation_data {
     eval {
         my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
         $c->log->debug("Populating navigation data for site: $site_name");
+        
+        # Ensure tables exist before querying them
+        my $db_model = $c->model('DBEncy');
+        my $schema = $db_model->schema;
+        
+        # Check if tables exist in the database
+        my $dbh = $schema->storage->dbh;
+        my $tables = $db_model->list_tables();
+        my $internal_links_exists = grep { $_ eq 'internal_links_tb' } @$tables;
+        my $page_tb_exists = grep { $_ eq 'page_tb' } @$tables;
+        
+        # If tables don't exist, try to create them
+        if (!$internal_links_exists || !$page_tb_exists) {
+            $c->log->debug("Navigation tables don't exist. Attempting to create them.");
+            
+            # Create tables if they don't exist
+            $db_model->create_table_from_result('InternalLinksTb', $schema, $c);
+            $db_model->create_table_from_result('PageTb', $schema, $c);
+            
+            # Check if tables were created successfully
+            $tables = $db_model->list_tables();
+            $internal_links_exists = grep { $_ eq 'internal_links_tb' } @$tables;
+            $page_tb_exists = grep { $_ eq 'page_tb' } @$tables;
+            
+            # If tables still don't exist, try to create them using SQL files
+            if (!$internal_links_exists || !$page_tb_exists) {
+                $c->log->debug("Creating tables from SQL files.");
+                
+                # Try to execute SQL files
+                if (!$internal_links_exists) {
+                    my $sql_file = $c->path_to('sql', 'internal_links_tb.sql')->stringify;
+                    if (-e $sql_file) {
+                        my $sql = do { local (@ARGV, $/) = $sql_file; <> };
+                        my @statements = split /;/, $sql;
+                        foreach my $statement (@statements) {
+                            $statement =~ s/^\s+|\s+$//g;  # Trim whitespace
+                            next unless $statement;  # Skip empty statements
+                            eval { $dbh->do($statement); };
+                            if ($@) {
+                                $c->log->error("Error executing SQL: $@");
+                            }
+                        }
+                    } else {
+                        $c->log->error("SQL file not found: $sql_file");
+                    }
+                }
+                
+                if (!$page_tb_exists) {
+                    my $sql_file = $c->path_to('sql', 'page_tb.sql')->stringify;
+                    if (-e $sql_file) {
+                        my $sql = do { local (@ARGV, $/) = $sql_file; <> };
+                        my @statements = split /;/, $sql;
+                        foreach my $statement (@statements) {
+                            $statement =~ s/^\s+|\s+$//g;  # Trim whitespace
+                            next unless $statement;  # Skip empty statements
+                            eval { $dbh->do($statement); };
+                            if ($@) {
+                                $c->log->error("Error executing SQL: $@");
+                            }
+                        }
+                    } else {
+                        $c->log->error("SQL file not found: $sql_file");
+                    }
+                }
+            }
+        }
         
         # Populate member links
         $c->stash->{member_links} = $self->get_internal_links($c, 'Member_links', $site_name);

@@ -2,9 +2,39 @@ package MetadataParser;
 
 use strict;
 use warnings;
-use YAML::XS;
 use Carp;
 use File::Find;
+
+# Use flexible YAML loading with fallback options
+my $YAML_LOADER;
+BEGIN {
+    my $yaml_module;
+    for my $module (qw(YAML::XS YAML::Syck YAML::Tiny YAML)) {
+        eval "require $module";
+        if (!$@) {
+            $yaml_module = $module;
+            last;
+        }
+    }
+    
+    if ($yaml_module) {
+        if ($yaml_module eq 'YAML::XS') {
+            eval "use YAML::XS";
+            $YAML_LOADER = \&YAML::XS::Load;
+        } elsif ($yaml_module eq 'YAML::Syck') {
+            eval "use YAML::Syck";
+            $YAML_LOADER = \&YAML::Syck::Load;
+        } elsif ($yaml_module eq 'YAML::Tiny') {
+            eval "use YAML::Tiny";
+            $YAML_LOADER = sub { YAML::Tiny->read_string($_[0])->[0] };
+        } else {
+            eval "use YAML";
+            $YAML_LOADER = \&YAML::Load;
+        }
+    } else {
+        die "No YAML module available. Please install YAML::XS, YAML::Syck, YAML::Tiny, or YAML";
+    }
+}
 
 sub new {
     my ($class, %args) = @_;
@@ -33,7 +63,7 @@ sub parse_file {
         
         # Parse YAML
         eval {
-            $metadata = YAML::XS::Load($yaml_content);
+            $metadata = $YAML_LOADER->($yaml_content);
         };
         if ($@) {
             warn "Error parsing metadata in $file_path: $@";
