@@ -131,11 +131,14 @@ sub todo :Path('/todo') :Args(0) {
     my $today = $now->ymd;
 
     if ($filter_type eq 'day' || $filter_type eq 'today') {
-        # Today's todos
-        $search_conditions->{start_date} = { '<=' => $today };
+        # Today's todos: show todos that are due today, start today, or are active and overdue
         $search_conditions->{'-or'} = [
-            { due_date => { '>=' => $today } },
-            { status => { '!=' => 3 } }  # Not completed
+            { due_date => $today },                    # Due today
+            { start_date => $today },                  # Starting today
+            { '-and' => [                              # Overdue but not completed
+                { due_date => { '<' => $today } },
+                { status => { '!=' => 3 } }
+            ]}
         ];
     } elsif ($filter_type eq 'week') {
         # This week's todos
@@ -659,8 +662,23 @@ sub day :Path('/todo/day') :Args {
     # Fetch todos for the site, ordered by start_date
     my $todos = $todo_model->get_top_todos($c, $c->session->{SiteName});
 
-    # Filter todos for the given day and status not equal to 3
-    my @filtered_todos = grep { $_->start_date le $date && $_->status ne '3' } @$todos;
+    # Filter todos for the given day: due today or starting today only
+    my @filtered_todos = grep { 
+        ($_->due_date && $_->due_date eq $date) ||           # Due today
+        ($_->start_date && $_->start_date eq $date)          # Starting today  
+    } @$todos;
+    
+    # Debug logging
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day', 
+        "Filtering for date: $date, Total todos: " . scalar(@$todos) . ", Filtered todos: " . scalar(@filtered_todos));
+    
+    if ($c->session->{debug_mode}) {
+        foreach my $todo (@$todos) {
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day', 
+                "Todo: " . $todo->subject . ", Start: " . ($todo->start_date || 'NULL') . 
+                ", Due: " . ($todo->due_date || 'NULL') . ", Status: " . $todo->status);
+        }
+    }
 
     # Add the todos to the stash
     $c->stash(
@@ -697,8 +715,12 @@ sub week :Path('/todo/week') :Args {
     # Fetch todos for the site within the week, ordered by start_date
     my $todos = $todo_model->get_top_todos($c, $c->session->{SiteName});
 
-    # Filter todos for the given week and status not equal to 3
-    my @filtered_todos = grep { $_->start_date ge $start_of_week && $_->start_date le $end_of_week && $_->status ne '3' } @$todos;
+    # Filter todos for the given week: starting this week, due this week, or overdue but not completed
+    my @filtered_todos = grep { 
+        ($_->start_date && $_->start_date ge $start_of_week && $_->start_date le $end_of_week) ||  # Starting this week
+        ($_->due_date && $_->due_date ge $start_of_week && $_->due_date le $end_of_week) ||      # Due this week
+        ($_->due_date && $_->due_date lt $start_of_week && $_->status ne '3')                   # Overdue but not completed
+    } @$todos;
 
     # Add the todos to the stash
     $c->stash(
@@ -739,15 +761,25 @@ sub month :Path('/todo/month') :Args {
     # Fetch todos for the site
     my $todos = $todo_model->get_top_todos($c, $c->session->{SiteName});
 
-    # Filter todos for the given month and status not equal to 3
-    my @filtered_todos = grep { $_->start_date ge $start_of_month && $_->start_date le $end_of_month && $_->status ne '3' } @$todos;
+    # Filter todos for the given month: starting this month, due this month, or overdue but not completed
+    my @filtered_todos = grep { 
+        ($_->start_date && $_->start_date ge $start_of_month && $_->start_date le $end_of_month) ||  # Starting this month
+        ($_->due_date && $_->due_date ge $start_of_month && $_->due_date le $end_of_month) ||      # Due this month
+        ($_->due_date && $_->due_date lt $start_of_month && $_->status ne '3')                     # Overdue but not completed
+    } @$todos;
 
-    # Organize todos by day of month
+    # Organize todos by day of month (use due_date if available, otherwise start_date)
     my %todos_by_day;
     foreach my $todo (@filtered_todos) {
-        my $todo_date = DateTime::Format::ISO8601->parse_datetime($todo->start_date);
-        my $day = $todo_date->day;
-        push @{$todos_by_day{$day}}, $todo;
+        my $display_date = $todo->due_date || $todo->start_date;
+        if ($display_date) {
+            my $todo_date = DateTime::Format::ISO8601->parse_datetime($display_date);
+            # Only add to calendar if the display date is within this month
+            if ($todo_date->year == $dt->year && $todo_date->month == $dt->month) {
+                my $day = $todo_date->day;
+                push @{$todos_by_day{$day}}, $todo;
+            }
+        }
     }
 
     # Create a calendar structure
