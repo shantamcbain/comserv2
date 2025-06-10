@@ -242,6 +242,113 @@ sub edit :Path('/workshop/edit') :Args(1) {
 
 
 
+sub presentation :Path('/workshop/presentation') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Get the presentation name from the query parameters
+    my $presentation_name = $c->request->params->{name} || 'feedthepolinatores';
+    
+    # Define the presentation details
+    my %presentations = (
+        'feedthepolinatores' => {
+            title => 'Feed the Pollinators',
+            description => 'A workshop on how to create gardens that support pollinators',
+            author => 'Shanta',
+            date => '2024-06-10',
+            filename => 'feedthepolinatores.odp',
+            html_version => '', # Will be populated when HTML version is created
+            summary => '<p>This presentation covers the importance of pollinators in our ecosystem and provides practical guidance on creating gardens that support them.</p>
+                      <p>Key topics include:</p>
+                      <ul>
+                          <li>Types of pollinators and their roles</li>
+                          <li>Plant selection for different pollinators</li>
+                          <li>Garden design principles</li>
+                          <li>Seasonal considerations</li>
+                          <li>Avoiding harmful practices</li>
+                      </ul>'
+        }
+    );
+    
+    # Check if the requested presentation exists
+    unless (exists $presentations{$presentation_name}) {
+        $c->stash(
+            error => "Presentation not found",
+            template => 'WorkShops/error.tt'
+        );
+        return;
+    }
+    
+    # Stash the presentation details
+    $c->stash(
+        presentation => $presentations{$presentation_name},
+        template => 'WorkShops/presentation.tt'
+    );
+}
+
+sub download :Path('/workshop/download') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Get the file name from the query parameters
+    my $file = $c->request->params->{file};
+    
+    # Validate the file name to prevent directory traversal
+    if ($file =~ /[\/\\]/) {
+        $c->response->body('Invalid file name');
+        $c->response->status(400);
+        return;
+    }
+    
+    # Set the path to the file
+    my $file_path = $c->path_to('root', 'WorkShops', $file);
+    
+    # Check if the file exists
+    unless (-e $file_path) {
+        $c->response->body('File not found');
+        $c->response->status(404);
+        return;
+    }
+    
+    # Set the content type based on the file extension
+    my $content_type = 'application/vnd.oasis.opendocument.presentation';
+    if ($file =~ /\.pdf$/i) {
+        $content_type = 'application/pdf';
+    } elsif ($file =~ /\.html?$/i) {
+        $content_type = 'text/html';
+    }
+    
+    # Send the file to the client
+    $c->response->content_type($content_type);
+    $c->response->header('Content-Disposition' => "attachment; filename=$file");
+    $c->response->body($file_path->slurp);
+}
+
+sub view :Path('/workshop/view') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Get the file name from the query parameters
+    my $file = $c->request->params->{file};
+    
+    # Validate the file name to prevent directory traversal
+    if ($file =~ /[\/\\]/) {
+        $c->response->body('Invalid file name');
+        $c->response->status(400);
+        return;
+    }
+    
+    # Set the path to the file
+    my $file_path = $c->path_to('root', 'WorkShops', $file);
+    
+    # Check if the file exists
+    unless (-e $file_path) {
+        $c->response->body('HTML version not available yet');
+        $c->response->status(404);
+        return;
+    }
+    
+    # Send the file to the client for viewing in browser
+    $c->response->content_type('text/html');
+    $c->response->body($file_path->slurp);
+}
 
 __PACKAGE__->meta->make_immutable;
 

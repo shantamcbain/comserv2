@@ -4,7 +4,38 @@
 [% END %]
 
 <h1>Workshops</h1>
-<a href="/workshop/add">Add Workshop</a>
+<div class="workshop-actions">
+    <a href="/workshop/add" class="button">Add Workshop</a>
+    <a href="/workshop/presentation" class="button presentation-button">Feed the Pollinators Presentation</a>
+</div>
+
+<style>
+    .workshop-actions {
+        margin: 20px 0;
+    }
+    
+    .button {
+        display: inline-block;
+        padding: 8px 15px;
+        background-color: #4CAF50;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+        margin-right: 10px;
+    }
+    
+    .button:hover {
+        background-color: #45a049;
+    }
+    
+    .presentation-button {
+        background-color: #2196F3;
+    }
+    
+    .presentation-button:hover {
+        background-color: #0b7dda;
+    }
+</style>
 <table>
     <tr>
         <th>SiteName</th>
