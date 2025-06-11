@@ -34,7 +34,26 @@ sub index :Path :Args(0) {
     # Get the current user's role
     my $user_role = 'normal';  # Default to normal user
     if ($c->user_exists) {
-        $user_role = $c->user->role || 'normal';
+        # Check session roles first
+        if ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && @{$c->session->{roles}}) {
+            # If user has multiple roles, prioritize admin role
+            if (grep { lc($_) eq 'admin' } @{$c->session->{roles}}) {
+                $user_role = 'admin';
+            } else {
+                # Otherwise use the first role
+                $user_role = $c->session->{roles}->[0];
+            }
+        }
+        # Fallback to user's roles if available
+        elsif ($c->user->can('roles') && $c->user->roles) {
+            my @user_roles = ref($c->user->roles) eq 'ARRAY' ? @{$c->user->roles} : ($c->user->roles);
+            if (grep { lc($_) eq 'admin' } @user_roles) {
+                $user_role = 'admin';
+            } else {
+                # Otherwise use the first role
+                $user_role = $user_roles[0] || 'normal';
+            }
+        }
     }
     
     # Get the current site name
@@ -168,7 +187,26 @@ sub view :Path('view') :Args(1) {
     # Get the current user's role
     my $user_role = 'normal';  # Default to normal user
     if ($c->user_exists) {
-        $user_role = $c->user->role || 'normal';
+        # Check session roles first
+        if ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && @{$c->session->{roles}}) {
+            # If user has multiple roles, prioritize admin role
+            if (grep { lc($_) eq 'admin' } @{$c->session->{roles}}) {
+                $user_role = 'admin';
+            } else {
+                # Otherwise use the first role
+                $user_role = $c->session->{roles}->[0];
+            }
+        }
+        # Fallback to user's roles if available
+        elsif ($c->user->can('roles') && $c->user->roles) {
+            my @user_roles = ref($c->user->roles) eq 'ARRAY' ? @{$c->user->roles} : ($c->user->roles);
+            if (grep { lc($_) eq 'admin' } @user_roles) {
+                $user_role = 'admin';
+            } else {
+                # Otherwise use the first role
+                $user_role = $user_roles[0] || 'normal';
+            }
+        }
     }
     
     # Get the current site name
@@ -287,7 +325,19 @@ sub reload :Local :Args(0) {
     my ($self, $c) = @_;
     
     # Check if user has admin or developer role
-    unless ($c->user_exists && ($c->user->role eq 'admin' || $c->user->role eq 'developer')) {
+    my $has_admin_role = 0;
+    
+    # Check session roles first
+    if ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY') {
+        $has_admin_role = grep { $_ eq 'admin' || $_ eq 'developer' } @{$c->session->{roles}};
+    }
+    # Fallback to user roles if available
+    elsif ($c->user_exists && $c->user->can('roles')) {
+        my @user_roles = ref($c->user->roles) eq 'ARRAY' ? @{$c->user->roles} : ($c->user->roles);
+        $has_admin_role = grep { $_ eq 'admin' || $_ eq 'developer' } @user_roles;
+    }
+    
+    unless ($c->user_exists && $has_admin_role) {
         $c->stash(error_msg => "You don't have permission to access this page");
         $c->detach('/error/access_denied');
         return;

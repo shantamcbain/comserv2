@@ -1,3 +1,13 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Changelog' %]
+
+<!-- Documentation page for Changelog -->
+<div class="documentation-content">
+
 <section id="changelog" class="doc-section admin-only">
     <h2 class="section-toggle">Changelog</h2>
     <p>System updates and changes. <span class="admin-badge">Admin Only</span></p>
@@ -40,7 +50,6 @@
             
             [% # Use date from filename, or fallback to page metadata date if available %]
             [% sort_date = date_match ? sort_date : (page.date ? page.date : '0000-00-00') %]
-            [% # Use a numerical sort for dates to ensure proper ordering %]
             
             [% # Ensure consistent format for sorting %]
             [% IF sort_date.length < 10 && sort_date != '0000-00-00' %]
@@ -77,16 +86,14 @@
                 <h3>[% page.title %]</h3>
                 <div class="changelog-meta">
                     <span class="date">[% changelog_date %]</span>
-                    [% IF page.author %]<span class="author">by [% page.author %]</span>[% END %]
                 </div>
                 <p>[% page.description || 'System change documentation.' %]</p>
-                [% IF page.file_type %]<span class="file-type-badge [% page.file_type %]">[% page.file_type %]</span>[% END %]
                 <span class="role-badge">Admin Only</span>
             </a>
         [% END %]
         
         [% IF recent_count == 0 %]
-        <p class="no-content">No changelog entries available.</p>
+            <p class="no-content">No changelog entries available.</p>
         [% END %]
     </div>
 </section>
@@ -137,3 +144,4 @@
         font-style: italic;
     }
 </style>
+</div>

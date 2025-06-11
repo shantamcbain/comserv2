@@ -1,230 +1,295 @@
-[% META 
-   title = "Account Management Guide"
-   description = "Guide for managing your Comserv account, including login, profile updates, and security settings"
-   roles = "normal,editor,admin,developer"
-   category = "user_guides"
-%]
+[% PageVersion = 'Comserv/root/Documentation/roles/normal/account_management.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
 
-<div class="doc-page">
-    <h1>Account Management Guide</h1>
-    
-    <div class="doc-meta">
-        <p><strong>Version:</strong> 1.1</p>
-        <p><strong>Last Updated:</strong> October 15, 2025</p>
-        <p><strong>Author:</strong> User Support Team</p>
-    </div>
-    
-    <div class="doc-section">
-        <h2>Overview</h2>
-        <p>
-            This guide will help you manage your Comserv account, including how to log in, log out, 
-            update your profile information, and change your account settings.
-        </p>
-    </div>
-    
-    <div class="doc-section">
-        <h2>Logging In</h2>
-        <ol>
-            <li>Click on the "Login" link in the top navigation bar</li>
-            <li>Enter your username and password</li>
-            <li>Click the "Login" button</li>
-        </ol>
-        <p>
-            If you've forgotten your password, click the "Forgot Password" link on the login page to reset it.
-        </p>
-    </div>
-    
-    <div class="doc-section">
-        <h2>Logging Out</h2>
-        <p>To securely end your session:</p>
-        <ol>
-            <li>Click on your username in the top navigation bar</li>
-            <li>Select "Logout" from the dropdown menu</li>
-        </ol>
-        <p class="note-box">
-            <strong>Important:</strong> Always log out when using a shared or public computer to protect your account.
-        </p>
-    </div>
-    
-    <div class="doc-section">
-        <h2>Viewing Your Profile</h2>
-        <p>Your profile contains your personal information and account details:</p>
-        <ol>
-            <li>Click on your username in the top navigation bar</li>
-            <li>Select "My Profile" from the dropdown menu</li>
-        </ol>
-        <p>The profile page displays:</p>
-        <ul>
-            <li>Your name and username</li>
-            <li>Email address</li>
-            <li>Account roles and permissions</li>
-            <li>Recent activity (if enabled)</li>
-        </ul>
-    </div>
-    
-    <div class="doc-section">
-        <h2>Managing Account Settings</h2>
-        
-        <h3>Accessing Settings</h3>
-        <ol>
-            <li>Click on your username in the top navigation bar</li>
-            <li>Select "Account Settings" from the dropdown menu</li>
-        </ol>
-        
-        <h3>Updating Personal Information</h3>
-        <p>To update your name or email address:</p>
-        <ol>
-            <li>Go to Account Settings</li>
-            <li>In the "Personal Information" section, modify the relevant fields</li>
-            <li>Click "Save Changes"</li>
-        </ol>
-        
-        <h3>Changing Your Password</h3>
-        <p>For security reasons, you should change your password periodically:</p>
-        <ol>
-            <li>Go to Account Settings</li>
-            <li>Click "Change Password" in the Danger Zone section</li>
-            <li>Enter your current password</li>
-            <li>Enter and confirm your new password</li>
-            <li>Click "Update Password"</li>
-        </ol>
-        <p>Password requirements:</p>
-        <ul>
-            <li>Minimum 8 characters</li>
-            <li>At least one uppercase letter</li>
-            <li>At least one number</li>
-            <li>At least one special character</li>
-        </ul>
-        
-        <h3>Appearance Preferences</h3>
-        <p>Customize your experience with theme settings:</p>
-        <ol>
-            <li>Go to Account Settings</li>
-            <li>In the "Preferences" section, select your preferred theme</li>
-            <li>Click "Save Changes"</li>
-        </ol>
-        <p>Available themes:</p>
-        <ul>
-            <li>Default</li>
-            <li>Dark</li>
-            <li>Light</li>
-        </ul>
-        
-        <h3>Notification Preferences</h3>
-        <p>Control how and when you receive notifications:</p>
-        <ol>
-            <li>Go to Account Settings</li>
-            <li>In the "Preferences" section, toggle "Receive email notifications"</li>
-            <li>Click "Save Changes"</li>
-        </ol>
-    </div>
-    
-    <div class="doc-section">
-        <h2>Account Security Best Practices</h2>
-        <ol>
-            <li><strong>Strong Passwords:</strong> Use unique, complex passwords</li>
-            <li><strong>Regular Updates:</strong> Change your password every 3-6 months</li>
-            <li><strong>Secure Access:</strong> Avoid logging in from public or unsecured networks</li>
-            <li><strong>Session Management:</strong> Always log out when finished</li>
-            <li><strong>Email Verification:</strong> Keep your email address current for account recovery</li>
-        </ol>
-    </div>
-    
-    <div class="doc-section">
-        <h2>Troubleshooting</h2>
-        
-        <h3>Login Issues</h3>
-        <p>If you cannot log in:</p>
-        <ol>
-            <li>Verify you're using the correct username and password</li>
-            <li>Check if Caps Lock is enabled</li>
-            <li>Clear your browser cookies and cache</li>
-            <li>Try using a different browser</li>
-            <li>Contact support if problems persist</li>
-        </ol>
-        
-        <h3>Profile Update Problems</h3>
-        <p>If you encounter errors when updating your profile:</p>
-        <ol>
-            <li>Ensure all required fields are completed</li>
-            <li>Verify your email address is in the correct format</li>
-            <li>Check that your password meets all requirements</li>
-            <li>Try again after a few minutes</li>
-        </ol>
-    </div>
-    
-    <div class="doc-section">
-        <h2>Getting Help</h2>
-        <p>If you need assistance with your account:</p>
-        <ol>
-            <li>Check the FAQ section for common questions</li>
-            <li>Click the "Help" link in the footer</li>
-            <li>Contact support at support@comserv.example.com</li>
-            <li>Use the live chat feature during business hours</li>
-        </ol>
-    </div>
-    
-    <div class="doc-section">
-        <h2>Privacy Information</h2>
-        <p>We take your privacy seriously:</p>
-        <ul>
-            <li>Your personal information is stored securely</li>
-            <li>Passwords are encrypted and never stored in plain text</li>
-            <li>We do not share your information with third parties</li>
-            <li>You can request a copy of your data at any time</li>
-        </ul>
-        <p>For more details, please review our Privacy Policy.</p>
-    </div>
+[% META title = 'Account Management Guide' %]
+
+<!-- Documentation page for account_management -->
+<div class="documentation-content">
+
+
+
+<!-- Include documentation CSS -->
+<link rel="stylesheet" href="/static/css/documentation.css">
+
+<div class="markdown-content">
+
+
+**Version:** 1.0  
+
+**Last Updated:** May 31, 2024  
+
+**Author:** User Support Team
+
+
+
+<h2>Overview</h2>
+
+
+
+This guide will help you manage your Comserv account, including how to log in, log out, update your profile information, and change your account settings.
+
+
+
+<h2>Logging In</h2>
+
+
+
+<ol><li>Click on the "Login" link in the top navigation bar</li></ol>
+
+<ol><li>Enter your username and password</li></ol>
+
+<ol><li>Click the "Login" button</li></ol>
+
+
+
+If you've forgotten your password, click the "Forgot Password" link on the login page to reset it.
+
+
+
+<h2>Logging Out</h2>
+
+
+
+To securely end your session:
+
+
+
+<ol><li>Click on your username in the top navigation bar</li></ol>
+
+<ol><li>Select "Logout" from the dropdown menu</li></ol>
+
+
+
+**Important:** Always log out when using a shared or public computer to protect your account.
+
+
+
+<h2>Viewing Your Profile</h2>
+
+
+
+Your profile contains your personal information and account details:
+
+
+
+<ol><li>Click on your username in the top navigation bar</li></ol>
+
+<ol><li>Select "My Profile" from the dropdown menu</li></ol>
+
+
+
+The profile page displays:
+
+<ul><li>Your name and username</li></ul>
+
+<ul><li>Email address</li></ul>
+
+<ul><li>Account roles and permissions</li></ul>
+
+<ul><li>Recent activity (if enabled)</li></ul>
+
+
+
+<h2>Managing Account Settings</h2>
+
+
+
+<h3>Accessing Settings</h3>
+
+
+
+<ol><li>Click on your username in the top navigation bar</li></ol>
+
+<ol><li>Select "Account Settings" from the dropdown menu</li></ol>
+
+
+
+<h3>Updating Personal Information</h3>
+
+
+
+To update your name or email address:
+
+
+
+<ol><li>Go to Account Settings</li></ol>
+
+<ol><li>In the "Personal Information" section, modify the relevant fields</li></ol>
+
+<ol><li>Click "Save Changes"</li></ol>
+
+
+
+<h3>Changing Your Password</h3>
+
+
+
+For security reasons, you should change your password periodically:
+
+
+
+<ol><li>Go to Account Settings</li></ol>
+
+<ol><li>Click "Change Password" in the Danger Zone section</li></ol>
+
+<ol><li>Enter your current password</li></ol>
+
+<ol><li>Enter and confirm your new password</li></ol>
+
+<ol><li>Click "Update Password"</li></ol>
+
+
+
+Password requirements:
+
+<ul><li>Minimum 8 characters</li></ul>
+
+<ul><li>At least one uppercase letter</li></ul>
+
+<ul><li>At least one number</li></ul>
+
+<ul><li>At least one special character</li></ul>
+
+
+
+<h3>Appearance Preferences</h3>
+
+
+
+Customize your experience with theme settings:
+
+
+
+<ol><li>Go to Account Settings</li></ol>
+
+<ol><li>In the "Preferences" section, select your preferred theme</li></ol>
+
+<ol><li>Click "Save Changes"</li></ol>
+
+
+
+Available themes:
+
+<ul><li>Default</li></ul>
+
+<ul><li>Dark</li></ul>
+
+<ul><li>Light</li></ul>
+
+
+
+<h3>Notification Preferences</h3>
+
+
+
+Control how and when you receive notifications:
+
+
+
+<ol><li>Go to Account Settings</li></ol>
+
+<ol><li>In the "Preferences" section, toggle "Receive email notifications"</li></ol>
+
+<ol><li>Click "Save Changes"</li></ol>
+
+
+
+<h2>Account Security Best Practices</h2>
+
+
+
+<ol><li>**Strong Passwords**: Use unique, complex passwords</li></ol>
+
+<ol><li>**Regular Updates**: Change your password every 3-6 months</li></ol>
+
+<ol><li>**Secure Access**: Avoid logging in from public or unsecured networks</li></ol>
+
+<ol><li>**Session Management**: Always log out when finished</li></ol>
+
+<ol><li>**Email Verification**: Keep your email address current for account recovery</li></ol>
+
+
+
+<h2>Troubleshooting</h2>
+
+
+
+<h3>Login Issues</h3>
+
+
+
+If you cannot log in:
+
+
+
+<ol><li>Verify you're using the correct username and password</li></ol>
+
+<ol><li>Check if Caps Lock is enabled</li></ol>
+
+<ol><li>Clear your browser cookies and cache</li></ol>
+
+<ol><li>Try using a different browser</li></ol>
+
+<ol><li>Contact support if problems persist</li></ol>
+
+
+
+<h3>Profile Update Problems</h3>
+
+
+
+If you encounter errors when updating your profile:
+
+
+
+<ol><li>Ensure all required fields are completed</li></ol>
+
+<ol><li>Verify your email address is in the correct format</li></ol>
+
+<ol><li>Check that your password meets all requirements</li></ol>
+
+<ol><li>Try again after a few minutes</li></ol>
+
+
+
+<h2>Getting Help</h2>
+
+
+
+If you need assistance with your account:
+
+
+
+<ol><li>Check the FAQ section for common questions</li></ol>
+
+<ol><li>Click the "Help" link in the footer</li></ol>
+
+<ol><li>Contact support at support@comserv.example.com</li></ol>
+
+<ol><li>Use the live chat feature during business hours</li></ol>
+
+
+
+<h2>Privacy Information</h2>
+
+
+
+We take your privacy seriously:
+
+
+
+<ul><li>Your personal information is stored securely</li></ul>
+
+<ul><li>Passwords are encrypted and never stored in plain text</li></ul>
+
+<ul><li>We do not share your information with third parties</li></ul>
+
+<ul><li>You can request a copy of your data at any time</li></ul>
+
+
+
+For more details, please review our Privacy Policy.
+
 </div>
-
-<style>
-    .doc-page {
-        max-width: 900px;
-        margin: 0 auto;
-        padding: 20px;
-        font-family: Arial, sans-serif;
-        line-height: 1.6;
-    }
-    
-    .doc-meta {
-        background-color: #f8f9fa;
-        padding: 10px 15px;
-        border-radius: 4px;
-        margin-bottom: 20px;
-        font-size: 0.9em;
-    }
-    
-    .doc-meta p {
-        margin: 5px 0;
-    }
-    
-    .doc-section {
-        margin-bottom: 30px;
-    }
-    
-    .doc-section h2 {
-        border-bottom: 1px solid #eee;
-        padding-bottom: 5px;
-        margin-top: 30px;
-    }
-    
-    .doc-section h3 {
-        margin-top: 20px;
-        color: #333;
-    }
-    
-    .note-box {
-        background-color: #fff3cd;
-        border-left: 4px solid #ffc107;
-        padding: 10px 15px;
-        margin: 15px 0;
-    }
-    
-    ul, ol {
-        margin-bottom: 15px;
-    }
-    
-    li {
-        margin-bottom: 5px;
-    }
-</style>

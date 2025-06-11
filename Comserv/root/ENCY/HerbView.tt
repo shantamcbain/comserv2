@@ -15,7 +15,7 @@
 [% IF mode == 'view' %]
     <div>
         <a href="[% c.uri_for('/ENCY/BotanicalNameView') %]">Back to Botanical Name View</a>
-        [% IF c.session.roles == 'admin' %]
+        [% IF c.session.roles.grep('admin').size %]
             <a href="[% c.uri_for('/ENCY/edit_herb', { id => herb.record_id }) %]">Edit Herb</a>
         [% END %]
     </div>

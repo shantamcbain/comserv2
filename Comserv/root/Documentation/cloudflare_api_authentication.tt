@@ -5,6 +5,11 @@
 
 [% META title = 'Cloudflare API Authentication' %]
 
+<!-- Documentation page for cloudflare_api_authentication -->
+<div class="documentation-content">
+
+
+
 <div class="documentation-container">
     <h1>Cloudflare API Authentication</h1>
     
@@ -18,7 +23,6 @@
             <li><a href="#api-token">Creating a New API Token</a></li>
             <li><a href="#troubleshooting">Troubleshooting</a></li>
         </ul>
-    </div>
     
     <section id="overview">
         <h2>Overview</h2>
@@ -96,10 +100,10 @@
         <p>You can test the Cloudflare API authentication using the provided test scripts:</p>
         
         <pre>
-# Test API token authentication
+<h1>Test API token authentication</h1>
 perl /home/shanta/PycharmProjects/comserv2/Comserv/script/test_cloudflare_token.pl
 
-# Test domain-specific operations
+<h1>Test domain-specific operations</h1>
 perl /home/shanta/PycharmProjects/comserv2/Comserv/script/test_cloudflare_domain.pl
         </pre>
         
@@ -125,7 +129,6 @@ perl /home/shanta/PycharmProjects/comserv2/Comserv/script/test_cloudflare_domain
             </dd>
         </dl>
     </section>
-</div>
 
 <style>
     .documentation-container {
@@ -166,3 +169,5 @@ perl /home/shanta/PycharmProjects/comserv2/Comserv/script/test_cloudflare_domain
         margin-left: 20px;
     }
 </style>
+
+</div>

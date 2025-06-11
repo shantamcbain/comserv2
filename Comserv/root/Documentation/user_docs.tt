@@ -1,19 +1,29 @@
-[% IF categories.user_guides %]
-<section class="doc-section">
-    <h2 class="section-toggle">User Documentation</h2>
-    <p>Essential guides for Comserv users.</p>
-    <div class="section-content">
-        [% FOREACH page_name IN categories.user_guides.pages.sort %]
-            [% IF structured_pages.$page_name %]
-                [% page = structured_pages.$page_name %]
-            <a href="[% page.url %]" class="doc-card">
-                <h3>[% page.title %]</h3>
-                <p>[% page.description || 'User guide for Comserv functionality.' %]</p>
-                [% IF page.site != 'all' %]<span class="site-badge">[% page.site %]</span>[% END %]
-                [% IF page.file_type %]<span class="file-type-badge [% page.file_type %]">[% page.file_type %]</span>[% END %]
-            </a>
-            [% END %]
-        [% END %]
-    </div>
-</section>
+[% PageVersion = 'Comserv/root/Documentation/user_docs.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
 [% END %]
+
+[% META title = 'User Docs' %]
+
+<!-- Documentation page for User Docs -->
+<div class="documentation-content">
+
+[% IF categories.user_guides %]
+    <section class="doc-section">
+        <h2 class="section-toggle">User Documentation</h2>
+        <p>Essential guides for Comserv users.</p>
+        <div class="section-content">
+            [% FOREACH page_name IN categories.user_guides.pages.sort %]
+                [% IF structured_pages.$page_name %]
+                    [% page = structured_pages.$page_name %]
+                    <a href="[% page.url %]" class="doc-card">
+                        <h3>[% page.title %]</h3>
+                        <p>[% page.description || 'User guide for Comserv functionality.' %]</p>
+                    </a>
+                [% END %]
+            [% END %]
+        </div>
+    </section>
+[% END %]
+
+</div>

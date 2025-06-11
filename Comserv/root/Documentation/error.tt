@@ -32,32 +32,62 @@
                 <span class="value">[% site_name || 'default' %]</span>
             </div>
             <div class="role-info">
-                <span class="label">User Role:</span>
-                <span class="value">[% user_role || 'normal' %]</span>
+                <span class="label">Roles:</span>
+                <span class="value">
+                    [% IF user_roles && user_roles.size > 0 %]
+                        [% user_roles.join(', ') %]
+                    [% ELSE %]
+                        No roles defined
+                    [% END %]
+                </span>
             </div>
             <div class="session-info">
                 <span class="label">Username:</span>
                 <span class="value">[% c.session.username || 'Not logged in' %]</span>
             </div>
-            [% IF c.session.roles %]
             <div class="session-roles-info">
                 <span class="label">Session Roles:</span>
-                <span class="value">[% c.session.roles.join(', ') %]</span>
+                <span class="value">
+                    [% IF session_roles && session_roles.size > 0 %]
+                        [% session_roles.join(', ') %]
+                    [% ELSIF c.session.roles && c.session.roles.size > 0 %]
+                        [% c.session.roles.join(', ') %]
+                    [% ELSE %]
+                        No session roles found
+                    [% END %]
+                </span>
             </div>
-            [% END %]
         </div>
 
-        [% IF c.session.debug_mode == 1 || user_role == 'admin' || user_role == 'developer' %]
+        [% # Check if user has admin or developer role - for showing debug information
+           has_debug_access = 0;
+           IF c.session.debug_mode == 1;
+               has_debug_access = 1;
+           ELSIF user_roles && user_roles.size > 0;
+               FOREACH role IN user_roles;
+                   IF role == 'admin' || role == 'developer';
+                       has_debug_access = 1;
+                   END;
+               END;
+           ELSIF c.session.roles && c.session.roles.size > 0;
+               FOREACH role IN c.session.roles;
+                   IF role == 'admin' || role == 'developer';
+                       has_debug_access = 1;
+                   END;
+               END;
+           END;
+           IF has_debug_access %]
         <div class="debug-section">
             <h2>Debug Information</h2>
             <p>The documentation system is looking for your file in the following locations:</p>
             <ul>
+                <li>Documentation/[% page_name %].tt</li>
                 <li>Documentation/[% page_name %].md</li>
-                <li>Documentation/roles/normal/[% page_name %].md</li>
-                <li>Documentation/roles/admin/[% page_name %].md</li>
-                <li>Documentation/roles/developer/[% page_name %].md</li>
-                <li>Documentation/tutorials/[% page_name %].md</li>
-                <li>Documentation/sites/[% site_name %]/[% page_name %].md</li>
+                <li>Documentation/roles/user/[% page_name %].tt</li>
+                <li>Documentation/roles/admin/[% page_name %].tt</li>
+                <li>Documentation/roles/developer/[% page_name %].tt</li>
+                <li>Documentation/tutorials/[% page_name %].tt</li>
+                <li>Documentation/sites/[% site_name %]/[% page_name %].tt</li>
             </ul>
 
             <div class="debug-actions">

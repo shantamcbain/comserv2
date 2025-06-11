@@ -1,8 +1,5 @@
 
-[% IF c.session.roles == 'admin' %]
-    <a href="[% c.uri_for('/ENCY/edit_herb', herb.record_id) %]">Edit Herb</a>
-[% END %]
-[% IF c.session.roles == 'admin' %]
+[% IF c.session.roles.grep('admin').size %]
     <a href="[% c.uri_for('/ENCY/edit_herb', herb.record_id) %]">Edit Herb</a>
 [% END %]
 

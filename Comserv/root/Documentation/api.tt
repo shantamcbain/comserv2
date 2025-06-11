@@ -1,3 +1,13 @@
+[% PageVersion = 'Comserv/root/Documentation/api.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = '    Comserv API Documentation' %]
+
+<!-- Documentation page for     Comserv API Documentation -->
+<div class="documentation-content">
+
 [% META 
    title = "API Documentation"
    description = "Comprehensive API reference for the Comserv system"

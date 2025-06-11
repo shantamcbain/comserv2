@@ -1,350 +1,709 @@
-[% META 
-   title = "Proxmox VE API Documentation"
-   description = "Overview of the Proxmox VE API endpoints used in the Comserv application"
-   roles = "admin,developer"
-   category = "infrastructure"
-%]
+[% PageVersion = 'Comserv/root/Documentation/proxmox/api.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
 
-<div class="doc-page">
-    <h1>Proxmox VE API Documentation</h1>
-    
-    <div class="doc-section">
-        <h2 class="section-toggle expanded">API Overview</h2>
-        <div class="section-content expanded">
-            <p>
-                This document provides an overview of the Proxmox VE (Virtual Environment) API endpoints used in the Comserv application. 
-                The Proxmox VE API is a RESTful API that provides a wide range of endpoints for managing virtual machines, containers, nodes, storage, and more.
-            </p>
-            
-            <h3>Related Documentation</h3>
-            <ul>
-                <li><a href="[% c.uri_for('/Documentation/proxmox/commands') %]">Proxmox Command Reference</a> - Comprehensive list of CLI commands for managing Proxmox VE</li>
-                <li><a href="[% c.uri_for('/Documentation/proxmox/ip_configuration') %]">Proxmox IP Configuration Guide</a> - Detailed guide for configuring IP addresses in Proxmox</li>
-            </ul>
-        </div>
-    </div>
-    
-    <div class="doc-section">
-        <h2 class="section-toggle expanded">API Base URL</h2>
-        <div class="section-content expanded">
-            <p>The Proxmox VE API is accessible via HTTPS on port 8006:</p>
-            
-            <pre class="code-block">
+[% META title = 'Proxmox VE API Documentation' %]
+
+<!-- Documentation page for api -->
+<div class="documentation-content">
+
+
+
+<!-- Include documentation CSS -->
+<link rel="stylesheet" href="/static/css/documentation.css">
+
+<div class="markdown-content">
+
+
+This document provides an overview of the Proxmox VE (Virtual Environment) API endpoints used in the Comserv application. The Proxmox VE API is a RESTful API that provides a wide range of endpoints for managing virtual machines, containers, nodes, storage, and more.
+
+
+
+<h2>Related Documentation</h2>
+
+
+
+<ul><li><a href="proxmox_commands.md">Proxmox Command Reference</a> - Comprehensive list of CLI commands for managing Proxmox VE</li></ul>
+
+<ul><li><a href="proxmox_ip_configuration.md">Proxmox IP Configuration Guide</a> - Detailed guide for configuring IP addresses in Proxmox</li></ul>
+
+
+
+<h2>API Base URL</h2>
+
+
+
+The Proxmox VE API is accessible via HTTPS on port 8006:
+
+
+
+<code></code>`
+
 https://<proxmox-host>:8006/api2/json
-            </pre>
-            
-            <p>All endpoints return JSON by default unless specified otherwise.</p>
-        </div>
-    </div>
-    
-    <div class="doc-section">
-        <h2 class="section-toggle expanded">Authentication</h2>
-        <div class="section-content expanded">
-            <h3>Using API Tokens (Required)</h3>
-            <p>
-                As of the latest update, our application exclusively uses API tokens for Proxmox authentication. 
-                This eliminates the need for user login to access Proxmox functionality. API tokens don't require 
-                CSRF tokens for write operations and provide a more secure and streamlined authentication method.
-            </p>
-            
-            <pre class="code-block">
+
+<code></code>`
+
+
+
+All endpoints return JSON by default unless specified otherwise.
+
+
+
+<h2>Authentication</h2>
+
+
+
+<h3>Using API Tokens (Required)</h3>
+
+
+
+As of the latest update, our application exclusively uses API tokens for Proxmox authentication. This eliminates the need for user login to access Proxmox functionality. API tokens don't require CSRF tokens for write operations and provide a more secure and streamlined authentication method.
+
+
+
+<code></code>`
+
 Authorization: PVEAPIToken=USER@REALM!TOKENID=UUID
-            </pre>
-            
-            <p>Example in our application:</p>
-            <pre class="code-block">
+
+<code></code>`
+
+
+
+Example in our application:
+
+<code></code>`perl
+
 my $token = "PVEAPIToken=" . $self->{token_user} . "=" . $self->{token_value};
+
 $req->header('Authorization' => $token);
-            </pre>
-            
-            <p>The API tokens are stored in the <code>proxmox_credentials.json</code> configuration file and are automatically loaded and used by the application.</p>
-            
-            <h3>Token Configuration</h3>
-            <ol>
-                <li>Log in to the Proxmox VE web interface</li>
-                <li>Navigate to Datacenter → Permissions → API Tokens</li>
-                <li>Create a new token for the desired user</li>
-                <li>Assign appropriate permissions (at minimum, VM.Audit for viewing VMs)</li>
-                <li>Store the token ID and value in the <code>proxmox_credentials.json</code> file</li>
-            </ol>
-        </div>
-    </div>
-    
-    <div class="doc-section">
-        <h2 class="section-toggle expanded">VM IP Address Management</h2>
-        <div class="section-content expanded">
-            <h3>Reading VM IP Configuration</h3>
-            <p>To retrieve the current IP configuration of a VM, you can use the following API endpoint:</p>
-            
-            <pre class="code-block">
-GET /api2/json/nodes/{node}/qemu/{vmid}/config
-            </pre>
-            
-            <p>This will return the complete VM configuration, including network interfaces and IP settings if configured via QEMU guest agent.</p>
-            
-            <p>Example response (partial):</p>
-            <pre class="code-block">
-{
-  "data": {
-    "cores": 2,
-    "memory": 2048,
-    "name": "vm-example",
-    "net0": "virtio=XX:XX:XX:XX:XX:XX,bridge=vmbr0",
-    "ipconfig0": "ip=192.168.1.100/24,gw=192.168.1.1"
-  }
-}
-            </pre>
-            
-            <h3>Reading IP Address via QEMU Guest Agent</h3>
-            <p>If the VM has the QEMU guest agent installed and running, you can get more detailed network information:</p>
-            
-            <pre class="code-block">
-GET /api2/json/nodes/{node}/qemu/{vmid}/agent/network-get-interfaces
-            </pre>
-            
-            <p>Example response:</p>
-            <pre class="code-block">
-{
-  "data": [
-    {
-      "name": "lo",
-      "ip-addresses": [
-        {
-          "ip-address": "127.0.0.1",
-          "prefix": 8,
-          "ip-address-type": "ipv4"
-        }
-      ]
-    },
-    {
-      "name": "eth0",
-      "ip-addresses": [
-        {
-          "ip-address": "192.168.1.100",
-          "prefix": 24,
-          "ip-address-type": "ipv4"
-        }
-      ],
-      "hardware-address": "XX:XX:XX:XX:XX:XX"
-    }
-  ]
-}
-            </pre>
-            
-            <h3>Modifying VM IP Configuration</h3>
-            <p>To change the IP address of a VM, you can use the following API endpoint:</p>
-            
-            <pre class="code-block">
-PUT /api2/json/nodes/{node}/qemu/{vmid}/config
-            </pre>
-            
-            <p>Parameters:</p>
-            <ul>
-                <li><code>ipconfig0</code>: IP configuration for the first network interface</li>
-                <li><code>ipconfig1</code>: IP configuration for the second network interface (if present)</li>
-                <li>And so on for additional interfaces...</li>
-            </ul>
-            
-            <p>Example request to set a static IP:</p>
-            <pre class="code-block">
-PUT /api2/json/nodes/proxmox/qemu/100/config
-Content-Type: application/x-www-form-urlencoded
 
-ipconfig0=ip=192.168.1.200/24,gw=192.168.1.1
-            </pre>
-            
-            <p>Example request to set DHCP:</p>
-            <pre class="code-block">
-PUT /api2/json/nodes/proxmox/qemu/100/config
-Content-Type: application/x-www-form-urlencoded
+<code></code>`
 
-ipconfig0=ip=dhcp
-            </pre>
-            
-            <h3>Using curl to Modify IP Address</h3>
-            <p>You can use curl to test or automate IP address changes:</p>
-            
-            <pre class="code-block">
-# Set static IP for VM 100
-curl -k -X PUT \
-  "https://proxmox-host:8006/api2/json/nodes/proxmox/qemu/100/config" \
-  -H "Authorization: PVEAPIToken=USER@REALM!TOKENID=UUID" \
-  -d "ipconfig0=ip=192.168.1.200/24,gw=192.168.1.1"
 
-# Set DHCP for VM 100
-curl -k -X PUT \
-  "https://proxmox-host:8006/api2/json/nodes/proxmox/qemu/100/config" \
-  -H "Authorization: PVEAPIToken=USER@REALM!TOKENID=UUID" \
-  -d "ipconfig0=ip=dhcp"
-            </pre>
-            
-            <div class="note-box">
-                <strong>Note:</strong> IP configuration changes via the API require the QEMU guest agent to be installed and running in the VM. The changes will be applied the next time the VM boots.
-            </div>
-            
-            <h3>Applying IP Changes to a Running VM</h3>
-            <p>
-                To apply IP changes to a running VM, you need to reboot the VM after changing the configuration:
-            </p>
-            
-            <pre class="code-block">
-# First, update the IP configuration
-PUT /api2/json/nodes/proxmox/qemu/100/config
-Content-Type: application/x-www-form-urlencoded
 
-ipconfig0=ip=192.168.1.200/24,gw=192.168.1.1
+The API tokens are stored in the <code>proxmox_credentials.json</code> configuration file and are automatically loaded and used by the application.
 
-# Then, reboot the VM to apply changes
-POST /api2/json/nodes/proxmox/qemu/100/status/reboot
-            </pre>
-            
-            <p>Using curl:</p>
-            <pre class="code-block">
-# Update IP configuration
-curl -k -X PUT \
-  "https://proxmox-host:8006/api2/json/nodes/proxmox/qemu/100/config" \
-  -H "Authorization: PVEAPIToken=USER@REALM!TOKENID=UUID" \
-  -d "ipconfig0=ip=192.168.1.200/24,gw=192.168.1.1"
 
-# Reboot VM to apply changes
-curl -k -X POST \
-  "https://proxmox-host:8006/api2/json/nodes/proxmox/qemu/100/status/reboot" \
-  -H "Authorization: PVEAPIToken=USER@REALM!TOKENID=UUID"
-            </pre>
-        </div>
-    </div>
-    
-    <div class="doc-section">
-        <h2 class="section-toggle expanded">Key API Endpoints</h2>
-        <div class="section-content expanded">
-            <h3>Cluster Management</h3>
-            <pre class="code-block">
+
+<h3>Token Configuration</h3>
+
+
+
+API tokens must be configured in the Proxmox VE web interface:
+
+
+
+<ol><li>Log in to the Proxmox VE web interface</li></ol>
+
+<ol><li>Navigate to Datacenter → Permissions → API Tokens</li></ol>
+
+<ol><li>Create a new token for the desired user</li></ol>
+
+<ol><li>Assign appropriate permissions (at minimum, VM.Audit for viewing VMs)</li></ol>
+
+<ol><li>Store the token ID and value in the <code>proxmox_credentials.json</code> file</li></ol>
+
+
+
+<h3>Authentication Flow</h3>
+
+
+
+<ol><li>The application loads the API token from the configuration file</li></ol>
+
+<ol><li>The token is deobfuscated by the <code>ProxmoxCredentials</code> utility</li></ol>
+
+<ol><li>The Proxmox model uses the token for all API requests</li></ol>
+
+<ol><li>No user login is required to access Proxmox functionality</li></ol>
+
+
+
+For more details on the authentication changes, see the <a href="proxmox_authentication_changes.md">Proxmox Authentication Changes</a> document.
+
+
+
+<h2>Key API Endpoints</h2>
+
+
+
+<h3>Cluster Management</h3>
+
+
+
+<code></code>`
+
 GET /api2/json/cluster/status
-            </pre>
-            <p>Get the status of the cluster (nodes, quorum, etc.).</p>
-            
-            <pre class="code-block">
-GET /api2/json/cluster/resources?type=vm
-            </pre>
-            <p>List all resources in the cluster, filtered by type (e.g., vm for VMs only).</p>
-            
-            <h3>Node Management</h3>
-            <pre class="code-block">
-GET /api2/json/nodes
-            </pre>
-            <p>List all nodes in the cluster.</p>
-            
-            <pre class="code-block">
-GET /api2/json/nodes/{node}/status
-            </pre>
-            <p>Get the status of a specific node (e.g., CPU, memory usage).</p>
-            
-            <h3>Virtual Machines (QEMU/KVM)</h3>
-            <pre class="code-block">
-GET /api2/json/nodes/{node}/qemu
-            </pre>
-            <p>List all QEMU VMs on a specific node.</p>
-            
-            <pre class="code-block">
-GET /api2/json/nodes/{node}/qemu/{vmid}/status/current
-            </pre>
-            <p>Get the current status of a specific VM.</p>
-            
-            <pre class="code-block">
-POST /api2/json/nodes/{node}/qemu/{vmid}/status/start
-            </pre>
-            <p>Start a VM.</p>
-            
-            <pre class="code-block">
-POST /api2/json/nodes/{node}/qemu/{vmid}/status/stop
-            </pre>
-            <p>Stop a VM.</p>
-            
-            <pre class="code-block">
-POST /api2/json/nodes/{node}/qemu/{vmid}/status/shutdown
-            </pre>
-            <p>Gracefully shut down a VM.</p>
-            
-            <h3>Containers (LXC)</h3>
-            <pre class="code-block">
-GET /api2/json/nodes/{node}/lxc
-            </pre>
-            <p>List all LXC containers on a specific node.</p>
-            
-            <pre class="code-block">
-GET /api2/json/nodes/{node}/lxc/{vmid}/status/current
-            </pre>
-            <p>Get the current status of a container.</p>
-        </div>
-    </div>
-    
-    <div class="doc-section">
-        <h2 class="section-toggle expanded">Implementation in Comserv</h2>
-        <div class="section-content expanded">
-            <p>In our Comserv application, we primarily use the following endpoints:</p>
-            <ol>
-                <li><code>/nodes</code> - To get a list of all nodes in the cluster</li>
-                <li><code>/cluster/resources?type=vm</code> - To get a list of all VMs in the cluster</li>
-                <li><code>/cluster/resources?type=qemu</code> - Alternative endpoint to get QEMU VMs</li>
-                <li><code>/cluster/resources</code> - To get all resources (including VMs and containers)</li>
-                <li><code>/nodes/{node}/qemu</code> - To get QEMU VMs on a specific node</li>
-                <li><code>/nodes/{node}/lxc</code> - To get LXC containers on a specific node</li>
-                <li><code>/version</code> - To check connectivity and get Proxmox version information</li>
-            </ol>
-            
-            <p>Our implementation includes fallback mechanisms to try different endpoints if the primary ones fail, ensuring robust operation even with different Proxmox configurations.</p>
-        </div>
-    </div>
-    
-    <div class="doc-section">
-        <h2 class="section-toggle expanded">Error Handling</h2>
-        <div class="section-content expanded">
-            <p>The Proxmox API returns standard HTTP status codes:</p>
-            <ul>
-                <li>200 OK - Request successful</li>
-                <li>400 Bad Request - Invalid parameters</li>
-                <li>401 Unauthorized - Authentication failed</li>
-                <li>403 Forbidden - Permission denied</li>
-                <li>404 Not Found - Resource not found</li>
-                <li>500 Internal Server Error - Server-side error</li>
-            </ul>
-            
-            <p>In our application, we handle these errors and provide detailed logging to help diagnose issues.</p>
-        </div>
-    </div>
-    
-    <div class="doc-section">
-        <h2 class="section-toggle expanded">Further Resources</h2>
-        <div class="section-content expanded">
-            <ul>
-                <li><a href="https://pve.proxmox.com/pve-docs/api-viewer/" target="_blank">Official Proxmox VE API Documentation</a></li>
-                <li>Access the API Viewer on your Proxmox instance: <code>https://&lt;your-proxmox-host&gt;:8006/pve-docs/api-viewer/</code></li>
-                <li>Use the <code>pvesh</code> command-line tool on a Proxmox node (e.g., <code>pvesh get / --output-format json</code>) to inspect available paths dynamically</li>
-            </ul>
-        </div>
-    </div>
-</div>
 
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        document.querySelectorAll('.section-toggle').forEach(header => {
-            header.addEventListener('click', function() {
-                this.classList.toggle('expanded');
-                const content = this.nextElementSibling;
-                
-                if (content.classList.contains('expanded')) {
-                    content.classList.remove('expanded');
-                    content.style.maxHeight = '0';
-                } else {
-                    content.classList.add('expanded');
-                    content.style.maxHeight = content.scrollHeight + 'px';
-                }
-            });
-        });
-        
-        // Initialize all expanded sections
-        document.querySelectorAll('.section-content.expanded').forEach(content => {
-            content.style.maxHeight = content.scrollHeight + 'px';
-        });
-    });
-</script>
+<code></code>`
+
+Get the status of the cluster (nodes, quorum, etc.).
+
+
+
+<code></code>`
+
+GET /api2/json/cluster/resources?type=vm
+
+<code></code>`
+
+List all resources in the cluster, filtered by type (e.g., vm for VMs only).
+
+
+
+<h3>Node Management</h3>
+
+
+
+<code></code>`
+
+GET /api2/json/nodes
+
+<code></code>`
+
+List all nodes in the cluster.
+
+
+
+<code></code>`
+
+GET /api2/json/nodes/{node}/status
+
+<code></code>`
+
+Get the status of a specific node (e.g., CPU, memory usage).
+
+
+
+<h3>Virtual Machines (QEMU/KVM)</h3>
+
+
+
+<code></code>`
+
+GET /api2/json/nodes/{node}/qemu
+
+<code></code>`
+
+List all QEMU VMs on a specific node.
+
+
+
+<code></code>`
+
+GET /api2/json/nodes/{node}/qemu/{vmid}/status/current
+
+<code></code>`
+
+Get the current status of a specific VM.
+
+
+
+<code></code>`
+
+POST /api2/json/nodes/{node}/qemu/{vmid}/status/start
+
+<code></code>`
+
+Start a VM.
+
+
+
+<code></code>`
+
+POST /api2/json/nodes/{node}/qemu/{vmid}/status/stop
+
+<code></code>`
+
+Stop a VM.
+
+
+
+<code></code>`
+
+POST /api2/json/nodes/{node}/qemu/{vmid}/status/shutdown
+
+<code></code>`
+
+Gracefully shut down a VM.
+
+
+
+<code></code>`
+
+GET /api2/json/nodes/{node}/qemu/{vmid}/config
+
+<code></code>`
+
+Get the configuration of a VM.
+
+
+
+<code></code>`
+
+PUT /api2/json/nodes/{node}/qemu/{vmid}/config
+
+<code></code>`
+
+Update the VM configuration.
+
+
+
+<h3>Containers (LXC)</h3>
+
+
+
+<code></code>`
+
+GET /api2/json/nodes/{node}/lxc
+
+<code></code>`
+
+List all LXC containers on a specific node.
+
+
+
+<code></code>`
+
+GET /api2/json/nodes/{node}/lxc/{vmid}/status/current
+
+<code></code>`
+
+Get the current status of a container.
+
+
+
+<code></code>`
+
+POST /api2/json/nodes/{node}/lxc/{vmid}/status/start
+
+<code></code>`
+
+Start a container.
+
+
+
+<code></code>`
+
+POST /api2/json/nodes/{node}/lxc/{vmid}/status/stop
+
+<code></code>`
+
+Stop a container.
+
+
+
+<h3>Storage Management</h3>
+
+
+
+<code></code>`
+
+GET /api2/json/storage
+
+<code></code>`
+
+List all storage definitions in the cluster.
+
+
+
+<code></code>`
+
+GET /api2/json/nodes/{node}/storage/{storage}/content
+
+<code></code>`
+
+List the content of a specific storage (e.g., VM disks, ISO images).
+
+
+
+<h3>Tasks and Logs</h3>
+
+
+
+<code></code>`
+
+GET /api2/json/nodes/{node}/tasks
+
+<code></code>`
+
+List all tasks (e.g., VM creation, backups) on a node.
+
+
+
+<code></code>`
+
+GET /api2/json/nodes/{node}/tasks/{upid}/status
+
+<code></code>`
+
+Get the status of a specific task by its Unique Process ID (UPID).
+
+
+
+<code></code>`
+
+GET /api2/json/nodes/{node}/tasks/{upid}/log
+
+<code></code>`
+
+Get the log output of a specific task.
+
+
+
+<h3>Guest Agent (QEMU)</h3>
+
+
+
+<code></code>`
+
+GET /api2/json/nodes/{node}/qemu/{vmid}/agent/info
+
+<code></code>`
+
+Get info from the QEMU guest agent (if installed in the VM).
+
+
+
+<code></code>`
+
+POST /api2/json/nodes/{node}/qemu/{vmid}/agent/exec
+
+<code></code>`
+
+Execute a command inside the VM via the guest agent.
+
+
+
+<h3>Backup and Restore</h3>
+
+
+
+<code></code>`
+
+POST /api2/json/nodes/{node}/vzdump
+
+<code></code>`
+
+Create a backup of a VM or container.
+
+
+
+<code></code>`
+
+POST /api2/json/nodes/{node}/qemu/{vmid}/snapshot
+
+<code></code>`
+
+Create a snapshot of a VM.
+
+
+
+<code></code>`
+
+POST /api2/json/nodes/{node}/qemu/{vmid}/snapshot/{snapname}/rollback
+
+<code></code>`
+
+Roll back a VM to a specific snapshot.
+
+
+
+<h2>Implementation in Comserv</h2>
+
+
+
+In our Comserv application, we primarily use the following endpoints:
+
+
+
+<ol><li><code>/nodes</code> - To get a list of all nodes in the cluster</li></ol>
+
+<ol><li><code>/cluster/resources?type=vm</code> - To get a list of all VMs in the cluster</li></ol>
+
+<ol><li><code>/cluster/resources?type=qemu</code> - Alternative endpoint to get QEMU VMs</li></ol>
+
+<ol><li><code>/cluster/resources</code> - To get all resources (including VMs and containers)</li></ol>
+
+<ol><li><code>/nodes/{node}/qemu</code> - To get QEMU VMs on a specific node</li></ol>
+
+<ol><li><code>/nodes/{node}/lxc</code> - To get LXC containers on a specific node</li></ol>
+
+<ol><li><code>/version</code> - To check connectivity and get Proxmox version information</li></ol>
+
+
+
+Our implementation includes fallback mechanisms to try different endpoints if the primary ones fail, ensuring robust operation even with different Proxmox configurations.
+
+
+
+<h3>Key Endpoints for VM Management</h3>
+
+
+
+**To get a list of nodes (physical servers) in the cluster**:
+
+<code></code>`
+
+GET /api2/json/nodes
+
+<code></code>`
+
+This does NOT return VMs, only the physical nodes in your cluster.
+
+
+
+**To get a list of all VMs across the cluster**:
+
+<code></code>`
+
+GET /api2/json/cluster/resources?type=vm
+
+<code></code>`
+
+or
+
+<code></code>`
+
+GET /api2/json/cluster/resources?type=qemu
+
+<code></code>`
+
+These endpoints return all VMs across all nodes in the cluster.
+
+
+
+**To get VMs on a specific node**:
+
+<code></code>`
+
+GET /api2/json/nodes/{node}/qemu
+
+<code></code>`
+
+Where <code>{node}</code> is the name of the node (e.g., "pve").
+
+
+
+**To get LXC containers on a specific node**:
+
+<code></code>`
+
+GET /api2/json/nodes/{node}/lxc
+
+<code></code>`
+
+
+
+<h3>Endpoint Selection Logic</h3>
+
+
+
+Our application tries to retrieve VM data in the following order:
+
+
+
+<ol><li>First, it gets a list of all nodes in the cluster using <code>/nodes</code></li></ol>
+
+<ol><li>Then it tries the cluster resources endpoint with different type parameters:</li></ol>
+
+   - <code>/cluster/resources?type=vm</code>
+
+   - <code>/cluster/resources?type=qemu</code>
+
+   - <code>/cluster/resources</code> (without type filter)
+
+<ol><li>If those fail, it tries to get VMs from each node individually:</li></ol>
+
+   - <code>/nodes/{node}/qemu</code> for QEMU VMs
+
+   - <code>/nodes/{node}/lxc</code> for LXC containers
+
+
+
+This approach ensures that we can retrieve VM data from different Proxmox configurations, including standalone nodes and clusters.
+
+
+
+<h3>Testing API Endpoints Directly</h3>
+
+
+
+You can test these endpoints directly using curl to diagnose issues:
+
+
+
+<code></code>`bash
+
+<h1>Replace with your actual values</h1>
+
+PROXMOX_HOST="your-proxmox-host.example.com"
+
+API_TOKEN_USER="your-user@pam!tokenid"
+
+API_TOKEN_VALUE="your-token-value"
+
+
+
+<h1>Test getting nodes</h1>
+
+curl -k -s "https://$PROXMOX_HOST:8006/api2/json/nodes" \
+
+  -H "Authorization: PVEAPIToken=$API_TOKEN_USER=$API_TOKEN_VALUE"
+
+
+
+<h1>Test getting VMs via cluster resources</h1>
+
+curl -k -s "https://$PROXMOX_HOST:8006/api2/json/cluster/resources?type=vm" \
+
+  -H "Authorization: PVEAPIToken=$API_TOKEN_USER=$API_TOKEN_VALUE"
+
+
+
+<h1>Test getting VMs on a specific node (using 'proxmox' as the node name)</h1>
+
+curl -k -s "https://$PROXMOX_HOST:8006/api2/json/nodes/proxmox/qemu" \
+
+  -H "Authorization: PVEAPIToken=$API_TOKEN_USER=$API_TOKEN_VALUE"
+
+
+
+<h1>If your node has a different name, replace 'proxmox' with your node name</h1>
+
+<h1>For example, if your node is named 'pve':</h1>
+
+curl -k -s "https://$PROXMOX_HOST:8006/api2/json/nodes/pve/qemu" \
+
+  -H "Authorization: PVEAPIToken=$API_TOKEN_USER=$API_TOKEN_VALUE"
+
+<code></code>`
+
+
+
+The <code>-k</code> flag disables SSL verification, which is useful for testing but should be avoided in production.
+
+
+
+<h4>Finding Your Node Name</h4>
+
+
+
+If you're not sure what your node name is, you can:
+
+
+
+<ol><li>Look at the Proxmox web interface - the node name is usually shown in the server list</li></ol>
+
+<ol><li>Use the <code>/nodes</code> API endpoint to get a list of all nodes</li></ol>
+
+<ol><li>Check the hostname of your Proxmox server (often the node name is the same as the hostname)</li></ol>
+
+
+
+Our code now automatically tries both the configured node name and 'proxmox' to ensure it works regardless of your configuration.
+
+
+
+<h3>Common Issues and Solutions</h3>
+
+
+
+<ol><li>**Authentication Issues**:</li></ol>
+
+   - Make sure the API token has the correct permissions
+
+   - Verify the token format: <code>PVEAPIToken=USER@REALM!TOKENID=UUID</code>
+
+   - Check that the token is not expired
+
+   - Ensure the token has the correct role with VM.Audit permission
+
+   - No user login is required - the application uses API tokens exclusively
+
+   - If authentication fails, check the <code>proxmox_credentials.json</code> file for correct token configuration
+
+
+
+<ol><li>**Node Name Issues**:</li></ol>
+
+   - The default node name in Proxmox is often 'pve', but it can be customized
+
+   - Our code now automatically detects node names from the API
+
+   - If you know your node name (e.g., 'proxmox'), you can set it in the configuration
+
+   - You can see the node name in the Proxmox web interface or by using the <code>/nodes</code> API endpoint
+
+
+
+<ol><li>**Empty VM List**:</li></ol>
+
+   - The API token might not have permission to view VMs
+
+   - The cluster resources endpoint might not be available in your Proxmox version
+
+   - Try using node-specific endpoints instead
+
+   - Check if you have any VMs created on the Proxmox server
+
+   - Make sure you're using the correct node name in node-specific endpoints
+
+
+
+<ol><li>**SSL/TLS Issues**:</li></ol>
+
+   - Our code disables SSL verification for development environments
+
+   - For production, consider enabling proper SSL verification
+
+   - If using a self-signed certificate, you may need to add it to your trusted certificates
+
+
+
+<ol><li>**Version Differences**:</li></ol>
+
+   - Different Proxmox versions might have slightly different API responses
+
+   - Our code includes fallbacks for different API formats
+
+   - Proxmox VE 7.x and 8.x have slightly different API structures
+
+
+
+<h2>Error Handling</h2>
+
+
+
+The Proxmox API returns standard HTTP status codes:
+
+<ul><li>200 OK - Request successful</li></ul>
+
+<ul><li>400 Bad Request - Invalid parameters</li></ul>
+
+<ul><li>401 Unauthorized - Authentication failed</li></ul>
+
+<ul><li>403 Forbidden - Permission denied</li></ul>
+
+<ul><li>404 Not Found - Resource not found</li></ul>
+
+<ul><li>500 Internal Server Error - Server-side error</li></ul>
+
+
+
+In our application, we handle these errors and provide detailed logging to help diagnose issues.
+
+
+
+<h2>Further Resources</h2>
+
+
+
+<ul><li><a href="https://pve.proxmox.com/pve-docs/api-viewer/">Official Proxmox VE API Documentation</a></li></ul>
+
+<ul><li>Access the API Viewer on your Proxmox instance: <code>https://<your-proxmox-host>:8006/pve-docs/api-viewer/</code></li></ul>
+
+<ul><li>Use the <code>pvesh</code> command-line tool on a Proxmox node (e.g., <code>pvesh get / --output-format json</code>) to inspect available paths dynamically</li></ul>
+
+</div>

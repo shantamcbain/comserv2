@@ -1,3 +1,13 @@
+[% PageVersion = 'Comserv/root/Documentation/cloudflare.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = '    Cloudflare DNS Management' %]
+
+<!-- Documentation page for     Cloudflare DNS Management -->
+<div class="documentation-content">
+
 [% META 
    title = 'Cloudflare DNS Management'
    description = 'Role-based Cloudflare DNS management integrated with the Comserv2 site system'

@@ -34,7 +34,7 @@
      
         <h2>Herbs by Botanical name.</h2>
  <!-- Display the Add Herb button only for admin users -->
-[% IF c.session.roles == 'admin' %]
+[% IF c.session.roles.grep('admin').size %]
     <button onclick="window.location.href='/ENCY/add_herb';">Add Herb</button>
 [% END %]
 

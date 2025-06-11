@@ -1,18 +1,30 @@
-[% IF categories.site_specific %]
-<section class="doc-section site-specific">
-    <h2 class="section-toggle">[% site_name || 'Comserv' %] Documentation</h2>
-    <p>Documentation specific to [% site_name || 'Comserv' %].</p>
-    <div class="section-content">
-        [% FOREACH page_name IN categories.site_specific.pages.sort %]
-            [% IF structured_pages.$page_name %]
-                [% page = structured_pages.$page_name %]
-            <a href="[% page.url %]" class="doc-card">
-                <h3>[% page.title %]</h3>
-                <p>[% page.description || 'Site-specific documentation.' %]</p>
-                <span class="site-badge">[% page.site %]</span>
-            </a>
-            [% END %]
-        [% END %]
-    </div>
-</section>
+[% PageVersion = 'Comserv/root/Documentation/site_specific.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
 [% END %]
+
+[% META title = 'Site Specific' %]
+
+<!-- Documentation page for Site Specific -->
+<div class="documentation-content">
+
+[% IF categories.site_specific %]
+    <section class="doc-section site-specific">
+        <h2 class="section-toggle">[% site_name || 'Comserv' %] Documentation</h2>
+        <p>Documentation specific to [% site_name || 'Comserv' %].</p>
+        <div class="section-content">
+            [% FOREACH page_name IN categories.site_specific.pages.sort %]
+                [% IF structured_pages.$page_name %]
+                    [% page = structured_pages.$page_name %]
+                    <a href="[% page.url %]" class="doc-card">
+                        <h3>[% page.title %]</h3>
+                        <p>[% page.description || 'Site-specific documentation.' %]</p>
+                        <span class="site-badge">[% page.site %]</span>
+                    </a>
+                [% END %]
+            [% END %]
+        </div>
+    </section>
+[% END %]
+
+</div>

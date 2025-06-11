@@ -54,61 +54,61 @@
       "id": "user_guide",
       "title": "User Guide",
       "description": "Complete guide for using the system",
-      "path": "Documentation/roles/normal/user_guide.md",
+      "path": "Documentation/roles/normal/user_guide.tt",
       "categories": ["user_guides"],
       "roles": ["normal", "editor", "admin", "developer"],
       "site": "all",
-      "format": "markdown"
+      "format": "template"
     },
     {
       "id": "getting_started",
       "title": "Getting Started",
       "description": "Quick start guide for new users",
-      "path": "Documentation/roles/normal/getting_started.md",
+      "path": "Documentation/roles/normal/getting_started.tt",
       "categories": ["user_guides", "tutorials"],
       "roles": ["normal", "editor", "admin", "developer"],
       "site": "all",
-      "format": "markdown"
+      "format": "template"
     },
     {
       "id": "account_management",
       "title": "Account Management",
       "description": "How to manage your account settings",
-      "path": "Documentation/roles/normal/account_management.md",
+      "path": "Documentation/roles/normal/account_management.tt",
       "categories": ["user_guides"],
       "roles": ["normal", "editor", "admin", "developer"],
       "site": "all",
-      "format": "markdown"
+      "format": "template"
     },
     {
       "id": "admin_guide",
       "title": "Administrator Guide",
       "description": "Complete guide for system administrators",
-      "path": "Documentation/roles/admin/admin_guide.md",
+      "path": "Documentation/roles/admin/admin_guide.tt",
       "categories": ["admin_guides"],
       "roles": ["admin", "developer"],
       "site": "all",
-      "format": "markdown"
+      "format": "template"
     },
     {
       "id": "installation",
       "title": "Installation Guide",
       "description": "How to install and configure the system",
-      "path": "Documentation/roles/admin/installation.md",
+      "path": "Documentation/roles/admin/installation.tt",
       "categories": ["admin_guides"],
       "roles": ["admin", "developer"],
       "site": "all",
-      "format": "markdown"
+      "format": "template"
     },
     {
       "id": "api_reference",
       "title": "API Reference",
       "description": "Complete API documentation for developers",
-      "path": "Documentation/roles/developer/api_reference.md",
+      "path": "Documentation/roles/developer/api_reference.tt",
       "categories": ["developer_guides"],
       "roles": ["developer"],
       "site": "all",
-      "format": "markdown"
+      "format": "template"
     },
     {
       "id": "database_schema",
@@ -124,41 +124,41 @@
       "id": "login_authentication",
       "title": "Login and Authentication",
       "description": "How to log in and manage authentication",
-      "path": "Documentation/tutorials/login_authentication.md",
+      "path": "Documentation/tutorials/login_authentication.tt",
       "categories": ["tutorials"],
       "roles": ["normal", "editor", "admin", "developer"],
       "site": "all",
-      "format": "markdown"
+      "format": "template"
     },
     {
       "id": "mcoop_user_guide",
       "title": "MCOOP User Guide",
       "description": "User guide specific to MCOOP site",
-      "path": "Documentation/sites/mcoop/mcoop_user_guide.md",
+      "path": "Documentation/sites/mcoop/mcoop_user_guide.tt",
       "categories": ["user_guides", "site_specific"],
       "roles": ["normal", "editor", "admin", "developer"],
       "site": "MCOOP",
-      "format": "markdown"
+      "format": "template"
     },
     {
       "id": "mcoop_getting_started",
       "title": "Getting Started with MCOOP",
       "description": "Quick start guide for MCOOP users",
-      "path": "Documentation/tutorials/mcoop_getting_started.md",
+      "path": "Documentation/tutorials/mcoop_getting_started.tt",
       "categories": ["tutorials", "site_specific"],
       "roles": ["normal", "editor", "admin", "developer"],
       "site": "MCOOP",
-      "format": "markdown"
+      "format": "template"
     },
     {
       "id": "documentation_system",
       "title": "Documentation System",
       "description": "How the documentation system works",
-      "path": "Documentation/documentation_system.md",
+      "path": "Documentation/documentation_system.tt",
       "categories": ["developer_guides", "modules"],
       "roles": ["developer"],
       "site": "all",
-      "format": "markdown"
+      "format": "template"
     },
     {
       "id": "user_module",

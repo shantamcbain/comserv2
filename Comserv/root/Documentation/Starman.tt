@@ -1,5 +1,13 @@
-[% META title = 'Starman Server Documentation' %]
 [% PageVersion = 'Documentation/Starman.tt,v 0.10 2024/05/20 Admin Exp admin ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Starman Server Documentation' %]
+
+<!-- Documentation page for Starman -->
+<div class="documentation-content">
+
 
 <h1 id="starman-top">Starman High-Performance Perl PSGI Server</h1>
 
@@ -80,7 +88,7 @@ sudo chown -R starman:starman /var/www/starman</pre>
     </li>
     <li><strong>Dependency Isolation</strong>
         <pre>
-# In app directory
+<h1>In app directory</h1>
 carton init
 echo "requires 'Catalyst::Runtime';" >> cpanfile
 carton install</pre>
@@ -125,3 +133,5 @@ carton install</pre>
         <pre>curl -I https://starman.example.com/status</pre>
     </li>
 </ol>
+
+</div>

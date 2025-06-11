@@ -1,197 +1,157 @@
-[% META title = 'Starman Restart Functionality Improvements - September 2025' %]
-[% PageVersion = 'Documentation/changelog/2025-09-starman-restart-fix.tt,v 0.01 2025/09/15 Shanta Exp shanta ' %]
-[% # Set metadata for this changelog entry %]
-[% SET 
-   entry_date = '2025-09-15'
-   entry_author = 'System Development Team'
-   entry_description = 'The Starman server restart functionality in the admin interface has been enhanced to improve usability, security, and cross-server compatibility.'
-%]
-
+[% PageVersion = 'Comserv/root/Documentation/changelog/2025-09-starman-restart-fix.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
-<h1>[% template.title %]</h1>
-<div class="changelog-meta">
-    <span class="date">[% entry_date.replace('-', '/') %]</span>
-    <span class="author">by [% entry_author %]</span>
-</div>
+[% META title = 'Starman Restart Functionality Improvements - September 2025' %]
 
-<div class="changelog-content">
-    <h2>Overview</h2>
-    <p>[% entry_description %]</p>
-    
-    <h2>Changes</h2>
-    
-    <h3>Added Features</h3>
-    <ol>
-        <li>
-            <strong>System Username Field</strong>:
-            <ul>
-                <li>Added a username field to the restart form</li>
-                <li>This allows the feature to work across different servers with various user accounts</li>
-                <li>The form now pre-fills with the current user's username when available</li>
-            </ul>
-        </li>
-        <li>
-            <strong>Improved User Interface</strong>:
-            <ul>
-                <li>Updated form labels and instructions for clarity</li>
-                <li>Added more detailed error messages</li>
-                <li>Enhanced the confirmation workflow</li>
-            </ul>
-        </li>
-    </ol>
-    
-    <h3>Bug Fixes</h3>
-    <ol>
-        <li>
-            <strong>Authentication Issues</strong>:
-            <ul>
-                <li>Fixed user authentication verification</li>
-                <li>Properly checks for admin role in session</li>
-                <li>Added additional checks for is_admin flag</li>
-            </ul>
-        </li>
-        <li>
-            <strong>Template Rendering</strong>:
-            <ul>
-                <li>Removed dependency on the 'dump' filter which was causing template errors</li>
-                <li>Improved template conditional logic</li>
-                <li>Fixed debug information display</li>
-            </ul>
-        </li>
-        <li>
-            <strong>Command Execution</strong>:
-            <ul>
-                <li>Updated restart command to use the specified username with sudo</li>
-                <li>Improved error handling for failed commands</li>
-                <li>Enhanced security with better input sanitization</li>
-            </ul>
-        </li>
-    </ol>
-    
-    <h3>Technical Improvements</h3>
-    <ol>
-        <li>
-            <strong>Enhanced Logging</strong>:
-            <ul>
-                <li>Added more detailed debug messages</li>
-                <li>Improved logging of user authentication status</li>
-                <li>Better tracking of command execution</li>
-            </ul>
-        </li>
-        <li>
-            <strong>Security Enhancements</strong>:
-            <ul>
-                <li>Improved credential handling</li>
-                <li>Better protection against command injection</li>
-                <li>Removed password from logs and debug output</li>
-            </ul>
-        </li>
-        <li>
-            <strong>Code Organization</strong>:
-            <ul>
-                <li>Refactored controller code for better readability</li>
-                <li>Improved error handling and user feedback</li>
-                <li>Better session management</li>
-            </ul>
-        </li>
-    </ol>
-    
-    <h2>Files Modified</h2>
-    <ul>
-        <li><code>/Comserv/lib/Comserv/Controller/Admin.pm</code></li>
-        <li><code>/Comserv/root/admin/restart_starman.tt</code></li>
-    </ul>
-    
-    <h2>Documentation</h2>
-    <p>New documentation has been created to explain the updated functionality:</p>
-    <ul>
-        <li><a href="[% c.uri_for('/Documentation/view/roles/admin/starman_restart_guide') %]">Starman Restart Guide</a></li>
-    </ul>
-    
-    <p>The main <a href="[% c.uri_for('/Documentation/view/roles/admin/admin_guide') %]">Administrator Guide</a> has also been updated to include information about the Starman restart functionality.</p>
-    
-    <h2>Contributors</h2>
-    <ul>
-        <li>System Development Team</li>
-        <li>Administrator Support Team</li>
-    </ul>
-</div>
+<!-- Documentation page for 2025-09-starman-restart-fix -->
+<div class="documentation-content">
 
-<div class="back-link">
-    <a href="[% c.uri_for('/Documentation/all_changelog') %]">← Back to All Changelogs</a>
-</div>
 
-<style>
-    .changelog-meta {
-        color: #666;
-        font-size: 0.9em;
-        margin-bottom: 20px;
-        border-bottom: 1px solid #eee;
-        padding-bottom: 10px;
-    }
-    
-    .changelog-meta .date {
-        font-weight: bold;
-        margin-right: 10px;
-    }
-    
-    .changelog-meta .author {
-        font-style: italic;
-    }
-    
-    .changelog-content {
-        line-height: 1.6;
-    }
-    
-    .changelog-content h2 {
-        margin-top: 25px;
-        border-bottom: 1px solid #eee;
-        padding-bottom: 5px;
-    }
-    
-    .changelog-content h3 {
-        margin-top: 20px;
-        color: #333;
-    }
-    
-    .changelog-content ul, .changelog-content ol {
-        margin-left: 20px;
-        margin-bottom: 15px;
-    }
-    
-    .changelog-content li {
-        margin-bottom: 5px;
-    }
-    
-    .changelog-content code {
-        background-color: #f5f5f5;
-        padding: 2px 5px;
-        border-radius: 3px;
-        font-family: monospace;
-    }
-    
-    .back-link {
-        margin-top: 30px;
-        padding-top: 15px;
-        border-top: 1px solid #eee;
-    }
-    
-    .back-link a {
-        display: inline-block;
-        padding: 8px 15px;
-        background-color: #f8f9fa;
-        border: 1px solid #dee2e6;
-        border-radius: 4px;
-        color: #495057;
-        text-decoration: none;
-        transition: all 0.3s;
-    }
-    
-    .back-link a:hover {
-        background-color: #e9ecef;
-        color: #212529;
-    }
-</style>
+
+<!-- Include documentation CSS -->
+<link rel="stylesheet" href="/static/css/documentation.css">
+
+<div class="markdown-content">
+
+
+<h2>Overview</h2>
+
+
+
+The Starman server restart functionality in the admin interface has been enhanced to improve usability, security, and cross-server compatibility.
+
+
+
+<h2>Changes</h2>
+
+
+
+<h3>Added Features</h3>
+
+
+
+<ol><li>**System Username Field**: </li></ol>
+
+   - Added a username field to the restart form
+
+   - This allows the feature to work across different servers with various user accounts
+
+   - The form now pre-fills with the current user's username when available
+
+
+
+<ol><li>**Improved User Interface**:</li></ol>
+
+   - Updated form labels and instructions for clarity
+
+   - Added more detailed error messages
+
+   - Enhanced the confirmation workflow
+
+
+
+<h3>Bug Fixes</h3>
+
+
+
+<ol><li>**Authentication Issues**:</li></ol>
+
+   - Fixed user authentication verification
+
+   - Properly checks for admin role in session
+
+   - Added additional checks for is_admin flag
+
+
+
+<ol><li>**Template Rendering**:</li></ol>
+
+   - Removed dependency on the 'dump' filter which was causing template errors
+
+   - Improved template conditional logic
+
+   - Fixed debug information display
+
+
+
+<ol><li>**Command Execution**:</li></ol>
+
+   - Updated restart command to use the specified username with sudo
+
+   - Improved error handling for failed commands
+
+   - Enhanced security with better input sanitization
+
+
+
+<h3>Technical Improvements</h3>
+
+
+
+<ol><li>**Enhanced Logging**:</li></ol>
+
+   - Added more detailed debug messages
+
+   - Improved logging of user authentication status
+
+   - Better tracking of command execution
+
+
+
+<ol><li>**Security Enhancements**:</li></ol>
+
+   - Improved credential handling
+
+   - Better protection against command injection
+
+   - Removed password from logs and debug output
+
+
+
+<ol><li>**Code Organization**:</li></ol>
+
+   - Refactored controller code for better readability
+
+   - Improved error handling and user feedback
+
+   - Better session management
+
+
+
+<h2>Files Modified</h2>
+
+
+
+<ul><li><code>/Comserv/lib/Comserv/Controller/Admin.pm</code></li></ul>
+
+<ul><li><code>/Comserv/root/admin/restart_starman.tt</code></li></ul>
+
+
+
+<h2>Documentation</h2>
+
+
+
+New documentation has been created to explain the updated functionality:
+
+
+
+<ul><li><a href="/Documentation/roles/admin/starman_restart_guide.md">Starman Restart Guide</a></li></ul>
+
+
+
+The main <a href="/Documentation/roles/admin/admin_guide.md">Administrator Guide</a> has also been updated to include information about the Starman restart functionality.
+
+
+
+<h2>Contributors</h2>
+
+
+
+<ul><li>System Development Team</li></ul>
+
+<ul><li>Administrator Support Team</li></ul>
+
+</div>

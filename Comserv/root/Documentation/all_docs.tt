@@ -1,100 +1,144 @@
-[% IF categories.general && categories.general.pages.size > 0 %]
-<section class="doc-section admin-only">
-    <h2 class="section-toggle">All Documentation Files</h2>
-    <p>Complete list of all documentation files. <span class="admin-badge">Admin Only</span></p>
-    <div class="file-type-tabs">
-        <button class="file-type-tab active" onclick="showFileType(event, 'all-docs')">All Files</button>
-        <button class="file-type-tab" onclick="showFileType(event, 'template-docs')">Template Files</button>
-        <button class="file-type-tab" onclick="showFileType(event, 'markdown-docs')">Markdown Files</button>
-        <button class="file-type-tab" onclick="showFileType(event, 'other-docs')">Other Files</button>
-    </div>
-    <div class="section-content expanded active" id="all-docs">
-        [% sorted_pages = [] %]
-        [% FOREACH page_name IN categories.general.pages %]
-            [% IF structured_pages.$page_name %]
-                [% sorted_pages.push({ name => page_name, title => structured_pages.$page_name.title }) %]
-            [% END %]
-        [% END %]
-        [% sorted_pages = sorted_pages.nsort('title') %]
-        [% FOREACH page_info IN sorted_pages %]
-            [% page_name = page_info.name %]
-            [% page = structured_pages.$page_name %]
-        <a href="[% page.url %]" class="doc-card">
-            <h3>[% page.title %]</h3>
-            <p>[% page.description || 'Documentation file.' %]</p>
-            [% IF page.site != 'all' %]<span class="site-badge">[% page.site %]</span>[% END %]
-            [% IF page.file_type %]<span class="file-type-badge [% page.file_type %]">[% page.file_type %]</span>[% END %]
-        </a>
-        [% END %]
-    </div>
-    <div class="section-content" id="template-docs" style="display: none;">
-        [% template_pages = [] %]
-        [% FOREACH page_name IN categories.general.pages %]
-            [% IF structured_pages.$page_name && structured_pages.$page_name.file_type == 'template' %]
-                [% template_pages.push({ name => page_name, title => structured_pages.$page_name.title }) %]
-            [% END %]
-        [% END %]
-        [% template_pages = template_pages.nsort('title') %]
-        [% IF template_pages.size > 0 %]
-            [% FOREACH page_info IN template_pages %]
-                [% page_name = page_info.name %]
-                [% page = structured_pages.$page_name %]
-            <a href="[% page.url %]" class="doc-card">
-                <h3>[% page.title %]</h3>
-                <p>[% page.description || 'Template documentation file.' %]</p>
-                [% IF page.site != 'all' %]<span class="site-badge">[% page.site %]</span>[% END %]
-                <span class="file-type-badge template">template</span>
-            </a>
-            [% END %]
-        [% ELSE %]
-        <p class="no-content">No template files found.</p>
-        [% END %]
-    </div>
-    <div class="section-content" id="markdown-docs" style="display: none;">
-        [% markdown_pages = [] %]
-        [% FOREACH page_name IN categories.general.pages %]
-            [% IF structured_pages.$page_name && structured_pages.$page_name.file_type == 'markdown' %]
-                [% markdown_pages.push({ name => page_name, title => structured_pages.$page_name.title }) %]
-            [% END %]
-        [% END %]
-        [% markdown_pages = markdown_pages.nsort('title') %]
-        [% IF markdown_pages.size > 0 %]
-            [% FOREACH page_info IN markdown_pages %]
-                [% page_name = page_info.name %]
-                [% page = structured_pages.$page_name %]
-            <a href="[% page.url %]" class="doc-card">
-                <h3>[% page.title %]</h3>
-                <p>[% page.description || 'Markdown documentation file.' %]</p>
-                [% IF page.site != 'all' %]<span class="site-badge">[% page.site %]</span>[% END %]
-                <span class="file-type-badge markdown">markdown</span>
-            </a>
-            [% END %]
-        [% ELSE %]
-        <p class="no-content">No markdown files found.</p>
-        [% END %]
-    </div>
-    <div class="section-content" id="other-docs" style="display: none;">
-        [% other_pages = [] %]
-        [% FOREACH page_name IN categories.general.pages %]
-            [% IF structured_pages.$page_name && structured_pages.$page_name.file_type == 'other' %]
-                [% other_pages.push({ name => page_name, title => structured_pages.$page_name.title }) %]
-            [% END %]
-        [% END %]
-        [% other_pages = other_pages.nsort('title') %]
-        [% IF other_pages.size > 0 %]
-            [% FOREACH page_info IN other_pages %]
-                [% page_name = page_info.name %]
-                [% page = structured_pages.$page_name %]
-            <a href="[% page.url %]" class="doc-card">
-                <h3>[% page.title %]</h3>
-                <p>[% page.description || 'Other documentation file.' %]</p>
-                [% IF page.site != 'all' %]<span class="site-badge">[% page.site %]</span>[% END %]
-                <span class="file-type-badge other">other</span>
-            </a>
-            [% END %]
-        [% ELSE %]
-        <p class="no-content">No other files found.</p>
-        [% END %]
-    </div>
-</section>
+[% PageVersion = 'Comserv/root/Documentation/all_docs.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
 [% END %]
+
+[% META title = 'All Docs' %]
+
+<!-- Documentation page for All Docs -->
+<div class="documentation-content">
+
+[% IF categories.general && categories.general.pages.size > 0 %]
+    <section class="doc-section admin-only">
+        <h2 class="section-toggle">All Documentation Files</h2>
+        <p>Complete list of all documentation files. <span class="admin-badge">Admin Only</span></p>
+        <div class="file-type-tabs">
+            <button class="file-type-tab active" onclick="showFileType(event, 'all-docs')">All Files</button>
+            <button class="file-type-tab" onclick="showFileType(event, 'template-docs')">Template Files</button>
+            <button class="file-type-tab" onclick="showFileType(event, 'markdown-docs')">Markdown Files</button>
+            <button class="file-type-tab" onclick="showFileType(event, 'other-docs')">Other Files</button>
+        </div>
+        
+        <!-- All Documents Tab -->
+        <div class="section-content file-type-content" id="all-docs">
+            [% sorted_pages = [] %]
+            [% FOREACH page_name IN categories.general.pages %]
+                [% IF structured_pages.$page_name %]
+                    [% sorted_pages.push({ name => page_name, title => structured_pages.$page_name.title }) %]
+                [% END %]
+            [% END %]
+            
+            [% sorted_pages = sorted_pages.nsort('title') %]
+            [% FOREACH page_info IN sorted_pages %]
+                [% page_name = page_info.name %]
+                [% page = structured_pages.$page_name %]
+                <a href="[% page.url %]" class="doc-card">
+                    <h3>[% page.title %]</h3>
+                    <p>[% page.description || 'Documentation file.' %]</p>
+                </a>
+            [% END %]
+        </div>
+        
+        <!-- Template Documents Tab -->
+        <div class="section-content file-type-content" id="template-docs" style="display: none;">
+            [% template_pages = [] %]
+            [% FOREACH page_name IN categories.general.pages %]
+                [% IF structured_pages.$page_name && structured_pages.$page_name.file_type == 'template' %]
+                    [% template_pages.push({ name => page_name, title => structured_pages.$page_name.title }) %]
+                [% END %]
+            [% END %]
+            
+            [% template_pages = template_pages.nsort('title') %]
+            [% IF template_pages.size > 0 %]
+                [% FOREACH page_info IN template_pages %]
+                    [% page_name = page_info.name %]
+                    [% page = structured_pages.$page_name %]
+                    <a href="[% page.url %]" class="doc-card">
+                        <h3>[% page.title %]</h3>
+                        <p>[% page.description || 'Template documentation file.' %]</p>
+                        <span class="file-type-badge template">template</span>
+                    </a>
+                [% END %]
+            [% ELSE %]
+                <p class="no-content">No template files found.</p>
+            [% END %]
+        </div>
+        
+        <!-- Markdown Documents Tab -->
+        <div class="section-content file-type-content" id="markdown-docs" style="display: none;">
+            [% markdown_pages = [] %]
+            [% FOREACH page_name IN categories.general.pages %]
+                [% IF structured_pages.$page_name && structured_pages.$page_name.file_type == 'markdown' %]
+                    [% markdown_pages.push({ name => page_name, title => structured_pages.$page_name.title }) %]
+                [% END %]
+            [% END %]
+            
+            [% markdown_pages = markdown_pages.nsort('title') %]
+            [% IF markdown_pages.size > 0 %]
+                [% FOREACH page_info IN markdown_pages %]
+                    [% page_name = page_info.name %]
+                    [% page = structured_pages.$page_name %]
+                    <a href="[% page.url %]" class="doc-card">
+                        <h3>[% page.title %]</h3>
+                        <p>[% page.description || 'Markdown documentation file.' %]</p>
+                        <span class="file-type-badge markdown">markdown</span>
+                    </a>
+                [% END %]
+            [% ELSE %]
+                <p class="no-content">No markdown files found.</p>
+            [% END %]
+        </div>
+        
+        <!-- Other Documents Tab -->
+        <div class="section-content file-type-content" id="other-docs" style="display: none;">
+            [% other_pages = [] %]
+            [% FOREACH page_name IN categories.general.pages %]
+                [% IF structured_pages.$page_name && structured_pages.$page_name.file_type == 'other' %]
+                    [% other_pages.push({ name => page_name, title => structured_pages.$page_name.title }) %]
+                [% END %]
+            [% END %]
+            
+            [% other_pages = other_pages.nsort('title') %]
+            [% IF other_pages.size > 0 %]
+                [% FOREACH page_info IN other_pages %]
+                    [% page_name = page_info.name %]
+                    [% page = structured_pages.$page_name %]
+                    <a href="[% page.url %]" class="doc-card">
+                        <h3>[% page.title %]</h3>
+                        <p>[% page.description || 'Other documentation file.' %]</p>
+                        <span class="file-type-badge other">other</span>
+                    </a>
+                [% END %]
+            [% ELSE %]
+                <p class="no-content">No other files found.</p>
+            [% END %]
+        </div>
+    </section>
+[% END %]
+
+</div>
+
+<!-- JavaScript for tab switching -->
+<script>
+function showFileType(evt, fileTypeId) {
+    // Hide all file type content
+    var contents = document.getElementsByClassName('file-type-content');
+    for (var i = 0; i < contents.length; i++) {
+        contents[i].style.display = 'none';
+    }
+    
+    // Remove active class from all tabs
+    var tabs = document.getElementsByClassName('file-type-tab');
+    for (var i = 0; i < tabs.length; i++) {
+        tabs[i].className = tabs[i].className.replace(' active', '');
+    }
+    
+    // Show the selected file type content and mark the tab as active
+    var fileTypeElement = document.getElementById(fileTypeId);
+    if (fileTypeElement) {
+        fileTypeElement.style.display = 'block';
+    }
+    
+    evt.currentTarget.className += ' active';
+}
+</script>

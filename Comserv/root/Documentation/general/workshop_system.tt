@@ -1,0 +1,327 @@
+[% PageVersion = 'Documentation/general/workshop_system.tt,v 0.01 2024/06/10 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+ [% PageVersion %]
+[% END %]
+
+<div class="documentation-container">
+    <h1>Workshop System Documentation</h1>
+    
+    <div class="toc">
+        <h2>Table of Contents</h2>
+        <ul>
+            <li><a href="#overview">Overview</a></li>
+            <li><a href="#features">Features</a></li>
+            <li><a href="#usage">Using the Workshop System</a>
+                <ul>
+                    <li><a href="#viewing">Viewing Workshops</a></li>
+                    <li><a href="#adding">Adding Workshops</a></li>
+                    <li><a href="#editing">Editing Workshops</a></li>
+                    <li><a href="#presentations">Working with Presentations</a></li>
+                </ul>
+            </li>
+            <li><a href="#technical">Technical Implementation</a>
+                <ul>
+                    <li><a href="#controllers">Controllers</a></li>
+                    <li><a href="#models">Models</a></li>
+                    <li><a href="#templates">Templates</a></li>
+                    <li><a href="#database">Database Schema</a></li>
+                </ul>
+            </li>
+            <li><a href="#future">Future Development Plan</a>
+                <ul>
+                    <li><a href="#conversion">Presentation Conversion Plan</a></li>
+                    <li><a href="#database-migration">Database Migration Plan</a></li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+    
+    <div id="overview" class="section">
+        <h2>Overview</h2>
+        <p>The Workshop System is a component of the Comserv application that allows administrators to create, manage, and present workshops to users. It includes functionality for scheduling workshops, managing participant limits, and sharing presentation materials.</p>
+    </div>
+    
+    <div id="features" class="section">
+        <h2>Features</h2>
+        <ul>
+            <li>Workshop listing with detailed information</li>
+            <li>Workshop creation and editing for administrators</li>
+            <li>Presentation materials management</li>
+            <li>Downloadable presentation files (ODP, PDF)</li>
+            <li>Future: Browser-based presentation viewing</li>
+            <li>Future: Database-backed presentation management</li>
+        </ul>
+    </div>
+    
+    <div id="usage" class="section">
+        <h2>Using the Workshop System</h2>
+        
+        <div id="viewing" class="subsection">
+            <h3>Viewing Workshops</h3>
+            <p>Users can view all active workshops from the main Workshop page at <code>/workshop</code>. This page displays a table with workshop details including:</p>
+            <ul>
+                <li>Site name</li>
+                <li>Date and time</li>
+                <li>Location</li>
+                <li>Title</li>
+                <li>Maximum participants</li>
+            </ul>
+            <p>Users can click on the "Details" button to view more information about a specific workshop.</p>
+        </div>
+        
+        <div id="adding" class="subsection">
+            <h3>Adding Workshops</h3>
+            <p>Administrators can add new workshops by clicking the "Add Workshop" button on the main Workshop page. The form requires the following information:</p>
+            <ul>
+                <li>Site name</li>
+                <li>Title</li>
+                <li>Description</li>
+                <li>Date and time</li>
+                <li>End time</li>
+                <li>Location</li>
+                <li>Instructor</li>
+                <li>Maximum participants</li>
+                <li>Sharing options</li>
+            </ul>
+        </div>
+        
+        <div id="editing" class="subsection">
+            <h3>Editing Workshops</h3>
+            <p>Administrators can edit existing workshops by clicking the "Edit" button next to a workshop in the listing. The edit form allows updating all workshop details.</p>
+        </div>
+        
+        <div id="presentations" class="subsection">
+            <h3>Working with Presentations</h3>
+            <p>The Workshop system includes support for presentation materials. Currently, presentations are stored as files in the <code>/home/shanta/PycharmProjects/comserv2/Comserv/root/WorkShops/</code> directory.</p>
+            
+            <h4>Available Presentations</h4>
+            <ul>
+                <li><strong>Feed the Pollinators</strong> - A presentation on creating gardens that support pollinators (<a href="/workshop/presentation">View details</a>)</li>
+            </ul>
+            
+            <h4>Accessing Presentations</h4>
+            <p>Users can access presentations in two ways:</p>
+            <ol>
+                <li>From the main Workshops page by clicking the dedicated button</li>
+                <li>Directly via URL: <code>/workshop/presentation</code></li>
+            </ol>
+            
+            <h4>Downloading Presentations</h4>
+            <p>From the presentation details page, users can download the presentation file for offline viewing.</p>
+        </div>
+    </div>
+    
+    <div id="technical" class="section">
+        <h2>Technical Implementation</h2>
+        
+        <div id="controllers" class="subsection">
+            <h3>Controllers</h3>
+            <p>The Workshop system is primarily managed by the <code>Comserv::Controller::WorkShop</code> controller, which provides the following actions:</p>
+            <ul>
+                <li><code>index</code> - Displays the list of active workshops</li>
+                <li><code>add</code> - Displays the form for adding a new workshop</li>
+                <li><code>addworkshop</code> - Processes the form submission for a new workshop</li>
+                <li><code>details</code> - Displays detailed information about a specific workshop</li>
+                <li><code>edit</code> - Displays and processes the form for editing a workshop</li>
+                <li><code>presentation</code> - Displays the presentation details page</li>
+                <li><code>download</code> - Handles file downloads</li>
+                <li><code>view</code> - Handles browser-based presentation viewing</li>
+            </ul>
+        </div>
+        
+        <div id="models" class="subsection">
+            <h3>Models</h3>
+            <p>The Workshop system uses the following models:</p>
+            <ul>
+                <li><code>Comserv::Model::WorkShop</code> - Workshop business logic</li>
+                <li><code>Comserv::Model::Schema::Ency::Result::WorkShop</code> - Database schema for workshops</li>
+                <li><code>Comserv::Model::Schema::Ency::Result::SiteWorkshop</code> - Database schema for site-workshop relationships</li>
+            </ul>
+        </div>
+        
+        <div id="templates" class="subsection">
+            <h3>Templates</h3>
+            <p>The Workshop system uses the following Template Toolkit templates:</p>
+            <ul>
+                <li><code>WorkShops/workshops.tt</code> - Main workshop listing</li>
+                <li><code>WorkShops/details.tt</code> - Workshop details</li>
+                <li><code>WorkShops/addworkshop.tt</code> - Form for adding workshops</li>
+                <li><code>WorkShops/edit.tt</code> - Form for editing workshops</li>
+                <li><code>WorkShops/presentation.tt</code> - Presentation details page</li>
+                <li><code>WorkShops/error.tt</code> - Error display</li>
+            </ul>
+        </div>
+        
+        <div id="database" class="subsection">
+            <h3>Database Schema</h3>
+            <p>Workshops are stored in the database using the following schema:</p>
+            <pre>
+CREATE TABLE workshop (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sitename TEXT,
+    title TEXT,
+    description TEXT,
+    date DATETIME,
+    time TIME,
+    end_time TIME,
+    location TEXT,
+    instructor TEXT,
+    max_participants INTEGER,
+    share BOOLEAN
+);
+            </pre>
+        </div>
+    </div>
+    
+    <div id="future" class="section">
+        <h2>Future Development Plan</h2>
+        
+        <div id="conversion" class="subsection">
+            <h3>Presentation Conversion Plan</h3>
+            <p>The current system stores presentations as files (.odp format). The future plan involves:</p>
+            
+            <h4>Phase 1: Convert to .tt Format</h4>
+            <ol>
+                <li>Create a script to convert ODP files to HTML format using LibreOffice headless mode:
+                    <pre>libreoffice --headless --convert-to html presentation.odp</pre>
+                </li>
+                <li>Wrap the HTML content in a .tt template with proper navigation and Comserv styling</li>
+                <li>Store these .tt files alongside the original ODP files</li>
+                <li>Update the controller to serve the .tt version when users choose "View in Browser"</li>
+            </ol>
+            
+            <h4>Phase 2: Database Migration</h4>
+            <ol>
+                <li>Create a new database schema for presentations:
+                    <pre>
+CREATE TABLE presentation (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT,
+    description TEXT,
+    author TEXT,
+    created_date DATETIME,
+    last_modified DATETIME,
+    summary TEXT,
+    original_file TEXT,
+    html_version TEXT,
+    preview_image TEXT
+);
+                    </pre>
+                </li>
+                <li>Create a database schema for presentation slides:
+                    <pre>
+CREATE TABLE presentation_slide (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    presentation_id INTEGER,
+    slide_number INTEGER,
+    title TEXT,
+    content TEXT,
+    image TEXT,
+    FOREIGN KEY(presentation_id) REFERENCES presentation(id)
+);
+                    </pre>
+                </li>
+                <li>Develop a model and controller for managing presentations in the database</li>
+                <li>Create an import tool to extract slides from ODP/HTML files and store them in the database</li>
+                <li>Develop a dynamic slide viewer that loads content from the database</li>
+            </ol>
+        </div>
+        
+        <div id="database-migration" class="subsection">
+            <h3>Database Migration Plan</h3>
+            
+            <h4>Phase 1: Schema Updates</h4>
+            <ol>
+                <li>Add presentation-related tables to the database schema</li>
+                <li>Create relationships between workshops and presentations</li>
+                <li>Update the existing WorkShop model to handle presentation relationships</li>
+            </ol>
+            
+            <h4>Phase 2: Interface Development</h4>
+            <ol>
+                <li>Create admin interface for uploading and managing presentations</li>
+                <li>Develop slide editor for creating and editing presentations directly in the browser</li>
+                <li>Implement presentation viewer with navigation controls</li>
+                <li>Add user analytics to track presentation views and downloads</li>
+            </ol>
+            
+            <h4>Phase 3: Metadata and Search</h4>
+            <ol>
+                <li>Implement tagging system for presentations</li>
+                <li>Add full-text search for presentation content</li>
+                <li>Create categorization system for organizing presentations</li>
+                <li>Develop related content suggestions</li>
+            </ol>
+        </div>
+    </div>
+</div>
+
+<style>
+    .documentation-container {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+    }
+    
+    .toc {
+        background-color: #f5f5f5;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 30px;
+    }
+    
+    .toc ul {
+        list-style-type: none;
+        padding-left: 20px;
+    }
+    
+    .section {
+        margin-bottom: 40px;
+    }
+    
+    .subsection {
+        margin-bottom: 30px;
+        padding-left: 20px;
+    }
+    
+    h1 {
+        color: #2c3e50;
+        border-bottom: 2px solid #3498db;
+        padding-bottom: 10px;
+    }
+    
+    h2 {
+        color: #2c3e50;
+        border-bottom: 1px solid #ddd;
+        padding-bottom: 5px;
+    }
+    
+    h3 {
+        color: #3498db;
+    }
+    
+    pre {
+        background-color: #f8f8f8;
+        border: 1px solid #ddd;
+        border-radius: 3px;
+        padding: 10px;
+        overflow-x: auto;
+    }
+    
+    code {
+        background-color: #f8f8f8;
+        padding: 2px 4px;
+        border-radius: 3px;
+    }
+    
+    a {
+        color: #3498db;
+        text-decoration: none;
+    }
+    
+    a:hover {
+        text-decoration: underline;
+    }
+</style>

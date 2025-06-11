@@ -1,3 +1,17 @@
+[% PageVersion = 'Comserv/root/Documentation/documentation_tt_template.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = '    Documentation Template Toolkit (.tt) Template' %]
+
+<!-- Documentation page for documentation_tt_template -->
+<div class="documentation-content">
+
+
+
+<!-- Documentation page for     Documentation Template Toolkit (.tt) Template -->
+
 [% META 
    title = "Documentation Template Toolkit (.tt) Template"
    description = "Template for creating new documentation using Template Toolkit format"
@@ -14,7 +28,6 @@
             This template provides the structure and format for creating new documentation files using 
             Template Toolkit (.tt) format. Use this as a starting point for all new documentation.
         </p>
-    </div>
     
     <div class="doc-section">
         <h2>Basic Template Structure</h2>
@@ -50,7 +63,7 @@
         &lt;p&gt;More content here...&lt;/p&gt;
         
         &lt;pre class="code-block"&gt;
-# Code block example
+<h1>Code block example</h1>
 function example() {
     return "This is a code example";
 }
@@ -60,7 +73,6 @@ function example() {
     &lt;!-- Add more sections as needed --&gt;
 &lt;/div&gt;
         </pre>
-    </div>
     
     <div class="doc-section">
         <h2>Metadata Explanation</h2>
@@ -79,7 +91,6 @@ function example() {
             </li>
             <li><strong>category</strong>: The category this document belongs to (must match one of the defined categories in documentation_config.json)</li>
         </ul>
-    </div>
     
     <div class="doc-section">
         <h2>CSS Classes</h2>
@@ -95,7 +106,6 @@ function example() {
             <li><code>admin-only</code> - For content visible only to admins</li>
             <li><code>developer-only</code> - For content visible only to developers</li>
         </ul>
-    </div>
     
     <div class="doc-section">
         <h2>Template Toolkit Features</h2>
@@ -106,7 +116,6 @@ function example() {
     &lt;div class="admin-only"&gt;
         This content is only visible to administrators.
     &lt;/div&gt;
-[% END %]
 
 [% # Include another template file %]
 [% INCLUDE 'path/to/another/template.tt' %]
@@ -114,9 +123,7 @@ function example() {
 [% # Loop through items %]
 [% FOREACH item IN items %]
     &lt;div&gt;[% item.name %]&lt;/div&gt;
-[% END %]
         </pre>
-    </div>
     
     <div class="doc-section">
         <h2>Adding to Documentation System</h2>
@@ -140,5 +147,5 @@ function example() {
   "your_new_page": "Documentation/path/to/your_new_page.tt"
 }
         </pre>
-    </div>
-</div>
+
+[% END %]</div>

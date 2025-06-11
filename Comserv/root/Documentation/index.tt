@@ -276,45 +276,90 @@
 </style>
 
 <script>
+    // Function to toggle a section open/closed
+    function toggleSection(header) {
+        // Toggle the expanded class on the header
+        header.classList.toggle('expanded');
+        
+        // Find the content section
+        const section = header.closest('.doc-section');
+        if (!section) return; // Safety check
+        
+        const content = section.querySelector('.section-content');
+        if (!content) return; // Safety check
+        
+        console.log("Toggling section:", header.textContent.trim());
+        
+        // Toggle the expanded state
+        if (content.classList.contains('expanded')) {
+            // Close the section
+            content.style.maxHeight = '0px';
+            content.classList.remove('expanded');
+            console.log("Section closed");
+        } else {
+            // Open the section
+            content.classList.add('expanded');
+            content.style.maxHeight = content.scrollHeight + 'px';
+            console.log("Section opened, height:", content.scrollHeight);
+        }
+    }
+    
+    // Initialize all sections on page load
     document.addEventListener('DOMContentLoaded', function() {
-        document.querySelectorAll('.section-toggle').forEach(header => {
-            header.addEventListener('click', function() {
-                this.classList.toggle('expanded');
-                // Find the next .section-content element within the same section
-                const section = this.closest('.doc-section');
-                const content = section.querySelector('.section-content');
-                
-                if (content.classList.contains('expanded')) {
-                    content.style.maxHeight = '0';
-                    content.classList.remove('expanded');
-                } else {
-                    content.style.maxHeight = content.scrollHeight + 'px';
-                    content.classList.add('expanded');
-                }
+        console.log("Document loaded, initializing sections");
+        
+        // Add click event listeners to all toggle headers
+        const toggleHeaders = document.querySelectorAll('.section-toggle');
+        console.log("Found", toggleHeaders.length, "toggle headers");
+        
+        toggleHeaders.forEach(header => {
+            header.addEventListener('click', function(e) {
+                e.preventDefault();
+                toggleSection(this);
             });
         });
         
-        // Initialize all sections as closed by default
+        // Make sure all sections start closed
         document.querySelectorAll('.section-content').forEach(content => {
-            content.style.maxHeight = '0';
+            content.classList.remove('expanded');
+            content.style.maxHeight = '0px';
         });
+        
+        // Also ensure any headers don't have the expanded class
+        document.querySelectorAll('.section-toggle').forEach(header => {
+            header.classList.remove('expanded');
+        });
+        
+        console.log("Initialization complete");
     });
 
+    // Function for the file type tabs
     function showFileType(evt, fileType) {
-        var contents = document.getElementsByClassName('section-content');
-        for (var i = 0; i < contents.length; i++) {
-            contents[i].style.display = 'none';
-            contents[i].classList.remove('active');
-        }
-        var tabs = document.getElementsByClassName('file-type-tab');
-        for (var i = 0; i < tabs.length; i++) {
-            tabs[i].classList.remove('active');
-        }
+        console.log("Showing file type:", fileType);
+        
+        // Hide all file type content sections
+        var contents = document.querySelectorAll('.file-type-content');
+        contents.forEach(content => {
+            content.style.display = 'none';
+            content.classList.remove('active');
+        });
+        
+        // Deactivate all tabs
+        var tabs = document.querySelectorAll('.file-type-tab');
+        tabs.forEach(tab => {
+            tab.classList.remove('active');
+        });
+        
+        // Show and activate the selected content and tab
         var activeContent = document.getElementById(fileType);
-        activeContent.style.display = 'grid';
-        activeContent.classList.add('active');
-        activeContent.style.maxHeight = activeContent.scrollHeight + 'px';
-        evt.currentTarget.classList.add('active');
+        if (activeContent) {
+            activeContent.style.display = 'grid';
+            activeContent.classList.add('active');
+            evt.currentTarget.classList.add('active');
+            console.log("Activated content:", fileType);
+        } else {
+            console.log("Content not found for:", fileType);
+        }
     }
 </script>
 
@@ -403,5 +448,5 @@
         font-size: 1.2em;
     }
 
-    /* ... rest of your CSS ... */
+    /* End of CSS section */
 </style>
