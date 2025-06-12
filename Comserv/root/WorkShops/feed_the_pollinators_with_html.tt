@@ -1,0 +1,331 @@
+[% PageVersion = 'WorkShops/feed_the_pollinators_with_html.tt,v 0.01 2024/06/12 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="presentation-wrapper">
+    <header class="presentation-header">
+        <h1>Feed the Pollinators</h1>
+        <p class="author">By Shanta</p>
+        <div class="presentation-nav">
+            <a href="/workshop/presentation?name=feedthepolinatores" class="nav-button">Overview</a>
+            <a href="/workshop/download?file=feedthepolinatores.odp" class="download-button">Download Full Presentation</a>
+        </div>
+    </header>
+
+    <div class="presentation-controls">
+        <button id="prev-slide" class="nav-button"><i class="fa fa-arrow-left"></i> Previous</button>
+        <span id="slide-counter">Slide <span id="current-slide">1</span> of <span id="total-slides">0</span></span>
+        <button id="next-slide" class="nav-button">Next <i class="fa fa-arrow-right"></i></button>
+    </div>
+
+    <div class="slides-container">
+        <!-- Slides will be loaded from the HTML file -->
+        <div id="slides-content"></div>
+    </div>
+
+    <!-- Plant Database Section -->
+    <section class="related-herbs">
+        <h2>Featured Pollinator Plants in Our Database</h2>
+        <div class="herbs-grid">
+            [% IF bee_plants && bee_plants.size > 0 %]
+                [% # Loop through the first 6 bee plants from the database %]
+                [% count = 0 %]
+                [% FOREACH plant IN bee_plants %]
+                    [% # Only show up to 6 plants %]
+                    [% LAST IF count >= 6 %]
+                    <div class="herb-card">
+                        <h3><a href="/ENCY/herb_detail/[% plant.record_id %]">[% plant.botanical_name || 'Unknown Botanical Name' %]</a></h3>
+                        <p>[% plant.common_names || plant.key_name || 'Pollinator Plant' %]</p>
+                        [% IF plant.apis %]<p class="apis-note"><strong>Bee notes:</strong> [% plant.apis.substr(0, 100) %][% IF plant.apis.length > 100 %]...[% END %]</p>[% END %]
+                    </div>
+                    [% count = count + 1 %]
+                [% END %]
+            [% ELSE %]
+                <!-- Fallback if no plants are retrieved from database -->
+                <div class="herb-card">
+                    <h3><a href="/ENCY/herb_detail/123">Lavender</a></h3>
+                    <p>Rich in nectar, attracts honeybees and bumblebees</p>
+                </div>
+                <div class="herb-card">
+                    <h3><a href="/ENCY/herb_detail/147">Borage</a></h3>
+                    <p>Star-shaped blue flowers with abundant nectar</p>
+                </div>
+                <div class="herb-card">
+                    <h3><a href="/ENCY/herb_detail/156">Echinacea</a></h3>
+                    <p>Popular with bees and butterflies</p>
+                </div>
+                <div class="herb-card">
+                    <h3><a href="/ENCY/herb_detail/167">Thyme</a></h3>
+                    <p>Low-growing herb with tiny flowers loved by bees</p>
+                </div>
+                <div class="herb-card">
+                    <h3><a href="/ENCY/herb_detail/189">Milkweed</a></h3>
+                    <p>Essential for Monarch butterflies</p>
+                </div>
+                <div class="herb-card">
+                    <h3><a href="/ENCY/herb_detail/278">Asters</a></h3>
+                    <p>Critical fall nectar source</p>
+                </div>
+            [% END %]
+        </div>
+        <p class="database-link">
+            <a href="/ENCY/herbs" class="button">Explore All Plants in Our Database</a>
+        </p>
+    </section>
+</div>
+
+<!-- Plant name to database ID mapping -->
+<script type="text/javascript">
+    // Map of plant names to their database IDs
+    const plantToDbId = {
+        // Trees
+        "Cottonwood": 301,
+        "Pacific Dogwood": 302,
+        "Cherry": 303,
+        "Plum": 304,
+        "Apple": 305,
+        "Maple": 306,
+        
+        // Herbs & Plants
+        "Lavender": 123,
+        "Borage": 147,
+        "Echinacea": 156, 
+        "Thyme": 167,
+        "Milkweed": 189,
+        "Asters": 278,
+        "Goldenrod": 267,
+        "Dandelion": 190,
+        "Clover": 192,
+        "Sunflower": 185,
+        "Oregano": 215,
+        "Rosemary": 218,
+        "Sage": 220,
+        "Mint": 235,
+        "Basil": 240
+    };
+    
+    // Function to find and link plant names in content
+    function linkPlantsInContent(element) {
+        if (!element || element.nodeType !== Node.ELEMENT_NODE) return;
+        
+        // Skip if this is already a link
+        if (element.tagName === 'A') return;
+        
+        // Process text nodes
+        Array.from(element.childNodes).forEach(node => {
+            if (node.nodeType === Node.TEXT_NODE) {
+                let content = node.textContent;
+                let newContent = content;
+                
+                // Look for plant names in the text
+                for (const [plantName, dbId] of Object.entries(plantToDbId)) {
+                    // Use regex to find whole word matches with word boundaries
+                    const regex = new RegExp(`\\b${plantName}\\b`, 'gi');
+                    newContent = newContent.replace(regex, (match) => {
+                        return `<a href="/ENCY/herb_detail/${dbId}" class="herb-link">${match}</a>`;
+                    });
+                }
+                
+                // If replacements were made, update the DOM
+                if (content !== newContent) {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = newContent;
+                    
+                    // Insert each child of the temp div in place of the text node
+                    const fragment = document.createDocumentFragment();
+                    while (tempDiv.firstChild) {
+                        fragment.appendChild(tempDiv.firstChild);
+                    }
+                    
+                    element.replaceChild(fragment, node);
+                }
+            } else if (node.nodeType === Node.ELEMENT_NODE) {
+                // Recursively process child elements
+                linkPlantsInContent(node);
+            }
+        });
+    }
+</script>
+
+<script type="text/javascript">
+    document.addEventListener('DOMContentLoaded', function() {
+        const slidesContainer = document.getElementById('slides-content');
+        const currentSlideEl = document.getElementById('current-slide');
+        const totalSlidesEl = document.getElementById('total-slides');
+        const prevButton = document.getElementById('prev-slide');
+        const nextButton = document.getElementById('next-slide');
+        
+        // Fetch the HTML content
+        fetch('/WorkShops/feedthepolinatores.html')
+            .then(response => response.text())
+            .then(html => {
+                // Create a temporary div to parse the HTML
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = html;
+                
+                // Extract all slide content (h1 elements with page breaks are slide titles)
+                const slides = [];
+                let currentSlide = { title: '', content: document.createElement('div') };
+                
+                // Get the body element from the parsed HTML
+                const bodyEl = tempDiv.querySelector('body');
+                if (!bodyEl) {
+                    console.error('Could not find body element in HTML');
+                    return;
+                }
+                
+                // Process all child nodes of the body
+                Array.from(bodyEl.childNodes).forEach((node, index) => {
+                    // If this is an h1 with page-break, it's a new slide
+                    if (node.tagName === 'H1') {
+                        if (index > 0) {
+                            // Save the previous slide
+                            slides.push({ ...currentSlide });
+                            // Create a new slide
+                            currentSlide = { title: node.textContent, content: document.createElement('div') };
+                        } else {
+                            // First slide title
+                            currentSlide.title = node.textContent;
+                        }
+                    } else {
+                        // Add content to the current slide
+                        currentSlide.content.appendChild(node.cloneNode(true));
+                    }
+                });
+                
+                // Add the last slide
+                slides.push({ ...currentSlide });
+                
+                // Create slide elements in the DOM
+                slides.forEach((slide, index) => {
+                    const slideDiv = document.createElement('div');
+                    slideDiv.className = 'slide';
+                    slideDiv.dataset.slide = index + 1;
+                    
+                    const slideTitle = document.createElement('h2');
+                    slideTitle.textContent = slide.title;
+                    slideDiv.appendChild(slideTitle);
+                    
+                    const slideContent = document.createElement('div');
+                    slideContent.className = 'slide-content';
+                    slideContent.appendChild(slide.content);
+                    slideDiv.appendChild(slideContent);
+                    
+                    // Link plant names in this slide content
+                    linkPlantsInContent(slideContent);
+                    
+                    // Hide all slides except the first one
+                    if (index > 0) {
+                        slideDiv.style.display = 'none';
+                    }
+                    
+                    slidesContainer.appendChild(slideDiv);
+                });
+                
+                // Update total slides count
+                totalSlidesEl.textContent = slides.length;
+                
+                // Setup navigation
+                let currentSlideIndex = 1;
+                
+                // Handle next button click
+                nextButton.addEventListener('click', function() {
+                    if (currentSlideIndex < slides.length) {
+                        document.querySelector(`.slide[data-slide="${currentSlideIndex}"]`).style.display = 'none';
+                        currentSlideIndex++;
+                        document.querySelector(`.slide[data-slide="${currentSlideIndex}"]`).style.display = 'block';
+                        currentSlideEl.textContent = currentSlideIndex;
+                        
+                        // Update button states
+                        prevButton.disabled = false;
+                        if (currentSlideIndex === slides.length) {
+                            nextButton.disabled = true;
+                        }
+                        
+                        // Scroll to top of slide
+                        document.querySelector('.slides-container').scrollTop = 0;
+                    }
+                });
+                
+                // Handle previous button click
+                prevButton.addEventListener('click', function() {
+                    if (currentSlideIndex > 1) {
+                        document.querySelector(`.slide[data-slide="${currentSlideIndex}"]`).style.display = 'none';
+                        currentSlideIndex--;
+                        document.querySelector(`.slide[data-slide="${currentSlideIndex}"]`).style.display = 'block';
+                        currentSlideEl.textContent = currentSlideIndex;
+                        
+                        // Update button states
+                        nextButton.disabled = false;
+                        if (currentSlideIndex === 1) {
+                            prevButton.disabled = true;
+                        }
+                        
+                        // Scroll to top of slide
+                        document.querySelector('.slides-container').scrollTop = 0;
+                    }
+                });
+                
+                // Initialize button states
+                prevButton.disabled = currentSlideIndex === 1;
+                nextButton.disabled = currentSlideIndex === slides.length;
+                
+                // Add keyboard navigation
+                document.addEventListener('keydown', function(e) {
+                    if (e.key === 'ArrowRight' || e.key === ' ') {
+                        nextButton.click();
+                    } else if (e.key === 'ArrowLeft') {
+                        prevButton.click();
+                    }
+                });
+            })
+            .catch(error => {
+                console.error('Error loading presentation:', error);
+                slidesContainer.innerHTML = `
+                    <div class="error-message">
+                        <h2>Error Loading Presentation</h2>
+                        <p>Sorry, we couldn't load the presentation content. Please try again later.</p>
+                    </div>
+                `;
+            });
+    });
+</script>
+
+<link rel="stylesheet" href="[% c.uri_for('/static/css/components/presentations.css') %]">
+
+<style>
+    /* Additional styles for HTML content integration */
+    .slide h2 {
+        margin-top: 0;
+        color: #2c3e50;
+        border-bottom: 2px solid #3498db;
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+    }
+    
+    .slide-content ul {
+        padding-left: 20px;
+    }
+    
+    .slide-content li {
+        margin-bottom: 10px;
+    }
+    
+    .herb-link {
+        color: #16a085;
+        text-decoration: none;
+        border-bottom: 1px dotted #16a085;
+    }
+    
+    .herb-link:hover {
+        color: #1abc9c;
+        border-bottom: 1px solid #1abc9c;
+    }
+    
+    .apis-note {
+        font-size: 0.9em;
+        color: #555;
+        margin-top: 5px;
+    }
+</style>

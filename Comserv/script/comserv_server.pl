@@ -264,7 +264,11 @@ my @required_modules = (
     'Email::MIME',
     'Email::Sender::Simple',
     'Catalyst::View::Email',
-    'Catalyst::View::Email::Template'
+    'Catalyst::View::Email::Template',
+    'GD',           # For image manipulation
+    'GD::Text',
+    'PDF::API2',
+    'PDF::TextBlock'
 );
 
 my @missing_modules = ();
@@ -312,11 +316,47 @@ foreach my $module (@other_modules) {
 if (@missing_modules && !$already_tried_install) {
     print "Installing missing modules: " . join(', ', @missing_modules) . "\n";
     
+    # Special handling for GD module which requires system libraries
+    if (grep { $_ eq 'GD' } @missing_modules) {
+        print "GD module requires system libraries. Checking if they're installed...\n";
+        
+        # Try to detect Linux distribution
+        my $is_debian_based = -f '/etc/debian_version' || -f '/etc/ubuntu_version';
+        my $is_redhat_based = -f '/etc/redhat-release' || -f '/etc/centos-release';
+        
+        if ($is_debian_based) {
+            print "Detected Debian/Ubuntu-based system. The following command may need to be run with sudo:\n";
+            print "sudo apt-get install -y libgd-dev libpng-dev libjpeg-dev libfreetype6-dev\n";
+            print "Please run this command if the installation fails, then restart the application.\n";
+        } elsif ($is_redhat_based) {
+            print "Detected RedHat/CentOS-based system. The following command may need to be run with sudo:\n";
+            print "sudo yum install -y gd-devel libpng-devel libjpeg-devel freetype-devel\n";
+            print "Please run this command if the installation fails, then restart the application.\n";
+        } else {
+            print "Could not detect Linux distribution. You may need to install GD development libraries manually.\n";
+            print "Common package names: libgd-dev, gd-devel, libpng-dev, libjpeg-dev, freetype-dev\n";
+        }
+    }
+    
     foreach my $module (@missing_modules) {
         print "Installing $module...\n";
-        my $result = system("cpanm --local-lib=$FindBin::Bin/../local --force $module");
+        my $result;
+        
+        if ($module eq 'GD') {
+            # Use force flag for GD module and increase timeout
+            print "Installing GD module with extended timeout and force flag...\n";
+            $result = system("cpanm --local-lib=$FindBin::Bin/../local --force --verbose --timeout 600 $module");
+        } else {
+            $result = system("cpanm --local-lib=$FindBin::Bin/../local --force $module");
+        }
+        
         if ($result != 0) {
-            warn "Failed to install $module. Some functionality may be limited.\n";
+            if ($module eq 'GD') {
+                warn "Failed to install GD module. This often requires system libraries.\n";
+                warn "Please install the required system libraries as mentioned above and retry.\n";
+            } else {
+                warn "Failed to install $module. Some functionality may be limited.\n";
+            }
         } else {
             print "Successfully installed $module\n";
             $need_restart = 1;

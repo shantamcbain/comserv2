@@ -6,7 +6,32 @@
 <h1>Workshops</h1>
 <div class="workshop-actions">
     <a href="/workshop/add" class="button">Add Workshop</a>
-    <a href="/workshop/presentation" class="button presentation-button">Feed the Pollinators Presentation</a>
+    <a href="/workshop/presentations" class="button presentation-button">View All Presentations</a>
+    <a href="/workshop/files" class="button files-button">Manage Files</a>
+    <a href="/workshop/upload" class="button upload-button">Upload Presentation</a>
+</div>
+
+<div class="presentations-section">
+    <h2>Workshop Presentations</h2>
+    <p>We offer a variety of educational presentations on gardening, permaculture, and sustainable practices.</p>
+    
+    <div class="featured-presentation">
+        <h3>Featured Presentation</h3>
+        <div class="presentation-card">
+            <div class="presentation-info">
+                <h3>Feed the Pollinators</h3>
+                <p>Learn about creating gardens that support pollinators in your ecosystem</p>
+            </div>
+            <div class="presentation-actions">
+                <a href="/workshop/presentation?name=feedthepolinatores" class="view-link">View Online</a>
+                <a href="/workshop/download?file=feedthepolinatores.odp" class="download-link">Download</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="view-all-presentations">
+        <a href="/workshop/presentations" class="button all-presentations-button">View All Presentations</a>
+    </div>
 </div>
 
 <style>
@@ -34,6 +59,128 @@
     
     .presentation-button:hover {
         background-color: #0b7dda;
+    }
+    
+    .files-button {
+        background-color: #607d8b;
+    }
+    
+    .files-button:hover {
+        background-color: #546e7a;
+    }
+    
+    .upload-button {
+        background-color: #ff9800;
+    }
+    
+    .upload-button:hover {
+        background-color: #e68a00;
+    }
+    
+    .all-presentations-button {
+        background-color: #2196F3;
+        margin-top: 20px;
+        display: inline-block;
+    }
+    
+    .all-presentations-button:hover {
+        background-color: #0b7dda;
+    }
+    
+    .presentations-section {
+        margin: 30px 0;
+        padding: 20px;
+        background-color: #f9f9f9;
+        border-radius: 8px;
+    }
+    
+    .presentations-section h2 {
+        color: #333;
+        margin-top: 0;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #ddd;
+    }
+    
+    .presentations-section > p {
+        color: #666;
+        margin-bottom: 20px;
+    }
+    
+    .featured-presentation {
+        margin: 20px 0;
+    }
+    
+    .featured-presentation h3 {
+        color: #333;
+        margin-bottom: 15px;
+        padding-bottom: 5px;
+        border-bottom: 1px dashed #ddd;
+    }
+    
+    .view-all-presentations {
+        text-align: center;
+        margin: 20px 0 10px;
+    }
+    
+    .presentation-card {
+        background-color: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        transition: transform 0.2s, box-shadow 0.2s;
+        max-width: 500px;
+        margin: 0 auto;
+    }
+    
+    .presentation-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+    
+    .presentation-info h3 {
+        margin-top: 0;
+        color: #333;
+    }
+    
+    .presentation-info p {
+        color: #666;
+        margin-bottom: 15px;
+    }
+    
+    .presentation-actions {
+        margin-top: 15px;
+        display: flex;
+        gap: 10px;
+    }
+    
+    .view-link, .download-link {
+        padding: 8px 12px;
+        text-decoration: none;
+        border-radius: 4px;
+        text-align: center;
+        font-weight: bold;
+        flex: 1;
+    }
+    
+    .view-link {
+        background-color: #2196F3;
+        color: white;
+    }
+    
+    .view-link:hover {
+        background-color: #0b7dda;
+    }
+    
+    .download-link {
+        background-color: #4CAF50;
+        color: white;
+    }
+    
+    .download-link:hover {
+        background-color: #45a049;
     }
 </style>
 <table>

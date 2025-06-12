@@ -1,0 +1,366 @@
+[% PageVersion = 'WorkShops/feed_the_pollinators.tt,v 0.01 2024/06/12 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="presentation-wrapper">
+    <header class="presentation-header">
+        <h1>Feed the Pollinators</h1>
+        <p class="author">By Shanta</p>
+        <div class="presentation-nav">
+            <a href="/workshop/presentation?name=feedthepolinatores" class="nav-button">Overview</a>
+            <a href="/workshop/download?file=feedthepolinatores.odp" class="download-button">Download Full Presentation</a>
+        </div>
+    </header>
+
+    <div class="presentation-controls">
+        <button id="prev-slide" class="nav-button"><i class="fa fa-arrow-left"></i> Previous</button>
+        <span id="slide-counter">Slide <span id="current-slide">1</span> of <span id="total-slides">15</span></span>
+        <button id="next-slide" class="nav-button">Next <i class="fa fa-arrow-right"></i></button>
+    </div>
+
+    <div class="slides-container">
+        <!-- Slide 1: Introduction -->
+        <div class="slide" data-slide="1">
+            <h2>Feed the Pollinators</h2>
+            <div class="slide-content">
+                <div class="slide-text">
+                    <p>Welcome to our workshop on supporting pollinators through thoughtful garden design and plant selection.</p>
+                    <p>In this presentation, we'll explore how to create gardens that nourish and support essential pollinators in our ecosystem.</p>
+                </div>
+                <div class="slide-image">
+                    <img src="/static/images/workshops/pollinators/intro.jpg" alt="Pollinator Garden" class="presentation-image">
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 2: Types of Pollinators -->
+        <div class="slide" data-slide="2">
+            <h2>Types of Pollinators</h2>
+            <div class="slide-content">
+                <div class="slide-text">
+                    <p>Pollinators come in many forms:</p>
+                    <ul>
+                        <li>Bees (honey bees, bumble bees, solitary bees)</li>
+                        <li>Butterflies and moths</li>
+                        <li>Hummingbirds</li>
+                        <li>Beetles</li>
+                        <li>Flies</li>
+                        <li>Bats (in some regions)</li>
+                    </ul>
+                    <p>Each pollinator has specific preferences and needs that we can support through our gardens.</p>
+                </div>
+                <div class="slide-image">
+                    <img src="/static/images/workshops/pollinators/types.jpg" alt="Types of Pollinators" class="presentation-image">
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 3: Importance of Pollinators -->
+        <div class="slide" data-slide="3">
+            <h2>Why Pollinators Matter</h2>
+            <div class="slide-content">
+                <div class="slide-text">
+                    <p>Pollinators are essential for:</p>
+                    <ul>
+                        <li>Reproduction of 80% of flowering plants</li>
+                        <li>Production of 1/3 of our food crops</li>
+                        <li>Supporting biodiversity</li>
+                        <li>Maintaining healthy ecosystems</li>
+                    </ul>
+                    <p>Unfortunately, many pollinator populations are in decline due to habitat loss, pesticide use, and climate change.</p>
+                </div>
+                <div class="slide-image">
+                    <img src="/static/images/workshops/pollinators/importance.jpg" alt="Importance of Pollinators" class="presentation-image">
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 4: Bee-Friendly Plants -->
+        <div class="slide" data-slide="4">
+            <h2>Bee-Friendly Plants</h2>
+            <div class="slide-content">
+                <div class="slide-text">
+                    <p>Bees are attracted to:</p>
+                    <ul>
+                        <li><a href="/ENCY/herb_detail/123" class="herb-link">Lavender (Lavandula spp.)</a> - Rich in nectar, attracts honey bees</li>
+                        <li><a href="/ENCY/herb_detail/147" class="herb-link">Borage (Borago officinalis)</a> - Produces abundant nectar for long periods</li>
+                        <li><a href="/ENCY/herb_detail/156" class="herb-link">Echinacea (Echinacea purpurea)</a> - Attractive to bumblebees and solitary bees</li>
+                        <li><a href="/ENCY/herb_detail/185" class="herb-link">Sunflowers (Helianthus annuus)</a> - Provides both pollen and nectar</li>
+                        <li><a href="/ENCY/herb_detail/167" class="herb-link">Thyme (Thymus vulgaris)</a> - Low-growing herb loved by bees</li>
+                    </ul>
+                </div>
+                <div class="slide-image">
+                    <img src="/static/images/workshops/pollinators/bee_plants.jpg" alt="Bee-Friendly Plants" class="presentation-image">
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 5: Butterfly Garden Plants -->
+        <div class="slide" data-slide="5">
+            <h2>Butterfly-Friendly Plants</h2>
+            <div class="slide-content">
+                <div class="slide-text">
+                    <p>Butterflies need both nectar plants for adults and host plants for caterpillars:</p>
+                    <ul>
+                        <li><a href="/ENCY/herb_detail/189" class="herb-link">Milkweed (Asclepias spp.)</a> - Essential host plant for Monarch butterflies</li>
+                        <li><a href="/ENCY/herb_detail/203" class="herb-link">Joe-Pye Weed (Eutrochium purpureum)</a> - Attracts swallowtails and fritillaries</li>
+                        <li><a href="/ENCY/herb_detail/211" class="herb-link">Coneflower (Echinacea spp.)</a> - Provides nectar for many butterfly species</li>
+                        <li><a href="/ENCY/herb_detail/178" class="herb-link">Fennel (Foeniculum vulgare)</a> - Host plant for black swallowtail butterflies</li>
+                        <li><a href="/ENCY/herb_detail/197" class="herb-link">Butterfly Bush (Buddleja davidii)</a> - Attracts many butterfly species</li>
+                    </ul>
+                </div>
+                <div class="slide-image">
+                    <img src="/static/images/workshops/pollinators/butterfly_plants.jpg" alt="Butterfly-Friendly Plants" class="presentation-image">
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 6: Garden Design Principles -->
+        <div class="slide" data-slide="6">
+            <h2>Garden Design for Pollinators</h2>
+            <div class="slide-content">
+                <div class="slide-text">
+                    <p>Effective pollinator garden design includes:</p>
+                    <ul>
+                        <li>Plant in clusters to make it easier for pollinators to find flowers</li>
+                        <li>Include a diversity of flower shapes, sizes, and colors</li>
+                        <li>Plan for continuous blooms throughout the growing season</li>
+                        <li>Incorporate both native and adapted non-native plants</li>
+                        <li>Create sheltered areas and nesting sites</li>
+                        <li>Provide water sources like shallow dishes or bird baths</li>
+                    </ul>
+                </div>
+                <div class="slide-image">
+                    <img src="/static/images/workshops/pollinators/garden_design.jpg" alt="Garden Design Principles" class="presentation-image">
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 7: Seasonal Considerations -->
+        <div class="slide" data-slide="7">
+            <h2>Seasonal Planting Guide</h2>
+            <div class="slide-content">
+                <div class="slide-text">
+                    <p>For year-round pollinator support:</p>
+                    <p><strong>Spring Bloomers:</strong></p>
+                    <ul>
+                        <li><a href="/ENCY/herb_detail/231" class="herb-link">Crocus (Crocus spp.)</a> - Early spring nectar source</li>
+                        <li><a href="/ENCY/herb_detail/245" class="herb-link">Chives (Allium schoenoprasum)</a> - Early blooming herb</li>
+                    </ul>
+                    <p><strong>Summer Bloomers:</strong></p>
+                    <ul>
+                        <li><a href="/ENCY/herb_detail/167" class="herb-link">Thyme (Thymus vulgaris)</a> - Drought-tolerant summer bloomer</li>
+                        <li><a href="/ENCY/herb_detail/156" class="herb-link">Echinacea (Echinacea purpurea)</a> - Mid-summer blooms</li>
+                    </ul>
+                    <p><strong>Fall Bloomers:</strong></p>
+                    <ul>
+                        <li><a href="/ENCY/herb_detail/267" class="herb-link">Goldenrod (Solidago spp.)</a> - Important late-season food source</li>
+                        <li><a href="/ENCY/herb_detail/278" class="herb-link">Asters (Symphyotrichum spp.)</a> - Critical fall nectar source</li>
+                    </ul>
+                </div>
+                <div class="slide-image">
+                    <img src="/static/images/workshops/pollinators/seasonal.jpg" alt="Seasonal Planting Guide" class="presentation-image">
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 8: Avoiding Harmful Practices -->
+        <div class="slide" data-slide="8">
+            <h2>Pollinator-Friendly Practices</h2>
+            <div class="slide-content">
+                <div class="slide-text">
+                    <p><strong>Avoid:</strong></p>
+                    <ul>
+                        <li>Using pesticides, especially neonicotinoids</li>
+                        <li>Removing all dead stems and leaves in fall (they provide overwintering habitat)</li>
+                        <li>Planting double-flowered cultivars that lack accessible nectar</li>
+                    </ul>
+                    <p><strong>Embrace:</strong></p>
+                    <ul>
+                        <li>Organic gardening methods</li>
+                        <li>Leaving some bare soil for ground-nesting bees</li>
+                        <li>Creating "messy" areas with leaf litter and hollow stems</li>
+                        <li>Installing bee houses and butterfly shelters</li>
+                    </ul>
+                </div>
+                <div class="slide-image">
+                    <img src="/static/images/workshops/pollinators/best_practices.jpg" alt="Best Practices" class="presentation-image">
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 9: Creating a Pollinator Pathway -->
+        <div class="slide" data-slide="9">
+            <h2>Creating a Pollinator Pathway</h2>
+            <div class="slide-content">
+                <div class="slide-text">
+                    <p>Connect your garden to the larger ecosystem:</p>
+                    <ul>
+                        <li>Coordinate with neighbors to create continuous habitat</li>
+                        <li>Plant pollinator-friendly trees and shrubs as "stepping stones"</li>
+                        <li>Reduce lawn areas and convert to pollinator meadows</li>
+                        <li>Register your garden with pollinator conservation programs</li>
+                        <li>Share plants and seeds with community members</li>
+                    </ul>
+                </div>
+                <div class="slide-image">
+                    <img src="/static/images/workshops/pollinators/pathway.jpg" alt="Pollinator Pathway" class="presentation-image">
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 10: Resources -->
+        <div class="slide" data-slide="10">
+            <h2>Resources for Pollinator Gardening</h2>
+            <div class="slide-content">
+                <div class="slide-text">
+                    <p><strong>Online Resources:</strong></p>
+                    <ul>
+                        <li>Xerces Society for Invertebrate Conservation</li>
+                        <li>Pollinator Partnership</li>
+                        <li>National Wildlife Federation</li>
+                    </ul>
+                    <p><strong>Books:</strong></p>
+                    <ul>
+                        <li>"Attracting Native Pollinators" by The Xerces Society</li>
+                        <li>"Planting for Honeybees" by Sarah Wyndham Lewis</li>
+                        <li>"Garden Revolution" by Larry Weaner and Thomas Christopher</li>
+                    </ul>
+                    <p><strong>Local Resources:</strong></p>
+                    <ul>
+                        <li>Extension services</li>
+                        <li>Native plant societies</li>
+                        <li>Botanical gardens</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Plant Database Section -->
+    <section class="related-herbs">
+        <h2>Featured Pollinator Plants in Our Database</h2>
+        <div class="herbs-grid">
+            [% IF bee_plants && bee_plants.size > 0 %]
+                [% # Loop through the first 6 bee plants from the database %]
+                [% count = 0 %]
+                [% FOREACH plant IN bee_plants %]
+                    [% # Only show up to 6 plants %]
+                    [% LAST IF count >= 6 %]
+                    <div class="herb-card">
+                        <h3><a href="/ENCY/herb_detail/[% plant.record_id %]">[% plant.botanical_name || 'Unknown Botanical Name' %]</a></h3>
+                        <p>[% plant.common_names || plant.key_name || 'Pollinator Plant' %]</p>
+                        [% IF plant.apis %]<p class="apis-note"><strong>Bee notes:</strong> [% plant.apis.substr(0, 100) %][% IF plant.apis.length > 100 %]...[% END %]</p>[% END %]
+                    </div>
+                    [% count = count + 1 %]
+                [% END %]
+            [% ELSE %]
+                <!-- Fallback if no plants are retrieved from database -->
+                <div class="herb-card">
+                    <h3><a href="/ENCY/herb_detail/123">Lavender</a></h3>
+                    <p>Rich in nectar, attracts honeybees and bumblebees</p>
+                </div>
+                <div class="herb-card">
+                    <h3><a href="/ENCY/herb_detail/147">Borage</a></h3>
+                    <p>Star-shaped blue flowers with abundant nectar</p>
+                </div>
+                <div class="herb-card">
+                    <h3><a href="/ENCY/herb_detail/156">Echinacea</a></h3>
+                    <p>Popular with bees and butterflies</p>
+                </div>
+                <div class="herb-card">
+                    <h3><a href="/ENCY/herb_detail/167">Thyme</a></h3>
+                    <p>Low-growing herb with tiny flowers loved by bees</p>
+                </div>
+                <div class="herb-card">
+                    <h3><a href="/ENCY/herb_detail/189">Milkweed</a></h3>
+                    <p>Essential for Monarch butterflies</p>
+                </div>
+                <div class="herb-card">
+                    <h3><a href="/ENCY/herb_detail/278">Asters</a></h3>
+                    <p>Critical fall nectar source</p>
+                </div>
+            [% END %]
+        </div>
+        <p class="database-link">
+            <a href="/ENCY/herbs" class="button">Explore All Plants in Our Database</a>
+        </p>
+    </section>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const slides = document.querySelectorAll('.slide');
+        const totalSlides = slides.length;
+        const currentSlideEl = document.getElementById('current-slide');
+        const totalSlidesEl = document.getElementById('total-slides');
+        const prevButton = document.getElementById('prev-slide');
+        const nextButton = document.getElementById('next-slide');
+        
+        let currentSlide = 1;
+        
+        // Initialize slide counter
+        totalSlidesEl.textContent = totalSlides;
+        currentSlideEl.textContent = currentSlide;
+        
+        // Show only the first slide initially
+        slides.forEach(slide => {
+            slide.style.display = 'none';
+        });
+        document.querySelector('.slide[data-slide="1"]').style.display = 'block';
+        
+        // Handle next button click
+        nextButton.addEventListener('click', function() {
+            if (currentSlide < totalSlides) {
+                document.querySelector(`.slide[data-slide="${currentSlide}"]`).style.display = 'none';
+                currentSlide++;
+                document.querySelector(`.slide[data-slide="${currentSlide}"]`).style.display = 'block';
+                currentSlideEl.textContent = currentSlide;
+                
+                // Update button states
+                prevButton.disabled = false;
+                if (currentSlide === totalSlides) {
+                    nextButton.disabled = true;
+                }
+                
+                // Scroll to top of slide
+                document.querySelector('.slides-container').scrollTop = 0;
+            }
+        });
+        
+        // Handle previous button click
+        prevButton.addEventListener('click', function() {
+            if (currentSlide > 1) {
+                document.querySelector(`.slide[data-slide="${currentSlide}"]`).style.display = 'none';
+                currentSlide--;
+                document.querySelector(`.slide[data-slide="${currentSlide}"]`).style.display = 'block';
+                currentSlideEl.textContent = currentSlide;
+                
+                // Update button states
+                nextButton.disabled = false;
+                if (currentSlide === 1) {
+                    prevButton.disabled = true;
+                }
+                
+                // Scroll to top of slide
+                document.querySelector('.slides-container').scrollTop = 0;
+            }
+        });
+        
+        // Initialize button states
+        prevButton.disabled = currentSlide === 1;
+        nextButton.disabled = currentSlide === totalSlides;
+        
+        // Add keyboard navigation
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowRight' || e.key === ' ') {
+                nextButton.click();
+            } else if (e.key === 'ArrowLeft') {
+                prevButton.click();
+            }
+        });
+    });
+</script>
+
+<link rel="stylesheet" href="[% c.uri_for('/static/css/components/presentations.css') %]">

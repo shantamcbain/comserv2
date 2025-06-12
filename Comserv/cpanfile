@@ -59,6 +59,14 @@ requires 'Net::CIDR';
 requires 'File::Find';
 requires 'File::Basename';
 requires 'File::Slurp';
+requires 'File::Path';
+requires 'File::Spec';
+
+# PDF and Image handling
+requires 'PDF::API2';
+requires 'PDF::TextBlock';
+requires 'GD';           # For image manipulation
+requires 'GD::Text';
 
 # Network related
 
