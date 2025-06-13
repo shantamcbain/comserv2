@@ -1,31 +1,113 @@
-[% PageVersion = 'coop/index.tt,v 0.01 2024/11/22 shanta Exp shanta ' %]
+[% META title = 'Monashee Coop Technical Support' %]
+[% PageVersion = 'coop/index.tt,v 0.04 2025/04/01 shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
+    [% # Use the standard debug message system %]
+    [% IF debug_msg.defined && debug_msg.size > 0 %]
+        <div class="debug-messages">
+            [% FOREACH msg IN debug_msg %]
+                <p class="debug">Debug: [% msg %]</p>
+            [% END %]
+        </div>
+    [% END %]
 [% END %]
 [% USE Date %]
-
 <div class="container">
+    <!-- Header is provided by layout.tt -->
 
-    <nav>
-        <a href="[% c.uri_for('Http://monasheecoop.com') %]">Main website.</a> |
-        <!-- Add more navigation links as needed -->
-    </nav>
+
+    [% # The navigation menu has been moved to pagetop.tt and TopDropListCoop.tt %]
+
     <main>
-        [% IF c.user.role == 'admin' %]
-            <h2>Admin Dashboard</h2>
-            <p>Use this dashboard to manage coop operations and support tasks.</p>
-            <div class="autocrud-controls">
-                <a href="[% c.uri_for('/admin/autocrud_list', 'documentation') %]" class="button">Edit Documentation</a>
-                <a href="[% c.uri_for('/admin/autocrud_list', 'user') %]" class="button">Manage Users</a>
-                <a href="[% c.uri_for('/admin/autocrud_list', 'ticket') %]" class="button">Manage Tickets</a>
-                <a href="[% c.uri_for('/admin/autocrud_list', 'comment') %]" class="button">Manage Comments</a>
-                <a href="[% c.uri_for('/admin/list_migrations') %]" class="button">Database Migrations</a>
+        [% # Content for not logged in users or normal role users %]
+        [% IF !c.session.username || (c.session.roles && !c.session.roles.grep('^admin$').size) %]
+            <div class="public-view">
+                <h2>Technical Support Center</h2>
+                <div class="alert alert-info">
+                    <p> Our team is ready to assist you with any technical issues or questions.</p>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h3>Member Services</h3>
+                    </div>
+                    <div class="card-body">
+                        <p>Please sign in or create an account to access our support services.</p>
+                        <p>As a registered user, you'll be able to:</p>
+                        <ul>
+                            <li>Submit technical support requests</li>
+                            <li>Monitor the progress of your support tickets</li>
+                            <li>Browse our knowledge base and documentation</li>
+                            <li>Communicate directly with our support specialists</li>
+                        </ul>
+
+                        [% IF !c.session.username %]
+                            <div class="mt-3">
+                                <a href="/user/register" class="btn btn-primary">Create Account</a>
+                                <a href="/user/login" class="btn btn-secondary">Sign In</a>
+                            </div>
+                        [% END %]
+                    </div>
+                </div>
             </div>
-        [% ELSE %]
-            <h2>Support for the Website</h2>
-            <p>Please create an account and log in to access support features.</p>
+        [% END %]
+
+        [% # Admin view - only shown to admin users %]
+        [% IF c.session.roles && c.session.roles.grep('^admin$').size %]
+            <h2>Administrator Dashboard</h2>
+            <p>Welcome to the administrative dashboard for Monashee Coop technical support services.</p>
+            <p>From here, you can manage support tickets, user accounts, and system configurations.</p>
+
+            <div class="features">
+                <h3>Quick Access:</h3>
+                <ul>
+                    <li>View and respond to support tickets</li>
+                    <li>Manage knowledge base articles</li>
+                    <li>Monitor system status</li>
+                    <li><a href="/MCoop/server-room-plan" style="font-weight: bold; color: #006633;">Server Infrastructure</a></li>
+                </ul>
+            </div>
+
+            <div class="admin-section">
+                <h3>Administration</h3>
+                <div class="admin-grid">
+                    <div class="admin-card">
+                        <h4>Infrastructure</h4>
+                        <ul>
+                            <li><a href="/MCoop/server-room-plan">Server Infrastructure</a></li>
+                            <li><a href="#">Network Management</a></li>
+                            <li><a href="#">Backup & Recovery</a></li>
+                        </ul>
+                    </div>
+                    <div class="admin-card">
+                        <h4>User Management</h4>
+                        <ul>
+                            <li><a href="#">Member Directory</a></li>
+                            <li><a href="#">Staff Accounts</a></li>
+                            <li><a href="#">Access Control</a></li>
+                        </ul>
+                    </div>
+                    <div class="admin-card">
+                        <h4>Support Resources</h4>
+                        <ul>
+                            <li><a href="#">Knowledge Base</a></li>
+                            <li><a href="#">Support Tickets</a></li>
+                            <li><a href="#">Documentation</a></li>
+                        </ul>
+                    </div>
+                    <div class="admin-card">
+                        <h4>System Settings</h4>
+                        <ul>
+                            <li><a href="#">Portal Configuration</a></li>
+                            <li><a href="#">Notification Settings</a></li>
+                            <li><a href="#">Interface Customization</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
         [% END %]
     </main>
+
     <footer>
         <p>&copy; [% Date.format(Date.now, '%Y') %] Monashee Coop. All rights reserved.</p>
     </footer>

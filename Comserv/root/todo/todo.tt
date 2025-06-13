@@ -4,16 +4,79 @@
     [%# "Debugging HostName: " _ HostName %]
     [%# INCLUDE 'debug.tt' %]
 [% END %]
-<!-- Include the new CSS file -->
-<link rel="stylesheet" type="text/css" href="/static/css/week_view.css">
+
 
 <h1>ToDo List</h1>
 <h2>[% date_today %]</h2>
 
 
-<form action="/todo/addtodo" method="post">
-    <button type="submit">Add New Record</button>
-</form>
+
+<div class="filter-container">
+    <form action="/todo" method="get">
+        <div class="filter-row">
+            <div class="filter-group">
+                <label for="filter">Time Filter:</label>
+                <select id="filter" name="filter">
+                    <option value="all" [% IF filter_type == 'all' %]selected[% END %]>All Todos</option>
+                    <option value="day" [% IF filter_type == 'day' %]selected[% END %]>Today's Todos</option>
+                    <option value="week" [% IF filter_type == 'week' %]selected[% END %]>This Week's Todos</option>
+                    <option value="month" [% IF filter_type == 'month' %]selected[% END %]>This Month's Todos</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="project_id">Project:</label>
+                <select id="project_id" name="project_id">
+                    <option value="">All Projects</option>
+                    [% IF projects && projects.size > 0 %]
+                        [% FOREACH project IN projects %]
+                            <option value="[% project.id %]" [% IF project_id == project.id %]selected[% END %]>[% project.name %]</option>
+                            [% IF project.sub_projects && project.sub_projects.size > 0 %]
+                                [% FOREACH sub_project IN project.sub_projects %]
+                                    <option value="[% sub_project.id %]" [% IF project_id == sub_project.id %]selected[% END %]>&nbsp;&nbsp;- [% sub_project.name %]</option>
+                                    [% IF sub_project.sub_projects && sub_project.sub_projects.size > 0 %]
+                                        [% FOREACH sub_sub_project IN sub_project.sub_projects %]
+                                            <option value="[% sub_sub_project.id %]" [% IF project_id == sub_sub_project.id %]selected[% END %]>&nbsp;&nbsp;&nbsp;&nbsp;-- [% sub_sub_project.name %]</option>
+                                        [% END %]
+                                    [% END %]
+                                [% END %]
+                            [% END %]
+                        [% END %]
+                    [% END %]
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="status">Status:</label>
+                <select id="status" name="status">
+                    <option value="" [% IF status_filter == '' %]selected[% END %]>Active Todos</option>
+                    <option value="all" [% IF status_filter == 'all' %]selected[% END %]>All Statuses</option>
+                    <option value="new" [% IF status_filter == 'new' %]selected[% END %]>New</option>
+                    <option value="in_progress" [% IF status_filter == 'in_progress' %]selected[% END %]>In Progress</option>
+                    <option value="completed" [% IF status_filter == 'completed' %]selected[% END %]>Completed</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="search">Search:</label>
+                <input type="text" id="search" name="search" placeholder="Search in subject, description, comments..." value="[% search_term %]">
+            </div>
+        </div>
+
+        <div class="filter-buttons">
+            <button type="submit">Apply Filters</button>
+            <button type="button" class="reset-button" onclick="window.location.href='/todo'">Reset Filters</button>
+        </div>
+    </form>
+</div>
+
+<div class="view-buttons">
+    <a href="/todo" class="[% IF !filter_type || filter_type == 'all' %]active[% END %]">List View</a>
+    <a href="/todo/day">Day View</a>
+    <a href="/todo/week">Week View</a>
+    <a href="/todo/month">Month View</a>
+    <a href="/todo/addtodo" style="margin-left: auto;">Add New Todo</a>
+</div>
 <table class="week-view-table">
   <tr>
     <th>Sitename</th>
@@ -73,14 +136,26 @@
       <td>[% task.get_column('status') %]</td>
       <td>[% task.get_column('comments') %]</td>
       <td>[% task.get_column('accumulative_time') %]</td>
-      <td>
+      <td class="action-buttons-cell">
         <form action="/log/log_form" method="POST" target="_blank">
-          <input type="hidden" name="record_id" value="[% task.get_column('record_id') %]">
-          <button type="submit">Add Log</button>
+          <input type="hidden" name="todo_record_id" value="[% task.get_column('record_id') %]">
+          <input type="hidden" name="site_name" value="[% task.get_column('sitename') %]">
+          <input type="hidden" name="start_date" value="[% task.get_column('start_date') %]">
+          <input type="hidden" name="due_date" value="[% task.get_column('due_date') %]">
+          <input type="hidden" name="abstract" value="[% task.get_column('subject') %]">
+          <input type="hidden" name="details" value="[% task.get_column('description') %]">
+          <input type="hidden" name="priority" value="[% task.get_column('priority') %]">
+          <input type="hidden" name="status" value="[% task.get_column('status') %]">
+          <input type="hidden" name="comments" value="[% task.get_column('comments') %]">
+          <button type="submit" class="action-button log-button">Add Log</button>
         </form>
         <form action="/todo/details" method="POST">
-          <input type="hidden" name="record_id" class="[% IF day.todos.$i.due_date < day.date %]overdue[% ELSE %]todo-button[% END %]" value="[% task.get_column('record_id') %]">
-          <button type="submit">Details</button>
+          <input type="hidden" name="record_id" value="[% task.get_column('record_id') %]">
+          <button type="submit" class="action-button details-button">Details</button>
+        </form>
+        <form action="/todo/edit/[% task.get_column('record_id') %]" method="POST">
+          <input type="hidden" name="record_id" value="[% task.get_column('record_id') %]">
+          <button type="submit" class="action-button edit-button">Edit</button>
         </form>
       </td>
     </tr>

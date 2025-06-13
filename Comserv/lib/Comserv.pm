@@ -1,24 +1,29 @@
-package Comserv;
-use Moose;
-use namespace::autoclean;
-use Config::JSON;
-use FindBin '$Bin';
-use Comserv::Util::Logging;
-use Try::Tiny;
+# perl
+                package Comserv;
+                use Moose;
+                use namespace::autoclean;
+                use Config::JSON;
+                use FindBin '$Bin';
+                use Comserv::Util::Logging;
 
-use Catalyst::Runtime 5.80;
-use Catalyst qw/
-    ConfigLoader
-    Static::Simple
-    StackTrace
-    Session
-    Session::Store::File
-    Session::State::Cookie
-    Authentication
-    Authorization::Roles
-    Log::Dispatch
-    Authorization::ACL
-/;
+                # Initialize the logging system
+                BEGIN {
+                    Comserv::Util::Logging->init();
+                }
+
+                use Catalyst::Runtime 5.80;
+                use Catalyst qw/
+                    ConfigLoader
+                    Static::Simple
+                    StackTrace
+                    Session
+                    Session::Store::File
+                    Session::State::Cookie
+                    Authentication
+                    Authorization::Roles
+                    Log::Dispatch
+                    Authorization::ACL
+                /;
 
 extends 'Catalyst';
 
@@ -38,16 +43,8 @@ __PACKAGE__->config(
     encoding => 'UTF-8',
     debug => $ENV{CATALYST_DEBUG} // 0,
     default_view => 'TT',
-    'View::TT' => {
-        INCLUDE_PATH => [
-            __PACKAGE__->path_to('root'),
-            __PACKAGE__->path_to('root', 'WorkShops'),
-        ],
-        WRAPPER => 'layout.tt',
-        DEBUG => 1,
-        TEMPLATE_EXTENSION => '.tt',
-        ERROR => 'error.tt',
-    },
+    use_request_uri_for_path => 1,  # Use the request URI for path matching
+    use_hash_path_suffix => 1,      # Use hash path suffix for better URL handling
     'Plugin::Log::Dispatch' => {
         dispatchers => [
             {
@@ -59,29 +56,57 @@ __PACKAGE__->config(
             },
         ],
     },
-    'Plugin::Authentication' => {
-        default_realm => 'members',
-        realms => {
-            members => {
-                credential => {
-                    class => 'Password',
-                    password_field => 'password',
-                    password_type => 'hashed',
-                },
-                store => {
-                    class => 'DBIx::Class',
-                    user_model => 'DB::User',
-                    role_relation => 'roles',
-                    role_field => 'role',
-                },
-            },
-        },
-    },
-    'Plugin::Session' => {
-        storage => '/tmp/session_data',
-        expires => 3600,
-    },
 );
+                __PACKAGE__->config(
+                    name => 'Comserv',
+                    disable_component_resolution_regex_fallback => 1,
+                    enable_catalyst_header => $ENV{CATALYST_HEADER} // 1,
+                    encoding => 'UTF-8',
+                    debug => $ENV{CATALYST_DEBUG} // 0,
+                    default_view => 'TT',
+                    # Configure URI generation to not include port
+                    using_frontend_proxy => 1,
+                    ignore_frontend_proxy_port => 1,
+                    'Plugin::Authentication' => {
+                        default_realm => 'members',
+                        realms        => {
+                            members => {
+                                credential => {
+                                    class          => 'Password',
+                                    password_field => 'password',
+                                    password_type  => 'hashed',
+                                },
+                                store => {
+                                    class         => 'DBIx::Class',
+                                    user_model    => 'DB::User',
+                                    role_relation => 'roles',
+                                    role_field    => 'role',
+                                },
+                            },
+                        },
+                    },
+                    'Plugin::Session' => {
+                        storage => '/tmp/session_data',
+                        expires => 3600,
+                    },
+                    'Model::ThemeConfig' => {
+                        # Theme configuration model
+                    },
+                    'Model::Proxmox' => {
+                        # Proxmox VE API configuration
+                        proxmox_host => '172.30.236.89',
+                        api_url_base => 'https://172.30.236.89:8006/api2/json',
+                        node => 'pve',  # Default Proxmox node name
+                        image_url_base => 'http://172.30.167.222/kvm-images',  # URL for VM templates
+                        username => 'root',  # Proxmox username
+                        password => 'password',  # Proxmox password - CHANGE THIS TO YOUR ACTUAL PASSWORD
+                        realm => 'pam',  # Proxmox authentication realm
+                    },
+                    'Model::NPM' => {
+                        # NPM configuration is loaded dynamically from environment-specific config files
+                        # See Comserv::Controller::NPM for implementation details
+                    },
+                );
 
 sub psgi_app {
     my $self = shift;
@@ -91,91 +116,67 @@ sub psgi_app {
     return sub {
         my $env = shift;
 
-        $self->config->{enable_catalyst_header} = $ENV{CATALYST_HEADER} // 1;
-        $self->config->{debug} = $ENV{CATALYST_DEBUG} // 0;
+                        $self->config->{enable_catalyst_header} = $ENV{CATALYST_HEADER} // 1;
+                        $self->config->{debug} = $ENV{CATALYST_DEBUG} // 0;
 
-        return $app->($env);
-    };
-}
+                        return $app->($env);
+                    };
+                }
 
-sub check_and_update_schema {
-    my ($self) = @_;
-    my $logging = Comserv::Util::Logging->instance;
 
-    try {
-        my $schema = Comserv::Model::DBEncy->new->schema;
-        my $dbh = $schema->storage->dbh;
+                # Auto-fix for missing modules - attempt to load modules with fallbacks
+                # This ensures the application works even if modules are missing
+                
+                # First, try to load email modules
+                my $email_modules_loaded = 1;
+                eval {
+                    require Comserv::View::Email;
+                    require Comserv::View::Email::Template;
+                };
+                if ($@) {
+                    warn "Warning: Could not load Comserv email view modules: $@\n";
+                    warn "Email functionality may not work correctly.\n";
+                    $email_modules_loaded = 0;
+                    
+                    # Try to auto-install the modules if we're in development mode
+                    if ($ENV{CATALYST_DEBUG}) {
+                        warn "Attempting to auto-install email modules...\n";
+                        eval {
+                            require App::cpanminus;
+                            my $local_lib = __PACKAGE__->path_to('local');
+                            system("cpanm --local-lib=$local_lib --notest Catalyst::View::Email Catalyst::View::Email::Template");
+                            
+                            # Try loading again after installation
+                            require Comserv::View::Email;
+                            require Comserv::View::Email::Template;
+                            $email_modules_loaded = 1;
+                        };
+                        if ($@) {
+                            warn "Auto-installation failed: $@\n";
+                            warn "Email functionality will be limited.\n";
+                        }
+                    }
+                }
+                
+                # Check for session store modules
+                my $session_modules_loaded = 1;
+                eval {
+                    require Catalyst::Plugin::Session::Store::File;
+                };
+                if ($@) {
+                    warn "Warning: Could not load session store modules: $@\n";
+                    warn "Using fallback session storage mechanism.\n";
+                    $session_modules_loaded = 0;
+                    
+                    # Configure to use Cookie store as fallback
+                    __PACKAGE__->config(
+                        'Plugin::Session' => {
+                            storage => 'Cookie',
+                        }
+                    );
+                }
 
-        # Check if the schema is up-to-date
-        my $tables_exist = $dbh->selectrow_array("SHOW TABLES LIKE 'sitedomain'");
+                
+                __PACKAGE__->setup();
 
-        if ($tables_exist) {
-            # Assume no differences for now
-            $self->{schema_needs_update} = 0;
-        } else {
-            $self->deploy_schema();
-            $self->{schema_needs_update} = 0;
-        }
-    } catch {
-        $logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'check_and_update_schema', "Error: $_");
-        $self->{schema_needs_update} = 1;
-    };
-}
-
-sub schema_needs_update {
-    my ($self) = @_;
-    return $self->{schema_needs_update};
-}
-
-sub deploy_schema {
-    my ($self) = @_;
-    my $logging = Comserv::Util::Logging->instance;
-    
-    try {
-        # Get the schema
-        my $schema = Comserv::Model::DBEncy->new->schema;
-        
-        # Deploy the schema
-        $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'deploy_schema', "Deploying schema");
-        $schema->deploy();
-        $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'deploy_schema', "Schema deployed successfully");
-        
-        return 1;
-    } catch {
-        $logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'deploy_schema', "Error deploying schema: $_");
-        return 0;
-    };
-}
-
-__PACKAGE__->setup();
-
-=encoding utf8
-
-=head1 NAME
-
-Comserv - Catalyst based application
-
-=head1 SYNOPSIS
-
-    script/comserv_server.pl
-
-=head1 DESCRIPTION
-
-[enter your description here]
-
-=head1 SEE ALSO
-
-L<Comserv::Controller::Root>, L<Catalyst>
-
-=head1 AUTHOR
-
-Shanta McBain
-
-=head1 LICENSE
-
-This library is free software. You can redistribute it and/or modify
-it under the same terms as Perl itself.
-
-=cut
-
-1;
+                1;

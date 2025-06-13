@@ -1,4 +1,5 @@
-[% PageVersion	= 'CSC/CSC.tt,v 0.01 2023/08/30 shanta Exp shanta '	%]
+[% META title = 'Computer Systems Consulting' %]
+[% PageVersion = 'CSC/CSC.tt,v 0.03 2025/04/29 shanta Exp shanta ' %]
 [% debug %]
 [% IF c.session.debug_mode == 1 %]
  [%	PageVersion %]
@@ -24,21 +25,22 @@
 <p>We are in the need of Perl programmers and graphic designers. Be sure to check the jobs link in the top links.
 <p> Services provided: Click The product link in the main links group.
 <ul>
-<li><a href='http://www.computersystemconsulting.ca/Hosting.php'>Website hosting</a> </li>
+<li><a href='/hosting'>Website hosting</a></li>
 <li> <a href='http://www.computersystemconsulting.ca/domains'>Register your domain with us.</a></li>
 <li> Check out our <a href='http://demo.computersystemconsulting.ca' target='_blank'>Demo</a> </li>
+<li> <a href='/CSC/email_test'><strong>Email Test Form</strong></a> - Test the email functionality</li>
 <li>
 <h1>Join our VOIP services</h1>
-<p> <a href='http://computersystemconsulting.ca:5000/voip' name='Contact' target='_blank' title=' '>Learn more</a>
+<p> <a href='/voip'>Learn more</a>
 <li>We now offer over 1000 new communities to our phone options. Get one from your target community.</li>
 </li>
 </ul>
 <h2>Crypto currency</h2>
-<p>BitCoin and other coins are in the news a lot lately. The air is filled with. Wallets. Exchanges. <a href='https://computersystemconsulting.ca/cgi-bin/index.cgi?site=CSC&amp;page=MigratingToCrypto' target='_blank'>Join us in that adventure.</a> of fingerling it out.</p>
+<p>BitCoin and other coins are in the news a lot lately. The air is filled with. Wallets. Exchanges. <a href='https://computersystemconsulting.ca/MigratingToCrypto' target='_blank'>Join us in that adventure.</a> of fingerling it out.</p>
 <strong>
 New</strong>Pay for your services with us. Two BitCoin exchanges
 </p>
-<h2> <a href='http://computersystemconsultig.ca:5000/vpn' target='_blank' name='Our VPN Services'>vpn </a></h2>
+<h2> <a href='/vpn' target='_blank' name='Our VPN Services'>vpn </a></h2>
 <p>We now offer several choices of Virtual Private Network option. Click the VPN link on the left for more information.</p>
 
 

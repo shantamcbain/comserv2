@@ -14,20 +14,14 @@
                 <a href="https://3d.usbm.ca" target="_blank">3d Printing </a>
                <a href="https://3d.local:3000" target="_blank">local 3d Printing </a>                <a href="https://ve7tit.com" target="_blank">ve7tit.com   </a>
                 <a href="https://altpowerstore.com" target="_blank">altpowerstore.com</a>
-[% FOREACH link = c.stash.dbi.query("SELECT * FROM internal_links_tb
-                                WHERE  category = 'Hosted_link' AND (username_of_poster = '$username' OR share = 'public')
-                                  AND (sitename =  '$SiteName')
-                                  ORDER BY link_order
-                                    ")%]
-
-
+[% IF hosted_links.defined %]
+    [% FOREACH link IN hosted_links %]
        <a href="[% link.url %]" name="Contact" target="[%link.target %]"title="[% link.name %] "><font   class="LeftSideBarNavStyle">[% link.name %]</font></a>
       [% IF c.session.group == 'admin' %]
         <a href="/edit_link?link_id=[% link.id %]">Edit/Delete</a>
-        [% END %]
-
-
-  [% END %]
+      [% END %]
+    [% END %]
+[% END %]
                 <!-- Add more hosted options -->
                 [% IF c.session.hosted_links.size %]
                     [% FOREACH link IN c.session.hosted_links %]

@@ -1,39 +1,12 @@
-[% META title = 'Add Project' %]
-[% PageVersion = 'todo/editproject.tt,v 0.01 2024/03/15 shanta Exp shanta ' %]
-[% IF debug_mode == 1 %]
-    [% PageVersion %]
-[% END %]
-
-
-<h1>Edit Project [% project.id %]</h1>
-
-<!-- Display the error message if there is one -->
-[% IF error_message %]
-    <p class="error">[% error_message %]</p>
-[% END %]
-
+Edit Project
 
 <form method="POST" action="/project/update_project">
     <input type="hidden" id="project_id" name="project_id" value="[% project.id %]">
-    <label for="sitename">Site Name:</label><br>
-       [% INCLUDE 'site_selection.tt' %]
-
-
-<form method="POST" action="/project/create_project">
    [% INCLUDE "todo/site_list.tt" %]<br>
     <button type="button" onclick="openAddSiteForm()">Add Site</button><br>
 
     <label for="name">Project Name:</label><br>
     <input type="text" id="name" name="name" value="[% project.name %]" required><br>
-
-<label for="parent_id">Parent Project:</label><br>
-<select id="parent_id" name="parent_id">
-    <option value="" [% IF project.parent_id == '' OR project.parent_id == 0 %]selected[% END %]>None</option>
-    [% FOREACH proj IN projects %]
-        <option value="[% proj.id %]" [% IF proj.id == project.parent_id %]selected[% END %]>[% proj.name %]</option>
-    [% END %]
-</select><br>
-
 
     <label for="parent_id">Parent Project:</label>
 

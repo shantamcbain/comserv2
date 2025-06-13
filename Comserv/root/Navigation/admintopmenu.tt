@@ -1,162 +1,322 @@
-[% PageVersion = 'admintopmenu.tt,v 0.2 2023/08/30 shanta Exp shanta ' %]
+[% PageVersion = 'admintopmenu.tt,v 0.3 2025/06/01 shanta Exp shanta ' %]
 [% IF debug == 1 %]
     [% PageVersion %]
     [% #INCLUDE 'debug.tt' %]
 [% END %]
-<ul class="horizontal-menu">
-    <li class="horizontal-dropdown">
-        <a href="/admin" class="dropbtn">Admin</a>
-        <div class="dropdown-content">
-            <a href="/add_link?menu=admin">Add New Link</a>
-    <div class="submenu-item">
-    <span class="submenu-header"><a href="/admin" class="dropbtn">admin</a></span>
-    <div class="submenu">
-                <a href='/admin/view_log'>View Log</a>
+<li class="horizontal-dropdown">
+    <a href="/admin" class="dropbtn"><i class="icon-admin"></i>Admin</a>
+    <div class="dropdown-content">
+        <a href="/add_link?menu=admin"><i class="icon-add"></i>Add New Link</a>
+        
+        <div class="submenu-item">
+            <span class="submenu-header"><a href="/admin" class="dropbtn"><i class="icon-admin"></i>Admin</a></span>
+            <div class="submenu">
+                <a href='/admin/view_log'><i class="icon-log"></i>View Log</a>
+                <a href="/admin/git_pull"><i class="icon-log"></i>Git Pull</a>
+                <a href='/ProxyManager'><i class="icon-log"></i>Proxy Manager</a>
+                <a href="/log"><i class="icon-log"></i>Open Log</a>
+            </div>
+        </div>
 
-        <a href="/documentation">Documentation</a>
-<!--<a href="[% c.uri_for(c.controller('Log').action_for('log')) %]">Open Log</a>-->
-<!-- Manually constructing the URL as a temporary workaround-->
+        <!-- Projects Section with Improved Navigation -->
+        <div class="submenu-item">
+            <span class="submenu-header"><a href="/project" class="dropbtn"><i class="icon-file"></i>Projects</a></span>
+            <div class="submenu">
+                <a href="/project/addproject"><i class="icon-add"></i>Add New Project</a>
+                <!-- Project List -->
+                [% IF projects && projects.size %]
+                    <div class="project-list-container">
+                        [% MACRO display_projects(projects, level) BLOCK %]
+                            <ul class="project-list level-[% level %]">
+                            [% FOREACH project IN projects.sort('name') %]
+                                <li>
+                                    <a href="/project/details?project_id=[% project.id %]">[% project.name %]</a>
+                                    [% IF project.sub_projects.size && level < 3 %]
+                                        [% display_projects(project.sub_projects, level + 1) %]
+                                    [% END %]
+                                </li>
+                            [% END %]
+                            </ul>
+                        [% END %]
+                        
+                        [% projects_to_display = c.controller('Project').fetch_projects_with_subprojects(c) %]
+                        [% IF projects_to_display.size %]
+                            [% display_projects(projects_to_display, 1) %]
+                        [% ELSE %]
+                            <p class="no-projects">No projects available</p>
+                        [% END %]
+                    </div>
+                [% ELSE %]
+                    <a href="/project"><i class="icon-list"></i>View All Projects</a>
+                [% END %]
+            </div>
+        </div>
 
-<a href="/log">Open Log</a>
-        <a href="[% c.uri_for(c.controller('project').action_for('project')) %]">Projects</a>
+        <!-- Documentation Section with Improved Navigation -->
+        <div class="submenu-item">
+            <span class="submenu-header"><a href="/documentation" class="dropbtn"><i class="icon-documentation"></i>Documentation</a></span>
+            <div class="submenu">
+                <a href="/documentation"><i class="icon-list"></i>All Documentation</a>
+                <a href="/documentation?category=user_guides"><i class="icon-user-guide"></i>User Guides</a>
+                <a href="/documentation?category=admin_guides"><i class="icon-admin-guide"></i>Admin Guides</a>
+                <a href="/documentation?category=tutorials"><i class="icon-tutorial"></i>Tutorials</a>
+                <a href="/documentation?category=changelog"><i class="icon-changelog"></i>Changelog</a>
+                [% IF c.session.roles.grep('admin').size || c.session.roles.grep('developer').size %]
+                    <div class="submenu-section">
+                        <span class="submenu-section-title">Admin Resources</span>
+                        <a href="/documentation/linux_commands"><i class="icon-terminal"></i>Linux Commands</a>
+                        <a href="/admin/edit_documentation"><i class="icon-edit"></i>Edit Documentation</a>
+                    </div>
+                [% END %]
+            </div>
+        </div>
 
-    </div>
-</div>
-
-<div class="submenu-item">
-    <span class="submenu-header">ToDo</span>
-    <div class="submenu">
-        <a href="/todo">ToDo</a>
-        <a href="/todo/display_tables">ToDo Tables</a>
-        <a href="/todo/day">ToDo Day</a>
-        <a href="/todo/week">ToDo Week</a>
-  [% FOREACH todo IN c.session.todos %]
-    <form action="/todo/details" method="POST">
-        <input type="hidden" name="record_id" value="[% todo.record_id %]">
-        <button type="submit" style="background:none!important; border:none; padding:0!important; color:#069; text-decoration:underline; cursor:pointer;">Priority: [% todo.priority %], Subject: [% todo.subject %]</button>
-    </form>
-[% END %]
-    </div>
-</div>
-
-<div class="submenu-item">
-    <span class="submenu-header"><a href="/file">File Management</a></span>
-    <div class="submenu">
-        <a href="/file">File</a>
-    </div>
-<div class="submenu">
-        <a href="/file/upload_file">Upload a file.</a>
-       <a href="/file/files">files in db.</a>
-    </div>
-    <div class="submenu">
-  <form action="file/search_and_insert" method="get">
-    <label for="fileType">Select file type:</label>
-    <select id="fileType">
-        <option value="txt">Text</option>
-        <option value="doc">Word Document</option>
-        <option value="pdf">PDF</option>
-        <option value="odt">Open Document</option>
-        <option value="epub">eBook</option>
-        <option value="jpg">JPEG Image</option>
-        <option value="png">PNG Image</option>
-        <option value="gif">GIF Image</option>
-        <option value="mp4">MP4 Video</option>
-        <option value="mp3">MP3 Audio</option>
-        <option value="epub">EPUB eBook</option>
-        <option value="mobi">MOBI eBook</option>
-        <option value="azw">AZW eBook</option>
-        <option value="fb2">FB2 eBook</option>
-        <option value="ibooks">iBooks eBook</option>
-        <option value="xls">Excel Spreadsheet</option>
-        <option value="xlsx">Excel 2007+ Spreadsheet</option>
-        <option value="ods">OpenDocument Spreadsheet</option>
-        <option value="csv">CSV File</option>
-        <option value="zip">zip File</option>
-    </select>
-       <input type="submit" value="Start Search">
-</form>
-    </div>
-</div>
-
-  <div class="submenu-item">
-    <span class="submenu-header"><a href="/log">Loging</a></span>
-    <div class="submenu">
-        <a href="log">Loging system</a>
-    </div>
-</div>
-          <div class="submenu-item">
-    <span class="submenu-header">User</span>
-    <div class="submenu">
-        <a href="/user/list_users">List User</a>
-        <a href="/todo/display_tables">ToDo Tables</a>
-    </div>
-</div>
-
-            <div class="submenu-item">
-                <span class="submenu-header">Setup</span>
-                <div class="submenu">
-                    <a href="/site">Site Setup</a>
-                    <a href="/site/add_site_form">Add Site</a>
-                    <a href="/site/list_domains">All Sites</a>
-                    <a href="/admin/edit_documentation">Documentation editing</a>
-                    <a href="/documentation">/Documentation</a>
-                    <a href="/css_form">CSS Settings</a>
-                    <a href="/admin/users">Users</a>
-                    <a href="/display_schema">Schema</a>
-            <a href="/mail/add_mail_config_form">Mail Configuration</a>
-
+        <div class="submenu-item">
+            <span class="submenu-header"><a href="/todo" class="dropbtn"><i class="icon-todo"></i>ToDo</a></span>
+            <div class="submenu">
+                <a href="/todo"><i class="icon-todo"></i>All Todos</a>
+                <a href="/todo/addtodo"><i class="icon-add"></i>Add New Todo</a>
+                
+                <!-- Time-based Views -->
+                <div class="submenu-section">
+                    <span class="submenu-section-title">Time Views</span>
+                    <a href="/todo?filter=day"><i class="icon-day"></i>Today's Todos</a>
+                    <a href="/todo?filter=week"><i class="icon-week"></i>This Week's Todos</a>
+                    <a href="/todo?filter=month"><i class="icon-month"></i>This Month's Todos</a>
+                    <a href="/todo/day"><i class="icon-day"></i>Day View</a>
+                    <a href="/todo/week"><i class="icon-week"></i>Week View</a>
+                    <a href="/todo/month"><i class="icon-month"></i>Month View</a>
                 </div>
+                
+                <!-- Admin Tools -->
+                [% IF c.session.roles.grep('admin').size %]
+                    <div class="submenu-section">
+                        <span class="submenu-section-title">Admin Tools</span>
+                        <a href="/todo/display_tables"><i class="icon-tables"></i>ToDo Tables</a>
+                    </div>
+                [% END %]
+                
+                <!-- Recent Todos -->
+                [% IF c.session.todos && c.session.todos.size %]
+                    <div class="submenu-section">
+                        <span class="submenu-section-title">Recent Todos</span>
+                        <div class="recent-todos-container">
+                            [% FOREACH todo IN c.session.todos %]
+                                <form action="/todo/details" method="POST" class="recent-todo-form">
+                                    <input type="hidden" name="record_id" value="[% todo.record_id %]">
+                                    <button type="submit" class="recent-todo-button">
+                                        <span class="todo-priority priority-[% todo.priority %]">[% todo.priority %]</span>
+                                        <span class="todo-subject">[% todo.subject %]</span>
+                                    </button>
+                                </form>
+                            [% END %]
+                        </div>
+                    </div>
+                [% END %]
             </div>
-            <div class="submenu-item">
-                <span class="submenu-header">Select Domain</span>
-                <div class="submenu">
-                    <a href="?site=BMaster" class="site-dropdown-item" onclick="activateSite('BMaster')">BMaster</a>
-                     <a href="http://bmaster.local:3000" class="site-dropdown-item" onclick="activateSite('BMaster')">BMaster.local</a>
-                   <a href="?site=CSC" class="site-dropdown-item" onclick="activateSite('CSC')">CSC</a>
-                   <a href="http://comserv.local:3000" class="site-dropdown-item" onclick="activateSite('CSC')">CSC local</a>
-                    <a href="?site=Dev" class="site-dropdown-item" onclick="activateSite('Dev')">Dev</a>
-                    <a href="?site=Monashee" class="site-dropdown-item" onclick="activateSite('Monashee')">Monashee</a>
-                    <a href="?site=None" class="site-dropdown-item" onclick="activateSite('None')">None</a>
-                    <a href="?site=Forager" class="site-dropdown-item" onclick="activateSite('Forager')">Forager</a>
-                    <a href="?site=Shanta" class="site-dropdown-item" onclick="activateSite('Shanta')">Shanta</a>
-                   <a href="http://shanta.local:3000" class="site-dropdown-item" onclick="activateSite('Shanta')">Shanta.local</a>
-                    <a href="?site=SunFire" class="site-dropdown-item" onclick="activateSite('SunFire')
-">SunFire</a>
-           <a href="http://usbm.ca:5000" class="site-dropdown-item" onclick="activateSite('USBM')">USBM</a>
-           <a href="?site=WB" class="site-dropdown-item" onclick="activateSite('wb')">WeaverBeck.com</a>
-                   <a href="http://ve7tit.local:3000" class="site-dropdown-item" target="_blank" onclick="activateSite('ve7tit')">ve7tit.local</a>
-          <a href="/?site=home" class="site-dropdown-item" onclick="activateSite('home')
-">Default home</a>               </div>
-            </div>
-            <div class="submenu-item">
-                <span class="submenu-header">System Links</span>
-                <div class="submenu">
-                    <a href="/admin/edit_admin_notes">Edit Admin Notes</a>
-                    [% FOREACH link = c.stash.dbi.query("SELECT * FROM page_tb WHERE (menu = 'Admin' AND status = 2) AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
-                        <a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=[% link.page_code %]" name="Contact" target="[% link.target %]" title=" [% linkview_.name %] "><font class="LeftSideBarNavStyle">[% link.view_name %]</font></a>
-                    [% END %]
-                </div>
-            </div>
-            <div class="submenu-item">
-                <span class="submenu-header">TTML List</span>
-                <div class="submenu">
-                    [% FOREACH link = c.stash.dbi.query("SELECT * FROM internal_links_tb WHERE category = 'Admin_links' AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
-                        <a href="[% link.url %]?site=[% SiteName %]&amp;[% session_string %]&amp;[% link.view_name %]" name="Contact" target="[% link.target %]" title=" [% link.name %] "><font class="LeftSideBarNavStyle">[% link.name %]</font></a>
-                    [% END %]
-                </div>
-            </div>
-            <div class="submenu-item">
-                <span class="submenu-header">Other Options</span>
-                <div class="submenu">
-                    [% IF c.session.debug_mode == 1 %]
-                        <a href="[% c.session.return_url %]?debug=0">Toggle Debug Mode OFF</a>
-                    [% ELSE %]
-                        <a href="[% c.session.return_url %]?debug=1">Toggle Debug Mode ON</a>
-                    [% END %]
-            <a href="/debug" target="_blank">Debug</a>
-                   <a href="https://computersystemconsulting.ca:10000" target="_blank">Sunfire WHM</a>
+        </div>
+
+        <div class="submenu-item">
+            <span class="submenu-header"><a href="/file"><i class="icon-file"></i>File Management</a></span>
+            <div class="submenu">
+                <a href="/file"><i class="icon-file"></i>File Dashboard</a>
+                <a href="/file/upload_file"><i class="icon-upload"></i>Upload a File</a>
+                <a href="/file/files"><i class="icon-file"></i>Files in Database</a>
+                
+                <!-- File Search Section -->
+                <div class="submenu-section">
+                    <span class="submenu-section-title">Search by File Type</span>
+                    <div class="file-search-container">
+                        <form action="file/search_and_insert" method="get" class="file-search-form">
+                            <select id="fileType" name="fileType" class="file-type-select">
+                                <optgroup label="Documents">
+                                    <option value="txt">Text</option>
+                                    <option value="doc">Word Document</option>
+                                    <option value="pdf">PDF</option>
+                                    <option value="odt">Open Document</option>
+                                </optgroup>
+                                <optgroup label="Images">
+                                    <option value="jpg">JPEG Image</option>
+                                    <option value="png">PNG Image</option>
+                                    <option value="gif">GIF Image</option>
+                                </optgroup>
+                                <optgroup label="Media">
+                                    <option value="mp4">MP4 Video</option>
+                                    <option value="mp3">MP3 Audio</option>
+                                </optgroup>
+                                <optgroup label="eBooks">
+                                    <option value="epub">EPUB eBook</option>
+                                    <option value="mobi">MOBI eBook</option>
+                                    <option value="azw">AZW eBook</option>
+                                    <option value="fb2">FB2 eBook</option>
+                                    <option value="ibooks">iBooks eBook</option>
+                                </optgroup>
+                                <optgroup label="Spreadsheets">
+                                    <option value="xls">Excel Spreadsheet</option>
+                                    <option value="xlsx">Excel 2007+ Spreadsheet</option>
+                                    <option value="ods">OpenDocument Spreadsheet</option>
+                                    <option value="csv">CSV File</option>
+                                </optgroup>
+                                <optgroup label="Archives">
+                                    <option value="zip">ZIP Archive</option>
+                                </optgroup>
+                            </select>
+                            <button type="submit" class="file-search-button">Search</button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
-    </li>
-</ul>
+
+        <div class="submenu-item">
+            <span class="submenu-header"><a href="/log"><i class="icon-log"></i>Logging</a></span>
+            <div class="submenu">
+                <a href="/log"><i class="icon-log"></i>Logging System</a>
+                <a href="/admin/view_log"><i class="icon-view"></i>View Application Log</a>
+                <a href="/admin/git_pull"><i class="icon-git"></i>Pull from Git Repository</a>
+            </div>
+        </div>
+
+        <!-- User Management Section -->
+        <div class="submenu-item">
+            <span class="submenu-header"><a href="/user/list_users"><i class="icon-user"></i>User Management</a></span>
+            <div class="submenu">
+                <a href="/user/list_users"><i class="icon-user-list"></i>List All Users</a>
+                <a href="/admin/users"><i class="icon-user-admin"></i>User Administration</a>
+                [% IF c.session.roles.grep('admin').size %]
+                    <a href="/user/add_user"><i class="icon-add"></i>Add New User</a>
+                [% END %]
+            </div>
+        </div>
+
+        <!-- Setup Section -->
+        <div class="submenu-item">
+            <span class="submenu-header"><a href="/site"><i class="icon-setup"></i>System Setup</a></span>
+            <div class="submenu">
+                <!-- Site Management -->
+                <div class="submenu-section">
+                    <span class="submenu-section-title">Site Management</span>
+                    <a href="/site"><i class="icon-domain"></i>Site Setup</a>
+                    <a href="/site/add_site_form"><i class="icon-add"></i>Add Site</a>
+                    <a href="/site/list_domains"><i class="icon-domain"></i>All Sites</a>
+                </div>
+                
+                <!-- System Configuration -->
+                <div class="submenu-section">
+                    <span class="submenu-section-title">System Configuration</span>
+                    <a href="/css_form"><i class="icon-css"></i>CSS Settings</a>
+                    <a href="/display_schema"><i class="icon-schema"></i>Database Schema</a>
+                    <a href="/mail/add_mail_config_form"><i class="icon-mail-config"></i>Mail Configuration</a>
+                    <a href="/ApiCredentials"><i class="icon-key"></i>API Credentials</a>
+                    <a href="/cloudflareapi"><i class="icon-cloud"></i>Cloudflare DNS</a>
+                </div>
+                
+                <!-- Network Management -->
+                <div class="submenu-section">
+                    <span class="submenu-section-title">Network Management</span>
+                    <a href="/admin/network_devices"><i class="icon-network"></i>Network Devices</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Domain Selection -->
+        <div class="submenu-item">
+            <span class="submenu-header"><a href="/site/list_domains"><i class="icon-domain"></i>Select Domain</a></span>
+            <div class="submenu">
+                <div class="domain-list-container">
+                    <!-- Production Sites -->
+                    <div class="submenu-section">
+                        <span class="submenu-section-title">Production Sites</span>
+                        <a href="?site=BMaster" class="site-dropdown-item" onclick="activateSite('BMaster')">BMaster</a>
+                        <a href="?site=CSC" class="site-dropdown-item" onclick="activateSite('CSC')">CSC</a>
+                        <a href="?site=Monashee" class="site-dropdown-item" onclick="activateSite('Monashee')">Monashee</a>
+                        <a href="?site=Forager" class="site-dropdown-item" onclick="activateSite('Forager')">Forager</a>
+                        <a href="?site=Shanta" class="site-dropdown-item" onclick="activateSite('Shanta')">Shanta</a>
+                        <a href="?site=SunFire" class="site-dropdown-item" onclick="activateSite('SunFire')">SunFire</a>
+                        <a href="?site=USBM" class="site-dropdown-item" onclick="activateSite('USBM')">USBM</a>
+                        <a href="?site=WB" class="site-dropdown-item" onclick="activateSite('wb')">WeaverBeck.com</a>
+                    </div>
+                    
+                    <!-- Local Development -->
+                    <div class="submenu-section">
+                        <span class="submenu-section-title">Local Development</span>
+                        <a href="http://bmaster.local:3000" class="site-dropdown-item">BMaster.local</a>
+                        <a href="http://comserv.local:3000" class="site-dropdown-item">CSC local</a>
+                        <a href="http://shanta.local:3000" class="site-dropdown-item">Shanta.local</a>
+                        <a href="http://ve7tit.local:3000" class="site-dropdown-item" target="_blank">ve7tit.local</a>
+                    </div>
+                    
+                    <!-- Other Options -->
+                    <div class="submenu-section">
+                        <span class="submenu-section-title">Other Options</span>
+                        <a href="?site=Dev" class="site-dropdown-item" onclick="activateSite('Dev')">Development</a>
+                        <a href="?site=None" class="site-dropdown-item" onclick="activateSite('None')">None</a>
+                        <a href="/?site=home" class="site-dropdown-item" onclick="activateSite('home')">Default home</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Links -->
+        <div class="submenu-item">
+            <span class="submenu-header"><a href="/admin"><i class="icon-link"></i>System Links</a></span>
+            <div class="submenu">
+                <a href="/admin/edit_admin_notes"><i class="icon-edit"></i>Edit Admin Notes</a>
+                
+                <!-- System Management -->
+                <div class="submenu-section">
+                    <span class="submenu-section-title">System Management</span>
+                    <a href="/admin/git_pull"><i class="icon-git"></i>Pull from Git Repository</a>
+                    <a href="/admin/view_log"><i class="icon-log"></i>View Application Log</a>
+                    <a href="/admin/theme"><i class="icon-theme"></i>Theme Management</a>
+                </div>
+                
+                <!-- Dynamic Links -->
+                <div class="submenu-section">
+                    <span class="submenu-section-title">Admin Links</span>
+                    [% FOREACH link = c.stash.dbi.query("SELECT * FROM page_tb WHERE (menu = 'Admin' AND status = 2) AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
+                        <a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=[% link.page_code %]" name="Contact" target="[% link.target %]" title="[% link.view_name %]">[% link.view_name %]</a>
+                    [% END %]
+                </div>
+                
+                <!-- TTML Links -->
+                <div class="submenu-section">
+                    <span class="submenu-section-title">TTML Links</span>
+                    [% FOREACH link = c.stash.dbi.query("SELECT * FROM internal_links_tb WHERE category = 'Admin_links' AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
+                        <a href="[% link.url %]?site=[% SiteName %]&amp;[% session_string %]&amp;[% link.view_name %]" name="Contact" target="[% link.target %]" title="[% link.name %]">[% link.name %]</a>
+                    [% END %]
+                </div>
+            </div>
+        </div>
+
+        <!-- MCOOP Admin Section -->
+        [% IF c.session.roles && c.session.roles.grep('^admin$').size && (c.session.SiteName == 'MCOOP' || c.stash.SiteName == 'MCOOP') %]
+        <div class="submenu-item">
+            <span class="submenu-header"><a href="/mcoop"><i class="icon-mcoop"></i>MCOOP Admin</a></span>
+            <div class="submenu">
+                <a href="/mcoop"><i class="icon-home"></i>MCOOP Home</a>
+                <a href="/mcoop/server-room-plan"><i class="icon-server"></i>Server Room Plan</a>
+                <a href="/mcoop/network"><i class="icon-network"></i>Network Infrastructure</a>
+                <a href="/mcoop/services"><i class="icon-service"></i>COOP Services</a>
+                <a href="/mcoop/admin/infrastructure"><i class="icon-infrastructure"></i>Infrastructure Management</a>
+                <a href="/mcoop/admin/reports"><i class="icon-report"></i>COOP Reports</a>
+                <a href="/mcoop/admin/planning"><i class="icon-planning"></i>Strategic Planning</a>
+            </div>
+        </div>
+        [% END %]
+
+        <!-- Debug Options -->
+        <div class="submenu-item">
+            <span class="submenu-header"><i class="icon-debug"></i>Debug Options</span>
+            <div class="submenu">
+                [% IF c.session.debug_mode == 1 %]
+                    <a href="[% c.session.return_url %]?debug=0"><i class="icon-toggle-off"></i>Toggle Debug Mode OFF</a>
+                [% ELSE %]
+                    <a href="[% c.session.return_url %]?debug=1"><i class="icon-toggle-on"></i>Toggle Debug Mode ON</a>
+                [% END %]
+                <a href="/debug" target="_blank"><i class="icon-debug"></i>Debug Console</a>
+                <a href="https://computersystemconsulting.ca:10000" target="_blank"><i class="icon-server"></i>Sunfire WHM</a>
+            </div>
+        </div>
+    </div>
+</li>

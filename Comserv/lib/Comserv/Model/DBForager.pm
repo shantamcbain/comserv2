@@ -1,27 +1,71 @@
 package Comserv::Model::DBForager;
 
 use strict;
-
-use JSON;  # Add this line
+use JSON;
 use base 'Catalyst::Model::DBIC::Schema';
-
-use FindBin;
-use File::Spec;
+use Catalyst::Utils;  # For path_to
+use Data::Dumper;
 
 # Load the database configuration from db_config.json
-my $config_file = File::Spec->catfile($FindBin::Bin, '..', 'db_config.json');
+my $config_file;
 my $json_text;
-{
+
+# Try to load the config file using Catalyst::Utils if the application is initialized
+eval {
+    $config_file = Catalyst::Utils::path_to('db_config.json');
+};
+
+# Fallback to FindBin if Catalyst::Utils fails (during application initialization)
+if ($@ || !defined $config_file) {
+    use FindBin;
+    use File::Basename;
+    use Cwd 'abs_path';
+    
+    # Get the application root directory (one level up from script or lib)
+    my $bin_dir = $FindBin::Bin;
+    my $app_root;
+    
+    # If we're in a script directory, go up one level to find app root
+    if ($bin_dir =~ /\/script$/) {
+        $app_root = dirname($bin_dir);
+    }
+    # If we're somewhere else, try to find the app root
+    else {
+        # Check if we're already in the app root
+        if (-f "$bin_dir/db_config.json") {
+            $app_root = $bin_dir;
+        }
+        # Otherwise, try one level up
+        elsif (-f dirname($bin_dir) . "/db_config.json") {
+            $app_root = dirname($bin_dir);
+        }
+        # If all else fails, assume we're in lib and need to go up one level
+        else {
+            $app_root = dirname($bin_dir);
+        }
+    }
+    
+    $config_file = "$app_root/db_config.json";
+    warn "Using FindBin fallback for config file: $config_file";
+}
+
+# Load the configuration file
+eval {
     local $/; # Enable 'slurp' mode
     open my $fh, "<", $config_file or die "Could not open $config_file: $!";
     $json_text = <$fh>;
     close $fh;
+};
+
+if ($@) {
+    die "Error loading config file $config_file: $@";
 }
+
 my $config = decode_json($json_text);
 
 # Print the configuration for debugging
 print "DBForager Configuration:\n";
-print "Host: $config->{shanta_forager}->{host} (should be localhost)\n";
+print "Host: $config->{shanta_forager}->{host}\n";
 print "Database: $config->{shanta_forager}->{database}\n";
 print "Username: $config->{shanta_forager}->{username}\n";
 
@@ -29,7 +73,8 @@ print "Username: $config->{shanta_forager}->{username}\n";
 __PACKAGE__->config(
     schema_class => 'Comserv::Model::Schema::Forager',
     connect_info => {
-        dsn => "dbi:$config->{shanta_forager}->{db_type}:dbname=$config->{shanta_forager}->{database};host=$config->{shanta_forager}->{host};port=$config->{shanta_forager}->{port}",
+        # Fixed DSN format for MySQL - most common format
+        dsn => "dbi:mysql:database=$config->{shanta_forager}->{database};host=$config->{shanta_forager}->{host};port=$config->{shanta_forager}->{port}",
         user => $config->{shanta_forager}->{username},
         password => $config->{shanta_forager}->{password},
         mysql_enable_utf8 => 1,
@@ -54,7 +99,28 @@ sub get_herbal_data {
     return [$dbforager->all]
 
 }
-# In Comserv::Model::DBForager
+# Get herbs with bee forage information
+sub get_bee_forage_plants {
+    my ($self) = @_;
+
+    # Search for herbs that have apis, nectar, or pollen information
+    my $bee_plants = $self->schema->resultset('Herb')->search(
+        {
+            -or => [
+                'apis' => { '!=' => '', '!=' => undef },
+                'nectar' => { '!=' => '', '!=' => undef },
+                'pollen' => { '!=' => '', '!=' => undef }
+            ]
+        },
+        {
+            order_by => 'botanical_name',
+            columns => [qw(record_id botanical_name common_names apis nectar pollen image)]
+        }
+    );
+
+    return [$bee_plants->all];
+}
+
 # In Comserv::Model::DBForager
 sub get_herbs_with_apis {
     my ($self) = @_;

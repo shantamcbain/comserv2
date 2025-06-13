@@ -18,11 +18,11 @@ sub get_top_todos {
     # Validate that roles are an array reference
     if (ref $roles ne 'ARRAY') {
         # Log the error
-        $c->log->error("Expected roles to be an ARRAY but got: " . ref($roles) || 'undef');
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_top_todos', "Expected roles to be an ARRAY but got: " . ref($roles) || 'undef');
 
         # Set an error message and return gracefully
         $c->stash->{error_msg} = "Invalid roles format in session. Please log in again.";
-        $c->res->redirect($c->uri_for('/login'));
+        $c->res->redirect($c->uri_for('/user/login'));
         $c->detach;
     }
 
@@ -30,14 +30,14 @@ sub get_top_todos {
     my @roles = @$roles;
 
     # Log the roles being used (debugging information)
-    $c->log->debug("Roles available for Todo: " . join(', ', @roles));
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_top_todos', "Roles available for Todo: " . join(', ', @roles));
 
     # Example: Check if user is an admin
     if (grep { $_ eq 'admin' } @roles) {
-        $c->log->debug("User has admin privilege.");
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_top_todos', "User has admin privilege.");
         # Allow some admin-specific logic
     } else {
-        $c->log->debug("User does not have admin privilege.");
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_top_todos', "User does not have admin privilege.");
         # Handle non-admin logic
     }
 

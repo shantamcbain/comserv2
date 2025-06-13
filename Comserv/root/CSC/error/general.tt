@@ -1,0 +1,13 @@
+[% META title = 'Error' %]
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="alert alert-danger">
+                <h3><i class="fa fa-exclamation-triangle"></i> Error</h3>
+                <p>[% error_message || 'An unexpected error occurred. Please try again later.' %]</p>
+                <p><a href="[% c.uri_for('/') %]" class="btn btn-primary">Return to Home</a></p>
+            </div>
+        </div>
+    </div>
+</div>

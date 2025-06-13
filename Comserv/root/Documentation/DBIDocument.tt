@@ -1,23 +1,134 @@
-
-
-[% PageVersion = 'Documentation/DBIDocument.tt,v 0.02 2024/05/22 Shanta Exp shanta ' %]
+[% PageVersion = 'Documentation/DBIDocument.tt,v 0.03 2024/08/15 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
     [%# "Debugging HostName: " _ HostName %]
     [%# INCLUDE 'debug.tt' %]
 [% END %]
-
 <h1>DBI Setup</h1>
 <p>DBI (Database Independent Interface) is a database access module for the Perl programming language. It defines a set of methods, variables, and conventions that provide a consistent database interface, independent of the actual database being used.</p>
-<p>In the `Comserv::Model::DBEncy` and `Comserv::Model::DBForager` modules, DBI is used to establish connections to the respective MySQL databases ('Ency' and 'Forager').</p>
-<p>The database connection information for each module is retrieved from a JSON file named 'db_config.json', which contains details such as the database name, host, port, username, and password.</p>
-<p>The `_build_dbh` method in each module is responsible for establishing the database connection using the DBI->connect method.</p>
 
-<h2>Database Operations</h2>
-<p>The `DBEncy` and `DBForager` modules provide methods for performing various database operations specific to their respective MySQL databases.</p>
+<h2>Overview</h2>
+<p>The `Comserv::Model::DBEncy` and `Comserv::Model::DBForager` modules are used to access the 'Ency' and 'Forager' MySQL databases, respectively. These modules are designed to be used as models in a Catalyst application.</p>
 
-<h2>Debugging</h2>
-<p>The code includes extensive debugging output, with print statements showing the progress of execution and the values of important variables. This can be very helpful for troubleshooting problems with database operations.</p>
+<h2>Database Configuration</h2>
+<p>The database configuration for each module is loaded from a JSON file named `db_config.json`. This file contains details such as the database name, host, port, username, and password. The structure of the `db_config.json` file is as follows:</p>
+<pre><code>{
+    "shanta_ency": {
+        "database": "ency_db",
+        "host": "localhost",
+        "port": 3306,
+        "username": "user",
+        "password": "password"
+    },
+    "shanta_forager": {
+        "database": "forager_db",
+        "host": "localhost",
+        "port": 3306,
+        "username": "user",
+        "password": "password"
+    }
+}
+</code></pre>
+
+<h3>Configuration File Loading</h3>
+<p>As of August 2024, the configuration file loading mechanism has been improved to handle different execution environments (Starman vs. comserv_server.pl) more robustly. The system now uses a two-step approach:</p>
+
+<ol>
+    <li>First, it attempts to load the configuration file using <code>Catalyst::Utils::path_to</code>, which resolves paths relative to the application root directory regardless of the current working directory.</li>
+    <li>If that fails (which can happen during application initialization), it falls back to using a smart detection algorithm to locate the application root directory and find the configuration file.</li>
+</ol>
+
+<p>This approach ensures that the configuration file can be found regardless of which directory the application is started from, without relying on hard-coded relative paths.</p>
+
+<pre><code>
+# Try to load the config file using Catalyst::Utils if the application is initialized
+eval {
+    $config_file = Catalyst::Utils::path_to('db_config.json');
+};
+
+# Fallback to smart detection if Catalyst::Utils fails (during application initialization)
+if ($@ || !defined $config_file) {
+    use FindBin;
+    use File::Basename;
+    
+    # Get the application root directory (one level up from script or lib)
+    my $bin_dir = $FindBin::Bin;
+    my $app_root;
+    
+    # If we're in a script directory, go up one level to find app root
+    if ($bin_dir =~ /\/script$/) {
+        $app_root = dirname($bin_dir);
+    }
+    # If we're somewhere else, try to find the app root
+    else {
+        # Check if we're already in the app root
+        if (-f "$bin_dir/db_config.json") {
+            $app_root = $bin_dir;
+        }
+        # Otherwise, try one level up
+        elsif (-f dirname($bin_dir) . "/db_config.json") {
+            $app_root = dirname($bin_dir);
+        }
+        # If all else fails, assume we're in lib and need to go up one level
+        else {
+            $app_root = dirname($bin_dir);
+        }
+    }
+    
+    $config_file = "$app_root/db_config.json";
+    warn "Using FindBin fallback for config file: $config_file";
+}
+</code></pre>
+
+<h2>Database Connection</h2>
+<p>The database connection is established using the DBI->connect method. The `schema_class` and `connect_info` attributes are set in each module to specify the database schema and connection details. It is important to note that `DBEncy` and `DBForager` provide the database connections, and no other controller or model needs to know the connection details.</p>
+<pre><code>__PACKAGE__->config(
+    schema_class => 'Comserv::Model::Schema::Ency',
+    connect_info => {
+        dsn => "dbi:mysql:dbname=$config->{shanta_ency}->{database};host=$config->{shanta_ency}->{host};port=$config->{shanta_ency}->{port}",
+        user => $config->{shanta_ency}->{username},
+        password => $config->{shanta_ency}->{password},
+    }
+);
+</code></pre>
+
+<h2>Methods</h2>
+<p>Both modules provide several methods for performing various database operations. Here are some key methods:</p>
+
+<h3>Comserv::Model::DBEncy</h3>
+<ul>
+    <li><strong>get_active_projects</strong>: Fetches active projects for a given site.</li>
+    <li><strong>get_table_info</strong>: Retrieves schema information for a specified table.</li>
+</ul>
+
+<h3>Comserv::Model::DBForager</h3>
+<ul>
+    <li><strong>get_herbal_data</strong>: Fetches herbal data from the database.</li>
+    <li><strong>get_herbs_with_apis</strong>: Retrieves herbs with non-empty 'apis' fields.</li>
+    <li><strong>get_herb_by_id</strong>: Fetches a herb by its ID.</li>
+    <li><strong>searchHerbs</strong>: Searches for herbs based on a search string.</li>
+</ul>
+
+<h2>Debugging, Logging, and Error Handling</h2>
+<p>Both modules include extensive debugging output, with print statements showing the progress of execution and the values of important variables. This can be very helpful for troubleshooting problems with database operations.</p>
+
+<p>The improved configuration file loading mechanism also includes enhanced error handling to provide more detailed information when issues occur:</p>
+
+<pre><code>
+# Load the configuration file
+eval {
+    local $/; # Enable 'slurp' mode
+    open my $fh, "<", $config_file or die "Could not open $config_file: $!";
+    $json_text = <$fh>;
+    close $fh;
+};
+
+if ($@) {
+    die "Error loading config file $config_file: $@";
+}
+</code></pre>
+
+<p>This approach ensures that any errors encountered during the loading of the configuration file are properly reported, making it easier to diagnose and fix issues.</p>
 
 <h2>Security</h2>
 <p>The code employs security measures such as hashing passwords using the Digest::SHA module to ensure secure password storage.</p>

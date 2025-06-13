@@ -2,8 +2,11 @@ body {
   font-family: Verdana, Helvetica, sans-serif;
   font-size: 20px;
   color: black;
-  background-color: #ccffff;
+  background: url("../images/CSC/background.jpg") no-repeat center center fixed;
+  background-size: cover;
+  background-color: #ccffff; /* Fallback color */
 }
+
 header {
     /* Site Greeting */
 }

@@ -25,14 +25,14 @@
        # Usage: [% results = INCLUDE execute_query('DBName', 'SELECT * FROM table') %]
 
        # Use the RemoteDB model to execute the query
-       IF database == 'ENCY' || database == 'ency' %]
-           [% results = c.model('DBEncy').schema.storage.dbh.selectall_arrayref(query, { Slice => {} }) %]
-       [% ELSIF database == 'FORAGER' || database == 'forager' %]
-           [% results = c.model('DBForager').schema.storage.dbh.selectall_arrayref(query, { Slice => {} }) %]
-       [% ELSE %]
-           [% # For remote databases, use the RemoteDB model
-              results = c.model('RemoteDB').execute_query(c, database, query, []) %]
-       [% END %]
+       IF database == 'ENCY' || database == 'ency';
+           results = c.model('DBEncy').schema.storage.dbh.selectall_arrayref(query, { Slice => {} });
+       ELSIF database == 'FORAGER' || database == 'forager';
+           results = c.model('DBForager').schema.storage.dbh.selectall_arrayref(query, { Slice => {} });
+       ELSE;
+           # For remote databases, use the RemoteDB model
+           results = c.model('RemoteDB').execute_query(c, database, query, []);
+       END;
 
        # Return the results
        results;

@@ -1,5 +1,214 @@
+[% META title = 'error.tt' %]
+[% PageVersion	= 'error.tt,v 0.01.01 2025/03/31 shanta Exp shanta '	%]
+[% IF debug_mode == 1 %]
+ [%	PageVersion %]
+ [% IF debug_msg %]<div class="debug-message">[% debug_msg %]</div>[% END %]
+[% END %]
 
-    <h1>Error</h1>
-    <p>[% error_msg %]</p>
-    <a href="[% c.uri_for('/') %]">Return to Home</a>
+<div class="error-container">
+    <h1>[% error_title || 'Error' %]</h1>
+
+    <div class="error-message">
+        <p>[% error_msg %]</p>
+
+        [% IF admin_msg %]
+        <p class="admin-message">[% admin_msg %]</p>
+        [% END %]
+
+        [% IF action_required %]
+        <div class="action-required">
+            <h3>Action Required:</h3>
+            <p>[% action_required %]</p>
+        </div>
+        [% END %]
+        
+        [% IF setup_instructions %]
+        <div class="setup-instructions">
+            <h3>Setup Instructions:</h3>
+            <p>To install Docker and set up Nginx Proxy Manager:</p>
+            <ol>
+                <li>Go to the <a href="[% c.uri_for('/proxymanager/setup_infrastructure') %]">Infrastructure Setup</a> page</li>
+                <li>Click the "Install Docker" button and wait for the installation to complete</li>
+                <li>Once Docker is installed, click the "Install NPM" button</li>
+                <li>After installation, you can access the NPM admin interface at <a href="http://localhost:81" target="_blank">http://localhost:81</a></li>
+                <li>Log in with the default credentials (admin\@example.com / changeme)</li>
+                <li>Generate an API key in the NPM admin interface</li>
+                <li>Update the API key in your configuration file</li>
+            </ol>
+            
+            <div class="warning">
+                <p>You may need to log out and log back in after Docker installation for group changes to take effect.</p>
+            </div>
+        </div>
+        [% END %]
+
+        [% IF technical_details && c.session.debug_mode %]
+        <div class="technical-details">
+            <h3>Technical Details:</h3>
+            <p>[% technical_details %]</p>
+        </div>
+        [% END %]
+        
+        [% IF available_equipment && available_equipment.size > 0 %]
+        <div class="available-equipment">
+            <h3>Available Equipment Pages:</h3>
+            <ul>
+                [% FOREACH equip IN available_equipment %]
+                <li><a href="/ve7tit/equipment/[% equip %]">[% equip %]</a></li>
+                [% END %]
+            </ul>
+        </div>
+        [% END %]
+
+        [% IF debug_msg.defined || debug_msg_str.defined %]
+        <div class="debug-message">
+            <h3>Debug Message:</h3>
+            [% IF debug_msg.size && debug_msg.0.defined %]
+                <!-- Handle debug_msg as an array -->
+                [% FOREACH msg IN debug_msg %]
+                    <p>[% msg %]</p>
+                [% END %]
+            [% ELSIF debug_msg_str.defined %]
+                <!-- Handle debug_msg_str as a string -->
+                <p>[% debug_msg_str %]</p>
+            [% ELSE %]
+                <!-- Handle debug_msg as a string (legacy) -->
+                <p>[% debug_msg %]</p>
+            [% END %]
+        </div>
+        [% END %]
+
+        [% IF debug_errors.size && c.session.debug_mode %]
+        <div class="debug-errors">
+            <h3>Debug Errors:</h3>
+            <ul>
+                [% FOREACH error IN debug_errors %]
+                <li>[% error %]</li>
+                [% END %]
+            </ul>
+        </div>
+        [% END %]
+    </div>
+
+    <div class="error-actions">
+        <a href="[% c.uri_for('/') %]" class="btn btn-primary">Return to Home</a>
+
+        [% IF c.session.debug_mode %]
+        <a href="javascript:history.back()" class="btn btn-secondary">Go Back</a>
+        [% END %]
+    </div>
+</div>
+
+<style>
+    .error-container {
+        max-width: 800px;
+        margin: 50px auto;
+        padding: 20px;
+        background-color: #f8f9fa;
+        border-radius: 5px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .error-container h1 {
+        color: #dc3545;
+        margin-bottom: 20px;
+    }
+
+    .error-message {
+        margin-bottom: 30px;
+    }
+
+    .admin-message {
+        font-style: italic;
+        color: #6c757d;
+    }
+
+    .technical-details {
+        background-color: #f1f1f1;
+        padding: 15px;
+        border-left: 4px solid #007bff;
+        margin-top: 20px;
+    }
+
+    .action-required {
+        background-color: #fff3cd;
+        padding: 15px;
+        border-left: 4px solid #ffc107;
+        margin-top: 20px;
+    }
+
+    .action-required h3 {
+        color: #856404;
+        margin-top: 0;
+    }
+
+    .debug-message {
+        background-color: #fff3cd;
+        padding: 15px;
+        border-left: 4px solid #ffc107;
+        margin-top: 20px;
+    }
+
+    .debug-errors {
+        background-color: #f8d7da;
+        padding: 15px;
+        border-left: 4px solid #dc3545;
+        margin-top: 20px;
+    }
+
+    .debug-errors ul {
+        margin: 0;
+        padding-left: 20px;
+    }
+
+    .debug-errors li {
+        margin-bottom: 5px;
+    }
+    
+    .available-equipment {
+        background-color: #d1ecf1;
+        padding: 15px;
+        border-left: 4px solid #17a2b8;
+        margin-top: 20px;
+    }
+    
+    .available-equipment h3 {
+        color: #0c5460;
+        margin-top: 0;
+    }
+    
+    .available-equipment ul {
+        columns: 2;
+        -webkit-columns: 2;
+        -moz-columns: 2;
+    }
+    
+    .available-equipment li {
+        margin-bottom: 5px;
+    }
+
+    .error-actions {
+        margin-top: 30px;
+    }
+
+    .btn {
+        display: inline-block;
+        padding: 8px 16px;
+        margin-right: 10px;
+        text-decoration: none;
+        border-radius: 4px;
+    }
+
+    .btn-primary {
+        background-color: #007bff;
+        color: white;
+    }
+
+    .btn-secondary {
+        background-color: #6c757d;
+        color: white;
+    }
+</style>
+
+
 

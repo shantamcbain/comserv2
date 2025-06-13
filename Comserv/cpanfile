@@ -1,29 +1,22 @@
 requires 'Moose';
 requires 'namespace::autoclean';
 requires 'JSON::MaybeXS';
-requires 'Catalyst::ScriptRunner';  # Ensure ScriptRunner is explicitly required
-requires 'DBIx::Class::Schema::Loader';
-requires 'Socket';
-requires 'Sys::Hostname';
 requires 'Term::Menus';
 
+# System modules
+requires 'Socket';
+requires 'Sys::Hostname';
 requires 'MooseX::MarkAsMethods';
-requires 'DBD::mysql';
 requires 'Catalyst::Runtime' => '5.90130';
 requires 'Catalyst::Model';
 requires 'Catalyst::Restarter';
-requires 'DBI';
 requires 'DBIx::Class';
 requires 'DBIx::Class::Schema::Loader';
 requires 'DBIx::Class::TimeStamp';
 requires 'DBIx::Class::Migration';
 requires 'DBIx::Class::EncodedColumn';
 requires 'SQL::Translator';
-
-#json
-requires 'JSON';
-requires 'Config::JSON';
-
+requires 'DBD::mysql';
 #json
 requires 'JSON';
 requires 'Config::JSON';
@@ -35,11 +28,15 @@ requires 'Template::Plugin::JSON';
 requires 'Template::Plugin::Number::Format';
 requires 'Template::Plugin::URL';
 requires 'Template::Plugin::DBI';
+requires 'Template::Plugin::Markdown';
+
+# Catalyst Plugins
 requires 'Catalyst::Plugin::ConfigLoader';
 requires 'Catalyst::Plugin::Static::Simple';
 requires 'Catalyst::Plugin::StackTrace';
 requires 'Catalyst::Plugin::Session';
 requires 'Catalyst::Plugin::Session::Store::FastMmap';
+requires 'Catalyst::Plugin::Session::Store::Delegate';
 requires 'Catalyst::Plugin::Session::Store::DBIC';
 requires 'Catalyst::Plugin::Session::Store::Cookie';
 requires 'Catalyst::Plugin::Session::Store::File';
@@ -51,19 +48,19 @@ requires 'Catalyst::Plugin::Authorization::ACL';
 requires 'Catalyst::Plugin::Log::Dispatch';
 requires 'Log::Dispatch::Config';
 requires 'Catalyst::View::TT';
-requires 'Catalyst::Authentication::Store::DBIx::Class';
-# Add these lines to cpanfile
-requires 'Catalyst::View::JSON';  # Required for AutoCRUD JSON view
-requires 'JSON::MaybeXS';        # JSON backend# DateTime related
+# DateTime related
 requires 'DateTime';
 requires 'DateTime::Event::Recurrence';
 requires 'DateTime::Format::Strptime';
 requires 'DateTime::Format::ISO8601';
+requires 'Net::CIDR';
 
 # File handling
 requires 'File::Find';
 requires 'File::Basename';
 requires 'File::Slurp';
+
+# Network related
 
 # Cryptography and Security
 requires 'Digest::SHA';
@@ -74,9 +71,15 @@ requires 'Email::Simple::Creator';
 requires 'Email::Sender::Simple';
 
 # Utility modules
-requires 'JSON';
 requires 'URI::Escape';
 requires 'Data::FormValidator';
+requires 'LWP::UserAgent';
+requires 'HTTP::Request';
+requires 'Try::Tiny';
+requires 'Text::Markdown';
+requires 'YAML::XS';
+requires 'YAML::Tiny';
+requires 'YAML::Syck';
 
 # Development and testing
 requires 'Term::ReadPassword';

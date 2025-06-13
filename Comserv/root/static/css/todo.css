@@ -1,26 +1,191 @@
-No content yet
-.todo-actions {
-    margin: 10px 0;
+.week-view-table {
+    width: 100%;
 }
 
-.todo-actions button {
-    margin-right: 10px;
+/* Todo action buttons */
+.action-buttons-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.action-button {
     padding: 5px 10px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    width: 100%;
+}
+
+.log-button {
+    background-color: #4CAF50;
+    color: white;
+}
+
+.details-button {
+    background-color: #2196F3;
+    color: white;
+}
+
+.edit-button {
+    background-color: #FF9800;
+    color: white;
+}
+
+.action-button:hover {
+    opacity: 0.9;
+}
+
+/* Todo filter container */
+.filter-container {
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.filter-group {
+    flex: 1;
+    min-width: 200px;
+}
+
+.filter-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.filter-group select,
+.filter-group input[type="text"] {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.filter-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.filter-buttons button {
+    padding: 8px 15px;
     background-color: #4CAF50;
     color: white;
     border: none;
-    border-radius: 3px;
+    border-radius: 4px;
     cursor: pointer;
 }
 
-.log-entries {
-    margin-left: 20px;
-    padding: 10px;
-    background-color: #f9f9f9;
-    border-left: 3px solid #4CAF50;
+.filter-buttons button:hover {
+    background-color: #45a049;
 }
 
-.log-entries ul {
-    list-style-type: none;
-    padding-left: 0;
+.filter-buttons .reset-button {
+    background-color: #f44336;
+}
+
+.filter-buttons .reset-button:hover {
+    background-color: #d32f2f;
+}
+
+/* Todo view buttons */
+.view-buttons {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.view-buttons a {
+    padding: 8px 15px;
+    background-color: #2196F3;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.view-buttons a:hover {
+    background-color: #0b7dda;
+}
+
+.view-buttons a.active {
+    background-color: #0b7dda;
+    font-weight: bold;
+}
+
+/* Day view specific styles */
+.day-view-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    margin-top: 20px;
+}
+
+.day-view-table th, .day-view-table td {
+    border: 1px solid var(--border-color, #ddd);
+    padding: 10px;
+    word-wrap: break-word;
+}
+
+.day-view-table th {
+    background-color: var(--table-header-bg, #f2f2f2);
+    color: var(--text-color, #000000);
+    text-align: left;
+}
+
+.day-navigation {
+    display: flex;
+    justify-content: space-between;
+    margin: 20px 0;
+}
+
+.day-navigation a {
+    padding: 8px 15px;
+    background-color: var(--button-bg, #f2f2f2);
+    color: var(--button-text, #000000);
+    text-decoration: none;
+    border-radius: 4px;
+    border: 1px solid var(--button-border, #cccccc);
+}
+
+.day-navigation a:hover {
+    background-color: var(--button-hover-bg, #e0e0e0);
+}
+
+.action-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.action-cell button {
+    padding: 5px 10px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    width: 100%;
+}
+
+.priority-1 {
+    background-color: #ffcccc;
+}
+
+.priority-2 {
+    background-color: #ffffcc;
+}
+
+.priority-3 {
+    background-color: #ccffcc;
 }

@@ -1,88 +1,287 @@
 [% META title = 'Projects Documentation' %]
-[% PageVersion = 'Documentation/Projects.tt,v 0.03 2025/02/28 Shanta Exp shanta ' %]
+    [% PageVersion = 'Documentation/Projects.tt,v 0.06 2025/08/25 Shanta Exp shanta ' %]
+[% IF debug == 1 %]
+    [% PageVersion %]
+[% END %]
 
-<h1 id="projects-top">Projects System Documentation</h1>
+    <h1 id="projects-top">Projects System Documentation</h1>
 
-<nav>
-    <a href="#projects-overview">Projects Overview</a> |
-    <a href="#projects-controller">Projects Controller</a> |
-    <a href="#projects-model">Projects Model</a> |
-    <a href="#projects-templates">Projects Templates</a> |
-    <a href="#projects-workflow">Projects Workflow</a>
-    <a href="#projects-usage">Projects Usage</a>
-</nav>
+    <nav>
+        <a href="#projects-overview">Projects Overview</a> |
+        <a href="#projects-controller">Projects Controller</a> |
+        <a href="#projects-model">Projects Model</a> |
+        <a href="#projects-templates">Projects Templates</a> |
+        <a href="#projects-ui">Projects UI Components</a> |
+        <a href="#projects-filtering">Projects Filtering</a> |
+        <a href="#projects-workflow">Projects Workflow</a> |
+        <a href="#projects-usage">Projects Usage</a> |
+        <a href="#projects-troubleshooting">Troubleshooting</a>
+    </nav>
 
-<h2 id="projects-overview">Projects Overview</h2>
-<p>The Projects system is designed to manage and organize projects within the application. It provides functionality for creating, updating, and viewing project details, ensuring efficient project management and data integrity.</p>
-<p><a href="#projects-top">Back to top</a></p>
-<h2 id="projects-controller">Projects Controller</h2>
-<p>The <code>Comserv::Controller::Project</code> module handles the routing and logic for project-related actions:</p>
-<ul>
-    <li><strong>Index:</strong> Redirects to the project list.</li>
-    <li><strong>Add Project:</strong> Prepares data for adding a new project, sorts projects alphabetically by name, and fetches all sites.</li>
-    <li><strong>Create Project:</strong> Processes form submissions to create new projects, handles errors, and redirects on success.</li>
-    <li><strong>Project List:</strong> Displays a list of projects.</li>
-    <li><strong>Project Details:</strong> Shows detailed information for a specific project and fetches associated todos.</li>
-    <li><strong>Edit Project:</strong> Prepares data for editing an existing project.</li>
-    <li><strong>Update Project:</strong> Updates project data based on form submissions.</li>
-</ul>
-<p><a href="#projects-top">Back to top</a></p>
-<h2 id="projects-model">Projects Model</h2>
-<p>The <code>Comserv::Model::Project</code> module provides methods for interacting with the project data:</p>
-<ul>
-    <li><strong>Get Projects:</strong> Retrieves a list of active projects for a site.</li>
-    <li><strong>Get Project:</strong> Retrieves a specific project by ID.</li>
-</ul>
-<p><a href="#projects-top">Back to top</a></p>
-<h2 id="projects-templates">Projects Templates</h2>
-<p>The following templates are used in the Projects system:</p>
-<ul>
-    <li><strong>todo/add_project.tt:</strong> Form for adding new projects.</li>
-    <li><strong>todo/project.tt:</strong> Displays the list of projects.</li>
-    <li><strong>todo/projectdetails.tt:</strong> Shows detailed information for a project.</li>
-    <li><strong>todo/editproject.tt:</strong> Form for editing existing projects.</li>
-</ul>
+    <h2 id="projects-overview">Projects Overview</h2>
+    <p>The Projects system manages hierarchical project structures with support for parent-child relationships. Each project can have multiple sub-projects, and the system maintains data integrity through proper handling of user permissions and data validation.</p>
 
-<h2 id="projects-workflow">Projects Workflow</h2>
-<p>The typical workflow for managing projects involves navigating to the project list, selecting a project to view or edit, and using forms to add or update project information. The system ensures data integrity and user feedback through success and error messages.</p>
-<p><a href="#projects-top">Back to top</a></p>
-<h2 id="projects-usage">How to Use the Projects Module</h2>
+    <h2 id="projects-controller">Projects Controller</h2>
+    <p>Key features in <code>Comserv::Controller::Project</code>:</p>
+    <ul>
+        <li><strong>Project Creation:</strong> Handles form submissions with proper validation for:
+            <ul>
+                <li>Parent-child relationships (parent_id)</li>
+                <li>User authentication and username tracking</li>
+                <li>Required fields and data type validation</li>
+            </ul>
+        </li>
+        <li><strong>Project Hierarchy:</strong> Manages up to 4 levels of sub-projects</li>
+        <li><strong>Project Listing:</strong> Displays projects in a card-based layout, sorted by name</li>
+        <li><strong>Error Handling:</strong> Provides detailed error messages and logging</li>
+        <li><strong>UI Configuration:</strong> Sets up the UI with:
+            <ul>
+                <li>CSS loading with cache-busting timestamps</li>
+                <li>Fluid container layout for better card display</li>
+                <li>Debug mode for troubleshooting</li>
+                <li>Template timestamp for forced reloading</li>
+            </ul>
+        </li>
+    </ul>
+    
+    <h3>Controller Code Example</h3>
+    <pre><code># Add the projects and filter info to the stash
+$c->stash(
+    projects => $projects,
+    role_filter => $role_filter,
+    project_filter => $project_filter,
+    priority_filter => $priority_filter,
+    template => 'todo/project.tt',
+    template_timestamp => time(), # Add a timestamp to force template reload
+    additional_css => ['/static/css/components/project-cards.css?v=' . time()], # Add timestamp to force CSS reload
+    use_fluid_container => 1, # Use fluid container for better card layout
+    debug_mode => 1 # Enable debug mode to see template version
+);</code></pre>
 
-<p>The Projects module provides a comprehensive system for managing projects and sub-projects. Below are the steps to add, edit, and manage projects:</p>
+    <h2 id="projects-model">Projects Model</h2>
+    <p>The database schema includes these key fields:</p>
+    <ul>
+        <li>id (Primary Key)</li>
+        <li>name (Project name)</li>
+        <li>parent_id (Optional, for sub-projects)</li>
+        <li>sitename (Associated site)</li>
+        <li>status (Project status)</li>
+        <li>username_of_poster (Creator/owner)</li>
+        <li>Various metadata fields (dates, descriptions, etc.)</li>
+    </ul>
 
-<h3>Adding a New Project</h3>
-<ol>
-    <li>Navigate to the "Add Project" page by selecting the "Add Project" option from the Projects menu.</li>
-    <li>Fill out the form with the necessary details:
-        <ul>
-            <li><strong>Site Name:</strong> Select the site associated with the project.</li>
-            <li><strong>Project Name:</strong> Enter a unique name for the project.</li>
-            <li><strong>Description:</strong> Provide a brief description of the project.</li>
-            <li><strong>Start Date and End Date:</strong> Specify the project timeline.</li>
-            <li><strong>Status:</strong> Choose the current status of the project (e.g., Requested, In-Process).</li>
-            <li><strong>Project Code:</strong> Enter a code to identify the project.</li>
-            <li><strong>Additional Details:</strong> Fill in other fields such as Project Size, Estimated Man Hours, Developer Name, and Client Name.</li>
-        </ul>
-    </li>
-    <li>Click "Add Project" to save the new project.</li>
-</ol>
-<p><a href="#projects-top">Back to top</a></p>
-<h3>Editing an Existing Project</h3>
-<ol>
-    <li>Go to the "Project List" and select the project you wish to edit.</li>
-    <li>Click on the "Edit Project" button to open the edit form.</li>
-    <li>Update the project details as needed and click "Update Project" to save changes.</li>
-</ol>
-<p><a href="#projects-top">Back to top</a></p>
-<h3>Managing Sub-Projects</h3>
-<ol>
-    <li>To add a sub-project, navigate to the "Project Details" page of the parent project.</li>
-    <li>Click on "Add Sub-Project" and fill out the form with the sub-project details.</li>
-    <li>Sub-projects can be managed similarly to main projects, with options to edit and update their details.</li>
-</ol>
+    <h2 id="projects-templates">Projects Templates</h2>
+    <p>Current template structure:</p>
+    <ul>
+        <li><strong>todo/project.tt:</strong> Main project listing with vertical card-based layout
+            <ul>
+                <li>Displays projects as collapsible vertical cards</li>
+                <li>Includes filter panel for project and priority filtering</li>
+                <li>Includes inline critical CSS to ensure proper rendering</li>
+                <li>Uses recursive macros to display hierarchical project structure</li>
+                <li>Implements JavaScript for collapsible functionality</li>
+            </ul>
+        </li>
+        <li><strong>todo/add_project.tt:</strong> Project creation form</li>
+        <li><strong>todo/editproject.tt:</strong> Project editing interface</li>
+        <li><strong>todo/projectdetails.tt:</strong> Detailed project view</li>
+        <li><strong>todo/project_list.tt:</strong> Reusable component for project selection dropdowns</li>
+    </ul>
+    
+    <p>The template system uses Template Toolkit with the following features:</p>
+    <ul>
+        <li>Version tracking in PageVersion variable</li>
+        <li>Debug mode support for troubleshooting</li>
+        <li>Responsive design principles</li>
+        <li>Role-based access control for admin functions</li>
+        <li>Helper macros for complex UI components</li>
+    </ul>
 
-<p>For more detailed instructions, refer to the specific sections on the <a href="#projects-controller">Projects Controller</a> and <a href="#projects-model">Projects Model</a>.</p>
+    <h2 id="projects-ui">Projects UI Components</h2>
+    <p>The Projects system uses a vertical card-based UI for displaying projects:</p>
+    
+    <h3>Card Layout</h3>
+    <ul>
+        <li><strong>Card Header:</strong> Contains project name, priority badge, and collapse toggle</li>
+        <li><strong>Card Body:</strong> Displays project description, status badge, key details, and sub-projects</li>
+        <li><strong>Action Buttons:</strong> Details and Edit buttons within the card body</li>
+        <li><strong>Sub-Projects Container:</strong> Visually distinct area for sub-projects with left border and indentation</li>
+    </ul>
+    
+    <h3>CSS Implementation</h3>
+    <p>The card layout is implemented using a combination of:</p>
+    <ul>
+        <li><strong>External CSS:</strong> <code>/static/css/components/project-cards.css</code> - Contains all card styling</li>
+        <li><strong>Inline Critical CSS:</strong> Embedded in the template to ensure proper rendering even if external CSS fails to load</li>
+        <li><strong>Bootstrap-Compatible Classes:</strong> Uses standard Bootstrap class names for compatibility</li>
+        <li><strong>Custom Classes:</strong> Additional classes for collapsible cards and sub-project containers</li>
+    </ul>
+    
+    <h3>Responsive Design</h3>
+    <ul>
+        <li>Vertical card layout that adapts to all screen sizes</li>
+        <li>Collapsible cards to save vertical space</li>
+        <li>Filter panel that adapts to mobile screens</li>
+        <li>Fluid container for better use of screen space</li>
+    </ul>
+    
+    <h3>Visual Indicators</h3>
+    <ul>
+        <li><strong>Priority Badges:</strong> Color-coded badges for High (red), Medium (yellow), Low (blue)</li>
+        <li><strong>Status Badges:</strong> New (blue), In Progress (primary), Completed (green)</li>
+        <li><strong>Icons:</strong> Font Awesome icons for improved visual cues</li>
+        <li><strong>Collapse Indicators:</strong> Chevron icons that rotate to indicate collapse state</li>
+        <li><strong>Sub-Project Indicators:</strong> Left border and indentation to show hierarchy</li>
+    </ul>
+    
+    <h2 id="projects-filtering">Projects Filtering</h2>
+    <p>The Projects system includes a comprehensive filtering system:</p>
+    
+    <h3>Filter Panel</h3>
+    <ul>
+        <li><strong>Project Filter:</strong> Dropdown to select a specific project or sub-project</li>
+        <li><strong>Priority Filter:</strong> Dropdown to filter by priority level (High, Medium, Low)</li>
+        <li><strong>Apply Filters Button:</strong> Submits the filter form</li>
+        <li><strong>Clear Filters Button:</strong> Resets all filters</li>
+    </ul>
+    
+    <h3>Filtering Logic</h3>
+    <ul>
+        <li><strong>Project Filtering:</strong> When a project is selected, only that project and its sub-projects are displayed</li>
+        <li><strong>Sub-Project Filtering:</strong> When a sub-project is selected, its parent project is displayed with only the selected sub-project</li>
+        <li><strong>Priority Filtering:</strong> Only projects with the selected priority are displayed</li>
+        <li><strong>Combined Filtering:</strong> Project and priority filters can be used together</li>
+        <li><strong>Hierarchical Awareness:</strong> Parent projects remain visible when their sub-projects match the filter</li>
+    </ul>
+    
+    <h3>Implementation Details</h3>
+    <ul>
+        <li><strong>Template Macros:</strong> Helper macros determine if a project should be displayed based on filter criteria</li>
+        <li><strong>JavaScript:</strong> Auto-expands relevant projects when filtering</li>
+        <li><strong>Controller Support:</strong> The controller passes filter parameters to the template</li>
+        <li><strong>Query Parameters:</strong> Filters are maintained in the URL for bookmarking and sharing</li>
+    </ul>
+    
+    <h3>Code Example: Filter Panel</h3>
+    <pre><code>&lt;div class="filter-panel mb-4"&gt;
+    &lt;form id="projectFilterForm" class="form-inline" method="GET" action="/project/project"&gt;
+        &lt;div class="form-group mb-2"&gt;
+            &lt;label for="project_filter" class="mr-2"&gt;Project:&lt;/label&gt;
+            &lt;select id="project_filter" name="project_id" class="form-control"&gt;
+                &lt;option value=""&gt;All Projects&lt;/option&gt;
+                [% FOREACH project IN projects.sort('name') %]
+                    &lt;option value="[% project.id %]" [% IF project_filter == project.id %]selected[% END %]&gt;
+                        [% project.name %]
+                    &lt;/option&gt;
+                    [% FOREACH subproject IN project.sub_projects.sort('name') %]
+                        &lt;option value="[% subproject.id %]" [% IF project_filter == subproject.id %]selected[% END %]&gt;
+                            &amp;nbsp;&amp;nbsp;└─ [% subproject.name %]
+                        &lt;/option&gt;
+                    [% END %]
+                [% END %]
+            &lt;/select&gt;
+        &lt;/div&gt;
+        
+        &lt;div class="form-group mb-2 ml-3"&gt;
+            &lt;label for="priority_filter" class="mr-2"&gt;Priority:&lt;/label&gt;
+            &lt;select id="priority_filter" name="priority" class="form-control"&gt;
+                &lt;option value=""&gt;All Priorities&lt;/option&gt;
+                &lt;option value="1" [% IF priority_filter == '1' %]selected[% END %]&gt;High&lt;/option&gt;
+                &lt;option value="2" [% IF priority_filter == '2' %]selected[% END %]&gt;Medium&lt;/option&gt;
+                &lt;option value="3" [% IF priority_filter == '3' %]selected[% END %]&gt;Low&lt;/option&gt;
+            &lt;/select&gt;
+        &lt;/div&gt;
+        
+        &lt;button type="submit" class="btn btn-primary mb-2 ml-3"&gt;Apply Filters&lt;/button&gt;
+        &lt;button type="button" id="clearFilters" class="btn btn-outline-secondary mb-2 ml-2"&gt;Clear Filters&lt;/button&gt;
+    &lt;/form&gt;
+&lt;/div&gt;</code></pre>
 
+    <h2 id="projects-workflow">Projects Workflow</h2>
+    <ol>
+        <li><strong>Project Creation:</strong>
+            <ul>
+                <li>User fills out project form</li>
+                <li>System validates input and handles parent-child relationships</li>
+                <li>Project is created with proper user and site association</li>
+            </ul>
+        </li>
+        <li><strong>Project Management:</strong>
+            <ul>
+                <li>Projects can be viewed in hierarchical list</li>
+                <li>Admin users can edit project details</li>
+                <li>Sub-projects are managed within parent context</li>
+            </ul>
+        </li>
+    </ol>
 
+    <h2 id="projects-usage">System Requirements and Limitations</h2>
+    <ul>
+        <li>User must be authenticated for project creation</li>
+        <li>Admin privileges required for editing projects</li>
+        <li>Maximum of 4 levels in project hierarchy</li>
+        <li>Project names must be unique within a site</li>
+        <li>Browser must support CSS Flexbox for optimal card layout</li>
+        <li>Font Awesome 5.x is required for icons</li>
+    </ul>
 
-<p><a href="#projects-top">Back to top</a></p>
+    <h2 id="projects-troubleshooting">Troubleshooting</h2>
+    
+    <h3>CSS Display Issues</h3>
+    <p>If projects are not displaying correctly as cards:</p>
+    <ol>
+        <li>Verify that the CSS file is being loaded correctly (check browser developer tools)</li>
+        <li>Ensure the template is using the correct CSS classes</li>
+        <li>Check that the inline critical CSS is present in the template</li>
+        <li>Verify that the controller is setting <code>use_fluid_container => 1</code></li>
+        <li>Check for JavaScript errors that might be affecting the layout</li>
+    </ol>
+    
+    <h3>Collapsible Card Issues</h3>
+    <p>If the collapsible functionality is not working:</p>
+    <ol>
+        <li>Check browser console for JavaScript errors</li>
+        <li>Verify that the <code>toggleCollapse</code> function is defined in the template</li>
+        <li>Ensure that card IDs are unique and properly referenced in the onclick handlers</li>
+        <li>Check that the collapse icon is properly styled and transitions are working</li>
+    </ol>
+    
+    <h3>Filtering Issues</h3>
+    <p>If filtering is not working correctly:</p>
+    <ol>
+        <li>Verify that the filter form is submitting to the correct URL</li>
+        <li>Check that the controller is correctly passing filter parameters to the template</li>
+        <li>Ensure that the <code>is_parent_of_filtered_project</code> macro is correctly implemented</li>
+        <li>Check the browser's network tab to confirm filter parameters are being sent</li>
+        <li>Verify that the NEXT statements in the template are correctly evaluating filter conditions</li>
+    </ol>
+    
+    <h3>Debug Mode</h3>
+    <p>Enable debug mode in the controller to see additional information:</p>
+    <pre><code>$c->stash(debug_mode => 1);</code></pre>
+    <p>This will display template version and CSS file information at the top of the page.</p>
+    
+    <h3>Common Issues</h3>
+    <ul>
+        <li><strong>Cards not collapsing/expanding:</strong> JavaScript errors or missing event handlers</li>
+        <li><strong>Filters not working:</strong> Form submission issues or incorrect template logic</li>
+        <li><strong>Sub-projects not displaying:</strong> Check the recursive macro implementation</li>
+        <li><strong>Parent projects not showing when filtering by sub-project:</strong> Issue with the <code>is_parent_of_filtered_project</code> macro</li>
+        <li><strong>Missing badges or icons:</strong> Font Awesome not loading correctly</li>
+        <li><strong>Auto-expand not working when filtering:</strong> JavaScript initialization issue</li>
+    </ul>
+    
+    <h3>Logging</h3>
+    <p>The Project controller logs important events to the application log:</p>
+    <pre><code>$self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'project', 'message');</code></pre>
+    <p>Check <code>logs/application.log</code> for debugging information, especially filter parameters and project data structure.</p>
+    
+    <h3>JavaScript Debugging</h3>
+    <p>For JavaScript-related issues, add console logging to the script:</p>
+    <pre><code>console.log('Filter parameters:', {
+    project: document.getElementById('project_filter').value,
+    priority: document.getElementById('priority_filter').value
+});</code></pre>
+    <p>This can help identify issues with the collapsible functionality and filter handling.</p>
+
+    <p><a href="#projects-top">Back to top</a></p>

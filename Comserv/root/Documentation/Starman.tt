@@ -1,267 +1,127 @@
-[% PageVersion = 'Documentation/Starman.tt,v 0.05 2025/02/18 Shanta Exp shanta ' %]
-[% IF c.session.debug_mode == 1 %]
-[% END %]
-    [% PageVersion %]
+[% META title = 'Starman Server Documentation' %]
+[% PageVersion = 'Documentation/Starman.tt,v 0.10 2024/05/20 Admin Exp admin ' %]
 
-<h1 id="starman_top"><a href="#top">Setting Up Starman</a></h1>
+<h1 id="starman-top">Starman High-Performance Perl PSGI Server</h1>
 
 <nav>
-<a href="#starman_overview">Starman Overview</a> |
-<a href="#starman_prereq">Starman Prerequisites</a> |
-<a href="#starman_dev">Development Setup</a> |
-<a href="#starman_prod">Production Setup</a> |
-<a href="#starman_nginx">Nginx Config</a> |
-<a href="#starman_files">File Structure</a> |
-<a href="#starman_perm">Permissions</a> |
-<a href="#starman_monitor">Monitoring</a> |
-<a href="#starman_trouble">Troubleshooting</a>
+    <a href="#installation">1. Installation</a> |
+    <a href="#configuration">2. Configuration</a> |
+    <a href="#ssl-config">3. SSL Setup</a> |
+    <a href="#catalyst">4. Catalyst Integration</a> |
+    <a href="#scaling">5. Scaling & Proxmox</a> |
+    <a href="#troubleshooting">6. Troubleshooting</a>
 </nav>
 
-<h2 id="starman_overview">Starman Overview</h2>
-<p>Starman is a high-performance PSGI web server for Perl applications. This guide covers both development and production setups with appropriate permissions and file locations.</p>
-<p><a href="#starman_top">Back to Top</a></p>
-
-<h2 id="starman_prereq">Starman Prerequisites</h2>
-<h2 id="starman_dev_setup">Development Environment Initial Setup</h2>
-    <h3>Project Structure</h3>
-    <pre><code>~/PycharmProjects/comserv2/Comserv/    # Project root
-    ├── comserv.psgi                       # PSGI application file
-    ├── lib/                              # Application libraries
-    ├── db_config.json                    # Database configuration
-    └── log/                             # Development logs</code></pre>
-
-    <h3>Database Configuration</h3>
-    <ol>
-        <li>Create database config file (db_config.json):
-            <pre><code>{
-        "development": {
-            "dsn": "dbi:mysql:database=your_db_name",
-            "username": "your_username",
-            "password": "your_password",
-            "host": "localhost",
-            "port": 3306
-        }
-    }</code></pre>
-        </li>
-        <li>Set proper permissions:
-            <pre><code>chmod 600 db_config.json</code></pre>
-        </li>
-    </ol>
-
-    <h3>Running Development Server</h3>
-    <pre><code>cd ~/PycharmProjects/comserv2/Comserv
-    starman --workers 2 --listen :5000 --reload comserv.psgi</code></pre>
-
-    <h3>Common Development Issues</h3>
-    <ul>
-        <li>Missing db_config.json:
-            <pre><code>Error: Could not open db_config.json: No such file or directory
-    Solution: Create db_config.json in project root directory</code></pre>
-        </li>
-        <li>Perl module path issues:
-            <pre><code># Add local lib path to PERL5LIB
-    export PERL5LIB=$PERL5LIB:~/PycharmProjects/comserv2/Comserv/lib</code></pre>
-        </li>
-        <li>Uninitialized value warnings in Catalyst::Log:
-            <pre><code># Can be safely ignored in development environment
-    # To suppress: export CATALYST_LOG_LEVEL=error</code></pre>
-        </li>
-    </ul>
-
-    <h3>Development Environment Variables</h3>
-    <pre><code># Add to ~/.bashrc or similar
-    export CATALYST_HOME=~/PycharmProjects/comserv2/Comserv
-    export PERL5LIB=$PERL5LIB:$CATALYST_HOME/lib
-    export CATALYST_DEBUG=1          # Enable debug mode
-    export PLACK_ENV=development    # Set environment</code></pre>
-
-<h3>Production Environment</h3>
-<ul>
-    <li>Perl 5.10.1 or later</li>
-    <li>Root access for initial setup</li>
-    <li>System user 'www-data' (or equivalent web server user)</li>
-    <li>Required Perl modules (installed system-wide):
-        <pre><code>sudo cpanm Plack Catalyst::Runtime Starman</code></pre>
+<!-- SECTION 1: INSTALLATION -->
+<h2 id="installation">1. Installation Sequence</h2>
+<ol class="steps">
+    <li><strong>Base System Preparation</strong>
+        <pre>sudo apt update && sudo apt upgrade -y</pre>
     </li>
-</ul>
-<p><a href="#starman_top">Back to Top</a></p>
-
-<h2 id="starman_dev">Development Environment Setup</h2>
-<h3>Directory Structure (Local User)</h3>
-<pre><code>~/projects/comserv/         # Project root
-├── comserv.psgi           # PSGI application file
-├── lib/                   # Application libraries
-├── log/                   # Development logs
-└── script/               # Application scripts</code></pre>
-
-<h3>Setup Steps</h3>
-<ol>
-    <li>Create development directories:
-        <pre><code>mkdir -p ~/projects/comserv/log</code></pre>
+    <li><strong>Dependency Installation</strong>
+        <pre>sudo apt install cpanminus build-essential libssl-dev</pre>
     </li>
-    <li>Create PSGI file (~/projects/comserv/comserv.psgi):
-        <pre><code>use strict;
-use warnings;
-use Comserv;
-
-my $app = Comserv->apply_default_middlewares(Comserv->psgi_app);
-$app;</code></pre>
+    <li><strong>Starman Installation</strong>
+        <pre>sudo cpanm Starman</pre>
     </li>
-    <li>Run Starman in development mode:
-        <pre><code>cd ~/projects/comserv
-starman --workers 2 --listen :5000 --reload \
-    --error-log ./log/error.log \
-    --access-log ./log/access.log \
-    comserv.psgi</code></pre>
-    </li>
-</ol>
-<p><a href="#starman_top">Back to Top</a></p>
-
-<h2 id="starman_prod">Production Environment Setup</h2>
-<h3>Directory Structure (System-wide)</h3>
-<pre><code>/opt/comserv/              # Application root
-├── comserv.psgi           # PSGI application file
-├── lib/                   # Application libraries
-└── script/               # Application scripts
-
-/var/log/starman/          # Log directory
-├── access.log
-└── error.log</code></pre>
-
-<h3>Initial Setup (Root Required)</h3>
-<ol>
-    <li>Create application directories:
-        <pre><code>sudo mkdir -p /opt/comserv
-sudo mkdir -p /var/log/starman</code></pre>
-    </li>
-    <li>Set ownership:
-        <pre><code>sudo chown -R www-data:www-data /opt/comserv
-sudo chown -R www-data:www-data /var/log/starman</code></pre>
-    </li>
-    <li>Set directory permissions:
-        <pre><code>sudo chmod 755 /opt/comserv
-sudo chmod 755 /var/log/starman</code></pre>
+    <li><strong>Verification</strong>
+        <pre>starman --version</pre>
+        Expected output: <em>Starman version x.x</em>
     </li>
 </ol>
 
-<h3>Application Deployment (as www-data)</h3>
-<pre><code>cd /opt/comserv
-starman --workers 5 \
-    --user www-data \
-    --group www-data \
-    --listen :5000 \
-    --preload-app \
-    --error-log /var/log/starman/error.log \
-    --access-log /var/log/starman/access.log \
-    comserv.psgi</code></pre>
-<p><a href="#starman_top">Back to Top</a></p>
+<!-- SECTION 2: CONFIGURATION -->
+<h2 id="configuration">2. Configuration Workflow</h2>
+<ol class="steps">
+    <li><strong>Create Service Account</strong>
+        <pre>sudo useradd --system --home-dir /var/www/starman starman</pre>
+    </li>
+    <li><strong>Directory Structure</strong>
+        <pre>
+sudo mkdir -p /var/www/starman/{app,logs,tmp}
+sudo chown -R starman:starman /var/www/starman</pre>
+    </li>
+    <li><strong>Systemd Service File</strong>
+        <pre>/etc/systemd/system/starman.service</pre>
+        <em>(Contents as previous documentation)</em>
+    </li>
+    <li><strong>Reload Daemon</strong>
+        <pre>sudo systemctl daemon-reload</pre>
+    </li>
+</ol>
 
-<h2 id="starman_nginx">Nginx Configuration (Root Required)</h2>
-<h3>File Location</h3>
-<pre><code>/etc/nginx/sites-available/comserv
-/etc/nginx/sites-enabled/comserv</code></pre>
+<!-- SECTION 3: SSL CONFIGURATION -->
+<h2 id="ssl-config">3. SSL Implementation Sequence</h2>
+<ol class="steps">
+    <li><strong>Port Preparation</strong>
+        <pre>sudo ufw allow 80/tcp  # For Let's Encrypt validation</pre>
+    </li>
+    <li><strong>Certificate Generation</strong>
+        <pre>sudo certbot certonly --standalone -d starman.example.com</pre>
+    </li>
+    <li><strong>Service File Modification</strong>
+        <pre>
+--listen :443 \
+--ssl \
+--ssl-cert /etc/letsencrypt/live/example.com/fullchain.pem \
+--ssl-key /etc/letsencrypt/live/example.com/privkey.pem</pre>
+    </li>
+    <li><strong>Firewall Adjustment</strong>
+        <pre>sudo ufw delete allow 80/tcp && sudo ufw allow 443/tcp</pre>
+    </li>
+</ol>
 
-<h3>Configuration</h3>
-<pre><code>server {
-    listen 80;
-    server_name your-domain.com;
+<!-- SECTION 4: CATALYST INTEGRATION -->
+<h2 id="catalyst">4. Catalyst Deployment Flow</h2>
+<ol class="steps">
+    <li><strong>PSGI File Creation</strong>
+        <pre>/var/www/starman/app/myapp.psgi</pre>
+        <em>(Contents as previous)</em>
+    </li>
+    <li><strong>Dependency Isolation</strong>
+        <pre>
+# In app directory
+carton init
+echo "requires 'Catalyst::Runtime';" >> cpanfile
+carton install</pre>
+    </li>
+    <li><strong>Environment Configuration</strong>
+        <pre>/etc/starman/environment.conf</pre>
+        <em>(Set CATALYST_DEBUG=0 etc.)</em>
+    </li>
+</ol>
 
-    access_log /var/log/nginx/comserv_access.log;
-    error_log /var/log/nginx/comserv_error.log;
+<!-- SECTION 5: SCALING -->
+<h2 id="scaling">5. Proxmox Scaling Procedure</h2>
+<ol class="steps">
+    <li><strong>Base VM Preparation</strong>
+        <pre>qm clone 1000 1001 --name starman-worker1</pre>
+    </li>
+    <li><strong>Network Configuration</strong>
+        <pre>qm set 1001 -net0 virtio,bridge=vmbr1</pre>
+    </li>
+    <li><strong>Load Balancer Setup</strong>
+        <pre>/etc/haproxy/haproxy.cfg</pre>
+        <em>(Backend config as previous)</em>
+    </li>
+    <li><strong>Service Deployment</strong>
+        <pre>scp myapp.psgi starman@worker1:/var/www/starman/app/</pre>
+    </li>
+</ol>
 
-    location / {
-        proxy_pass http://127.0.0.1:5000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}</code></pre>
-
-<h3>Enable Site</h3>
-<pre><code>sudo ln -s /etc/nginx/sites-available/comserv /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl reload nginx</code></pre>
-<p><a href="#starman_top">Back to Top</a></p>
-
-<h2 id="starman_files">Systemd Service Configuration (Root Required)</h2>
-<h3>Service File Location</h3>
-<pre><code>/etc/systemd/system/starman.service</code></pre>
-
-<h3>Configuration</h3>
-<pre><code>[Unit]
-Description=Starman PSGI Web Server
-After=network.target
-Requires=network.target
-
-[Service]
-Type=simple
-User=www-data
-Group=www-data
-Environment=CATALYST_HOME=/opt/comserv
-Environment=PERL5LIB=/opt/comserv/lib
-Environment=PLACK_ENV=production
-WorkingDirectory=/opt/comserv
-ExecStart=/usr/local/bin/starman \
-    --workers 5 \
-    --listen :5000 \
-    --preload-app \
-    --error-log /var/log/starman/error.log \
-    /opt/comserv/comserv.psgi
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target</code></pre>
-
-<h3>Enable Service</h3>
-<pre><code>sudo systemctl daemon-reload
-sudo systemctl enable starman
-sudo systemctl start starman</code></pre>
-<p><a href="#starman_top">Back to Top</a></p>
-
-<h2 id="starman_perm">File Permissions Summary</h2>
-<h3>Development Environment</h3>
-<ul>
-    <li>All files owned by local user</li>
-    <li>Directories: <code>chmod 755</code></li>
-    <li>Files: <code>chmod 644</code></li>
-    <li>Log directory: <code>chmod 755</code></li>
-</ul>
-
-<h3>Production Environment</h3>
-<ul>
-    <li>Application files: <code>www-data:www-data</code> with <code>644</code></li>
-    <li>Directories: <code>www-data:www-data</code> with <code>755</code></li>
-    <li>Log directory: <code>www-data:www-data</code> with <code>755</code></li>
-    <li>Configuration files: <code>root:root</code> with <code>644</code></li>
-</ul>
-<p><a href="#starman_top">Back to Top</a></p>
-
-<h2 id="starman_monitor">Monitoring</h2>
-<h3>Development Logs</h3>
-<pre><code>tail -f ~/projects/comserv/log/error.log
-tail -f ~/projects/comserv/log/access.log</code></pre>
-
-<h3>Production Logs (Root Required)</h3>
-<pre><code>sudo tail -f /var/log/starman/error.log
-sudo tail -f /var/log/starman/access.log
-sudo journalctl -u starman</code></pre>
-<p><a href="#starman_top">Back to Top</a></p>
-
-<h2 id="starman_trouble">Troubleshooting</h2>
-<h3>Development Issues</h3>
-<ul>
-    <li>Check local log files in <code>~/projects/comserv/log/</code></li>
-    <li>Verify port 5000 is available: <code>netstat -tulpn | grep :5000</code></li>
-    <li>Test with plackup: <code>plackup -r comserv.psgi</code></li>
-</ul>
-
-<h3>Production Issues (Root Required)</h3>
-<ul>
-    <li>Check system logs: <code>sudo journalctl -xe</code></li>
-    <li>Verify permissions: <code>ls -la /opt/comserv /var/log/starman</code></li>
-    <li>Check service status: <code>sudo systemctl status starman</code></li>
-    <li>Test config: <code>sudo nginx -t</code></li>
-</ul>
-<p><a href="#starman_top">Back to Top</a></p>
+<!-- SECTION 6: TROUBLESHOOTING -->
+<h2 id="troubleshooting">6. Diagnostic Sequence</h2>
+<ol class="steps">
+    <li><strong>Service Status Check</strong>
+        <pre>sudo systemctl status starman</pre>
+    </li>
+    <li><strong>Log Inspection</strong>
+        <pre>journalctl -u starman -f --since "5 minutes ago"</pre>
+    </li>
+    <li><strong>Port Verification</strong>
+        <pre>sudo ss -tulpn | grep starman</pre>
+    </li>
+    <li><strong>Worker Health Check</strong>
+        <pre>curl -I https://starman.example.com/status</pre>
+    </li>
+</ol>

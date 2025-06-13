@@ -1,24 +1,28 @@
 
  
            <li class="horizontal-dropdown">
-                <a href="HelpDesk" class="dropbtn" target=.blank'>HelpDesk</a>
+                <a href="/HelpDesk" class="dropbtn">HelpDesk</a>
                 <div class="dropdown-content">
-                    [% IF c.session.group == 'admin' %]
-                    <a href="/add_link?menu=HelpDesk">Add</a>
+                    [% IF c.session.roles && c.session.roles.grep('^admin$').size %]
+                    <a href="/HelpDesk/admin"><i class="icon-admin"></i>HelpDesk Admin</a>
                     [% END %]
-                    <a href="/HelpDesk"target=.blank'>HelpDesk</a>
-                    <a href="/faq" target="_blank" ><font   class="LeftSideBarNavStyle">Our FAQ</font></a>
-                    <a href="/KnowlegeBase" target="_blank" >Knowledge
-                            base</a>
-                    <a href="https://www.computersystemconsulting.ca/whmcs/submitticket.php?step=2&deptid=2"
-                   target='_blank' >Sumbmit a support ticket.</a>
-                [% FOREACH link IN member_links %]
+                    <a href="/HelpDesk"><i class="icon-helpdesk"></i>HelpDesk Home</a>
+                    <a href="/HelpDesk/ticket/new"><i class="icon-ticket"></i>Submit a Ticket</a>
+                    <a href="/HelpDesk/ticket/status"><i class="icon-status"></i>Check Ticket Status</a>
+                    <a href="/Documentation"><i class="icon-docs"></i>Documentation</a>
+                    <a href="/HelpDesk/kb"><i class="icon-kb"></i>Knowledge Base</a>
+                    [% IF c.session.roles && c.session.roles.grep('^admin$').size %]
+                    <a href="/HelpDesk/kb/linux_commands"><i class="icon-terminal"></i>Linux Commands</a>
+                    [% END %]
+                    <a href="/faq"><i class="icon-faq"></i>FAQ</a>
+                    <a href="/HelpDesk/contact"><i class="icon-contact"></i>Contact Support</a>
+                    
+                    [% FOREACH link IN member_links %]
                     <a href="[% link.url %]">[% link.name %]</a>
-                    [% IF c.session.group == 'admin' %]
+                    [% IF c.session.roles && c.session.roles.grep('^admin$').size %]
                         <a href="/edit_link?link_id=[% link.id %]">Edit/Delete</a>
                     [% END %]
-                [% END %]
-                    <!-- Add more hosted options -->
+                    [% END %]
                 </div>
             </li>
 

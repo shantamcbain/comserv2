@@ -1,0 +1,348 @@
+[% META title = 'Proxmox Dashboard' %]
+[% PageVersion = '/proxmox/index.tt,v 0.03.01 2025/07/10 shanta Exp shanta ' %]
+[% IF debug == 1 %]
+    [% PageVersion %]
+[% END %]
+<div class="container">
+    <h1>Proxmox VE Dashboard</h1>
+    <p class="text-muted small">[% PageVersion %]</p>
+[% IF error_msg %]
+<div class="error-message">
+    [% error_msg %]
+</div>
+[% ELSIF auth_error && auth_error != 'none' %]
+<div class="error-message">
+    [% auth_error %]
+</div>
+[% END %]
+
+[% IF success_msg %]
+<div class="success-message">
+    [% success_msg %]
+</div>
+[% END %]
+
+<!-- No login check required -->
+<div class="action-panel">
+    <h2>Actions</h2>
+    <div class="action-buttons">
+        <a href="[% c.uri_for('/proxmox/create') %]" class="btn-action">
+            <i class="icon-plus"></i>
+            Create New VM
+        </a>
+        <a href="#" class="btn-action" onclick="refreshVMList()">
+            <i class="icon-refresh"></i>
+            Refresh VM List
+        </a>
+    </div>
+</div>
+
+<div class="vm-list-panel">
+    <h2>Virtual Machines</h2>
+
+    [% IF auth_success == 'yes' || auth_success == 1 %]
+        [% IF vms && vms.size > 0 %]
+        <table class="vm-table">
+            <thead>
+            <tr>
+                <th>VMID</th>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Memory</th>
+                <th>CPU</th>
+                <th>Uptime</th>
+                <th>Actions</th>
+            </tr>
+            </thead>
+            <tbody>
+                [% FOREACH vm IN vms %]
+                <tr>
+                    <td>[% vm.vmid %]</td>
+                    <td>[% vm.name %]</td>
+                    <td class="type [% vm.type %]">[% vm.type || 'unknown' %]</td>
+                    <td class="status [% vm.status %]">[% vm.status %]</td>
+                    <td>[% vm.maxmem ? (vm.maxmem / (1024*1024)) _ ' MB' : 'N/A' %]</td>
+                    <td>[% vm.cpus || vm.cpu || 'N/A' %]</td>
+                    <td>[% vm.uptime ? formatUptime(vm.uptime) : 'Not running' %]</td>
+                    <td class="actions">
+                        <a href="[% c.uri_for('/proxmox/vm_status', vm.vmid) %]" class="btn-small">Details</a>
+                    </td>
+                </tr>
+                [% END %]
+            </tbody>
+        </table>
+        [% ELSE %]
+        <div class="no-vms">
+            <p>No virtual machines found.</p>
+            <p>Click "Create New VM" to get started.</p>
+        </div>
+        [% END %]
+    [% ELSE %]
+    <div class="alert alert-warning">
+        <p>Unable to retrieve VM list. Please check Proxmox server connection and credentials.</p>
+    </div>
+    [% END %]
+</div>
+
+[% IF debug_info %]
+<div class="debug-info">
+    <h3>Debug Information</h3>
+    <pre>[% debug_info_json %]</pre>
+</div>
+[% END %]
+</div>
+
+<style>
+    .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+    }
+
+    h1 {
+        color: #333;
+        margin-bottom: 30px;
+        text-align: center;
+    }
+
+    h2 {
+        color: #555;
+        margin-top: 0;
+        margin-bottom: 20px;
+        border-bottom: 1px solid #ddd;
+        padding-bottom: 10px;
+    }
+
+    .user-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+    }
+
+    .btn-logout {
+        background-color: #f8d7da;
+        color: #721c24;
+        padding: 8px 15px;
+        border-radius: 4px;
+        text-decoration: none;
+        font-size: 0.9em;
+    }
+
+    .btn-logout:hover {
+        background-color: #f5c6cb;
+    }
+
+    .action-panel, .vm-list-panel {
+        background-color: #f9f9f9;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+
+    .action-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .btn-action {
+        background-color: #4CAF50;
+        color: white;
+        padding: 12px 20px;
+        border-radius: 4px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        font-weight: bold;
+    }
+
+    .btn-action:hover {
+        background-color: #45a049;
+    }
+
+    .icon-plus::before {
+        content: "+";
+        margin-right: 8px;
+        font-size: 1.2em;
+    }
+
+    .icon-refresh::before {
+        content: "↻";
+        margin-right: 8px;
+        font-size: 1.2em;
+    }
+
+    .vm-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+    }
+
+    .vm-table th, .vm-table td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid #ddd;
+    }
+
+    .vm-table th {
+        background-color: #f2f2f2;
+        font-weight: bold;
+    }
+
+    .vm-table tr:hover {
+        background-color: #f5f5f5;
+    }
+
+    .status {
+        padding: 5px 10px;
+        border-radius: 3px;
+        font-size: 0.9em;
+        text-align: center;
+    }
+
+    .status.running {
+        background-color: #d4edda;
+        color: #155724;
+    }
+
+    .status.stopped {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+    
+    .type {
+        padding: 5px 10px;
+        border-radius: 3px;
+        font-size: 0.9em;
+        text-align: center;
+    }
+    
+    .type.qemu {
+        background-color: #cce5ff;
+        color: #004085;
+    }
+    
+    .type.lxc {
+        background-color: #d1ecf1;
+        color: #0c5460;
+    }
+
+    .actions {
+        white-space: nowrap;
+    }
+
+    .btn-small {
+        background-color: #007bff;
+        color: white;
+        padding: 5px 10px;
+        border-radius: 3px;
+        text-decoration: none;
+        font-size: 0.9em;
+    }
+
+    .btn-small:hover {
+        background-color: #0069d9;
+    }
+
+    .no-vms {
+        text-align: center;
+        padding: 30px;
+        color: #666;
+    }
+
+    .login-prompt {
+        text-align: center;
+        padding: 50px 20px;
+        background-color: #f9f9f9;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+    }
+
+    .btn-login {
+        display: inline-block;
+        background-color: #4CAF50;
+        color: white;
+        padding: 12px 25px;
+        border-radius: 4px;
+        text-decoration: none;
+        font-weight: bold;
+        margin-top: 20px;
+    }
+
+    .btn-login:hover {
+        background-color: #45a049;
+    }
+
+    .error-message, .success-message {
+        padding: 15px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+        font-weight: bold;
+    }
+
+    .error-message {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+
+    .success-message {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .alert-warning {
+        background-color: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeeba;
+        padding: 15px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+    }
+
+    .debug-info {
+        margin-top: 30px;
+        padding: 15px;
+        background-color: #f8f9fa;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        overflow-x: auto;
+    }
+
+    .debug-info pre {
+        margin: 0;
+        white-space: pre-wrap;
+        font-family: monospace;
+    }
+</style>
+
+<script>
+    // Function to format uptime in a human-readable format
+    function formatUptime(seconds) {
+        if (!seconds || seconds <= 0) return 'Not running';
+        
+        const days = Math.floor(seconds / 86400);
+        const hours = Math.floor((seconds % 86400) / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        
+        let result = '';
+        if (days > 0) result += days + ' days, ';
+        if (hours > 0 || days > 0) result += hours + ' hours, ';
+        result += minutes + ' minutes';
+        
+        return result;
+    }
+    
+    // Function to refresh the VM list
+    function refreshVMList() {
+        window.location.reload();
+    }
+</script>

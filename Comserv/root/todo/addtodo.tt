@@ -1,13 +1,49 @@
-[% PageVersion = 'addtodo.tt,v 0.03 2025/02/04shanta Exp shanta ' %]
+[% PageVersion = 'addtodo.tt,v 0.04 2024/11/23 shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
     Version: [% PageVersion %]
 [% END %]
 
+<style>
+    /* Form styling */
+    form div {
+        margin-bottom: 15px;
+    }
+
+    label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+    }
+
+    input[type="text"],
+    input[type="date"],
+    input[type="number"],
+    select {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+    }
+
+    input[type="submit"] {
+        background-color: #4CAF50;
+        color: white;
+        padding: 10px 15px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+    }
+
+    input[type="submit"]:hover {
+        background-color: #45a049;
+    }
+</style>
+
 <h1>Add a New To-do Item</h1>
 
 <form action="/todo/create" method="post">
-<form action="/todo/create" method="post" onsubmit="updateManualProjectId(document.getElementById('parent_id').value);">
-
     <div>
         <label for="sitename">Site Name:</label>
         <input type="text" id="sitename" name="sitename" value="[% SiteName OR 'Site Name' %]" readonly>
@@ -17,36 +53,13 @@
         <input type="date" id="start_date" name="start_date" value="[% start_date OR '' %]">
     </div>
     <div>
-        <label for="parent_id">Parent Project:</label><br>
-        <select id="parent_id" name="parent_id" onchange="updateManualProjectId(this.value);">
-            <option value="0">None</option>
-            <!-- Include the project list as options -->
         <label for="project_id">Select Project:</label>
-        <select id="project_id" name="project_id" class="form-select" required>
-            [% FOREACH project IN projects %]
-                [% IF !project.parent_id %]
-                    <option value="[% project.id %]" [% IF project.id == project_id %]selected[% END %]>[% project.name %]</option>
-                    [% IF project.sub_projects.size %]
-                        [% FOREACH sub_project IN project.sub_projects %]
-                            <option value="[% sub_project.id %]" [% IF sub_project.id == project_id %]selected[% END %]>--- [% sub_project.name %]</option>
-                        [% END %]
-                    [% END %]
-                [% END %]
-            <option value="[% project.id %]" [% IF current_project && current_project.id == project.id %]selected[% END %]>
-                [% project.name %]
-            </option>
-            [% FOREACH sub_project IN project.sub_projects %]
-            <option value="[% sub_project.id %]" [% IF current_project && current_project.id == sub_project.id %]selected[% END %]>
-                -- [% sub_project.name %]
-            </option>
-            [% END %]
-            [% END %]
-        </select>
+          [% INCLUDE "todo/project_list.tt" projects=projects selected_project_id=current_project.id %]<br>
     </div>
 
     <div>
         <label for="manual_project_id">Manual Project ID:</label>
-        <input type="text" id="manual_project_id" name="manual_project_id" value="[% project_id OR '0' %]" readonly>
+        <input type="text" id="manual_project_id" name="manual_project_id" value="[% project_id OR '' %]" placeholder="Only if project not in list">
     </div>
     <div>
         <label for="due_date">Due Date:</label>
@@ -103,17 +116,6 @@
         <label for="last_mod_date">Last Modified Date:</label>
         <input type="date" id="last_mod_date" name="last_mod_date" value="[% todo.last_mod_date OR '' %]">
     </div>
-
-    <div>
-        <label for="user_id">User ID:</label>
-        <select id="user_id" name="user_id">
-            [% FOREACH user IN users %]
-                <!-- Use user_id from the stash to set the selected option -->
-                <option value="[% user.id %]" [% IF user.id == user_id %]selected[% END %]>[% user.username %]</option>
-            [% END %]
-        </select>
-    </div>
-
     <div>
         <label for="user_id">User ID:</label>
         <select id="user_id" name="user_id" class="form-select">
@@ -126,14 +128,3 @@
         <input type="submit" value="Add Todo" class="btn btn-primary">
     </div>
 </form>
-
-<script>
-function updateManualProjectId(value) {
-    document.getElementById('manual_project_id').value = value || '0';
-}
-
-// Initialize the manual project ID field on page load
-document.addEventListener('DOMContentLoaded', function() {
-    updateManualProjectId(document.getElementById('parent_id').value);
-});
-</script>

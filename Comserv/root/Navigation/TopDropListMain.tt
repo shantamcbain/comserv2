@@ -9,13 +9,13 @@
 
  <!-- Start /HTMLTemplates/Default/TopDropListMain.tt-->
          <li class="horizontal-dropdown">
-                <a href="/" class="dropbtn">Main</a>
+                <a href="/" class="dropbtn"><i class="icon-main"></i>Main</a>
                 <div class="dropdown-content">
-                    <a href="[% c.uri_for('/' )%]" onclick="activateSite('Home')">Home</a>
-                    <a href="[% c.session.return_url %]">Go Back</a>
-               <span><a href="[% c.uri_for('/workshop') %]" onclick="activateSite('Workshops')" target="_blenk">Workshops</a></span>
+                    <a href="/" onclick="activateSite('Home')"><i class="icon-home"></i>Home</a>
+                    <a href="[% c.session.return_url %]"><i class="icon-back"></i>Go Back</a>
+               <span><a href="/workshop" onclick="activateSite('Workshops')" target="_blenk"><i class="icon-workshop"></i>Workshops</a></span>
             <div class="submenu-item">
-                <span class="submenu-header">Mail</span>
+                <span class="submenu-header"><i class="icon-mail"></i>Mail</span>
                 <div class="submenu">
      [% IF c.session.username == 'Shanta' %]
     <a href="https://beemaster.ca:20000" target="_Blank">BMaster</a>
@@ -39,30 +39,24 @@
             </div>
                     <ul>
       <!-- populate from Page_tb -->
-       [% FOREACH link = c.stash.dbi.query("SELECT * FROM page_tb
-	                                  WHERE  menu = 'Main'
-	                                  AND (sitename =  '$SiteName' OR sitename =  'All')
-	                                  ORDER BY link_order
-	                                  ")%]
-
-	       <a href="&amp;page=[% link.page_code %]" name="Contact" target="[% link.target %]"
-              title=" [% linkview_.name %] "><font   class="LeftSideBarNavStyle">[% link.view_name %]</font></a>
-     [% IF c.session.group == 'admin' %]
-        <a href="/edit_link?link_id=[% link.record_id %]">Edit/Delete</a>
-        [% END %]
-
-
-	[% END %]30
+       [% IF main_pages.defined %]
+           [% FOREACH link IN main_pages %]
+	           <a href="&amp;page=[% link.page_code %]" name="Contact" target="[% link.target %]"
+                  title=" [% linkview_.name %] "><font   class="LeftSideBarNavStyle">[% link.view_name %]</font></a>
+               [% IF c.session.group == 'admin' %]
+                  <a href="/edit_link?link_id=[% link.record_id %]">Edit/Delete</a>
+               [% END %]
+	       [% END %]
+       [% END %]
 	      <!-- populate from links_tb -->
-	  [% FOREACH link = c.stash.dbi.query("SELECT * FROM internal_links_tb
-	                                  WHERE  category = 'Main_links'
-	                                  AND (sitename =  '$SiteName' OR sitename =  'All')
-	                                  ORDER BY link_order
-	                                  ")%]
-
-	       <a href="[% link.url %]?site=[% SiteName %]&amp;[% link.view_name %]" name="Contact" target="[% link.target %]" title=" [% link.name %] "><font   class="LeftSideBarNavStyle">[% link.name %]</font ></a>
-<a href="/edit_link/[% link.record_id %]">Edit/Delete</a>
-	[% END %]
+       [% IF main_links.defined %]
+	       [% FOREACH link IN main_links %]
+	           <a href="[% link.url %]?site=[% SiteName %]&amp;[% link.view_name %]" name="Contact" target="[% link.target %]" title=" [% link.name %] "><font   class="LeftSideBarNavStyle">[% link.name %]</font ></a>
+               [% IF c.session.group == 'admin' %]
+                  <a href="/edit_link/[% link.record_id %]">Edit/Delete</a>
+               [% END %]
+	       [% END %]
+       [% END %]
        </ul>[% IF c.session.main_links.size %]
     [% FOREACH link IN c.session.main_links %]
         <a href="site=[% SiteName %]&amp;page=[% link.page_code %]" name="Contact" target="[% link.target %]" title=" [% link.view_name %] "><font class="LeftSideBarNavStyle">[% link.view_name %]</font></a>

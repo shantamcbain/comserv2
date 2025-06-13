@@ -1,0 +1,38 @@
+[% META title = 'Bee Yards for ' _ site_name %]
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>Bee Yards for [% site_name %]</h1>
+            
+            [% IF yards && yards.size > 0 %]
+                <div class="row">
+                    [% FOREACH yard IN yards %]
+                        <div class="col-md-4 mb-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>[% yard.yard_name %]</h3>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Location:</strong> [% yard.location %]</p>
+                                    <p><strong>Coordinates:</strong> [% yard.latitude %], [% yard.longitude %]</p>
+                                    <p><strong>Established:</strong> [% yard.date_established %]</p>
+                                    <p><strong>Status:</strong> [% yard.status %]</p>
+                                    <a href="/Apiary/hives_for_yard/[% yard.yard_id %]" class="btn btn-primary">View Hives</a>
+                                </div>
+                            </div>
+                        </div>
+                    [% END %]
+                </div>
+            [% ELSE %]
+                <div class="alert alert-info">
+                    No bee yards found for this site.
+                </div>
+            [% END %]
+            
+            <div class="mt-4">
+                <a href="/Apiary" class="btn btn-primary">Back to Apiary Management</a>
+            </div>
+        </div>
+    </div>
+</div>

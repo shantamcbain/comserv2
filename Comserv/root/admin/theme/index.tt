@@ -1,0 +1,160 @@
+[% META title = 'Theme Management' %]
+
+<div class="container">
+    <h1>Theme Management</h1>
+
+    [% IF c.flash.message %]
+        <div class="alert alert-success">[% c.flash.message %]</div>
+    [% END %]
+
+    [% IF c.flash.error %]
+        <div class="alert alert-danger">[% c.flash.error %]</div>
+    [% END %]
+
+    [% IF info_msg %]
+        <div class="alert alert-info">[% info_msg %]</div>
+    [% END %]
+
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h3 class="card-title mb-0">Current Theme Settings</h3>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h4>Active Theme: [% theme_name %]</h4>
+                    <p>Site: [% site.name %]</p>
+
+                    <form action="[% c.uri_for('/admin/theme/update') %]" method="POST" class="mt-3">
+                        <input type="hidden" name="site_id" value="[% site.id %]">
+                        <div class="form-group">
+                            <label for="theme">Select Theme:</label>
+                            <select name="theme" id="theme" class="form-control">
+                                [% FOREACH theme IN available_themes %]
+                                <option value="[% theme %]" [% IF theme == theme_name %]selected[% END %]>
+                                    [% theme | ucfirst %]
+                                </option>
+                                [% END %]
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary mt-3">Update Theme</button>
+                    </form>
+                </div>
+                <div class="col-md-6">
+                    <div class="theme-preview p-3 border rounded">
+                        <h5>Theme Preview</h5>
+                        <div class="preview-box" style="background-color: var(--primary-color);">
+                            <p style="color: var(--text-color);">Sample Text</p>
+                            <a href="#" style="color: var(--link-color);">Sample Link</a>
+                            <button class="btn" style="background-color: var(--button-bg); color: var(--button-text);">
+                                Sample Button
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header bg-success text-white">
+            <h3 class="card-title mb-0">Create Custom Theme</h3>
+        </div>
+        <div class="card-body">
+            <form action="[% c.uri_for('/admin/theme/create_custom') %]" method="POST">
+                <input type="hidden" name="site_id" value="[% site.id %]">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="primary_color">Primary Color:</label>
+                            <input type="color" name="primary_color" id="primary_color" class="form-control" value="#ccffff">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="secondary_color">Secondary Color:</label>
+                            <input type="color" name="secondary_color" id="secondary_color" class="form-control" value="#e6ffff">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="accent_color">Accent Color:</label>
+                            <input type="color" name="accent_color" id="accent_color" class="form-control" value="#FF9900">
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="text_color">Text Color:</label>
+                            <input type="color" name="text_color" id="text_color" class="form-control" value="#000000">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="link_color">Link Color:</label>
+                            <input type="color" name="link_color" id="link_color" class="form-control" value="#0000FF">
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <button type="submit" class="btn btn-success">Create Custom Theme</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header bg-secondary text-white">
+            <h3 class="card-title mb-0">Available Themes</h3>
+        </div>
+        <div class="card-body">
+            <table class="table table-striped table-hover">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th>Preview</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                [% FOREACH theme_name IN available_themes %]
+                <tr>
+                    <td>[% theme_name | ucfirst %]</td>
+                    <td>[% themes.$theme_name.description || "Standard theme" %]</td>
+                    <td>
+                        <div class="theme-swatch" style="background-color: [% themes.$theme_name.variables.item('primary-color') || '#ccffff' %];"></div>
+                    </td>
+                    <td>
+                        <a href="[% c.uri_for('/admin/theme/edit', theme_name) %]" class="btn btn-sm btn-secondary">
+                            Edit CSS
+                        </a>
+                    </td>
+                </tr>
+                [% END %]
+            </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+.theme-swatch {
+    width: 30px;
+    height: 30px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.theme-preview {
+    min-height: 200px;
+    background-color: #f8f9fa;
+}
+
+.preview-box {
+    padding: 15px;
+    border-radius: 4px;
+    margin-top: 10px;
+}
+</style>

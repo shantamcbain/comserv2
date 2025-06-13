@@ -1,10 +1,9 @@
-# In Comserv/lib/Comserv/Model/Schema/Ency/Result/Category.pm
 package Comserv::Model::Schema::Ency::Result::Category;
 use base 'DBIx::Class::Core';
 
 __PACKAGE__->table('categories');
 __PACKAGE__->add_columns(
-     category_id => {
+    category_id => {
         data_type => 'integer',
         is_auto_increment => 1,
     },

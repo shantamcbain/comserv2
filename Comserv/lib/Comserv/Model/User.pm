@@ -39,8 +39,41 @@ package Comserv::Model::User;
 
                 sub roles {
                     my $self = shift;
-                    my $role = $self->_user->role;
-                    return [ $role ];  # Return it as an array reference
+                    my $roles = $self->_user->roles;
+                    
+                    # Log the raw roles value for debugging
+                    warn "DEBUG: User roles raw value: " . (defined $roles ? "'$roles'" : "undefined") . 
+                         ", type: " . (defined $roles ? (ref $roles || "string") : "undefined") . 
+                         ", username: " . $self->_user->username;
+                    
+                    # TEMPORARY FIX: Ensure Shanta has admin role
+                    if ($self->_user->username eq 'Shanta') {
+                        warn "DEBUG: Ensuring admin role for user Shanta";
+                        return ['admin', 'user'];
+                    }
+                    
+                    # Handle different role formats
+                    if (!defined $roles) {
+                        warn "DEBUG: No roles defined, returning default ['user']";
+                        return ['user']; # Default role if none defined
+                    } elsif (!ref $roles) {
+                        # If roles is a string, split it by commas or spaces
+                        if ($roles =~ /,/) {
+                            my @role_array = split(/\s*,\s*/, $roles);
+                            warn "DEBUG: Split comma-separated roles into: [" . join(", ", @role_array) . "]";
+                            return \@role_array;
+                        } else {
+                            warn "DEBUG: Single role string: '$roles', returning [$roles]";
+                            return [$roles]; # Single role as string
+                        }
+                    } elsif (ref $roles eq 'ARRAY') {
+                        warn "DEBUG: Roles is already an array reference: [" . join(", ", @$roles) . "]";
+                        return $roles; # Already an array reference
+                    } else {
+                        # Unexpected format, log and return default
+                        warn "DEBUG: Unexpected roles format: " . (ref $roles || 'undefined') . ", returning default ['user']";
+                        return ['user'];
+                    }
                 }
 
                 sub create_user {
@@ -53,6 +86,19 @@ package Comserv::Model::User;
                         roles => $user_data->{roles} // 'default_role',
                     });
                     return $new_user;
+                }
+                
+                sub delete_user {
+                    my ($self, $user_id) = @_;
+                    my $schema = Comserv::Model::DBEncy->new->schema;
+                    my $user = $schema->resultset('User')->find($user_id);
+                    
+                    return "User not found" unless $user;
+                    
+                    # Delete the user
+                    $user->delete;
+                    
+                    return 1; # Success
                 }
 
                 __PACKAGE__->meta->make_immutable;

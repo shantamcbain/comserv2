@@ -1,0 +1,3 @@
+[submodule "aimanager"]
+	path = aimanager
+	url = https://github.com/shantamcbain/aimanager.git
