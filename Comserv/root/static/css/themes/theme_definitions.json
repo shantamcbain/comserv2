@@ -248,6 +248,7 @@
     "mcoop": "mcoop"
   },
   "component_styles": {
-    "api_credentials": "api_credentials.css"
+    "api_credentials": "api_credentials.css",
+    "todo": "todo.css"
   }
 }

@@ -100,6 +100,10 @@
     [% IF template.match('ApiCredentials/') %]
     <link rel="stylesheet" type="text/css" href="/static/css/themes/api_credentials.css">
     [% END %]
+    
+    [% IF template.match('todo/') %]
+    <link rel="stylesheet" type="text/css" href="/static/css/todo.css">
+    [% END %]
 
     <!-- jQuery for AJAX functionality -->
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
