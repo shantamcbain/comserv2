@@ -48,6 +48,7 @@ requires 'Catalyst::Plugin::Authorization::ACL';
 requires 'Catalyst::Plugin::Log::Dispatch';
 requires 'Log::Dispatch::Config';
 requires 'Catalyst::View::TT';
+requires 'Catalyst::View::JSON';
 # DateTime related
 requires 'DateTime';
 requires 'DateTime::Event::Recurrence';

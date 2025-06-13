@@ -1,9 +1,11 @@
 package Comserv::Model::Schema::Ency::Result::Page;
 
+use strict;
+use warnings;
 use base 'DBIx::Class::Core';
 
 __PACKAGE__->load_components('InflateColumn::DateTime', 'TimeStamp', 'EncodedColumn');
-__PACKAGE__->table('pages');
+__PACKAGE__->table('pages_content');
 
 __PACKAGE__->add_columns(
     'id' => {
@@ -11,54 +13,65 @@ __PACKAGE__->add_columns(
         is_auto_increment => 1,
         is_nullable       => 0,
     },
-    'title' => {
-        data_type => 'varchar',
-        size => 255,
+    'sitename' => {
+        data_type   => 'varchar',
+        size        => 255,
         is_nullable => 0,
     },
-    'content_id' => {
-        data_type => 'integer',
-        is_nullable => 1,
-        is_foreign_key => 1,
+    'menu' => {
+        data_type   => 'varchar',
+        size        => 255,
+        is_nullable => 0,
     },
     'page_code' => {
         data_type   => 'varchar',
         size        => 255,
         is_nullable => 0,
     },
-    'status' => {
-        data_type   => 'varchar',
-        size        => 255,
+    'title' => {
+        data_type => 'varchar',
+        size => 255,
         is_nullable => 0,
     },
-    'share' => {
-        data_type   => 'varchar',
-        size        => 255,
-        is_nullable => 0,  # Could be enum('public', 'private', 'user')
+    'body' => {
+        data_type   => 'text',
+        is_nullable => 0,
+    },
+    'description' => {
+        data_type   => 'text',
+        is_nullable => 1,
+    },
+    'keywords' => {
+        data_type   => 'text',
+        is_nullable => 1,
     },
     'link_order' => {
         data_type   => 'integer',
         is_nullable => 0,
+        default_value => 0,
     },
-    'news' => {
-        data_type   => 'integer',
+    'status' => {
+        data_type   => 'varchar',
+        size        => 50,
+        is_nullable => 0,
+        default_value => 'active',
+    },
+    'roles' => {
+        data_type   => 'varchar',
+        size        => 255,
+        is_nullable => 1,
+        default_value => 'public',
+    },
+    'created_by' => {
+        data_type => 'varchar',
+        size => 255,
         is_nullable => 0,
     },
-    'last_modified_by' => {
-        data_type => 'integer',
-        is_nullable => 1,
-        is_foreign_key => 1,
-    },
-    'last_modified_at' => {
-        data_type => 'datetime',
-        set_on_update => 1,
-    },
-    'social_media' => {
-        data_type => 'text',
-        is_nullable => 1,
-        serializer_class => 'JSON',
-    },
     'created_at' => {
+        data_type => 'datetime',
+        set_on_create => 1,
+    },
+    'updated_at' => {
         data_type => 'datetime',
         set_on_create => 1,
         set_on_update => 1,
@@ -68,21 +81,9 @@ __PACKAGE__->add_columns(
 __PACKAGE__->set_primary_key('id');
 __PACKAGE__->add_unique_constraint(['page_code']);
 
-__PACKAGE__->belongs_to(
-    'content',
-    'Comserv::Model::Schema::Ency::Result::Content',
-    'content_id'
-);
-
-__PACKAGE__->belongs_to(
-    'last_modifier' => 'Comserv::Model::Schema::Ency::Result::User::User',
-    'last_modified_by'
-);
-
-__PACKAGE__->has_many(
-    'page_navigations',
-    'Comserv::Model::Schema::Ency::Result::Navigation',
-    'page_id'
-);
+# Add indexes for common queries
+__PACKAGE__->resultset_attributes({
+    order_by => ['sitename', 'menu', 'link_order']
+});
 
 1;

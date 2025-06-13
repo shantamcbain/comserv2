@@ -1,0 +1,50 @@
+[% PageVersion = 'pages/list.tt,v 1.0 2024/12/29 Page List Template' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="page-list">
+    <h1>Pages - [% sitename %] ([% menu %])</h1>
+    
+    [% IF c.session.roles.match('admin') %]
+    <div class="admin-controls">
+        <a href="/pages/create" class="btn btn-success">Create New Page</a>
+    </div>
+    [% END %]
+    
+    [% IF pages.size > 0 %]
+    <div class="pages-grid">
+        [% FOREACH page IN pages %]
+        <div class="page-item">
+            <h3><a href="/page/[% page.page_code %]">[% page.title %]</a></h3>
+            <p class="page-meta">
+                Site: [% page.sitename %] | 
+                Menu: [% page.menu %] | 
+                Roles: [% page.roles %] |
+                Order: [% page.link_order %]
+            </p>
+            [% IF page.description %]
+            <p class="page-description">[% page.description %]</p>
+            [% END %]
+            
+            [% IF c.session.roles.match('admin') %]
+            <div class="admin-actions">
+                <a href="/pages/edit/[% page.page_code %]" class="btn btn-sm">Edit</a>
+            </div>
+            [% END %]
+        </div>
+        [% END %]
+    </div>
+    [% ELSE %]
+    <p>No pages found for this site and menu.</p>
+    [% END %]
+    
+    <div class="menu-navigation">
+        <h4>Browse by Menu:</h4>
+        <a href="/pages?menu=Main">Main</a> |
+        <a href="/pages?menu=member">Member</a> |
+        [% IF c.session.roles.match('admin') %]
+        <a href="/pages?menu=Admin">Admin</a>
+        [% END %]
+    </div>
+</div>

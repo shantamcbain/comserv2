@@ -1316,6 +1316,107 @@ sub execute_git_pull {
     return ($success, $output, $warning);
 }
 
+# Database management functionality
+sub database :Path('/admin/database') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'database', 
+        "Starting database management action");
+    
+    # Check if the user has admin role
+    unless ($c->user_exists && ($c->check_user_roles('admin') || $c->session->{username} eq 'Shanta')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'database', 
+            "Access denied: User does not have admin role");
+        
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        $c->response->redirect($c->uri_for('/user/login', {
+            destination => $c->req->uri
+        }));
+        return;
+    }
+    
+    # Handle POST requests for database operations
+    if ($c->req->method eq 'POST') {
+        my $action = $c->req->param('action');
+        
+        if ($action eq 'create_pages_table') {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'database', 
+                "Creating pages_content table");
+            
+            eval {
+                my $schema_manager = $c->model('DBSchemaManager');
+                my $result = $schema_manager->create_pages_table($c);
+                
+                $c->flash->{success_msg} = "Pages table created successfully! " .
+                    "Executed $result->{executed_count} of $result->{total_statements} statements.";
+                
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'database', 
+                    "Pages table created successfully");
+            };
+            if ($@) {
+                my $error = $@;
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'database', 
+                    "Error creating pages table: $error");
+                $c->flash->{error_msg} = "Error creating pages table: $error";
+            }
+        }
+        elsif ($action eq 'check_tables') {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'database', 
+                "Checking database tables");
+            
+            eval {
+                my $schema_manager = $c->model('DBSchemaManager');
+                my $tables = $schema_manager->list_tables($c, 'ENCY');
+                
+                $c->stash(database_tables => $tables);
+                $c->flash->{success_msg} = "Database tables checked successfully. Found " . 
+                    scalar(@$tables) . " tables.";
+            };
+            if ($@) {
+                my $error = $@;
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'database', 
+                    "Error checking tables: $error");
+                $c->flash->{error_msg} = "Error checking tables: $error";
+            }
+        }
+        
+        $c->response->redirect($c->uri_for('/admin/database'));
+        return;
+    }
+    
+    # Check table status
+    my $table_status = {};
+    eval {
+        my $schema_manager = $c->model('DBSchemaManager');
+        $table_status->{pages_content} = $schema_manager->table_exists($c, 'ENCY', 'pages_content');
+        
+        # Get list of all tables
+        my $tables = $schema_manager->list_tables($c, 'ENCY');
+        $c->stash(database_tables => $tables);
+    };
+    if ($@) {
+        my $error = $@;
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'database', 
+            "Warning checking table status: $error");
+        $c->stash(database_error => $error);
+    }
+    
+    # Use the standard debug message system
+    if ($c->session->{debug_mode}) {
+        push @{$c->stash->{debug_msg}}, "Admin controller database view - Template: admin/database.tt";
+        push @{$c->stash->{debug_msg}}, "Table status: " . Dumper($table_status);
+    }
+    
+    # Set the template and stash data
+    $c->stash(
+        template => 'admin/database.tt',
+        table_status => $table_status
+    );
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'database', 
+        "Completed database management action");
+}
+
 =head1 AUTHOR
 
 Shanta McBain
