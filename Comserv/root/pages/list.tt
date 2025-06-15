@@ -1,10 +1,84 @@
-[% PageVersion = 'pages/list.tt,v 1.0 2024/12/29 Page List Template' %]
+[% PageVersion = 'pages/list.tt,v 1.1 2024/12/29 Page List Template with CSC Multi-Site Support' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
+<style>
+.site-section {
+    margin-bottom: 20px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+.site-header {
+    background-color: #f5f5f5;
+    padding: 10px 15px;
+    cursor: pointer;
+    border-bottom: 1px solid #ddd;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.site-header:hover {
+    background-color: #e9e9e9;
+}
+
+.site-content {
+    padding: 15px;
+    display: none;
+}
+
+.site-content.expanded {
+    display: block;
+}
+
+.toggle-icon {
+    font-weight: bold;
+    transition: transform 0.3s ease;
+}
+
+.toggle-icon.expanded {
+    transform: rotate(90deg);
+}
+
+.page-item {
+    margin-bottom: 15px;
+    padding: 10px;
+    border: 1px solid #eee;
+    border-radius: 3px;
+    background-color: #fafafa;
+}
+
+.pages-grid {
+    display: grid;
+    gap: 15px;
+}
+</style>
+
+<script>
+function toggleSiteSection(siteId) {
+    var content = document.getElementById('site-content-' + siteId);
+    var icon = document.getElementById('toggle-icon-' + siteId);
+    
+    if (content.classList.contains('expanded')) {
+        content.classList.remove('expanded');
+        icon.classList.remove('expanded');
+        icon.innerHTML = '▶';
+    } else {
+        content.classList.add('expanded');
+        icon.classList.add('expanded');
+        icon.innerHTML = '▼';
+    }
+}
+</script>
+
 <div class="page-list">
-    <h1>Pages - [% sitename %] ([% menu %])</h1>
+    [% IF is_csc %]
+        <h1>All Pages - CSC Administrator View ([% menu %])</h1>
+    [% ELSE %]
+        <h1>Pages - [% sitename %] ([% menu %])</h1>
+    [% END %]
     
     [% IF c.session.roles.match('admin') %]
     <div class="admin-controls">
@@ -12,31 +86,71 @@
     </div>
     [% END %]
     
-    [% IF pages.size > 0 %]
-    <div class="pages-grid">
-        [% FOREACH page IN pages %]
-        <div class="page-item">
-            <h3><a href="/page/[% page.page_code %]">[% page.title %]</a></h3>
-            <p class="page-meta">
-                Site: [% page.sitename %] | 
-                Menu: [% page.menu %] | 
-                Roles: [% page.roles %] |
-                Order: [% page.link_order %]
-            </p>
-            [% IF page.description %]
-            <p class="page-description">[% page.description %]</p>
+    [% IF is_csc %]
+        [% # CSC View: Display pages grouped by site with collapsible sections %]
+        [% IF pages_by_site.keys.size > 0 %]
+            [% FOREACH site_name IN pages_by_site.keys.sort %]
+                [% site_id = site_name.replace('[^a-zA-Z0-9]', '_') %]
+                <div class="site-section">
+                    <div class="site-header" onclick="toggleSiteSection('[% site_id %]')">
+                        <h3>[% site_name %] ([% pages_by_site.$site_name.size %] pages)</h3>
+                        <span class="toggle-icon" id="toggle-icon-[% site_id %]">▶</span>
+                    </div>
+                    <div class="site-content" id="site-content-[% site_id %]">
+                        <div class="pages-grid">
+                            [% FOREACH page IN pages_by_site.$site_name %]
+                            <div class="page-item">
+                                <h4><a href="/page/[% page.page_code %]">[% page.title %]</a></h4>
+                                <p class="page-meta">
+                                    Menu: [% page.menu %] | 
+                                    Roles: [% page.roles %] |
+                                    Order: [% page.link_order %]
+                                </p>
+                                [% IF page.description %]
+                                <p class="page-description">[% page.description %]</p>
+                                [% END %]
+                                
+                                [% IF c.session.roles.match('admin') %]
+                                <div class="admin-actions">
+                                    <a href="/pages/edit/[% page.page_code %]" class="btn btn-sm">Edit</a>
+                                </div>
+                                [% END %]
+                            </div>
+                            [% END %]
+                        </div>
+                    </div>
+                </div>
             [% END %]
-            
-            [% IF c.session.roles.match('admin') %]
-            <div class="admin-actions">
-                <a href="/pages/edit/[% page.page_code %]" class="btn btn-sm">Edit</a>
+        [% ELSE %]
+            <p>No pages found for any site in the [% menu %] menu.</p>
+        [% END %]
+    [% ELSE %]
+        [% # Regular Site View: Display only their own pages %]
+        [% IF pages.size > 0 %]
+        <div class="pages-grid">
+            [% FOREACH page IN pages %]
+            <div class="page-item">
+                <h3><a href="/page/[% page.page_code %]">[% page.title %]</a></h3>
+                <p class="page-meta">
+                    Menu: [% page.menu %] | 
+                    Roles: [% page.roles %] |
+                    Order: [% page.link_order %]
+                </p>
+                [% IF page.description %]
+                <p class="page-description">[% page.description %]</p>
+                [% END %]
+                
+                [% IF c.session.roles.match('admin') %]
+                <div class="admin-actions">
+                    <a href="/pages/edit/[% page.page_code %]" class="btn btn-sm">Edit</a>
+                </div>
+                [% END %]
             </div>
             [% END %]
         </div>
+        [% ELSE %]
+        <p>No pages found for this site and menu.</p>
         [% END %]
-    </div>
-    [% ELSE %]
-    <p>No pages found for this site and menu.</p>
     [% END %]
     
     <div class="menu-navigation">

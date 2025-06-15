@@ -16,6 +16,7 @@
       <li><a href="[% c.uri_for('/admin/schema_manager') %]">Schema Manager</a></li>
       <li><a href="[% c.uri_for('/admin/compare_schema') %]">Compare Schema</a></li>
       <li><a href="[% c.uri_for('/admin/migrate_schema') %]">Migrate Schema</a></li>
+      <li><a href="[% c.uri_for('/admin/migrate_pages') %]">Migrate Pages (Forager → Ency)</a></li>
     </ul>
   </div>
 

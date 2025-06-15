@@ -15,11 +15,18 @@
     <form method="POST" action="/pages/create">
         <div class="form-group">
             <label for="sitename">Site Name:</label>
-            <select name="sitename" id="sitename" required>
-                <option value="CSC" [% IF form_data.sitename == 'CSC' %]selected[% END %]>CSC</option>
-                <option value="MCOOP" [% IF form_data.sitename == 'MCOOP' %]selected[% END %]>MCOOP</option>
-                <option value="USBM" [% IF form_data.sitename == 'USBM' %]selected[% END %]>USBM</option>
-            </select>
+            [% IF is_csc %]
+                <select name="sitename" id="sitename" required>
+                    [% FOREACH site IN available_sites %]
+                        <option value="[% site %]" [% IF form_data.sitename == site || (!form_data.sitename && site == current_sitename) %]selected[% END %]>[% site %]</option>
+                    [% END %]
+                </select>
+                <small>CSC can create pages for any site</small>
+            [% ELSE %]
+                <input type="hidden" name="sitename" value="[% current_sitename %]">
+                <input type="text" value="[% current_sitename %]" disabled>
+                <small>You can only create pages for your site: [% current_sitename %]</small>
+            [% END %]
         </div>
         
         <div class="form-group">

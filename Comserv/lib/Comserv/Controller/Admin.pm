@@ -113,67 +113,11 @@ sub base :Chained('/') :PathPart('admin') :CaptureArgs(0) {
 }
 
 # Admin dashboard
-sub index :Path :Args(0) {
+sub index :Chained('base') :PathPart('') :Args(0) {
     my ($self, $c) = @_;
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
         "Starting Admin index action");
-    
-    # TEMPORARY FIX: Allow specific users direct access
-    if ($c->session->{username} && $c->session->{username} eq 'Shanta') {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
-            "Admin access granted to user Shanta (bypass role check)");
-        # Continue with the admin page
-    }
-    else {
-        # Check if the user has admin role
-        my $has_admin_role = 0;
-        
-        # First check if user exists
-        if ($c->user_exists) {
-            # Get roles from session
-            my $roles = $c->session->{roles};
-            
-            # Log the roles for debugging
-            my $roles_debug = 'none';
-            if (defined $roles) {
-                if (ref($roles) eq 'ARRAY') {
-                    $roles_debug = join(', ', @$roles);
-                    
-                    # Check if 'admin' is in the roles array
-                    foreach my $role (@$roles) {
-                        if (lc($role) eq 'admin') {
-                            $has_admin_role = 1;
-                            last;
-                        }
-                    }
-                } elsif (!ref($roles)) {
-                    $roles_debug = $roles;
-                    # Check if roles string contains 'admin'
-                    if ($roles =~ /\badmin\b/i) {
-                        $has_admin_role = 1;
-                    }
-                }
-            }
-            
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
-                "Admin access check - User: " . $c->session->{username} . ", Roles: $roles_debug, Has admin: " . ($has_admin_role ? 'Yes' : 'No'));
-        }
-        
-        unless ($has_admin_role) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'index', 
-                "Access denied: User does not have admin role");
-            
-            # Set error message in flash
-            $c->flash->{error_msg} = "You need to be an administrator to access this area.";
-            
-            # Redirect to login page with destination parameter
-            $c->response->redirect($c->uri_for('/user/login', {
-                destination => $c->req->uri
-            }));
-            return;
-        }
-    }
     
     # Get system stats
     my $stats = $self->get_system_stats($c);
@@ -363,8 +307,322 @@ sub get_system_notifications {
     return \@notifications;
 }
 
+# Page migration from Forager to Ency schema
+sub migrate_pages :Chained('base') :PathPart('migrate_pages') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'migrate_pages', 
+        "Starting page migration process");
+    
+    if ($c->request->method eq 'POST') {
+        my $action = $c->request->param('action') || '';
+        
+        if ($action eq 'preview') {
+            # Preview migration - show what would be migrated
+            my $preview_data = $self->_preview_page_migration($c);
+            $c->stash(
+                preview_data => $preview_data,
+                show_preview => 1
+            );
+        }
+        elsif ($action eq 'migrate') {
+            # Perform actual migration
+            my $selected_pages = $c->request->param('selected_pages') || [];
+            $selected_pages = [$selected_pages] unless ref($selected_pages) eq 'ARRAY';
+            
+            my $migration_result = $self->_perform_page_migration($c, $selected_pages);
+            $c->stash(
+                migration_result => $migration_result,
+                show_result => 1
+            );
+        }
+    }
+    
+    $c->stash(
+        template => 'admin/migrate_pages.tt'
+    );
+}
+
+# Preview what pages would be migrated
+sub _preview_page_migration {
+    my ($self, $c) = @_;
+    
+    my @forager_pages = ();
+    my @mapping_issues = ();
+    my $total_count = 0;
+    
+    eval {
+        # Get all pages from Forager schema
+        @forager_pages = $c->model('DBForager')->resultset('Page')->search(
+            {},
+            {
+                order_by => ['sitename', 'menu', 'link_order']
+            }
+        );
+        
+        $total_count = scalar(@forager_pages);
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_preview_page_migration', 
+            "Found $total_count pages in Forager schema");
+        
+        # Check for potential mapping issues
+        foreach my $page (@forager_pages) {
+            my @issues = ();
+            
+            # Check if page_code already exists in Ency
+            my $existing = $c->model('DBEncy')->resultset('Page')->find({ page_code => $page->page_code });
+            if ($existing) {
+                push @issues, "Page code '" . $page->page_code . "' already exists in destination";
+            }
+            
+            # Check for required fields
+            unless ($page->sitename) {
+                push @issues, "Missing sitename";
+            }
+            unless ($page->menu) {
+                push @issues, "Missing menu";
+            }
+            unless ($page->page_code) {
+                push @issues, "Missing page_code";
+            }
+            
+            if (@issues) {
+                push @mapping_issues, {
+                    page => $page,
+                    issues => \@issues
+                };
+            }
+        }
+        
+    };
+    
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_preview_page_migration', 
+            "Error during preview: $@");
+        push @mapping_issues, { error => "Database error: $@" };
+    }
+    
+    return {
+        forager_pages => \@forager_pages,
+        mapping_issues => \@mapping_issues,
+        total_count => $total_count,
+        issues_count => scalar(@mapping_issues)
+    };
+}
+
+# Perform the actual page migration
+sub _perform_page_migration {
+    my ($self, $c, $selected_pages) = @_;
+    
+    my $migrated_count = 0;
+    my $skipped_count = 0;
+    my $error_count = 0;
+    my @migration_log = ();
+    my @errors = ();
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_perform_page_migration', 
+        "Starting migration of " . scalar(@$selected_pages) . " selected pages");
+    
+    foreach my $page_id (@$selected_pages) {
+        eval {
+            # Get the Forager page
+            my $forager_page = $c->model('DBForager')->resultset('Page')->find($page_id);
+            unless ($forager_page) {
+                push @errors, "Forager page with ID $page_id not found";
+                $error_count++;
+                next;
+            }
+            
+            # Check if already exists in Ency
+            my $existing = $c->model('DBEncy')->resultset('Page')->find({ page_code => $forager_page->page_code });
+            if ($existing) {
+                push @migration_log, "Skipped: Page code '" . $forager_page->page_code . "' already exists";
+                $skipped_count++;
+                next;
+            }
+            
+            # Map the data from Forager to Ency schema
+            my $ency_data = $self->_map_forager_to_ency_page($forager_page, $c);
+            
+            # Create the new page in Ency schema
+            my $new_page = $c->model('DBEncy')->resultset('Page')->create($ency_data);
+            
+            push @migration_log, "Migrated: " . $forager_page->page_code . " -> ID " . $new_page->id;
+            $migrated_count++;
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_perform_page_migration', 
+                "Successfully migrated page: " . $forager_page->page_code);
+        };
+        
+        if ($@) {
+            my $error_msg = "Error migrating page ID $page_id: $@";
+            push @errors, $error_msg;
+            $error_count++;
+            
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_perform_page_migration', 
+                $error_msg);
+        }
+    }
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_perform_page_migration', 
+        "Migration completed: $migrated_count migrated, $skipped_count skipped, $error_count errors");
+    
+    return {
+        migrated_count => $migrated_count,
+        skipped_count => $skipped_count,
+        error_count => $error_count,
+        migration_log => \@migration_log,
+        errors => \@errors
+    };
+}
+
+# Map Forager page data to Ency page schema
+sub _map_forager_to_ency_page {
+    my ($self, $forager_page, $c) = @_;
+    
+    # Map the fields from Forager to Ency schema
+    my $ency_data = {
+        sitename => $forager_page->sitename,
+        menu => $forager_page->menu,
+        page_code => $forager_page->page_code,
+        title => $forager_page->app_title || $forager_page->page_code, # Use app_title or fallback to page_code
+        body => $forager_page->body,
+        description => $forager_page->description,
+        keywords => $forager_page->keywords,
+        link_order => $forager_page->link_order || 0,
+        status => $forager_page->status || 'active',
+        roles => 'public', # Default to public, can be customized
+        created_by => $forager_page->username_of_poster || $forager_page->last_mod_by || 'migrated'
+    };
+    
+    # Set timestamps if available
+    if ($forager_page->last_mod_date) {
+        $ency_data->{created_at} = $forager_page->last_mod_date;
+        $ency_data->{updated_at} = $forager_page->last_mod_date;
+    }
+    
+    return $ency_data;
+}
+
+# Schema Manager - View and manage database schemas
+sub schema_manager :Chained('base') :PathPart('schema_manager') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_manager', 
+        "Starting schema manager");
+    
+    my $database = $c->request->param('database') || 'ENCY';
+    
+    my @tables = ();
+    eval {
+        if ($database eq 'ENCY') {
+            my $schema = $c->model('DBEncy')->schema;
+            @tables = $schema->storage->dbh->tables(undef, undef, '%', 'TABLE');
+        } elsif ($database eq 'FORAGER') {
+            my $schema = $c->model('DBForager')->schema;
+            @tables = $schema->storage->dbh->tables(undef, undef, '%', 'TABLE');
+        }
+        
+        # Clean up table names (remove schema prefixes if present)
+        @tables = map { 
+            my $table = $_;
+            $table =~ s/^.*\.//;  # Remove schema prefix
+            $table =~ s/^`(.*)`$/$1/;  # Remove backticks
+            $table;
+        } @tables;
+        
+        @tables = sort @tables;
+    };
+    
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'schema_manager', 
+            "Error getting tables: $@");
+        $c->stash(error_msg => "Error getting tables: $@");
+    }
+    
+    $c->stash(
+        database => $database,
+        tables => \@tables,
+        template => 'admin/SchemaManager.tt'
+    );
+}
+
+# Compare schemas between databases
+sub compare_schema :Chained('base') :PathPart('compare_schema') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'compare_schema', 
+        "Starting schema comparison");
+    
+    my $comparison_result = {};
+    
+    eval {
+        # Get tables from both schemas
+        my $ency_schema = $c->model('DBEncy')->schema;
+        my @ency_tables = $ency_schema->storage->dbh->tables(undef, undef, '%', 'TABLE');
+        
+        my $forager_schema = $c->model('DBForager')->schema;
+        my @forager_tables = $forager_schema->storage->dbh->tables(undef, undef, '%', 'TABLE');
+        
+        # Clean up table names
+        @ency_tables = map { 
+            my $table = $_;
+            $table =~ s/^.*\.//;
+            $table =~ s/^`(.*)`$/$1/;
+            $table;
+        } sort @ency_tables;
+        
+        @forager_tables = map { 
+            my $table = $_;
+            $table =~ s/^.*\.//;
+            $table =~ s/^`(.*)`$/$1/;
+            $table;
+        } sort @forager_tables;
+        
+        # Find differences
+        my %ency_hash = map { $_ => 1 } @ency_tables;
+        my %forager_hash = map { $_ => 1 } @forager_tables;
+        
+        my @only_in_ency = grep { !$forager_hash{$_} } @ency_tables;
+        my @only_in_forager = grep { !$ency_hash{$_} } @forager_tables;
+        my @common_tables = grep { $forager_hash{$_} } @ency_tables;
+        
+        $comparison_result = {
+            ency_tables => \@ency_tables,
+            forager_tables => \@forager_tables,
+            only_in_ency => \@only_in_ency,
+            only_in_forager => \@only_in_forager,
+            common_tables => \@common_tables
+        };
+    };
+    
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'compare_schema', 
+            "Error comparing schemas: $@");
+        $c->stash(error_msg => "Error comparing schemas: $@");
+    }
+    
+    $c->stash(
+        comparison => $comparison_result,
+        template => 'admin/compare_schema.tt'
+    );
+}
+
+# Migrate schema - placeholder for future implementation
+sub migrate_schema :Chained('base') :PathPart('migrate_schema') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'migrate_schema', 
+        "Starting schema migration");
+    
+    $c->stash(
+        message => "Schema migration functionality is not yet implemented. Please use the specific migration tools like 'Migrate Pages' for now.",
+        template => 'admin/migrate_schema.tt'
+    );
+}
+
 # Admin users management
-sub users :Path('/admin/users') :Args(0) {
+sub users :Chained('base') :PathPart('users') :Args(0) {
     my ($self, $c) = @_;
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users', 
@@ -460,26 +718,11 @@ sub users :Path('/admin/users') :Args(0) {
 }
 
 # Admin content management
-sub content :Path('/admin/content') :Args(0) {
+sub content :Chained('base') :PathPart('content') :Args(0) {
     my ($self, $c) = @_;
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'content', 
         "Starting content action");
-    
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'content', 
-            "Access denied: User does not have admin role");
-        
-        # Set error message in flash
-        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
-        
-        # Redirect to login page with destination parameter
-        $c->response->redirect($c->uri_for('/login', {
-            destination => $c->req->uri
-        }));
-        return;
-    }
     
     # Get filter parameter
     my $filter = $c->req->param('filter') || 'all';

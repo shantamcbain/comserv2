@@ -260,7 +260,17 @@ sub admin :Chained('base') :PathPart('admin') :Args(0) {
         "Starting admin action");
     
     # Check if user has admin role
-    unless ($c->session->{roles} && grep { $_ eq 'admin' } @{$c->session->{roles}}) {
+    my $has_admin_role = 0;
+    if ($c->session->{roles}) {
+        my $roles = $c->session->{roles};
+        if (ref($roles) eq 'ARRAY') {
+            $has_admin_role = grep { $_ eq 'admin' } @$roles;
+        } elsif (!ref($roles)) {
+            $has_admin_role = $roles =~ /\badmin\b/i;
+        }
+    }
+    
+    unless ($has_admin_role) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'admin', 
             "Unauthorized access attempt to HelpDesk admin by user: " . ($c->user_exists ? $c->user->username : 'Guest'));
         
