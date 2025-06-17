@@ -34,11 +34,13 @@ sub begin : Private {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', 
         "Admin controller begin method called by user: $username");
     
-    # Initialize debug_msg array if it doesn't exist
-    $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
-    
-    # Add the debug message to the array
-    push @{$c->stash->{debug_msg}}, "Admin controller loaded successfully";
+    # Initialize debug_msg array if it doesn't exist and debug mode is enabled
+    if ($c->session->{debug_mode}) {
+        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
+        
+        # Add the debug message to the array
+        push @{$c->stash->{debug_msg}}, "Admin controller loaded successfully";
+    }
     
     return 1; # Allow the request to proceed
 }
@@ -188,6 +190,7 @@ sub index :Path :Args(0) {
     
     # Use the standard debug message system
     if ($c->session->{debug_mode}) {
+        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
         push @{$c->stash->{debug_msg}}, "Admin controller index view - Template: admin/index.tt";
     }
     
@@ -442,6 +445,7 @@ sub users :Path('/admin/users') :Args(0) {
     
     # Use the standard debug message system
     if ($c->session->{debug_mode}) {
+        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
         push @{$c->stash->{debug_msg}}, "Admin controller users view - Template: admin/users.tt";
         push @{$c->stash->{debug_msg}}, "Filter: $filter, Search: $search, Page: $page";
         push @{$c->stash->{debug_msg}}, "User count: " . $users_rs->pager->total_entries;
@@ -529,6 +533,7 @@ sub content :Path('/admin/content') :Args(0) {
     
     # Use the standard debug message system
     if ($c->session->{debug_mode}) {
+        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
         push @{$c->stash->{debug_msg}}, "Admin controller content view - Template: admin/content.tt";
         push @{$c->stash->{debug_msg}}, "Filter: $filter, Search: $search, Page: $page";
         push @{$c->stash->{debug_msg}}, "Content count: " . $content_rs->pager->total_entries;
@@ -730,6 +735,7 @@ sub settings :Path('/admin/settings') :Args(0) {
     
     # Use the standard debug message system
     if ($c->session->{debug_mode}) {
+        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
         push @{$c->stash->{debug_msg}}, "Admin controller settings view - Template: admin/settings.tt";
         push @{$c->stash->{debug_msg}}, "Available themes: " . join(', ', @themes);
     }
@@ -772,6 +778,7 @@ sub system_info :Path('/admin/system_info') :Args(0) {
     
     # Use the standard debug message system
     if ($c->session->{debug_mode}) {
+        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
         push @{$c->stash->{debug_msg}}, "Admin controller system_info view - Template: admin/system_info.tt";
     }
     
@@ -928,6 +935,7 @@ sub logs :Path('/admin/logs') :Args(0) {
     
     # Use the standard debug message system
     if ($c->session->{debug_mode}) {
+        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
         push @{$c->stash->{debug_msg}}, "Admin controller logs view - Template: admin/logs.tt";
         push @{$c->stash->{debug_msg}}, "Log file: $log_file";
         push @{$c->stash->{debug_msg}}, "Available log files: " . join(', ', @log_files);
@@ -1214,6 +1222,7 @@ sub schema_compare :Path('/admin/schema_compare') :Args(0) {
     
     # Use the standard debug message system
     if ($c->session->{debug_mode}) {
+        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
         push @{$c->stash->{debug_msg}}, "Admin controller schema_compare view - Template: admin/schema_compare.tt";
         push @{$c->stash->{debug_msg}}, "Ency tables: " . scalar(@{$database_comparison->{ency}->{tables}});
         push @{$c->stash->{debug_msg}}, "Forager tables: " . scalar(@{$database_comparison->{forager}->{tables}});
@@ -1345,6 +1354,7 @@ sub get_field_comparison :Path('/admin/get_field_comparison') :Args(0) {
         $c->stash(json => {
             success => 1,
             comparison => $comparison,
+            debug_mode => $c->session->{debug_mode} ? 1 : 0,
             debug => {
                 table_name => $table_name,
                 database => $database,
@@ -2022,7 +2032,7 @@ sub get_table_result_comparison {
         $comparison->{fields}->{$field_name} = {
             table => $table_field,
             result => $result_field,
-            differences => $self->compare_field_attributes($table_field, $result_field)
+            differences => $self->compare_field_attributes($table_field, $result_field, $c, $field_name)
         };
     }
     
@@ -2090,7 +2100,7 @@ sub get_table_result_comparison_v2 {
         $comparison->{fields}->{$field_name} = {
             table => $table_field,
             result => $result_field,
-            differences => $self->compare_field_attributes($table_field, $result_field)
+            differences => $self->compare_field_attributes($table_field, $result_field, $c, $field_name)
         };
     }
     
@@ -2099,7 +2109,7 @@ sub get_table_result_comparison_v2 {
 
 # Compare field attributes between table and Result file
 sub compare_field_attributes {
-    my ($self, $table_field, $result_field) = @_;
+    my ($self, $table_field, $result_field, $c, $field_name) = @_;
     
     my @differences = ();
     my @attributes = qw(data_type size is_nullable is_auto_increment default_value);
@@ -2108,9 +2118,26 @@ sub compare_field_attributes {
         my $table_value = $table_field ? $table_field->{$attr} : undef;
         my $result_value = $result_field ? $result_field->{$attr} : undef;
         
+        # Store original values for debugging
+        my $original_table_value = $table_value;
+        my $original_result_value = $result_value;
+        
         # Normalize values for comparison
         $table_value = $self->normalize_field_value($attr, $table_value);
         $result_value = $self->normalize_field_value($attr, $result_value);
+        
+        # Add debug information for data_type comparisons when debug_mode is enabled
+        if ($c && $c->session->{debug_mode} && $attr eq 'data_type' && defined $original_table_value && defined $original_result_value) {
+            push @{$c->stash->{debug_msg}}, sprintf(
+                "Field '%s' data_type normalization: Table Type: %s -> %s, Result Type: %s -> %s, Match: %s",
+                $field_name || 'unknown',
+                $original_table_value || 'undef',
+                $table_value || 'undef',
+                $original_result_value || 'undef', 
+                $result_value || 'undef',
+                (defined $table_value && defined $result_value && $table_value eq $result_value) ? 'YES' : 'NO'
+            );
+        }
         
         if (defined $table_value && defined $result_value) {
             if ($table_value ne $result_value) {
@@ -2118,6 +2145,8 @@ sub compare_field_attributes {
                     attribute => $attr,
                     table_value => $table_value,
                     result_value => $result_value,
+                    original_table_value => $original_table_value,
+                    original_result_value => $original_result_value,
                     type => 'different'
                 };
             }
@@ -2126,6 +2155,8 @@ sub compare_field_attributes {
                 attribute => $attr,
                 table_value => $table_value,
                 result_value => undef,
+                original_table_value => $original_table_value,
+                original_result_value => $original_result_value,
                 type => 'missing_in_result'
             };
         } elsif (!defined $table_value && defined $result_value) {
@@ -2133,6 +2164,8 @@ sub compare_field_attributes {
                 attribute => $attr,
                 table_value => undef,
                 result_value => $result_value,
+                original_table_value => $original_table_value,
+                original_result_value => $original_result_value,
                 type => 'missing_in_table'
             };
         }
@@ -2146,6 +2179,11 @@ sub normalize_field_value {
     my ($self, $attribute, $value) = @_;
     
     return undef unless defined $value;
+    
+    # Handle data type normalization
+    if ($attribute eq 'data_type') {
+        return $self->normalize_data_type($value);
+    }
     
     # Handle boolean attributes
     if ($attribute eq 'is_nullable' || $attribute eq 'is_auto_increment') {
@@ -3434,6 +3472,97 @@ sub get_table_field_info {
     };
 }
 
+# Enhanced helper method to normalize data types for comparison
+sub normalize_data_type {
+    my ($self, $data_type) = @_;
+    
+    return '' unless defined $data_type;
+    
+    # Store original for debugging
+    my $original_type = $data_type;
+    
+    # Convert to lowercase for consistent comparison
+    $data_type = lc($data_type);
+    
+    # Remove size specifications and constraints
+    # Examples: varchar(255) -> varchar, int(11) -> int, decimal(10,2) -> decimal
+    $data_type =~ s/\([^)]*\)//g;
+    
+    # Remove extra whitespace
+    $data_type =~ s/^\s+|\s+$//g;
+    
+    # Handle unsigned/signed modifiers
+    $data_type =~ s/\s+unsigned$//;
+    $data_type =~ s/\s+signed$//;
+    
+    # Remove other common modifiers
+    $data_type =~ s/\s+zerofill$//;
+    $data_type =~ s/\s+binary$//;
+    
+    # Comprehensive type mapping for database-specific variations
+    my %type_mapping = (
+        # Integer types
+        'int'           => 'integer',
+        'int4'          => 'integer',
+        'int8'          => 'bigint',
+        'integer'       => 'integer',
+        'bigint'        => 'bigint',
+        'smallint'      => 'smallint',
+        'tinyint'       => 'tinyint',
+        'mediumint'     => 'integer',
+        
+        # String types
+        'varchar'       => 'varchar',
+        'char'          => 'char',
+        'character'     => 'char',
+        'text'          => 'text',
+        'longtext'      => 'text',
+        'mediumtext'    => 'text',
+        'tinytext'      => 'text',
+        'clob'          => 'text',
+        
+        # Boolean types
+        'bool'          => 'boolean',
+        'boolean'       => 'boolean',
+        'bit'           => 'boolean',
+        
+        # Floating point types
+        'float'         => 'real',
+        'real'          => 'real',
+        'double'        => 'double precision',
+        'double precision' => 'double precision',
+        'decimal'       => 'decimal',
+        'numeric'       => 'decimal',
+        
+        # Date/time types
+        'datetime'      => 'datetime',
+        'timestamp'     => 'timestamp',
+        'date'          => 'date',
+        'time'          => 'time',
+        'year'          => 'year',
+        
+        # Binary types
+        'blob'          => 'blob',
+        'longblob'      => 'blob',
+        'mediumblob'    => 'blob',
+        'tinyblob'      => 'blob',
+        'binary'        => 'binary',
+        'varbinary'     => 'varbinary',
+        
+        # JSON and other modern types
+        'json'          => 'json',
+        'jsonb'         => 'json',
+        'uuid'          => 'uuid',
+        'enum'          => 'enum',
+        'set'           => 'set',
+    );
+    
+    # Apply mapping or return normalized type
+    my $normalized_type = $type_mapping{$data_type} || $data_type;
+    
+    return $normalized_type;
+}
+
 # Helper method to get result field information
 sub get_result_field_info {
     my ($self, $c, $table_name, $field_name, $database) = @_;
@@ -3449,14 +3578,21 @@ sub get_result_field_info {
     }
     
     unless ($result_file_path && -f $result_file_path) {
-        my $debug_info = "Result file not found for table '$table_name' in get_result_field_info.\n";
-        $debug_info .= "Table key searched: '$table_key'\n";
-        $debug_info .= "Available tables: " . join(', ', keys %$result_table_mapping) . "\n";
-        $debug_info .= "Result file path: " . ($result_file_path || 'undefined') . "\n";
-        if ($result_file_path) {
-            $debug_info .= "File exists: " . (-f $result_file_path ? 'YES' : 'NO') . "\n";
+        my $error_msg = "Result file not found for table '$table_name'";
+        
+        # Add debug information if debug mode is enabled
+        if ($c->session->{debug_mode}) {
+            my $debug_info = "\nDEBUG INFO (get_result_field_info):\n";
+            $debug_info .= "Table key searched: '$table_key'\n";
+            $debug_info .= "Available tables: " . join(', ', keys %$result_table_mapping) . "\n";
+            $debug_info .= "Result file path: " . ($result_file_path || 'undefined') . "\n";
+            if ($result_file_path) {
+                $debug_info .= "File exists: " . (-f $result_file_path ? 'YES' : 'NO') . "\n";
+            }
+            $error_msg .= $debug_info;
         }
-        die $debug_info;
+        
+        die $error_msg;
     }
     
     # Read and parse the result file
@@ -3517,7 +3653,28 @@ sub get_result_field_info {
         }
     }
     
-    die "Field '$field_name' not found in result file";
+    my $error_msg = "Field '$field_name' not found in result file";
+    
+    # Add debug information if debug mode is enabled
+    if ($c->session->{debug_mode}) {
+        my $debug_info = "\nDEBUG INFO (get_result_field_info - field parsing):\n";
+        $debug_info .= "Field name searched: '$field_name'\n";
+        $debug_info .= "Result file path: '$result_file_path'\n";
+        
+        # Show a snippet of the add_columns section for debugging
+        if ($content =~ /__PACKAGE__->add_columns\(\s*(.*?)\s*\);/s) {
+            my $columns_section = $1;
+            my $snippet = substr($columns_section, 0, 500);
+            $snippet .= "..." if length($columns_section) > 500;
+            $debug_info .= "add_columns section (first 500 chars): $snippet\n";
+        } else {
+            $debug_info .= "No add_columns section found in result file\n";
+        }
+        
+        $error_msg .= $debug_info;
+    }
+    
+    die $error_msg;
 }
 
 # Helper method to update result file with table field values
@@ -3535,14 +3692,21 @@ sub update_result_field_from_table {
     }
     
     unless ($result_file_path && -f $result_file_path) {
-        my $debug_info = "Result file not found for table '$table_name' in update_result_field_from_table.\n";
-        $debug_info .= "Table key searched: '$table_key'\n";
-        $debug_info .= "Available tables: " . join(', ', keys %$result_table_mapping) . "\n";
-        $debug_info .= "Result file path: " . ($result_file_path || 'undefined') . "\n";
-        if ($result_file_path) {
-            $debug_info .= "File exists: " . (-f $result_file_path ? 'YES' : 'NO') . "\n";
+        my $error_msg = "Result file not found for table '$table_name'";
+        
+        # Add debug information if debug mode is enabled
+        if ($c->session->{debug_mode}) {
+            my $debug_info = "\nDEBUG INFO (update_result_field_from_table):\n";
+            $debug_info .= "Table key searched: '$table_key'\n";
+            $debug_info .= "Available tables: " . join(', ', keys %$result_table_mapping) . "\n";
+            $debug_info .= "Result file path: " . ($result_file_path || 'undefined') . "\n";
+            if ($result_file_path) {
+                $debug_info .= "File exists: " . (-f $result_file_path ? 'YES' : 'NO') . "\n";
+            }
+            $error_msg .= $debug_info;
         }
-        die $debug_info;
+        
+        die $error_msg;
     }
     
     # Read the result file
@@ -3597,7 +3761,29 @@ sub update_result_field_from_table {
         }
     }
     
-    die "Could not update field '$field_name' in result file";
+    my $error_msg = "Could not update field '$field_name' in result file";
+    
+    # Add debug information if debug mode is enabled
+    if ($c->session->{debug_mode}) {
+        my $debug_info = "\nDEBUG INFO (update_result_field_from_table - field update):\n";
+        $debug_info .= "Field name to update: '$field_name'\n";
+        $debug_info .= "Result file path: '$result_file_path'\n";
+        $debug_info .= "New field definition: $new_field_def\n";
+        
+        # Show a snippet of the add_columns section for debugging
+        if ($content =~ /__PACKAGE__->add_columns\(\s*(.*?)\s*\);/s) {
+            my $columns_section = $1;
+            my $snippet = substr($columns_section, 0, 500);
+            $snippet .= "..." if length($columns_section) > 500;
+            $debug_info .= "add_columns section (first 500 chars): $snippet\n";
+        } else {
+            $debug_info .= "No add_columns section found in result file\n";
+        }
+        
+        $error_msg .= $debug_info;
+    }
+    
+    die $error_msg;
 }
 
 # Helper method to update table schema with result field values

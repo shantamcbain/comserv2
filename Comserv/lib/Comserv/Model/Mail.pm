@@ -33,7 +33,10 @@ sub send_email {
     unless ($smtp_config) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email', 
             "No SMTP config for site_id $site_id");
-        $c->stash->{debug_msg} = "Missing SMTP configuration";
+        if ($c->session->{debug_mode}) {
+            $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
+            push @{$c->stash->{debug_msg}}, "Missing SMTP configuration";
+        }
         return;
     }
 
@@ -104,7 +107,10 @@ sub send_email {
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email', 
             "Failed to send email to $to: $_");
-        $c->stash->{debug_msg} = "Email sending failed: $_";
+        if ($c->session->{debug_mode}) {
+            $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
+            push @{$c->stash->{debug_msg}}, "Email sending failed: $_";
+        }
         return;
     };
 }
@@ -164,7 +170,10 @@ sub create_mail_account {
     unless ($virtualmin_pass) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_mail_account', 
             "Virtualmin password not configured");
-        $c->stash->{debug_msg} = "Virtualmin API credentials not configured";
+        if ($c->session->{debug_mode}) {
+            $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
+            push @{$c->stash->{debug_msg}}, "Virtualmin API credentials not configured";
+        }
         return;
     }
 

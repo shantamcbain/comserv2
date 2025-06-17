@@ -150,11 +150,13 @@ sub searchHerbs {
     # Convert to lowercase
     $search_string = lc($search_string);
 
-    # Initialize an array to hold the debug messages
+    # Initialize an array to hold the debug messages (only if debug mode is enabled)
     my @debug_messages;
 
-    # Log the search string and add it to the debug messages
-    push @debug_messages, __PACKAGE__ . " " . __LINE__ . ": Search string: $search_string";
+    # Log the search string and add it to the debug messages (only if debug mode is enabled)
+    if ($c->session->{debug_mode}) {
+        push @debug_messages, __PACKAGE__ . " " . __LINE__ . ": Search string: $search_string";
+    }
 
     # Get a ResultSet object for the 'Herb' table
     my $rs = $self->schema->resultset('Herb');
@@ -203,16 +205,20 @@ sub searchHerbs {
     };
     if ($@) {
         my $error = $@;
-        push @debug_messages, __PACKAGE__ . " " . __LINE__ . ": Error searching herbs: $error";
+        if ($c->session->{debug_mode}) {
+            push @debug_messages, __PACKAGE__ . " " . __LINE__ . ": Error searching herbs: $error";
+        }
         $c->stash(error_msg => "Error searching herbs: $error");
         return;
     }
 
-    # Log the number of results and add it to the debug messages
-    push @debug_messages, __PACKAGE__ . " " . __LINE__ . ": Number of results: " . scalar @results;
-
-    # Add the debug messages to the stash
-    $c->stash(debug_msg => \@debug_messages);
+    # Log the number of results and add it to the debug messages (only if debug mode is enabled)
+    if ($c->session->{debug_mode}) {
+        push @debug_messages, __PACKAGE__ . " " . __LINE__ . ": Number of results: " . scalar @results;
+        
+        # Add the debug messages to the stash
+        $c->stash(debug_msg => \@debug_messages);
+    }
 
     return \@results;
 }
