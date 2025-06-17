@@ -222,3 +222,149 @@ sub trim {
     $s =~ s/^\s+|\s+$//g;
     return $s;
 }
+
+# Add an update_herb method to handle herb updates
+sub update_herb {
+    my ($self, $c, $record_id, $form_data) = @_;
+    
+    # Get the application's logging utility
+    use Comserv::Util::Logging;
+    my $logging = Comserv::Util::Logging->instance;
+    
+    # Log the update attempt
+    $logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_herb', 
+        "Attempting to update herb with ID: $record_id");
+    $logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'update_herb', 
+        "Form data: " . join(", ", map { "$_=" . ($form_data->{$_} // 'undef') } sort keys %$form_data));
+    
+    # Input validation
+    unless (defined $record_id && $record_id =~ /^\d+$/) {
+        $logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_herb', 
+            "Invalid record ID: " . (defined $record_id ? $record_id : "undefined"));
+        return (0, "Invalid record ID");
+    }
+    
+    # Attempt to find the herb
+    my $herb = $self->schema->resultset('Herb')->find($record_id);
+    unless ($herb) {
+        $logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_herb', 
+            "Herb with ID $record_id not found");
+        return (0, "Herb with ID $record_id not found");
+    }
+    
+    $logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_herb', 
+        "Found herb: " . $herb->botanical_name . " (ID: $record_id)");
+    
+    # Log current image value before update
+    my $current_image = $herb->image // 'undef';
+    $logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'update_herb', 
+        "Current image value before update: $current_image");
+    
+    # Update the herb with the form data
+    eval {
+        # Log all available columns for debugging
+        my @available_columns = $herb->result_source->columns;
+        $logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'update_herb', 
+            "Available columns in Herb table: " . join(", ", sort @available_columns));
+        
+        # Check specifically for image column
+        my $has_image_column = grep { $_ eq 'image' } @available_columns;
+        $logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'update_herb', 
+            "Image column present in schema: " . ($has_image_column ? 'YES' : 'NO'));
+        
+        # Remove any keys that don't correspond to columns in the Herb table
+        my %clean_data;
+        foreach my $column (@available_columns) {
+            if (exists $form_data->{$column}) {
+                $clean_data{$column} = $form_data->{$column};
+                $logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'update_herb', 
+                    "Setting $column = " . ($clean_data{$column} // 'undef'));
+            }
+        }
+        
+        # Log what's NOT being set (form data keys that don't match columns)
+        foreach my $form_key (keys %$form_data) {
+            unless (grep { $_ eq $form_key } @available_columns) {
+                $logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'update_herb', 
+                    "Form data key '$form_key' does not match any table column - skipping");
+            }
+        }
+        
+        # Log what we're actually trying to update
+        $logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'update_herb', 
+            "About to update with data: " . join(", ", map { "$_=" . ($clean_data{$_} // 'undef') } sort keys %clean_data));
+        
+        # Perform the update with the cleaned data
+        $herb->update(\%clean_data);
+        $logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_herb', 
+            "Update executed successfully");
+        
+
+        
+        # Log image value after update
+        $herb->discard_changes; # Refresh from database
+        my $updated_image = $herb->image // 'undef';
+        $logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'update_herb', 
+            "Image value after update: $updated_image");
+    };
+    
+    # Handle any errors
+    if ($@) {
+        my $error = $@;
+        $logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_herb', 
+            "Error updating herb: $error");
+        return (0, "Database error: $error");
+    }
+    
+    $logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_herb', 
+        "Successfully updated herb with ID: $record_id");
+    return (1, "Herb updated successfully");
+}
+
+# Add a delete_herb method to handle herb deletion
+sub delete_herb {
+    my ($self, $c, $record_id) = @_;
+    
+    # Get the application's logging utility
+    use Comserv::Util::Logging;
+    my $logging = Comserv::Util::Logging->instance;
+    
+    # Log the delete attempt
+    $logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete_herb', 
+        "Attempting to delete herb with ID: $record_id");
+    
+    # Input validation
+    unless (defined $record_id && $record_id =~ /^\d+$/) {
+        $logging->log_with_details($c, 'error', __FILE__, __LINE__, 'delete_herb', 
+            "Invalid record ID: " . (defined $record_id ? $record_id : "undefined"));
+        return (0, "Invalid record ID");
+    }
+    
+    # Attempt to find the herb
+    my $herb = $self->schema->resultset('Herb')->find($record_id);
+    unless ($herb) {
+        $logging->log_with_details($c, 'error', __FILE__, __LINE__, 'delete_herb', 
+            "Herb not found with ID: $record_id");
+        return (0, "Herb not found");
+    }
+    
+    # Log herb details before deletion
+    my $botanical_name = $herb->botanical_name // 'Unknown';
+    $logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete_herb', 
+        "Found herb to delete: $botanical_name (ID: $record_id)");
+    
+    # Attempt to delete the herb
+    eval {
+        $herb->delete;
+        $logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete_herb', 
+            "Successfully deleted herb: $botanical_name (ID: $record_id)");
+    };
+    
+    if ($@) {
+        $logging->log_with_details($c, 'error', __FILE__, __LINE__, 'delete_herb', 
+            "Failed to delete herb with ID $record_id: $@");
+        return (0, "Database error: $@");
+    }
+    
+    return (1, "Herb deleted successfully");
+}

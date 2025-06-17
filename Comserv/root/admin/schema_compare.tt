@@ -1,0 +1,939 @@
+[% PageVersion = 'admin/schema_compare.tt,v 4.0 2024/12/19 shanta Exp shanta ' %]
+[% WRAPPER layout.tt %]
+
+<head>
+    <link rel="stylesheet" href="[% c.uri_for('/static/css/themes/schema_compare.css') %]">
+</head>
+
+<div class="schema-compare-container">
+    <header class="schema-compare-header">
+        <h1><i class="fas fa-database"></i> Database Schema Comparison</h1>
+        <div class="schema-compare-context">
+            <span class="context-item"><strong>Site:</strong> [% site_name || 'Comserv' %]</span>
+            <span class="context-item"><strong>Status:</strong> Active</span>
+            <button type="button" class="refresh-btn" onclick="refreshComparison()">
+                <i class="fas fa-sync-alt"></i> Refresh Comparison
+            </button>
+        </div>
+    </header>
+    <p class="intro">Compare database table schemas with their corresponding Result files to ensure synchronization during development.</p>
+
+    <!-- Summary Statistics -->
+    <div class="schema-summary-stats">
+        <div class="stat-card">
+            <div class="stat-icon databases"><i class="fas fa-database"></i></div>
+            <div class="stat-content">
+                <span class="stat-label">Total Databases</span>
+                <span class="stat-number">[% database_comparison.summary.total_databases %]</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon connected"><i class="fas fa-check-circle"></i></div>
+            <div class="stat-content">
+                <span class="stat-label">Connected</span>
+                <span class="stat-number">[% database_comparison.summary.connected_databases %]</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon tables"><i class="fas fa-table"></i></div>
+            <div class="stat-content">
+                <span class="stat-label">Total Tables</span>
+                <span class="stat-number">[% database_comparison.summary.total_tables %]</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon status"><i class="fas fa-check-circle"></i></div>
+            <div class="stat-content">
+                <span class="stat-label">With Results</span>
+                <span class="stat-number">[% database_comparison.summary.tables_with_results %]</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Debug Information -->
+    [% IF c.session.debug_mode %]
+        <div class="debug-info">
+            <h5>Debug Information:</h5>
+            <p><strong>Ency Status:</strong> [% database_comparison.ency.connection_status %]</p>
+            <p><strong>Ency Tables:</strong> [% database_comparison.ency.table_count %]</p>
+            <p><strong>Forager Status:</strong> [% database_comparison.forager.connection_status %]</p>
+            <p><strong>Forager Tables:</strong> [% database_comparison.forager.table_count %]</p>
+            <p><strong>Tables with Results:</strong> [% database_comparison.summary.tables_with_results %]</p>
+            <p><strong>Tables without Results:</strong> [% database_comparison.summary.tables_without_results %]</p>
+        </div>
+    [% END %]
+
+    <!-- Instructions -->
+    <div class="instructions-info">
+        <i class="fas fa-info-circle"></i>
+        <strong>Instructions:</strong> 
+        <ol>
+            <li>Each database is compared with its corresponding Result files</li>
+            <li>Click on table comparison cards to view detailed field comparisons between database and Result file</li>
+            <li>Use checkboxes to select the correct field attributes for synchronization</li>
+            <li>Click "Sync Field" to apply selected attributes or "Batch Sync" for all fields</li>
+            <li>Use "Create" buttons for missing Result files</li>
+        </ol>
+    </div>
+
+    <!-- Database Sections -->
+    [% IF database_comparison.ency.connection_status == 'connected' OR database_comparison.forager.connection_status == 'connected' %]
+        
+        <!-- Ency Database Section -->
+        [% IF database_comparison.ency.connection_status == 'connected' %]
+        <div class="schema-section">
+            <button class="section-toggle" onclick="toggleSection(this)">
+                <span>
+                    <i class="fas fa-database"></i> [% database_comparison.ency.display_name %]
+                    <span class="status-badge connected">Connected</span>
+                    <span class="table-count">[% database_comparison.ency.table_count %] tables</span>
+                </span>
+                <i class="fas fa-chevron-right"></i>
+            </button>
+            <div class="section-content">
+                <!-- Group 1: Tables with Result files -->
+                [% tables_with_results = [] %]
+                [% tables_without_results = [] %]
+                [% FOREACH table_comparison IN database_comparison.ency.table_comparisons %]
+                    [% IF table_comparison.has_result_file %]
+                        [% tables_with_results.push(table_comparison) %]
+                    [% ELSE %]
+                        [% tables_without_results.push(table_comparison) %]
+                    [% END %]
+                [% END %]
+                
+                [% IF tables_with_results.size > 0 %]
+                <div class="table-group">
+                    <div class="table-group-header" onclick="toggleTableGroup(this)">
+                        <span>
+                            <i class="fas fa-check-circle"></i> Tables with Result Files
+                            <span class="group-count">[% tables_with_results.size %]</span>
+                        </span>
+                        <i class="fas fa-chevron-right group-toggle-icon"></i>
+                    </div>
+                    <div class="table-group-content">
+                    [% FOREACH table_comparison IN tables_with_results %]
+                        <div class="table-comparison-card" data-table="[% table_comparison.table_name | html %]" data-database="ency">
+                            <div class="table-comparison-header" onclick="toggleTableComparison(this)">
+                                <div class="table-comparison-title">
+                                    <i class="fas fa-table"></i>
+                                    <h4>[% table_comparison.table_name | html %]</h4>
+                                    [% IF table_comparison.sync_status == 'synchronized' %]
+                                        <span class="difference-indicator same" title="Synchronized"></span>
+                                    [% ELSE %]
+                                        <span class="difference-indicator different" title="Needs sync"></span>
+                                    [% END %]
+                                </div>
+                                <div class="table-comparison-actions">
+                                    [% IF table_comparison.sync_status == 'needs_sync' %]
+                                        <button class="sync-btn" onclick="syncTable('[% table_comparison.table_name | html %]', 'ency'); event.stopPropagation();">
+                                            <i class="fas fa-sync"></i> Sync
+                                        </button>
+                                    [% END %]
+                                    <i class="fas fa-chevron-right expand-icon"></i>
+                                </div>
+                            </div>
+                            <div class="field-comparison-content">
+                                <div class="loading-indicator">
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                    <span>Loading field comparison...</span>
+                                </div>
+                            </div>
+                        </div>
+                    [% END %]
+                    </div>
+                </div>
+                [% END %]
+                
+                <!-- Group 2: Result files without Tables -->
+                [% IF database_comparison.ency.results_without_tables.size > 0 %]
+                <div class="table-group">
+                    <div class="table-group-header" onclick="toggleTableGroup(this)">
+                        <span>
+                            <i class="fas fa-file-alt"></i> Result Files without Tables
+                            <span class="group-count">[% database_comparison.ency.results_without_tables.size %]</span>
+                        </span>
+                        <i class="fas fa-chevron-right group-toggle-icon"></i>
+                    </div>
+                    <div class="table-group-content">
+                    [% FOREACH result_file IN database_comparison.ency.results_without_tables %]
+                        <div class="table-comparison-card">
+                            <div class="table-comparison-header">
+                                <div class="table-comparison-title">
+                                    <i class="fas fa-file-alt"></i>
+                                    <h4>[% result_file.result_name | html %] (Result only)</h4>
+                                    <span class="difference-indicator missing" title="No corresponding table"></span>
+                                </div>
+                                <div class="table-comparison-actions">
+                                    <button class="create-btn" onclick="createTableFromResult('[% result_file.result_name | html %]', 'ency'); event.stopPropagation();">
+                                        <i class="fas fa-plus"></i> Create Table
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    [% END %]
+                    </div>
+                </div>
+                [% END %]
+                
+                <!-- Group 3: Tables without Result files -->
+                [% IF tables_without_results.size > 0 %]
+                <div class="table-group">
+                    <div class="table-group-header" onclick="toggleTableGroup(this)">
+                        <span>
+                            <i class="fas fa-plus-square"></i> Tables without Result Files
+                            <span class="group-count">[% tables_without_results.size %]</span>
+                        </span>
+                        <i class="fas fa-chevron-right group-toggle-icon"></i>
+                    </div>
+                    <div class="table-group-content">
+                    [% FOREACH table_comparison IN tables_without_results %]
+                        <div class="table-comparison-card">
+                            <div class="table-comparison-header">
+                                <div class="table-comparison-title">
+                                    <i class="fas fa-table"></i>
+                                    <h4>[% table_comparison.table_name | html %] (Table only)</h4>
+                                    <span class="difference-indicator missing" title="No result file"></span>
+                                </div>
+                                <div class="table-comparison-actions">
+                                    <button class="create-btn" onclick="createResultFromTable('[% table_comparison.table_name | html %]', 'ency'); event.stopPropagation();">
+                                        <i class="fas fa-plus"></i> Create Result
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    [% END %]
+                    </div>
+                </div>
+                [% END %]
+            </div>
+        </div>
+        [% END %]
+        
+        <!-- Forager Database Section -->
+        [% IF database_comparison.forager.connection_status == 'connected' %]
+        <div class="schema-section">
+            <button class="section-toggle" onclick="toggleSection(this)">
+                <span>
+                    <i class="fas fa-database"></i> [% database_comparison.forager.display_name %]
+                    <span class="status-badge connected">Connected</span>
+                    <span class="table-count">[% database_comparison.forager.table_count %] tables</span>
+                </span>
+                <i class="fas fa-chevron-right"></i>
+            </button>
+            <div class="section-content">
+                <!-- Group 1: Tables with Result files -->
+                [% tables_with_results = [] %]
+                [% tables_without_results = [] %]
+                [% FOREACH table_comparison IN database_comparison.forager.table_comparisons %]
+                    [% IF table_comparison.has_result_file %]
+                        [% tables_with_results.push(table_comparison) %]
+                    [% ELSE %]
+                        [% tables_without_results.push(table_comparison) %]
+                    [% END %]
+                [% END %]
+                
+                [% IF tables_with_results.size > 0 %]
+                <div class="table-group">
+                    <div class="table-group-header" onclick="toggleTableGroup(this)">
+                        <span>
+                            <i class="fas fa-check-circle"></i> Tables with Result Files
+                            <span class="group-count">[% tables_with_results.size %]</span>
+                        </span>
+                        <i class="fas fa-chevron-right group-toggle-icon"></i>
+                    </div>
+                    <div class="table-group-content">
+                    [% FOREACH table_comparison IN tables_with_results %]
+                        <div class="table-comparison-card" data-table="[% table_comparison.table_name | html %]" data-database="forager">
+                            <div class="table-comparison-header" onclick="toggleTableComparison(this)">
+                                <div class="table-comparison-title">
+                                    <i class="fas fa-table"></i>
+                                    <h4>[% table_comparison.table_name | html %]</h4>
+                                    [% IF table_comparison.sync_status == 'synchronized' %]
+                                        <span class="difference-indicator same" title="Synchronized"></span>
+                                    [% ELSE %]
+                                        <span class="difference-indicator different" title="Needs sync"></span>
+                                    [% END %]
+                                </div>
+                                <div class="table-comparison-actions">
+                                    [% IF table_comparison.sync_status == 'needs_sync' %]
+                                        <button class="sync-btn" onclick="syncTable('[% table_comparison.table_name | html %]', 'forager'); event.stopPropagation();">
+                                            <i class="fas fa-sync"></i> Sync
+                                        </button>
+                                    [% END %]
+                                    <i class="fas fa-chevron-right expand-icon"></i>
+                                </div>
+                            </div>
+                            <div class="field-comparison-content">
+                                <div class="loading-indicator">
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                    <span>Loading field comparison...</span>
+                                </div>
+                            </div>
+                        </div>
+                    [% END %]
+                    </div>
+                </div>
+                [% END %]
+                
+                <!-- Group 2: Result files without Tables -->
+                [% IF database_comparison.forager.results_without_tables.size > 0 %]
+                <div class="table-group">
+                    <div class="table-group-header" onclick="toggleTableGroup(this)">
+                        <span>
+                            <i class="fas fa-file-alt"></i> Result Files without Tables
+                            <span class="group-count">[% database_comparison.forager.results_without_tables.size %]</span>
+                        </span>
+                        <i class="fas fa-chevron-right group-toggle-icon"></i>
+                    </div>
+                    <div class="table-group-content">
+                    [% FOREACH result_file IN database_comparison.forager.results_without_tables %]
+                        <div class="table-comparison-card">
+                            <div class="table-comparison-header">
+                                <div class="table-comparison-title">
+                                    <i class="fas fa-file-alt"></i>
+                                    <h4>[% result_file.result_name | html %] (Result only)</h4>
+                                    <span class="difference-indicator missing" title="No corresponding table"></span>
+                                </div>
+                                <div class="table-comparison-actions">
+                                    <button class="create-btn" onclick="createTableFromResult('[% result_file.result_name | html %]', 'forager'); event.stopPropagation();">
+                                        <i class="fas fa-plus"></i> Create Table
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    [% END %]
+                    </div>
+                </div>
+                [% END %]
+                
+                <!-- Group 3: Tables without Result files -->
+                [% IF tables_without_results.size > 0 %]
+                <div class="table-group">
+                    <div class="table-group-header" onclick="toggleTableGroup(this)">
+                        <span>
+                            <i class="fas fa-plus-square"></i> Tables without Result Files
+                            <span class="group-count">[% tables_without_results.size %]</span>
+                        </span>
+                        <i class="fas fa-chevron-right group-toggle-icon"></i>
+                    </div>
+                    <div class="table-group-content">
+                    [% FOREACH table_comparison IN tables_without_results %]
+                        <div class="table-comparison-card">
+                            <div class="table-comparison-header">
+                                <div class="table-comparison-title">
+                                    <i class="fas fa-table"></i>
+                                    <h4>[% table_comparison.table_name | html %] (Table only)</h4>
+                                    <span class="difference-indicator missing" title="No result file"></span>
+                                </div>
+                                <div class="table-comparison-actions">
+                                    <button class="create-btn" onclick="createResultFromTable('[% table_comparison.table_name | html %]', 'forager'); event.stopPropagation();">
+                                        <i class="fas fa-plus"></i> Create Result
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    [% END %]
+                    </div>
+                </div>
+                [% END %]
+            </div>
+        </div>
+        [% END %]
+
+    [% ELSE %]
+        <!-- Connection Error Display -->
+        <div class="error-message">
+            <i class="fas fa-exclamation-triangle"></i>
+            <h4>Database Connection Required</h4>
+            <p>Both Ency and Forager databases must be connected to perform schema comparison.</p>
+            [% IF database_comparison.ency.connection_status != 'connected' %]
+                <p><strong>Ency Status:</strong> [% database_comparison.ency.connection_status %]</p>
+                [% IF database_comparison.ency.error %]
+                    <p><strong>Ency Error:</strong> [% database_comparison.ency.error | html %]</p>
+                [% END %]
+            [% END %]
+            [% IF database_comparison.forager.connection_status != 'connected' %]
+                <p><strong>Forager Status:</strong> [% database_comparison.forager.connection_status %]</p>
+                [% IF database_comparison.forager.error %]
+                    <p><strong>Forager Error:</strong> [% database_comparison.forager.error | html %]</p>
+                [% END %]
+            [% END %]
+            <small><strong>Note:</strong> Please ensure db_config.json exists and contains valid database connection settings.</small>
+        </div>
+    [% END %]
+</div>
+
+<script>
+// Function to refresh the comparison data
+function refreshComparison() {
+    location.reload();
+}
+
+// Function to toggle database sections
+function toggleSection(button) {
+    const section = button.closest('.schema-section');
+    const content = section.querySelector('.section-content');
+    const icon = button.querySelector('.fas.fa-chevron-down, .fas.fa-chevron-right');
+    
+    if (content.classList.contains('expanded')) {
+        content.classList.remove('expanded');
+        content.style.display = 'none';
+        icon.classList.remove('fa-chevron-down');
+        icon.classList.add('fa-chevron-right');
+    } else {
+        content.classList.add('expanded');
+        content.style.display = 'block';
+        icon.classList.remove('fa-chevron-right');
+        icon.classList.add('fa-chevron-down');
+    }
+}
+
+// Function to toggle table groups (Tables with Results, Result Files without Tables, etc.)
+function toggleTableGroup(header) {
+    const group = header.closest('.table-group');
+    const content = group.querySelector('.table-group-content');
+    const icon = header.querySelector('.group-toggle-icon');
+    
+    if (content.classList.contains('expanded')) {
+        content.classList.remove('expanded');
+        content.style.display = 'none';
+        icon.classList.remove('fa-chevron-down');
+        icon.classList.add('fa-chevron-right');
+    } else {
+        content.classList.add('expanded');
+        content.style.display = 'block';
+        icon.classList.remove('fa-chevron-right');
+        icon.classList.add('fa-chevron-down');
+    }
+}
+
+// Function to toggle table comparison details
+function toggleTableComparison(header) {
+    const card = header.closest('.table-comparison-card');
+    const content = card.querySelector('.field-comparison-content');
+    const icon = header.querySelector('.expand-icon');
+    
+    if (content.classList.contains('expanded')) {
+        content.classList.remove('expanded');
+        content.style.display = 'none';
+        icon.classList.remove('fa-chevron-down');
+        icon.classList.add('fa-chevron-right');
+        card.classList.remove('expanded');
+    } else {
+        content.classList.add('expanded');
+        content.style.display = 'block';
+        icon.classList.remove('fa-chevron-right');
+        icon.classList.add('fa-chevron-down');
+        card.classList.add('expanded');
+        
+        // Load field comparison if not already loaded
+        const tableName = card.dataset.table;
+        const database = card.dataset.database;
+        if (content.querySelector('.loading-indicator')) {
+            loadFieldComparison(content, tableName, database);
+        }
+    }
+}
+
+// Load field comparison data via AJAX
+function loadFieldComparison(container, tableName, database) {
+    // First try to get the basic table schema (this was working)
+    fetch('[% c.uri_for("/admin/get_table_schema") %]', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'table_name=' + encodeURIComponent(tableName) + '&database=' + encodeURIComponent(database)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Try to get detailed field comparison
+            loadDetailedFieldComparison(container, tableName, database, data.schema);
+        } else {
+            container.innerHTML = '<div class="error-message"><i class="fas fa-exclamation-triangle"></i> Error loading table schema: ' + (data.error || 'Unknown error') + '</div>';
+        }
+    })
+    .catch(error => {
+        container.innerHTML = '<div class="error-message"><i class="fas fa-exclamation-triangle"></i> Failed to load table schema. Please try again.</div>';
+    });
+}
+
+// Load detailed field comparison (new functionality)
+function loadDetailedFieldComparison(container, tableName, database, tableSchema) {
+    fetch('[% c.uri_for("/admin/get_field_comparison") %]', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'table_name=' + encodeURIComponent(tableName) + '&database=' + encodeURIComponent(database)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Log debug information
+            if (data.debug) {
+                console.log('Field comparison debug:', data.debug);
+            }
+            container.innerHTML = buildFieldComparisonHTML(data.comparison, tableName, database);
+        } else {
+            // Fallback to basic table schema display if field comparison fails
+            console.log('Field comparison failed, falling back to basic schema display:', data.error);
+            container.innerHTML = buildTableSchemaHTML(tableSchema, tableName, database);
+        }
+    })
+    .catch(error => {
+        // Fallback to basic table schema display if field comparison fails
+        console.log('Field comparison request failed, falling back to basic schema display:', error);
+        container.innerHTML = buildTableSchemaHTML(tableSchema, tableName, database);
+    });
+}
+
+// Build HTML for field comparison display
+function buildFieldComparisonHTML(comparison, tableName, database) {
+    console.log('Building field comparison HTML for:', tableName, database);
+    console.log('Comparison data:', comparison);
+    
+    let html = '<div class="field-comparison-display">';
+    html += '<h5>Field Comparison: ' + tableName + ' (' + database + ')</h5>';
+    
+    // Add debug information
+    html += '<div class="debug-info" style="background: #f0f0f0; padding: 10px; margin: 10px 0; font-size: 12px;">';
+    html += '<strong>Debug Info:</strong><br>';
+    html += 'Has Result File: ' + (comparison.has_result_file ? 'YES' : 'NO') + '<br>';
+    html += 'Result File Path: ' + (comparison.result_file_path || 'NOT FOUND') + '<br>';
+    html += 'Fields Count: ' + (comparison.fields ? Object.keys(comparison.fields).length : 0) + '<br>';
+    html += '</div>';
+    
+    if (!comparison.has_result_file) {
+        html += '<div class="no-result-file">';
+        html += '<p><i class="fas fa-exclamation-triangle"></i> No Result file found for this table.</p>';
+        html += '<button class="create-btn" onclick="createResultFromTable(\'' + tableName + '\', \'' + database + '\');">';
+        html += '<i class="fas fa-plus"></i> Create Result File</button>';
+        html += '</div>';
+        html += '</div>';
+        return html;
+    }
+    
+    if (comparison.fields && Object.keys(comparison.fields).length > 0) {
+        html += '<table class="field-comparison-table">';
+        html += '<thead>';
+        html += '<tr>';
+        html += '<th class="field-name-column">Field Name</th>';
+        html += '<th class="database-column">Table (' + database + ')</th>';
+        html += '<th class="database-column">Result File</th>';
+        html += '<th class="actions-column">Actions</th>';
+        html += '</tr>';
+        html += '</thead>';
+        html += '<tbody>';
+        
+        // Group fields by property type
+        const properties = ['data_type', 'size', 'is_nullable', 'is_auto_increment', 'default_value'];
+        
+        for (const [fieldName, fieldData] of Object.entries(comparison.fields)) {
+            const tableField = fieldData.table;
+            const resultField = fieldData.result;
+            const tableMissing = !tableField;
+            const resultMissing = !resultField;
+            
+            // Field header row
+            html += '<tr class="field-header-row">';
+            html += '<td colspan="4" class="field-header">';
+            html += '<strong>' + fieldName + '</strong>';
+            if (tableMissing) {
+                html += ' <span class="missing-indicator">(Missing in Table)</span>';
+            } else if (resultMissing) {
+                html += ' <span class="missing-indicator">(Missing in Result)</span>';
+            }
+            html += '</td>';
+            html += '</tr>';
+            
+            // Property rows
+            for (const prop of properties) {
+                const tableValue = tableField ? tableField[prop] : null;
+                const resultValue = resultField ? resultField[prop] : null;
+                const isDifferent = tableValue !== resultValue;
+                
+                html += '<tr>';
+                html += '<td class="field-name-column">' + formatPropertyName(prop) + '</td>';
+                
+                // Table column
+                html += '<td class="database-column">';
+                if (!tableMissing) {
+                    html += '<div class="field-value-container">';
+                    if (isDifferent && !resultMissing) {
+                        html += '<input type="radio" name="' + fieldName + '_' + prop + '" value="table" class="field-checkbox">';
+                    }
+                    html += '<div class="field-value ' + (isDifferent ? 'different' : '') + '">' + formatFieldValue(tableValue) + '</div>';
+                    html += '</div>';
+                } else {
+                    html += '<div class="field-value missing">Field not found in table</div>';
+                }
+                html += '</td>';
+                
+                // Result column
+                html += '<td class="database-column">';
+                if (!resultMissing) {
+                    html += '<div class="field-value-container">';
+                    if (isDifferent && !tableMissing) {
+                        html += '<input type="radio" name="' + fieldName + '_' + prop + '" value="result" class="field-checkbox" checked>';
+                    }
+                    html += '<div class="field-value ' + (isDifferent ? 'different' : '') + '">' + formatFieldValue(resultValue) + '</div>';
+                    html += '</div>';
+                } else {
+                    html += '<div class="field-value missing">Field not found in result</div>';
+                }
+                html += '</td>';
+                
+                // Actions column
+                html += '<td class="actions-column">';
+                if (isDifferent && !tableMissing && !resultMissing) {
+                    html += '<button class="sync-field-btn" onclick="syncSingleField(\'' + tableName + '\', \'' + database + '\', \'' + fieldName + '\', \'' + prop + '\');">';
+                    html += '<i class="fas fa-sync"></i> Sync</button>';
+                }
+                html += '</td>';
+                
+                html += '</tr>';
+            }
+        }
+        
+        html += '</tbody>';
+        html += '</table>';
+        
+        // Add action buttons
+        html += '<div class="field-actions">';
+        html += '<button class="sync-all-btn" onclick="syncAllFields(\'' + tableName + '\', \'' + database + '\');">';
+        html += '<i class="fas fa-sync"></i> Sync All Selected Fields</button>';
+        html += '<button class="refresh-btn" onclick="refreshFieldComparison(\'' + tableName + '\', \'' + database + '\');">';
+        html += '<i class="fas fa-refresh"></i> Refresh</button>';
+        html += '</div>';
+        
+    } else {
+        html += '<p>No field information available.</p>';
+    }
+    
+    html += '</div>';
+    return html;
+}
+
+// Build HTML for basic table schema display (fallback)
+function buildTableSchemaHTML(schema, tableName, database) {
+    let html = '<div class="table-schema-display">';
+    html += '<h5>Table Schema: ' + tableName + ' (' + database + ')</h5>';
+    
+    if (schema && schema.columns && Object.keys(schema.columns).length > 0) {
+        html += '<table class="schema-table">';
+        html += '<thead>';
+        html += '<tr>';
+        html += '<th>Column Name</th>';
+        html += '<th>Data Type</th>';
+        html += '<th>Size</th>';
+        html += '<th>Nullable</th>';
+        html += '<th>Default</th>';
+        html += '<th>Auto Increment</th>';
+        html += '</tr>';
+        html += '</thead>';
+        html += '<tbody>';
+        
+        for (const [columnName, columnInfo] of Object.entries(schema.columns)) {
+            html += '<tr>';
+            html += '<td><strong>' + columnName + '</strong></td>';
+            html += '<td>' + (columnInfo.data_type || 'N/A') + '</td>';
+            html += '<td>' + (columnInfo.size || 'N/A') + '</td>';
+            html += '<td>' + (columnInfo.is_nullable ? 'YES' : 'NO') + '</td>';
+            html += '<td>' + (columnInfo.default_value || 'NULL') + '</td>';
+            html += '<td>' + (columnInfo.is_auto_increment ? 'YES' : 'NO') + '</td>';
+            html += '</tr>';
+        }
+        
+        html += '</tbody>';
+        html += '</table>';
+        
+        // Show primary keys if available
+        if (schema.primary_keys && schema.primary_keys.length > 0) {
+            html += '<div class="primary-keys">';
+            html += '<strong>Primary Keys:</strong> ' + schema.primary_keys.join(', ');
+            html += '</div>';
+        }
+        
+        // Show relationships if available
+        if (schema.relationships && schema.relationships.length > 0) {
+            html += '<div class="relationships">';
+            html += '<strong>Relationships:</strong>';
+            html += '<ul>';
+            for (const rel of schema.relationships) {
+                html += '<li>' + rel.type + ': ' + rel.accessor + ' -> ' + rel.related_class + '</li>';
+            }
+            html += '</ul>';
+            html += '</div>';
+        }
+    } else {
+        html += '<p>No schema information available.</p>';
+    }
+    
+    html += '</div>';
+    return html;
+}
+
+// Format property names for display
+function formatPropertyName(prop) {
+    const names = {
+        'data_type': 'Data Type',
+        'size': 'Size',
+        'is_nullable': 'Nullable',
+        'default_value': 'Default Value',
+        'is_auto_increment': 'Auto Increment',
+        'is_primary_key': 'Primary Key'
+    };
+    return names[prop] || prop;
+}
+
+// Format field values for display
+function formatFieldValue(value) {
+    if (value === null || value === undefined) {
+        return '<em>NULL</em>';
+    }
+    if (typeof value === 'boolean') {
+        return value ? 'YES' : 'NO';
+    }
+    if (value === '') {
+        return '<em>Empty</em>';
+    }
+    return String(value);
+}
+
+// Sync all selected fields for a table
+function syncAllFields(tableName, database) {
+    const selectedFields = {};
+    const radios = document.querySelectorAll('input[type="radio"]:checked');
+    
+    radios.forEach(radio => {
+        const [fieldName, property] = radio.name.split('_');
+        if (!selectedFields[fieldName]) {
+            selectedFields[fieldName] = {};
+        }
+        selectedFields[fieldName][property] = radio.value;
+    });
+    
+    if (Object.keys(selectedFields).length === 0) {
+        alert('No fields selected for synchronization.');
+        return;
+    }
+    
+    if (!confirm('Are you sure you want to sync the selected fields for table "' + tableName + '"?')) {
+        return;
+    }
+    
+    // Show loading state
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing...';
+    button.disabled = true;
+    
+    fetch('[% c.uri_for("/admin/sync_fields") %]', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            table_name: tableName,
+            database: database,
+            selected_fields: selectedFields
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        
+        if (data.success) {
+            alert('Fields synchronized successfully!');
+            // Reload the field comparison
+            refreshFieldComparison(tableName, database);
+        } else {
+            alert('Error synchronizing fields: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        alert('Failed to synchronize fields. Please try again.');
+    });
+}
+
+// Sync a single field property
+function syncSingleField(tableName, database, fieldName, property) {
+    const radio = document.querySelector('input[name="' + fieldName + '_' + property + '"]:checked');
+    if (!radio) {
+        alert('No value selected for this field property.');
+        return;
+    }
+    
+    const selectedFields = {};
+    selectedFields[fieldName] = {};
+    selectedFields[fieldName][property] = radio.value;
+    
+    if (!confirm('Are you sure you want to sync ' + property + ' for field "' + fieldName + '"?')) {
+        return;
+    }
+    
+    // Show loading state
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    button.disabled = true;
+    
+    fetch('[% c.uri_for("/admin/sync_fields") %]', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            table_name: tableName,
+            database: database,
+            selected_fields: selectedFields
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        
+        if (data.success) {
+            alert('Field synchronized successfully!');
+            // Reload the field comparison
+            refreshFieldComparison(tableName, database);
+        } else {
+            alert('Error synchronizing field: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        alert('Failed to synchronize field. Please try again.');
+    });
+}
+
+// Refresh field comparison for a specific table
+function refreshFieldComparison(tableName, database) {
+    const card = document.querySelector('.table-comparison-card[data-table="' + tableName + '"][data-database="' + database + '"]');
+    if (card) {
+        const content = card.querySelector('.field-comparison-content');
+        content.innerHTML = '<div class="loading-indicator"><i class="fas fa-spinner fa-spin"></i><span>Loading field comparison...</span></div>';
+        loadFieldComparison(content, tableName, database);
+    }
+}
+
+// Batch sync all fields for a table
+function batchSyncTable(tableName) {
+    if (!confirm('Are you sure you want to batch sync all fields for table "' + tableName + '"? This will use the table structure as the source.')) {
+        return;
+    }
+    
+    fetch('[% c.uri_for("/admin/batch_sync_table") %]', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            table_name: tableName
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Table synchronized successfully!');
+            refreshComparison();
+        } else {
+            alert('Error synchronizing table: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        alert('Failed to synchronize table. Please try again.');
+    });
+}
+
+// Create table from result
+function createTableFromResult(resultName) {
+    if (!confirm('Are you sure you want to create a table from result "' + resultName + '"?')) {
+        return;
+    }
+    
+    fetch('[% c.uri_for("/admin/create_table_from_result") %]', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            result_name: resultName
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Table created successfully!');
+            refreshComparison();
+        } else {
+            alert('Error creating table: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        alert('Failed to create table. Please try again.');
+    });
+}
+
+// Create result from table
+function createResultFromTable(tableName) {
+    if (!confirm('Are you sure you want to create a result from table "' + tableName + '"?')) {
+        return;
+    }
+    
+    fetch('[% c.uri_for("/admin/create_result_from_table") %]', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            table_name: tableName
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Result created successfully!');
+            refreshComparison();
+        } else {
+            alert('Error creating result: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        alert('Failed to create result. Please try again.');
+    });
+}
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', function() {
+    // Add event listeners for radio button changes
+    document.addEventListener('change', function(e) {
+        if (e.target.type === 'radio' && e.target.classList.contains('field-checkbox')) {
+            // Update visual state when radio buttons change
+            const container = e.target.closest('.field-value-container');
+            const fieldValue = container.querySelector('.field-value');
+            
+            // Remove checked state from all values in this row
+            const row = e.target.closest('tr');
+            row.querySelectorAll('.field-value').forEach(val => {
+                val.classList.remove('selected');
+            });
+            
+            // Add checked state to selected value
+            if (e.target.checked) {
+                fieldValue.classList.add('selected');
+            }
+        }
+    });
+});
+</script>
+
+[% END %]

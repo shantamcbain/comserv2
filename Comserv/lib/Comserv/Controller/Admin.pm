@@ -14,6 +14,8 @@ use File::Basename;
 use File::Path qw(make_path);
 use File::Copy;
 use Digest::SHA qw(sha256_hex);
+use File::Find;
+use Module::Load;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -28,7 +30,7 @@ sub begin : Private {
     my ($self, $c) = @_;
     
     # Add detailed logging
-    my $username = $c->user_exists ? $c->user->username : 'Guest';
+    my $username = ($c->user_exists && $c->user) ? $c->user->username : ($c->session->{username} || 'Guest');
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', 
         "Admin controller begin method called by user: $username");
     
@@ -379,7 +381,7 @@ sub users :Path('/admin/users') :Args(0) {
         $c->flash->{error_msg} = "You need to be an administrator to access this area.";
         
         # Redirect to login page with destination parameter
-        $c->response->redirect($c->uri_for('/login', {
+        $c->response->redirect($c->uri_for('/user/login', {
             destination => $c->req->uri
         }));
         return;
@@ -475,7 +477,7 @@ sub content :Path('/admin/content') :Args(0) {
         $c->flash->{error_msg} = "You need to be an administrator to access this area.";
         
         # Redirect to login page with destination parameter
-        $c->response->redirect($c->uri_for('/login', {
+        $c->response->redirect($c->uri_for('/user/login', {
             destination => $c->req->uri
         }));
         return;
@@ -561,7 +563,7 @@ sub settings :Path('/admin/settings') :Args(0) {
         $c->flash->{error_msg} = "You need to be an administrator to access this area.";
         
         # Redirect to login page with destination parameter
-        $c->response->redirect($c->uri_for('/login', {
+        $c->response->redirect($c->uri_for('/user/login', {
             destination => $c->req->uri
         }));
         return;
@@ -759,7 +761,7 @@ sub system_info :Path('/admin/system_info') :Args(0) {
         $c->flash->{error_msg} = "You need to be an administrator to access this area.";
         
         # Redirect to login page with destination parameter
-        $c->response->redirect($c->uri_for('/login', {
+        $c->response->redirect($c->uri_for('/user/login', {
             destination => $c->req->uri
         }));
         return;
@@ -893,7 +895,7 @@ sub logs :Path('/admin/logs') :Args(0) {
         $c->flash->{error_msg} = "You need to be an administrator to access this area.";
         
         # Redirect to login page with destination parameter
-        $c->response->redirect($c->uri_for('/login', {
+        $c->response->redirect($c->uri_for('/user/login', {
             destination => $c->req->uri
         }));
         return;
@@ -955,7 +957,7 @@ sub backup :Path('/admin/backup') :Args(0) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'backup',
             "Access denied: User does not have admin role");
 
-        $c->response->redirect($c->uri_for('/login', {
+        $c->response->redirect($c->uri_for('/user/login', {
             destination => $c->req->uri,
             mid => $c->set_error_msg("You need to be an administrator to access this area.")
         }));
@@ -1175,6 +1177,1710 @@ sub network_devices_forward :Path('/admin/network_devices_old') :Args(0) {
 # sub delete_network_device :Path('/admin/delete_network_device') :Args(1) {
 #     # Implementation removed to avoid duplication
 # }
+
+# Database Schema Comparison functionality (with alias)
+sub compare_schema :Path('/admin/compare_schema') :Args(0) {
+    my ($self, $c) = @_;
+    # Redirect to the main schema_compare action
+    $c->response->redirect($c->uri_for('/admin/schema_compare'));
+    return;
+}
+
+# Database Schema Comparison functionality
+sub schema_compare :Path('/admin/schema_compare') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare', 
+        "Starting schema_compare action");
+    
+    # Check if the user has admin role
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'schema_compare', 
+            "Access denied: User does not have admin role");
+        
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        $c->response->redirect($c->uri_for('/user/login', {
+            destination => $c->req->uri
+        }));
+        return;
+    }
+    
+    # Get database comparison data
+    my $database_comparison = $self->get_database_comparison($c);
+    
+    # Debug: Log the structure of database_comparison
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare', 
+        "Database comparison structure: " . Data::Dumper::Dumper($database_comparison));
+    
+    # Use the standard debug message system
+    if ($c->session->{debug_mode}) {
+        push @{$c->stash->{debug_msg}}, "Admin controller schema_compare view - Template: admin/schema_compare.tt";
+        push @{$c->stash->{debug_msg}}, "Ency tables: " . scalar(@{$database_comparison->{ency}->{tables}});
+        push @{$c->stash->{debug_msg}}, "Forager tables: " . scalar(@{$database_comparison->{forager}->{tables}});
+        push @{$c->stash->{debug_msg}}, "Tables with results: " . $database_comparison->{summary}->{tables_with_results};
+        push @{$c->stash->{debug_msg}}, "Tables without results: " . $database_comparison->{summary}->{tables_without_results};
+    }
+    
+    # Set the template and data
+    $c->stash(
+        template => 'admin/schema_compare.tt',
+        database_comparison => $database_comparison
+    );
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare', 
+        "Completed schema_compare action");
+}
+
+# AJAX endpoint to get table schema details
+sub get_table_schema :Path('/admin/get_table_schema') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_table_schema', 
+        "Starting get_table_schema action");
+    
+    # Check if the user has admin role
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $c->response->status(403);
+        $c->stash(json => { success => 0, error => 'Access denied' });
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    my $table_name = $c->req->param('table_name');
+    my $database = $c->req->param('database');
+    
+    unless ($table_name && $database) {
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => 'Missing required parameters' });
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    try {
+        my $schema_info;
+        
+        if ($database eq 'ency') {
+            $schema_info = $self->get_ency_table_schema($c, $table_name);
+        } elsif ($database eq 'forager') {
+            $schema_info = $self->get_forager_table_schema($c, $table_name);
+        } else {
+            die "Invalid database: $database";
+        }
+        
+        $c->stash(json => { 
+            success => 1, 
+            schema => $schema_info,
+            table_name => $table_name,
+            database => $database
+        });
+        
+    } catch {
+        my $error = "Error getting table schema: $_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_table_schema', $error);
+        
+        $c->response->status(500);
+        $c->stash(json => { success => 0, error => $error });
+    };
+    
+    $c->forward('View::JSON');
+}
+
+# Get field comparison between table and Result file
+sub get_field_comparison :Path('/admin/get_field_comparison') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_field_comparison',
+        "Starting get_field_comparison action");
+    
+    my $table_name = $c->request->param('table_name');
+    my $database = $c->request->param('database');
+    
+    unless ($table_name && $database) {
+        $c->response->status(400);
+        $c->stash(json => {
+            success => 0,
+            error => 'Missing table_name or database parameter'
+        });
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    try {
+        my $comparison = $self->get_table_result_comparison($c, $table_name, $database);
+        
+        # Add debugging information
+        my $result_name = $self->table_name_to_result_name($table_name);
+        my $result_file_path = $self->find_result_file($c, $table_name, $database);
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_field_comparison',
+            "Table: $table_name, Database: $database, Result name: $result_name, Result file: " . ($result_file_path || 'NOT FOUND'));
+        
+        $c->stash(json => {
+            success => 1,
+            comparison => $comparison,
+            debug => {
+                table_name => $table_name,
+                database => $database,
+                result_name => $result_name,
+                result_file_path => $result_file_path,
+                has_result_file => $comparison->{has_result_file}
+            }
+        });
+        
+    } catch {
+        my $error = "Error getting field comparison for $table_name ($database): $_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_field_comparison', $error);
+        
+        $c->response->status(500);
+        $c->stash(json => {
+            success => 0,
+            error => $error
+        });
+    };
+    
+    $c->forward('View::JSON');
+}
+
+# Get database comparison between each database and its result files
+sub get_database_comparison {
+    my ($self, $c) = @_;
+    
+    my $comparison = {
+        ency => {
+            name => 'ency',
+            display_name => 'Encyclopedia Database',
+            tables => [],
+            table_count => 0,
+            connection_status => 'unknown',
+            error => undef,
+            table_comparisons => []
+        },
+        forager => {
+            name => 'forager',
+            display_name => 'Forager Database',
+            tables => [],
+            table_count => 0,
+            connection_status => 'unknown',
+            error => undef,
+            table_comparisons => []
+        },
+        summary => {
+            total_databases => 2,
+            connected_databases => 0,
+            total_tables => 0,
+            tables_with_results => 0,
+            tables_without_results => 0,
+            results_without_tables => 0
+        }
+    };
+    
+    # Get Ency database tables and compare with result files
+    try {
+        my $ency_tables = $self->get_ency_database_tables($c);
+        $comparison->{ency}->{tables} = $ency_tables;
+        $comparison->{ency}->{table_count} = scalar(@$ency_tables);
+        $comparison->{ency}->{connection_status} = 'connected';
+        $comparison->{summary}->{connected_databases}++;
+        $comparison->{summary}->{total_tables} += scalar(@$ency_tables);
+        
+        # Compare each table with its result file
+        my @tables_with_results = ();
+        my @tables_without_results = ();
+        
+        foreach my $table_name (@$ency_tables) {
+            my $table_comparison = $self->compare_table_with_result_file($c, $table_name, 'ency');
+            
+            # Debug logging
+            my $result_name = $self->table_name_to_result_name($table_name);
+            my $result_file_path = $self->find_result_file($c, $table_name, 'ency');
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_database_comparison', 
+                "Table: $table_name -> Result: $result_name -> Path: " . ($result_file_path || 'NOT FOUND') . 
+                " -> Has result: " . ($table_comparison->{has_result_file} ? 'YES' : 'NO'));
+            
+            if ($table_comparison->{has_result_file}) {
+                push @tables_with_results, $table_comparison;
+                $comparison->{summary}->{tables_with_results}++;
+            } else {
+                push @tables_without_results, $table_comparison;
+                $comparison->{summary}->{tables_without_results}++;
+            }
+        }
+        
+        # Find result files without corresponding tables
+        my @results_without_tables = $self->find_orphaned_result_files($c, 'ency', $ency_tables);
+        $comparison->{summary}->{results_without_tables} += scalar(@results_without_tables);
+        
+        # Organize comparisons: tables with results first, then tables without results
+        $comparison->{ency}->{table_comparisons} = [@tables_with_results, @tables_without_results];
+        $comparison->{ency}->{results_without_tables} = \@results_without_tables;
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_database_comparison', 
+            "Found " . scalar(@$ency_tables) . " tables in ency database: " . join(', ', @$ency_tables));
+            
+    } catch {
+        my $error = "Error connecting to ency database: $_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_database_comparison', $error);
+        $comparison->{ency}->{connection_status} = 'error';
+        $comparison->{ency}->{error} = $error;
+    };
+    
+    # Get Forager database tables and compare with result files
+    try {
+        my $forager_tables = $self->get_forager_database_tables($c);
+        $comparison->{forager}->{tables} = $forager_tables;
+        $comparison->{forager}->{table_count} = scalar(@$forager_tables);
+        $comparison->{forager}->{connection_status} = 'connected';
+        $comparison->{summary}->{connected_databases}++;
+        $comparison->{summary}->{total_tables} += scalar(@$forager_tables);
+        
+        # Compare each table with its result file
+        my @tables_with_results = ();
+        my @tables_without_results = ();
+        
+        foreach my $table_name (@$forager_tables) {
+            my $table_comparison = $self->compare_table_with_result_file($c, $table_name, 'forager');
+            
+            # Debug logging
+            my $result_name = $self->table_name_to_result_name($table_name);
+            my $result_file_path = $self->find_result_file($c, $table_name, 'forager');
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_database_comparison', 
+                "Forager Table: $table_name -> Result: $result_name -> Path: " . ($result_file_path || 'NOT FOUND') . 
+                " -> Has result: " . ($table_comparison->{has_result_file} ? 'YES' : 'NO'));
+            
+            if ($table_comparison->{has_result_file}) {
+                push @tables_with_results, $table_comparison;
+                $comparison->{summary}->{tables_with_results}++;
+            } else {
+                push @tables_without_results, $table_comparison;
+                $comparison->{summary}->{tables_without_results}++;
+            }
+        }
+        
+        # Find result files without corresponding tables
+        my @results_without_tables = $self->find_orphaned_result_files($c, 'forager', $forager_tables);
+        $comparison->{summary}->{results_without_tables} += scalar(@results_without_tables);
+        
+        # Organize comparisons: tables with results first, then tables without results
+        $comparison->{forager}->{table_comparisons} = [@tables_with_results, @tables_without_results];
+        $comparison->{forager}->{results_without_tables} = \@results_without_tables;
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_database_comparison', 
+            "Found " . scalar(@$forager_tables) . " tables in forager database: " . join(', ', @$forager_tables));
+            
+    } catch {
+        my $error = "Error connecting to forager database: $_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_database_comparison', $error);
+        $comparison->{forager}->{connection_status} = 'error';
+        $comparison->{forager}->{error} = $error;
+    };
+    
+    return $comparison;
+}
+
+# Compare a database table with its Result file
+sub compare_table_with_result_file {
+    my ($self, $c, $table_name, $database) = @_;
+    
+    my $comparison = {
+        table_name => $table_name,
+        database => $database,
+        has_result_file => 0,
+        result_file_path => undef,
+        database_schema => {},
+        result_file_schema => {},
+        differences => [],
+        sync_status => 'unknown',
+        last_modified => undef
+    };
+    
+    # Look for Result file
+    my $result_file_path = $self->find_result_file($c, $table_name, $database);
+    if ($result_file_path && -f $result_file_path) {
+        $comparison->{has_result_file} = 1;
+        $comparison->{result_file_path} = $result_file_path;
+        $comparison->{last_modified} = (stat($result_file_path))[9];
+        
+        # Get database schema
+        try {
+            if ($database eq 'ency') {
+                $comparison->{database_schema} = $self->get_ency_table_schema($c, $table_name);
+            } elsif ($database eq 'forager') {
+                $comparison->{database_schema} = $self->get_forager_table_schema($c, $table_name);
+            }
+        } catch {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'compare_table_with_result_file', 
+                "Error getting database schema for $table_name: $_");
+        };
+        
+        # Parse Result file schema
+        try {
+            $comparison->{result_file_schema} = $self->parse_result_file_schema($c, $result_file_path);
+        } catch {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'compare_table_with_result_file', 
+                "Error parsing Result file schema for $table_name: $_");
+        };
+        
+        # Compare schemas and find differences
+        $comparison->{differences} = $self->find_schema_differences(
+            $comparison->{database_schema}, 
+            $comparison->{result_file_schema}
+        );
+        
+        # Determine sync status
+        if (scalar(@{$comparison->{differences}}) == 0) {
+            $comparison->{sync_status} = 'synchronized';
+        } else {
+            $comparison->{sync_status} = 'needs_sync';
+        }
+    } else {
+        $comparison->{sync_status} = 'no_result_file';
+    }
+    
+    return $comparison;
+}
+
+# Find Result file for a table
+sub find_result_file {
+    my ($self, $c, $table_name, $database) = @_;
+    
+    # Convert table name to proper case for Result file names
+    my $result_name = $self->table_name_to_result_name($table_name);
+    
+    # Database-specific Result file locations to check
+    my @search_paths;
+    
+    # Get the application root directory
+    my $app_root = $c->config->{home} || '/home/shanta/PycharmProjects/comserv2';
+    
+    if (lc($database) eq 'ency') {
+        @search_paths = (
+            "$app_root/Comserv/lib/Comserv/Model/Schema/Ency/Result/$result_name.pm",
+            "$app_root/Comserv/lib/Comserv/Model/Schema/Ency/Result/System/$result_name.pm",
+            "$app_root/Comserv/lib/Comserv/Model/Schema/Ency/Result/User/$result_name.pm"
+        );
+    } elsif (lc($database) eq 'forager') {
+        @search_paths = (
+            "$app_root/Comserv/lib/Comserv/Model/Schema/Forager/Result/$result_name.pm"
+        );
+    } else {
+        # Fallback for unknown databases
+        @search_paths = (
+            "$app_root/Comserv/lib/Comserv/Model/Schema/Result/$result_name.pm",
+            "$app_root/Comserv/lib/Comserv/Schema/Result/$result_name.pm"
+        );
+    }
+    
+    foreach my $path (@search_paths) {
+        if (-f $path) {
+            return $path;
+        }
+    }
+    
+    return undef;
+}
+
+# Convert table name to Result class name
+sub table_name_to_result_name {
+    my ($self, $table_name) = @_;
+    
+    # Convert snake_case or lowercase to PascalCase
+    # e.g., "user_group" -> "UserGroup", "ency_herb_tb" -> "Herb"
+    
+    # Handle database-specific table name patterns
+    my $clean_name = $table_name;
+    
+    # Remove common prefixes
+    $clean_name =~ s/^ency_//i;
+    $clean_name =~ s/^forager_//i;
+    
+    # Remove common suffixes
+    $clean_name =~ s/_tb$//i;
+    $clean_name =~ s/_table$//i;
+    
+    # Handle special plurals and known mappings
+    my %table_to_result = (
+        'categories' => 'Category',
+        'event' => 'Event',
+        'files' => 'File',
+        'groups' => 'Group',
+        'internal_links_tb' => 'InternalLinksTb',
+        'learned_data' => 'Learned_data',
+        'log' => 'Log',
+        'mail_domains' => 'MailDomain',
+        'network_devices' => 'NetworkDevice',
+        'pages_content' => 'Pages_content',
+        'page_tb' => 'PageTb',
+        'pallets' => 'Pallet',
+        'participant' => 'Participant',
+        'projects' => 'Project',
+        'project_sites' => 'ProjectSite',
+        'queens' => 'Queen',
+        'reference' => 'Reference',
+        'site_config' => 'SiteConfig',
+        'sitedomain' => 'SiteDomain',
+        'sites' => 'Site',
+        'site_themes' => 'SiteTheme',
+        'site_workshop' => 'SiteWorkshop',
+        'themes' => 'Theme',
+        'theme_variables' => 'ThemeVariable',
+        'todo' => 'Todo',
+        'user_groups' => 'UserGroup',
+        'users' => 'User',
+        'user_sites' => 'UserSite',
+        'workshop' => 'WorkShop',
+        'yards' => 'Yard',
+        'ency_herb_tb' => 'Herb',
+        'page' => 'Page'
+    );
+    
+    # Check if it's a known mapping
+    if (exists $table_to_result{lc($table_name)}) {
+        return $table_to_result{lc($table_name)};
+    }
+    
+    # Convert underscores to PascalCase
+    my $result_name = join('', map { ucfirst(lc($_)) } split(/_/, $clean_name));
+    
+    return $result_name;
+}
+
+# Find Result files that don't have corresponding database tables
+sub find_orphaned_result_files {
+    my ($self, $c, $database, $existing_tables) = @_;
+    
+    my @orphaned_results = ();
+    my %table_lookup = map { lc($_) => 1 } @$existing_tables;
+    
+    # Get all Result files for this database
+    my @result_files = $self->get_all_result_files($database);
+    
+    foreach my $result_file (@result_files) {
+        # Extract table name from Result file
+        my $table_name = $self->result_name_to_table_name($result_file->{name});
+        
+        # Check if corresponding table exists
+        unless (exists $table_lookup{lc($table_name)}) {
+            push @orphaned_results, {
+                result_name => $result_file->{name},
+                result_path => $result_file->{path},
+                expected_table_name => $table_name,
+                last_modified => $result_file->{last_modified}
+            };
+        }
+    }
+    
+    return @orphaned_results;
+}
+
+# Get all Result files for a database
+sub get_all_result_files {
+    my ($self, $database) = @_;
+    
+    my @result_files = ();
+    my $base_path = "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema";
+    
+    if (lc($database) eq 'ency') {
+        my $result_dir = "$base_path/Ency/Result";
+        @result_files = $self->scan_result_directory($result_dir, '');
+        
+        # Also scan subdirectories
+        if (-d "$result_dir/System") {
+            push @result_files, $self->scan_result_directory("$result_dir/System", 'System/');
+        }
+        if (-d "$result_dir/User") {
+            push @result_files, $self->scan_result_directory("$result_dir/User", 'User/');
+        }
+    } elsif (lc($database) eq 'forager') {
+        my $result_dir = "$base_path/Forager/Result";
+        @result_files = $self->scan_result_directory($result_dir, '');
+    }
+    
+    return @result_files;
+}
+
+# Scan a directory for Result files
+sub scan_result_directory {
+    my ($self, $dir_path, $prefix) = @_;
+    
+    my @files = ();
+    
+    if (opendir(my $dh, $dir_path)) {
+        while (my $file = readdir($dh)) {
+            next if $file =~ /^\.\.?$/;  # Skip . and ..
+            next unless $file =~ /\.pm$/;  # Only .pm files
+            
+            my $full_path = "$dir_path/$file";
+            next unless -f $full_path;  # Only regular files
+            
+            my $name = $file;
+            $name =~ s/\.pm$//;  # Remove .pm extension
+            
+            push @files, {
+                name => $prefix . $name,
+                path => $full_path,
+                last_modified => (stat($full_path))[9]
+            };
+        }
+        closedir($dh);
+    }
+    
+    return @files;
+}
+
+# Convert Result class name back to table name
+sub result_name_to_table_name {
+    my ($self, $result_name) = @_;
+    
+    # Remove any path prefix (e.g., "System/Site" -> "Site")
+    $result_name =~ s/.*\///;
+    
+    # Handle special cases - map Result names to actual table names
+    my %result_to_table = (
+        'Category' => 'categories',
+        'File' => 'files',
+        'Group' => 'groups',
+        'User' => 'users',
+        'Event' => 'events',
+        'Site' => 'sites',
+        'Todo' => 'todos',
+        'Project' => 'projects',
+        'WorkShop' => 'workshops',
+        'Theme' => 'themes',
+        'Reference' => 'references',
+        'Participant' => 'participants',
+        'Herb' => 'ency_herb_tb',
+        'Page' => 'page',
+        'Pages_content' => 'pages_content',
+        'InternalLinksTb' => 'internal_links_tb',
+        'Learned_data' => 'learned_data',
+        'Log' => 'log',
+        'MailDomain' => 'mail_domains',
+        'NetworkDevice' => 'network_devices',
+        'PageTb' => 'page_tb',
+        'Pallet' => 'pallets',
+        'ProjectSite' => 'project_sites',
+        'Queen' => 'queens',
+        'SiteConfig' => 'site_config',
+        'SiteDomain' => 'sitedomain',
+        'SiteTheme' => 'site_themes',
+        'SiteWorkshop' => 'site_workshop',
+        'ThemeVariable' => 'theme_variables',
+        'UserGroup' => 'user_groups',
+        'UserSite' => 'user_sites',
+        'Yard' => 'yards'
+    );
+    
+    # Check if it's a known mapping
+    if (exists $result_to_table{$result_name}) {
+        return $result_to_table{$result_name};
+    }
+    
+    # Convert PascalCase to snake_case
+    my $table_name = $result_name;
+    $table_name =~ s/([a-z])([A-Z])/$1_$2/g;  # Insert underscore before capitals
+    $table_name = lc($table_name);
+    
+    # For unknown mappings, try common patterns
+    # This is a fallback - ideally all mappings should be explicit above
+    return $table_name;
+}
+
+# Get detailed field comparison between table and Result file
+sub get_table_result_comparison {
+    my ($self, $c, $table_name, $database) = @_;
+    
+    # Get table schema
+    my $table_schema;
+    eval {
+        $table_schema = $self->get_table_schema($c, $table_name, $database);
+    };
+    if ($@) {
+        warn "Failed to get table schema for $table_name ($database): $@";
+        $table_schema = { columns => {} };
+    }
+    
+    # Find and parse Result file
+    my $result_file_path = $self->find_result_file($c, $table_name, $database);
+    my $result_schema = { columns => {} };
+    
+    if ($result_file_path && -f $result_file_path) {
+        eval {
+            $result_schema = $self->parse_result_file_schema($c, $result_file_path);
+        };
+        if ($@) {
+            warn "Failed to parse Result file $result_file_path: $@";
+            $result_schema = { columns => {} };
+        }
+    }
+    
+    # Create field comparison
+    my $comparison = {
+        table_name => $table_name,
+        database => $database,
+        has_result_file => ($result_file_path && -f $result_file_path) ? 1 : 0,
+        result_file_path => $result_file_path,
+        fields => {}
+    };
+    
+    # Get all unique field names from both sources
+    my %all_fields = ();
+    if ($table_schema && $table_schema->{columns}) {
+        %all_fields = (%all_fields, map { $_ => 1 } keys %{$table_schema->{columns}});
+    }
+    if ($result_schema && $result_schema->{columns}) {
+        %all_fields = (%all_fields, map { $_ => 1 } keys %{$result_schema->{columns}});
+    }
+    
+    # Compare each field
+    foreach my $field_name (sort keys %all_fields) {
+        my $table_field = $table_schema->{columns}->{$field_name};
+        my $result_field = $result_schema->{columns}->{$field_name};
+        
+        $comparison->{fields}->{$field_name} = {
+            table => $table_field,
+            result => $result_field,
+            differences => $self->compare_field_attributes($table_field, $result_field)
+        };
+    }
+    
+    return $comparison;
+}
+
+# Compare field attributes between table and Result file
+sub compare_field_attributes {
+    my ($self, $table_field, $result_field) = @_;
+    
+    my @differences = ();
+    my @attributes = qw(data_type size is_nullable is_auto_increment default_value);
+    
+    foreach my $attr (@attributes) {
+        my $table_value = $table_field ? $table_field->{$attr} : undef;
+        my $result_value = $result_field ? $result_field->{$attr} : undef;
+        
+        # Normalize values for comparison
+        $table_value = $self->normalize_field_value($attr, $table_value);
+        $result_value = $self->normalize_field_value($attr, $result_value);
+        
+        if (defined $table_value && defined $result_value) {
+            if ($table_value ne $result_value) {
+                push @differences, {
+                    attribute => $attr,
+                    table_value => $table_value,
+                    result_value => $result_value,
+                    type => 'different'
+                };
+            }
+        } elsif (defined $table_value && !defined $result_value) {
+            push @differences, {
+                attribute => $attr,
+                table_value => $table_value,
+                result_value => undef,
+                type => 'missing_in_result'
+            };
+        } elsif (!defined $table_value && defined $result_value) {
+            push @differences, {
+                attribute => $attr,
+                table_value => undef,
+                result_value => $result_value,
+                type => 'missing_in_table'
+            };
+        }
+    }
+    
+    return \@differences;
+}
+
+# Normalize field values for comparison
+sub normalize_field_value {
+    my ($self, $attribute, $value) = @_;
+    
+    return undef unless defined $value;
+    
+    # Handle boolean attributes
+    if ($attribute eq 'is_nullable' || $attribute eq 'is_auto_increment') {
+        return $value ? 1 : 0;
+    }
+    
+    # Handle numeric attributes
+    if ($attribute eq 'size') {
+        return $value + 0 if $value =~ /^\d+$/;
+    }
+    
+    # Handle string attributes
+    return "$value";
+}
+
+# Parse Result file schema
+sub parse_result_file_schema {
+    my ($self, $c, $file_path) = @_;
+    
+    my $schema = {
+        columns => {},
+        primary_keys => [],
+        relationships => [],
+        table_name => undef
+    };
+    
+    # Read the Result file
+    my $content;
+    eval {
+        $content = File::Slurp::read_file($file_path);
+    };
+    if ($@) {
+        warn "Failed to read Result file $file_path: $@";
+        return $schema;
+    }
+    
+    # Extract table name
+    if ($content =~ /__PACKAGE__->table\(['"]([^'"]+)['"]\);/) {
+        $schema->{table_name} = $1;
+    }
+    
+    # Extract columns
+    if ($content =~ /__PACKAGE__->add_columns\(\s*(.*?)\s*\);/s) {
+        my $columns_block = $1;
+        
+        # Parse individual column definitions (format: column_name => { attributes })
+        while ($columns_block =~ /(\w+)\s*=>\s*\{([^}]+)\}/g) {
+            my ($col_name, $col_def) = ($1, $2);
+            
+            my $column = {
+                data_type => undef,
+                is_nullable => 1,
+                size => undef,
+                is_auto_increment => 0,
+                default_value => undef
+            };
+            
+            # Parse column attributes
+            if ($col_def =~ /data_type\s*=>\s*['"]([^'"]+)['"]/) {
+                $column->{data_type} = $1;
+            }
+            if ($col_def =~ /is_nullable\s*=>\s*(\d+)/) {
+                $column->{is_nullable} = $1;
+            }
+            if ($col_def =~ /size\s*=>\s*(\d+)/) {
+                $column->{size} = $1;
+            }
+            if ($col_def =~ /is_auto_increment\s*=>\s*(\d+)/) {
+                $column->{is_auto_increment} = $1;
+            }
+            if ($col_def =~ /default_value\s*=>\s*['"]([^'"]+)['"]/) {
+                $column->{default_value} = $1;
+            }
+            
+            $schema->{columns}->{$col_name} = $column;
+        }
+    }
+    
+    # Extract primary keys
+    if ($content =~ /__PACKAGE__->set_primary_key\(([^)]+)\);/) {
+        my $pk_def = $1;
+        while ($pk_def =~ /['"]([^'"]+)['"]/g) {
+            push @{$schema->{primary_keys}}, $1;
+        }
+    }
+    
+    # Extract relationships
+    while ($content =~ /__PACKAGE__->(belongs_to|has_many|might_have|has_one)\(\s*['"]([^'"]+)['"],\s*['"]([^'"]+)['"],\s*\{([^}]+)\}/gs) {
+        my ($rel_type, $accessor, $related_class, $rel_def) = ($1, $2, $3, $4);
+        
+        my $relationship = {
+            type => $rel_type,
+            accessor => $accessor,
+            related_class => $related_class,
+            foreign_key => undef
+        };
+        
+        if ($rel_def =~ /['"]foreign\.([^'"]+)['"]/) {
+            $relationship->{foreign_key} = $1;
+        }
+        
+        push @{$schema->{relationships}}, $relationship;
+    }
+    
+    return $schema;
+}
+
+# Find differences between database and Result file schemas
+sub find_schema_differences {
+    my ($self, $db_schema, $result_schema) = @_;
+    
+    my @differences = ();
+    
+    # Compare columns
+    my %db_columns = %{$db_schema->{columns} || {}};
+    my %result_columns = %{$result_schema->{columns} || {}};
+    
+    # Find columns in database but not in Result file
+    foreach my $col_name (keys %db_columns) {
+        unless (exists $result_columns{$col_name}) {
+            push @differences, {
+                type => 'missing_in_result',
+                column => $col_name,
+                description => "Column '$col_name' exists in database but not in Result file"
+            };
+        }
+    }
+    
+    # Find columns in Result file but not in database
+    foreach my $col_name (keys %result_columns) {
+        unless (exists $db_columns{$col_name}) {
+            push @differences, {
+                type => 'missing_in_database',
+                column => $col_name,
+                description => "Column '$col_name' exists in Result file but not in database"
+            };
+        }
+    }
+    
+    # Compare column attributes for common columns
+    foreach my $col_name (keys %db_columns) {
+        if (exists $result_columns{$col_name}) {
+            my $db_col = $db_columns{$col_name};
+            my $result_col = $result_columns{$col_name};
+            
+            # Compare data types
+            if (($db_col->{data_type} || '') ne ($result_col->{data_type} || '')) {
+                push @differences, {
+                    type => 'column_type_mismatch',
+                    column => $col_name,
+                    database_value => $db_col->{data_type},
+                    result_value => $result_col->{data_type},
+                    description => "Data type mismatch for column '$col_name'"
+                };
+            }
+            
+            # Compare nullable status
+            if (($db_col->{is_nullable} || 0) != ($result_col->{is_nullable} || 0)) {
+                push @differences, {
+                    type => 'column_nullable_mismatch',
+                    column => $col_name,
+                    database_value => $db_col->{is_nullable} ? 'YES' : 'NO',
+                    result_value => $result_col->{is_nullable} ? 'YES' : 'NO',
+                    description => "Nullable status mismatch for column '$col_name'"
+                };
+            }
+        }
+    }
+    
+    return \@differences;
+}
+
+# Get the database name
+sub get_database_name {
+    my ($self, $c) = @_;
+    
+    my $database_name = 'Unknown Database';
+    
+    try {
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        my $sth = $dbh->prepare("SELECT DATABASE()");
+        $sth->execute();
+        
+        if (my ($db_name) = $sth->fetchrow_array()) {
+            $database_name = $db_name;
+        }
+        
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_database_name', 
+            "Error getting database name: $_");
+    };
+    
+    return $database_name;
+}
+
+# Get list of database tables with their schema information
+sub get_database_tables {
+    my ($self, $c) = @_;
+    
+    my @tables = ();
+    
+    try {
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        my $sth = $dbh->prepare("SHOW TABLES");
+        $sth->execute();
+        
+        while (my ($table) = $sth->fetchrow_array()) {
+            push @tables, $table;
+        }
+        
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_database_tables', 
+            "Error getting database tables: $_");
+    };
+    
+    return \@tables;
+}
+
+# Get list of tables from the Ency database
+sub get_ency_database_tables {
+    my ($self, $c) = @_;
+    
+    my @tables = ();
+    
+    try {
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        my $sth = $dbh->prepare("SHOW TABLES");
+        $sth->execute();
+        
+        while (my ($table) = $sth->fetchrow_array()) {
+            push @tables, $table;
+        }
+        
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_ency_database_tables', 
+            "Error getting ency database tables: $_");
+        die $_;
+    };
+    
+    return \@tables;
+}
+
+# Get list of tables from the Forager database
+sub get_forager_database_tables {
+    my ($self, $c) = @_;
+    
+    my @tables = ();
+    
+    try {
+        my $dbh = $c->model('DBForager')->schema->storage->dbh;
+        my $sth = $dbh->prepare("SHOW TABLES");
+        $sth->execute();
+        
+        while (my ($table) = $sth->fetchrow_array()) {
+            push @tables, $table;
+        }
+        
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_forager_database_tables', 
+            "Error getting forager database tables: $_");
+        die $_;
+    };
+    
+    return \@tables;
+}
+
+# Get table schema from the Ency database
+sub get_ency_table_schema {
+    my ($self, $c, $table_name) = @_;
+    
+    my $schema_info = {
+        columns => {},
+        primary_keys => [],
+        unique_constraints => [],
+        foreign_keys => [],
+        indexes => []
+    };
+    
+    try {
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        
+        # Get column information
+        my $sth = $dbh->prepare("DESCRIBE $table_name");
+        $sth->execute();
+        
+        while (my $row = $sth->fetchrow_hashref()) {
+            my $column_name = $row->{Field};
+            
+            $schema_info->{columns}->{$column_name} = {
+                data_type => $row->{Type},
+                is_nullable => ($row->{Null} eq 'YES' ? 1 : 0),
+                default_value => $row->{Default},
+                is_auto_increment => ($row->{Extra} =~ /auto_increment/i ? 1 : 0),
+                size => undef  # Will be parsed from Type if needed
+            };
+            
+            # Check for primary key
+            if ($row->{Key} eq 'PRI') {
+                push @{$schema_info->{primary_keys}}, $column_name;
+            }
+        }
+        
+        # Get foreign key information
+        $sth = $dbh->prepare("
+            SELECT 
+                COLUMN_NAME,
+                REFERENCED_TABLE_NAME,
+                REFERENCED_COLUMN_NAME,
+                CONSTRAINT_NAME
+            FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE 
+            WHERE TABLE_SCHEMA = DATABASE() 
+            AND TABLE_NAME = ? 
+            AND REFERENCED_TABLE_NAME IS NOT NULL
+        ");
+        $sth->execute($table_name);
+        
+        while (my $row = $sth->fetchrow_hashref()) {
+            push @{$schema_info->{foreign_keys}}, {
+                column => $row->{COLUMN_NAME},
+                referenced_table => $row->{REFERENCED_TABLE_NAME},
+                referenced_column => $row->{REFERENCED_COLUMN_NAME},
+                constraint_name => $row->{CONSTRAINT_NAME}
+            };
+        }
+        
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_ency_table_schema', 
+            "Error getting ency table schema for $table_name: $_");
+        die $_;
+    };
+    
+    return $schema_info;
+}
+
+# Get table schema from the Forager database
+sub get_forager_table_schema {
+    my ($self, $c, $table_name) = @_;
+    
+    my $schema_info = {
+        columns => {},
+        primary_keys => [],
+        unique_constraints => [],
+        foreign_keys => [],
+        indexes => []
+    };
+    
+    try {
+        my $dbh = $c->model('DBForager')->schema->storage->dbh;
+        
+        # Get column information
+        my $sth = $dbh->prepare("DESCRIBE $table_name");
+        $sth->execute();
+        
+        while (my $row = $sth->fetchrow_hashref()) {
+            my $column_name = $row->{Field};
+            
+            $schema_info->{columns}->{$column_name} = {
+                data_type => $row->{Type},
+                is_nullable => ($row->{Null} eq 'YES' ? 1 : 0),
+                default_value => $row->{Default},
+                is_auto_increment => ($row->{Extra} =~ /auto_increment/i ? 1 : 0),
+                size => undef  # Will be parsed from Type if needed
+            };
+            
+            # Check for primary key
+            if ($row->{Key} eq 'PRI') {
+                push @{$schema_info->{primary_keys}}, $column_name;
+            }
+        }
+        
+        # Get foreign key information
+        $sth = $dbh->prepare("
+            SELECT 
+                COLUMN_NAME,
+                REFERENCED_TABLE_NAME,
+                REFERENCED_COLUMN_NAME,
+                CONSTRAINT_NAME
+            FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE 
+            WHERE TABLE_SCHEMA = DATABASE() 
+            AND TABLE_NAME = ? 
+            AND REFERENCED_TABLE_NAME IS NOT NULL
+        ");
+        $sth->execute($table_name);
+        
+        while (my $row = $sth->fetchrow_hashref()) {
+            push @{$schema_info->{foreign_keys}}, {
+                column => $row->{COLUMN_NAME},
+                referenced_table => $row->{REFERENCED_TABLE_NAME},
+                referenced_column => $row->{REFERENCED_COLUMN_NAME},
+                constraint_name => $row->{CONSTRAINT_NAME}
+            };
+        }
+        
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_forager_table_schema', 
+            "Error getting forager table schema for $table_name: $_");
+        die $_;
+    };
+    
+    return $schema_info;
+}
+
+# Get database table schema information
+sub get_database_table_schema {
+    my ($self, $c, $table_name) = @_;
+    
+    my $schema_info = {
+        columns => {},
+        primary_keys => [],
+        unique_constraints => [],
+        foreign_keys => [],
+        indexes => []
+    };
+    
+    try {
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        
+        # Get column information
+        my $sth = $dbh->prepare("DESCRIBE `$table_name`");
+        $sth->execute();
+        
+        while (my $row = $sth->fetchrow_hashref()) {
+            my $column_name = $row->{Field};
+            
+            # Parse MySQL column type
+            my ($data_type, $size) = $self->parse_mysql_column_type($row->{Type});
+            
+            $schema_info->{columns}->{$column_name} = {
+                data_type => $data_type,
+                size => $size,
+                is_nullable => ($row->{Null} eq 'YES' ? 1 : 0),
+                default_value => $row->{Default},
+                is_auto_increment => ($row->{Extra} =~ /auto_increment/i ? 1 : 0),
+                extra => $row->{Extra}
+            };
+            
+            # Check for primary key
+            if ($row->{Key} eq 'PRI') {
+                push @{$schema_info->{primary_keys}}, $column_name;
+            }
+        }
+        
+        # Get foreign key information
+        $sth = $dbh->prepare("
+            SELECT 
+                COLUMN_NAME,
+                REFERENCED_TABLE_NAME,
+                REFERENCED_COLUMN_NAME,
+                CONSTRAINT_NAME
+            FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE 
+            WHERE TABLE_SCHEMA = DATABASE() 
+            AND TABLE_NAME = ? 
+            AND REFERENCED_TABLE_NAME IS NOT NULL
+        ");
+        $sth->execute($table_name);
+        
+        while (my $row = $sth->fetchrow_hashref()) {
+            push @{$schema_info->{foreign_keys}}, {
+                column => $row->{COLUMN_NAME},
+                referenced_table => $row->{REFERENCED_TABLE_NAME},
+                referenced_column => $row->{REFERENCED_COLUMN_NAME},
+                constraint_name => $row->{CONSTRAINT_NAME}
+            };
+        }
+        
+        # Get unique constraints
+        $sth = $dbh->prepare("
+            SELECT 
+                CONSTRAINT_NAME,
+                GROUP_CONCAT(COLUMN_NAME ORDER BY ORDINAL_POSITION) as COLUMNS
+            FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE 
+            WHERE TABLE_SCHEMA = DATABASE() 
+            AND TABLE_NAME = ? 
+            AND CONSTRAINT_NAME != 'PRIMARY'
+            GROUP BY CONSTRAINT_NAME
+        ");
+        $sth->execute($table_name);
+        
+        while (my $row = $sth->fetchrow_hashref()) {
+            push @{$schema_info->{unique_constraints}}, {
+                name => $row->{CONSTRAINT_NAME},
+                columns => [split(',', $row->{COLUMNS})]
+            };
+        }
+        
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_database_table_schema', 
+            "Error getting schema for table $table_name: $_");
+    };
+    
+    return $schema_info;
+}
+
+# Parse MySQL column type to extract data type and size
+sub parse_mysql_column_type {
+    my ($self, $type_string) = @_;
+    
+    # Handle common MySQL types
+    if ($type_string =~ /^(\w+)\((\d+)\)/) {
+        return ($1, $2);
+    } elsif ($type_string =~ /^(\w+)\((\d+),(\d+)\)/) {
+        return ($1, "$2,$3");  # For decimal types
+    } elsif ($type_string =~ /^(\w+)/) {
+        return ($1, undef);
+    }
+    
+    return ($type_string, undef);
+}
+
+# Get Result files and their schema information
+sub get_result_files {
+    my ($self, $c) = @_;
+    
+    my $result_files = {};
+    
+    try {
+        my $result_dir = $c->path_to('lib', 'Comserv', 'Model', 'Schema', 'Ency', 'Result');
+        
+        if (-d $result_dir) {
+            find(sub {
+                return unless -f $_ && /\.pm$/;
+                return if $_ eq 'User.pm' && -d $File::Find::dir . '/User'; # Skip if there's a User directory
+                
+                my $file_path = $File::Find::name;
+                my $relative_path = $file_path;
+                $relative_path =~ s/^\Q$result_dir\E\/?//;
+                
+                # Skip files in subdirectories for now (like User/User.pm)
+                return if $relative_path =~ /\//;
+                
+                my $table_name = $_;
+                $table_name =~ s/\.pm$//;
+                
+                my $schema_info = $self->get_result_file_schema($c, $table_name, $file_path);
+                if ($schema_info) {
+                    $result_files->{$schema_info->{table_name} || lc($table_name)} = $schema_info;
+                }
+            }, $result_dir);
+        }
+        
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_result_files', 
+            "Error getting Result files: $_");
+    };
+    
+    return $result_files;
+}
+
+# Get schema information from a Result file
+sub get_result_file_schema {
+    my ($self, $c, $class_name, $file_path) = @_;
+    
+    my $schema_info = {
+        file_path => $file_path,
+        columns => {},
+        primary_keys => [],
+        unique_constraints => [],
+        relationships => [],
+        table_name => undef
+    };
+    
+    try {
+        # Read the file content
+        my $content = read_file($file_path);
+        
+        # Extract table name
+        if ($content =~ /__PACKAGE__->table\(['"]([^'"]+)['"]\)/) {
+            $schema_info->{table_name} = $1;
+        }
+        
+        # Extract columns
+        if ($content =~ /__PACKAGE__->add_columns\((.*?)\);/s) {
+            my $columns_text = $1;
+            $schema_info->{columns} = $self->parse_result_file_columns($columns_text);
+        }
+        
+        # Extract primary key
+        if ($content =~ /__PACKAGE__->set_primary_key\((.*?)\)/) {
+            my $pk_text = $1;
+            $pk_text =~ s/['"\s]//g;
+            @{$schema_info->{primary_keys}} = split(/,/, $pk_text);
+        }
+        
+        # Extract unique constraints
+        while ($content =~ /__PACKAGE__->add_unique_constraint\(['"]([^'"]+)['"] => \[(.*?)\]\)/g) {
+            my $constraint_name = $1;
+            my $columns_text = $2;
+            $columns_text =~ s/['"\s]//g;
+            push @{$schema_info->{unique_constraints}}, {
+                name => $constraint_name,
+                columns => [split(/,/, $columns_text)]
+            };
+        }
+        
+        # Extract relationships
+        while ($content =~ /__PACKAGE__->(belongs_to|has_many|has_one|might_have)\(([^)]+)\)/g) {
+            my $relationship_type = $1;
+            my $relationship_text = $2;
+            
+            # Parse relationship parameters
+            my @params = split(/,/, $relationship_text);
+            if (@params >= 3) {
+                my $accessor = $params[0];
+                my $related_class = $params[1];
+                my $foreign_key = $params[2];
+                
+                # Clean up the parameters
+                $accessor =~ s/['"\s]//g;
+                $related_class =~ s/['"\s]//g;
+                $foreign_key =~ s/['"\s]//g;
+                
+                push @{$schema_info->{relationships}}, {
+                    type => $relationship_type,
+                    accessor => $accessor,
+                    related_class => $related_class,
+                    foreign_key => $foreign_key
+                };
+            }
+        }
+        
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_result_file_schema', 
+            "Error parsing Result file $file_path: $_");
+        return undef;
+    };
+    
+    return $schema_info;
+}
+
+# Parse column definitions from Result file
+sub parse_result_file_columns {
+    my ($self, $columns_text) = @_;
+    
+    my $columns = {};
+    
+    # Split by column definitions (looking for column_name => { ... })
+    while ($columns_text =~ /(\w+)\s*=>\s*\{([^}]+)\}/g) {
+        my $column_name = $1;
+        my $column_def = $2;
+        
+        my $column_info = {};
+        
+        # Parse column attributes
+        while ($column_def =~ /(\w+)\s*=>\s*['"]?([^'",\s]+)['"]?/g) {
+            my $attr = $1;
+            my $value = $2;
+            
+            if ($attr eq 'size' && $value =~ /^\d+$/) {
+                $column_info->{$attr} = int($value);
+            } elsif ($attr eq 'is_nullable' || $attr eq 'is_auto_increment') {
+                $column_info->{$attr} = ($value eq '1' || $value eq 'true') ? 1 : 0;
+            } else {
+                $column_info->{$attr} = $value;
+            }
+        }
+        
+        $columns->{$column_name} = $column_info;
+    }
+    
+    return $columns;
+}
+
+# Compare schema between database table and Result file
+sub compare_table_schema {
+    my ($self, $c, $table_name, $db_tables, $result_files) = @_;
+    
+    my $comparison = {
+        table_name => $table_name,
+        database_table_exists => 0,
+        result_file_exists => 0,
+        has_differences => 0,
+        column_differences => [],
+        primary_key_differences => [],
+        relationship_differences => [],
+        unique_constraint_differences => [],
+        database_schema => undef,
+        result_file_schema => undef
+    };
+    
+    # Check if database table exists
+    $comparison->{database_table_exists} = grep { $_ eq $table_name } @$db_tables;
+    
+    # Check if Result file exists
+    $comparison->{result_file_exists} = exists $result_files->{$table_name};
+    
+    # Get schemas if both exist
+    if ($comparison->{database_table_exists}) {
+        $comparison->{database_schema} = $self->get_database_table_schema($c, $table_name);
+    }
+    
+    if ($comparison->{result_file_exists}) {
+        $comparison->{result_file_schema} = $result_files->{$table_name};
+    }
+    
+    # Compare if both exist
+    if ($comparison->{database_table_exists} && $comparison->{result_file_exists}) {
+        $self->compare_columns($comparison);
+        $self->compare_primary_keys($comparison);
+        $self->compare_unique_constraints($comparison);
+        $self->compare_relationships($comparison);
+        
+        # Set has_differences flag
+        $comparison->{has_differences} = (
+            @{$comparison->{column_differences}} > 0 ||
+            @{$comparison->{primary_key_differences}} > 0 ||
+            @{$comparison->{relationship_differences}} > 0 ||
+            @{$comparison->{unique_constraint_differences}} > 0
+        );
+    } elsif (!$comparison->{database_table_exists} || !$comparison->{result_file_exists}) {
+        $comparison->{has_differences} = 1;
+    }
+    
+    return $comparison;
+}
+
+# Compare columns between database and Result file
+sub compare_columns {
+    my ($self, $comparison) = @_;
+    
+    my $db_columns = $comparison->{database_schema}->{columns};
+    my $result_columns = $comparison->{result_file_schema}->{columns};
+    
+    # Get all column names
+    my %all_columns = ();
+    foreach my $col (keys %$db_columns) { $all_columns{$col} = 1; }
+    foreach my $col (keys %$result_columns) { $all_columns{$col} = 1; }
+    
+    foreach my $column_name (sort keys %all_columns) {
+        my $db_col = $db_columns->{$column_name};
+        my $result_col = $result_columns->{$column_name};
+        
+        if (!$db_col) {
+            push @{$comparison->{column_differences}}, {
+                column => $column_name,
+                type => 'missing_in_database',
+                result_file_definition => $result_col
+            };
+        } elsif (!$result_col) {
+            push @{$comparison->{column_differences}}, {
+                column => $column_name,
+                type => 'missing_in_result_file',
+                database_definition => $db_col
+            };
+        } else {
+            # Compare column attributes
+            my @differences = ();
+            
+            # Compare data type
+            if (lc($db_col->{data_type}) ne lc($result_col->{data_type})) {
+                push @differences, {
+                    attribute => 'data_type',
+                    database_value => $db_col->{data_type},
+                    result_file_value => $result_col->{data_type}
+                };
+            }
+            
+            # Compare size
+            if (defined($db_col->{size}) != defined($result_col->{size}) ||
+                (defined($db_col->{size}) && defined($result_col->{size}) && 
+                 $db_col->{size} ne $result_col->{size})) {
+                push @differences, {
+                    attribute => 'size',
+                    database_value => $db_col->{size},
+                    result_file_value => $result_col->{size}
+                };
+            }
+            
+            # Compare nullable
+            if (($db_col->{is_nullable} || 0) != ($result_col->{is_nullable} || 0)) {
+                push @differences, {
+                    attribute => 'is_nullable',
+                    database_value => $db_col->{is_nullable},
+                    result_file_value => $result_col->{is_nullable}
+                };
+            }
+            
+            # Compare auto increment
+            if (($db_col->{is_auto_increment} || 0) != ($result_col->{is_auto_increment} || 0)) {
+                push @differences, {
+                    attribute => 'is_auto_increment',
+                    database_value => $db_col->{is_auto_increment},
+                    result_file_value => $result_col->{is_auto_increment}
+                };
+            }
+            
+            if (@differences) {
+                push @{$comparison->{column_differences}}, {
+                    column => $column_name,
+                    type => 'attribute_differences',
+                    differences => \@differences,
+                    database_definition => $db_col,
+                    result_file_definition => $result_col
+                };
+            }
+        }
+    }
+}
+
+# Compare primary keys
+sub compare_primary_keys {
+    my ($self, $comparison) = @_;
+    
+    my $db_pks = $comparison->{database_schema}->{primary_keys};
+    my $result_pks = $comparison->{result_file_schema}->{primary_keys};
+    
+    # Sort for comparison
+    my @db_pks_sorted = sort @$db_pks;
+    my @result_pks_sorted = sort @$result_pks;
+    
+    if (join(',', @db_pks_sorted) ne join(',', @result_pks_sorted)) {
+        push @{$comparison->{primary_key_differences}}, {
+            database_primary_keys => \@db_pks_sorted,
+            result_file_primary_keys => \@result_pks_sorted
+        };
+    }
+}
+
+# Compare unique constraints
+sub compare_unique_constraints {
+    my ($self, $comparison) = @_;
+    
+    my $db_constraints = $comparison->{database_schema}->{unique_constraints};
+    my $result_constraints = $comparison->{result_file_schema}->{unique_constraints};
+    
+    # This is a simplified comparison - you might want to make it more sophisticated
+    if (@$db_constraints != @$result_constraints) {
+        push @{$comparison->{unique_constraint_differences}}, {
+            database_constraints => $db_constraints,
+            result_file_constraints => $result_constraints
+        };
+    }
+}
+
+# Compare relationships (this is Result file specific)
+sub compare_relationships {
+    my ($self, $comparison) = @_;
+    
+    # For now, we'll just note if relationships exist in the Result file
+    # but aren't reflected in the database foreign keys
+    my $result_relationships = $comparison->{result_file_schema}->{relationships};
+    my $db_foreign_keys = $comparison->{database_schema}->{foreign_keys};
+    
+    if (@$result_relationships > @$db_foreign_keys) {
+        push @{$comparison->{relationship_differences}}, {
+            type => 'missing_foreign_keys_in_database',
+            result_file_relationships => $result_relationships,
+            database_foreign_keys => $db_foreign_keys
+        };
+    }
+}
+
+# Apply selected schema changes
+sub apply_schema_changes {
+    my ($self, $c) = @_;
+    
+    my $changes = $c->req->param('changes');
+    my $direction = $c->req->param('direction'); # 'db_to_result' or 'result_to_db'
+    
+    if (!$changes) {
+        $c->flash->{error_msg} = "No changes selected to apply.";
+        return;
+    }
+    
+    try {
+        my $changes_data = decode_json($changes);
+        my $applied_changes = 0;
+        
+        foreach my $change (@$changes_data) {
+            if ($direction eq 'db_to_result') {
+                $self->apply_database_to_result_change($c, $change);
+            } elsif ($direction eq 'result_to_db') {
+                $self->apply_result_to_database_change($c, $change);
+            }
+            $applied_changes++;
+        }
+        
+        $c->flash->{success_msg} = "Successfully applied $applied_changes changes.";
+        
+    } catch {
+        my $error = "Error applying changes: $_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'apply_schema_changes', $error);
+        $c->flash->{error_msg} = $error;
+    };
+}
+
+# Apply change from database to Result file
+sub apply_database_to_result_change {
+    my ($self, $c, $change) = @_;
+    
+    # This would update the Result file based on database schema
+    # Implementation depends on the specific change type
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'apply_database_to_result_change', 
+        "Applying database to Result file change: " . encode_json($change));
+}
+
+# Apply change from Result file to database
+sub apply_result_to_database_change {
+    my ($self, $c, $change) = @_;
+    
+    # This would update the database schema based on Result file
+    # Implementation depends on the specific change type
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'apply_result_to_database_change', 
+        "Applying Result file to database change: " . encode_json($change));
+}
+
+# Generate Result file from database table
+sub generate_result_file {
+    my ($self, $c) = @_;
+    
+    my $table_name = $c->req->param('table_name');
+    
+    if (!$table_name) {
+        $c->flash->{error_msg} = "No table name specified for Result file generation.";
+        return;
+    }
+    
+    try {
+        my $db_schema = $self->get_database_table_schema($c, $table_name);
+        my $result_file_content = $self->generate_result_file_content($table_name, $db_schema);
+        
+        # Save the Result file
+        my $result_file_path = $c->path_to('lib', 'Comserv', 'Model', 'Schema', 'Ency', 'Result', ucfirst($table_name) . '.pm');
+        write_file($result_file_path, $result_file_content);
+        
+        $c->flash->{success_msg} = "Result file generated successfully for table '$table_name'.";
+        
+    } catch {
+        my $error = "Error generating Result file: $_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'generate_result_file', $error);
+        $c->flash->{error_msg} = $error;
+    };
+}
+
+# Generate Result file content from database schema
+sub generate_result_file_content {
+    my ($self, $table_name, $db_schema) = @_;
+    
+    my $class_name = ucfirst($table_name);
+    my $content = "package Comserv::Model::Schema::Ency::Result::$class_name;\n";
+    $content .= "use base 'DBIx::Class::Core';\n\n";
+    $content .= "__PACKAGE__->table('$table_name');\n";
+    $content .= "__PACKAGE__->add_columns(\n";
+    
+    # Add columns
+    foreach my $column_name (sort keys %{$db_schema->{columns}}) {
+        my $col = $db_schema->{columns}->{$column_name};
+        $content .= "    $column_name => {\n";
+        $content .= "        data_type => '$col->{data_type}',\n";
+        
+        if (defined $col->{size}) {
+            $content .= "        size => $col->{size},\n";
+        }
+        
+        if ($col->{is_nullable}) {
+            $content .= "        is_nullable => 1,\n";
+        }
+        
+        if ($col->{is_auto_increment}) {
+            $content .= "        is_auto_increment => 1,\n";
+        }
+        
+        if (defined $col->{default_value}) {
+            $content .= "        default_value => '$col->{default_value}',\n";
+        }
+        
+        $content .= "    },\n";
+    }
+    
+    $content .= ");\n";
+    
+    # Add primary key
+    if (@{$db_schema->{primary_keys}}) {
+        my $pk_list = join(', ', map { "'$_'" } @{$db_schema->{primary_keys}});
+        $content .= "__PACKAGE__->set_primary_key($pk_list);\n";
+    }
+    
+    # Add unique constraints
+    foreach my $constraint (@{$db_schema->{unique_constraints}}) {
+        my $col_list = join(', ', map { "'$_'" } @{$constraint->{columns}});
+        $content .= "__PACKAGE__->add_unique_constraint('$constraint->{name}' => [$col_list]);\n";
+    }
+    
+    $content .= "\n1;\n";
+    
+    return $content;
+}
 
 # Git pull functionality
 sub git_pull :Path('/admin/git_pull') :Args(0) {

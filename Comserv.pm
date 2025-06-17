@@ -119,5 +119,16 @@ sub schema_needs_update {
     return $self->{schema_needs_update};
 }
 
+# Add user_exists method to Catalyst context
+sub user_exists {
+    my ($c) = @_;
+    return $c->controller('Root')->user_exists($c);
+}
+
+# Add check_user_roles method to Catalyst context
+sub check_user_roles {
+    my ($c, $role) = @_;
+    return $c->controller('Root')->check_user_roles($c, $role);
+}
 
 1;

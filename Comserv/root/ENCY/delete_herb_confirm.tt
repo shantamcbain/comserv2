@@ -1,0 +1,90 @@
+[% META title = 'Confirm Herb Deletion' %]
+
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header bg-danger text-white">
+            <h2>Confirm Herb Deletion</h2>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-warning">
+                <h4 class="alert-heading">Warning!</h4>
+                <p>You are about to delete the herb <strong>[% herb.botanical_name | html %]</strong> ([% herb.common_names | html %]).</p>
+                <p>This action cannot be undone. All data associated with this herb will be permanently deleted.</p>
+            </div>
+            
+            <h4>Herb Details</h4>
+            <table class="table table-bordered">
+                <tr>
+                    <th>Record ID</th>
+                    <td>[% herb.record_id | html %]</td>
+                </tr>
+                <tr>
+                    <th>Botanical Name</th>
+                    <td>[% herb.botanical_name | html %]</td>
+                </tr>
+                <tr>
+                    <th>Common Names</th>
+                    <td>[% herb.common_names | html %]</td>
+                </tr>
+                <tr>
+                    <th>Key Name</th>
+                    <td>[% herb.key_name | html %]</td>
+                </tr>
+                [% IF herb.medical_uses %]
+                <tr>
+                    <th>Medical Uses</th>
+                    <td>[% herb.medical_uses | html %]</td>
+                </tr>
+                [% END %]
+            </table>
+            
+            [% IF error_message %]
+                <div class="alert alert-danger">
+                    <strong>Error:</strong> [% error_message | html %]
+                </div>
+            [% END %]
+            
+            <form method="post" action="[% c.uri_for('/ENCY/delete_herb', herb.record_id) %]" class="mt-4">
+                <input type="hidden" name="confirm_delete" value="yes">
+                
+                <div class="form-group">
+                    <div class="custom-control custom-checkbox">
+                        <input type="checkbox" class="custom-control-input" id="confirmCheck" required>
+                        <label class="custom-control-label" for="confirmCheck">
+                            I understand that this action cannot be undone
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="form-group mt-3">
+                    <label for="confirmText">Type the botanical name to confirm deletion:</label>
+                    <input type="text" class="form-control" id="confirmText" placeholder="[% herb.botanical_name | html %]" required>
+                    <small class="form-text text-muted">This helps prevent accidental deletions.</small>
+                </div>
+                
+                <div class="form-group mt-4">
+                    <button type="submit" class="btn btn-danger" id="deleteButton" disabled>Delete Herb</button>
+                    <a href="[% c.uri_for('/ENCY/herb_detail', herb.record_id) %]" class="btn btn-secondary ml-2">Cancel</a>
+                </div>
+                
+                <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    const confirmCheck = document.getElementById('confirmCheck');
+                    const confirmText = document.getElementById('confirmText');
+                    const deleteButton = document.getElementById('deleteButton');
+                    const expectedText = '[% herb.botanical_name | html %]';
+                    
+                    function checkForm() {
+                        const isChecked = confirmCheck.checked;
+                        const textMatches = confirmText.value.trim() === expectedText;
+                        deleteButton.disabled = !(isChecked && textMatches);
+                    }
+                    
+                    confirmCheck.addEventListener('change', checkForm);
+                    confirmText.addEventListener('input', checkForm);
+                });
+                </script>
+            </form>
+        </div>
+    </div>
+</div>

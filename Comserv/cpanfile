@@ -61,6 +61,8 @@ requires 'File::Basename';
 requires 'File::Slurp';
 requires 'File::Path';
 requires 'File::Spec';
+requires 'File::Copy';
+requires 'Module::Load';
 
 # PDF and Image handling
 requires 'PDF::API2';
@@ -77,6 +79,7 @@ requires 'Digest::SHA';
 requires 'Email::Simple';
 requires 'Email::Simple::Creator';
 requires 'Email::Sender::Simple';
+requires 'Email::Sender::Transport::SMTP';
 
 # Utility modules
 requires 'URI::Escape';
