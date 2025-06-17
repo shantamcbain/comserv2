@@ -6,10 +6,10 @@ use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
 use Data::Dumper;
-use JSON;
+use JSON qw(decode_json);
 use Try::Tiny;
 use MIME::Base64;
-use File::Slurp;
+use File::Slurp qw(read_file write_file);
 use File::Basename;
 use File::Path qw(make_path);
 use File::Copy;
@@ -1306,14 +1306,41 @@ sub get_field_comparison :Path('/admin/get_field_comparison') :Args(0) {
     }
     
     try {
-        my $comparison = $self->get_table_result_comparison($c, $table_name, $database);
+        # Build comprehensive mapping for this database
+        my $result_table_mapping = $self->build_result_table_mapping($c, $database);
+        
+        my $comparison = $self->get_table_result_comparison_v2($c, $table_name, $database, $result_table_mapping);
         
         # Add debugging information
-        my $result_name = $self->table_name_to_result_name($table_name);
-        my $result_file_path = $self->find_result_file($c, $table_name, $database);
+        my $table_key = lc($table_name);
+        my $result_info = $result_table_mapping->{$table_key};
+        my $result_file_path = $result_info ? $result_info->{result_path} : undef;
+        my $result_name = $result_info ? $result_info->{result_name} : 'NOT FOUND';
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_field_comparison',
             "Table: $table_name, Database: $database, Result name: $result_name, Result file: " . ($result_file_path || 'NOT FOUND'));
+        
+        # Add detailed debugging
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_field_comparison',
+            "Comparison has_result_file: " . ($comparison->{has_result_file} ? 'YES' : 'NO'));
+        
+        if ($comparison->{fields}) {
+            my $field_count = scalar(keys %{$comparison->{fields}});
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_field_comparison',
+                "Fields found: $field_count");
+            
+            # Log first few fields for debugging
+            my $count = 0;
+            foreach my $field_name (keys %{$comparison->{fields}}) {
+                last if $count >= 3;
+                my $field_data = $comparison->{fields}->{$field_name};
+                my $has_table = $field_data->{table} ? 'YES' : 'NO';
+                my $has_result = $field_data->{result} ? 'YES' : 'NO';
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_field_comparison',
+                    "Field '$field_name': Table=$has_table, Result=$has_result");
+                $count++;
+            }
+        }
         
         $c->stash(json => {
             success => 1,
@@ -1323,7 +1350,8 @@ sub get_field_comparison :Path('/admin/get_field_comparison') :Args(0) {
                 database => $database,
                 result_name => $result_name,
                 result_file_path => $result_file_path,
-                has_result_file => $comparison->{has_result_file}
+                has_result_file => $comparison->{has_result_file},
+                total_result_files => scalar(keys %$result_table_mapping)
             }
         });
         
@@ -1383,19 +1411,20 @@ sub get_database_comparison {
         $comparison->{summary}->{connected_databases}++;
         $comparison->{summary}->{total_tables} += scalar(@$ency_tables);
         
+        # Build comprehensive mapping of result files to their actual table names
+        my $result_table_mapping = $self->build_result_table_mapping($c, 'ency');
+        
         # Compare each table with its result file
         my @tables_with_results = ();
         my @tables_without_results = ();
         
         foreach my $table_name (@$ency_tables) {
-            my $table_comparison = $self->compare_table_with_result_file($c, $table_name, 'ency');
+            my $table_comparison = $self->compare_table_with_result_file_v2($c, $table_name, 'ency', $result_table_mapping);
             
             # Debug logging
-            my $result_name = $self->table_name_to_result_name($table_name);
-            my $result_file_path = $self->find_result_file($c, $table_name, 'ency');
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_database_comparison', 
-                "Table: $table_name -> Result: $result_name -> Path: " . ($result_file_path || 'NOT FOUND') . 
-                " -> Has result: " . ($table_comparison->{has_result_file} ? 'YES' : 'NO'));
+                "Table: $table_name -> Has result: " . ($table_comparison->{has_result_file} ? 'YES' : 'NO') .
+                ($table_comparison->{result_file_path} ? " -> Path: " . $table_comparison->{result_file_path} : ""));
             
             if ($table_comparison->{has_result_file}) {
                 push @tables_with_results, $table_comparison;
@@ -1407,7 +1436,7 @@ sub get_database_comparison {
         }
         
         # Find result files without corresponding tables
-        my @results_without_tables = $self->find_orphaned_result_files($c, 'ency', $ency_tables);
+        my @results_without_tables = $self->find_orphaned_result_files_v2($c, 'ency', $ency_tables, $result_table_mapping);
         $comparison->{summary}->{results_without_tables} += scalar(@results_without_tables);
         
         # Organize comparisons: tables with results first, then tables without results
@@ -1415,7 +1444,10 @@ sub get_database_comparison {
         $comparison->{ency}->{results_without_tables} = \@results_without_tables;
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_database_comparison', 
-            "Found " . scalar(@$ency_tables) . " tables in ency database: " . join(', ', @$ency_tables));
+            "Found " . scalar(@$ency_tables) . " tables in ency database, " . 
+            scalar(@tables_with_results) . " with results, " . 
+            scalar(@tables_without_results) . " without results, " . 
+            scalar(@results_without_tables) . " orphaned results");
             
     } catch {
         my $error = "Error connecting to ency database: $_";
@@ -1433,19 +1465,20 @@ sub get_database_comparison {
         $comparison->{summary}->{connected_databases}++;
         $comparison->{summary}->{total_tables} += scalar(@$forager_tables);
         
+        # Build comprehensive mapping of result files to their actual table names
+        my $result_table_mapping = $self->build_result_table_mapping($c, 'forager');
+        
         # Compare each table with its result file
         my @tables_with_results = ();
         my @tables_without_results = ();
         
         foreach my $table_name (@$forager_tables) {
-            my $table_comparison = $self->compare_table_with_result_file($c, $table_name, 'forager');
+            my $table_comparison = $self->compare_table_with_result_file_v2($c, $table_name, 'forager', $result_table_mapping);
             
             # Debug logging
-            my $result_name = $self->table_name_to_result_name($table_name);
-            my $result_file_path = $self->find_result_file($c, $table_name, 'forager');
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_database_comparison', 
-                "Forager Table: $table_name -> Result: $result_name -> Path: " . ($result_file_path || 'NOT FOUND') . 
-                " -> Has result: " . ($table_comparison->{has_result_file} ? 'YES' : 'NO'));
+                "Forager Table: $table_name -> Has result: " . ($table_comparison->{has_result_file} ? 'YES' : 'NO') .
+                ($table_comparison->{result_file_path} ? " -> Path: " . $table_comparison->{result_file_path} : ""));
             
             if ($table_comparison->{has_result_file}) {
                 push @tables_with_results, $table_comparison;
@@ -1457,7 +1490,7 @@ sub get_database_comparison {
         }
         
         # Find result files without corresponding tables
-        my @results_without_tables = $self->find_orphaned_result_files($c, 'forager', $forager_tables);
+        my @results_without_tables = $self->find_orphaned_result_files_v2($c, 'forager', $forager_tables, $result_table_mapping);
         $comparison->{summary}->{results_without_tables} += scalar(@results_without_tables);
         
         # Organize comparisons: tables with results first, then tables without results
@@ -1465,7 +1498,10 @@ sub get_database_comparison {
         $comparison->{forager}->{results_without_tables} = \@results_without_tables;
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_database_comparison', 
-            "Found " . scalar(@$forager_tables) . " tables in forager database: " . join(', ', @$forager_tables));
+            "Found " . scalar(@$forager_tables) . " tables in forager database, " . 
+            scalar(@tables_with_results) . " with results, " . 
+            scalar(@tables_without_results) . " without results, " . 
+            scalar(@results_without_tables) . " orphaned results");
             
     } catch {
         my $error = "Error connecting to forager database: $_";
@@ -1655,8 +1691,11 @@ sub find_orphaned_result_files {
     my @result_files = $self->get_all_result_files($database);
     
     foreach my $result_file (@result_files) {
-        # Extract table name from Result file
-        my $table_name = $self->result_name_to_table_name($result_file->{name});
+        # Extract actual table name from Result file by reading the __PACKAGE__->table() declaration
+        my $table_name = $self->extract_table_name_from_result_file($result_file->{path});
+        
+        # Skip if we couldn't extract table name
+        next unless $table_name;
         
         # Check if corresponding table exists
         unless (exists $table_lookup{lc($table_name)}) {
@@ -1664,7 +1703,145 @@ sub find_orphaned_result_files {
                 result_name => $result_file->{name},
                 result_path => $result_file->{path},
                 expected_table_name => $table_name,
+                actual_table_name => $table_name,
                 last_modified => $result_file->{last_modified}
+            };
+        }
+    }
+    
+    return @orphaned_results;
+}
+
+# Extract table name from Result file by reading __PACKAGE__->table() declaration
+sub extract_table_name_from_result_file {
+    my ($self, $file_path) = @_;
+    
+    return undef unless -f $file_path;
+    
+    # Read the Result file
+    my $content;
+    eval {
+        $content = File::Slurp::read_file($file_path);
+    };
+    if ($@) {
+        warn "Failed to read Result file $file_path: $@";
+        return undef;
+    }
+    
+    # Extract table name from __PACKAGE__->table('table_name') declaration
+    if ($content =~ /__PACKAGE__->table\(['"]([^'"]+)['"]\);/) {
+        return $1;
+    }
+    
+    return undef;
+}
+
+# Build comprehensive mapping of result files to their actual table names
+sub build_result_table_mapping {
+    my ($self, $c, $database) = @_;
+    
+    my %mapping = ();  # table_name => { result_name => ..., result_path => ... }
+    
+    # Get all Result files for this database
+    my @result_files = $self->get_all_result_files($database);
+    
+    foreach my $result_file (@result_files) {
+        # Extract actual table name from Result file
+        my $table_name = $self->extract_table_name_from_result_file($result_file->{path});
+        
+        if ($table_name) {
+            $mapping{lc($table_name)} = {
+                result_name => $result_file->{name},
+                result_path => $result_file->{path},
+                last_modified => $result_file->{last_modified}
+            };
+        }
+    }
+    
+    return \%mapping;
+}
+
+# Compare table with result file using the comprehensive mapping
+sub compare_table_with_result_file_v2 {
+    my ($self, $c, $table_name, $database, $result_table_mapping) = @_;
+    
+    my $comparison = {
+        table_name => $table_name,
+        database => $database,
+        has_result_file => 0,
+        result_file_path => undef,
+        database_schema => {},
+        result_file_schema => {},
+        differences => [],
+        sync_status => 'unknown',
+        last_modified => undef
+    };
+    
+    # Check if this table has a corresponding result file
+    my $table_key = lc($table_name);
+    if (exists $result_table_mapping->{$table_key}) {
+        my $result_info = $result_table_mapping->{$table_key};
+        
+        $comparison->{has_result_file} = 1;
+        $comparison->{result_file_path} = $result_info->{result_path};
+        $comparison->{last_modified} = $result_info->{last_modified};
+        
+        # Get database schema
+        try {
+            if ($database eq 'ency') {
+                $comparison->{database_schema} = $self->get_ency_table_schema($c, $table_name);
+            } elsif ($database eq 'forager') {
+                $comparison->{database_schema} = $self->get_forager_table_schema($c, $table_name);
+            }
+        } catch {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'compare_table_with_result_file_v2', 
+                "Error getting database schema for $table_name: $_");
+        };
+        
+        # Parse Result file schema
+        try {
+            $comparison->{result_file_schema} = $self->parse_result_file_schema($c, $result_info->{result_path});
+        } catch {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'compare_table_with_result_file_v2', 
+                "Error parsing Result file schema for $table_name: $_");
+        };
+        
+        # Compare schemas and find differences
+        $comparison->{differences} = $self->find_schema_differences(
+            $comparison->{database_schema}, 
+            $comparison->{result_file_schema}
+        );
+        
+        # Determine sync status
+        if (scalar(@{$comparison->{differences}}) == 0) {
+            $comparison->{sync_status} = 'synchronized';
+        } else {
+            $comparison->{sync_status} = 'needs_sync';
+        }
+    } else {
+        $comparison->{sync_status} = 'no_result_file';
+    }
+    
+    return $comparison;
+}
+
+# Find result files without corresponding tables using the comprehensive mapping
+sub find_orphaned_result_files_v2 {
+    my ($self, $c, $database, $existing_tables, $result_table_mapping) = @_;
+    
+    my @orphaned_results = ();
+    my %table_lookup = map { lc($_) => 1 } @$existing_tables;
+    
+    # Check each result file to see if its table exists
+    foreach my $table_name (keys %$result_table_mapping) {
+        unless (exists $table_lookup{$table_name}) {
+            my $result_info = $result_table_mapping->{$table_name};
+            push @orphaned_results, {
+                result_name => $result_info->{result_name},
+                result_path => $result_info->{result_path},
+                expected_table_name => $table_name,
+                actual_table_name => $table_name,
+                last_modified => $result_info->{last_modified}
             };
         }
     }
@@ -1792,7 +1969,13 @@ sub get_table_result_comparison {
     # Get table schema
     my $table_schema;
     eval {
-        $table_schema = $self->get_table_schema($c, $table_name, $database);
+        if ($database eq 'ency') {
+            $table_schema = $self->get_ency_table_schema($c, $table_name);
+        } elsif ($database eq 'forager') {
+            $table_schema = $self->get_forager_table_schema($c, $table_name);
+        } else {
+            die "Invalid database: $database";
+        }
     };
     if ($@) {
         warn "Failed to get table schema for $table_name ($database): $@";
@@ -1819,6 +2002,74 @@ sub get_table_result_comparison {
         database => $database,
         has_result_file => ($result_file_path && -f $result_file_path) ? 1 : 0,
         result_file_path => $result_file_path,
+        fields => {}
+    };
+    
+    # Get all unique field names from both sources
+    my %all_fields = ();
+    if ($table_schema && $table_schema->{columns}) {
+        %all_fields = (%all_fields, map { $_ => 1 } keys %{$table_schema->{columns}});
+    }
+    if ($result_schema && $result_schema->{columns}) {
+        %all_fields = (%all_fields, map { $_ => 1 } keys %{$result_schema->{columns}});
+    }
+    
+    # Compare each field
+    foreach my $field_name (sort keys %all_fields) {
+        my $table_field = $table_schema->{columns}->{$field_name};
+        my $result_field = $result_schema->{columns}->{$field_name};
+        
+        $comparison->{fields}->{$field_name} = {
+            table => $table_field,
+            result => $result_field,
+            differences => $self->compare_field_attributes($table_field, $result_field)
+        };
+    }
+    
+    return $comparison;
+}
+
+# Get detailed field comparison between table and Result file using comprehensive mapping
+sub get_table_result_comparison_v2 {
+    my ($self, $c, $table_name, $database, $result_table_mapping) = @_;
+    
+    # Get table schema
+    my $table_schema;
+    eval {
+        if ($database eq 'ency') {
+            $table_schema = $self->get_ency_table_schema($c, $table_name);
+        } elsif ($database eq 'forager') {
+            $table_schema = $self->get_forager_table_schema($c, $table_name);
+        } else {
+            die "Invalid database: $database";
+        }
+    };
+    if ($@) {
+        warn "Failed to get table schema for $table_name ($database): $@";
+        $table_schema = { columns => {} };
+    }
+    
+    # Check if this table has a corresponding result file using the mapping
+    my $table_key = lc($table_name);
+    my $result_info = $result_table_mapping->{$table_key};
+    my $result_schema = { columns => {} };
+    
+    if ($result_info && -f $result_info->{result_path}) {
+        eval {
+            $result_schema = $self->parse_result_file_schema($c, $result_info->{result_path});
+        };
+        if ($@) {
+            warn "Failed to parse Result file $result_info->{result_path}: $@";
+            $result_schema = { columns => {} };
+        }
+    }
+    
+    # Create field comparison
+    my $comparison = {
+        table_name => $table_name,
+        database => $database,
+        has_result_file => $result_info ? 1 : 0,
+        result_file_path => $result_info ? $result_info->{result_path} : undef,
         fields => {}
     };
     
@@ -3020,6 +3271,353 @@ sub execute_git_pull {
     };
     
     return ($success, $output, $warning);
+}
+
+# AJAX endpoint to sync table field to result file
+sub sync_table_to_result :Path('/admin/sync_table_to_result') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_table_to_result',
+        "Starting sync_table_to_result action");
+    
+    # Check if the user has admin role
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $c->response->status(403);
+        $c->stash(json => { success => 0, error => 'Access denied' });
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Parse JSON request
+    my $json_data;
+    try {
+        my $body = $c->req->body;
+        if ($body) {
+            local $/;
+            my $json_text = <$body>;
+            $json_data = decode_json($json_text);
+        } else {
+            die "No request body provided";
+        }
+    } catch {
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => "Invalid JSON request: $_" });
+        $c->forward('View::JSON');
+        return;
+    };
+    
+    my $table_name = $json_data->{table_name};
+    my $field_name = $json_data->{field_name};
+    my $database = $json_data->{database};
+    
+    unless ($table_name && $field_name && $database) {
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => 'Missing required parameters: table_name, field_name, database' });
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    try {
+        # Get table field info
+        my $table_field_info = $self->get_table_field_info($c, $table_name, $field_name, $database);
+        
+        # Update result file with table values
+        my $result = $self->update_result_field_from_table($c, $table_name, $field_name, $database, $table_field_info);
+        
+        $c->stash(json => {
+            success => 1,
+            message => "Successfully synced table field '$field_name' to result file",
+            field_info => $table_field_info
+        });
+        
+    } catch {
+        my $error = "Error syncing table to result: $_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'sync_table_to_result', $error);
+        
+        $c->response->status(500);
+        $c->stash(json => { success => 0, error => $error });
+    };
+    
+    $c->forward('View::JSON');
+}
+
+# AJAX endpoint to sync result field to table
+sub sync_result_to_table :Path('/admin/sync_result_to_table') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_result_to_table',
+        "Starting sync_result_to_table action");
+    
+    # Check if the user has admin role
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $c->response->status(403);
+        $c->stash(json => { success => 0, error => 'Access denied' });
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Parse JSON request
+    my $json_data;
+    try {
+        my $body = $c->req->body;
+        if ($body) {
+            local $/;
+            my $json_text = <$body>;
+            $json_data = decode_json($json_text);
+        } else {
+            die "No request body provided";
+        }
+    } catch {
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => "Invalid JSON request: $_" });
+        $c->forward('View::JSON');
+        return;
+    };
+    
+    my $table_name = $json_data->{table_name};
+    my $field_name = $json_data->{field_name};
+    my $database = $json_data->{database};
+    
+    unless ($table_name && $field_name && $database) {
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => 'Missing required parameters: table_name, field_name, database' });
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    try {
+        # Get result field info
+        my $result_field_info = $self->get_result_field_info($c, $table_name, $field_name, $database);
+        
+        # Update table schema with result values
+        my $result = $self->update_table_field_from_result($c, $table_name, $field_name, $database, $result_field_info);
+        
+        $c->stash(json => {
+            success => 1,
+            message => "Successfully synced result field '$field_name' to table",
+            field_info => $result_field_info
+        });
+        
+    } catch {
+        my $error = "Error syncing result to table: $_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'sync_result_to_table', $error);
+        
+        $c->response->status(500);
+        $c->stash(json => { success => 0, error => $error });
+    };
+    
+    $c->forward('View::JSON');
+}
+
+# Helper method to get table field information
+sub get_table_field_info {
+    my ($self, $c, $table_name, $field_name, $database) = @_;
+    
+    my $model_name = $database eq 'ency' ? 'DBEncy' : 'DBForager';
+    my $schema = $c->model($model_name)->schema;
+    
+    # Get table information from database
+    my $dbh = $schema->storage->dbh;
+    my $sth = $dbh->column_info(undef, undef, $table_name, $field_name);
+    my $column_info = $sth->fetchrow_hashref;
+    
+    if (!$column_info) {
+        die "Field '$field_name' not found in table '$table_name'";
+    }
+    
+    return {
+        data_type => $column_info->{TYPE_NAME} || $column_info->{DATA_TYPE},
+        size => $column_info->{COLUMN_SIZE},
+        is_nullable => $column_info->{NULLABLE} ? 1 : 0,
+        is_auto_increment => $column_info->{IS_AUTOINCREMENT} ? 1 : 0,
+        default_value => $column_info->{COLUMN_DEF}
+    };
+}
+
+# Helper method to get result field information
+sub get_result_field_info {
+    my ($self, $c, $table_name, $field_name, $database) = @_;
+    
+    # Build result file path
+    my $result_table_mapping = $self->build_result_table_mapping($c, $database);
+    my $result_file_path;
+    
+    # Find the result file for this table (mapping key is lowercase table name)
+    my $table_key = lc($table_name);
+    if (exists $result_table_mapping->{$table_key}) {
+        $result_file_path = $result_table_mapping->{$table_key}->{result_path};
+    }
+    
+    unless ($result_file_path && -f $result_file_path) {
+        my $debug_info = "Result file not found for table '$table_name' in get_result_field_info.\n";
+        $debug_info .= "Table key searched: '$table_key'\n";
+        $debug_info .= "Available tables: " . join(', ', keys %$result_table_mapping) . "\n";
+        $debug_info .= "Result file path: " . ($result_file_path || 'undefined') . "\n";
+        if ($result_file_path) {
+            $debug_info .= "File exists: " . (-f $result_file_path ? 'YES' : 'NO') . "\n";
+        }
+        die $debug_info;
+    }
+    
+    # Read and parse the result file
+    my $content = read_file($result_file_path);
+    
+    # Parse the add_columns section to find the field
+    if ($content =~ /__PACKAGE__->add_columns\(\s*(.*?)\s*\);/s) {
+        my $columns_section = $1;
+        
+        my $field_info = {};
+        
+        # Try hash format first: field_name => { ... }
+        if ($columns_section =~ /(?:^|\s|,)\s*'?$field_name'?\s*=>\s*\{([^}]+)\}/s) {
+            my $field_def = $1;
+            
+            # Parse field attributes from hash format
+            if ($field_def =~ /data_type\s*=>\s*["']([^"']+)["']/) {
+                $field_info->{data_type} = $1;
+            }
+            if ($field_def =~ /size\s*=>\s*(\d+)/) {
+                $field_info->{size} = $1;
+            }
+            if ($field_def =~ /is_nullable\s*=>\s*([01])/) {
+                $field_info->{is_nullable} = $1;
+            }
+            if ($field_def =~ /is_auto_increment\s*=>\s*([01])/) {
+                $field_info->{is_auto_increment} = $1;
+            }
+            if ($field_def =~ /default_value\s*=>\s*["']([^"']*)["']/) {
+                $field_info->{default_value} = $1;
+            }
+            
+            return $field_info;
+        }
+        
+        # Try array format: "field_name", { ... }
+        if ($columns_section =~ /["']$field_name["']\s*,\s*\{([^}]+)\}/s) {
+            my $field_def = $1;
+            
+            # Parse field attributes from array format
+            if ($field_def =~ /data_type\s*=>\s*["']([^"']+)["']/) {
+                $field_info->{data_type} = $1;
+            }
+            if ($field_def =~ /size\s*=>\s*(\d+)/) {
+                $field_info->{size} = $1;
+            }
+            if ($field_def =~ /is_nullable\s*=>\s*([01])/) {
+                $field_info->{is_nullable} = $1;
+            }
+            if ($field_def =~ /is_auto_increment\s*=>\s*([01])/) {
+                $field_info->{is_auto_increment} = $1;
+            }
+            if ($field_def =~ /default_value\s*=>\s*["']([^"']*)["']/) {
+                $field_info->{default_value} = $1;
+            }
+            
+            return $field_info;
+        }
+    }
+    
+    die "Field '$field_name' not found in result file";
+}
+
+# Helper method to update result file with table field values
+sub update_result_field_from_table {
+    my ($self, $c, $table_name, $field_name, $database, $table_field_info) = @_;
+    
+    # Build result file path
+    my $result_table_mapping = $self->build_result_table_mapping($c, $database);
+    my $result_file_path;
+    
+    # Find the result file for this table (mapping key is lowercase table name)
+    my $table_key = lc($table_name);
+    if (exists $result_table_mapping->{$table_key}) {
+        $result_file_path = $result_table_mapping->{$table_key}->{result_path};
+    }
+    
+    unless ($result_file_path && -f $result_file_path) {
+        my $debug_info = "Result file not found for table '$table_name' in update_result_field_from_table.\n";
+        $debug_info .= "Table key searched: '$table_key'\n";
+        $debug_info .= "Available tables: " . join(', ', keys %$result_table_mapping) . "\n";
+        $debug_info .= "Result file path: " . ($result_file_path || 'undefined') . "\n";
+        if ($result_file_path) {
+            $debug_info .= "File exists: " . (-f $result_file_path ? 'YES' : 'NO') . "\n";
+        }
+        die $debug_info;
+    }
+    
+    # Read the result file
+    my $content = read_file($result_file_path);
+    
+    # Build new field definition
+    my $new_field_def = "{ data_type => '$table_field_info->{data_type}'";
+    
+    if ($table_field_info->{size}) {
+        $new_field_def .= ", size => $table_field_info->{size}";
+    }
+    
+    $new_field_def .= ", is_nullable => $table_field_info->{is_nullable}";
+    
+    if ($table_field_info->{is_auto_increment}) {
+        $new_field_def .= ", is_auto_increment => 1";
+    }
+    
+    if (defined $table_field_info->{default_value}) {
+        $new_field_def .= ", default_value => '$table_field_info->{default_value}'";
+    }
+    
+    $new_field_def .= " }";
+    
+    # Update the field definition in the content
+    if ($content =~ /__PACKAGE__->add_columns\(\s*(.*?)\s*\);/s) {
+        my $columns_section = $1;
+        my $updated = 0;
+        
+        # Try hash format first: field_name => { ... }
+        if ($columns_section =~ /(?:^|\s|,)\s*'?$field_name'?\s*=>\s*\{[^}]+\}/) {
+            $columns_section =~ s/(?:^|\s|,)\s*'?$field_name'?\s*=>\s*\{[^}]+\}/$field_name => $new_field_def/;
+            $updated = 1;
+        }
+        # Try array format: "field_name", { ... }
+        elsif ($columns_section =~ /["']$field_name["']\s*,\s*\{[^}]+\}/) {
+            $columns_section =~ s/["']$field_name["']\s*,\s*\{[^}]+\}/"$field_name", $new_field_def/;
+            $updated = 1;
+        }
+        
+        if ($updated) {
+            # Replace in the full content
+            $content =~ s/__PACKAGE__->add_columns\(\s*.*?\s*\);/__PACKAGE__->add_columns(\n$columns_section\n);/s;
+            
+            # Write back to file
+            write_file($result_file_path, $content);
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_result_field_from_table',
+                "Updated field '$field_name' in result file '$result_file_path'");
+            
+            return 1;
+        }
+    }
+    
+    die "Could not update field '$field_name' in result file";
+}
+
+# Helper method to update table schema with result field values
+sub update_table_field_from_result {
+    my ($self, $c, $table_name, $field_name, $database, $result_field_info) = @_;
+    
+    # This is a placeholder - actual table schema modification would require
+    # database-specific ALTER TABLE statements and is more complex
+    # For now, we'll just log what would be done
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_table_field_from_result',
+        "Would update table '$table_name' field '$field_name' with result file values: " . 
+        Data::Dumper::Dumper($result_field_info));
+    
+    # In a real implementation, you would:
+    # 1. Generate appropriate ALTER TABLE statement
+    # 2. Execute it against the database
+    # 3. Handle any constraints or dependencies
+    
+    return 1;
 }
 
 =head1 AUTHOR

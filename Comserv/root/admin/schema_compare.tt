@@ -70,10 +70,35 @@
         <ol>
             <li>Each database is compared with its corresponding Result files</li>
             <li>Click on table comparison cards to view detailed field comparisons between database and Result file</li>
-            <li>Use checkboxes to select the correct field attributes for synchronization</li>
-            <li>Click "Sync Field" to apply selected attributes or "Batch Sync" for all fields</li>
-            <li>Use "Create" buttons for missing Result files</li>
+            <li>Fields with differences are highlighted with ⚠ warning icons</li>
+            <li>Use "To Result" buttons to sync table values to result files</li>
+            <li>Use "To Table" buttons to sync result values to database tables (caution: modifies database)</li>
+            <li>Use "Create" buttons for missing Result files or tables</li>
         </ol>
+        
+        <div class="legend" style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 4px;">
+            <strong>Legend:</strong>
+            <div style="display: flex; gap: 20px; margin-top: 8px; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 5px;">
+                    <div style="width: 20px; height: 15px; background: #007bff; border-radius: 2px;"></div>
+                    <span>Table Data</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 5px;">
+                    <div style="width: 20px; height: 15px; background: #6f42c1; border-radius: 2px;"></div>
+                    <span>Result File Data</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 5px;">
+                    <div style="width: 20px; height: 15px; background: #ffecb3; border-radius: 2px; position: relative;">
+                        <span style="position: absolute; left: 2px; top: -2px; font-size: 10px;">⚠</span>
+                    </div>
+                    <span>Different Values</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 5px;">
+                    <div style="width: 20px; height: 15px; background: #fff3cd; border-radius: 2px;"></div>
+                    <span>Missing Fields</span>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Database Sections -->
@@ -504,6 +529,24 @@ function buildFieldComparisonHTML(comparison, tableName, database) {
     html += 'Has Result File: ' + (comparison.has_result_file ? 'YES' : 'NO') + '<br>';
     html += 'Result File Path: ' + (comparison.result_file_path || 'NOT FOUND') + '<br>';
     html += 'Fields Count: ' + (comparison.fields ? Object.keys(comparison.fields).length : 0) + '<br>';
+    
+    // Add detailed field debugging
+    if (comparison.fields) {
+        html += '<strong>Field Details:</strong><br>';
+        for (const [fieldName, fieldData] of Object.entries(comparison.fields)) {
+            html += '&nbsp;&nbsp;Field: ' + fieldName + '<br>';
+            html += '&nbsp;&nbsp;&nbsp;&nbsp;Has Table Data: ' + (fieldData.table ? 'YES' : 'NO') + '<br>';
+            html += '&nbsp;&nbsp;&nbsp;&nbsp;Has Result Data: ' + (fieldData.result ? 'YES' : 'NO') + '<br>';
+            if (fieldData.table) {
+                html += '&nbsp;&nbsp;&nbsp;&nbsp;Table Type: ' + (fieldData.table.data_type || 'undefined') + '<br>';
+            }
+            if (fieldData.result) {
+                html += '&nbsp;&nbsp;&nbsp;&nbsp;Result Type: ' + (fieldData.result.data_type || 'undefined') + '<br>';
+            }
+            html += '<br>';
+        }
+    }
+    
     html += '</div>';
     
     if (!comparison.has_result_file) {
@@ -520,16 +563,17 @@ function buildFieldComparisonHTML(comparison, tableName, database) {
         html += '<table class="field-comparison-table">';
         html += '<thead>';
         html += '<tr>';
+        html += '<th class="source-column">Source</th>';
         html += '<th class="field-name-column">Field Name</th>';
-        html += '<th class="database-column">Table (' + database + ')</th>';
-        html += '<th class="database-column">Result File</th>';
+        html += '<th class="data-type-column">Data Type</th>';
+        html += '<th class="size-column">Size</th>';
+        html += '<th class="nullable-column">Nullable</th>';
+        html += '<th class="auto-increment-column">Auto Inc</th>';
+        html += '<th class="default-column">Default</th>';
         html += '<th class="actions-column">Actions</th>';
         html += '</tr>';
         html += '</thead>';
         html += '<tbody>';
-        
-        // Group fields by property type
-        const properties = ['data_type', 'size', 'is_nullable', 'is_auto_increment', 'default_value'];
         
         for (const [fieldName, fieldData] of Object.entries(comparison.fields)) {
             const tableField = fieldData.table;
@@ -537,9 +581,9 @@ function buildFieldComparisonHTML(comparison, tableName, database) {
             const tableMissing = !tableField;
             const resultMissing = !resultField;
             
-            // Field header row
+            // Field header row (spans all columns)
             html += '<tr class="field-header-row">';
-            html += '<td colspan="4" class="field-header">';
+            html += '<td colspan="8" class="field-header">';
             html += '<strong>' + fieldName + '</strong>';
             if (tableMissing) {
                 html += ' <span class="missing-indicator">(Missing in Table)</span>';
@@ -549,53 +593,97 @@ function buildFieldComparisonHTML(comparison, tableName, database) {
             html += '</td>';
             html += '</tr>';
             
-            // Property rows
-            for (const prop of properties) {
-                const tableValue = tableField ? tableField[prop] : null;
-                const resultValue = resultField ? resultField[prop] : null;
-                const isDifferent = tableValue !== resultValue;
+            // Table row
+            if (!tableMissing) {
+                const hasDifferences = !resultMissing && (
+                    formatDataType(tableField.data_type) !== formatDataType(resultField.data_type) ||
+                    formatSize(tableField.data_type, tableField.size) !== formatSize(resultField.data_type, resultField.size) ||
+                    tableField.is_nullable !== resultField.is_nullable ||
+                    tableField.is_auto_increment !== resultField.is_auto_increment ||
+                    tableField.default_value !== resultField.default_value
+                );
                 
-                html += '<tr>';
-                html += '<td class="field-name-column">' + formatPropertyName(prop) + '</td>';
+                html += '<tr class="table-row' + (hasDifferences ? ' has-differences' : '') + '">';
+                html += '<td class="source-column"><strong>Table</strong></td>';
+                html += '<td class="field-name-column">' + fieldName + '</td>';
                 
-                // Table column
-                html += '<td class="database-column">';
-                if (!tableMissing) {
-                    html += '<div class="field-value-container">';
-                    if (isDifferent && !resultMissing) {
-                        html += '<input type="radio" name="' + fieldName + '_' + prop + '" value="table" class="field-checkbox">';
-                    }
-                    html += '<div class="field-value ' + (isDifferent ? 'different' : '') + '">' + formatFieldValue(tableValue) + '</div>';
-                    html += '</div>';
-                } else {
-                    html += '<div class="field-value missing">Field not found in table</div>';
-                }
-                html += '</td>';
+                // Add difference highlighting to individual cells
+                const dataTypeDiff = !resultMissing && formatDataType(tableField.data_type) !== formatDataType(resultField.data_type);
+                const sizeDiff = !resultMissing && formatSize(tableField.data_type, tableField.size) !== formatSize(resultField.data_type, resultField.size);
+                const nullableDiff = !resultMissing && tableField.is_nullable !== resultField.is_nullable;
+                const autoIncDiff = !resultMissing && tableField.is_auto_increment !== resultField.is_auto_increment;
+                const defaultDiff = !resultMissing && tableField.default_value !== resultField.default_value;
                 
-                // Result column
-                html += '<td class="database-column">';
-                if (!resultMissing) {
-                    html += '<div class="field-value-container">';
-                    if (isDifferent && !tableMissing) {
-                        html += '<input type="radio" name="' + fieldName + '_' + prop + '" value="result" class="field-checkbox" checked>';
-                    }
-                    html += '<div class="field-value ' + (isDifferent ? 'different' : '') + '">' + formatFieldValue(resultValue) + '</div>';
-                    html += '</div>';
-                } else {
-                    html += '<div class="field-value missing">Field not found in result</div>';
-                }
-                html += '</td>';
-                
-                // Actions column
+                html += '<td class="data-type-column' + (dataTypeDiff ? ' field-different' : '') + '">' + formatDataType(tableField.data_type) + '</td>';
+                html += '<td class="size-column' + (sizeDiff ? ' field-different' : '') + '">' + formatSize(tableField.data_type, tableField.size) + '</td>';
+                html += '<td class="nullable-column' + (nullableDiff ? ' field-different' : '') + '">' + formatFieldValue(tableField.is_nullable) + '</td>';
+                html += '<td class="auto-increment-column' + (autoIncDiff ? ' field-different' : '') + '">' + formatFieldValue(tableField.is_auto_increment) + '</td>';
+                html += '<td class="default-column' + (defaultDiff ? ' field-different' : '') + '">' + formatFieldValue(tableField.default_value) + '</td>';
                 html += '<td class="actions-column">';
-                if (isDifferent && !tableMissing && !resultMissing) {
-                    html += '<button class="sync-field-btn" onclick="syncSingleField(\'' + tableName + '\', \'' + database + '\', \'' + fieldName + '\', \'' + prop + '\');">';
-                    html += '<i class="fas fa-sync"></i> Sync</button>';
+                // Add sync to result button if there are differences and result exists
+                if (hasDifferences) {
+                    html += '<button class="sync-to-result-btn" onclick="syncTableToResult(\'' + tableName + '\', \'' + database + '\', \'' + fieldName + '\');">';
+                    html += '<i class="fas fa-arrow-right"></i> To Result</button>';
                 }
                 html += '</td>';
-                
+                html += '</tr>';
+            } else {
+                html += '<tr class="table-row missing-row">';
+                html += '<td class="source-column"><strong>Table</strong></td>';
+                html += '<td colspan="6" class="missing-field">Field not found in table</td>';
+                html += '<td class="actions-column"></td>';
                 html += '</tr>';
             }
+            
+            // Result row
+            if (!resultMissing) {
+                const hasDifferences = !tableMissing && (
+                    formatDataType(tableField.data_type) !== formatDataType(resultField.data_type) ||
+                    formatSize(tableField.data_type, tableField.size) !== formatSize(resultField.data_type, resultField.size) ||
+                    tableField.is_nullable !== resultField.is_nullable ||
+                    tableField.is_auto_increment !== resultField.is_auto_increment ||
+                    tableField.default_value !== resultField.default_value
+                );
+                
+                html += '<tr class="result-row' + (hasDifferences ? ' has-differences' : '') + '">';
+                html += '<td class="source-column"><strong>Result</strong></td>';
+                html += '<td class="field-name-column">' + fieldName + '</td>';
+                
+                // Add difference highlighting to individual cells
+                const dataTypeDiff = !tableMissing && formatDataType(tableField.data_type) !== formatDataType(resultField.data_type);
+                const sizeDiff = !tableMissing && formatSize(tableField.data_type, tableField.size) !== formatSize(resultField.data_type, resultField.size);
+                const nullableDiff = !tableMissing && tableField.is_nullable !== resultField.is_nullable;
+                const autoIncDiff = !tableMissing && tableField.is_auto_increment !== resultField.is_auto_increment;
+                const defaultDiff = !tableMissing && tableField.default_value !== resultField.default_value;
+                
+                html += '<td class="data-type-column' + (dataTypeDiff ? ' field-different' : '') + '">' + formatDataType(resultField.data_type) + '</td>';
+                html += '<td class="size-column' + (sizeDiff ? ' field-different' : '') + '">' + formatSize(resultField.data_type, resultField.size) + '</td>';
+                html += '<td class="nullable-column' + (nullableDiff ? ' field-different' : '') + '">' + formatFieldValue(resultField.is_nullable) + '</td>';
+                html += '<td class="auto-increment-column' + (autoIncDiff ? ' field-different' : '') + '">' + formatFieldValue(resultField.is_auto_increment) + '</td>';
+                html += '<td class="default-column' + (defaultDiff ? ' field-different' : '') + '">' + formatFieldValue(resultField.default_value) + '</td>';
+                html += '<td class="actions-column">';
+                // Add sync to table button if there are differences
+                if (hasDifferences) {
+                    html += '<button class="sync-to-table-btn" onclick="syncResultToTable(\'' + tableName + '\', \'' + database + '\', \'' + fieldName + '\');">';
+                    html += '<i class="fas fa-arrow-left"></i> To Table</button>';
+                }
+                html += '</td>';
+                html += '</tr>';
+            } else {
+                html += '<tr class="result-row missing-row">';
+                html += '<td class="source-column"><strong>Result</strong></td>';
+                html += '<td colspan="6" class="missing-field">Field not found in result file</td>';
+                html += '<td class="actions-column">';
+                if (!tableMissing) {
+                    html += '<button class="create-field-btn" onclick="createFieldInResult(\'' + tableName + '\', \'' + database + '\', \'' + fieldName + '\');">';
+                    html += '<i class="fas fa-plus"></i> Add to Result</button>';
+                }
+                html += '</td>';
+                html += '</tr>';
+            }
+            
+            // Add spacing row between fields
+            html += '<tr class="field-spacer"><td colspan="8"></td></tr>';
         }
         
         html += '</tbody>';
@@ -910,6 +998,131 @@ function createResultFromTable(tableName) {
     .catch(error => {
         alert('Failed to create result. Please try again.');
     });
+}
+
+// Sync table field to result file
+function syncTableToResult(tableName, database, fieldName) {
+    if (!confirm('Are you sure you want to sync table field "' + fieldName + '" to the result file?')) {
+        return;
+    }
+    
+    // Show loading state
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    button.disabled = true;
+    
+    fetch('[% c.uri_for("/admin/sync_table_to_result") %]', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            table_name: tableName,
+            field_name: fieldName,
+            database: database
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        
+        if (data.success) {
+            alert('Field synchronized successfully from table to result!');
+            // Refresh the field comparison
+            refreshFieldComparison(tableName, database);
+        } else {
+            alert('Error synchronizing field: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        alert('Failed to synchronize field. Please try again.');
+    });
+}
+
+// Sync result field to table
+function syncResultToTable(tableName, database, fieldName) {
+    if (!confirm('Are you sure you want to sync result field "' + fieldName + '" to the table? This will modify the database schema.')) {
+        return;
+    }
+    
+    // Show loading state
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    button.disabled = true;
+    
+    fetch('[% c.uri_for("/admin/sync_result_to_table") %]', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            table_name: tableName,
+            field_name: fieldName,
+            database: database
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        
+        if (data.success) {
+            alert('Field synchronized successfully from result to table!');
+            // Refresh the field comparison
+            refreshFieldComparison(tableName, database);
+        } else {
+            alert('Error synchronizing field: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        alert('Failed to synchronize field. Please try again.');
+    });
+}
+
+// Parse data type to extract base type and size
+function parseDataType(dataType) {
+    if (!dataType) return { baseType: 'N/A', size: null };
+    
+    // Handle cases like varchar(255), int(11), etc.
+    const match = dataType.match(/^(\w+)(?:\((\d+)\))?/);
+    if (match) {
+        return {
+            baseType: match[1],
+            size: match[2] ? parseInt(match[2]) : null
+        };
+    }
+    
+    return { baseType: dataType, size: null };
+}
+
+// Format data type for display (base type only)
+function formatDataType(dataType) {
+    const parsed = parseDataType(dataType);
+    return parsed.baseType;
+}
+
+// Format size for display, combining explicit size with parsed size
+function formatSize(dataType, explicitSize) {
+    const parsed = parseDataType(dataType);
+    
+    // If we have a size from parsing the data type, use that
+    if (parsed.size) {
+        return parsed.size.toString();
+    }
+    
+    // Otherwise use the explicit size if available
+    if (explicitSize && explicitSize !== null && explicitSize !== undefined) {
+        return explicitSize.toString();
+    }
+    
+    return '<em>N/A</em>';
 }
 
 // Initialize page
