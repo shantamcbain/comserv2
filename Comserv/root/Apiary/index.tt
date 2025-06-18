@@ -1,6 +1,5 @@
 [% META title = 'Apiary Management System' %]
 [% PageVersion = 'Apiary/index.tt,v 1.0 2025/01/27 shanta Exp shanta' %]
-[% WRAPPER layout.tt %]
 
 <head>
     <link rel="stylesheet" href="[% c.uri_for('/static/css/themes/apiary.css') %]">
@@ -423,5 +422,3 @@
         </div>
     [% END %]
 </div>
-
-[% END %]

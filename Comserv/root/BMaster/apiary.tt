@@ -1,23 +1,22 @@
-[% PageVersion = 'Bmaster/apiary.tt,v 0.02 2025/05/259 shanta Exp shanta ' %]
+[% PageVersion = 'BMaster/apiary.tt,v 0.03 2025/01/27 shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
      [% PageVersion %]
 [% END %]
 
-<h1>Welcome to the Apiary Management System</h1>
+<h2>Apiary Management System</h2>
 
 <p>This system is designed to provide you with a comprehensive overview of your beekeeping operation. It allows you to track, manage, and plan your apiary activities effectively.</p>
 
 <!-- Check if data is available -->
-<div style="border: 1px solid black; padding: 10px; margin: 10px; position: static; z-index: auto;">
+<div class="graph-container">
 [% IF no_data %]
  <!-- If no data, display a clickable message to add a yard -->
-<a href="/BMaster/yards" >Please add a Yard
-
-</a>
+<div class="no-data-message">
+<a href="/BMaster/yards">Please add a Yard</a>
+</div>
 [% ELSE %]
     <!-- If data is available, display the graph -->
-
-    <iframe src="http://localhost:5000/graph" width="100%" height="600px"></iframe>
+    <iframe src="http://localhost:5000/graph"></iframe>
 [% END %]
 </div>
 

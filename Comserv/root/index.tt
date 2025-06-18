@@ -1,5 +1,4 @@
-[%# INCLUDE 'layout.tt' %]
-[% PageVersion = 'index.tt,v 0.01 2024/15/30 shanta Exp shanta ' %]
+[% PageVersion = 'index.tt,v 0.02 2025/01/27 shanta Exp shanta ' %]
 
 [% IF c.session.debug_mode == 2 %]
 <div class="debug-info">

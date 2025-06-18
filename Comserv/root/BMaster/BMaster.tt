@@ -1,9 +1,8 @@
-[%# INCLUDE 'layout.tt' %]
-[% PageVersion	= 'Bmaster.tt,v 0.01 2023/08/30 shanta Exp shanta '	%]
-[% IF debug_mode == 1 %]
- [%	PageVersion %]
+[% PageVersion = 'BMaster/BMaster.tt,v 0.03 2025/01/27 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
 [% END %]
-<h1>BMaster Module</h1>
+<h2>BMaster Module</h2>
 <p>Welcome to the BMaster Module of our application!</p>
 <p>Explore the different sections:</p>
 <ul>
