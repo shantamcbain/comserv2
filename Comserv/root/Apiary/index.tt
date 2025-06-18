@@ -1,0 +1,427 @@
+[% META title = 'Apiary Management System' %]
+[% PageVersion = 'Apiary/index.tt,v 1.0 2025/01/27 shanta Exp shanta' %]
+[% WRAPPER layout.tt %]
+
+<head>
+    <link rel="stylesheet" href="[% c.uri_for('/static/css/themes/apiary.css') %]">
+</head>
+
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [% # Use the standard debug message system %]
+    [% IF debug_msg.defined && debug_msg.size > 0 %]
+        <div class="debug-messages">
+            [% FOREACH msg IN debug_msg %]
+                <p class="debug">Debug: [% msg %]</p>
+            [% END %]
+        </div>
+    [% END %]
+[% END %]
+
+[% USE Date %]
+
+<div class="apiary-container">
+    <header class="apiary-header">
+        <h1><i class="fas fa-honeycomb"></i> Apiary Management System</h1>
+        <div class="apiary-context">
+            <span class="context-item"><strong>Beekeeper:</strong> [% c.session.username || 'Guest' %]</span>
+            <span class="context-item"><strong>Season:</strong> [% current_season || Date.format(Date.now, '%Y') %]</span>
+            <span class="context-item"><strong>Status:</strong> <span class="status-active">Active</span></span>
+        </div>
+    </header>
+
+    [% # Public/Guest view - for non-logged in users %]
+    [% IF !c.session.username %]
+        <div class="public-view">
+            <div class="welcome-section">
+                <h2><i class="fas fa-bee"></i> Welcome to Our Apiary</h2>
+                <div class="alert alert-info">
+                    <p>Our apiary management system helps beekeepers maintain healthy hives and track their beekeeping operations.</p>
+                </div>
+                
+                <div class="info-cards">
+                    <div class="info-card">
+                        <div class="info-icon"><i class="fas fa-hive"></i></div>
+                        <h3>Hive Management</h3>
+                        <p>Track hive health, inspections, and maintenance schedules.</p>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-icon"><i class="fas fa-clipboard-list"></i></div>
+                        <h3>Record Keeping</h3>
+                        <p>Maintain detailed logs of all beekeeping activities and observations.</p>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-icon"><i class="fas fa-warehouse"></i></div>
+                        <h3>Inventory Tracking</h3>
+                        <p>Manage equipment, medications, and supplies efficiently.</p>
+                    </div>
+                </div>
+
+                <div class="access-section">
+                    <h3>Access Required</h3>
+                    <p>Please sign in to access the apiary management features.</p>
+                    <div class="access-buttons">
+                        <a href="/user/login" class="btn btn-primary"><i class="fas fa-sign-in-alt"></i> Sign In</a>
+                        <a href="/user/register" class="btn btn-secondary"><i class="fas fa-user-plus"></i> Register</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    [% END %]
+
+    [% # Regular user view - basic beekeeper access %]
+    [% IF c.session.username && (!c.session.roles || !c.session.roles.grep('^(admin|beekeeper)$').size) %]
+        <div class="user-view">
+            <div class="alert alert-warning">
+                <h3><i class="fas fa-exclamation-triangle"></i> Limited Access</h3>
+                <p>You have basic access to the apiary system. Contact an administrator for full beekeeper privileges.</p>
+            </div>
+
+            <div class="basic-features">
+                <h3>Available Features</h3>
+                <div class="feature-grid">
+                    <div class="feature-card readonly">
+                        <div class="feature-icon"><i class="fas fa-eye"></i></div>
+                        <h4>View Hive Status</h4>
+                        <p>View current hive conditions and basic information.</p>
+                        <a href="/Apiary/hives/view" class="btn btn-sm btn-outline">View Hives</a>
+                    </div>
+                    <div class="feature-card readonly">
+                        <div class="feature-icon"><i class="fas fa-book-open"></i></div>
+                        <h4>Read Logs</h4>
+                        <p>Access inspection logs and historical records.</p>
+                        <a href="/Apiary/logs/view" class="btn btn-sm btn-outline">View Logs</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    [% END %]
+
+    [% # Full access view - for admin and beekeeper roles %]
+    [% IF c.session.roles && c.session.roles.grep('^(admin|beekeeper)$').size %]
+        <div class="beekeeper-dashboard">
+            <!-- Dashboard Summary Cards -->
+            <div class="dashboard-stats">
+                <div class="stat-card hives">
+                    <div class="stat-icon"><i class="fas fa-hive"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-number">[% apiary_stats.total_hives || '0' %]</span>
+                        <span class="stat-label">Active Hives</span>
+                        <span class="stat-detail">[% apiary_stats.healthy_hives || '0' %] healthy</span>
+                    </div>
+                </div>
+                <div class="stat-card inspections">
+                    <div class="stat-icon"><i class="fas fa-search"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-number">[% apiary_stats.recent_inspections || '0' %]</span>
+                        <span class="stat-label">This Week</span>
+                        <span class="stat-detail">Inspections</span>
+                    </div>
+                </div>
+                <div class="stat-card todos">
+                    <div class="stat-icon"><i class="fas fa-tasks"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-number">[% apiary_stats.pending_todos || '0' %]</span>
+                        <span class="stat-label">Pending Tasks</span>
+                        <span class="stat-detail">[% apiary_stats.overdue_todos || '0' %] overdue</span>
+                    </div>
+                </div>
+                <div class="stat-card inventory">
+                    <div class="stat-icon"><i class="fas fa-boxes"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-number">[% apiary_stats.low_stock_items || '0' %]</span>
+                        <span class="stat-label">Low Stock</span>
+                        <span class="stat-detail">Items</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="quick-actions">
+                <h3><i class="fas fa-bolt"></i> Quick Actions</h3>
+                <div class="action-buttons">
+                    <a href="/Apiary/inspections/new" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> New Inspection
+                    </a>
+                    <a href="/Apiary/todos/add" class="btn btn-success">
+                        <i class="fas fa-plus-circle"></i> Add Task
+                    </a>
+                    <a href="/Apiary/notes/new" class="btn btn-info">
+                        <i class="fas fa-sticky-note"></i> Quick Note
+                    </a>
+                    <a href="/Apiary/inventory/check" class="btn btn-warning">
+                        <i class="fas fa-clipboard-check"></i> Inventory Check
+                    </a>
+                </div>
+            </div>
+
+            <!-- Main Feature Grid -->
+            <div class="feature-grid">
+                <!-- Hive Logs & Inspections -->
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <div class="feature-icon"><i class="fas fa-clipboard-list"></i></div>
+                        <h3>Hive Logs & Inspections</h3>
+                    </div>
+                    <div class="feature-content">
+                        <p>Record and track hive inspections, health assessments, and maintenance activities.</p>
+                        <ul class="feature-list">
+                            <li>Inspection records</li>
+                            <li>Health assessments</li>
+                            <li>Treatment logs</li>
+                            <li>Maintenance history</li>
+                        </ul>
+                    </div>
+                    <div class="feature-actions">
+                        <a href="/Apiary/logs" class="btn btn-primary">View Logs</a>
+                        <a href="/Apiary/inspections/new" class="btn btn-outline">New Inspection</a>
+                    </div>
+                </div>
+
+                <!-- Todo Lists & Task Management -->
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <div class="feature-icon"><i class="fas fa-tasks"></i></div>
+                        <h3>Tasks & Todo Lists</h3>
+                    </div>
+                    <div class="feature-content">
+                        <p>Manage seasonal activities, treatments, and routine beekeeping tasks.</p>
+                        <ul class="feature-list">
+                            <li>Seasonal task planning</li>
+                            <li>Treatment schedules</li>
+                            <li>Maintenance reminders</li>
+                            <li>Custom task lists</li>
+                        </ul>
+                    </div>
+                    <div class="feature-actions">
+                        <a href="/Apiary/todos" class="btn btn-primary">View Tasks</a>
+                        <a href="/Apiary/todos/add" class="btn btn-outline">Add Task</a>
+                    </div>
+                </div>
+
+                <!-- Project Management -->
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <div class="feature-icon"><i class="fas fa-project-diagram"></i></div>
+                        <h3>Project Management</h3>
+                    </div>
+                    <div class="feature-content">
+                        <p>Plan and track larger beekeeping projects and seasonal activities.</p>
+                        <ul class="feature-list">
+                            <li>Seasonal projects</li>
+                            <li>Hive expansion plans</li>
+                            <li>Equipment upgrades</li>
+                            <li>Research projects</li>
+                        </ul>
+                    </div>
+                    <div class="feature-actions">
+                        <a href="/Apiary/projects" class="btn btn-primary">View Projects</a>
+                        <a href="/Apiary/projects/new" class="btn btn-outline">New Project</a>
+                    </div>
+                </div>
+
+                <!-- Inventory Management -->
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <div class="feature-icon"><i class="fas fa-warehouse"></i></div>
+                        <h3>Inventory Management</h3>
+                    </div>
+                    <div class="feature-content">
+                        <p>Track equipment, medications, feed, and other beekeeping supplies.</p>
+                        <ul class="feature-list">
+                            <li>Equipment tracking</li>
+                            <li>Medication inventory</li>
+                            <li>Feed & supplements</li>
+                            <li>Supply ordering</li>
+                        </ul>
+                    </div>
+                    <div class="feature-actions">
+                        <a href="/Apiary/inventory" class="btn btn-primary">View Inventory</a>
+                        <a href="/Apiary/inventory/add" class="btn btn-outline">Add Item</a>
+                    </div>
+                </div>
+
+                <!-- Notes & Observations -->
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <div class="feature-icon"><i class="fas fa-sticky-note"></i></div>
+                        <h3>Notes & Observations</h3>
+                    </div>
+                    <div class="feature-content">
+                        <p>Record observations, weather conditions, and general beekeeping notes.</p>
+                        <ul class="feature-list">
+                            <li>Daily observations</li>
+                            <li>Weather tracking</li>
+                            <li>Behavior notes</li>
+                            <li>Research observations</li>
+                        </ul>
+                    </div>
+                    <div class="feature-actions">
+                        <a href="/Apiary/notes" class="btn btn-primary">View Notes</a>
+                        <a href="/Apiary/notes/new" class="btn btn-outline">New Note</a>
+                    </div>
+                </div>
+
+                <!-- Queen Rearing -->
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <div class="feature-icon"><i class="fas fa-crown"></i></div>
+                        <h3>Queen Rearing</h3>
+                    </div>
+                    <div class="feature-content">
+                        <p>Manage queen breeding programs, track queen performance, and maintain genetic records.</p>
+                        <ul class="feature-list">
+                            <li>Queen breeding schedules</li>
+                            <li>Genetic lineage tracking</li>
+                            <li>Performance monitoring</li>
+                            <li>Mating records</li>
+                        </ul>
+                    </div>
+                    <div class="feature-actions">
+                        <a href="/Apiary/QueenRearing" class="btn btn-primary">Queen Program</a>
+                        <a href="/Apiary/queens/new" class="btn btn-outline">New Queen</a>
+                    </div>
+                </div>
+
+                <!-- Reports & Analytics -->
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <div class="feature-icon"><i class="fas fa-chart-line"></i></div>
+                        <h3>Reports & Analytics</h3>
+                    </div>
+                    <div class="feature-content">
+                        <p>Generate reports and analyze your beekeeping operation performance.</p>
+                        <ul class="feature-list">
+                            <li>Hive performance reports</li>
+                            <li>Production tracking</li>
+                            <li>Health trend analysis</li>
+                            <li>Cost tracking</li>
+                        </ul>
+                    </div>
+                    <div class="feature-actions">
+                        <a href="/Apiary/reports" class="btn btn-primary">View Reports</a>
+                        <a href="/Apiary/reports/generate" class="btn btn-outline">Generate Report</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Development Planning Section -->
+            <div class="development-planning">
+                <h3><i class="fas fa-road"></i> Development Roadmap</h3>
+                <div class="planning-intro">
+                    <p>Track the development progress of the Apiary Management System. This section helps us plan features, track implementation status, and maintain development focus.</p>
+                </div>
+                
+                <div class="development-grid">
+                    <!-- Current Sprint -->
+                    <div class="dev-card current-sprint">
+                        <div class="dev-header">
+                            <div class="dev-icon"><i class="fas fa-rocket"></i></div>
+                            <h4>Current Sprint</h4>
+                            <span class="dev-status active">In Progress</span>
+                        </div>
+                        <div class="dev-content">
+                            <ul class="dev-tasks">
+                                <li class="completed"><i class="fas fa-check"></i> Landing page design & layout</li>
+                                <li class="completed"><i class="fas fa-check"></i> Role-based access control</li>
+                                <li class="completed"><i class="fas fa-check"></i> Dashboard statistics integration</li>
+                                <li class="in-progress"><i class="fas fa-spinner"></i> Queen Rearing module foundation</li>
+                                <li class="planned"><i class="fas fa-circle"></i> Todo system integration</li>
+                            </ul>
+                        </div>
+                        <div class="dev-actions">
+                            <a href="/todo?project_id=apiary&filter=week" class="btn btn-sm btn-primary">View Tasks</a>
+                        </div>
+                    </div>
+
+                    <!-- Next Features -->
+                    <div class="dev-card next-features">
+                        <div class="dev-header">
+                            <div class="dev-icon"><i class="fas fa-list-ul"></i></div>
+                            <h4>Planned Features</h4>
+                            <span class="dev-status planned">Backlog</span>
+                        </div>
+                        <div class="dev-content">
+                            <ul class="dev-tasks">
+                                <li class="planned"><i class="fas fa-circle"></i> Hive inspection forms</li>
+                                <li class="planned"><i class="fas fa-circle"></i> Inventory management system</li>
+                                <li class="planned"><i class="fas fa-circle"></i> Weather integration</li>
+                                <li class="planned"><i class="fas fa-circle"></i> Mobile-responsive design</li>
+                                <li class="planned"><i class="fas fa-circle"></i> Report generation</li>
+                            </ul>
+                        </div>
+                        <div class="dev-actions">
+                            <a href="/todo/addtodo?project_id=apiary" class="btn btn-sm btn-outline">Add Feature</a>
+                        </div>
+                    </div>
+
+                    <!-- Development Notes -->
+                    <div class="dev-card dev-notes">
+                        <div class="dev-header">
+                            <div class="dev-icon"><i class="fas fa-sticky-note"></i></div>
+                            <h4>Development Notes</h4>
+                            <span class="dev-status info">Reference</span>
+                        </div>
+                        <div class="dev-content">
+                            <ul class="dev-notes-list">
+                                <li><strong>Architecture:</strong> Leveraging existing Todo system for task management</li>
+                                <li><strong>Database:</strong> Extending current schema with apiary-specific tables</li>
+                                <li><strong>Integration:</strong> Using existing user roles and session management</li>
+                                <li><strong>Theme:</strong> Custom apiary.css theme with bee-inspired colors</li>
+                            </ul>
+                        </div>
+                        <div class="dev-actions">
+                            <a href="/Documentation/developer" class="btn btn-sm btn-info">Dev Docs</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Development Actions -->
+                <div class="dev-quick-actions">
+                    <h4><i class="fas fa-tools"></i> Quick Development Actions</h4>
+                    <div class="dev-action-buttons">
+                        <a href="/todo/addtodo?project_id=apiary&subject=Apiary Feature" class="btn btn-success">
+                            <i class="fas fa-plus"></i> Add Development Task
+                        </a>
+                        <a href="/todo?project_id=apiary" class="btn btn-primary">
+                            <i class="fas fa-tasks"></i> View All Apiary Tasks
+                        </a>
+                        <a href="/admin/schema_compare" class="btn btn-info">
+                            <i class="fas fa-database"></i> Check Database Schema
+                        </a>
+                        <a href="/Documentation/changelog" class="btn btn-secondary">
+                            <i class="fas fa-history"></i> View Changelog
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            [% # Admin-only section %]
+            [% IF c.session.roles && c.session.roles.grep('^admin$').size %]
+                <div class="admin-section">
+                    <h3><i class="fas fa-cog"></i> Administration</h3>
+                    <div class="admin-grid">
+                        <div class="admin-card">
+                            <h4>System Management</h4>
+                            <ul>
+                                <li><a href="/Apiary/admin/users">User Management</a></li>
+                                <li><a href="/Apiary/admin/settings">System Settings</a></li>
+                                <li><a href="/Apiary/admin/backup">Data Backup</a></li>
+                            </ul>
+                        </div>
+                        <div class="admin-card">
+                            <h4>Data Management</h4>
+                            <ul>
+                                <li><a href="/Apiary/admin/import">Import Data</a></li>
+                                <li><a href="/Apiary/admin/export">Export Data</a></li>
+                                <li><a href="/Apiary/admin/cleanup">Data Cleanup</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            [% END %]
+        </div>
+    [% END %]
+</div>
+
+[% END %]
