@@ -39,6 +39,7 @@ Comserv2.iml
 workspace.xml
 /Comserv/comserv.psgi
 DefaultDBI.tt
+workspace.xml
 Comserv/comserv.psgi
 .idea/workspace.xml
 .idea.*
@@ -51,6 +52,11 @@ Comserv/comserv.psgi
 /.idea/inspectionProfiles/profiles_settings.xml
 /.idea/vcs.xml
 /.idea/perl5local.xml
+/.idea/.gitignore
+/.idea/comserv2.iml
+/.idea/externalDependencies.xml
+/.idea/git_toolbox_blame.xml
+/main.py
 /aimanager/__init__.py
 /aimanager/__init__.py
 /aimanager/__init__.py
@@ -61,6 +67,9 @@ Comserv/comserv.psgi
 /.codebuddy/summary.md
 /aimanager/__init__.py
 /aimanager/__init__.py
+/.idea/externalDependencies.xml
+/main.py
+/Comserv/config/api_credentials.json
 /Comserv/config/api_credentials.json
 /AI_ASSISTANT_GUIDELINES.md
 /_Deparsed_XSubs.pm
