@@ -1,0 +1,181 @@
+[% TAGS [- -] %]
+[% BLOCK page_title %]Apiary Database Normalization Plan[% END %]
+
+<div class="apiary-container">
+    <div class="apiary-header">
+        <h1><i class="fas fa-database"></i>Apiary Database Normalization Plan</h1>
+        <div class="apiary-context">
+            <div class="context-item">Current: Denormalized ApisQueenLogTb</div>
+            <div class="context-item">Target: Normalized Relational Structure</div>
+            <div class="context-item">Status: Planning Phase</div>
+        </div>
+    </div>
+
+    <div class="feature-grid">
+        <!-- Current Structure Issues -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-exclamation-triangle feature-icon"></i>Current Structure Issues</h3>
+            </div>
+            <div class="feature-content">
+                <p>The current ApisQueenLogTb has several structural problems:</p>
+                <ul class="feature-list">
+                    <li>Denormalized box_1_*, box_2_*, box_x_* columns</li>
+                    <li>Mixed inspection data with hive metadata</li>
+                    <li>No proper relationships between entities</li>
+                    <li>Difficult to query and report on</li>
+                    <li>Data redundancy and inconsistency</li>
+                    <li>Limited scalability for multiple boxes per hive</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Proposed Structure -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-sitemap feature-icon"></i>Proposed Normalized Structure</h3>
+            </div>
+            <div class="feature-content">
+                <p>New relational structure with proper entity separation:</p>
+                <ul class="feature-list">
+                    <li><strong>hives</strong> - Main hive records (replaces scattered hive data)</li>
+                    <li><strong>boxes</strong> - Individual boxes within hives</li>
+                    <li><strong>hive_frames</strong> - Frames within boxes</li>
+                    <li><strong>inspections</strong> - Time-based inspection records</li>
+                    <li><strong>inspection_details</strong> - Detailed findings per box/frame</li>
+                    <li><strong>treatments</strong> - Treatment history</li>
+                    <li><strong>honey_harvests</strong> - Production tracking</li>
+                    <li><strong>hive_movements</strong> - Equipment movements</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Data Relationships -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-project-diagram feature-icon"></i>Entity Relationships</h3>
+            </div>
+            <div class="feature-content">
+                <p>Proper relational structure:</p>
+                <div style="font-family: monospace; background: #f8f9fa; padding: 15px; border-radius: 5px;">
+                    <strong>Yard</strong> (existing)<br>
+                    └── <strong>Hive</strong> (1:many)<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;├── <strong>Box</strong> (1:many)<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└── <strong>HiveFrame</strong> (1:many)<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;├── <strong>Inspection</strong> (1:many)<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└── <strong>InspectionDetail</strong> (1:many)<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;├── <strong>Treatment</strong> (1:many)<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;└── <strong>HoneyHarvest</strong> (1:many)
+                </div>
+            </div>
+        </div>
+
+        <!-- Migration Strategy -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-exchange-alt feature-icon"></i>Migration Strategy</h3>
+            </div>
+            <div class="feature-content">
+                <p>Proposed migration approach:</p>
+                <ul class="feature-list">
+                    <li>Create new normalized tables alongside existing ApisQueenLogTb</li>
+                    <li>Extract unique hives from queen_code/pallet_code combinations</li>
+                    <li>Convert each ApisQueenLogTb record to an inspection</li>
+                    <li>Parse box_1_*, box_2_*, box_x_* data into inspection_details</li>
+                    <li>Maintain migration_log for data lineage</li>
+                    <li>Keep ApisQueenLogTb as backup until migration verified</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Sample Data Mapping -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-table feature-icon"></i>Sample Data Mapping</h3>
+            </div>
+            <div class="feature-content">
+                <p>How current data maps to new structure:</p>
+                <div style="font-family: monospace; font-size: 0.9em; background: #f8f9fa; padding: 15px; border-radius: 5px;">
+                    <strong>ApisQueenLogTb Record:</strong><br>
+                    queen_code: "Q2024-001"<br>
+                    pallet_code: "P-15"<br>
+                    start_date: "2024-03-15"<br>
+                    box_1_bees: "moderate"<br>
+                    box_1_brood: "good"<br>
+                    box_2_honey: "75%"<br>
+                    <br>
+                    <strong>Becomes:</strong><br>
+                    <em>hives:</em> id=1, hive_number="Q2024-001", pallet_code="P-15"<br>
+                    <em>inspections:</em> id=1, hive_id=1, inspection_date="2024-03-15"<br>
+                    <em>inspection_details:</em> inspection_id=1, box_id=1, bees_coverage="moderate"<br>
+                    <em>inspection_details:</em> inspection_id=1, box_id=2, honey_percentage=75
+                </div>
+            </div>
+        </div>
+
+        <!-- Benefits -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-check-circle feature-icon"></i>Benefits of Normalization</h3>
+            </div>
+            <div class="feature-content">
+                <p>Advantages of the new structure:</p>
+                <ul class="feature-list">
+                    <li>Proper data integrity with foreign key constraints</li>
+                    <li>Flexible number of boxes per hive (not limited to 3)</li>
+                    <li>Detailed frame-level tracking capability</li>
+                    <li>Separate treatment and harvest tracking</li>
+                    <li>Better reporting and analytics capabilities</li>
+                    <li>Easier to extend with new features</li>
+                    <li>Reduced data redundancy</li>
+                    <li>Standard relational database practices</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="admin-section">
+        <h3><i class="fas fa-cogs"></i>Implementation Options</h3>
+        <div class="admin-grid">
+            <div class="admin-card">
+                <h4>Option 1: Use Application Tools</h4>
+                <ul>
+                    <li>Create tables using existing application database tools</li>
+                    <li>Create DBIx::Class Result files through application</li>
+                    <li>Test structure with sample data</li>
+                    <li>Build migration tools within application</li>
+                </ul>
+            </div>
+            <div class="admin-card">
+                <h4>Option 2: Manual SQL Approach</h4>
+                <ul>
+                    <li>Add table definitions to database_initialization_script.sql</li>
+                    <li>Create Result classes manually</li>
+                    <li>Run database initialization</li>
+                    <li>Build application features</li>
+                </ul>
+            </div>
+            <div class="admin-card">
+                <h4>Option 3: Gradual Migration</h4>
+                <ul>
+                    <li>Create new tables alongside existing ones</li>
+                    <li>Build new features using new structure</li>
+                    <li>Migrate data in phases</li>
+                    <li>Deprecate old structure when ready</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="alert alert-info">
+        <h3><i class="fas fa-info-circle"></i>Next Steps</h3>
+        <p>Please review this proposed structure and let me know:</p>
+        <ul>
+            <li>Does the entity relationship structure make sense for your apiary management needs?</li>
+            <li>Are there any missing entities or relationships?</li>
+            <li>Which implementation approach would you prefer?</li>
+            <li>Should we start with a subset of tables for testing?</li>
+        </ul>
+        <p>Once you approve the structure, I can help implement it using your preferred application tools.</p>
+    </div>
+</div>
