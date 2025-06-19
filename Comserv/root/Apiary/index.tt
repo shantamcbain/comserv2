@@ -395,6 +395,187 @@
                 </div>
             </div>
 
+            <!-- Migration Planning Section -->
+            <div class="migration-planning">
+                <h3><i class="fas fa-exchange-alt"></i> Database Migration Plan</h3>
+                <div class="migration-intro">
+                    <p><strong>Objective:</strong> Migrate from legacy Forager database (spreadsheet-style) to normalized Ency database structure while maintaining operational continuity.</p>
+                    <p><strong>Approach:</strong> Hybrid system - New functionality in Ency, legacy data accessible via Forager, gradual migration of critical data.</p>
+                </div>
+
+                <div class="migration-phases">
+                    <!-- Phase 1: Foundation -->
+                    <div class="migration-phase">
+                        <div class="phase-header">
+                            <div class="phase-icon"><i class="fas fa-foundation"></i></div>
+                            <h4>Phase 1: Database Foundation</h4>
+                            <span class="phase-status in-progress">In Progress</span>
+                        </div>
+                        <div class="phase-content">
+                            <div class="phase-description">
+                                <p>Create normalized database structure for modern apiary management</p>
+                            </div>
+                            <div class="phase-tasks">
+                                <h5>Database Tables to Create:</h5>
+                                <ul class="task-list">
+                                    <li class="completed"><i class="fas fa-check"></i> Yard (✓ Exists - needs relationships)</li>
+                                    <li class="completed"><i class="fas fa-check"></i> Pallet (✓ Exists - needs enhancement)</li>
+                                    <li class="completed"><i class="fas fa-check"></i> Queen (✓ Exists - needs performance tracking)</li>
+                                    <li class="planned"><i class="fas fa-circle"></i> Hive (yard_id, pallet_id, hive_number, status, type)</li>
+                                    <li class="planned"><i class="fas fa-circle"></i> Box (hive_id, box_number, box_type, position)</li>
+                                    <li class="planned"><i class="fas fa-circle"></i> Frame (box_id, frame_number, frame_type, content_type)</li>
+                                    <li class="planned"><i class="fas fa-circle"></i> Inspection (hive_id, inspector, date, weather, notes)</li>
+                                    <li class="planned"><i class="fas fa-circle"></i> QueenPerformance (queen_id, inspection_id, metrics)</li>
+                                    <li class="planned"><i class="fas fa-circle"></i> Equipment (type, location, status, maintenance_date)</li>
+                                    <li class="planned"><i class="fas fa-circle"></i> Treatment (hive_id, treatment_type, date, dosage)</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Phase 2: Data Migration -->
+                    <div class="migration-phase">
+                        <div class="phase-header">
+                            <div class="phase-icon"><i class="fas fa-database"></i></div>
+                            <h4>Phase 2: Data Migration Utilities</h4>
+                            <span class="phase-status planned">Planned</span>
+                        </div>
+                        <div class="phase-content">
+                            <div class="phase-description">
+                                <p>Create utilities to migrate critical data from Forager to Ency</p>
+                            </div>
+                            <div class="phase-tasks">
+                                <h5>Migration Scripts:</h5>
+                                <ul class="task-list">
+                                    <li class="planned"><i class="fas fa-circle"></i> Yard migration (ApisYardsTb → Yard)</li>
+                                    <li class="planned"><i class="fas fa-circle"></i> Pallet migration (ApisPalletTb → Pallet)</li>
+                                    <li class="planned"><i class="fas fa-circle"></i> Queen migration (ApisQueensTb → Queen)</li>
+                                    <li class="planned"><i class="fas fa-circle"></i> Performance data extraction (ApisQueenLogTb → QueenPerformance)</li>
+                                    <li class="planned"><i class="fas fa-circle"></i> Inventory migration (ApisInventoryTb → Equipment)</li>
+                                    <li class="planned"><i class="fas fa-circle"></i> Data validation and cleanup utilities</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Phase 3: Application Layer -->
+                    <div class="migration-phase">
+                        <div class="phase-header">
+                            <div class="phase-icon"><i class="fas fa-code"></i></div>
+                            <h4>Phase 3: Application Development</h4>
+                            <span class="phase-status planned">Planned</span>
+                        </div>
+                        <div class="phase-content">
+                            <div class="phase-description">
+                                <p>Build modern interfaces using normalized data structure</p>
+                            </div>
+                            <div class="phase-tasks">
+                                <h5>Application Features:</h5>
+                                <ul class="task-list">
+                                    <li class="planned"><i class="fas fa-circle"></i> Hive Management Interface</li>
+                                    <li class="planned"><i class="fas fa-circle"></i> Queen Performance Dashboard</li>
+                                    <li class="planned"><i class="fas fa-circle"></i> Inspection Forms & History</li>
+                                    <li class="planned"><i class="fas fa-circle"></i> Equipment Tracking System</li>
+                                    <li class="planned"><i class="fas fa-circle"></i> Treatment Scheduling</li>
+                                    <li class="planned"><i class="fas fa-circle"></i> Reporting & Analytics</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Phase 4: Integration -->
+                    <div class="migration-phase">
+                        <div class="phase-header">
+                            <div class="phase-icon"><i class="fas fa-link"></i></div>
+                            <h4>Phase 4: Legacy Integration</h4>
+                            <span class="phase-status planned">Planned</span>
+                        </div>
+                        <div class="phase-content">
+                            <div class="phase-description">
+                                <p>Maintain access to legacy data while transitioning to new system</p>
+                            </div>
+                            <div class="phase-tasks">
+                                <h5>Integration Features:</h5>
+                                <ul class="task-list">
+                                    <li class="planned"><i class="fas fa-circle"></i> Legacy data viewers (read-only)</li>
+                                    <li class="planned"><i class="fas fa-circle"></i> Data comparison tools</li>
+                                    <li class="planned"><i class="fas fa-circle"></i> Gradual data migration interface</li>
+                                    <li class="planned"><i class="fas fa-circle"></i> Historical data preservation</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Current Focus -->
+                <div class="current-focus">
+                    <h4><i class="fas fa-bullseye"></i> Current Focus</h4>
+                    <div class="focus-card">
+                        <div class="focus-header">
+                            <h5>Queen Performance Normalization</h5>
+                            <span class="priority high">High Priority</span>
+                        </div>
+                        <div class="focus-content">
+                            <p><strong>Challenge:</strong> ApisQueenLogTb contains denormalized data (box_1_bees, box_1_brood, box_2_bees, etc.)</p>
+                            <p><strong>Solution:</strong> Create normalized structure: Hive → Box → Frame → Content tracking</p>
+                            <p><strong>Benefit:</strong> Enable proper tracking of frame movement, queen movement, and performance metrics</p>
+                        </div>
+                        <div class="focus-actions">
+                            <a href="/todo/addtodo?project_id=apiary&subject=Create Hive table structure" class="btn btn-sm btn-primary">Create Task</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Legacy Data Analysis -->
+                <div class="legacy-analysis">
+                    <h4><i class="fas fa-search"></i> Legacy Data Analysis</h4>
+                    <div class="analysis-grid">
+                        <div class="analysis-card">
+                            <h5>ApisQueenLogTb Structure</h5>
+                            <div class="data-points">
+                                <ul>
+                                    <li><strong>Box Data:</strong> box_1_*, box_2_*, box_x_* (bees, brood, comb, empty, foundation, honey)</li>
+                                    <li><strong>Movement:</strong> brood_given, honey_added, honey_removed</li>
+                                    <li><strong>Tracking:</strong> queen_code, pallet_code, start_date, end_time</li>
+                                    <li><strong>Performance:</strong> Implicit in box contents and changes over time</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="analysis-card">
+                            <h5>Normalization Strategy</h5>
+                            <div class="strategy-points">
+                                <ul>
+                                    <li><strong>Hive:</strong> Container for boxes, linked to pallet and yard</li>
+                                    <li><strong>Box:</strong> Individual box within hive (1, 2, x positions)</li>
+                                    <li><strong>Frame:</strong> Individual frames with content type tracking</li>
+                                    <li><strong>Inspection:</strong> Time-based snapshots of hive state</li>
+                                    <li><strong>Movement:</strong> Track frame/box movements between hives</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Migration Actions -->
+                <div class="migration-actions">
+                    <h4><i class="fas fa-rocket"></i> Next Steps</h4>
+                    <div class="action-buttons">
+                        <a href="/todo/addtodo?project_id=apiary&subject=Create Hive table schema" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Create Hive Schema Task
+                        </a>
+                        <a href="/todo/addtodo?project_id=apiary&subject=Design Box-Frame relationship" class="btn btn-success">
+                            <i class="fas fa-sitemap"></i> Design Relationships
+                        </a>
+                        <a href="/Forager" class="btn btn-info">
+                            <i class="fas fa-database"></i> View Legacy Data
+                        </a>
+                        <a href="/todo?project_id=apiary" class="btn btn-secondary">
+                            <i class="fas fa-tasks"></i> View All Migration Tasks
+                        </a>
+                    </div>
+                </div>
+            </div>
+
             [% # Admin-only section %]
             [% IF c.session.roles && c.session.roles.grep('^admin$').size %]
                 <div class="admin-section">
