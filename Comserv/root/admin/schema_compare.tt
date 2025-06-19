@@ -1,5 +1,4 @@
 [% PageVersion = 'admin/schema_compare.tt,v 4.0 2024/12/19 shanta Exp shanta ' %]
-[% WRAPPER layout.tt %]
 
 <head>
     <link rel="stylesheet" href="[% c.uri_for('/static/css/themes/schema_compare.css') %]">
@@ -213,8 +212,8 @@
                     </div>
                     <div class="table-group-content">
                     [% FOREACH table_comparison IN tables_without_results %]
-                        <div class="table-comparison-card">
-                            <div class="table-comparison-header">
+                        <div class="table-comparison-card" data-table="[% table_comparison.table_name | html %]" data-database="ency">
+                            <div class="table-comparison-header" onclick="toggleTableComparison(this)">
                                 <div class="table-comparison-title">
                                     <i class="fas fa-table"></i>
                                     <h4>[% table_comparison.table_name | html %] (Table only)</h4>
@@ -224,6 +223,13 @@
                                     <button class="create-btn" onclick="createResultFromTable('[% table_comparison.table_name | html %]', 'ency'); event.stopPropagation();">
                                         <i class="fas fa-plus"></i> Create Result
                                     </button>
+                                    <i class="fas fa-chevron-right expand-icon"></i>
+                                </div>
+                            </div>
+                            <div class="field-comparison-content">
+                                <div class="loading-indicator">
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                    <span>Loading table schema...</span>
                                 </div>
                             </div>
                         </div>
@@ -344,8 +350,8 @@
                     </div>
                     <div class="table-group-content">
                     [% FOREACH table_comparison IN tables_without_results %]
-                        <div class="table-comparison-card">
-                            <div class="table-comparison-header">
+                        <div class="table-comparison-card" data-table="[% table_comparison.table_name | html %]" data-database="forager">
+                            <div class="table-comparison-header" onclick="toggleTableComparison(this)">
                                 <div class="table-comparison-title">
                                     <i class="fas fa-table"></i>
                                     <h4>[% table_comparison.table_name | html %] (Table only)</h4>
@@ -355,6 +361,13 @@
                                     <button class="create-btn" onclick="createResultFromTable('[% table_comparison.table_name | html %]', 'forager'); event.stopPropagation();">
                                         <i class="fas fa-plus"></i> Create Result
                                     </button>
+                                    <i class="fas fa-chevron-right expand-icon"></i>
+                                </div>
+                            </div>
+                            <div class="field-comparison-content">
+                                <div class="loading-indicator">
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                    <span>Loading table schema...</span>
                                 </div>
                             </div>
                         </div>
@@ -474,8 +487,18 @@ function loadFieldComparison(container, tableName, database) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Try to get detailed field comparison
-            loadDetailedFieldComparison(container, tableName, database, data.schema);
+            // Check if this table has a result file by looking at the card's title
+            const card = container.closest('.table-comparison-card');
+            const titleElement = card.querySelector('.table-comparison-title h4');
+            const hasResultFile = titleElement && !titleElement.textContent.includes('(Table only)');
+            
+            if (hasResultFile) {
+                // Try to get detailed field comparison for tables with result files
+                loadDetailedFieldComparison(container, tableName, database, data.schema);
+            } else {
+                // For tables without result files, just show the table schema
+                container.innerHTML = buildTableSchemaHTML(data.schema, tableName, database);
+            }
         } else {
             container.innerHTML = '<div class="error-message"><i class="fas fa-exclamation-triangle"></i> Error loading table schema: ' + (data.error || 'Unknown error') + '</div>';
         }
@@ -974,30 +997,54 @@ function createTableFromResult(resultName) {
 }
 
 // Create result from table
-function createResultFromTable(tableName) {
-    if (!confirm('Are you sure you want to create a result from table "' + tableName + '"?')) {
+function createResultFromTable(tableName, database) {
+    console.log('createResultFromTable called with:', { tableName, database });
+    
+    if (!confirm('Are you sure you want to create a result from table "' + tableName + '" in database "' + database + '"?')) {
         return;
     }
+    
+    // Show loading state
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+    button.disabled = true;
+    
+    const requestData = {
+        table_name: tableName,
+        database: database
+    };
+    
+    console.log('Sending request data:', requestData);
     
     fetch('[% c.uri_for("/admin/create_result_from_table") %]', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-            table_name: tableName
-        })
+        body: JSON.stringify(requestData)
     })
-    .then(response => response.json())
+    .then(response => {
+        return response.json();
+    })
     .then(data => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        
         if (data.success) {
-            alert('Result created successfully!');
-            refreshComparison();
+            alert('Result file created successfully!\n\nFile: ' + data.result_file_path + '\n\nThe application will restart to load the new file. Please refresh the page in a moment.');
+            // Wait for the app to restart, then refresh the page
+            setTimeout(() => {
+                window.location.reload();
+            }, 3000);
         } else {
             alert('Error creating result: ' + (data.error || 'Unknown error'));
         }
     })
     .catch(error => {
+        console.error('Request failed:', error);
+        button.innerHTML = originalText;
+        button.disabled = false;
         alert('Failed to create result. Please try again.');
     });
 }
@@ -1150,5 +1197,3 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
-
-[% END %]

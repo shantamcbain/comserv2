@@ -10,9 +10,10 @@ use JSON qw(decode_json);
 use Try::Tiny;
 use MIME::Base64;
 use File::Slurp qw(read_file write_file);
-use File::Basename;
+use File::Basename qw(dirname);
 use File::Path qw(make_path);
 use File::Copy;
+use File::Spec;
 use Digest::SHA qw(sha256_hex);
 use File::Find;
 use Module::Load;
@@ -3804,6 +3805,216 @@ sub update_table_field_from_result {
     # 3. Handle any constraints or dependencies
     
     return 1;
+}
+
+# AJAX endpoint to create a Result file from a database table
+sub create_result_from_table :Path('/admin/create_result_from_table') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_result_from_table',
+        "Starting create_result_from_table action");
+    
+    # Check if the user has admin role
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $c->response->status(403);
+        $c->stash(json => { success => 0, error => 'Access denied' });
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Parse JSON request
+    my $json_data;
+    try {
+        my $body = $c->req->body;
+        if ($body) {
+            local $/;
+            my $json_text = <$body>;
+            $json_data = decode_json($json_text);
+        } else {
+            die "No request body provided";
+        }
+    } catch {
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => "Invalid JSON request: $_" });
+        $c->forward('View::JSON');
+        return;
+    };
+    
+    my $table_name = $json_data->{table_name};
+    my $database = $json_data->{database};
+    
+    # Debug logging
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_result_from_table',
+        "Received parameters - table_name: " . ($table_name || 'UNDEFINED') . 
+        ", database: " . ($database || 'UNDEFINED') . 
+        ", JSON data: " . Data::Dumper::Dumper($json_data));
+    
+    unless ($table_name && $database) {
+        my $error_msg = 'Missing required parameters: ';
+        $error_msg .= 'table_name' unless $table_name;
+        $error_msg .= ', database' unless $database;
+        $error_msg .= " (received: table_name=" . ($table_name || 'UNDEFINED') . 
+                     ", database=" . ($database || 'UNDEFINED') . ")";
+        
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => $error_msg });
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    try {
+        # Get table schema from database
+        my $table_schema;
+        if ($database eq 'ency') {
+            $table_schema = $self->get_ency_table_schema($c, $table_name);
+        } elsif ($database eq 'forager') {
+            $table_schema = $self->get_forager_table_schema($c, $table_name);
+        } else {
+            die "Invalid database: $database";
+        }
+        
+        unless ($table_schema && $table_schema->{columns}) {
+            die "Could not retrieve schema for table '$table_name' from database '$database'";
+        }
+        
+        # Generate Result file content
+        my $result_content = $self->generate_result_file_content($c, $table_name, $database, $table_schema);
+        
+        # Determine Result file path
+        my $result_file_path = $self->get_result_file_path($c, $table_name, $database);
+        
+        # Create directory if it doesn't exist
+        my $result_dir = dirname($result_file_path);
+        unless (-d $result_dir) {
+            make_path($result_dir) or die "Could not create directory '$result_dir': $!";
+        }
+        
+        # Write Result file
+        write_file($result_file_path, $result_content);
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_result_from_table',
+            "Successfully created Result file '$result_file_path' for table '$table_name'");
+        
+        $c->stash(json => {
+            success => 1,
+            message => "Successfully created Result file for table '$table_name'",
+            result_file_path => $result_file_path,
+            table_name => $table_name,
+            database => $database
+        });
+        
+    } catch {
+        my $error = "Error creating Result file: $_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_result_from_table', $error);
+        
+        $c->response->status(500);
+        $c->stash(json => { success => 0, error => $error });
+    };
+    
+    $c->forward('View::JSON');
+}
+
+# Helper method to generate Result file content from table schema
+sub generate_result_file_content {
+    my ($self, $c, $table_name, $database, $table_schema) = @_;
+    
+    # Convert table name to proper case for class name
+    my $class_name = $self->table_name_to_class_name($table_name);
+    
+    # Determine the proper database namespace
+    my $namespace = $database eq 'ency' ? 'Ency' : 'Forager';
+    
+    my $content = "package Comserv::Model::Schema::${namespace}::Result::${class_name};\n";
+    $content .= "use base 'DBIx::Class::Core';\n\n";
+    
+    # Add table name
+    $content .= "__PACKAGE__->table('$table_name');\n";
+    
+    # Add columns
+    $content .= "__PACKAGE__->add_columns(\n";
+    
+    my @column_definitions;
+    foreach my $column_name (sort keys %{$table_schema->{columns}}) {
+        my $column_info = $table_schema->{columns}->{$column_name};
+        
+        my $column_def = "    $column_name => {\n";
+        $column_def .= "        data_type => '$column_info->{data_type}',\n";
+        
+        if ($column_info->{size}) {
+            $column_def .= "        size => $column_info->{size},\n";
+        }
+        
+        if ($column_info->{is_nullable}) {
+            $column_def .= "        is_nullable => 1,\n";
+        }
+        
+        if ($column_info->{is_auto_increment}) {
+            $column_def .= "        is_auto_increment => 1,\n";
+        }
+        
+        if (defined $column_info->{default_value} && $column_info->{default_value} ne '') {
+            $column_def .= "        default_value => '$column_info->{default_value}',\n";
+        }
+        
+        $column_def .= "    }";
+        push @column_definitions, $column_def;
+    }
+    
+    $content .= join(",\n", @column_definitions) . "\n";
+    $content .= ");\n\n";
+    
+    # Add primary key if available
+    if ($table_schema->{primary_keys} && @{$table_schema->{primary_keys}}) {
+        my $pk_list = join("', '", @{$table_schema->{primary_keys}});
+        $content .= "__PACKAGE__->set_primary_key('$pk_list');\n\n";
+    }
+    
+    # Add relationships placeholder (can be filled in manually later)
+    $content .= "# Add relationships here\n";
+    $content .= "# Example:\n";
+    $content .= "# __PACKAGE__->belongs_to(\n";
+    $content .= "#     'related_table',\n";
+    $content .= "#     'Comserv::Model::Schema::${namespace}::Result::RelatedTable',\n";
+    $content .= "#     'foreign_key_column'\n";
+    $content .= "# );\n\n";
+    
+    $content .= "1;\n";
+    
+    return $content;
+}
+
+# Helper method to convert table name to class name
+sub table_name_to_class_name {
+    my ($self, $table_name) = @_;
+    
+    # Convert snake_case or plural table names to PascalCase class names
+    # Examples: user_sites -> UserSite, sites -> Site, network_devices -> NetworkDevice
+    
+    # Remove common plural suffixes and convert to singular
+    my $singular = $table_name;
+    $singular =~ s/s$// if $singular =~ /[^s]s$/;  # Remove trailing 's' but not 'ss'
+    $singular =~ s/ies$/y/;  # categories -> category
+    $singular =~ s/ves$/f/;  # leaves -> leaf
+    
+    # Convert to PascalCase
+    my @words = split /_/, $singular;
+    my $class_name = join '', map { ucfirst(lc($_)) } @words;
+    
+    return $class_name;
+}
+
+# Helper method to determine Result file path
+sub get_result_file_path {
+    my ($self, $c, $table_name, $database) = @_;
+    
+    my $class_name = $self->table_name_to_class_name($table_name);
+    my $namespace = $database eq 'ency' ? 'Ency' : 'Forager';
+    
+    # Build the file path
+    my $base_path = $c->path_to('lib', 'Comserv', 'Model', 'Schema', $namespace, 'Result');
+    my $result_file_path = File::Spec->catfile($base_path, "$class_name.pm");
+    
+    return $result_file_path;
 }
 
 =head1 AUTHOR
