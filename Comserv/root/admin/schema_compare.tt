@@ -4,10 +4,10 @@
     <link rel="stylesheet" href="[% c.uri_for('/static/css/themes/schema_compare.css') %]">
 </head>
 
-<div class="schema-compare-container">
-    <header class="schema-compare-header">
+<div class="apiary-container">
+    <header class="apiary-header">
         <h1><i class="fas fa-database"></i> Database Schema Comparison</h1>
-        <div class="schema-compare-context">
+        <div class="apiary-context">
             <span class="context-item"><strong>Site:</strong> [% site_name || 'Comserv' %]</span>
             <span class="context-item"><strong>Status:</strong> Active</span>
             <button type="button" class="refresh-btn" onclick="refreshComparison()">
@@ -18,33 +18,33 @@
     <p class="intro">Compare database table schemas with their corresponding Result files to ensure synchronization during development.</p>
 
     <!-- Summary Statistics -->
-    <div class="schema-summary-stats">
-        <div class="stat-card">
-            <div class="stat-icon databases"><i class="fas fa-database"></i></div>
+    <div class="dashboard-stats">
+        <div class="stat-card databases">
+            <div class="stat-icon"><i class="fas fa-database"></i></div>
             <div class="stat-content">
-                <span class="stat-label">Total Databases</span>
-                <span class="stat-number">[% database_comparison.summary.total_databases %]</span>
+                <div class="stat-number">[% database_comparison.summary.total_databases %]</div>
+                <div class="stat-label">Total Databases</div>
             </div>
         </div>
-        <div class="stat-card">
-            <div class="stat-icon connected"><i class="fas fa-check-circle"></i></div>
+        <div class="stat-card connected">
+            <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
             <div class="stat-content">
-                <span class="stat-label">Connected</span>
-                <span class="stat-number">[% database_comparison.summary.connected_databases %]</span>
+                <div class="stat-number">[% database_comparison.summary.connected_databases %]</div>
+                <div class="stat-label">Connected</div>
             </div>
         </div>
-        <div class="stat-card">
-            <div class="stat-icon tables"><i class="fas fa-table"></i></div>
+        <div class="stat-card tables">
+            <div class="stat-icon"><i class="fas fa-table"></i></div>
             <div class="stat-content">
-                <span class="stat-label">Total Tables</span>
-                <span class="stat-number">[% database_comparison.summary.total_tables %]</span>
+                <div class="stat-number">[% database_comparison.summary.total_tables %]</div>
+                <div class="stat-label">Total Tables</div>
             </div>
         </div>
-        <div class="stat-card">
-            <div class="stat-icon status"><i class="fas fa-check-circle"></i></div>
+        <div class="stat-card results">
+            <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
             <div class="stat-content">
-                <span class="stat-label">With Results</span>
-                <span class="stat-number">[% database_comparison.summary.tables_with_results %]</span>
+                <div class="stat-number">[% database_comparison.summary.tables_with_results %]</div>
+                <div class="stat-label">With Results</div>
             </div>
         </div>
     </div>
@@ -137,31 +137,31 @@
                     </div>
                     <div class="table-group-content">
                     [% FOREACH table_comparison IN tables_with_results %]
-                        <div class="table-comparison-card" data-table="[% table_comparison.table_name | html %]" data-database="ency">
-                            <div class="table-comparison-header" onclick="toggleTableComparison(this)">
-                                <div class="table-comparison-title">
-                                    <i class="fas fa-table"></i>
-                                    <h4>[% table_comparison.table_name | html %]</h4>
+                        <div class="feature-card table-comparison-card" data-table="[% table_comparison.table_name | html %]" data-database="ency">
+                            <div class="feature-header" onclick="toggleTableComparison(this)">
+                                <h4>
+                                    <i class="feature-icon fas fa-table"></i>
+                                    [% table_comparison.table_name | html %]
                                     [% IF table_comparison.sync_status == 'synchronized' %]
                                         <span class="difference-indicator same" title="Synchronized"></span>
                                     [% ELSE %]
                                         <span class="difference-indicator different" title="Needs sync"></span>
                                     [% END %]
-                                </div>
-                                <div class="table-comparison-actions">
-                                    [% IF table_comparison.sync_status == 'needs_sync' %]
-                                        <button class="sync-btn" onclick="syncTable('[% table_comparison.table_name | html %]', 'ency'); event.stopPropagation();">
-                                            <i class="fas fa-sync"></i> Sync
-                                        </button>
-                                    [% END %]
                                     <i class="fas fa-chevron-right expand-icon"></i>
-                                </div>
+                                </h4>
                             </div>
-                            <div class="field-comparison-content">
+                            <div class="feature-content field-comparison-content">
                                 <div class="loading-indicator">
                                     <i class="fas fa-spinner fa-spin"></i>
                                     <span>Loading field comparison...</span>
                                 </div>
+                            </div>
+                            <div class="feature-actions">
+                                [% IF table_comparison.sync_status == 'needs_sync' %]
+                                    <button class="btn btn-success" onclick="syncTable('[% table_comparison.table_name | html %]', 'ency'); event.stopPropagation();">
+                                        <i class="fas fa-sync"></i> Sync
+                                    </button>
+                                [% END %]
                             </div>
                         </div>
                     [% END %]
@@ -181,8 +181,8 @@
                     </div>
                     <div class="table-group-content">
                     [% FOREACH result_file IN database_comparison.ency.results_without_tables %]
-                        <div class="table-comparison-card">
-                            <div class="table-comparison-header">
+                        <div class="table-comparison-card" data-result="[% result_file.result_name | html %]" data-database="ency">
+                            <div class="table-comparison-header" onclick="toggleResultComparison(this)">
                                 <div class="table-comparison-title">
                                     <i class="fas fa-file-alt"></i>
                                     <h4>[% result_file.result_name | html %] (Result only)</h4>
@@ -192,6 +192,13 @@
                                     <button class="create-btn" onclick="createTableFromResult('[% result_file.result_name | html %]', 'ency'); event.stopPropagation();">
                                         <i class="fas fa-plus"></i> Create Table
                                     </button>
+                                    <i class="fas fa-chevron-right expand-icon"></i>
+                                </div>
+                            </div>
+                            <div class="field-comparison-content">
+                                <div class="loading-indicator">
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                    <span>Loading result file fields...</span>
                                 </div>
                             </div>
                         </div>
@@ -319,8 +326,8 @@
                     </div>
                     <div class="table-group-content">
                     [% FOREACH result_file IN database_comparison.forager.results_without_tables %]
-                        <div class="table-comparison-card">
-                            <div class="table-comparison-header">
+                        <div class="table-comparison-card" data-result="[% result_file.result_name | html %]" data-database="forager">
+                            <div class="table-comparison-header" onclick="toggleResultComparison(this)">
                                 <div class="table-comparison-title">
                                     <i class="fas fa-file-alt"></i>
                                     <h4>[% result_file.result_name | html %] (Result only)</h4>
@@ -330,6 +337,13 @@
                                     <button class="create-btn" onclick="createTableFromResult('[% result_file.result_name | html %]', 'forager'); event.stopPropagation();">
                                         <i class="fas fa-plus"></i> Create Table
                                     </button>
+                                    <i class="fas fa-chevron-right expand-icon"></i>
+                                </div>
+                            </div>
+                            <div class="field-comparison-content">
+                                <div class="loading-indicator">
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                    <span>Loading result file fields...</span>
                                 </div>
                             </div>
                         </div>
@@ -474,6 +488,34 @@ function toggleTableComparison(header) {
     }
 }
 
+// Function to toggle result-only comparison details
+function toggleResultComparison(header) {
+    const card = header.closest('.table-comparison-card');
+    const content = card.querySelector('.field-comparison-content');
+    const icon = header.querySelector('.expand-icon');
+    
+    if (content.classList.contains('expanded')) {
+        content.classList.remove('expanded');
+        content.style.display = 'none';
+        icon.classList.remove('fa-chevron-down');
+        icon.classList.add('fa-chevron-right');
+        card.classList.remove('expanded');
+    } else {
+        content.classList.add('expanded');
+        content.style.display = 'block';
+        icon.classList.remove('fa-chevron-right');
+        icon.classList.add('fa-chevron-down');
+        card.classList.add('expanded');
+        
+        // Load result file fields if not already loaded
+        const resultName = card.dataset.result;
+        const database = card.dataset.database;
+        if (content.querySelector('.loading-indicator')) {
+            loadResultFileFields(content, resultName, database);
+        }
+    }
+}
+
 // Load field comparison data via AJAX
 function loadFieldComparison(container, tableName, database) {
     // First try to get the basic table schema (this was working)
@@ -536,6 +578,79 @@ function loadDetailedFieldComparison(container, tableName, database, tableSchema
         console.log('Field comparison request failed, falling back to basic schema display:', error);
         container.innerHTML = buildTableSchemaHTML(tableSchema, tableName, database);
     });
+}
+
+// Load result file fields data via AJAX
+function loadResultFileFields(container, resultName, database) {
+    fetch('[% c.uri_for("/admin/get_result_file_fields") %]', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'result_name=' + encodeURIComponent(resultName) + '&database=' + encodeURIComponent(database)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            container.innerHTML = buildResultFileFieldsHTML(data.fields, resultName, database);
+        } else {
+            container.innerHTML = '<div class="error-message"><i class="fas fa-exclamation-triangle"></i> Error loading result file fields: ' + (data.error || 'Unknown error') + '</div>';
+        }
+    })
+    .catch(error => {
+        container.innerHTML = '<div class="error-message"><i class="fas fa-exclamation-triangle"></i> Failed to load result file fields. Please try again.</div>';
+    });
+}
+
+// Build HTML for result file fields display
+function buildResultFileFieldsHTML(fields, resultName, database) {
+    let html = '<div class="result-file-fields-display">';
+    html += '<h5>Result File Fields: ' + resultName + ' (' + database + ')</h5>';
+    
+    if (fields && Object.keys(fields).length > 0) {
+        html += '<table class="result-fields-table">';
+        html += '<thead>';
+        html += '<tr>';
+        html += '<th>Field Name</th>';
+        html += '<th>Data Type</th>';
+        html += '<th>Size</th>';
+        html += '<th>Nullable</th>';
+        html += '<th>Auto Increment</th>';
+        html += '<th>Default</th>';
+        html += '<th>Actions</th>';
+        html += '</tr>';
+        html += '</thead>';
+        html += '<tbody>';
+        
+        for (const [fieldName, fieldData] of Object.entries(fields)) {
+            html += '<tr>';
+            html += '<td><strong>' + fieldName + '</strong></td>';
+            html += '<td>' + formatDataType(fieldData.data_type) + '</td>';
+            html += '<td>' + formatSize(fieldData.data_type, fieldData.size) + '</td>';
+            html += '<td>' + formatFieldValue(fieldData.is_nullable) + '</td>';
+            html += '<td>' + formatFieldValue(fieldData.is_auto_increment) + '</td>';
+            html += '<td>' + formatFieldValue(fieldData.default_value) + '</td>';
+            html += '<td>';
+            html += '<span class="field-info">Field from Result</span>';
+            html += '</td>';
+            html += '</tr>';
+        }
+        
+        html += '</tbody>';
+        html += '</table>';
+        
+        // Add action buttons
+        html += '<div class="field-actions">';
+        html += '<button class="create-btn" onclick="createTableFromResult(\'' + resultName + '\', \'' + database + '\');">';
+        html += '<i class="fas fa-plus"></i> Create Table with All Fields</button>';
+        html += '</div>';
+        
+    } else {
+        html += '<p>No field information available in this result file.</p>';
+    }
+    
+    html += '</div>';
+    return html;
 }
 
 // Build HTML for field comparison display

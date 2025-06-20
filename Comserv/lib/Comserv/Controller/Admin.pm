@@ -1380,6 +1380,115 @@ sub get_field_comparison :Path('/admin/get_field_comparison') :Args(0) {
     $c->forward('View::JSON');
 }
 
+# AJAX endpoint to get result file fields
+sub get_result_file_fields :Path('/admin/get_result_file_fields') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_result_file_fields', 
+        "Starting get_result_file_fields action");
+    
+    # Check if the user has admin role
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $c->response->status(403);
+        $c->stash(json => {
+            success => 0,
+            error => "Access denied: Admin role required"
+        });
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    my $result_name = $c->req->param('result_name');
+    my $database = $c->req->param('database');
+    
+    unless ($result_name && $database) {
+        $c->response->status(400);
+        $c->stash(json => {
+            success => 0,
+            error => "Missing required parameters: result_name and database"
+        });
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_result_file_fields', 
+        "Getting fields for result: $result_name in database: $database");
+    
+    try {
+        # Get the result file fields
+        my $fields = $self->get_result_file_field_definitions($c, $result_name, $database);
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_result_file_fields', 
+            "Successfully retrieved " . scalar(keys %$fields) . " fields for result: $result_name");
+        
+        $c->stash(json => {
+            success => 1,
+            fields => $fields,
+            result_name => $result_name,
+            database => $database
+        });
+        
+    } catch {
+        my $error = "Error getting result file fields for $result_name ($database): $_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_result_file_fields', $error);
+        
+        $c->response->status(500);
+        $c->stash(json => {
+            success => 0,
+            error => $error
+        });
+    };
+    
+    $c->forward('View::JSON');
+}
+
+# Get field definitions from a result file
+sub get_result_file_field_definitions {
+    my ($self, $c, $result_name, $database) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_result_file_field_definitions', 
+        "Getting field definitions for result: $result_name in database: $database");
+    
+    # Build the result file path
+    my $base_path = "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema";
+    my $result_file_path;
+    
+    if (lc($database) eq 'ency') {
+        $result_file_path = "$base_path/Ency/Result/$result_name.pm";
+        # Also check subdirectories
+        unless (-f $result_file_path) {
+            if (-f "$base_path/Ency/Result/System/$result_name.pm") {
+                $result_file_path = "$base_path/Ency/Result/System/$result_name.pm";
+            } elsif (-f "$base_path/Ency/Result/User/$result_name.pm") {
+                $result_file_path = "$base_path/Ency/Result/User/$result_name.pm";
+            }
+        }
+    } elsif (lc($database) eq 'forager') {
+        $result_file_path = "$base_path/Forager/Result/$result_name.pm";
+    } else {
+        die "Unsupported database: $database";
+    }
+    
+    unless (-f $result_file_path) {
+        die "Result file not found: $result_file_path";
+    }
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_result_file_field_definitions', 
+        "Found result file: $result_file_path");
+    
+    # Parse the result file schema
+    my $schema_info = $self->get_result_file_schema($c, $result_name, $result_file_path);
+    
+    unless ($schema_info && $schema_info->{columns}) {
+        die "Could not parse result file schema: $result_file_path";
+    }
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_result_file_field_definitions', 
+        "Successfully parsed " . scalar(keys %{$schema_info->{columns}}) . " fields from result file");
+    
+    return $schema_info->{columns};
+}
+
 # Get database comparison between each database and its result files
 sub get_database_comparison {
     my ($self, $c) = @_;

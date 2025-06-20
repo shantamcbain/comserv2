@@ -1,0 +1,1132 @@
+[% META title = 'New Hive Inspection' %]
+
+<div class="apiary-container">
+    <!-- Header Section -->
+    <div class="apiary-header">
+        <h1><i class="fas fa-search"></i>New Hive Inspection</h1>
+        <div class="apiary-context">
+            <div class="context-item">
+                <i class="fas fa-calendar"></i>
+                Date: [% inspection_date || 'Today' %]
+            </div>
+            <div class="context-item">
+                <i class="fas fa-user"></i>
+                Inspector: [% c.user.username || 'Current User' %]
+            </div>
+            <div class="context-item">
+                <i class="fas fa-thermometer-half"></i>
+                Weather: <span id="weather-display">Loading...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Inspection Form -->
+    <form id="inspection-form" method="POST" action="[% c.uri_for('/ency/apiary/inspection/create') %]">
+        
+        <!-- Basic Inspection Information -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-info-circle feature-icon"></i>Inspection Details</h3>
+            </div>
+            <div class="feature-content">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="inspection_date">Inspection Date *</label>
+                        <input type="date" id="inspection_date" name="inspection_date" 
+                               value="[% inspection_date || date.format(date.now, '%Y-%m-%d') %]" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="start_time">Start Time</label>
+                        <input type="time" id="start_time" name="start_time">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="end_time">End Time</label>
+                        <input type="time" id="end_time" name="end_time">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="temperature">Temperature (°C)</label>
+                        <input type="number" id="temperature" name="temperature" step="0.1" min="-20" max="50">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="weather_conditions">Weather Conditions</label>
+                        <select id="weather_conditions" name="weather_conditions">
+                            <option value="">Select weather...</option>
+                            <option value="sunny">Sunny</option>
+                            <option value="partly_cloudy">Partly Cloudy</option>
+                            <option value="cloudy">Cloudy</option>
+                            <option value="overcast">Overcast</option>
+                            <option value="light_rain">Light Rain</option>
+                            <option value="rain">Rain</option>
+                            <option value="windy">Windy</option>
+                            <option value="calm">Calm</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="inspection_type">Inspection Type *</label>
+                        <select id="inspection_type" name="inspection_type" required>
+                            <option value="routine">Routine</option>
+                            <option value="disease_check">Disease Check</option>
+                            <option value="harvest">Harvest</option>
+                            <option value="treatment">Treatment</option>
+                            <option value="emergency">Emergency</option>
+                            <option value="queen_check">Queen Check</option>
+                            <option value="splitting">Splitting</option>
+                            <option value="combining">Combining</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Queen and Hive Selection -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-crown feature-icon"></i>Queen & Hive Configuration</h3>
+            </div>
+            <div class="feature-content">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="queen_search">Find Queen *</label>
+                        <div class="search-container">
+                            <input type="text" id="queen_search" name="queen_search" 
+                                   placeholder="Search by tag number, yard, or pallet..." required>
+                            <button type="button" id="queen_search_btn" class="btn btn-secondary">
+                                <i class="fas fa-search"></i> Search
+                            </button>
+                        </div>
+                        <input type="hidden" id="queen_id" name="queen_id">
+                        <div id="queen_results" class="search-results"></div>
+                    </div>
+                    
+                    <div class="form-group" id="queen_details" style="display: none;">
+                        <label>Selected Queen Details</label>
+                        <div class="queen-info-card">
+                            <div class="queen-basic-info">
+                                <span class="queen-tag" id="selected_queen_tag"></span>
+                                <span class="queen-status" id="selected_queen_status"></span>
+                            </div>
+                            <div class="queen-location">
+                                <i class="fas fa-map-marker-alt"></i>
+                                <span id="selected_queen_location"></span>
+                            </div>
+                            <div class="queen-config">
+                                <i class="fas fa-layer-group"></i>
+                                <span id="selected_hive_config"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Current Hive Configuration Display -->
+                <div id="current_configuration" style="display: none;">
+                    <h4><i class="fas fa-layer-group"></i> Current Hive Configuration</h4>
+                    <div id="hive_structure_display"></div>
+                    
+                    <div class="configuration-actions">
+                        <button type="button" id="modify_config_btn" class="btn btn-outline">
+                            <i class="fas fa-edit"></i> Modify Configuration
+                        </button>
+                        <button type="button" id="add_box_btn" class="btn btn-outline">
+                            <i class="fas fa-plus"></i> Add Box
+                        </button>
+                        <button type="button" id="remove_box_btn" class="btn btn-outline">
+                            <i class="fas fa-minus"></i> Remove Box
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Queen Assessment -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-crown feature-icon"></i>Queen Assessment</h3>
+            </div>
+            <div class="feature-content">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Queen Status</label>
+                        <div class="checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="queen_seen" value="1">
+                                <span class="checkmark"></span>
+                                Queen Seen
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="queen_marked" value="1">
+                                <span class="checkmark"></span>
+                                Queen Marked
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="eggs_seen" value="1">
+                                <span class="checkmark"></span>
+                                Eggs Present
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="larvae_seen" value="1">
+                                <span class="checkmark"></span>
+                                Larvae Present
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="capped_brood_seen" value="1">
+                                <span class="checkmark"></span>
+                                Capped Brood Present
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="queen_tag_number">Queen Tag Number</label>
+                        <input type="text" id="queen_tag_number" name="queen_tag_number" 
+                               placeholder="Update if changed">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="queen_color">Queen Color/Genetics</label>
+                        <input type="text" id="queen_color" name="queen_color" 
+                               placeholder="Color marking or genetic line">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="laying_status">Laying Status</label>
+                        <select id="laying_status" name="laying_status">
+                            <option value="">Select status...</option>
+                            <option value="laying_well">Laying Well</option>
+                            <option value="laying_poor">Laying Poorly</option>
+                            <option value="not_laying">Not Laying</option>
+                            <option value="drone_layer">Drone Layer</option>
+                            <option value="superseded">Being Superseded</option>
+                            <option value="missing">Missing</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Queen Cells -->
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="supersedure_cells">Supersedure Cells</label>
+                        <input type="number" id="supersedure_cells" name="supersedure_cells" 
+                               min="0" max="20" value="0">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="swarm_cells">Swarm Cells</label>
+                        <input type="number" id="swarm_cells" name="swarm_cells" 
+                               min="0" max="50" value="0">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="queen_cells">Other Queen Cells</label>
+                        <input type="number" id="queen_cells" name="queen_cells" 
+                               min="0" max="20" value="0">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hive Population & Behavior -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-users feature-icon"></i>Population & Behavior</h3>
+            </div>
+            <div class="feature-content">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="population_estimate">Population Estimate</label>
+                        <select id="population_estimate" name="population_estimate">
+                            <option value="">Select estimate...</option>
+                            <option value="very_strong">Very Strong (8+ frames covered)</option>
+                            <option value="strong">Strong (6-8 frames covered)</option>
+                            <option value="moderate">Moderate (4-6 frames covered)</option>
+                            <option value="weak">Weak (2-4 frames covered)</option>
+                            <option value="very_weak">Very Weak (1-2 frames covered)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="temperament">Temperament</label>
+                        <select id="temperament" name="temperament">
+                            <option value="calm">Calm</option>
+                            <option value="moderate">Moderate</option>
+                            <option value="aggressive">Aggressive</option>
+                            <option value="very_aggressive">Very Aggressive</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="overall_status">Overall Hive Status</label>
+                        <select id="overall_status" name="overall_status">
+                            <option value="excellent">Excellent</option>
+                            <option value="good">Good</option>
+                            <option value="fair">Fair</option>
+                            <option value="poor">Poor</option>
+                            <option value="critical">Critical</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Box-by-Box Inspection -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-layer-group feature-icon"></i>Box-by-Box Assessment</h3>
+                <button type="button" id="add_box_detail" class="btn btn-sm btn-secondary">
+                    <i class="fas fa-plus"></i> Add Box
+                </button>
+            </div>
+            <div class="feature-content">
+                <div id="box_inspections">
+                    <!-- Box inspection details will be dynamically added here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Products Found/Created -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-honey-pot feature-icon"></i>Products & Findings</h3>
+            </div>
+            <div class="feature-content">
+                <div id="products_section">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="honey_harvested">Honey Harvested</label>
+                            <div class="input-group">
+                                <input type="number" id="honey_harvested" name="honey_harvested" 
+                                       step="0.1" min="0" placeholder="0.0">
+                                <select name="honey_unit">
+                                    <option value="kg">kg</option>
+                                    <option value="lbs">lbs</option>
+                                    <option value="frames">frames</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="pollen_collected">Pollen Collected</label>
+                            <div class="input-group">
+                                <input type="number" id="pollen_collected" name="pollen_collected" 
+                                       step="0.1" min="0" placeholder="0.0">
+                                <select name="pollen_unit">
+                                    <option value="kg">kg</option>
+                                    <option value="lbs">lbs</option>
+                                    <option value="frames">frames</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="propolis_collected">Propolis Collected</label>
+                            <div class="input-group">
+                                <input type="number" id="propolis_collected" name="propolis_collected" 
+                                       step="0.01" min="0" placeholder="0.00">
+                                <select name="propolis_unit">
+                                    <option value="g">grams</option>
+                                    <option value="oz">ounces</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Queen Cells Found -->
+                    <div class="product-section" id="queen_cells_section" style="display: none;">
+                        <h4><i class="fas fa-crown"></i> Queen Cells Found</h4>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="queen_cells_harvested">Queen Cells Harvested</label>
+                                <input type="number" id="queen_cells_harvested" name="queen_cells_harvested" 
+                                       min="0" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="queen_cell_quality">Cell Quality</label>
+                                <select id="queen_cell_quality" name="queen_cell_quality">
+                                    <option value="excellent">Excellent</option>
+                                    <option value="good">Good</option>
+                                    <option value="fair">Fair</option>
+                                    <option value="poor">Poor</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <button type="button" id="add_product_btn" class="btn btn-outline">
+                    <i class="fas fa-plus"></i> Add Product Finding
+                </button>
+            </div>
+        </div>
+
+        <!-- Actions Taken -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-tools feature-icon"></i>Actions Taken</h3>
+            </div>
+            <div class="feature-content">
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="foundation_added" value="1">
+                        <span class="checkmark"></span>
+                        Foundation Added
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="comb_removed" value="1">
+                        <span class="checkmark"></span>
+                        Comb Removed
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="boxes_added" value="1">
+                        <span class="checkmark"></span>
+                        Boxes Added
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="boxes_removed" value="1">
+                        <span class="checkmark"></span>
+                        Boxes Removed
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="treatment_applied" value="1">
+                        <span class="checkmark"></span>
+                        Treatment Applied
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="feeding_done" value="1">
+                        <span class="checkmark"></span>
+                        Feeding Done
+                    </label>
+                </div>
+                
+                <div class="form-group">
+                    <label for="treatment_details">Treatment Details</label>
+                    <textarea id="treatment_details" name="treatment_details" rows="3" 
+                              placeholder="Describe any treatments applied..."></textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notes and Follow-up -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-sticky-note feature-icon"></i>Notes & Follow-up</h3>
+            </div>
+            <div class="feature-content">
+                <div class="form-group">
+                    <label for="general_notes">General Notes</label>
+                    <textarea id="general_notes" name="general_notes" rows="4" 
+                              placeholder="General observations, concerns, or notes..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="action_required">Action Required</label>
+                    <textarea id="action_required" name="action_required" rows="3" 
+                              placeholder="What needs to be done next?"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="next_inspection_date">Next Inspection Date</label>
+                    <input type="date" id="next_inspection_date" name="next_inspection_date">
+                </div>
+            </div>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="feature-actions">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> Save Inspection
+            </button>
+            <button type="button" id="save_draft" class="btn btn-secondary">
+                <i class="fas fa-file-alt"></i> Save as Draft
+            </button>
+            <button type="button" onclick="window.history.back()" class="btn btn-outline">
+                <i class="fas fa-times"></i> Cancel
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Box Inspection Template (hidden) -->
+<template id="box_inspection_template">
+    <div class="box-inspection-card" data-box-id="">
+        <div class="box-header">
+            <h4>
+                <select name="box_type[]" class="box-type-select">
+                    <option value="brood">Brood Box</option>
+                    <option value="honey">Honey Box</option>
+                    <option value="x-ways">X-Ways (Side Rest)</option>
+                    <option value="super">Super</option>
+                </select>
+                <span class="box-position">Position: 
+                    <input type="number" name="box_position[]" min="1" max="10" value="1" class="position-input">
+                </span>
+            </h4>
+            <button type="button" class="remove-box-btn btn btn-sm btn-warning">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+        
+        <div class="box-content">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Frame Count</label>
+                    <input type="number" name="frame_count[]" min="1" max="10" value="10">
+                </div>
+                
+                <div class="form-group">
+                    <label>Bee Coverage</label>
+                    <select name="bee_coverage[]">
+                        <option value="none">None</option>
+                        <option value="light">Light</option>
+                        <option value="moderate">Moderate</option>
+                        <option value="heavy">Heavy</option>
+                        <option value="full">Full</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Brood Pattern</label>
+                    <select name="brood_pattern[]">
+                        <option value="excellent">Excellent</option>
+                        <option value="good">Good</option>
+                        <option value="fair">Fair</option>
+                        <option value="poor">Poor</option>
+                        <option value="spotty">Spotty</option>
+                        <option value="none">None</option>
+                    </select>
+                </div>
+            </div>
+            
+            <!-- Frame Content Percentages -->
+            <div class="content-percentages">
+                <h5>Frame Content Distribution</h5>
+                <div class="percentage-grid">
+                    <div class="percentage-item">
+                        <label>Brood %</label>
+                        <input type="number" name="brood_percentage[]" min="0" max="100" value="0" class="percentage-input">
+                    </div>
+                    <div class="percentage-item">
+                        <label>Honey %</label>
+                        <input type="number" name="honey_percentage[]" min="0" max="100" value="0" class="percentage-input">
+                    </div>
+                    <div class="percentage-item">
+                        <label>Pollen %</label>
+                        <input type="number" name="pollen_percentage[]" min="0" max="100" value="0" class="percentage-input">
+                    </div>
+                    <div class="percentage-item">
+                        <label>Empty %</label>
+                        <input type="number" name="empty_percentage[]" min="0" max="100" value="0" class="percentage-input">
+                    </div>
+                </div>
+                <div class="percentage-total">Total: <span class="total-display">0%</span></div>
+            </div>
+            
+            <div class="form-group">
+                <label>Box Notes</label>
+                <textarea name="box_notes[]" rows="2" placeholder="Specific observations for this box..."></textarea>
+            </div>
+        </div>
+    </div>
+</template>
+
+<style>
+/* Form-specific styles */
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    font-weight: 600;
+    margin-bottom: 5px;
+    color: var(--text-color);
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 14px;
+    background: var(--background-color);
+    color: var(--text-color);
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(var(--primary-color-rgb), 0.2);
+}
+
+.search-container {
+    display: flex;
+    gap: 10px;
+}
+
+.search-container input {
+    flex: 1;
+}
+
+.search-results {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    margin-top: 5px;
+    display: none;
+}
+
+.queen-info-card {
+    background: var(--table-header-bg);
+    padding: 15px;
+    border-radius: 8px;
+    border-left: 4px solid var(--accent-color);
+}
+
+.queen-basic-info {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 10px;
+}
+
+.queen-tag {
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+.queen-status {
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    background: var(--success-color);
+    color: white;
+}
+
+.checkbox-group {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin: 15px 0;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-weight: normal;
+}
+
+.checkbox-label input[type="checkbox"] {
+    margin-right: 8px;
+}
+
+.input-group {
+    display: flex;
+    gap: 5px;
+}
+
+.input-group input {
+    flex: 1;
+}
+
+.input-group select {
+    min-width: 80px;
+}
+
+.box-inspection-card {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 20px;
+    background: var(--background-color);
+}
+
+.box-header {
+    background: var(--table-header-bg);
+    padding: 15px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.box-header h4 {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.box-type-select,
+.position-input {
+    border: none;
+    background: transparent;
+    color: var(--text-color);
+    font-weight: bold;
+}
+
+.box-content {
+    padding: 20px;
+}
+
+.content-percentages {
+    background: var(--table-header-bg);
+    padding: 15px;
+    border-radius: 6px;
+    margin: 15px 0;
+}
+
+.percentage-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
+    margin: 10px 0;
+}
+
+.percentage-item {
+    text-align: center;
+}
+
+.percentage-item label {
+    font-size: 12px;
+    margin-bottom: 5px;
+}
+
+.percentage-input {
+    width: 60px;
+    text-align: center;
+    padding: 5px;
+}
+
+.percentage-total {
+    text-align: center;
+    font-weight: bold;
+    margin-top: 10px;
+    padding: 5px;
+    background: var(--background-color);
+    border-radius: 4px;
+}
+
+.configuration-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+    flex-wrap: wrap;
+}
+
+.product-section {
+    background: var(--table-header-bg);
+    padding: 15px;
+    border-radius: 8px;
+    margin: 15px 0;
+    border-left: 4px solid var(--accent-color);
+}
+
+.product-section h4 {
+    margin: 0 0 15px 0;
+    color: var(--text-color);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .percentage-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .search-container {
+        flex-direction: column;
+    }
+    
+    .box-header h4 {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .configuration-actions {
+        justify-content: center;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize form functionality
+    initializeInspectionForm();
+});
+
+function initializeInspectionForm() {
+    // Queen search functionality
+    setupQueenSearch();
+    
+    // Box inspection management
+    setupBoxInspections();
+    
+    // Product tracking
+    setupProductTracking();
+    
+    // Form validation
+    setupFormValidation();
+    
+    // Auto-save functionality
+    setupAutoSave();
+}
+
+function setupQueenSearch() {
+    const searchInput = document.getElementById('queen_search');
+    const searchBtn = document.getElementById('queen_search_btn');
+    const resultsDiv = document.getElementById('queen_results');
+    
+    searchBtn.addEventListener('click', function() {
+        const query = searchInput.value.trim();
+        if (query.length < 2) {
+            alert('Please enter at least 2 characters to search');
+            return;
+        }
+        
+        // AJAX call to search for queens
+        fetch('/ency/apiary/queen/search', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ query: query })
+        })
+        .then(response => response.json())
+        .then(data => {
+            displayQueenResults(data.queens);
+        })
+        .catch(error => {
+            console.error('Error searching queens:', error);
+            alert('Error searching for queens. Please try again.');
+        });
+    });
+    
+    // Enter key search
+    searchInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            searchBtn.click();
+        }
+    });
+}
+
+function displayQueenResults(queens) {
+    const resultsDiv = document.getElementById('queen_results');
+    
+    if (queens.length === 0) {
+        resultsDiv.innerHTML = '<div class="no-results">No queens found matching your search.</div>';
+        resultsDiv.style.display = 'block';
+        return;
+    }
+    
+    let html = '';
+    queens.forEach(queen => {
+        html += `
+            <div class="queen-result-item" data-queen-id="${queen.id}" onclick="selectQueen(${queen.id})">
+                <div class="queen-result-header">
+                    <span class="queen-tag">${queen.tag_number}</span>
+                    <span class="queen-status ${queen.status}">${queen.status}</span>
+                </div>
+                <div class="queen-result-location">
+                    <i class="fas fa-map-marker-alt"></i>
+                    ${queen.yard_name} - ${queen.pallet_code} - Position ${queen.position}
+                </div>
+                <div class="queen-result-config">
+                    <i class="fas fa-layer-group"></i>
+                    ${queen.hive_type} (${queen.box_count} boxes, ${queen.frame_count} frames)
+                </div>
+            </div>
+        `;
+    });
+    
+    resultsDiv.innerHTML = html;
+    resultsDiv.style.display = 'block';
+}
+
+function selectQueen(queenId) {
+    // Hide search results
+    document.getElementById('queen_results').style.display = 'none';
+    
+    // Set hidden field
+    document.getElementById('queen_id').value = queenId;
+    
+    // Fetch full queen details and current configuration
+    fetch(`/ency/apiary/queen/${queenId}/details`)
+        .then(response => response.json())
+        .then(data => {
+            displaySelectedQueen(data.queen);
+            displayCurrentConfiguration(data.configuration);
+        })
+        .catch(error => {
+            console.error('Error fetching queen details:', error);
+            alert('Error loading queen details. Please try again.');
+        });
+}
+
+function displaySelectedQueen(queen) {
+    document.getElementById('selected_queen_tag').textContent = queen.tag_number;
+    document.getElementById('selected_queen_status').textContent = queen.status;
+    document.getElementById('selected_queen_location').textContent = 
+        `${queen.yard_name} - ${queen.pallet_code} - Position ${queen.position}`;
+    document.getElementById('selected_hive_config').textContent = 
+        `${queen.hive_type} (${queen.box_count} boxes, ${queen.frame_count} frames)`;
+    
+    // Pre-fill queen assessment fields
+    document.getElementById('queen_tag_number').value = queen.tag_number;
+    document.getElementById('queen_color').value = queen.color || '';
+    document.getElementById('laying_status').value = queen.laying_status || '';
+    
+    document.getElementById('queen_details').style.display = 'block';
+}
+
+function displayCurrentConfiguration(configuration) {
+    const configDiv = document.getElementById('hive_structure_display');
+    
+    let html = '<div class="hive-structure">';
+    configuration.boxes.forEach((box, index) => {
+        html += `
+            <div class="config-box" data-box-id="${box.id}">
+                <div class="config-box-header">
+                    <strong>Box ${box.position}: ${box.type}</strong>
+                    <span class="frame-count">${box.frame_count} frames</span>
+                </div>
+                <div class="config-box-frames">
+                    ${box.frames.map(frame => 
+                        `<span class="frame-indicator ${frame.type}" title="${frame.type}">${frame.position}</span>`
+                    ).join('')}
+                </div>
+            </div>
+        `;
+    });
+    html += '</div>';
+    
+    configDiv.innerHTML = html;
+    document.getElementById('current_configuration').style.display = 'block';
+    
+    // Pre-populate box inspection section
+    populateBoxInspections(configuration.boxes);
+}
+
+function setupBoxInspections() {
+    const addBoxBtn = document.getElementById('add_box_detail');
+    const boxContainer = document.getElementById('box_inspections');
+    
+    addBoxBtn.addEventListener('click', function() {
+        addBoxInspection();
+    });
+    
+    // Handle percentage calculations
+    boxContainer.addEventListener('input', function(e) {
+        if (e.target.classList.contains('percentage-input')) {
+            updatePercentageTotal(e.target);
+        }
+    });
+    
+    // Handle box removal
+    boxContainer.addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-box-btn') || e.target.closest('.remove-box-btn')) {
+            const boxCard = e.target.closest('.box-inspection-card');
+            boxCard.remove();
+        }
+    });
+}
+
+function addBoxInspection(boxData = null) {
+    const template = document.getElementById('box_inspection_template');
+    const clone = template.content.cloneNode(true);
+    
+    if (boxData) {
+        // Pre-populate with existing box data
+        clone.querySelector('.box-type-select').value = boxData.type;
+        clone.querySelector('.position-input').value = boxData.position;
+        clone.querySelector('input[name="frame_count[]"]').value = boxData.frame_count;
+    }
+    
+    document.getElementById('box_inspections').appendChild(clone);
+}
+
+function populateBoxInspections(boxes) {
+    const container = document.getElementById('box_inspections');
+    container.innerHTML = ''; // Clear existing
+    
+    boxes.forEach(box => {
+        addBoxInspection(box);
+    });
+}
+
+function updatePercentageTotal(input) {
+    const boxCard = input.closest('.box-inspection-card');
+    const percentageInputs = boxCard.querySelectorAll('.percentage-input');
+    let total = 0;
+    
+    percentageInputs.forEach(input => {
+        total += parseInt(input.value) || 0;
+    });
+    
+    const totalDisplay = boxCard.querySelector('.total-display');
+    totalDisplay.textContent = total + '%';
+    
+    // Color code the total
+    if (total === 100) {
+        totalDisplay.style.color = 'var(--success-color)';
+    } else if (total > 100) {
+        totalDisplay.style.color = 'var(--warning-color)';
+    } else {
+        totalDisplay.style.color = 'var(--text-color)';
+    }
+}
+
+function setupProductTracking() {
+    // Show queen cells section when queen cells are found
+    const queenCellInputs = ['supersedure_cells', 'swarm_cells', 'queen_cells'];
+    
+    queenCellInputs.forEach(inputId => {
+        const input = document.getElementById(inputId);
+        input.addEventListener('input', function() {
+            const total = queenCellInputs.reduce((sum, id) => {
+                return sum + (parseInt(document.getElementById(id).value) || 0);
+            }, 0);
+            
+            const section = document.getElementById('queen_cells_section');
+            if (total > 0) {
+                section.style.display = 'block';
+                document.getElementById('queen_cells_harvested').max = total;
+            } else {
+                section.style.display = 'none';
+            }
+        });
+    });
+}
+
+function setupFormValidation() {
+    const form = document.getElementById('inspection-form');
+    
+    form.addEventListener('submit', function(e) {
+        if (!validateForm()) {
+            e.preventDefault();
+            return false;
+        }
+    });
+}
+
+function validateForm() {
+    const requiredFields = ['inspection_date', 'inspection_type', 'queen_id'];
+    let isValid = true;
+    
+    requiredFields.forEach(fieldName => {
+        const field = document.getElementById(fieldName) || document.querySelector(`[name="${fieldName}"]`);
+        if (!field || !field.value.trim()) {
+            isValid = false;
+            if (field) {
+                field.style.borderColor = 'var(--warning-color)';
+                field.focus();
+            }
+        } else if (field) {
+            field.style.borderColor = 'var(--border-color)';
+        }
+    });
+    
+    if (!isValid) {
+        alert('Please fill in all required fields.');
+    }
+    
+    return isValid;
+}
+
+function setupAutoSave() {
+    let autoSaveTimer;
+    const form = document.getElementById('inspection-form');
+    
+    form.addEventListener('input', function() {
+        clearTimeout(autoSaveTimer);
+        autoSaveTimer = setTimeout(function() {
+            saveFormDraft();
+        }, 30000); // Auto-save every 30 seconds
+    });
+    
+    // Save draft button
+    document.getElementById('save_draft').addEventListener('click', function() {
+        saveFormDraft();
+    });
+}
+
+function saveFormDraft() {
+    const formData = new FormData(document.getElementById('inspection-form'));
+    const draftData = {};
+    
+    for (let [key, value] of formData.entries()) {
+        draftData[key] = value;
+    }
+    
+    // Save to localStorage
+    localStorage.setItem('inspection_draft', JSON.stringify(draftData));
+    
+    // Show save indicator
+    showSaveIndicator('Draft saved');
+}
+
+function showSaveIndicator(message) {
+    // Create or update save indicator
+    let indicator = document.getElementById('save-indicator');
+    if (!indicator) {
+        indicator = document.createElement('div');
+        indicator.id = 'save-indicator';
+        indicator.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--success-color);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 6px;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        `;
+        document.body.appendChild(indicator);
+    }
+    
+    indicator.textContent = message;
+    indicator.style.opacity = '1';
+    
+    setTimeout(() => {
+        indicator.style.opacity = '0';
+    }, 2000);
+}
+
+// Load draft on page load
+window.addEventListener('load', function() {
+    const draft = localStorage.getItem('inspection_draft');
+    if (draft && confirm('A draft inspection was found. Would you like to load it?')) {
+        const draftData = JSON.parse(draft);
+        
+        Object.keys(draftData).forEach(key => {
+            const field = document.querySelector(`[name="${key}"]`);
+            if (field) {
+                if (field.type === 'checkbox') {
+                    field.checked = draftData[key] === '1';
+                } else {
+                    field.value = draftData[key];
+                }
+            }
+        });
+    }
+});
+</script>

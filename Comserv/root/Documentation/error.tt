@@ -10,21 +10,23 @@
 <!-- Include documentation CSS -->
 <link rel="stylesheet" href="/static/css/documentation.css">
 
-<div class="documentation-error">
-    <div class="error-container">
-        <div class="error-icon">
-            <i class="fas fa-exclamation-circle"></i>
+<div class="apiary-container">
+    <header class="apiary-header">
+        <h1><i class="fas fa-exclamation-triangle"></i> Documentation Error</h1>
+        <div class="apiary-context">
+            <span class="context-item"><strong>Site:</strong> [% site_name || 'default' %]</span>
+            <span class="context-item"><strong>User:</strong> [% c.session.username || 'Not logged in' %]</span>
         </div>
+    </header>
 
-        <h1>Documentation Error</h1>
-
-        <div class="error-message">
-            [% IF error_msg %]
-                <p>[% error_msg %]</p>
-            [% ELSE %]
-                <p>An error occurred while accessing the documentation.</p>
-            [% END %]
-        </div>
+    <div class="alert alert-warning">
+        <h3>Error</h3>
+        [% IF error_msg %]
+            <p>[% error_msg %]</p>
+        [% ELSE %]
+            <p>An error occurred while accessing the documentation.</p>
+        [% END %]
+    </div>
 
         <div class="user-context">
             <div class="site-info">
@@ -111,15 +113,16 @@
             </ul>
         </div>
 
-        <div class="error-actions">
-            <a href="[% c.uri_for('/Documentation') %]" class="action-button primary">Return to Documentation Home</a>
-            <a href="javascript:history.back()" class="action-button secondary">Go Back</a>
+    <div class="quick-actions">
+        <h3><i class="fas fa-tools"></i> Available Actions</h3>
+        <div class="action-buttons">
+            <a href="[% c.uri_for('/Documentation') %]" class="btn btn-primary"><i class="fas fa-home"></i> Return to Documentation Home</a>
+            <a href="javascript:history.back()" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Go Back</a>
         </div>
     </div>
 </div>
 
-<style>
-    .documentation-error {
+<!-- Now uses standard apiary-container, alert, and button styles from base-containers.css -->
         max-width: 800px;
         margin: 50px auto;
         padding: 20px;

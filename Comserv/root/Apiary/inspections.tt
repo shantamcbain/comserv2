@@ -1,0 +1,150 @@
+[% META title = 'Inspection Management' %]
+
+<div class="apiary-container">
+    <header class="apiary-header">
+        <h1><i class="fas fa-search"></i> Inspection Management</h1>
+        <div class="apiary-context">
+            <span class="context-item"><strong>Status:</strong> <span class="status-active">Active</span></span>
+            <span class="context-item"><strong>Season:</strong> [% USE date; date.format(date.now, '%Y') %]</span>
+        </div>
+    </header>
+
+    <div class="welcome-section">
+        <p>Manage and track all your hive inspections. Keep detailed records of queen status, brood patterns, and hive health.</p>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="feature-actions">
+        <a href="[% c.uri_for('/Apiary/inspections/new') %]" class="btn btn-primary">
+            <i class="fas fa-plus"></i> New Inspection
+        </a>
+        <a href="[% c.uri_for('/Apiary/inspections/reports') %]" class="btn btn-secondary">
+            <i class="fas fa-chart-bar"></i> Reports
+        </a>
+        <a href="[% c.uri_for('/Apiary/inspections/calendar') %]" class="btn btn-info">
+            <i class="fas fa-calendar"></i> Calendar View
+        </a>
+    </div>
+
+    <div class="feature-grid">
+        <!-- Inspection Statistics -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-chart-line feature-icon"></i>Inspection Statistics</h3>
+            </div>
+            <div class="feature-content">
+                [% IF inspection_stats %]
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-number">[% inspection_stats.total_inspections || 0 %]</div>
+                            <div class="stat-label">Total Inspections</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number">[% inspection_stats.this_month || 0 %]</div>
+                            <div class="stat-label">This Month</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number">[% inspection_stats.pending_actions || 0 %]</div>
+                            <div class="stat-label">Pending Actions</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number">[% inspection_stats.overdue || 0 %]</div>
+                            <div class="stat-label">Overdue</div>
+                        </div>
+                    </div>
+                [% ELSE %]
+                    <p class="info-text">No inspection data available yet. Start by creating your first inspection.</p>
+                [% END %]
+            </div>
+        </div>
+
+        <!-- Recent Inspections -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-history feature-icon"></i>Recent Inspections</h3>
+            </div>
+            <div class="feature-content">
+                [% IF recent_inspections && recent_inspections.size > 0 %]
+                    <div class="inspection-list">
+                        [% FOREACH inspection IN recent_inspections %]
+                            <div class="inspection-item">
+                                <div class="inspection-header">
+                                    <h4>[% inspection.queen_tag || 'Unknown Queen' %]</h4>
+                                    <span class="inspection-date">[% inspection.inspection_date %]</span>
+                                </div>
+                                <div class="inspection-details">
+                                    <span class="inspection-type">[% inspection.inspection_type.replace('_', ' ').title %]</span>
+                                    <span class="inspection-status status-[% inspection.overall_status %]">[% inspection.overall_status.title %]</span>
+                                </div>
+                                [% IF inspection.action_required %]
+                                    <div class="inspection-action">
+                                        <i class="fas fa-exclamation-triangle"></i> Action Required
+                                    </div>
+                                [% END %]
+                            </div>
+                        [% END %]
+                    </div>
+                    <div class="feature-actions">
+                        <a href="[% c.uri_for('/Apiary/inspections/all') %]" class="btn btn-secondary">View All Inspections</a>
+                    </div>
+                [% ELSE %]
+                    <p class="info-text">No recent inspections found.</p>
+                    <div class="feature-actions">
+                        <a href="[% c.uri_for('/Apiary/inspections/new') %]" class="btn btn-primary">Create First Inspection</a>
+                    </div>
+                [% END %]
+            </div>
+        </div>
+
+        <!-- Quick Tools -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-tools feature-icon"></i>Inspection Tools</h3>
+            </div>
+            <div class="feature-content">
+                <ul class="feature-list">
+                    <li><a href="[% c.uri_for('/Apiary/queens/search') %]">Queen Lookup</a></li>
+                    <li><a href="[% c.uri_for('/Apiary/yards') %]">Yard Management</a></li>
+                    <li><a href="[% c.uri_for('/Apiary/equipment') %]">Equipment Tracking</a></li>
+                    <li><a href="[% c.uri_for('/Apiary/weather') %]">Weather Conditions</a></li>
+                    <li><a href="[% c.uri_for('/Apiary/treatments') %]">Treatment Records</a></li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Upcoming Tasks -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-calendar-check feature-icon"></i>Upcoming Tasks</h3>
+            </div>
+            <div class="feature-content">
+                [% IF upcoming_tasks && upcoming_tasks.size > 0 %]
+                    <div class="task-list">
+                        [% FOREACH task IN upcoming_tasks %]
+                            <div class="task-item">
+                                <div class="task-date">[% task.due_date %]</div>
+                                <div class="task-description">[% task.description %]</div>
+                                <div class="task-priority priority-[% task.priority %]">[% task.priority.title %]</div>
+                            </div>
+                        [% END %]
+                    </div>
+                [% ELSE %]
+                    <p class="info-text">No upcoming inspection tasks scheduled.</p>
+                [% END %]
+            </div>
+        </div>
+    </div>
+
+    <!-- Success/Error Messages -->
+    [% IF c.request.param('success') %]
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle"></i> Inspection completed successfully!
+        </div>
+    [% END %]
+
+    [% IF error_message %]
+        <div class="alert alert-error">
+            <i class="fas fa-exclamation-triangle"></i> [% error_message %]
+        </div>
+    [% END %]
+</div>

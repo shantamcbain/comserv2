@@ -1,6 +1,8 @@
 package Comserv::Controller::Apiary;
 use Moose;
 use namespace::autoclean;
+use DateTime;
+use JSON;
 use Comserv::Util::Logging;
 use Comserv::Model::ApiaryModel;
 
@@ -112,6 +114,290 @@ sub bee_health :Path('/Apiary/BeeHealth') :Args(0) {
 
     # Set the template
     $c->stash(template => 'Apiary/bee_health.tt');
+}
+
+# Inspection Management Routes
+sub inspections :Path('/Apiary/inspections') :Args(0) {
+    my ( $self, $c ) = @_;
+
+    # Initialize debug_errors array
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+
+    # Log entry into the inspections method
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'inspections', 'Entered inspections method');
+    push @{$c->stash->{debug_errors}}, "Entered inspections method";
+
+    # Add debug message
+    if ($c->session->{debug_mode}) {
+        $c->stash->{debug_msg} = [] unless defined $c->stash->{debug_msg};
+        push @{$c->stash->{debug_msg}}, "Inspection Management System - Main Dashboard";
+    }
+
+    # Get recent inspections
+    my $recent_inspections = $self->_get_recent_inspections($c);
+    
+    # Get inspection statistics
+    my $inspection_stats = $self->_get_inspection_stats($c);
+
+    # Stash data for template
+    $c->stash(
+        recent_inspections => $recent_inspections,
+        inspection_stats => $inspection_stats,
+        template => 'Apiary/inspections.tt'
+    );
+}
+
+sub new_inspection :Path('/Apiary/inspections/new') :Args(0) {
+    my ( $self, $c ) = @_;
+
+    # Initialize debug_errors array
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+
+    # Log entry into the new_inspection method
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'new_inspection', 'Entered new_inspection method');
+    push @{$c->stash->{debug_errors}}, "Entered new_inspection method";
+
+    # Add debug message
+    if ($c->session->{debug_mode}) {
+        $c->stash->{debug_msg} = [] unless defined $c->stash->{debug_msg};
+        push @{$c->stash->{debug_msg}}, "New Inspection Form - Loading";
+        push @{$c->stash->{debug_msg}}, "User: " . ($c->session->{username} || 'Guest');
+    }
+
+    # Set default inspection date to today
+    my $today = DateTime->now->ymd;
+    
+    # Stash data for template
+    $c->stash(
+        inspection_date => $today,
+        template => 'Apiary/new_inspection.tt'
+    );
+}
+
+sub create_inspection :Path('/Apiary/inspections/create') :Args(0) {
+    my ( $self, $c ) = @_;
+
+    # Initialize debug_errors array
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+
+    # Only allow POST requests
+    unless ($c->request->method eq 'POST') {
+        $c->response->redirect($c->uri_for('/Apiary/inspections/new'));
+        return;
+    }
+
+    # Log entry into the create_inspection method
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_inspection', 'Entered create_inspection method');
+    push @{$c->stash->{debug_errors}}, "Entered create_inspection method";
+
+    # Add debug message
+    if ($c->session->{debug_mode}) {
+        $c->stash->{debug_msg} = [] unless defined $c->stash->{debug_msg};
+        push @{$c->stash->{debug_msg}}, "Creating new inspection record";
+    }
+
+    eval {
+        # Get form parameters
+        my $params = $c->request->parameters;
+        
+        # Validate required fields
+        my @required_fields = qw(inspection_date inspection_type queen_id);
+        my @missing_fields;
+        
+        for my $field (@required_fields) {
+            unless ($params->{$field} && $params->{$field} =~ /\S/) {
+                push @missing_fields, $field;
+            }
+        }
+        
+        if (@missing_fields) {
+            $c->stash(
+                error_message => "Missing required fields: " . join(', ', @missing_fields),
+                template => 'Apiary/new_inspection.tt'
+            );
+            return;
+        }
+
+        # Create inspection record
+        my $inspection_data = {
+            queen_id => $params->{queen_id},
+            inspection_date => $params->{inspection_date},
+            start_time => $params->{start_time} || undef,
+            end_time => $params->{end_time} || undef,
+            weather_conditions => $params->{weather_conditions} || undef,
+            temperature => $params->{temperature} || undef,
+            inspector => $c->session->{username} || 'Unknown',
+            inspection_type => $params->{inspection_type},
+            overall_status => $params->{overall_status} || 'good',
+            queen_seen => $params->{queen_seen} ? 1 : 0,
+            queen_marked => $params->{queen_marked} ? 1 : 0,
+            eggs_seen => $params->{eggs_seen} ? 1 : 0,
+            larvae_seen => $params->{larvae_seen} ? 1 : 0,
+            capped_brood_seen => $params->{capped_brood_seen} ? 1 : 0,
+            supersedure_cells => $params->{supersedure_cells} || 0,
+            swarm_cells => $params->{swarm_cells} || 0,
+            queen_cells => $params->{queen_cells} || 0,
+            population_estimate => $params->{population_estimate} || undef,
+            temperament => $params->{temperament} || 'calm',
+            general_notes => $params->{general_notes} || undef,
+            action_required => $params->{action_required} || undef,
+            next_inspection_date => $params->{next_inspection_date} || undef,
+        };
+
+        # Try to save to database (this will need the enhanced models)
+        # For now, we'll simulate success and redirect
+        
+        if ($c->session->{debug_mode}) {
+            push @{$c->stash->{debug_msg}}, "Inspection data prepared for saving";
+            push @{$c->stash->{debug_msg}}, "Queen ID: " . $params->{queen_id};
+            push @{$c->stash->{debug_msg}}, "Inspection Type: " . $params->{inspection_type};
+        }
+
+        # Redirect to success page
+        $c->response->redirect($c->uri_for('/Apiary/inspections') . '?success=1');
+        return;
+
+    };
+
+    if ($@) {
+        # Handle errors
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_inspection', "Error creating inspection: $@");
+        push @{$c->stash->{debug_errors}}, "Error creating inspection: $@";
+        
+        $c->stash(
+            error_message => "Error creating inspection: $@",
+            template => 'Apiary/new_inspection.tt'
+        );
+    }
+}
+
+# AJAX endpoints for the inspection form
+sub queen_search :Path('/Apiary/queen/search') :Args(0) {
+    my ( $self, $c ) = @_;
+
+    # Only allow POST requests
+    unless ($c->request->method eq 'POST') {
+        $c->response->status(405);
+        $c->response->body('Method not allowed');
+        return;
+    }
+
+    # Set JSON response
+    $c->response->content_type('application/json');
+
+    eval {
+        # Get search query from JSON body
+        my $json_data = $c->request->data;
+        my $query = $json_data->{query} || '';
+
+        if (length($query) < 2) {
+            $c->response->body('{"error": "Query too short"}');
+            return;
+        }
+
+        # Mock search results for now (replace with real database search)
+        my @mock_queens = (
+            {
+                id => 1,
+                tag_number => 'Q2024-001',
+                status => 'laying_well',
+                yard_name => 'Main Yard',
+                pallet_code => 'P001',
+                position => 1,
+                hive_type => 'single',
+                box_count => 2,
+                frame_count => 18
+            },
+            {
+                id => 2,
+                tag_number => 'Q2024-002',
+                status => 'laying_poor',
+                yard_name => 'North Yard',
+                pallet_code => 'P002',
+                position => 3,
+                hive_type => 'main',
+                box_count => 3,
+                frame_count => 30
+            }
+        );
+
+        # Filter results based on query
+        my @filtered_queens = grep {
+            $_->{tag_number} =~ /\Q$query\E/i ||
+            $_->{yard_name} =~ /\Q$query\E/i ||
+            $_->{pallet_code} =~ /\Q$query\E/i
+        } @mock_queens;
+
+        use JSON;
+        $c->response->body(encode_json({ queens => \@filtered_queens }));
+
+    };
+
+    if ($@) {
+        $c->response->status(500);
+        $c->response->body('{"error": "Internal server error"}');
+    }
+}
+
+sub queen_details :Path('/Apiary/queen') :Args(2) {
+    my ( $self, $c, $queen_id, $action ) = @_;
+
+    return unless $action eq 'details';
+
+    # Set JSON response
+    $c->response->content_type('application/json');
+
+    eval {
+        # Mock queen details (replace with real database lookup)
+        my $mock_queen = {
+            id => $queen_id,
+            tag_number => "Q2024-00$queen_id",
+            status => 'laying_well',
+            yard_name => 'Main Yard',
+            pallet_code => 'P001',
+            position => 1,
+            hive_type => 'single',
+            box_count => 2,
+            frame_count => 18,
+            color => 'Blue',
+            laying_status => 'laying_well'
+        };
+
+        my $mock_configuration = {
+            boxes => [
+                {
+                    id => 1,
+                    position => 1,
+                    type => 'brood',
+                    frame_count => 10,
+                    frames => [
+                        map { { position => $_, type => 'brood' } } (1..10)
+                    ]
+                },
+                {
+                    id => 2,
+                    position => 2,
+                    type => 'honey',
+                    frame_count => 8,
+                    frames => [
+                        map { { position => $_, type => 'honey' } } (1..8)
+                    ]
+                }
+            ]
+        };
+
+        use JSON;
+        $c->response->body(encode_json({
+            queen => $mock_queen,
+            configuration => $mock_configuration
+        }));
+
+    };
+
+    if ($@) {
+        $c->response->status(500);
+        $c->response->body('{"error": "Internal server error"}');
+    }
 }
 
 # API methods for accessing bee operation data
@@ -395,6 +681,102 @@ sub _get_apiary_todo_stats {
     
     if ($c->session->{debug_mode}) {
         push @{$c->stash->{debug_msg}}, "Final todo stats: " . join(', ', map { "$_=$stats->{$_}" } keys %$stats);
+    }
+    
+    return $stats;
+}
+
+# Private method to get recent inspections
+sub _get_recent_inspections {
+    my ($self, $c) = @_;
+    my $limit = shift || 10;
+    
+    # Initialize with empty array
+    my $inspections = [];
+    
+    # Add debug message if debug mode is enabled
+    if ($c->session->{debug_mode}) {
+        push @{$c->stash->{debug_msg}}, "Retrieving recent inspections...";
+    }
+    
+    eval {
+        # Try to get real inspections from database
+        # For now, return mock data
+        $inspections = [
+            {
+                id => 1,
+                inspection_date => '2024-01-15',
+                queen_tag => 'Q2024-001',
+                inspector => 'Shanta',
+                overall_status => 'excellent',
+                yard_name => 'Main Yard',
+                notes => 'Strong colony, good brood pattern'
+            },
+            {
+                id => 2,
+                inspection_date => '2024-01-14',
+                queen_tag => 'Q2024-002',
+                inspector => 'Shanta',
+                overall_status => 'good',
+                yard_name => 'North Yard',
+                notes => 'Queen seen, laying well'
+            }
+        ];
+        
+        if ($c->session->{debug_mode}) {
+            push @{$c->stash->{debug_msg}}, "Retrieved " . scalar(@$inspections) . " recent inspections";
+        }
+    };
+    
+    if ($@) {
+        if ($c->session->{debug_mode}) {
+            push @{$c->stash->{debug_msg}}, "Error retrieving inspections: $@";
+        }
+    }
+    
+    return $inspections;
+}
+
+# Private method to get inspection statistics
+sub _get_inspection_stats {
+    my ($self, $c) = @_;
+    
+    # Initialize stats with default values
+    my $stats = {
+        total_inspections => 0,
+        this_week => 0,
+        this_month => 0,
+        excellent_status => 0,
+        good_status => 0,
+        needs_attention => 0
+    };
+    
+    # Add debug message if debug mode is enabled
+    if ($c->session->{debug_mode}) {
+        push @{$c->stash->{debug_msg}}, "Retrieving inspection statistics...";
+    }
+    
+    eval {
+        # Try to get real statistics from database
+        # For now, return mock data
+        $stats = {
+            total_inspections => 25,
+            this_week => 8,
+            this_month => 22,
+            excellent_status => 12,
+            good_status => 10,
+            needs_attention => 3
+        };
+        
+        if ($c->session->{debug_mode}) {
+            push @{$c->stash->{debug_msg}}, "Retrieved inspection statistics";
+        }
+    };
+    
+    if ($@) {
+        if ($c->session->{debug_mode}) {
+            push @{$c->stash->{debug_msg}}, "Error retrieving inspection stats: $@";
+        }
     }
     
     return $stats;

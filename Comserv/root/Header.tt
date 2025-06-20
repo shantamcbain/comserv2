@@ -68,6 +68,9 @@
     <!-- Theme CSS: [% theme_name %] -->
     <link rel="stylesheet" type="text/css" href="/static/css/themes/[% theme_name %].css">
 
+    <!-- Universal Container System (loads after theme variables are defined) -->
+    <link rel="stylesheet" type="text/css" href="/static/css/themes/base-containers.css">
+
     <!-- Theme overrides to ensure proper application -->
     <link rel="stylesheet" type="text/css" href="/static/css/theme-overrides.css">
 

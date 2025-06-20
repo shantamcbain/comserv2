@@ -1,62 +1,86 @@
-[% PageVersion = 'BMaster/apiary.tt,v 0.03 2025/01/27 shanta Exp shanta ' %]
+[% PageVersion = 'BMaster/apiary.tt,v 0.04 2025/01/27 shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
      [% PageVersion %]
 [% END %]
 
-<h2>Apiary Management System</h2>
+<div class="apiary-container">
+    <header class="apiary-header">
+        <h1><i class="fas fa-hive"></i> Apiary Management System</h1>
+        <div class="apiary-context">
+            <span class="context-item"><strong>Status:</strong> <span class="status-active">Active</span></span>
+            <span class="context-item"><strong>Season:</strong> [% USE date; date.format(date.now, '%Y') %]</span>
+        </div>
+    </header>
 
-<p>This system is designed to provide you with a comprehensive overview of your beekeeping operation. It allows you to track, manage, and plan your apiary activities effectively.</p>
+    <div class="welcome-section">
+        <p>This system is designed to provide you with a comprehensive overview of your beekeeping operation. It allows you to track, manage, and plan your apiary activities effectively.</p>
+    </div>
 
-<!-- Check if data is available -->
-<div class="graph-container">
-[% IF no_data %]
- <!-- If no data, display a clickable message to add a yard -->
-<div class="no-data-message">
-<a href="/BMaster/yards">Please add a Yard</a>
+    <!-- Check if data is available -->
+    <div class="graph-container">
+    [% IF no_data %]
+     <!-- If no data, display a clickable message to add a yard -->
+    <div class="no-data-message">
+    <a href="/BMaster/yards">Please add a Yard</a>
+    </div>
+    [% ELSE %]
+        <!-- If data is available, display the graph -->
+        <iframe src="http://localhost:5000/graph"></iframe>
+    [% END %]
+    </div>
+
+    <div class="welcome-section">
+        <p>Start your beekeeping day by checking the graph above. It shows the changes in the number of frames of bees, brood, and other elements over the course of the season. This visual representation helps you understand the dynamics of your apiary at a glance.</p>
+    </div>
+
+    <div class="feature-grid">
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-hive feature-icon"></i>Hive Tracking</h3>
+            </div>
+            <div class="feature-content">
+                <p>Our system allows you to monitor various aspects of your hives, such as:</p>
+                <ul class="feature-list">
+                    <li>Hive condition</li>
+                    <li>Number of bees</li>
+                    <li>Frames of brood, honey, foundation, comb, and empty</li>
+                    <li>Weight</li>
+                    <li>Disease</li>
+                    <li>Internal temperature</li>
+                    <li>Temperament</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-boxes feature-icon"></i>Inventory Management</h3>
+            </div>
+            <div class="feature-content">
+                <p>Keep track of your apiary equipment inventory. This feature helps you plan what is needed for your next visit to the yard. You can track items like:</p>
+                <ul class="feature-list">
+                    <li>Tops</li>
+                    <li>Brood boxes</li>
+                    <li>Entrance reducers</li>
+                    <li>Frames</li>
+                    <li>Bottom boards</li>
+                    <li>Inner covers</li>
+                    <li>Frame feeders</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-calendar feature-icon"></i>Seasonal Calendar</h3>
+            </div>
+            <div class="feature-content">
+                <p>Plan your activities for the season with our integrated calendar. It helps you schedule and manage your tasks effectively.</p>
+            </div>
+            <div class="feature-actions">
+                <a href="/BMaster/Queens" class="btn btn-primary"><i class="fas fa-crown"></i>Queens Page</a>
+                <a href="/BMaster/yards" class="btn btn-secondary"><i class="fas fa-map-marker-alt"></i>Yards Page</a>
+            </div>
+        </div>
+    </div>
 </div>
-[% ELSE %]
-    <!-- If data is available, display the graph -->
-    <iframe src="http://localhost:5000/graph"></iframe>
-[% END %]
-</div>
-
-<p>Start your beekeeping day by checking the graph above. It shows the changes in the number of frames of bees, brood, and other elements over the course of the season. This visual representation helps you understand the dynamics of your apiary at a glance.</p>
-
-<h2>Key Features of Our System</h2>
-
-<h3>Hive Tracking</h3>
-
-<p>Our system allows you to monitor various aspects of your hives, such as:</p>
-
-<ul>
-    <li>Hive condition</li>
-    <li>Number of bees</li>
-    <li>Frames of brood, honey, foundation, comb, and empty</li>
-    <li>Weight</li>
-    <li>Disease</li>
-    <li>Internal temperature</li>
-    <li>Temperament</li>
-</ul>
-
-<h3>Inventory Management</h3>
-
-<p>Keep track of your apiary equipment inventory. This feature helps you plan what is needed for your next visit to the yard. You can track items like:</p>
-
-<ul>
-    <li>Tops</li>
-    <li>Brood boxes</li>
-    <li>Entrance reducers</li>
-    <li>Frames</li>
-    <li>Bottom boards</li>
-    <li>Inner covers</li>
-    <li>Frame feeders</li>
-</ul>
-
-<h3>Seasonal Calendar</h3>
-
-<p>Plan your activities for the season with our integrated calendar. It helps you schedule and manage your tasks effectively.</p>
-
-<p>Explore more features by visiting the following pages:</p>
-
-<a href="/BMaster/Queens">Queens Page</a>
-<a href="/BMaster/yards">Yards Page</a>

@@ -1,135 +1,34 @@
 /* Schema Compare Theme Styles */
-/* Following the Documentation pattern and theme system */
-
-/* Schema Compare Container */
-.schema-compare-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: var(--spacing-medium, 20px);
-    font-family: var(--body-font, 'Verdana, Helvetica, sans-serif');
-    color: var(--text-color, #000000);
-    background-color: var(--background-color, #ffffff);
-}
-
-/* Header Styles */
-.schema-compare-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: var(--spacing-medium, 20px);
-    padding-bottom: var(--spacing-small, 10px);
-    border-bottom: 2px solid var(--border-color, #cccccc);
-}
-
-.schema-compare-header h1 {
-    margin: 0;
-    color: var(--text-color, #000000);
-    font-family: var(--header-font, 'Verdana, Helvetica, sans-serif');
-    font-size: var(--font-size-xlarge, 24px);
-}
-
-.schema-compare-context {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-medium, 20px);
-}
-
-.context-item {
-    color: var(--text-color, #000000);
-    font-size: var(--font-size-small, 14px);
-}
+/* Uses theme variables for proper color inheritance */
+/* Now uses standard apiary-container and apiary-header from base-containers.css */
 
 .refresh-btn {
-    background-color: var(--button-bg, #f2f2f2);
-    color: var(--button-text, #000000);
-    border: 1px solid var(--button-border, #cccccc);
-    padding: 8px 15px;
-    border-radius: 4px;
+    background: rgba(255,255,255,0.2);
+    color: white;
+    border: 2px solid rgba(255,255,255,0.3);
+    padding: 10px 20px;
+    border-radius: 8px;
     cursor: pointer;
-    font-size: var(--font-size-small, 14px);
-    transition: background-color 0.3s;
+    font-size: 0.95rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
 }
 
 .refresh-btn:hover {
-    background-color: var(--button-hover-bg, #e0e0e0);
-}
-
-.intro {
-    color: var(--text-color, #000000);
-    font-size: var(--font-size-base, 16px);
-    margin-bottom: var(--spacing-medium, 20px);
-}
-
-/* Summary Statistics */
-.schema-summary-stats {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: var(--spacing-medium, 20px);
-    margin-bottom: var(--spacing-large, 30px);
-}
-
-.stat-card {
-    display: flex;
-    align-items: center;
-    padding: var(--spacing-medium, 20px);
-    background-color: var(--secondary-color, #f9f9f9);
-    border: 1px solid var(--border-color, #cccccc);
-    border-radius: 8px;
-    transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.stat-card:hover {
+    background: rgba(255,255,255,0.3);
     transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
-.stat-icon {
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-right: var(--spacing-medium, 20px);
-    font-size: var(--font-size-large, 20px);
+/* Intro text styling - inherits from standard container */
+.intro {
+    color: var(--text-color);
+    font-size: 1.1rem;
+    margin-bottom: 30px;
+    line-height: 1.6;
 }
 
-.stat-icon.databases {
-    background-color: var(--primary-color, #ccffff);
-    color: var(--text-color, #000000);
-}
-
-.stat-icon.connected {
-    background-color: var(--success-color, #009900);
-    color: white;
-}
-
-.stat-icon.tables {
-    background-color: var(--accent-color, #FF9900);
-    color: white;
-}
-
-.stat-icon.status {
-    background-color: var(--warning-color, #ff0000);
-    color: white;
-}
-
-.stat-content {
-    display: flex;
-    flex-direction: column;
-}
-
-.stat-label {
-    font-size: var(--font-size-small, 14px);
-    color: var(--text-color, #000000);
-    margin-bottom: 5px;
-}
-
-.stat-number {
-    font-size: var(--font-size-large, 20px);
-    font-weight: bold;
-    color: var(--text-color, #000000);
-}
+/* Dashboard stats now use standard classes from base-containers.css */
 
 /* Debug Information */
 .debug-info {
@@ -280,142 +179,39 @@
     display: block;
 }
 
-/* Table Comparison Cards */
-.table-comparison-card {
-    border: 1px solid var(--border-color, #cccccc);
-    border-radius: 6px;
-    margin-bottom: var(--spacing-medium, 20px);
-    background-color: var(--background-color, #ffffff);
+/* Table Comparison Cards - Now use standard feature-card classes from base-containers.css */
+.table-comparison-card.result-only {
+    border-top-color: var(--accent-color);
 }
 
-.table-comparison-header {
-    padding: var(--spacing-medium, 20px);
-    background-color: var(--table-header-bg, #f2f2f2);
-    border-bottom: 1px solid var(--border-color, #cccccc);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    cursor: pointer;
-}
-
-.table-comparison-header:hover {
-    background-color: var(--nav-hover-bg, rgba(0, 0, 0, 0.1));
-}
-
-.table-comparison-title {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-small, 10px);
-}
-
-.table-comparison-title h4 {
-    margin: 0;
-    color: var(--text-color, #000000);
-}
-
-.table-comparison-actions {
-    display: flex;
-    gap: var(--spacing-small, 10px);
-    align-items: center;
-}
-
-.sync-btn, .create-btn, .batch-sync-btn, .sync-to-result-btn, .sync-to-table-btn {
-    padding: 6px 12px;
-    border: 1px solid var(--button-border, #cccccc);
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: var(--font-size-small, 14px);
-    transition: background-color 0.3s;
-    margin: 2px;
-}
-
-.sync-btn {
-    background-color: var(--success-color, #009900);
-    color: white;
-}
-
-.sync-btn:hover {
-    background-color: #007700;
-}
-
-.create-btn {
-    background-color: var(--accent-color, #FF9900);
-    color: white;
-}
-
-.create-btn:hover {
-    background-color: #e68a00;
-}
-
-.batch-sync-btn {
-    background-color: var(--primary-color, #ccffff);
-    color: var(--text-color, #000000);
-}
-
-.batch-sync-btn:hover {
-    background-color: var(--nav-hover-bg, rgba(0, 0, 0, 0.1));
-}
-
-.sync-to-result-btn {
-    background-color: #007bff;
-    color: white;
-    border-color: #0056b3;
-}
-
-.sync-to-result-btn:hover {
-    background-color: #0056b3;
-}
-
-.sync-to-table-btn {
-    background-color: #6f42c1;
-    color: white;
-    border-color: #5a2d91;
-}
-
-.sync-to-table-btn:hover {
-    background-color: #5a2d91;
-}
+/* Button Styles - Now use standard .btn classes from base-containers.css */
 
 .expand-icon {
     transition: transform 0.3s;
 }
 
+/* Expand icon animation for table comparison cards */
 .table-comparison-card.expanded .expand-icon {
     transform: rotate(90deg);
 }
 
-/* Field Comparison Content */
-.field-comparison-content {
-    display: none;
-}
+/* Field comparison content now uses standard feature-content from base-containers.css */
 
-.field-comparison-content.expanded {
-    display: block;
-}
-
-/* Field Comparison Display */
-.field-comparison-display {
-    padding: var(--spacing-medium, 20px);
-}
-
-.field-comparison-display h5 {
-    margin-top: 0;
-    margin-bottom: var(--spacing-medium, 20px);
-    color: var(--text-color, #000000);
-    font-size: var(--font-size-large, 20px);
-}
+/* Field comparison display now uses standard feature-content styling */
 
 .no-result-file {
     text-align: center;
-    padding: var(--spacing-large, 30px);
-    background-color: var(--secondary-color, #f9f9f9);
-    border: 1px solid var(--border-color, #cccccc);
-    border-radius: 4px;
+    padding: 40px 20px;
+    background: linear-gradient(135deg, var(--background-color) 0%, var(--secondary-color) 100%);
+    border-radius: 8px;
+    border: 2px dashed var(--primary-color);
+    margin: 20px;
 }
 
 .no-result-file p {
-    margin-bottom: var(--spacing-medium, 20px);
-    color: var(--text-color, #000000);
+    margin-bottom: 20px;
+    color: var(--text-color);
+    font-size: 1.1rem;
 }
 
 .field-header-row {
@@ -641,13 +437,14 @@
     background-color: #6c757d;
 }
 
-/* Action Buttons */
+/* Action Buttons - Match Apiary Feature Actions */
 .field-actions {
+    padding: 20px;
+    background: #f8f9fa;
+    border-top: 1px solid #dee2e6;
     display: flex;
-    gap: var(--spacing-small, 10px);
-    margin-top: var(--spacing-medium, 20px);
-    padding-top: var(--spacing-medium, 20px);
-    border-top: 1px solid var(--border-color, #cccccc);
+    gap: 10px;
+    flex-wrap: wrap;
 }
 
 .sync-field-btn {
@@ -708,25 +505,27 @@
     background-color: var(--button-hover-bg, #e0e0e0);
 }
 
-/* Error and No Data Messages */
+/* Error and No Data Messages - Match Apiary Alert Styles */
 .error-message,
 .no-data-message {
-    padding: var(--spacing-medium, 20px);
-    text-align: center;
-    border-radius: 4px;
-    margin: var(--spacing-medium, 20px);
+    padding: 15px 20px;
+    border-radius: 8px;
+    margin: 20px;
+    border-left: 4px solid;
 }
 
 .error-message {
-    background-color: #ffe6e6;
-    border: 1px solid var(--warning-color, #ff0000);
-    color: var(--warning-color, #ff0000);
+    background: #fff3cd;
+    border-left-color: var(--apiary-danger);
+    color: #856404;
 }
 
 .no-data-message {
-    background-color: var(--secondary-color, #f9f9f9);
-    border: 1px solid var(--border-color, #cccccc);
-    color: var(--text-color, #000000);
+    text-align: center;
+    padding: 40px 20px;
+    background: linear-gradient(135deg, var(--apiary-light) 0%, #ffffff 100%);
+    border-radius: 8px;
+    border: 2px dashed var(--apiary-primary);
 }
 
 .error-message h4,
@@ -739,6 +538,62 @@
     margin-right: var(--spacing-small, 10px);
 }
 
+/* Result File Fields Display */
+.result-file-fields-display {
+    padding: var(--spacing-medium, 20px);
+}
+
+.result-file-fields-display h5 {
+    margin-top: 0;
+    margin-bottom: var(--spacing-medium, 20px);
+    color: var(--apiary-dark, #264653);
+    font-size: var(--font-size-large, 20px);
+}
+
+.result-fields-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: var(--spacing-medium, 20px);
+    background-color: var(--background-color, #ffffff);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.result-fields-table th,
+.result-fields-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color, #cccccc);
+    vertical-align: top;
+}
+
+.result-fields-table th {
+    background-color: var(--apiary-primary, #f4a261);
+    color: white;
+    font-weight: bold;
+    position: sticky;
+    top: 0;
+}
+
+.result-fields-table tr:nth-child(even) {
+    background-color: var(--apiary-light, #f1faee);
+}
+
+.result-fields-table tr:hover {
+    background-color: rgba(244, 162, 97, 0.1);
+}
+
+.result-fields-table td strong {
+    color: var(--apiary-dark, #264653);
+}
+
+.field-info {
+    color: var(--apiary-accent);
+    font-style: italic;
+    font-size: 0.9rem;
+}
+
 /* Table Schema Display */
 .table-schema-display {
     padding: var(--spacing-medium, 20px);
@@ -747,7 +602,7 @@
 .table-schema-display h5 {
     margin-top: 0;
     margin-bottom: var(--spacing-medium, 20px);
-    color: var(--text-color, #000000);
+    color: var(--apiary-dark, #264653);
     font-size: var(--font-size-large, 20px);
 }
 
@@ -806,15 +661,25 @@
     color: var(--text-color, #000000);
 }
 
-/* Loading States */
+/* Loading States - Match Apiary Loading Animation */
 .loading-indicator {
     text-align: center;
-    padding: var(--spacing-medium, 20px);
-    color: var(--text-color, #000000);
+    padding: 20px;
+    color: var(--apiary-dark);
+    font-size: 1.1rem;
 }
 
 .loading-indicator i {
-    margin-right: var(--spacing-small, 10px);
+    margin-right: 10px;
+    color: var(--apiary-primary);
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Animation for loading states */
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
 }
 
 /* Responsive Design */

@@ -1,0 +1,536 @@
+[% META title = 'New Hive Inspection' %]
+
+<div class="apiary-container">
+    <!-- Header Section -->
+    <header class="apiary-header">
+        <h1><i class="fas fa-search"></i> New Hive Inspection</h1>
+        <div class="apiary-context">
+            <span class="context-item"><strong>Date:</strong> [% inspection_date || 'Today' %]</span>
+            <span class="context-item"><strong>Inspector:</strong> [% c.user.username || 'Current User' %]</span>
+            <span class="context-item"><strong>Weather:</strong> <span id="weather-display">Loading...</span></span>
+            <span class="context-item status-active">New Record</span>
+        </div>
+    </header>
+
+    <!-- Inspection Form -->
+    <form id="inspection-form" method="POST" action="[% c.uri_for('/Apiary/inspections/create') %]">
+        
+        <div class="feature-grid">
+            
+            <!-- Basic Inspection Information -->
+            <div class="feature-card">
+                <div class="feature-header">
+                    <h3><i class="fas fa-info-circle feature-icon"></i>Basic Inspection Information</h3>
+                </div>
+                <div class="feature-content">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="inspection_date">Inspection Date *</label>
+                            <input type="date" class="form-input" id="inspection_date" name="inspection_date" 
+                                   value="[% inspection_date || '' %]" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="inspection_type">Inspection Type *</label>
+                            <select class="form-input" id="inspection_type" name="inspection_type" required>
+                                <option value="">Select Type</option>
+                                <option value="routine">Routine Inspection</option>
+                                <option value="disease_check">Disease Check</option>
+                                <option value="harvest">Harvest Inspection</option>
+                                <option value="treatment">Treatment Application</option>
+                                <option value="emergency">Emergency Assessment</option>
+                                <option value="queen_check">Queen Status Check</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="start_time">Start Time</label>
+                            <input type="time" class="form-input" id="start_time" name="start_time">
+                        </div>
+                        <div class="form-group">
+                            <label for="end_time">End Time</label>
+                            <input type="time" class="form-input" id="end_time" name="end_time">
+                        </div>
+                        <div class="form-group">
+                            <label for="temperature">Temperature (°C)</label>
+                            <input type="number" class="form-input" id="temperature" name="temperature" 
+                                   step="0.1" min="-20" max="50">
+                        </div>
+                        <div class="form-group">
+                            <label for="weather_conditions">Weather Conditions</label>
+                            <select class="form-input" id="weather_conditions" name="weather_conditions">
+                                <option value="">Select Weather</option>
+                                <option value="sunny">Sunny</option>
+                                <option value="partly_cloudy">Partly Cloudy</option>
+                                <option value="cloudy">Cloudy</option>
+                                <option value="light_rain">Light Rain</option>
+                                <option value="heavy_rain">Heavy Rain</option>
+                                <option value="windy">Windy</option>
+                                <option value="cold">Cold</option>
+                                <option value="hot">Hot</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Queen Selection -->
+            <div class="feature-card">
+                <div class="feature-header">
+                    <h3><i class="fas fa-crown feature-icon"></i>Queen Selection & Location</h3>
+                </div>
+                <div class="feature-content">
+                    <div class="form-group">
+                        <label for="queen_search">Search for Queen *</label>
+                        <div class="search-input-group">
+                            <input type="text" class="form-input" id="queen_search" 
+                                   placeholder="Enter queen tag number, yard name, or pallet code...">
+                            <button class="btn btn-primary" type="button" id="search_queen_btn">
+                                <i class="fas fa-search"></i> Search
+                            </button>
+                        </div>
+                        <input type="hidden" id="queen_id" name="queen_id" required>
+                    </div>
+                    
+                    <!-- Queen Search Results -->
+                    <div id="queen_search_results" class="search-results" style="display: none;">
+                        <h4>Search Results:</h4>
+                        <div id="queen_results_list"></div>
+                    </div>
+                    
+                    <!-- Selected Queen Display -->
+                    <div id="selected_queen_display" class="selected-display" style="display: none;">
+                        <div class="alert alert-info">
+                            <h4><i class="fas fa-crown"></i> Selected Queen</h4>
+                            <div id="queen_details"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Current Hive Configuration -->
+                    <div id="hive_configuration_display" class="config-display" style="display: none;">
+                        <h4><i class="fas fa-layer-group"></i> Current Hive Configuration</h4>
+                        <div id="configuration_details"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Queen Assessment -->
+            <div class="feature-card">
+                <div class="feature-header">
+                    <h3><i class="fas fa-check-circle feature-icon"></i>Queen Assessment</h3>
+                </div>
+                <div class="feature-content">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Queen Status</label>
+                            <div class="checkbox-group">
+                                <div class="form-check">
+                                    <input class="form-checkbox" type="checkbox" id="queen_seen" name="queen_seen" value="1">
+                                    <label class="checkbox-label" for="queen_seen">Queen Seen</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-checkbox" type="checkbox" id="queen_marked" name="queen_marked" value="1">
+                                    <label class="checkbox-label" for="queen_marked">Queen Marked</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Brood Evidence</label>
+                            <div class="checkbox-group">
+                                <div class="form-check">
+                                    <input class="form-checkbox" type="checkbox" id="eggs_seen" name="eggs_seen" value="1">
+                                    <label class="checkbox-label" for="eggs_seen">Eggs Seen</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-checkbox" type="checkbox" id="larvae_seen" name="larvae_seen" value="1">
+                                    <label class="checkbox-label" for="larvae_seen">Larvae Seen</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-checkbox" type="checkbox" id="capped_brood_seen" name="capped_brood_seen" value="1">
+                                    <label class="checkbox-label" for="capped_brood_seen">Capped Brood Seen</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="supersedure_cells">Supersedure Cells</label>
+                            <input type="number" class="form-input" id="supersedure_cells" name="supersedure_cells" 
+                                   min="0" max="50" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="swarm_cells">Swarm Cells</label>
+                            <input type="number" class="form-input" id="swarm_cells" name="swarm_cells" 
+                                   min="0" max="50" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="queen_cells">Other Queen Cells</label>
+                            <input type="number" class="form-input" id="queen_cells" name="queen_cells" 
+                                   min="0" max="50" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="population_estimate">Population Estimate</label>
+                            <select class="form-input" id="population_estimate" name="population_estimate">
+                                <option value="">Select Population</option>
+                                <option value="very_weak">Very Weak (1-2 frames)</option>
+                                <option value="weak">Weak (3-4 frames)</option>
+                                <option value="moderate">Moderate (5-7 frames)</option>
+                                <option value="strong">Strong (8-12 frames)</option>
+                                <option value="very_strong">Very Strong (13+ frames)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="temperament">Temperament</label>
+                            <select class="form-input" id="temperament" name="temperament">
+                                <option value="calm">Calm</option>
+                                <option value="moderate">Moderate</option>
+                                <option value="aggressive">Aggressive</option>
+                                <option value="very_aggressive">Very Aggressive</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Box-by-Box Inspection -->
+            <div class="feature-card">
+                <div class="feature-header">
+                    <h3><i class="fas fa-layer-group feature-icon"></i>Box-by-Box Inspection</h3>
+                </div>
+                <div class="feature-content">
+                    <div id="box_inspection_container">
+                        <p class="info-text">Select a queen first to load the hive configuration for detailed inspection.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Overall Assessment -->
+            <div class="feature-card">
+                <div class="feature-header">
+                    <h3><i class="fas fa-clipboard-check feature-icon"></i>Overall Assessment & Notes</h3>
+                </div>
+                <div class="feature-content">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="overall_status">Overall Status *</label>
+                            <select class="form-input" id="overall_status" name="overall_status" required>
+                                <option value="">Select Status</option>
+                                <option value="excellent">Excellent</option>
+                                <option value="good" selected>Good</option>
+                                <option value="fair">Fair</option>
+                                <option value="poor">Poor</option>
+                                <option value="critical">Critical</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="next_inspection_date">Next Inspection Date</label>
+                            <input type="date" class="form-input" id="next_inspection_date" name="next_inspection_date">
+                        </div>
+                        <div class="form-group">
+                            <label for="general_notes">General Notes</label>
+                            <textarea class="form-input" id="general_notes" name="general_notes" rows="4" 
+                                      placeholder="Record any observations, concerns, or notable findings..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="action_required">Action Required</label>
+                            <textarea class="form-input" id="action_required" name="action_required" rows="3" 
+                                      placeholder="List any actions that need to be taken based on this inspection..."></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Form Actions -->
+        <div class="feature-actions">
+            <button type="button" class="btn btn-secondary" onclick="window.history.back()">
+                <i class="fas fa-arrow-left"></i> Cancel
+            </button>
+            <button type="button" class="btn btn-info" id="save_draft_btn">
+                <i class="fas fa-save"></i> Save Draft
+            </button>
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-check"></i> Complete Inspection
+            </button>
+        </div>
+
+    </form>
+</div>
+
+<!-- Include the JavaScript for form functionality -->
+<script>
+// Form functionality
+document.addEventListener('DOMContentLoaded', function() {
+    // Queen search functionality
+    const queenSearchInput = document.getElementById('queen_search');
+    const searchButton = document.getElementById('search_queen_btn');
+    const resultsDiv = document.getElementById('queen_search_results');
+    const resultsList = document.getElementById('queen_results_list');
+    const selectedQueenDiv = document.getElementById('selected_queen_display');
+    const queenDetailsDiv = document.getElementById('queen_details');
+    const hiveConfigDiv = document.getElementById('hive_configuration_display');
+    const configDetailsDiv = document.getElementById('configuration_details');
+    const queenIdInput = document.getElementById('queen_id');
+
+    // Search for queens
+    function searchQueens() {
+        const query = queenSearchInput.value.trim();
+        if (query.length < 2) {
+            alert('Please enter at least 2 characters to search');
+            return;
+        }
+
+        // Mock search results (replace with actual AJAX call)
+        const mockResults = [
+            {
+                id: 1,
+                tag_number: 'Q2024-001',
+                status: 'laying_well',
+                yard_name: 'Main Yard',
+                pallet_code: 'P001',
+                position: 1,
+                hive_type: 'single',
+                box_count: 2,
+                frame_count: 18
+            },
+            {
+                id: 2,
+                tag_number: 'Q2024-002',
+                status: 'laying_poor',
+                yard_name: 'North Yard',
+                pallet_code: 'P002',
+                position: 3,
+                hive_type: 'main',
+                box_count: 3,
+                frame_count: 30
+            }
+        ];
+
+        // Filter results based on query
+        const filteredResults = mockResults.filter(queen => 
+            queen.tag_number.toLowerCase().includes(query.toLowerCase()) ||
+            queen.yard_name.toLowerCase().includes(query.toLowerCase()) ||
+            queen.pallet_code.toLowerCase().includes(query.toLowerCase())
+        );
+
+        displaySearchResults(filteredResults);
+    }
+
+    // Display search results
+    function displaySearchResults(results) {
+        if (results.length === 0) {
+            resultsList.innerHTML = '<div class="alert alert-warning">No queens found matching your search.</div>';
+        } else {
+            let html = '';
+            results.forEach(queen => {
+                html += `
+                    <div class="feature-card queen-result" data-queen-id="${queen.id}">
+                        <div class="feature-content">
+                            <div class="queen-result-info">
+                                <h4>${queen.tag_number}</h4>
+                                <p>
+                                    ${queen.yard_name} - ${queen.pallet_code} - Position ${queen.position}<br>
+                                    Status: ${queen.status.replace('_', ' ').toUpperCase()} | 
+                                    Type: ${queen.hive_type} | 
+                                    Boxes: ${queen.box_count} | 
+                                    Frames: ${queen.frame_count}
+                                </p>
+                                <button type="button" class="btn btn-primary select-queen-btn" data-queen-id="${queen.id}">
+                                    <i class="fas fa-check"></i> Select
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            resultsList.innerHTML = html;
+
+            // Add click handlers for select buttons
+            document.querySelectorAll('.select-queen-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const queenId = this.getAttribute('data-queen-id');
+                    selectQueen(queenId);
+                });
+            });
+        }
+        resultsDiv.style.display = 'block';
+    }
+
+    // Select a queen
+    function selectQueen(queenId) {
+        // Mock queen details (replace with actual AJAX call)
+        const mockQueen = {
+            id: queenId,
+            tag_number: `Q2024-00${queenId}`,
+            status: 'laying_well',
+            yard_name: 'Main Yard',
+            pallet_code: 'P001',
+            position: 1,
+            hive_type: 'single',
+            box_count: 2,
+            frame_count: 18,
+            color: 'Blue',
+            laying_status: 'laying_well'
+        };
+
+        const mockConfiguration = {
+            boxes: [
+                {
+                    id: 1,
+                    position: 1,
+                    type: 'brood',
+                    frame_count: 10,
+                    frames: Array.from({length: 10}, (_, i) => ({position: i+1, type: 'brood'}))
+                },
+                {
+                    id: 2,
+                    position: 2,
+                    type: 'honey',
+                    frame_count: 8,
+                    frames: Array.from({length: 8}, (_, i) => ({position: i+1, type: 'honey'}))
+                }
+            ]
+        };
+
+        // Update form
+        queenIdInput.value = queenId;
+        
+        // Display selected queen
+        queenDetailsDiv.innerHTML = `
+            <div class="queen-details-grid">
+                <div>
+                    <strong>Tag:</strong> ${mockQueen.tag_number}<br>
+                    <strong>Status:</strong> ${mockQueen.laying_status.replace('_', ' ').toUpperCase()}<br>
+                    <strong>Color:</strong> ${mockQueen.color}
+                </div>
+                <div>
+                    <strong>Location:</strong> ${mockQueen.yard_name} - ${mockQueen.pallet_code}<br>
+                    <strong>Position:</strong> ${mockQueen.position}<br>
+                    <strong>Type:</strong> ${mockQueen.hive_type}
+                </div>
+            </div>
+        `;
+        
+        // Display configuration
+        let configHtml = '<div class="config-grid">';
+        mockConfiguration.boxes.forEach(box => {
+            configHtml += `
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <h4>Box ${box.position} - ${box.type.toUpperCase()}</h4>
+                    </div>
+                    <div class="feature-content">
+                        <p><strong>Frames:</strong> ${box.frame_count}</p>
+                        <div class="frame-grid">
+                            ${box.frames.map(frame => 
+                                `<span class="frame-badge">${frame.position}</span>`
+                            ).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        configHtml += '</div>';
+        configDetailsDiv.innerHTML = configHtml;
+        
+        // Show the displays
+        selectedQueenDiv.style.display = 'block';
+        hiveConfigDiv.style.display = 'block';
+        resultsDiv.style.display = 'none';
+        
+        // Clear search
+        queenSearchInput.value = '';
+        
+        // Load box inspection interface
+        loadBoxInspectionInterface(mockConfiguration);
+    }
+
+    // Load box inspection interface
+    function loadBoxInspectionInterface(configuration) {
+        const container = document.getElementById('box_inspection_container');
+        let html = '';
+        
+        configuration.boxes.forEach(box => {
+            html += `
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <h4>Box ${box.position} - ${box.type.toUpperCase()} (${box.frame_count} frames)</h4>
+                    </div>
+                    <div class="feature-content">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Brood Pattern</label>
+                                <select class="form-input" name="box_${box.id}_brood_pattern">
+                                    <option value="">Select Pattern</option>
+                                    <option value="excellent">Excellent</option>
+                                    <option value="good">Good</option>
+                                    <option value="spotty">Spotty</option>
+                                    <option value="poor">Poor</option>
+                                    <option value="none">No Brood</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Honey Stores</label>
+                                <select class="form-input" name="box_${box.id}_honey_stores">
+                                    <option value="">Select Level</option>
+                                    <option value="full">Full</option>
+                                    <option value="good">Good</option>
+                                    <option value="moderate">Moderate</option>
+                                    <option value="low">Low</option>
+                                    <option value="empty">Empty</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Box Notes</label>
+                                <textarea class="form-input" name="box_${box.id}_notes" rows="2" 
+                                          placeholder="Notes for Box ${box.position}..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html;
+    }
+
+    // Event listeners
+    searchButton.addEventListener('click', searchQueens);
+    queenSearchInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            searchQueens();
+        }
+    });
+
+    // Auto-save functionality
+    let autoSaveTimer;
+    const formInputs = document.querySelectorAll('#inspection-form input, #inspection-form select, #inspection-form textarea');
+    
+    formInputs.forEach(input => {
+        input.addEventListener('change', function() {
+            clearTimeout(autoSaveTimer);
+            autoSaveTimer = setTimeout(autoSave, 2000); // Auto-save after 2 seconds of inactivity
+        });
+    });
+
+    function autoSave() {
+        // Implement auto-save functionality
+        console.log('Auto-saving inspection data...');
+        // You can implement localStorage or AJAX save here
+    }
+
+    // Save draft button
+    document.getElementById('save_draft_btn').addEventListener('click', function() {
+        // Implement save draft functionality
+        alert('Draft saved successfully!');
+    });
+
+    // Form validation
+    document.getElementById('inspection-form').addEventListener('submit', function(e) {
+        const queenId = document.getElementById('queen_id').value;
+        if (!queenId) {
+            e.preventDefault();
+            alert('Please select a queen before submitting the inspection.');
+            return false;
+        }
+    });
+});
+</script>

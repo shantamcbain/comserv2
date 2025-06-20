@@ -5,8 +5,14 @@
 
 [% META title = 'Theme System Documentation' %]
 
-<div class="documentation-container">
-    <h1>Theme System Documentation</h1>
+<div class="apiary-container">
+    <header class="apiary-header">
+        <h1><i class="fas fa-palette"></i> Theme System Documentation</h1>
+        <div class="apiary-context">
+            <span class="context-item"><strong>Category:</strong> System Documentation</span>
+            <span class="context-item"><strong>Type:</strong> Technical Guide</span>
+        </div>
+    </header>
     
     <div class="toc">
         <h2>Table of Contents</h2>
@@ -230,42 +236,4 @@
     </section>
 </div>
 
-<style>
-    .documentation-container {
-        max-width: 900px;
-        margin: 0 auto;
-        padding: 20px;
-    }
-    
-    .toc {
-        background-color: #f8f9fa;
-        padding: 15px;
-        border-radius: 5px;
-        margin-bottom: 30px;
-    }
-    
-    .toc ul {
-        list-style-type: none;
-        padding-left: 20px;
-    }
-    
-    section {
-        margin-bottom: 40px;
-    }
-    
-    pre {
-        background-color: #f5f5f5;
-        padding: 15px;
-        border-radius: 5px;
-        overflow-x: auto;
-    }
-    
-    dt {
-        font-weight: bold;
-        margin-top: 15px;
-    }
-    
-    dd {
-        margin-left: 20px;
-    }
-</style>
+<!-- Now uses standard apiary-container styles from base-containers.css -->
