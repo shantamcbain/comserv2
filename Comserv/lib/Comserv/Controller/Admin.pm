@@ -4845,7 +4845,7 @@ sub check_csc_admin_access {
     return 0;
 }
 
-# Check if we're on the install branch for dangerous operations
+# Check if we're on an allowed branch for upgrade operations
 sub check_install_branch {
     my ($self, $c) = @_;
     
@@ -4856,7 +4856,9 @@ sub check_install_branch {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_install_branch',
             "Current git branch: $current_branch");
         
-        return $current_branch eq 'install';
+        # Allow both 'install' and 'master' branches for upgrade operations
+        # This enables web-based upgrades without requiring SSH access to switch branches
+        return ($current_branch eq 'install' || $current_branch eq 'master' || $current_branch eq 'main');
     } catch {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'check_install_branch',
             "Could not determine git branch: $_");
@@ -4881,9 +4883,9 @@ sub start_dev_server :Path('/admin/start_dev_server') :Args(0) {
         return;
     }
     
-    # Check if we're on install branch
+    # Check if we're on an allowed branch
     unless ($self->check_install_branch($c)) {
-        $c->flash->{error_msg} = "Development server can only be started from the install branch for security reasons.";
+        $c->flash->{error_msg} = "Development server can only be started from the install, master, or main branches for security reasons.";
         $c->response->redirect($c->uri_for('/admin'));
         return;
     }
@@ -5021,9 +5023,9 @@ sub restart_starman :Path('/admin/restart_starman') :Args(0) {
         return;
     }
     
-    # Check if we're on install branch for production restart
+    # Check if we're on an allowed branch for production restart
     unless ($self->check_install_branch($c)) {
-        $c->flash->{error_msg} = "Starman server can only be restarted from the install branch for security reasons.";
+        $c->flash->{error_msg} = "Starman server can only be restarted from the install, master, or main branches for security reasons.";
         $c->response->redirect($c->uri_for('/admin'));
         return;
     }
@@ -5266,9 +5268,9 @@ sub software_upgrade :Path('/admin/software_upgrade') :Args(0) {
         return;
     }
     
-    # Check if we're on install branch for production upgrades
+    # Check if we're on an allowed branch for production upgrades
     unless ($self->check_install_branch($c)) {
-        $c->flash->{error_msg} = "Software upgrades can only be performed from the install branch for security reasons.";
+        $c->flash->{error_msg} = "Software upgrades can only be performed from the install, master, or main branches for security reasons.";
         $c->response->redirect($c->uri_for('/admin'));
         return;
     }

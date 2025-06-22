@@ -26,7 +26,7 @@
         <div class="status-grid">
             <div class="status-item">
                 <label>Git Branch:</label>
-                <span class="status-value [% system_status.git_branch == 'install' ? 'status-good' : 'status-warning' %]">
+                <span class="status-value [% system_status.git_branch == 'install' || system_status.git_branch == 'master' || system_status.git_branch == 'main' ? 'status-good' : 'status-warning' %]">
                     [% system_status.git_branch %]
                 </span>
             </div>
