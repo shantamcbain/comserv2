@@ -1,0 +1,316 @@
+/* Documentation System - Universal Container Integration */
+/* Uses base-containers.css universal system for consistency */
+
+/* Documentation Container - uses universal apiary-container */
+.documentation-container {
+    /* Inherits from .apiary-container in base-containers.css */
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+    background: linear-gradient(135deg, var(--background-color) 0%);
+    min-height: calc(100vh - 200px);
+    font-family: var(--body-font);
+}
+
+/* Documentation Header - uses universal apiary-header */
+.documentation-header {
+    /* Inherits from .apiary-header in base-containers.css */
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    color: var(--text-color);
+    padding: 30px;
+    border-radius: 12px;
+    margin-bottom: 30px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.documentation-header h1 {
+    margin: 0 0 15px 0;
+    font-size: 2.5rem;
+    font-weight: 700;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    color: var(--text-color);
+}
+
+/* Documentation Sections - uses universal feature-card */
+.documentation-section, .doc-section {
+    /* Inherits from .feature-card in base-containers.css */
+    background: var(--background-color);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border-top: 4px solid var(--primary-color);
+    margin-bottom: 20px;
+}
+
+.documentation-section:hover, .doc-section:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+/* Section Headers - uses universal feature-header */
+.section-toggle {
+    /* Inherits from .feature-header in base-containers.css */
+    background: linear-gradient(135deg, var(--table-header-bg) 0%);
+    padding: 20px;
+    border-bottom: 1px solid var(--border-color);
+    margin: 0;
+    color: var(--text-color);
+    font-size: 1.3rem;
+    cursor: pointer;
+    position: relative;
+    padding-right: 50px;
+}
+
+.section-toggle::after {
+    content: "▼";
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.8em;
+    color: var(--accent-color);
+    transition: transform 0.3s;
+}
+
+.section-toggle.expanded::after {
+    transform: translateY(-50%) rotate(180deg);
+}
+
+/* Section Content - uses universal feature-content */
+.section-content, .section-grid {
+    /* Inherits from .feature-content in base-containers.css */
+    padding: 20px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.5s ease;
+}
+
+.section-content.expanded, .section-grid.expanded {
+    max-height: 5000px;
+    overflow: visible;
+}
+
+/* Documentation Cards - uses universal info-card/admin-card */
+.documentation-card, .doc-card {
+    /* Inherits from .info-card in base-containers.css */
+    background: var(--background-color);
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    text-decoration: none;
+    color: var(--text-color);
+    display: block;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border-left: 4px solid var(--primary-color);
+}
+
+.documentation-card:hover, .doc-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.documentation-card h3, .doc-card h3 {
+    color: var(--text-color);
+    margin: 0 0 15px 0;
+    font-size: 1.3rem;
+}
+
+.documentation-card p, .doc-card p {
+    color: var(--text-color);
+    margin: 0 0 15px 0;
+    line-height: 1.6;
+}
+
+/* User Context - uses universal apiary-context */
+.user-context {
+    /* Inherits from .apiary-context in base-containers.css */
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    font-size: 1rem;
+    background: var(--table-header-bg);
+    padding: 15px 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.context-item {
+    /* Inherits from .context-item in base-containers.css */
+    background: rgba(255,255,255,0.2);
+    padding: 8px 15px;
+    border-radius: 20px;
+    backdrop-filter: blur(10px);
+    color: var(--text-color);
+}
+
+/* Buttons - uses universal btn classes */
+.refresh-button, .debug-button, .config-button, .debug-mode-button {
+    /* Inherits from .btn in base-containers.css */
+    display: inline-flex;
+    align-items: center;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    font-size: 0.95rem;
+    margin-right: 10px;
+}
+
+.refresh-button {
+    background: var(--primary-color);
+    color: var(--text-color);
+}
+
+.debug-button {
+    background: var(--warning-color);
+    color: var(--text-color);
+}
+
+.config-button {
+    background: var(--success-color);
+    color: white;
+}
+
+.debug-mode-button {
+    background: var(--secondary-color);
+    color: var(--text-color);
+}
+
+/* Badges - simple and consistent */
+.site-badge, .file-type-badge, .role-badge, .admin-badge, .developer-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75em;
+    margin: 0 5px 5px 0;
+    color: white;
+    font-weight: 500;
+}
+
+.site-badge { background: var(--accent-color); }
+.file-type-badge.template { background: var(--success-color); }
+.file-type-badge.markdown { background: var(--link-color); }
+.file-type-badge.other { background: var(--secondary-color); color: var(--text-color); }
+.role-badge, .admin-badge { background: var(--warning-color); }
+.developer-badge { background: var(--primary-color); }
+
+/* Lists - uses universal styling */
+.documentation-list, .recent-updates, .update-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.documentation-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 15px;
+}
+
+.documentation-list li {
+    background: var(--background-color);
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border-left: 4px solid var(--accent-color);
+    transition: transform 0.2s ease;
+}
+
+.documentation-list li:hover {
+    transform: translateY(-2px);
+}
+
+.documentation-list a {
+    text-decoration: none;
+    color: var(--text-color);
+    display: block;
+}
+
+/* Status Messages - uses universal alert */
+.status-message {
+    /* Inherits from .alert in base-containers.css */
+    padding: 15px 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border-left: 4px solid;
+    display: flex;
+    align-items: center;
+}
+
+.status-message.success {
+    background: #e6f7e6;
+    border-left-color: var(--success-color);
+    color: #2e7d32;
+}
+
+.status-message i {
+    margin-right: 10px;
+    font-size: 1.1em;
+}
+
+/* Debug Messages - uses universal debug styles */
+.debug-messages {
+    /* Inherits from .debug-messages in base-containers.css */
+    background: var(--table-header-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+    font-family: monospace;
+    border-left: 4px solid var(--warning-color);
+}
+
+.debug-messages h3 {
+    margin: 0 0 10px 0;
+    color: var(--warning-color);
+    font-size: 1.2rem;
+}
+
+/* Utility Classes */
+.label {
+    font-weight: bold;
+    margin-right: 5px;
+    color: var(--text-color);
+}
+
+.value {
+    color: var(--accent-color);
+    font-weight: bold;
+}
+
+.no-docs, .no-content {
+    color: var(--text-color);
+    font-style: italic;
+    padding: 20px;
+    text-align: center;
+    background: var(--table-header-bg);
+    border-radius: 8px;
+    border: 2px dashed var(--border-color);
+}
+
+/* Mobile Responsiveness - inherits from base-containers.css */
+@media (max-width: 768px) {
+    .documentation-container {
+        padding: 15px;
+    }
+    
+    .section-content, .section-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .documentation-list {
+        grid-template-columns: 1fr;
+    }
+    
+    .user-context {
+        flex-direction: column;
+        gap: 10px;
+    }
+}

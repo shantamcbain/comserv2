@@ -10,8 +10,8 @@
 
 
 
-<!-- Include documentation CSS -->
-<link rel="stylesheet" href="/static/css/documentation.css">
+
+<!-- Documentation CSS is now included in the theme system -->
 
 <div class="markdown-content">
 

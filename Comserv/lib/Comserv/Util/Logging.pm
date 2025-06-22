@@ -243,6 +243,7 @@ sub log_error {
 
 # Log a message to a file (defaults to the global log file)
 sub log_to_file {
+    my $self = shift if ref($_[0]); # Handle both instance and class method calls
     my ($message, $file_path, $level) = @_;
     
     # CRITICAL FIX: Ensure we always use a proper log file path

@@ -11,5 +11,8 @@
   --table-header-bg: #f2f2f2;
   --text-color: #000000;
   --warning-color: #f39c12;
+  
+  /* Documentation uses universal container system */
+  --body-font: Arial, sans-serif;
 }
 
