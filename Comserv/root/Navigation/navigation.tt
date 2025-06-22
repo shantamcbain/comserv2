@@ -15,11 +15,6 @@
 
     [% IF is_admin %]
         [% INCLUDE 'Navigation/admintopmenu.tt' %]
-    [% ELSE %]
-        <!-- Admin link for non-admin users - authentication handled by controller -->
-        <li class="horizontal-dropdown">
-            <a href="/admin" class="dropbtn"><i class="icon-admin"></i>Admin</a>
-        </li>
     [% END %]
 
     [% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]

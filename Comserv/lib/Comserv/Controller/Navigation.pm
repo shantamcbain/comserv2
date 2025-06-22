@@ -221,6 +221,25 @@ sub populate_navigation_data {
         my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
         $c->log->debug("Populating navigation data for site: $site_name");
         
+        # Set is_admin flag based on user roles
+        my $is_admin = 0;
+        if ($c->user_exists && $c->session->{roles}) {
+            if (ref($c->session->{roles}) eq 'ARRAY') {
+                $is_admin = grep { lc($_) eq 'admin' } @{$c->session->{roles}};
+            } elsif (!ref($c->session->{roles})) {
+                $is_admin = ($c->session->{roles} =~ /\badmin\b/i) ? 1 : 0;
+            }
+        }
+        
+        # Also check the legacy group field
+        if (!$is_admin && $c->session->{group} && lc($c->session->{group}) eq 'admin') {
+            $is_admin = 1;
+        }
+        
+        # Set the is_admin flag in stash for use in templates
+        $c->stash->{is_admin} = $is_admin;
+        $c->log->debug("Set is_admin flag to: " . ($is_admin ? 'true' : 'false'));
+        
         # Ensure tables exist before querying them
         my $db_model = $c->model('DBEncy');
         my $schema = $db_model->schema;
@@ -298,8 +317,8 @@ sub populate_navigation_data {
         # Populate hosted links
         $c->stash->{hosted_links} = $self->get_internal_links($c, 'Hosted_link', $site_name);
         
-        # Populate admin links and pages
-        if ($c->session->{group} && $c->session->{group} eq 'admin') {
+        # Populate admin links and pages only for admin users
+        if ($is_admin) {
             $c->stash->{admin_pages} = $self->get_admin_pages($c, $site_name);
             $c->stash->{admin_links} = $self->get_admin_links($c, $site_name);
         }
