@@ -47,27 +47,7 @@
 
 
 
-    <!-- Main Menu -->
-    <nav>
-        <ul class="horizontal-menu">
-            <li class="horizontal-dropdown">
-                <a href="[% c.session.return_url %]" class="dropbtn">Back</a>
-            </li>
-        [% INCLUDE 'Navigation/TopDropListMain.tt' %]
-        [% INCLUDE 'Navigation/TopDropListLogin.tt' %]
-        [% INCLUDE 'Navigation/TopDropListGlobal.tt' %]
-        [% INCLUDE 'Navigation/TopDropListHosted.tt' %]
-        [% INCLUDE 'Navigation/TopDropListMember.tt' %]
-        [% INCLUDE 'Navigation/TopDropListIT.tt' %]
-        <!-- TopDropListCoop.tt has been removed and merged into admintopmenu.tt -->
-
-        [% IF is_admin %]
-            [% INCLUDE 'Navigation/admintopmenu.tt' %]
-        [% END %]
-
-        [% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]
-        </ul>
-    </nav>
+    [% INCLUDE 'Navigation/navigation.tt' %]
 </header>
 [% IF error_msg %]<div class="alert error">[% error_msg %]</div>[% END %]
 [% IF success_msg %]<div class="alert success">[% success_msg %]</div>[% END %]

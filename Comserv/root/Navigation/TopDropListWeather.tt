@@ -1,0 +1,79 @@
+[% PageVersion = 'Navigation/TopDropListWeather.tt,v 0.01 2025/01/15 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [%# PageVersion %]
+    [%# "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+    [%# /Navigation/TopDropListWeather.tt %]
+[%# 	$Id: TopDropListWeather.tt,v 0.01 2025/01/15 06:33:25 shanta Exp shanta $	%]
+
+ <!-- Start /Navigation/TopDropListWeather.tt-->
+         <li class="horizontal-dropdown">
+                <a href="/Weather" class="dropbtn"><i class="icon-weather"></i>Weather</a>
+                <div class="dropdown-content">
+                    <a href="/Weather" onclick="activateSite('Weather Dashboard')"><i class="icon-dashboard"></i>Dashboard</a>
+                    <a href="/Weather/current" onclick="activateSite('Current Weather')"><i class="icon-thermometer"></i>Current Weather</a>
+                    <a href="/Weather/forecast" onclick="activateSite('Weather Forecast')"><i class="icon-forecast"></i>5-Day Forecast</a>
+                    <a href="/Weather/configuration" onclick="activateSite('Weather Configuration')"><i class="icon-config"></i>Configuration</a>
+                    
+                    <!-- Weather Tools Submenu -->
+                    <div class="submenu-item">
+                        <span class="submenu-header"><i class="icon-tools"></i>Weather Tools</span>
+                        <div class="submenu">
+                            <a href="/Weather/alerts" onclick="activateSite('Weather Alerts')">Weather Alerts</a>
+                            <a href="/Weather/history" onclick="activateSite('Weather History')">Historical Data</a>
+                            <a href="/Weather/export" onclick="activateSite('Weather Export')">Export Data</a>
+                        </div>
+                    </div>
+                    
+                    <!-- Admin Weather Options -->
+                    [% IF c.session.group == 'admin' %]
+                    <div class="submenu-item">
+                        <span class="submenu-header"><i class="icon-admin"></i>Admin</span>
+                        <div class="submenu">
+                            <a href="/Weather/admin" onclick="activateSite('Weather Admin')">Weather Admin</a>
+                            <a href="/Weather/api_settings" onclick="activateSite('API Settings')">API Settings</a>
+                            <a href="/Weather/maintenance" onclick="activateSite('Weather Maintenance')">Maintenance</a>
+                        </div>
+                    </div>
+                    [% END %]
+                    
+                    <ul>
+                        <!-- populate from Page_tb for weather pages -->
+                        [% IF weather_pages.defined %]
+                            [% FOREACH link IN weather_pages %]
+                                <a href="&amp;page=[% link.page_code %]" name="Weather" target="[% link.target %]"
+                                   title=" [% link.view_name %] "><font class="LeftSideBarNavStyle">[% link.view_name %]</font></a>
+                                [% IF c.session.group == 'admin' %]
+                                   <a href="/edit_link?link_id=[% link.record_id %]">Edit/Delete</a>
+                                [% END %]
+                            [% END %]
+                        [% END %]
+                        
+                        <!-- populate from links_tb for weather links -->
+                        [% IF weather_links.defined %]
+                            [% FOREACH link IN weather_links %]
+                                <a href="[% link.url %]?site=[% SiteName %]&amp;[% link.view_name %]" name="Weather" target="[% link.target %]" title=" [% link.name %] "><font class="LeftSideBarNavStyle">[% link.name %]</font></a>
+                                [% IF c.session.group == 'admin' %]
+                                   <a href="/edit_link/[% link.record_id %]">Edit/Delete</a>
+                                [% END %]
+                            [% END %]
+                        [% END %]
+                    </ul>
+                    
+                    <!-- Weather module specific links -->
+                    [% IF c.session.weather_links.defined AND c.session.weather_links.size %]
+                        [% FOREACH link IN c.session.weather_links %]
+                            <a href="[% link.url %]">[% link.name %]</a>
+                            [% IF c.session.group == 'admin' %]
+                                <a href="/edit_link?link_id=[% link.id %]">Edit/Delete</a>
+                            [% END %]
+                        [% END %]
+                    [% END %]
+                    
+                    [% IF c.session.group == 'admin' %]
+                        <a href="/add_link?menu=weather">Add Weather Link</a>
+                    [% END %]
+                </div>
+        </li>
+      <!-- End /Navigation/TopDropListWeather.tt -->

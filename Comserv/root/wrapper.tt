@@ -84,9 +84,7 @@
         </div>
     </header>
     
-    <nav>
-        [% INCLUDE 'navigation.tt' %]
-    </nav>
+    [% INCLUDE 'pagetop.tt' %]
     
     <!-- Use container or container-fluid based on template needs -->
     [% IF use_fluid_container %]
@@ -95,10 +93,14 @@
     <div class="container">
     [% END %]
         <div class="row">
+            [% IF use_sidebar %]
             <div class="col-md-3">
-                [% INCLUDE 'sidebar.tt' %]
+                [% INCLUDE 'navigation/sidebar.tt' %]
             </div>
             <div class="col-md-9">
+            [% ELSE %]
+            <div class="col-md-12">
+            [% END %]
                 <main class="main-content">
                     [% IF error %]
                     <div class="alert alert-danger" role="alert">

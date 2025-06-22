@@ -1,0 +1,284 @@
+[% META title = 'Weather Module - Setup & Configuration' %]
+
+<div class="weather-container">
+    <!-- Header Section -->
+    <header class="weather-header">
+        <h1><i class="fas fa-cloud-sun"></i> Weather Module</h1>
+        <div class="weather-context">
+            <span class="context-item"><strong>Status:</strong> 
+                [% IF config_status.api_configured %]
+                    <span class="status-active">Configured</span>
+                [% ELSE %]
+                    <span class="status-inactive">Not Configured</span>
+                [% END %]
+            </span>
+            <span class="context-item"><strong>Service:</strong> [% config_status.api_service || 'None' %]</span>
+            <span class="context-item"><strong>User:</strong> [% c.session.username || 'Guest' %]</span>
+        </div>
+    </header>
+
+    <div class="feature-grid">
+        
+        <!-- Welcome & Overview -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-info-circle feature-icon"></i>Welcome to Weather Integration</h3>
+            </div>
+            <div class="feature-content">
+                <p>The Weather Module provides real-time weather data integration for your entire application. 
+                   Once configured, weather information will be available across all modules including:</p>
+                <ul class="feature-list">
+                    <li>Apiary Management (for beekeeping conditions)</li>
+                    <li>Agricultural Planning</li>
+                    <li>Event Planning</li>
+                    <li>General Dashboard Information</li>
+                </ul>
+                <p><strong>Current Status:</strong> 
+                [% IF config_status.api_configured %]
+                    <span class="text-success">Weather service is configured and ready to use.</span>
+                [% ELSE %]
+                    <span class="text-warning">Weather service needs to be configured. Follow the setup guide below.</span>
+                [% END %]
+                </p>
+            </div>
+        </div>
+
+        <!-- Sample Weather Display -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-thermometer-half feature-icon"></i>Weather Display Preview</h3>
+            </div>
+            <div class="feature-content">
+                <p>Here's how weather information will appear throughout your application:</p>
+                <div class="weather-preview">
+                    <div class="weather-display-sample">
+                        <div class="weather-current">
+                            <div class="weather-icon">
+                                <i class="fas fa-[% sample_weather.icon == 'sunny' ? 'sun' : sample_weather.icon == 'partly-cloudy' ? 'cloud-sun' : 'cloud' %]"></i>
+                            </div>
+                            <div class="weather-info">
+                                <div class="weather-temp">[% sample_weather.temperature %]&deg;C</div>
+                                <div class="weather-condition">[% sample_weather.condition %]</div>
+                                <div class="weather-details">
+                                    Humidity: [% sample_weather.humidity %]% | 
+                                    Wind: [% sample_weather.wind_speed %]km/h [% sample_weather.wind_direction %]
+                                </div>
+                            </div>
+                        </div>
+                        <div class="weather-note">
+                            <small><i class="fas fa-info-circle"></i> This is sample data. Real weather will appear once configured.</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Setup Guide -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-cog feature-icon"></i>Weather Service Setup Guide</h3>
+            </div>
+            <div class="feature-content">
+                <div class="setup-steps">
+                    <div class="setup-step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <h4>Choose a Weather Service</h4>
+                            <p>Select from one of these popular weather API providers:</p>
+                            <div class="service-options">
+                                <div class="service-option">
+                                    <h5><i class="fas fa-external-link-alt"></i> OpenWeatherMap (Recommended)</h5>
+                                    <p>Free tier: 1,000 calls/day, 60 calls/minute</p>
+                                    <a href="https://openweathermap.org/api" target="_blank" class="btn btn-outline">
+                                        <i class="fas fa-external-link-alt"></i> Sign Up
+                                    </a>
+                                </div>
+                                <div class="service-option">
+                                    <h5><i class="fas fa-external-link-alt"></i> WeatherAPI</h5>
+                                    <p>Free tier: 1 million calls/month</p>
+                                    <a href="https://www.weatherapi.com/" target="_blank" class="btn btn-outline">
+                                        <i class="fas fa-external-link-alt"></i> Sign Up
+                                    </a>
+                                </div>
+                                <div class="service-option">
+                                    <h5><i class="fas fa-external-link-alt"></i> AccuWeather</h5>
+                                    <p>Free tier: 50 calls/day</p>
+                                    <a href="https://developer.accuweather.com/" target="_blank" class="btn btn-outline">
+                                        <i class="fas fa-external-link-alt"></i> Sign Up
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="setup-step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <h4>Get Your API Key</h4>
+                            <p>After signing up with your chosen service:</p>
+                            <ul>
+                                <li>Log into your weather service dashboard</li>
+                                <li>Navigate to API Keys or API Access section</li>
+                                <li>Generate a new API key</li>
+                                <li>Copy the API key for the next step</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="setup-step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <h4>Configure the Application</h4>
+                            <p>Add your weather configuration to the system:</p>
+                            <div class="config-actions">
+                                <a href="[% c.uri_for('/Weather/configuration') %]" class="btn btn-primary">
+                                    <i class="fas fa-cog"></i> Configure Weather Settings
+                                </a>
+                            </div>
+                            <p><small>You'll need your API key and location information.</small></p>
+                        </div>
+                    </div>
+
+                    <div class="setup-step">
+                        <div class="step-number">4</div>
+                        <div class="step-content">
+                            <h4>Test & Verify</h4>
+                            <p>Once configured, test your weather integration:</p>
+                            <div class="test-actions">
+                                <button class="btn btn-info" id="test-weather-btn">
+                                    <i class="fas fa-flask"></i> Test Weather Connection
+                                </button>
+                                <div id="test-results" class="test-results" style="display: none;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Links -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-link feature-icon"></i>Quick Access</h3>
+            </div>
+            <div class="feature-content">
+                <div class="quick-links">
+                    <a href="[% c.uri_for('/Weather/current') %]" class="quick-link">
+                        <i class="fas fa-thermometer-half"></i>
+                        <span>Current Weather API</span>
+                        <small>JSON endpoint for current conditions</small>
+                    </a>
+                    <a href="[% c.uri_for('/Weather/forecast') %]" class="quick-link">
+                        <i class="fas fa-calendar-week"></i>
+                        <span>Weather Forecast</span>
+                        <small>5-day weather forecast</small>
+                    </a>
+                    <a href="[% c.uri_for('/Weather/configuration') %]" class="quick-link">
+                        <i class="fas fa-cog"></i>
+                        <span>Configuration</span>
+                        <small>Manage weather settings</small>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Integration Examples -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-code feature-icon"></i>Integration Examples</h3>
+            </div>
+            <div class="feature-content">
+                <p>Once configured, you can use weather data in your applications:</p>
+                <div class="code-examples">
+                    <div class="code-example">
+                        <h5>JavaScript (Frontend)</h5>
+                        <pre><code>// Get current weather
+fetch('/Weather/current')
+  .then(response => response.json())
+  .then(weather => {
+    console.log(`Temperature: ${weather.temperature}°C`);
+    console.log(`Condition: ${weather.condition}`);
+  });</code></pre>
+                    </div>
+                    <div class="code-example">
+                        <h5>Template (Backend)</h5>
+                        <pre><code><!-- Include weather in any template -->
+&lt;div class="weather-widget"&gt;
+  &lt;span id="weather-display"&gt;Loading...&lt;/span&gt;
+&lt;/div&gt;</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="feature-actions">
+        [% IF config_status.api_configured %]
+            <a href="[% c.uri_for('/Weather/forecast') %]" class="btn btn-primary">
+                <i class="fas fa-calendar-week"></i> View Forecast
+            </a>
+            <a href="[% c.uri_for('/Weather/configuration') %]" class="btn btn-secondary">
+                <i class="fas fa-cog"></i> Manage Settings
+            </a>
+        [% ELSE %]
+            <a href="[% c.uri_for('/Weather/configuration') %]" class="btn btn-primary">
+                <i class="fas fa-cog"></i> Start Configuration
+            </a>
+        [% END %]
+        <button class="btn btn-info" onclick="window.history.back()">
+            <i class="fas fa-arrow-left"></i> Back
+        </button>
+    </div>
+</div>
+
+<!-- JavaScript for testing functionality -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const testButton = document.getElementById('test-weather-btn');
+    const testResults = document.getElementById('test-results');
+    
+    if (testButton) {
+        testButton.addEventListener('click', function() {
+            testButton.disabled = true;
+            testButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
+            testResults.style.display = 'block';
+            testResults.innerHTML = '<div class="alert alert-info">Testing weather connection...</div>';
+            
+            fetch('[% c.uri_for("/Weather/current") %]')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        testResults.innerHTML = `
+                            <div class="alert alert-warning">
+                                <strong>Test Result:</strong> ${data.error}<br>
+                                <small>This is expected if weather is not yet configured.</small>
+                            </div>
+                        `;
+                    } else {
+                        testResults.innerHTML = `
+                            <div class="alert alert-success">
+                                <strong>Test Successful!</strong><br>
+                                Temperature: ${data.temperature}°C<br>
+                                Condition: ${data.condition}<br>
+                                Source: ${data.data_source}
+                            </div>
+                        `;
+                    }
+                })
+                .catch(error => {
+                    testResults.innerHTML = `
+                        <div class="alert alert-danger">
+                            <strong>Test Failed:</strong> ${error.message}
+                        </div>
+                    `;
+                })
+                .finally(() => {
+                    testButton.disabled = false;
+                    testButton.innerHTML = '<i class="fas fa-flask"></i> Test Weather Connection';
+                });
+        });
+    }
+});
+</script>

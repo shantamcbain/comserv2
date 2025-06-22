@@ -40,5 +40,317 @@
     color: var(--bee-yellow);
 }
 
+/* Weather Display Styling */
+.weather-info {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-color);
+    font-weight: 500;
+}
+
+.weather-info i:first-child {
+    color: var(--honey-gold);
+    font-size: 1.1em;
+}
+
+.weather-details {
+    cursor: help;
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+}
+
+.weather-details:hover {
+    opacity: 1;
+    color: var(--accent-color);
+}
+
+.weather-error {
+    color: var(--warning-color);
+    font-style: italic;
+}
+
+.weather-error i {
+    color: var(--secondary-color);
+}
+
+/* Loading spinner for weather */
+#weather-display .fa-spinner {
+    color: var(--accent-color);
+}
+
+/* Weather Module Specific Styling */
+.weather-container {
+    /* Inherits from base container styles */
+}
+
+.weather-header {
+    /* Inherits from apiary-header styles */
+}
+
+.weather-preview {
+    background: var(--background-color);
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 1rem 0;
+}
+
+.weather-display-sample {
+    text-align: center;
+}
+
+.weather-current {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.weather-icon i {
+    font-size: 3rem;
+    color: var(--honey-gold);
+}
+
+.weather-temp {
+    font-size: 2rem;
+    font-weight: bold;
+    color: var(--text-color);
+}
+
+.weather-condition {
+    font-size: 1.2rem;
+    color: var(--accent-color);
+    margin-bottom: 0.5rem;
+}
+
+.weather-details {
+    font-size: 0.9rem;
+    color: var(--text-color);
+    opacity: 0.8;
+}
+
+.setup-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.setup-step {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.step-number {
+    background: var(--primary-color);
+    color: white;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.step-content h4 {
+    color: var(--text-color);
+    margin-bottom: 0.5rem;
+}
+
+.service-options {
+    display: grid;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.service-option {
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 1rem;
+    background: var(--background-color);
+}
+
+.service-option h5 {
+    color: var(--accent-color);
+    margin-bottom: 0.5rem;
+}
+
+.quick-links {
+    display: grid;
+    gap: 1rem;
+}
+
+.quick-link {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    text-decoration: none;
+    color: var(--text-color);
+    transition: all 0.2s ease;
+}
+
+.quick-link:hover {
+    background: var(--primary-color);
+    color: white;
+    transform: translateY(-2px);
+}
+
+.quick-link i {
+    font-size: 1.5rem;
+    color: var(--accent-color);
+}
+
+.quick-link:hover i {
+    color: white;
+}
+
+.quick-link span {
+    font-weight: 500;
+}
+
+.quick-link small {
+    opacity: 0.7;
+    font-size: 0.8rem;
+}
+
+.forecast-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.forecast-day {
+    text-align: center;
+    padding: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--background-color);
+}
+
+.forecast-date {
+    font-weight: bold;
+    color: var(--text-color);
+    margin-bottom: 0.5rem;
+}
+
+.forecast-icon i {
+    font-size: 2rem;
+    color: var(--honey-gold);
+    margin: 0.5rem 0;
+}
+
+.forecast-condition {
+    color: var(--accent-color);
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+}
+
+.forecast-temps {
+    margin: 0.5rem 0;
+}
+
+.temp-high {
+    font-weight: bold;
+    color: var(--text-color);
+    margin-right: 0.5rem;
+}
+
+.temp-low {
+    color: var(--text-color);
+    opacity: 0.7;
+}
+
+.forecast-precipitation {
+    font-size: 0.8rem;
+    color: var(--accent-color);
+}
+
+.current-weather-display {
+    display: grid;
+    gap: 1rem;
+}
+
+.current-weather-main {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.current-icon i {
+    font-size: 3rem;
+    color: var(--honey-gold);
+}
+
+.current-temp {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: var(--text-color);
+}
+
+.current-condition {
+    font-size: 1.2rem;
+    color: var(--accent-color);
+}
+
+.current-description {
+    color: var(--text-color);
+    opacity: 0.8;
+}
+
+.current-weather-details {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.25rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.detail-row:last-child {
+    border-bottom: none;
+}
+
+.weather-details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.detail-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--background-color);
+}
+
+.detail-label {
+    color: var(--text-color);
+    font-weight: 500;
+}
+
+.detail-label i {
+    color: var(--accent-color);
+    margin-right: 0.5rem;
+}
+
+.detail-value {
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
 /* All other container styles are inherited from base-containers.css */
 /* This ensures consistency across all themes while maintaining Apiary's unique bee styling */

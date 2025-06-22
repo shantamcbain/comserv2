@@ -174,6 +174,8 @@ sub new_inspection :Path('/Apiary/inspections/new') :Args(0) {
     );
 }
 
+
+
 sub create_inspection :Path('/Apiary/inspections/create') :Args(0) {
     my ( $self, $c ) = @_;
 

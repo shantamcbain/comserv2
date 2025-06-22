@@ -106,7 +106,7 @@
                     <li><a href="[% c.uri_for('/Apiary/queens/search') %]">Queen Lookup</a></li>
                     <li><a href="[% c.uri_for('/Apiary/yards') %]">Yard Management</a></li>
                     <li><a href="[% c.uri_for('/Apiary/equipment') %]">Equipment Tracking</a></li>
-                    <li><a href="[% c.uri_for('/Apiary/weather') %]">Weather Conditions</a></li>
+                    <li><a href="[% c.uri_for('/Weather') %]">Weather Conditions</a></li>
                     <li><a href="[% c.uri_for('/Apiary/treatments') %]">Treatment Records</a></li>
                 </ul>
             </div>

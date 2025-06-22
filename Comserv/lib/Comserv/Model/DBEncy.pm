@@ -7,6 +7,8 @@ use Socket;
 use JSON;
 use Data::Dumper;
 use Catalyst::Utils;  # For path_to
+use Try::Tiny;
+use SQL::Translator;
 
 # Load the database configuration from db_config.json
 my $config_file;
@@ -151,15 +153,33 @@ sub create_table_from_result {
     # Check if the required fields are present and in the correct format
     unless ($schema && $schema->isa('DBIx::Class::Schema')) {
         $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Schema is not a DBIx::Class::Schema object. Table name: $table_name");
-        return;
+        return 0;
     }
 
     # Get a DBI database handle
     my $dbh = $schema->storage->dbh;
 
+    # Get the actual table name from the Result class
+    my $result_class = "Comserv::Model::Schema::Ency::Result::$table_name";
+    eval "require $result_class";
+    if ($@) {
+        $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Could not load $result_class: $@. Table name: $table_name");
+        return 0;
+    }
+
+    # Get the actual table name from the Result class
+    my $actual_table_name;
+    eval {
+        $actual_table_name = $result_class->table;
+    };
+    if ($@) {
+        $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Could not get table name from $result_class: $@");
+        return 0;
+    }
+
     # Execute a SHOW TABLES LIKE 'table_name' SQL statement
     my $sth = $dbh->prepare("SHOW TABLES LIKE ?");
-    $sth->execute($table_name);
+    $sth->execute($actual_table_name);
 
     # Fetch the result
     my $result = $sth->fetch;
@@ -167,38 +187,68 @@ sub create_table_from_result {
     # Check if the table exists
     if (!$result) {
         # The table does not exist, create it
-        my $result_class = "Comserv::Model::Schema::Ency::Result::$table_name";
-        eval "require $result_class";
-        if ($@) {
-            $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Could not load $result_class: $@. Table name: $table_name");
-            return;
-        }
+        $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Table '$actual_table_name' does not exist, creating it from result class $result_class");
 
-        # Get the columns from the result class
-        my $columns_info = $result_class->columns_info;
-        my %columns = %$columns_info if ref $columns_info eq 'HASH';
+        try {
+            # Register the result class with the schema if not already registered
+            unless ($schema->source_registrations->{$table_name}) {
+                $schema->register_class($table_name, $result_class);
+                $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Registered result class $result_class as $table_name");
+            }
 
-        # Log the table properties before the table creation process starts
-        $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Table properties for $table_name: " . Dumper($columns_info));
-
-        # Define the structure of the table
-        my $source = $schema->source($table_name);
-        $source->add_columns(%columns);
-        $source->set_primary_key($result_class->primary_columns);
-
-        # Deploy the table
-        my $deploy_result = $schema->deploy({ sources => [$table_name] });
-
-        if ($deploy_result) {
-            $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Table $table_name deployed successfully.");
-            return 1;  # Return 1 to indicate that the table creation was successful
-        } else {
-            $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Failed to deploy table $table_name.");
-            $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Deployment details: " . Dumper($deploy_result) . ". Table name: $table_name");
-            return 0;  # Return 0 to indicate that the table creation failed but didn't raise an exception
-        }
+            # Get the source
+            my $source = $schema->source($table_name);
+            
+            # Generate the CREATE TABLE SQL
+            my $sql_translator = SQL::Translator->new(
+                parser => 'SQL::Translator::Parser::DBIx::Class',
+                producer => 'MySQL',
+            );
+            
+            # Create a temporary schema with just this source
+            my $temp_schema = DBIx::Class::Schema->connect(sub { });
+            $temp_schema->register_class($table_name, $result_class);
+            
+            # Generate SQL
+            my $sql = $sql_translator->translate(
+                data => $temp_schema
+            );
+            
+            if ($sql) {
+                # Extract just the CREATE TABLE statement for our table
+                my @statements = split /;\s*\n/, $sql;
+                my $create_statement;
+                
+                foreach my $statement (@statements) {
+                    if ($statement =~ /CREATE TABLE.*`?$actual_table_name`?/i) {
+                        $create_statement = $statement;
+                        last;
+                    }
+                }
+                
+                if ($create_statement) {
+                    # Execute the CREATE TABLE statement
+                    $dbh->do($create_statement);
+                    
+                    $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Table '$actual_table_name' created successfully using SQL: $create_statement");
+                    return 1;
+                } else {
+                    $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Could not find CREATE TABLE statement for '$actual_table_name' in generated SQL");
+                    return 0;
+                }
+            } else {
+                $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Failed to generate SQL for table '$actual_table_name'");
+                return 0;
+            }
+            
+        } catch {
+            my $error = $_;
+            $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Error creating table '$actual_table_name': $error");
+            return 0;
+        };
+        
     } else {
-        $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Table $table_name already exists.");
+        $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Table '$actual_table_name' already exists.");
         return 1;  # Return 1 to indicate that the table already exists
     }
 }

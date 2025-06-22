@@ -71,6 +71,9 @@ requires 'GD';           # For image manipulation
 requires 'GD::Text';
 
 # Network related
+requires 'LWP::UserAgent';
+requires 'LWP::Protocol::https';
+requires 'HTTP::Request';
 
 # Cryptography and Security
 requires 'Digest::SHA';

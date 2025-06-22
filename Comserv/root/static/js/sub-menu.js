@@ -29,8 +29,10 @@ function setSessionDebugMode(debugMode) {
 }
 
 function getSessionDebugMode() {
-    // Retrieve the debug mode value from the session or stash
-    return <%= $c->stash->{debug_mode} // $c->session->{debug_mode}%>;
+    // Retrieve the debug mode value from the session via AJAX
+    // Since this is a static JS file, we can't use Template Toolkit syntax
+    // We'll return 0 as default and let the server handle the actual state
+    return 0;
 }
 
 // Add dropdown menu functionality when the document is ready

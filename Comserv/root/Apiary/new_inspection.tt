@@ -1,12 +1,17 @@
 [% META title = 'New Hive Inspection' %]
-
+<head>
+    [% PageVersion = 'new_inspection.tt,v 0.01 2025/06/19 shanta Exp shanta ' %]
+    <meta charset="utf-8">
+    [% IF c.session.debug_mode == 1 %]
+        [% PageVersion %]
+    [% END %]
 <div class="apiary-container">
     <!-- Header Section -->
     <header class="apiary-header">
         <h1><i class="fas fa-search"></i> New Hive Inspection</h1>
         <div class="apiary-context">
             <span class="context-item"><strong>Date:</strong> [% inspection_date || 'Today' %]</span>
-            <span class="context-item"><strong>Inspector:</strong> [% c.user.username || 'Current User' %]</span>
+            <span class="context-item"><strong>Inspector:</strong> [% c.session.username || 'Current User' %]</span>
             <span class="context-item"><strong>Weather:</strong> <span id="weather-display">Loading...</span></span>
             <span class="context-item status-active">New Record</span>
         </div>
@@ -258,6 +263,82 @@
 <script>
 // Form functionality
 document.addEventListener('DOMContentLoaded', function() {
+    // Load weather data on page load
+    loadWeatherData();
+    
+    // Weather loading functionality
+    function loadWeatherData() {
+        const weatherDisplay = document.getElementById('weather-display');
+        
+        // Show loading state
+        weatherDisplay.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+        
+        // Fetch weather data from our API endpoint
+        fetch('[% c.uri_for("/Apiary/weather/current") %]')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Weather service unavailable');
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Update weather display with fetched data
+                const weatherIcon = getWeatherIcon(data.icon);
+                // Show data source indicator if it's mock data
+                const mockIndicator = data.data_source === 'MOCK_DATA' ? 
+                    ' <small style="opacity: 0.6;">(Mock)</small>' : '';
+                
+                weatherDisplay.innerHTML = `
+                    <span class="weather-info">
+                        <i class="${weatherIcon}"></i> 
+                        ${data.condition}, ${data.temperature}&deg;C${mockIndicator}
+                        <span class="weather-details" title="Humidity: ${data.humidity}%, Wind: ${data.wind_speed}km/h ${data.wind_direction}">
+                            <i class="fas fa-info-circle"></i>
+                        </span>
+                    </span>
+                `;
+                
+                // Also update the weather conditions dropdown to match current weather
+                const weatherSelect = document.getElementById('weather_conditions');
+                if (weatherSelect && data.condition) {
+                    const conditionValue = data.condition.toLowerCase().replace(/\s+/g, '_');
+                    const option = weatherSelect.querySelector(`option[value="${conditionValue}"]`);
+                    if (option) {
+                        weatherSelect.value = conditionValue;
+                    }
+                }
+                
+                // Update temperature field if available
+                const tempField = document.getElementById('temperature');
+                if (tempField && data.temperature) {
+                    tempField.value = data.temperature;
+                }
+            })
+            .catch(error => {
+                console.error('Error loading weather:', error);
+                weatherDisplay.innerHTML = `
+                    <span class="weather-error" title="Unable to load current weather">
+                        <i class="fas fa-exclamation-triangle"></i> Weather unavailable
+                    </span>
+                `;
+            });
+    }
+    
+    // Get appropriate weather icon based on condition
+    function getWeatherIcon(iconCode) {
+        const iconMap = {
+            'sunny': 'fas fa-sun',
+            'partly-cloudy': 'fas fa-cloud-sun',
+            'cloudy': 'fas fa-cloud',
+            'light-rain': 'fas fa-cloud-rain',
+            'heavy-rain': 'fas fa-cloud-showers-heavy',
+            'windy': 'fas fa-wind',
+            'cold': 'fas fa-snowflake',
+            'hot': 'fas fa-thermometer-full'
+        };
+        return iconMap[iconCode] || 'fas fa-cloud';
+    }
+    
     // Queen search functionality
     const queenSearchInput = document.getElementById('queen_search');
     const searchButton = document.getElementById('search_queen_btn');

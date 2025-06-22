@@ -954,6 +954,167 @@ sub logs :Path('/admin/logs') :Args(0) {
         "Completed logs action");
 }
 
+# Add missing field from table to result file
+sub add_field_to_result :Path('/admin/add_field_to_result') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_field_to_result', 
+        "Starting add_field_to_result action");
+    
+    # Check if the user has admin role
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $c->response->status(403);
+        $c->stash(json => { success => 0, error => 'Access denied' });
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    my $table_name = $c->req->param('table_name');
+    my $database = $c->req->param('database');
+    my $field_name = $c->req->param('field_name');
+    
+    unless ($table_name && $database && $field_name) {
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => 'Missing required parameters' });
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    try {
+        # Use the native comparison method to get field definitions
+        my $result_table_mapping = $self->build_result_table_mapping($c, $database);
+        my $comparison = $self->get_table_result_comparison_v2($c, $table_name, $database, $result_table_mapping);
+        
+        unless ($comparison->{has_result_file}) {
+            die "No result file found for table '$table_name'";
+        }
+        
+        # Get the field definition from the table
+        my $field_data = $comparison->{fields}->{$field_name};
+        unless ($field_data && $field_data->{table}) {
+            die "Field '$field_name' not found in table '$table_name'";
+        }
+        
+        my $field_def = $field_data->{table};
+        
+        # Add field to result file
+        my $success = $self->add_field_to_result_file($c, $comparison->{result_file_path}, $field_name, $field_def);
+        
+        if ($success) {
+            $c->stash(json => { 
+                success => 1, 
+                message => "Field '$field_name' added to result file successfully",
+                field_name => $field_name,
+                table_name => $table_name
+            });
+        } else {
+            die "Failed to add field to result file";
+        }
+        
+    } catch {
+        my $error = "Error adding field to result: $_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_field_to_result', $error);
+        
+        $c->response->status(500);
+        $c->stash(json => { success => 0, error => $error });
+    };
+    
+    $c->forward('View::JSON');
+}
+
+# Add missing field from result file to table
+sub add_field_to_table :Path('/admin/add_field_to_table') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_field_to_table', 
+        "Starting add_field_to_table action");
+    
+    # Check if the user has admin role
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $c->response->status(403);
+        $c->stash(json => { success => 0, error => 'Access denied' });
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    my $table_name = $c->req->param('table_name');
+    my $database = $c->req->param('database');
+    my $field_name = $c->req->param('field_name');
+    
+    unless ($table_name && $database && $field_name) {
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => 'Missing required parameters' });
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    try {
+        # Use the native comparison method to get field definitions
+        my $result_table_mapping = $self->build_result_table_mapping($c, $database);
+        
+        # Debug: Check if our specific table is in the mapping
+        my $table_key = lc($table_name);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_field_to_table',
+            "Looking for table '$table_key' in mapping with " . scalar(keys %$result_table_mapping) . " entries");
+        
+        if (exists $result_table_mapping->{$table_key}) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_field_to_table',
+                "Found mapping for '$table_key': " . $result_table_mapping->{$table_key}->{result_name});
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_field_to_table',
+                "No mapping found for '$table_key'. Available keys: " . join(', ', sort keys %$result_table_mapping));
+        }
+        
+        my $comparison = $self->get_table_result_comparison_v2($c, $table_name, $database, $result_table_mapping);
+        
+        # Debug: Log the comparison result
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_field_to_table',
+            "Comparison result: has_result_file=" . ($comparison->{has_result_file} ? 'YES' : 'NO') . 
+            ", result_file_path=" . ($comparison->{result_file_path} || 'NONE'));
+        
+        unless ($comparison->{has_result_file}) {
+            die "No result file found for table '$table_name'";
+        }
+        
+        # Get the field definition from the result file
+        my $field_data = $comparison->{fields}->{$field_name};
+        unless ($field_data && $field_data->{result}) {
+            die "Field '$field_name' not found in result file";
+        }
+        
+        my $field_def = $field_data->{result};
+        
+        # Validate field definition has required attributes
+        my $validation_errors = $self->validate_field_definition($field_def, $field_name);
+        if (@$validation_errors) {
+            die "Field validation errors: " . join(', ', @$validation_errors);
+        }
+        
+        # Add field to database table
+        my $success = $self->add_field_to_database_table($c, $table_name, $database, $field_name, $field_def);
+        
+        if ($success) {
+            $c->stash(json => { 
+                success => 1, 
+                message => "Field '$field_name' added to table '$table_name' successfully",
+                field_name => $field_name,
+                table_name => $table_name
+            });
+        } else {
+            die "Failed to add field to database table";
+        }
+        
+    } catch {
+        my $error = "Error adding field to table: $_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_field_to_table', $error);
+        
+        $c->response->status(500);
+        $c->stash(json => { success => 0, error => $error });
+    };
+    
+    $c->forward('View::JSON');
+}
+
 # Admin backup and restore
 sub backup :Path('/admin/backup') :Args(0) {
     my ($self, $c) = @_;
@@ -1302,6 +1463,24 @@ sub get_field_comparison :Path('/admin/get_field_comparison') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_field_comparison',
         "Starting get_field_comparison action");
     
+    # TEMPORARY FIX: Allow specific users direct access
+    if ($c->session->{username} && $c->session->{username} eq 'Shanta') {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_field_comparison', 
+            "Admin access granted to user Shanta (bypass role check)");
+    }
+    else {
+        # Check if the user has admin role
+        unless ($c->user_exists && $c->check_user_roles('admin')) {
+            $c->response->status(403);
+            $c->stash(json => {
+                success => 0,
+                error => "Access denied: Admin role required"
+            });
+            $c->forward('View::JSON');
+            return;
+        }
+    }
+    
     my $table_name = $c->request->param('table_name');
     my $database = $c->request->param('database');
     
@@ -1318,6 +1497,8 @@ sub get_field_comparison :Path('/admin/get_field_comparison') :Args(0) {
     try {
         # Build comprehensive mapping for this database
         my $result_table_mapping = $self->build_result_table_mapping($c, $database);
+        
+
         
         my $comparison = $self->get_table_result_comparison_v2($c, $table_name, $database, $result_table_mapping);
         
@@ -1370,10 +1551,14 @@ sub get_field_comparison :Path('/admin/get_field_comparison') :Args(0) {
         my $error = "Error getting field comparison for $table_name ($database): $_";
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_field_comparison', $error);
         
-        $c->response->status(500);
+        # Don't return 500 status - return success with error info instead
+        # This prevents JavaScript parsing errors
         $c->stash(json => {
             success => 0,
-            error => $error
+            error => $error,
+            table_name => $table_name,
+            database => $database,
+            debug_mode => $c->session->{debug_mode} ? 1 : 0
         });
     };
     
@@ -1865,6 +2050,10 @@ sub build_result_table_mapping {
     # Get all Result files for this database
     my @result_files = $self->get_all_result_files($database);
     
+    # Debug: Log the number of result files found
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'build_result_table_mapping',
+        "Found " . scalar(@result_files) . " result files for database '$database'");
+    
     foreach my $result_file (@result_files) {
         # Extract actual table name from Result file
         my $table_name = $self->extract_table_name_from_result_file($result_file->{path});
@@ -1877,6 +2066,11 @@ sub build_result_table_mapping {
             };
         }
     }
+    
+    # Debug: Log the final mapping keys
+    my @mapping_keys = sort keys %mapping;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'build_result_table_mapping',
+        "Final mapping contains " . scalar(@mapping_keys) . " entries: " . join(', ', @mapping_keys));
     
     return \%mapping;
 }
@@ -2154,7 +2348,7 @@ sub get_table_result_comparison_v2 {
     my ($self, $c, $table_name, $database, $result_table_mapping) = @_;
     
     # Get table schema
-    my $table_schema;
+    my $table_schema = { columns => {} };
     eval {
         if ($database eq 'ency') {
             $table_schema = $self->get_ency_table_schema($c, $table_name);
@@ -2163,6 +2357,10 @@ sub get_table_result_comparison_v2 {
         } else {
             die "Invalid database: $database";
         }
+        
+        # Ensure we have a valid schema structure
+        $table_schema = { columns => {} } unless $table_schema && ref($table_schema) eq 'HASH';
+        $table_schema->{columns} = {} unless $table_schema->{columns} && ref($table_schema->{columns}) eq 'HASH';
     };
     if ($@) {
         warn "Failed to get table schema for $table_name ($database): $@";
@@ -2188,7 +2386,7 @@ sub get_table_result_comparison_v2 {
     my $comparison = {
         table_name => $table_name,
         database => $database,
-        has_result_file => $result_info ? 1 : 0,
+        has_result_file => ($result_info && -f $result_info->{result_path}) ? 1 : 0,
         result_file_path => $result_info ? $result_info->{result_path} : undef,
         fields => {}
     };
@@ -2320,7 +2518,13 @@ sub parse_result_file_schema {
         table_name => undef
     };
     
-    # Read the Result file
+    # Try to load the Result class directly first
+    my $result_class_schema = $self->parse_result_class_schema($c, $file_path);
+    if ($result_class_schema && keys %{$result_class_schema->{columns}}) {
+        return $result_class_schema;
+    }
+    
+    # Fallback to file parsing if direct class loading fails
     my $content;
     eval {
         $content = File::Slurp::read_file($file_path);
@@ -2396,6 +2600,89 @@ sub parse_result_file_schema {
         }
         
         push @{$schema->{relationships}}, $relationship;
+    }
+    
+    return $schema;
+}
+
+# Parse Result class schema by loading the class directly
+sub parse_result_class_schema {
+    my ($self, $c, $file_path) = @_;
+    
+    my $schema = {
+        columns => {},
+        primary_keys => [],
+        relationships => [],
+        table_name => undef
+    };
+    
+    # Extract the Result class name from the file path
+    my $result_class;
+    if ($file_path =~ m{/Result/(.+)\.pm$}) {
+        my $class_path = $1;
+        $class_path =~ s{/}{::}g;  # Convert path separators to Perl package separators
+        $result_class = "Comserv::Model::Schema::Ency::Result::$class_path";
+    } else {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'parse_result_class_schema',
+            "Could not extract Result class name from path: $file_path");
+        return $schema;
+    }
+    
+    # Try to load the Result class
+    eval {
+        eval "require $result_class";
+        die $@ if $@;
+        
+        # Get the table name
+        $schema->{table_name} = $result_class->table if $result_class->can('table');
+        
+        # Get column information
+        if ($result_class->can('columns_info')) {
+            my $columns_info = $result_class->columns_info;
+            foreach my $col_name (keys %$columns_info) {
+                my $col_info = $columns_info->{$col_name};
+                $schema->{columns}->{$col_name} = {
+                    data_type => $col_info->{data_type} || 'unknown',
+                    is_nullable => $col_info->{is_nullable} // 1,
+                    size => $col_info->{size},
+                    is_auto_increment => $col_info->{is_auto_increment} || 0,
+                    default_value => $col_info->{default_value},
+                    extra => $col_info->{extra}
+                };
+            }
+        }
+        
+        # Get primary key information
+        if ($result_class->can('primary_columns')) {
+            my @primary_keys = $result_class->primary_columns;
+            $schema->{primary_keys} = \@primary_keys;
+        }
+        
+        # Get relationship information
+        if ($result_class->can('relationships')) {
+            my @relationships = $result_class->relationships;
+            foreach my $rel_name (@relationships) {
+                if ($result_class->can('relationship_info')) {
+                    my $rel_info = $result_class->relationship_info($rel_name);
+                    push @{$schema->{relationships}}, {
+                        type => $rel_info->{attrs}->{accessor} || 'unknown',
+                        accessor => $rel_name,
+                        related_class => $rel_info->{class},
+                        foreign_key => $rel_info->{cond} || {}
+                    };
+                }
+            }
+        }
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'parse_result_class_schema',
+            "Successfully loaded Result class $result_class with " . scalar(keys %{$schema->{columns}}) . " columns");
+            
+    };
+    
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'parse_result_class_schema',
+            "Failed to load Result class $result_class: $@");
+        return undef;  # Return undef to indicate failure, so fallback parsing can be used
     }
     
     return $schema;
@@ -3525,31 +3812,93 @@ sub sync_result_to_table :Path('/admin/sync_result_to_table') :Args(0) {
     my $table_name = $json_data->{table_name};
     my $field_name = $json_data->{field_name};
     my $database = $json_data->{database};
+    my $sync_all = $json_data->{sync_all};
     
-    unless ($table_name && $field_name && $database) {
+    unless ($table_name && $database) {
         $c->response->status(400);
-        $c->stash(json => { success => 0, error => 'Missing required parameters: table_name, field_name, database' });
+        $c->stash(json => { success => 0, error => 'Missing required parameters: table_name, database' });
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # If field_name is not provided but sync_all is not true, return error
+    unless ($field_name || $sync_all) {
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => 'Either field_name or sync_all must be provided' });
         $c->forward('View::JSON');
         return;
     }
     
     try {
-        # Get result field info
-        my $result_field_info = $self->get_result_field_info($c, $table_name, $field_name, $database);
-        
-        # Update table schema with result values
-        my $result = $self->update_table_field_from_result($c, $table_name, $field_name, $database, $result_field_info);
-        
-        $c->stash(json => {
-            success => 1,
-            message => "Successfully synced result field '$field_name' to table",
-            field_info => $result_field_info
-        });
+        if ($sync_all) {
+            # Sync all fields from Result to table
+            my $result = $self->sync_all_fields_result_to_table($c, $table_name, $database);
+            
+            $c->stash(json => {
+                success => 1,
+                message => "Successfully synced all fields from Result file to table '$table_name'",
+                synced_fields => $result->{synced_fields} || [],
+                warnings => $result->{warnings} || []
+            });
+        } else {
+            # Sync single field
+            my $result_field_info = $self->get_result_field_info($c, $table_name, $field_name, $database);
+            my $result = $self->update_table_field_from_result($c, $table_name, $field_name, $database, $result_field_info);
+            
+            $c->stash(json => {
+                success => 1,
+                message => "Successfully synced result field '$field_name' to table",
+                field_info => $result_field_info
+            });
+        }
         
     } catch {
         my $error = "Error syncing result to table: $_";
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'sync_result_to_table', $error);
         
+        $c->response->status(500);
+        $c->stash(json => { success => 0, error => $error });
+    };
+    
+    $c->forward('View::JSON');
+}
+
+# Debug endpoint to test field comparison
+sub debug_field_comparison :Path('/admin/debug_field_comparison') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Check if the user has admin role
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $c->response->status(403);
+        $c->stash(json => { success => 0, error => 'Access denied' });
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    my $table_name = $c->req->param('table_name') || 'users';
+    my $database = $c->req->param('database') || 'ency';
+    
+    try {
+        # Build comprehensive mapping for this database
+        my $result_table_mapping = $self->build_result_table_mapping($c, $database);
+        
+        my $comparison = $self->get_table_result_comparison_v2($c, $table_name, $database, $result_table_mapping);
+        
+        $c->stash(json => {
+            success => 1,
+            table_name => $table_name,
+            database => $database,
+            comparison => $comparison,
+            mapping_keys => [keys %$result_table_mapping],
+            debug_info => {
+                has_result_file => $comparison->{has_result_file},
+                result_file_path => $comparison->{result_file_path},
+                fields_count => $comparison->{fields} ? scalar(keys %{$comparison->{fields}}) : 0
+            }
+        });
+        
+    } catch {
+        my $error = "Debug field comparison error: $_";
         $c->response->status(500);
         $c->stash(json => { success => 0, error => $error });
     };
@@ -4023,6 +4372,86 @@ sub create_result_from_table :Path('/admin/create_result_from_table') :Args(0) {
     $c->forward('View::JSON');
 }
 
+# AJAX endpoint to create a database table from a Result file
+sub create_table_from_result :Path('/admin/create_table_from_result') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
+        "Starting create_table_from_result action");
+    
+    # Check if the user has admin role
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $c->response->status(403);
+        $c->stash(json => { success => 0, error => 'Access denied' });
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Parse JSON request
+    my $json_data;
+    try {
+        my $body = $c->req->body;
+        if ($body) {
+            local $/;
+            my $json_text = <$body>;
+            $json_data = decode_json($json_text);
+        } else {
+            die "No request body provided";
+        }
+    } catch {
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => "Invalid JSON request: $_" });
+        $c->forward('View::JSON');
+        return;
+    };
+    
+    my $result_name = $json_data->{result_name};
+    
+    unless ($result_name) {
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => 'Result name is required' });
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
+        "Attempting to create table from result: $result_name");
+    
+    try {
+        # Get the database schema
+        my $schema = $c->model('DBEncy')->schema;
+        
+        # Call the create_table_from_result method from the DBEncy model
+        my $result = $c->model('DBEncy')->create_table_from_result($result_name, $schema, $c);
+        
+        if ($result) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
+                "Successfully created table from result: $result_name");
+            
+            $c->stash(json => {
+                success => 1,
+                message => "Successfully created table from result '$result_name'",
+                result_name => $result_name
+            });
+        } else {
+            my $error = "Failed to create table from result '$result_name'";
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_table_from_result', $error);
+            
+            $c->response->status(500);
+            $c->stash(json => { success => 0, error => $error });
+        }
+        
+    } catch {
+        my $error = "Error creating table from result: $_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_table_from_result', $error);
+        
+        $c->response->status(500);
+        $c->stash(json => { success => 0, error => $error });
+    };
+    
+    $c->forward('View::JSON');
+}
+
 # Helper method to generate Result file content from table schema
 sub generate_result_file_content {
     my ($self, $c, $table_name, $database, $table_schema) = @_;
@@ -4126,6 +4555,68 @@ sub get_result_file_path {
     return $result_file_path;
 }
 
+# Sync all fields from Result file to database table
+sub sync_all_fields_result_to_table {
+    my ($self, $c, $table_name, $database) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_all_fields_result_to_table',
+        "Starting sync all fields for table '$table_name' in database '$database'");
+    
+    # Get the field comparison to see what needs to be synced
+    my $result_table_mapping = $self->build_result_table_mapping($c, $database);
+    my $comparison = $self->get_table_result_comparison_v2($c, $table_name, $database, $result_table_mapping);
+    
+    unless ($comparison->{has_result_file}) {
+        die "No Result file found for table '$table_name'";
+    }
+    
+    my @synced_fields = ();
+    my @warnings = ();
+    
+    # Process each field that has differences
+    foreach my $field_name (keys %{$comparison->{fields}}) {
+        my $field_data = $comparison->{fields}->{$field_name};
+        
+        # Skip if field exists in both and has no differences
+        if ($field_data->{table} && $field_data->{result} && 
+            (!$field_data->{differences} || @{$field_data->{differences}} == 0)) {
+            next;
+        }
+        
+        # Skip if field only exists in table (would require dropping column)
+        if ($field_data->{table} && !$field_data->{result}) {
+            push @warnings, "Field '$field_name' exists in table but not in Result file - skipping (manual intervention required)";
+            next;
+        }
+        
+        # Sync field if it exists in Result file
+        if ($field_data->{result}) {
+            eval {
+                my $result_field_info = $self->get_result_field_info($c, $table_name, $field_name, $database);
+                $self->update_table_field_from_result($c, $table_name, $field_name, $database, $result_field_info);
+                push @synced_fields, $field_name;
+                
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_all_fields_result_to_table',
+                    "Successfully synced field '$field_name' for table '$table_name'");
+            };
+            if ($@) {
+                push @warnings, "Failed to sync field '$field_name': $@";
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'sync_all_fields_result_to_table',
+                    "Failed to sync field '$field_name' for table '$table_name': $@");
+            }
+        }
+    }
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_all_fields_result_to_table',
+        "Completed sync for table '$table_name' - synced " . scalar(@synced_fields) . " fields, " . scalar(@warnings) . " warnings");
+    
+    return {
+        synced_fields => \@synced_fields,
+        warnings => \@warnings,
+        total_synced => scalar(@synced_fields)
+    };
+}
+
 =head1 AUTHOR
 
 Shanta McBain
@@ -4136,6 +4627,218 @@ This library is free software. You can redistribute it and/or modify
 it under the same terms as Perl itself.
 
 =cut
+
+# Find result file for a given table
+sub find_result_file_for_table {
+    my ($self, $c, $table_name, $database) = @_;
+    
+    # Build the expected result file path
+    my $result_dir;
+    if ($database eq 'ency') {
+        $result_dir = $c->path_to('lib', 'Comserv', 'Model', 'Schema', 'Ency', 'Result');
+    } elsif ($database eq 'forager') {
+        $result_dir = $c->path_to('lib', 'Comserv', 'Model', 'Schema', 'Forager', 'Result');
+    } else {
+        return undef;
+    }
+    
+    # Try different naming conventions
+    my @possible_names = (
+        ucfirst(lc($table_name)),  # Standard case
+        ucfirst($table_name),      # Keep original case
+        uc($table_name),           # All uppercase
+        lc($table_name),           # All lowercase
+        $table_name                # Exact match
+    );
+    
+    foreach my $name (@possible_names) {
+        my $file_path = File::Spec->catfile($result_dir, "$name.pm");
+        if (-f $file_path) {
+            return $file_path;
+        }
+    }
+    
+    return undef;
+}
+
+# Add field to result file
+sub add_field_to_result_file {
+    my ($self, $c, $result_file_path, $field_name, $field_def) = @_;
+    
+    try {
+        # Read the current file content
+        my $content = read_file($result_file_path);
+        
+        # Convert database field definition to DBIx::Class format
+        my $dbic_field_def = $self->convert_db_field_to_dbic($field_def);
+        
+        # Find the add_columns section
+        if ($content =~ /(__PACKAGE__->add_columns\(\s*)(.*?)(\s*\);)/s) {
+            my $before = $1;
+            my $columns_section = $2;
+            my $after = $3;
+            
+            # Add the new field to the columns section
+            my $new_field_text = sprintf(
+                "    %s => {\n        data_type => '%s',\n        is_nullable => %d,\n%s    },\n",
+                $field_name,
+                $dbic_field_def->{data_type},
+                $dbic_field_def->{is_nullable} ? 1 : 0,
+                $dbic_field_def->{size} ? "        size => $dbic_field_def->{size},\n" : ""
+            );
+            
+            # Add auto_increment if needed
+            if ($dbic_field_def->{is_auto_increment}) {
+                $new_field_text =~ s/    },\n$/        is_auto_increment => 1,\n    },\n/;
+            }
+            
+            # Add default value if specified
+            if (defined $dbic_field_def->{default_value}) {
+                my $default_val = $dbic_field_def->{default_value};
+                $default_val = "'$default_val'" unless $default_val =~ /^\d+$/;
+                $new_field_text =~ s/    },\n$/        default_value => $default_val,\n    },\n/;
+            }
+            
+            # Insert the new field (add comma to previous field if needed)
+            $columns_section =~ s/(\n\s*})(\s*)$/$1,\n$new_field_text$2/;
+            
+            # Reconstruct the file content
+            my $new_content = $before . $columns_section . $after;
+            
+            # Write the updated content back to the file
+            write_file($result_file_path, $new_content);
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_field_to_result_file',
+                "Added field '$field_name' to result file: $result_file_path");
+            
+            return 1;
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_field_to_result_file',
+                "Could not find add_columns section in result file: $result_file_path");
+            return 0;
+        }
+        
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_field_to_result_file',
+            "Error adding field to result file: $_");
+        return 0;
+    };
+}
+
+# Add field to database table
+sub add_field_to_database_table {
+    my ($self, $c, $table_name, $database, $field_name, $field_def) = @_;
+    
+    try {
+        # Get database handle
+        my $dbh;
+        if ($database eq 'ency') {
+            $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        } elsif ($database eq 'forager') {
+            $dbh = $c->model('DBForager')->schema->storage->dbh;
+        } else {
+            die "Invalid database: $database";
+        }
+        
+        # Convert DBIx::Class field definition to SQL
+        my $sql_field_def = $self->convert_dbic_field_to_sql($field_def);
+        
+        # Build ALTER TABLE statement
+        my $sql = "ALTER TABLE `$table_name` ADD COLUMN `$field_name` $sql_field_def";
+        
+        # Execute the ALTER TABLE statement
+        $dbh->do($sql);
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_field_to_database_table',
+            "Added field '$field_name' to table '$table_name' with SQL: $sql");
+        
+        return 1;
+        
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_field_to_database_table',
+            "Error adding field to database table: $_");
+        return 0;
+    };
+}
+
+# Validate field definition
+sub validate_field_definition {
+    my ($self, $field_def, $field_name) = @_;
+    
+    my @errors = ();
+    
+    # Check required attributes
+    unless ($field_def->{data_type}) {
+        push @errors, "Field '$field_name' missing data_type";
+    }
+    
+    # Check if integer types have size when required
+    if ($field_def->{data_type} && $field_def->{data_type} =~ /^(varchar|char|decimal|numeric)$/i) {
+        unless (defined $field_def->{size}) {
+            push @errors, "Field '$field_name' of type '$field_def->{data_type}' requires size specification";
+        }
+    }
+    
+    return \@errors;
+}
+
+# Convert database field definition to DBIx::Class format
+sub convert_db_field_to_dbic {
+    my ($self, $field_def) = @_;
+    
+    my $dbic_def = {
+        data_type => $field_def->{data_type},
+        is_nullable => $field_def->{is_nullable} // 1,
+        is_auto_increment => $field_def->{is_auto_increment} // 0,
+        default_value => $field_def->{default_value}
+    };
+    
+    # Handle size
+    if (defined $field_def->{size}) {
+        $dbic_def->{size} = $field_def->{size};
+    }
+    
+    # Normalize data type
+    $dbic_def->{data_type} = $self->normalize_data_type($dbic_def->{data_type});
+    
+    return $dbic_def;
+}
+
+# Convert DBIx::Class field definition to SQL
+sub convert_dbic_field_to_sql {
+    my ($self, $field_def) = @_;
+    
+    my $sql = $field_def->{data_type};
+    
+    # Add size if specified
+    if (defined $field_def->{size}) {
+        $sql .= "($field_def->{size})";
+    }
+    
+    # Add nullable constraint
+    if ($field_def->{is_nullable}) {
+        $sql .= " NULL";
+    } else {
+        $sql .= " NOT NULL";
+    }
+    
+    # Add auto increment
+    if ($field_def->{is_auto_increment}) {
+        $sql .= " AUTO_INCREMENT";
+    }
+    
+    # Add default value
+    if (defined $field_def->{default_value}) {
+        my $default = $field_def->{default_value};
+        if ($default =~ /^\d+$/) {
+            $sql .= " DEFAULT $default";
+        } else {
+            $sql .= " DEFAULT '$default'";
+        }
+    }
+    
+    return $sql;
+}
 
 __PACKAGE__->meta->make_immutable;
 

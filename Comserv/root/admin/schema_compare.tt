@@ -529,16 +529,37 @@ function loadFieldComparison(container, tableName, database) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Check if this table has a result file by looking at the card's title
-            const card = container.closest('.table-comparison-card');
-            const titleElement = card.querySelector('.table-comparison-title h4');
-            const hasResultFile = titleElement && !titleElement.textContent.includes('(Table only)');
+            // Check if this table has a result file by looking at the card's structure
+            const card = container.closest('.table-comparison-card') || container.closest('.feature-card');
+            let titleElement = null;
+            let hasResultFile = false;
+            
+            if (card) {
+                // For tables with result files (feature-card structure)
+                titleElement = card.querySelector('.feature-header h4');
+                if (titleElement) {
+                    hasResultFile = true; // feature-card means it has a result file
+                } else {
+                    // For tables without result files (table-comparison-card structure)
+                    titleElement = card.querySelector('.table-comparison-title h4');
+                    hasResultFile = titleElement ? !titleElement.textContent.includes('(Table only)') : false;
+                }
+            }
+            
+            const titleText = titleElement ? titleElement.textContent : 'NO TITLE FOUND';
+            
+            console.log('Card found:', card ? card.className : 'NO CARD FOUND');
+            console.log('Title element found:', titleElement ? 'YES' : 'NO');
+            console.log('Title text:', titleText);
+            console.log('Has result file:', hasResultFile);
             
             if (hasResultFile) {
                 // Try to get detailed field comparison for tables with result files
+                console.log('Table has result file, calling loadDetailedFieldComparison for:', tableName, database);
                 loadDetailedFieldComparison(container, tableName, database, data.schema);
             } else {
                 // For tables without result files, just show the table schema
+                console.log('Table has no result file, showing basic schema for:', tableName, database);
                 container.innerHTML = buildTableSchemaHTML(data.schema, tableName, database);
             }
         } else {
@@ -552,6 +573,8 @@ function loadFieldComparison(container, tableName, database) {
 
 // Load detailed field comparison (new functionality)
 function loadDetailedFieldComparison(container, tableName, database, tableSchema) {
+    console.log('loadDetailedFieldComparison called with:', { tableName, database });
+    
     fetch('[% c.uri_for("/admin/get_field_comparison") %]', {
         method: 'POST',
         headers: {
@@ -559,13 +582,18 @@ function loadDetailedFieldComparison(container, tableName, database, tableSchema
         },
         body: 'table_name=' + encodeURIComponent(tableName) + '&database=' + encodeURIComponent(database)
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('Field comparison response status:', response.status);
+        return response.json();
+    })
     .then(data => {
+        console.log('Field comparison response data:', data);
         if (data.success) {
             // Log debug information
             if (data.debug) {
                 console.log('Field comparison debug:', data.debug);
             }
+            console.log('Building field comparison HTML...');
             container.innerHTML = buildFieldComparisonHTML(data.comparison, tableName, database, data.debug_mode);
         } else {
             // Fallback to basic table schema display if field comparison fails
@@ -655,8 +683,10 @@ function buildResultFileFieldsHTML(fields, resultName, database) {
 
 // Build HTML for field comparison display
 function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
-    console.log('Building field comparison HTML for:', tableName, database);
+    console.log('buildFieldComparisonHTML called with:', { tableName, database, debugMode });
     console.log('Comparison data:', comparison);
+    console.log('Has result file:', comparison.has_result_file);
+    console.log('Fields count:', comparison.fields ? Object.keys(comparison.fields).length : 0);
     
     let html = '<div class="field-comparison-display">';
     html += '<h5>Field Comparison: ' + tableName + ' (' + database + ')</h5>';
@@ -771,7 +801,12 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
                 html += '<tr class="table-row missing-row">';
                 html += '<td class="source-column"><strong>Table</strong></td>';
                 html += '<td colspan="6" class="missing-field">Field not found in table</td>';
-                html += '<td class="actions-column"></td>';
+                html += '<td class="actions-column">';
+                if (!resultMissing) {
+                    html += '<button class="create-field-btn" onclick="createFieldInTable(\'' + tableName + '\', \'' + database + '\', \'' + fieldName + '\');">';
+                    html += '<i class="fas fa-plus"></i> Add to Table</button>';
+                }
+                html += '</td>';
                 html += '</tr>';
             }
             
@@ -1311,4 +1346,136 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+// Sync table functionality
+function syncTable(tableName, database) {
+    if (!confirm('Are you sure you want to sync table "' + tableName + '" with its Result file? This will update the database schema.')) {
+        return;
+    }
+    
+    // Show loading indicator
+    const button = event.target;
+    const originalText = button.textContent;
+    button.textContent = 'Syncing...';
+    button.disabled = true;
+    
+    fetch('[% c.uri_for("/admin/sync_result_to_table") %]', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            table_name: tableName,
+            database: database,
+            sync_all: true
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Successfully synced table: ' + data.message);
+            // Refresh the comparison to show updated data
+            location.reload();
+        } else {
+            alert('Sync failed: ' + data.error);
+        }
+    })
+    .catch(error => {
+        alert('Sync request failed: ' + error);
+    })
+    .finally(() => {
+        button.textContent = originalText;
+        button.disabled = false;
+    });
+}
+
+function createTableFromResult(resultName, database) {
+    alert('Create table functionality not yet implemented for ' + resultName + ' (' + database + ')');
+}
+
+function createResultFromTable(tableName, database) {
+    alert('Create result functionality not yet implemented for ' + tableName + ' (' + database + ')');
+}
+
+// Create field in result file (add missing field from table to result)
+function createFieldInResult(tableName, database, fieldName) {
+    if (!confirm('Are you sure you want to add field "' + fieldName + '" from table "' + tableName + '" to the result file?')) {
+        return;
+    }
+    
+    // Show loading state
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
+    button.disabled = true;
+    
+    fetch('[% c.uri_for("/admin/add_field_to_result") %]', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'table_name=' + encodeURIComponent(tableName) + 
+              '&database=' + encodeURIComponent(database) + 
+              '&field_name=' + encodeURIComponent(fieldName)
+    })
+    .then(response => response.json())
+    .then(data => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        
+        if (data.success) {
+            alert('Field "' + fieldName + '" added to result file successfully!');
+            // Refresh the field comparison
+            refreshFieldComparison(tableName, database);
+        } else {
+            alert('Error adding field to result: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        alert('Failed to add field to result. Please try again.');
+    });
+}
+
+// Create field in table (add missing field from result to table)
+function createFieldInTable(tableName, database, fieldName) {
+    if (!confirm('Are you sure you want to add field "' + fieldName + '" from result file to table "' + tableName + '"? This will modify the database schema.')) {
+        return;
+    }
+    
+    // Show loading state
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
+    button.disabled = true;
+    
+    fetch('[% c.uri_for("/admin/add_field_to_table") %]', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'table_name=' + encodeURIComponent(tableName) + 
+              '&database=' + encodeURIComponent(database) + 
+              '&field_name=' + encodeURIComponent(fieldName)
+    })
+    .then(response => response.json())
+    .then(data => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        
+        if (data.success) {
+            alert('Field "' + fieldName + '" added to table successfully!');
+            // Refresh the field comparison
+            refreshFieldComparison(tableName, database);
+        } else {
+            alert('Error adding field to table: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        alert('Failed to add field to table. Please try again.');
+    });
+}
 </script>
