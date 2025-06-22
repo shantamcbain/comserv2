@@ -1,5 +1,6 @@
 # perl
 # Production deployment fix - ensuring latest version is deployed
+# Last updated: Sun 22 Jun 2025 06:46:31 AM PDT - Version check for production deployment
                 package Comserv;
                 use Moose;
                 use namespace::autoclean;
