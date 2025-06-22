@@ -1,42 +1,15 @@
-/* Theme: default - Clean Professional Theme */
+/* Theme: default */
 :root {
-  /* Core Universal Container Variables - Clean Professional */
-  --primary-color: #007bff;        /* Professional blue */
-  --secondary-color: #6c757d;      /* Gray secondary */
-  --accent-color: #FF9900;         /* Orange accent */
-  --text-color: #212529;           /* Dark text */
-  --background-color: #ffffff;     /* Clean white background */
-  --warning-color: #ffc107;        /* Yellow warning */
-  --success-color: #28a745;        /* Green success */
-  --link-color: #007bff;           /* Blue links */
-  --link-hover-color: #0056b3;     /* Darker blue on hover */
-  --border-color: #dee2e6;         /* Light gray border */
-  --table-header-bg: #f8f9fa;      /* Very light gray header */
-  
-  /* Additional variables for complete theme support */
-  --error-color: #dc3545;          /* Red for errors */
-  --muted-text-color: #6c757d;     /* Muted gray text */
-  --primary-color-rgb: 0, 123, 255; /* RGB values for rgba usage */
-  
-  /* Navigation and UI specific */
-  --nav-bg: #f8f9fa;
-  --nav-link-color: #212529;
-  --nav-text: #212529;
-  --nav-hover-bg: #e9ecef;
-  --dropdown-bg: #ffffff;
-  
-  /* Header and Footer */
-  --header-bg: #f8f9fa;
-  --footer-bg: #f8f9fa;
-  --footer-text-color: #212529;
-  
-  /* Button theming */
-  --button-bg: #007bff;
-  --button-text: #ffffff;
-  --button-border: #007bff;
-  --button-hover-bg: #0056b3;
-  
-  /* Documentation uses universal container system */
-  --body-font: Arial, sans-serif;
+  --accent-color: #FF9900;
+  --background-color: #ffffff;
+  --border-color: #dddddd;
+  --link-color: #0000FF;
+  --link-hover-color: #000099;
+  --primary-color: #ffffff;
+  --secondary-color: #f9f9f9;
+  --success-color: #27ae60;
+  --table-header-bg: #f2f2f2;
+  --text-color: #000000;
+  --warning-color: #f39c12;
 }
 

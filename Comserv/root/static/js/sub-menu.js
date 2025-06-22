@@ -38,6 +38,8 @@ function getSessionDebugMode() {
 // Add dropdown menu functionality when the document is ready
 $(document).ready(function() {
     console.log('Menu initialization starting...');
+    console.log('jQuery version:', $.fn.jquery);
+    console.log('Found dropbtn elements:', $('.dropbtn').length);
 
     // Force horizontal menu layout
     $('.horizontal-menu').css({
@@ -80,21 +82,28 @@ $(document).ready(function() {
         }
     );
 
-    // Add click handlers for mobile
+    // Add click handlers - very simple approach
     $('.dropbtn').on('click', function(e) {
-        var $dropdown = $(this).closest('.horizontal-dropdown');
-        var $content = $dropdown.find('.dropdown-content');
+        var href = $(this).attr('href');
+        var isDropdownOnly = $(this).hasClass('dropdown-only') || href === 'javascript:void(0)' || href === '#';
 
-        if ($content.is(':visible')) {
-            $content.hide();
-        } else {
-            // Hide all other dropdowns
-            $('.dropdown-content').hide();
-            $content.show();
+        console.log('Dropdown clicked, href:', href, 'isDropdownOnly:', isDropdownOnly);
+
+        // Only prevent default for dropdown-only buttons
+        if (isDropdownOnly) {
+            e.preventDefault();
+            var $dropdown = $(this).closest('.horizontal-dropdown');
+            var $content = $dropdown.find('.dropdown-content');
+            
+            if ($content.is(':visible')) {
+                $content.hide();
+            } else {
+                // Hide all other dropdowns first
+                $('.dropdown-content').hide();
+                $content.show();
+            }
         }
-
-        e.preventDefault();
-        console.log('Dropdown clicked');
+        // For all other buttons, let the browser handle the navigation normally
     });
 
     console.log('Menu dropdown functionality initialized');

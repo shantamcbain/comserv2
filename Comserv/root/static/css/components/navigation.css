@@ -314,3 +314,93 @@ nav {
   border-top: none;
   padding-top: 0;
 }
+
+/* Login/User Menu Specific Styles */
+.horizontal-dropdown .dropbtn {
+  display: flex;
+  align-items: center;
+  padding: 8px 15px;
+}
+
+.horizontal-dropdown .user-menu {
+  /* Use a more subtle background that will work with various themes */
+  background-color: transparent;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.1);
+}
+
+.horizontal-dropdown .login-menu {
+  background-color: transparent;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.1);
+}
+
+.horizontal-dropdown .username {
+  font-weight: bold;
+  margin-right: 8px;
+  display: flex;
+  align-items: center;
+}
+
+.horizontal-dropdown .username i {
+  margin-right: 5px;
+}
+
+.horizontal-dropdown .login-text {
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+}
+
+.horizontal-dropdown .login-text i {
+  margin-right: 5px;
+}
+
+.horizontal-dropdown .role-badge {
+  font-size: 0.8em;
+  color: #666;
+  font-style: italic;
+  margin-left: 5px;
+  opacity: 0.8;
+}
+
+.dropdown-content {
+  min-width: 200px;
+}
+
+.dropdown-content .menu-item {
+  padding: 10px 15px;
+  display: flex;
+  align-items: center;
+}
+
+.dropdown-content .menu-item i {
+  margin-right: 8px;
+  width: 16px;
+  text-align: center;
+}
+
+.dropdown-content .logout {
+  color: #dc3545;
+}
+
+.dropdown-divider {
+  height: 1px;
+  margin: 5px 0;
+  overflow: hidden;
+  background-color: #e9ecef;
+}
+
+.edit-link, .add-link {
+  font-size: 0.8em;
+  color: #6c757d;
+  margin-left: 5px;
+}
+
+/* Icon placeholders - replace with actual icons if available */
+.icon-user:before { content: "👤"; }
+.icon-cog:before { content: "⚙️"; }
+.icon-dashboard:before { content: "📊"; }
+.icon-refresh:before { content: "🔄"; }
+.icon-signout:before { content: "🚪"; }
+.icon-signin:before { content: "🔑"; }
+.icon-user-plus:before { content: "➕"; }
+.icon-key:before { content: "🔑"; }

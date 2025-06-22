@@ -1,6 +1,9 @@
 [% META title = 'Restart Starman Server' %]
 <!-- File: /home/shanta/PycharmProjects/comserv2/Comserv/root/admin/restart_starman.tt -->
-[% PageVersion = 'admin/restart_starman.tt,v 0.01 2025/09/10 shanta Exp shanta ' %]
+[% PageVersion = 'admin/restart_starman.tt,v 0.02 2025/01/15 shanta Exp shanta ' %]
+
+<!-- Include admin-specific CSS -->
+<link rel="stylesheet" type="text/css" href="[% c.uri_for('/static/css/themes/admin.css') %]">
 
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
@@ -14,12 +17,12 @@
     <a href="[% c.uri_for('/admin/git_pull') %]" class="btn btn-sm btn-primary">
         <i class="fas fa-code-branch"></i> Git Pull
     </a>
-    <a href="[% c.uri_for('/admin/network_diagnostics') %]" class="btn btn-sm btn-info">
-        <i class="fas fa-network-wired"></i> Network Diagnostics
+    <a href="[% c.uri_for('/admin/start_dev_server') %]" class="btn btn-sm btn-success">
+        <i class="fas fa-play"></i> Start Dev Server
     </a>
 </div>
 
-<div class="container">
+<div class="apiary-container">
     <div class="row">
         <div class="col-md-12">
             <h1>Restart Starman Server</h1>
@@ -82,6 +85,19 @@
             [% END %]
             
             [% UNLESS output %]
+                <div class="alert alert-danger">
+                    <strong>DANGER:</strong> This action will restart the production Starman server, causing temporary downtime.
+                </div>
+                
+                <div class="alert alert-warning">
+                    <strong>Security Notice:</strong> This function is only available:
+                    <ul>
+                        <li>To CSC administrators</li>
+                        <li>When on the install branch</li>
+                        <li>After testing with the development server</li>
+                    </ul>
+                </div>
+                
                 [% # Always show the credentials form when confirming restart or when explicitly requested %]
                 [% IF show_password_form || c.request.params.show_credentials_form || (c.request.params.confirm && (!c.request.params.sudo_username || !c.request.params.sudo_password)) %]
                     <div class="alert alert-info">

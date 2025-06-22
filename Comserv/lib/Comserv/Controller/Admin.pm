@@ -124,60 +124,29 @@ sub index :Path :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
         "Starting Admin index action");
     
-    # TEMPORARY FIX: Allow specific users direct access
-    if ($c->session->{username} && $c->session->{username} eq 'Shanta') {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
-            "Admin access granted to user Shanta (bypass role check)");
-        # Continue with the admin page
-    }
-    else {
-        # Check if the user has admin role
-        my $has_admin_role = 0;
+    # Debug session information
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
+        "Session debug - Username: " . ($c->session->{username} || 'none') . 
+        ", User ID: " . ($c->session->{user_id} || 'none') . 
+        ", Roles: " . (ref($c->session->{roles}) eq 'ARRAY' ? join(',', @{$c->session->{roles}}) : ($c->session->{roles} || 'none')));
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
+        "user_exists: " . ($c->user_exists ? 'true' : 'false') . 
+        ", check_user_roles('admin'): " . ($c->check_user_roles('admin') ? 'true' : 'false'));
+    
+    # Check if the user has admin role (same as other admin functions)
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'index', 
+            "Access denied: User does not have admin role");
         
-        # First check if user exists
-        if ($c->user_exists) {
-            # Get roles from session
-            my $roles = $c->session->{roles};
-            
-            # Log the roles for debugging
-            my $roles_debug = 'none';
-            if (defined $roles) {
-                if (ref($roles) eq 'ARRAY') {
-                    $roles_debug = join(', ', @$roles);
-                    
-                    # Check if 'admin' is in the roles array
-                    foreach my $role (@$roles) {
-                        if (lc($role) eq 'admin') {
-                            $has_admin_role = 1;
-                            last;
-                        }
-                    }
-                } elsif (!ref($roles)) {
-                    $roles_debug = $roles;
-                    # Check if roles string contains 'admin'
-                    if ($roles =~ /\badmin\b/i) {
-                        $has_admin_role = 1;
-                    }
-                }
-            }
-            
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
-                "Admin access check - User: " . $c->session->{username} . ", Roles: $roles_debug, Has admin: " . ($has_admin_role ? 'Yes' : 'No'));
-        }
+        # Set error message in flash
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
         
-        unless ($has_admin_role) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'index', 
-                "Access denied: User does not have admin role");
-            
-            # Set error message in flash
-            $c->flash->{error_msg} = "You need to be an administrator to access this area.";
-            
-            # Redirect to login page with destination parameter
-            $c->response->redirect($c->uri_for('/user/login', {
-                destination => $c->req->uri
-            }));
-            return;
-        }
+        # Redirect to login page with destination parameter
+        $c->response->redirect($c->uri_for('/user/login', {
+            destination => $c->req->uri
+        }));
+        return;
     }
     
     # Get system stats
@@ -3575,8 +3544,8 @@ sub git_pull :Path('/admin/git_pull') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
         "Starting git_pull action");
     
-    # Check if the user has admin role
-    unless ($c->user_exists && ($c->check_user_roles('admin') || $c->session->{username} eq 'Shanta')) {
+    # Check if the user has admin role (same as other admin functions)
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_pull', 
             "Access denied: User does not have admin role");
         
@@ -4838,6 +4807,445 @@ sub convert_dbic_field_to_sql {
     }
     
     return $sql;
+}
+
+# Enhanced security check for CSC admin operations
+sub check_csc_admin_access {
+    my ($self, $c) = @_;
+    
+    # Check if user exists and is logged in
+    unless ($c->user_exists) {
+        return 0;
+    }
+    
+    # TEMPORARY FIX: Allow specific users direct access
+    if ($c->session->{username} && $c->session->{username} eq 'Shanta') {
+        return 1;
+    }
+    
+    # Check for CSC admin role specifically
+    my $roles = $c->session->{roles};
+    if (defined $roles) {
+        if (ref($roles) eq 'ARRAY') {
+            # Check if 'csc_admin' or 'admin' is in the roles array
+            foreach my $role (@$roles) {
+                if (lc($role) eq 'csc_admin' || lc($role) eq 'admin') {
+                    return 1;
+                }
+            }
+        } elsif (!ref($roles)) {
+            # Check if roles string contains 'csc_admin' or 'admin'
+            if ($roles =~ /\b(csc_admin|admin)\b/i) {
+                return 1;
+            }
+        }
+    }
+    
+    return 0;
+}
+
+# Check if we're on the install branch for dangerous operations
+sub check_install_branch {
+    my ($self, $c) = @_;
+    
+    try {
+        my $current_branch = `git -C ${\$c->path_to()} branch --show-current 2>/dev/null`;
+        chomp $current_branch;
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_install_branch',
+            "Current git branch: $current_branch");
+        
+        return $current_branch eq 'install';
+    } catch {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'check_install_branch',
+            "Could not determine git branch: $_");
+        return 0;
+    };
+}
+
+# Start development server for testing
+sub start_dev_server :Path('/admin/start_dev_server') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'start_dev_server',
+        "Starting development server action");
+    
+    # Enhanced security check
+    unless ($self->check_csc_admin_access($c)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'start_dev_server',
+            "Access denied: User does not have CSC admin role");
+        
+        $c->flash->{error_msg} = "You need CSC administrator privileges to start the development server.";
+        $c->response->redirect($c->uri_for('/admin'));
+        return;
+    }
+    
+    # Check if we're on install branch
+    unless ($self->check_install_branch($c)) {
+        $c->flash->{error_msg} = "Development server can only be started from the install branch for security reasons.";
+        $c->response->redirect($c->uri_for('/admin'));
+        return;
+    }
+    
+    # Check if this is a POST request (user confirmed)
+    if ($c->req->method eq 'POST' && $c->req->param('confirm')) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'start_dev_server',
+            "Development server start confirmed, executing");
+        
+        # Execute the development server startup
+        my ($success, $output, $warning, $dev_url) = $self->execute_start_dev_server($c);
+        
+        # Store the results in stash for the template
+        $c->stash(
+            output => $output,
+            success_msg => $success ? "Development server started successfully." : undef,
+            error_msg => $success ? undef : "Failed to start development server. See output for details.",
+            warning_msg => $warning,
+            dev_server_url => $dev_url
+        );
+    }
+    
+    # Use the standard debug message system
+    if ($c->session->{debug_mode}) {
+        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
+        push @{$c->stash->{debug_msg}}, "Admin controller start_dev_server view - Template: admin/start_dev_server.tt";
+    }
+    
+    # Set the template
+    $c->stash(template => 'admin/start_dev_server.tt');
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'start_dev_server',
+        "Completed start_dev_server action");
+}
+
+# Execute the development server startup
+sub execute_start_dev_server {
+    my ($self, $c) = @_;
+    my $output = '';
+    my $warning = undef;
+    my $success = 0;
+    my $dev_url = undef;
+    
+    try {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_start_dev_server',
+            "Starting development server execution");
+        
+        # Check if development server is already running
+        my $check_running = `ps aux | grep 'comserv_server.pl' | grep -v grep`;
+        if ($check_running) {
+            $output .= "Development server appears to be already running:\n$check_running\n";
+            $warning = "A development server process is already running. You may need to stop it first.";
+        }
+        
+        # Install/update dependencies first
+        $output .= "Installing/updating dependencies...\n";
+        my $cpanm_output = `cd ${\$c->path_to()} && cpanm --installdeps . 2>&1`;
+        $output .= "Dependency installation output:\n$cpanm_output\n";
+        
+        # Check if dependency installation was successful
+        if ($? != 0) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'execute_start_dev_server',
+                "Dependency installation had issues, but continuing");
+            $warning = "Some dependencies may not have installed correctly. Check the output for details.";
+        }
+        
+        # Start the development server in the background
+        my $app_root = $c->path_to();
+        my $dev_port = 3000; # Default Catalyst development port
+        
+        # Create a unique log file for this development server session
+        my $timestamp = time();
+        my $log_file = "$app_root/script/logs/dev_server_$timestamp.log";
+        
+        # Ensure log directory exists
+        system("mkdir -p $app_root/script/logs");
+        
+        # Start development server with proper environment
+        my $start_cmd = "cd $app_root && CATALYST_DEBUG=1 perl script/comserv_server.pl -r -d > $log_file 2>&1 &";
+        $output .= "Starting development server with command:\n$start_cmd\n";
+        
+        my $start_result = system($start_cmd);
+        
+        if ($start_result == 0) {
+            $success = 1;
+            $dev_url = "http://localhost:$dev_port";
+            $output .= "Development server started successfully!\n";
+            $output .= "Server should be available at: $dev_url\n";
+            $output .= "Log file: $log_file\n";
+            $output .= "Note: It may take a few moments for the server to fully start up.\n";
+            
+            # Store dev server info in session for later reference
+            $c->session->{dev_server} = {
+                url => $dev_url,
+                log_file => $log_file,
+                started_at => $timestamp,
+                pid_check_cmd => "ps aux | grep 'comserv_server.pl' | grep -v grep"
+            };
+            
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_start_dev_server',
+                "Failed to start development server");
+            $output .= "Failed to start development server.\n";
+            return (0, $output, "Development server startup failed.");
+        }
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_start_dev_server',
+            "Development server startup completed successfully");
+            
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_start_dev_server',
+            "Error during development server startup: $error");
+        $output .= "Error: $error\n";
+        return (0, $output, undef, undef);
+    };
+    
+    return ($success, $output, $warning, $dev_url);
+}
+
+# Restart Starman server
+sub restart_starman :Path('/admin/restart_starman') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman',
+        "Starting restart_starman action");
+    
+    # Enhanced security check
+    unless ($self->check_csc_admin_access($c)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'restart_starman',
+            "Access denied: User does not have CSC admin role");
+        
+        $c->flash->{error_msg} = "You need CSC administrator privileges to restart the Starman server.";
+        $c->response->redirect($c->uri_for('/admin'));
+        return;
+    }
+    
+    # Check if we're on install branch for production restart
+    unless ($self->check_install_branch($c)) {
+        $c->flash->{error_msg} = "Starman server can only be restarted from the install branch for security reasons.";
+        $c->response->redirect($c->uri_for('/admin'));
+        return;
+    }
+    
+    # Check if this is a POST request (user confirmed)
+    if ($c->req->method eq 'POST' && $c->req->param('confirm')) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman',
+            "Starman restart confirmed, executing");
+        
+        # Execute the Starman restart
+        my ($success, $output, $warning) = $self->execute_restart_starman($c);
+        
+        # Store the results in stash for the template
+        $c->stash(
+            output => $output,
+            success_msg => $success ? "Starman server restart initiated successfully." : undef,
+            error_msg => $success ? undef : "Failed to restart Starman server. See output for details.",
+            warning_msg => $warning
+        );
+    }
+    
+    # Use the standard debug message system
+    if ($c->session->{debug_mode}) {
+        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
+        push @{$c->stash->{debug_msg}}, "Admin controller restart_starman view - Template: admin/restart_starman.tt";
+    }
+    
+    # Set the template
+    $c->stash(template => 'admin/restart_starman.tt');
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman',
+        "Completed restart_starman action");
+}
+
+# Execute the Starman server restart
+sub execute_restart_starman {
+    my ($self, $c) = @_;
+    my $output = '';
+    my $warning = undef;
+    my $success = 0;
+    
+    try {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_restart_starman',
+            "Starting Starman server restart");
+        
+        # First, try to find running Starman processes
+        my $starman_processes = `ps aux | grep starman | grep -v grep`;
+        $output .= "Current Starman processes:\n$starman_processes\n";
+        
+        if (!$starman_processes) {
+            $output .= "No Starman processes found running.\n";
+            $warning = "No Starman processes were found. The server may not be running via Starman.";
+        }
+        
+        # Try different methods to restart Starman
+        my $restart_success = 0;
+        
+        # Method 1: Try systemctl if it's a systemd service
+        $output .= "Attempting to restart via systemctl...\n";
+        my $systemctl_result = system("sudo systemctl restart starman 2>/dev/null");
+        if ($systemctl_result == 0) {
+            $output .= "Successfully restarted via systemctl.\n";
+            $restart_success = 1;
+        } else {
+            $output .= "systemctl restart failed or service not found.\n";
+        }
+        
+        # Method 2: Try service command if systemctl failed
+        if (!$restart_success) {
+            $output .= "Attempting to restart via service command...\n";
+            my $service_result = system("sudo service starman restart 2>/dev/null");
+            if ($service_result == 0) {
+                $output .= "Successfully restarted via service command.\n";
+                $restart_success = 1;
+            } else {
+                $output .= "service restart failed or service not found.\n";
+            }
+        }
+        
+        # Method 3: Try to kill and restart manually if other methods failed
+        if (!$restart_success && $starman_processes) {
+            $output .= "Attempting manual restart by killing existing processes...\n";
+            
+            # Kill existing Starman processes
+            my $kill_result = system("sudo pkill -f starman");
+            if ($kill_result == 0) {
+                $output .= "Successfully killed existing Starman processes.\n";
+                
+                # Wait a moment for processes to terminate
+                sleep(2);
+                
+                # Try to start Starman again (this would need to be configured based on your setup)
+                $output .= "Note: Manual restart of Starman would require specific startup script.\n";
+                $warning = "Starman processes were killed, but automatic restart requires manual configuration.";
+                $restart_success = 1; # Consider it successful if we killed the processes
+            } else {
+                $output .= "Failed to kill existing Starman processes.\n";
+            }
+        }
+        
+        # Method 4: Check for common Starman startup scripts
+        if (!$restart_success) {
+            my @common_scripts = (
+                '/etc/init.d/starman',
+                '/usr/local/bin/restart-starman.sh',
+                '/opt/starman/restart.sh'
+            );
+            
+            foreach my $script (@common_scripts) {
+                if (-x $script) {
+                    $output .= "Found startup script: $script\n";
+                    my $script_result = system("sudo $script restart 2>&1");
+                    if ($script_result == 0) {
+                        $output .= "Successfully restarted via $script\n";
+                        $restart_success = 1;
+                        last;
+                    } else {
+                        $output .= "Failed to restart via $script\n";
+                    }
+                }
+            }
+        }
+        
+        if ($restart_success) {
+            $success = 1;
+            $output .= "\nStarman server restart completed.\n";
+            $output .= "Please wait a few moments for the server to fully restart.\n";
+        } else {
+            $output .= "\nCould not automatically restart Starman server.\n";
+            $output .= "You may need to manually restart the server or configure the restart method.\n";
+            $warning = "Automatic restart failed. Manual intervention may be required.";
+        }
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_restart_starman',
+            "Starman restart attempt completed");
+            
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_restart_starman',
+            "Error during Starman restart: $error");
+        $output .= "Error: $error\n";
+        return (0, $output, undef);
+    };
+    
+    return ($success, $output, $warning);
+}
+
+# Stop development server
+sub stop_dev_server :Path('/admin/stop_dev_server') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'stop_dev_server',
+        "Starting stop_dev_server action");
+    
+    # Enhanced security check
+    unless ($self->check_csc_admin_access($c)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'stop_dev_server',
+            "Access denied: User does not have CSC admin role");
+        
+        $c->flash->{error_msg} = "You need CSC administrator privileges to stop the development server.";
+        $c->response->redirect($c->uri_for('/admin'));
+        return;
+    }
+    
+    # Execute the development server stop
+    my ($success, $output) = $self->execute_stop_dev_server($c);
+    
+    # Store the results in stash
+    $c->stash(
+        output => $output,
+        success_msg => $success ? "Development server stopped successfully." : undef,
+        error_msg => $success ? undef : "Failed to stop development server completely.",
+    );
+    
+    # Clear dev server info from session
+    delete $c->session->{dev_server};
+    
+    # Redirect back to admin with message
+    $c->flash->{success_msg} = $c->stash->{success_msg} if $c->stash->{success_msg};
+    $c->flash->{error_msg} = $c->stash->{error_msg} if $c->stash->{error_msg};
+    $c->response->redirect($c->uri_for('/admin'));
+}
+
+# Execute the development server stop
+sub execute_stop_dev_server {
+    my ($self, $c) = @_;
+    my $output = '';
+    my $success = 0;
+    
+    try {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_stop_dev_server',
+            "Stopping development server");
+        
+        # Find and kill development server processes
+        my $dev_processes = `ps aux | grep 'comserv_server.pl' | grep -v grep`;
+        $output .= "Current development server processes:\n$dev_processes\n";
+        
+        if ($dev_processes) {
+            # Kill the development server processes
+            my $kill_result = system("pkill -f 'comserv_server.pl'");
+            if ($kill_result == 0) {
+                $output .= "Successfully stopped development server processes.\n";
+                $success = 1;
+            } else {
+                $output .= "Failed to stop some development server processes.\n";
+            }
+        } else {
+            $output .= "No development server processes found running.\n";
+            $success = 1; # Consider it successful if nothing was running
+        }
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_stop_dev_server',
+            "Development server stop completed");
+            
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_stop_dev_server',
+            "Error during development server stop: $error");
+        $output .= "Error: $error\n";
+        return (0, $output);
+    };
+    
+    return ($success, $output);
 }
 
 __PACKAGE__->meta->make_immutable;

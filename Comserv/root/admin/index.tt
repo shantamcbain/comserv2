@@ -1,5 +1,8 @@
 [% META title = 'Admin Dashboard' %]
-[% PageVersion = 'admin/index.tt,v 0.01 2023/08/10 shanta Exp shanta ' %]
+[% PageVersion = 'admin/index.tt,v 0.02 2025/01/15 shanta Exp shanta ' %]
+
+<!-- Include admin-specific CSS -->
+<link rel="stylesheet" type="text/css" href="[% c.uri_for('/static/css/themes/admin.css') %]">
 
 <h1>Admin Dashboard</h1>
 
@@ -24,9 +27,25 @@
     <ul>
       <li><a href="[% c.uri_for('/admin/theme') %]">Theme Management</a></li>
       <li><a href="[% c.uri_for('/admin/view_log') %]">View Application Log</a></li>
-      <li><a href="[% c.uri_for('/admin/git_pull') %]">Pull from Git Repository</a></li>
-      <li><a href="[% c.uri_for('/admin/restart_starman') %]">Restart Starman Server</a></li>
       <li><a href="[% c.uri_for('/admin/network_diagnostics') %]">Network Diagnostics</a></li>
+    </ul>
+  </div>
+
+  <div class="admin-section">
+    <h3>Git Operations</h3>
+    <ul>
+      <li><a href="[% c.uri_for('/admin/git_pull') %]">Pull from Git Repository</a></li>
+    </ul>
+  </div>
+
+  <div class="admin-section">
+    <h3>Production Deployment (CSC Admin + Install Branch Only)</h3>
+    <ul>
+      <li><a href="[% c.uri_for('/admin/start_dev_server') %]">Start Development Server for Testing</a></li>
+      <li><a href="[% c.uri_for('/admin/restart_starman') %]">Restart Production Server (Starman)</a></li>
+      [% IF c.session.dev_server %]
+      <li><a href="[% c.session.dev_server.url %]" target="_blank" class="dev-server-link">Open Development Server</a> | <a href="[% c.uri_for('/admin/stop_dev_server') %]">Stop Dev Server</a></li>
+      [% END %]
     </ul>
   </div>
 
@@ -39,16 +58,4 @@
   </div>
 </div>
 
-<style>
-  .admin-section {
-    margin-bottom: 20px;
-  }
-  .admin-section h3 {
-    margin-bottom: 10px;
-    border-bottom: 1px solid #ddd;
-    padding-bottom: 5px;
-  }
-  .admin-section ul {
-    margin-left: 20px;
-  }
-</style>
+<!-- CSS now handled by admin.css theme file -->

@@ -1,44 +1,28 @@
-/* Theme: mcoop - Cooperative Green Theme */
+/* Theme: mcoop */
 :root {
-  /* Core Universal Container Variables - Cooperative Green Themed */
-  --primary-color: #006633;        /* Deep cooperative green */
-  --secondary-color: #99cc99;      /* Light cooperative green */
-  --accent-color: #ffcc33;         /* Golden yellow accent */
-  --text-color: #333333;           /* Dark gray text */
-  --background-color: #ffffff;     /* Clean white background */
-  --warning-color: #cc3300;        /* Red warning */
-  --success-color: #339933;        /* Success green */
-  --link-color: #006633;           /* Green links */
-  --link-hover-color: #004d26;     /* Darker green on hover */
-  --border-color: #99cc99;         /* Light green border */
-  --table-header-bg: #e6f2e6;      /* Very light green header */
-  
-  /* Additional variables for complete theme support */
-  --error-color: #cc3300;          /* Red for errors */
-  --muted-text-color: #666666;     /* Muted gray text */
-  --primary-color-rgb: 0, 102, 51; /* RGB values for rgba usage */
-  
-  /* Navigation and UI specific */
-  --nav-bg: #006633;
-  --nav-link-color: #ffffff;
-  --nav-text: #ffffff;
-  --nav-hover-bg: #004d26;
-  --dropdown-bg: #99cc99;
-  
-  /* Header and Footer */
-  --header-bg: #006633;
-  --header-color: #ffffff;
-  --footer-bg: #006633;
-  --footer-text-color: #ffffff;
-  
-  /* Button theming */
+  --accent-color: #ffcc33;
+  --background-color: #ffffff;
+  --border-color: #99cc99;
   --button-bg: #006633;
-  --button-text: #ffffff;
   --button-border: #004d26;
   --button-hover-bg: #004d26;
-  
-  /* Documentation uses universal container system */
-  --body-font: Arial, sans-serif;
+  --button-text: #ffffff;
+  --footer-bg: #006633;
+  --footer-text-color: #ffffff;
+  --header-bg: #006633;
+  --header-color: #ffffff;
+  --link-color: #006633;
+  --link-hover-color: #004d26;
+  --nav-bg: #006633;
+  --nav-hover-bg: #004d26;
+  --nav-link-color: #ffffff;
+  --nav-text: #ffffff;
+  --primary-color: #006633;
+  --secondary-color: #99cc99;
+  --success-color: #339933;
+  --table-header-bg: #e6f2e6;
+  --text-color: #333333;
+  --warning-color: #cc3300;
 }
 
 body {

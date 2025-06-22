@@ -5,7 +5,7 @@
     [%# INCLUDE 'debug.tt' %]
 [% END %]
         <li class="horizontal-dropdown">
-            <a href="#" class="dropbtn"><i class="icon-global"></i>Global</a>
+            <a href="javascript:void(0)" class="dropbtn dropdown-only"><i class="icon-global"></i>Global</a>
             <div class="dropdown-content">
                 <a href="/mail"><i class="icon-mail"></i>Mail</a>
                 <a href="/jobs"><i class="icon-file"></i>Jobs</a>

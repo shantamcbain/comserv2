@@ -87,6 +87,7 @@
 
     <!-- Menu CSS (part of theme system) -->
     <link rel="stylesheet" type="text/css" href="/static/css/menu-theme.css">
+    <link rel="stylesheet" type="text/css" href="/static/css/components/navigation.css">
 
     <!-- Debug: Using theme system only, removed old CSS references -->
     [% IF c.session.debug_mode == 1 %]
