@@ -1,4 +1,5 @@
 # perl
+# Production deployment fix - ensuring latest version is deployed
                 package Comserv;
                 use Moose;
                 use namespace::autoclean;
