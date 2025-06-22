@@ -65,6 +65,9 @@ Comserv/comserv.psgi
 /Comserv/root/static/errormessages
 /.idea/git_toolbox_blame.xml
 /.codebuddy/summary.md
+
+# Development systemd service files (personal setup)
+*.service
 /aimanager/__init__.py
 /aimanager/__init__.py
 /.idea/externalDependencies.xml
