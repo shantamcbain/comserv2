@@ -3,15 +3,15 @@
     [% PageVersion %]
 [% END %]
 
-<div class="documentation-page">
-    <div class="recent-updates-header">
+<div class="container">
+    <div class="changelog-header">
         <h1>Recent Updates</h1>
         <a href="[% c.uri_for('/Documentation/changelog') %]" class="view-all-link">View All Changes</a>
     </div>
     
     <!-- Show only the 3 most recent changes -->
-    <div class="section">
-        <h2>API Credentials Documentation Fix (June 15, 2025)</h2>
+    <div class="changelog-summary">
+        <h3>API Credentials Documentation Fix (June 15, 2025)</h3>
         <p>
             Fixed issues with the API credentials documentation routing and consolidated duplicate documentation files.
         </p>
@@ -21,12 +21,12 @@
             <li><strong>Fixed Routing</strong> - Resolved 404 errors when accessing documentation from the API Credentials interface</li>
         </ul>
         <p>
-            <a href="[% c.uri_for('/Documentation/changelog/2025-06-15-api-credentials-documentation-fix') %]">Read the full changelog entry</a>
+            <a href="[% c.uri_for('/Documentation/changelog/2025-06-15-api-credentials-documentation-fix') %]" class="read-more">Read the full changelog entry</a>
         </p>
     </div>
     
-    <div class="section">
-        <h2>Documentation System (March 03, 2025)</h2>
+    <div class="changelog-summary">
+        <h3>Documentation System (March 03, 2025)</h3>
         <p>
             The Documentation system has been completely overhauled with the following improvements:
         </p>
@@ -36,12 +36,12 @@
             <li><strong>Support for Multiple File Types</strong> - The system now handles various file types including JSON, HTML, and images</li>
         </ul>
         <p>
-            <a href="[% c.uri_for('/Documentation/changelog/2025-03-03-documentation-system-overhaul') %]">Read the full changelog entry</a>
+            <a href="[% c.uri_for('/Documentation/changelog/2025-03-03-documentation-system-overhaul') %]" class="read-more">Read the full changelog entry</a>
         </p>
     </div>
     
-    <div class="section">
-        <h2>New Documentation Pages (March 03, 2025)</h2>
+    <div class="changelog-summary">
+        <h3>New Documentation Pages (March 03, 2025)</h3>
         <p>
             Several new documentation pages have been added:
         </p>
@@ -51,84 +51,9 @@
             <li><a href="[% c.uri_for('/Documentation/user_manual') %]">User Manual</a> - Comprehensive user guide</li>
         </ul>
         <p>
-            <a href="[% c.uri_for('/Documentation/changelog/2025-03-03-new-documentation-pages') %]">Read the full changelog entry</a>
+            <a href="[% c.uri_for('/Documentation/changelog/2025-03-03-new-documentation-pages') %]" class="read-more">Read the full changelog entry</a>
         </p>
     </div>
 </div>
 
-<style>
-    .documentation-page {
-        max-width: 800px;
-        margin: 0 auto;
-        padding: 20px;
-        font-family: Arial, sans-serif;
-        line-height: 1.6;
-    }
-    
-    .recent-updates-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 20px;
-        border-bottom: 2px solid #eee;
-        padding-bottom: 10px;
-    }
-    
-    .recent-updates-header h1 {
-        color: #333;
-        margin: 0;
-        border-bottom: none;
-        padding-bottom: 0;
-    }
-    
-    .view-all-link {
-        background-color: #0066cc;
-        color: white;
-        padding: 8px 15px;
-        border-radius: 4px;
-        text-decoration: none;
-        font-size: 14px;
-        transition: background-color 0.3s;
-    }
-    
-    .view-all-link:hover {
-        background-color: #0055aa;
-        text-decoration: none;
-    }
-    
-    .section {
-        margin-bottom: 30px;
-        padding-bottom: 20px;
-        border-bottom: 1px solid #eee;
-    }
-    
-    .section:last-child {
-        border-bottom: none;
-    }
-    
-    h2 {
-        color: #0066cc;
-        margin-top: 20px;
-    }
-    
-    ul {
-        padding-left: 25px;
-    }
-    
-    li {
-        margin-bottom: 8px;
-    }
-    
-    strong {
-        color: #333;
-    }
-    
-    a {
-        color: #0066cc;
-        text-decoration: none;
-    }
-    
-    a:hover {
-        text-decoration: underline;
-    }
-</style>
+<!-- All CSS moved to theme system - NO INLINE STYLES ALLOWED -->

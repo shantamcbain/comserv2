@@ -295,6 +295,136 @@
     border: 2px dashed var(--border-color);
 }
 
+/* Recent Updates Section Styles - moved from inline CSS */
+.changelog-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.changelog-header h3 {
+    margin: 0;
+    color: var(--text-color);
+}
+
+.view-all-link {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 8px 15px;
+    border-radius: 4px;
+    text-decoration: none;
+    font-size: 14px;
+    transition: background-color 0.3s;
+}
+
+.view-all-link:hover {
+    background-color: var(--link-hover-color);
+    text-decoration: none;
+    color: white;
+}
+
+.changelog-summary {
+    background-color: var(--table-header-bg);
+    border-left: 4px solid var(--primary-color);
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 0 4px 4px 0;
+}
+
+.changelog-summary h3 {
+    margin-top: 0;
+    color: var(--text-color);
+}
+
+.changelog-meta {
+    color: var(--text-color);
+    opacity: 0.7;
+    font-size: 0.9em;
+    margin-bottom: 10px;
+}
+
+.changelog-meta .date {
+    font-weight: bold;
+    margin-right: 10px;
+}
+
+.read-more {
+    display: inline-block;
+    margin-top: 10px;
+    color: var(--link-color);
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.read-more:hover {
+    color: var(--link-hover-color);
+    text-decoration: underline;
+}
+
+/* Quick Access Links for Admins */
+.quick-access-links {
+    background: var(--background-color);
+    border-radius: 12px;
+    padding: 25px;
+    margin-bottom: 30px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+}
+
+.quick-access-links h2 {
+    margin: 0 0 20px 0;
+    color: var(--text-color);
+    font-size: 1.5rem;
+}
+
+.quick-links-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.quick-link-card {
+    background: var(--background-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+    text-decoration: none;
+    color: var(--text-color);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border-left: 4px solid var(--primary-color);
+}
+
+.quick-link-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    text-decoration: none;
+    color: var(--text-color);
+}
+
+.quick-link-card h3 {
+    margin: 0 0 10px 0;
+    color: var(--text-color);
+    font-size: 1.2rem;
+}
+
+.quick-link-card p {
+    margin: 0 0 15px 0;
+    color: var(--text-color);
+    opacity: 0.8;
+    line-height: 1.5;
+}
+
+.admin-badge {
+    background: var(--warning-color);
+    color: var(--text-color);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75em;
+    font-weight: 500;
+}
+
 /* Mobile Responsiveness - inherits from base-containers.css */
 @media (max-width: 768px) {
     .documentation-container {
@@ -311,6 +441,16 @@
     
     .user-context {
         flex-direction: column;
+        gap: 10px;
+    }
+    
+    .quick-links-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .changelog-header {
+        flex-direction: column;
+        align-items: flex-start;
         gap: 10px;
     }
 }

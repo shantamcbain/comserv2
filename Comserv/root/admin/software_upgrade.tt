@@ -1,0 +1,337 @@
+[% META title = 'Software Upgrade Manager' %]
+[% PageVersion = 'admin/software_upgrade.tt,v 1.0 2025/01/15 shanta Exp shanta ' %]
+
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    <div class="debug">
+        <p>Current step: [% current_step %]</p>
+        <p>Upgrade status: [% upgrade_status.current_step %]</p>
+        <p>Steps completed: [% upgrade_status.steps_completed.keys.join(', ') %]</p>
+    </div>
+[% END %]
+
+<div class="software-upgrade-container">
+    <header class="upgrade-header">
+        <h1>Software Upgrade Manager</h1>
+        <div class="server-info">
+            <span class="server-label">Production Server:</span> 
+            <span class="server-name">[% production_server %]</span>
+            <span class="server-path">([% server_path %])</span>
+        </div>
+    </header>
+
+    <!-- System Status Overview -->
+    <section class="system-status">
+        <h2>Current System Status</h2>
+        <div class="status-grid">
+            <div class="status-item">
+                <label>Git Branch:</label>
+                <span class="status-value [% system_status.git_branch == 'install' ? 'status-good' : 'status-warning' %]">
+                    [% system_status.git_branch %]
+                </span>
+            </div>
+            <div class="status-item">
+                <label>Git Status:</label>
+                <span class="status-value [% system_status.git_status == 'clean' ? 'status-good' : 'status-warning' %]">
+                    [% system_status.git_status %]
+                </span>
+            </div>
+            <div class="status-item">
+                <label>Last Commit:</label>
+                <span class="status-value">[% system_status.git_last_commit %]</span>
+            </div>
+            <div class="status-item">
+                <label>Development Server:</label>
+                <span class="status-value [% system_status.dev_server_running ? 'status-warning' : 'status-good' %]">
+                    [% system_status.dev_server_running ? 'Running' : 'Stopped' %]
+                </span>
+            </div>
+            <div class="status-item">
+                <label>Production Server:</label>
+                <span class="status-value [% system_status.starman_running ? 'status-good' : 'status-error' %]">
+                    [% system_status.starman_running ? 'Running' : 'Stopped' %]
+                </span>
+            </div>
+            <div class="status-item">
+                <label>Disk Space:</label>
+                <span class="status-value">[% system_status.disk_space %]</span>
+            </div>
+            <div class="status-item">
+                <label>Perl Version:</label>
+                <span class="status-value">[% system_status.perl_version %]</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Upgrade Progress -->
+    <section class="upgrade-progress">
+        <h2>Upgrade Progress</h2>
+        <div class="progress-steps">
+            <div class="step [% upgrade_status.steps_completed.git_pull ? 'completed' : (current_step == 'git_pull' ? 'active' : 'pending') %]">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <h3>Pull Latest Code</h3>
+                    <p>Download latest changes from GitHub repository</p>
+                </div>
+            </div>
+            <div class="step [% upgrade_status.steps_completed.dependencies ? 'completed' : (current_step == 'dependencies' ? 'active' : 'pending') %]">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                    <h3>Update Dependencies</h3>
+                    <p>Install/update Perl and Node.js dependencies</p>
+                </div>
+            </div>
+            <div class="step [% upgrade_status.steps_completed.dev_server_start ? 'completed' : (current_step == 'dev_server' ? 'active' : 'pending') %]">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                    <h3>Test with Development Server</h3>
+                    <p>Start development server and verify functionality</p>
+                </div>
+            </div>
+            <div class="step [% upgrade_status.steps_completed.production_restart ? 'completed' : (current_step == 'production' ? 'active' : 'pending') %]">
+                <div class="step-number">4</div>
+                <div class="step-content">
+                    <h3>Restart Production Server</h3>
+                    <p>Apply changes to production Starman server</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Step-specific Content -->
+    [% IF current_step == 'overview' || current_step == 'git_pull' %]
+    <section class="step-section">
+        <h2>Step 1: Pull Latest Code from GitHub</h2>
+        <div class="step-description">
+            <p>This step will connect to your GitHub repository and pull the latest changes to the production server.</p>
+            <ul>
+                <li>Backs up current theme_mappings.json if it exists</li>
+                <li>Pulls latest code from the repository</li>
+                <li>Handles any merge conflicts with local customizations</li>
+                <li>Restores theme mappings if needed</li>
+            </ul>
+        </div>
+        
+        [% IF step_output %]
+        <div class="step-output">
+            <h3>Output:</h3>
+            <pre>[% step_output %]</pre>
+        </div>
+        [% END %]
+        
+        [% UNLESS upgrade_status.steps_completed.git_pull %]
+        <form method="POST" action="[% c.uri_for('/admin/software_upgrade') %]">
+            <input type="hidden" name="step" value="git_pull">
+            <input type="hidden" name="action" value="execute">
+            <button type="submit" class="btn btn-primary">Execute Git Pull</button>
+        </form>
+        [% ELSE %]
+        <div class="step-completed">
+            <span class="checkmark">✓</span> Git pull completed successfully
+            <a href="[% c.uri_for('/admin/software_upgrade', { step => 'dependencies' }) %]" class="btn btn-secondary">Continue to Next Step</a>
+        </div>
+        [% END %]
+    </section>
+    [% END %]
+
+    [% IF current_step == 'dependencies' %]
+    <section class="step-section">
+        <h2>Step 2: Update Dependencies</h2>
+        <div class="step-description">
+            <p>This step will install and update all required dependencies for the application.</p>
+            <ul>
+                <li>Updates Perl modules using cpanm</li>
+                <li>Updates Node.js packages if package.json exists</li>
+                <li>Ensures all dependencies are compatible</li>
+                <li>Reports any installation issues</li>
+            </ul>
+        </div>
+        
+        [% IF step_output %]
+        <div class="step-output">
+            <h3>Output:</h3>
+            <pre>[% step_output %]</pre>
+        </div>
+        [% END %]
+        
+        [% UNLESS upgrade_status.steps_completed.dependencies %]
+        <form method="POST" action="[% c.uri_for('/admin/software_upgrade') %]">
+            <input type="hidden" name="step" value="dependencies">
+            <input type="hidden" name="action" value="execute">
+            <button type="submit" class="btn btn-primary">Update Dependencies</button>
+        </form>
+        [% ELSE %]
+        <div class="step-completed">
+            <span class="checkmark">✓</span> Dependencies updated successfully
+            <a href="[% c.uri_for('/admin/software_upgrade', { step => 'dev_server' }) %]" class="btn btn-secondary">Continue to Next Step</a>
+        </div>
+        [% END %]
+    </section>
+    [% END %]
+
+    [% IF current_step == 'dev_server' %]
+    <section class="step-section">
+        <h2>Step 3: Test with Development Server</h2>
+        <div class="step-description">
+            <p>Start a development server to test the updated code before applying to production.</p>
+            <ul>
+                <li>Starts development server with CATALYST_DEBUG=1</li>
+                <li>Provides a test URL to verify functionality</li>
+                <li>Allows you to test all critical features</li>
+                <li>Must be stopped before proceeding to production</li>
+            </ul>
+        </div>
+        
+        [% IF step_output %]
+        <div class="step-output">
+            <h3>Output:</h3>
+            <pre>[% step_output %]</pre>
+        </div>
+        [% END %]
+        
+        [% IF upgrade_status.dev_server_url %]
+        <div class="dev-server-running">
+            <h3>Development Server Running</h3>
+            <p>Test URL: <a href="[% upgrade_status.dev_server_url %]" target="_blank" class="test-link">[% upgrade_status.dev_server_url %]</a></p>
+            <p><strong>Please test the application thoroughly before proceeding.</strong></p>
+            
+            <form method="POST" action="[% c.uri_for('/admin/software_upgrade') %]" style="margin-top: 20px;">
+                <input type="hidden" name="step" value="dev_server">
+                <input type="hidden" name="action" value="stop">
+                <button type="submit" class="btn btn-warning">Stop Development Server & Continue</button>
+            </form>
+        </div>
+        [% ELSIF upgrade_status.steps_completed.dev_server_stop %]
+        <div class="step-completed">
+            <span class="checkmark">✓</span> Development server testing completed
+            <a href="[% c.uri_for('/admin/software_upgrade', { step => 'production' }) %]" class="btn btn-secondary">Continue to Production Restart</a>
+        </div>
+        [% ELSE %]
+        <form method="POST" action="[% c.uri_for('/admin/software_upgrade') %]">
+            <input type="hidden" name="step" value="dev_server">
+            <input type="hidden" name="action" value="start">
+            <button type="submit" class="btn btn-primary">Start Development Server</button>
+        </form>
+        [% END %]
+    </section>
+    [% END %]
+
+    [% IF current_step == 'production' %]
+    <section class="step-section">
+        <h2>Step 4: Restart Production Server</h2>
+        <div class="step-description">
+            <p>Apply the updates to the production Starman server.</p>
+            <ul>
+                <li>Gracefully restarts the Starman server</li>
+                <li>Uses systemctl restart starman command</li>
+                <li>Monitors the restart process</li>
+                <li>Verifies the server is running after restart</li>
+            </ul>
+            <div class="warning-box">
+                <strong>Warning:</strong> This will briefly interrupt service to users. 
+                Ensure you have tested thoroughly with the development server.
+            </div>
+        </div>
+        
+        [% IF step_output %]
+        <div class="step-output">
+            <h3>Output:</h3>
+            <pre>[% step_output %]</pre>
+        </div>
+        [% END %]
+        
+        [% UNLESS upgrade_status.steps_completed.production_restart %]
+        <form method="POST" action="[% c.uri_for('/admin/software_upgrade') %]" onsubmit="return confirm('Are you sure you want to restart the production server? This will briefly interrupt service.');">
+            <input type="hidden" name="step" value="production">
+            <input type="hidden" name="action" value="restart">
+            <button type="submit" class="btn btn-danger">Restart Production Server</button>
+        </form>
+        [% ELSE %]
+        <div class="step-completed">
+            <span class="checkmark">✓</span> Production server restarted successfully
+            <a href="[% c.uri_for('/admin/software_upgrade', { step => 'complete' }) %]" class="btn btn-success">View Completion Summary</a>
+        </div>
+        [% END %]
+    </section>
+    [% END %]
+
+    [% IF current_step == 'complete' %]
+    <section class="step-section">
+        <h2>Upgrade Complete!</h2>
+        <div class="completion-summary">
+            <div class="success-message">
+                <span class="checkmark">✓</span>
+                <h3>Software upgrade completed successfully!</h3>
+            </div>
+            
+            <div class="completion-details">
+                <h4>Upgrade Summary:</h4>
+                <ul>
+                    <li>✓ Latest code pulled from GitHub</li>
+                    <li>✓ Dependencies updated</li>
+                    <li>✓ Development server testing completed</li>
+                    <li>✓ Production server restarted</li>
+                </ul>
+                
+                <p><strong>Upgrade started:</strong> [% upgrade_status.start_time | date('%Y-%m-%d %H:%M:%S') %]</p>
+                <p><strong>Completed:</strong> [% date.now | date('%Y-%m-%d %H:%M:%S') %]</p>
+            </div>
+            
+            <div class="next-steps">
+                <h4>Recommended Next Steps:</h4>
+                <ul>
+                    <li>Verify the production site is working correctly</li>
+                    <li>Check application logs for any errors</li>
+                    <li>Monitor system performance</li>
+                    <li>Update documentation if needed</li>
+                </ul>
+            </div>
+            
+            <div class="completion-actions">
+                <a href="[% c.uri_for('/admin') %]" class="btn btn-primary">Return to Admin Dashboard</a>
+                <form method="POST" action="[% c.uri_for('/admin/software_upgrade') %]" style="display: inline;">
+                    <input type="hidden" name="step" value="complete">
+                    <input type="hidden" name="action" value="reset">
+                    <button type="submit" class="btn btn-secondary">Start New Upgrade</button>
+                </form>
+            </div>
+        </div>
+    </section>
+    [% END %]
+
+    <!-- Upgrade Log -->
+    [% IF upgrade_status.logs.size > 0 %]
+    <section class="upgrade-log">
+        <h2>Upgrade Log</h2>
+        <div class="log-entries">
+            [% FOREACH log_entry IN upgrade_status.logs.reverse %]
+            <div class="log-entry [% log_entry.success ? 'log-success' : 'log-error' %]">
+                <div class="log-header">
+                    <span class="log-timestamp">[% log_entry.timestamp %]</span>
+                    <span class="log-step">[% log_entry.step %] - [% log_entry.action %]</span>
+                    <span class="log-status">[% log_entry.success ? 'SUCCESS' : 'FAILED' %]</span>
+                </div>
+                [% IF log_entry.warning %]
+                <div class="log-warning">Warning: [% log_entry.warning %]</div>
+                [% END %]
+                [% IF log_entry.output %]
+                <div class="log-output">
+                    <pre>[% log_entry.output %]</pre>
+                </div>
+                [% END %]
+            </div>
+            [% END %]
+        </div>
+    </section>
+    [% END %]
+
+    <!-- Navigation -->
+    <nav class="upgrade-navigation">
+        <a href="[% c.uri_for('/admin') %]" class="nav-link">← Back to Admin Dashboard</a>
+        [% IF current_step != 'overview' && current_step != 'complete' %]
+        <a href="[% c.uri_for('/admin/software_upgrade') %]" class="nav-link">← Back to Overview</a>
+        [% END %]
+    </nav>
+</div>
+
+<!-- All CSS moved to theme system - NO INLINE STYLES ALLOWED -->

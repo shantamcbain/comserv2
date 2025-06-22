@@ -169,7 +169,8 @@ sub index :Path :Args(0) {
         template => 'admin/index.tt',
         stats => $stats,
         recent_activity => $recent_activity,
-        notifications => $notifications
+        notifications => $notifications,
+        is_admin => 1  # User has already passed admin check to get here
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
@@ -5246,6 +5247,260 @@ sub execute_stop_dev_server {
     };
     
     return ($success, $output);
+}
+
+# Software Upgrade Management - Step-by-step upgrade process
+sub software_upgrade :Path('/admin/software_upgrade') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'software_upgrade',
+        "Starting software upgrade management");
+    
+    # Enhanced security check - CSC admin only for production upgrades
+    unless ($self->check_csc_admin_access($c)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'software_upgrade',
+            "Access denied: User does not have CSC admin role");
+        
+        $c->flash->{error_msg} = "You need CSC administrator privileges to perform software upgrades.";
+        $c->response->redirect($c->uri_for('/admin'));
+        return;
+    }
+    
+    # Check if we're on install branch for production upgrades
+    unless ($self->check_install_branch($c)) {
+        $c->flash->{error_msg} = "Software upgrades can only be performed from the install branch for security reasons.";
+        $c->response->redirect($c->uri_for('/admin'));
+        return;
+    }
+    
+    # Handle different upgrade steps
+    my $step = $c->req->param('step') || 'overview';
+    my $action = $c->req->param('action') || '';
+    
+    # Initialize upgrade status in session if not exists
+    unless ($c->session->{upgrade_status}) {
+        $c->session->{upgrade_status} = {
+            current_step => 'overview',
+            steps_completed => {},
+            start_time => time(),
+            logs => []
+        };
+    }
+    
+    my $upgrade_status = $c->session->{upgrade_status};
+    
+    # Process actions based on step
+    if ($c->req->method eq 'POST' && $action) {
+        $self->process_upgrade_action($c, $step, $action);
+    }
+    
+    # Get current system status
+    my $system_status = $self->get_upgrade_system_status($c);
+    
+    # Use the standard debug message system
+    if ($c->session->{debug_mode}) {
+        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
+        push @{$c->stash->{debug_msg}}, "Admin controller software_upgrade view - Template: admin/software_upgrade.tt";
+    }
+    
+    # Set template data
+    $c->stash(
+        template => 'admin/software_upgrade.tt',
+        current_step => $step,
+        upgrade_status => $upgrade_status,
+        system_status => $system_status,
+        production_server => 'computersystemconsulting.ca',
+        server_path => '/opt/comserv'
+    );
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'software_upgrade',
+        "Completed software upgrade management");
+}
+
+# Process upgrade actions for each step
+sub process_upgrade_action {
+    my ($self, $c, $step, $action) = @_;
+    
+    my $upgrade_status = $c->session->{upgrade_status};
+    my $output = '';
+    my $success = 0;
+    my $warning = undef;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process_upgrade_action',
+        "Processing upgrade action: step=$step, action=$action");
+    
+    if ($step eq 'git_pull' && $action eq 'execute') {
+        # Step 1: Pull latest code from GitHub
+        ($success, $output, $warning) = $self->execute_git_pull($c);
+        $upgrade_status->{steps_completed}->{git_pull} = $success;
+        $upgrade_status->{current_step} = $success ? 'dependencies' : 'git_pull';
+        
+    } elsif ($step eq 'dependencies' && $action eq 'execute') {
+        # Step 2: Install/update dependencies
+        ($success, $output, $warning) = $self->execute_dependency_update($c);
+        $upgrade_status->{steps_completed}->{dependencies} = $success;
+        $upgrade_status->{current_step} = $success ? 'dev_server' : 'dependencies';
+        
+    } elsif ($step eq 'dev_server' && $action eq 'start') {
+        # Step 3: Start development server for testing
+        my $dev_url;
+        ($success, $output, $warning, $dev_url) = $self->execute_start_dev_server($c);
+        $upgrade_status->{steps_completed}->{dev_server_start} = $success;
+        $upgrade_status->{dev_server_url} = $dev_url if $success;
+        
+    } elsif ($step eq 'dev_server' && $action eq 'stop') {
+        # Stop development server
+        ($success, $output) = $self->execute_stop_dev_server($c);
+        $upgrade_status->{steps_completed}->{dev_server_stop} = $success;
+        $upgrade_status->{current_step} = 'production' if $success;
+        delete $upgrade_status->{dev_server_url};
+        
+    } elsif ($step eq 'production' && $action eq 'restart') {
+        # Step 4: Restart production Starman server
+        ($success, $output, $warning) = $self->execute_restart_starman($c);
+        $upgrade_status->{steps_completed}->{production_restart} = $success;
+        $upgrade_status->{current_step} = $success ? 'complete' : 'production';
+        
+    } elsif ($step eq 'complete' && $action eq 'reset') {
+        # Reset upgrade process
+        delete $c->session->{upgrade_status};
+        $c->response->redirect($c->uri_for('/admin/software_upgrade'));
+        return;
+    }
+    
+    # Store action results
+    push @{$upgrade_status->{logs}}, {
+        timestamp => scalar(localtime()),
+        step => $step,
+        action => $action,
+        success => $success,
+        output => $output,
+        warning => $warning
+    };
+    
+    # Set flash messages
+    if ($success) {
+        $c->flash->{success_msg} = "Step completed successfully.";
+    } else {
+        $c->flash->{error_msg} = "Step failed. Check the output for details.";
+    }
+    
+    if ($warning) {
+        $c->flash->{warning_msg} = $warning;
+    }
+    
+    # Store output for template
+    $c->stash(
+        step_output => $output,
+        step_success => $success,
+        step_warning => $warning
+    );
+}
+
+# Execute dependency update (similar to what's done in start_dev_server)
+sub execute_dependency_update {
+    my ($self, $c) = @_;
+    my $output = '';
+    my $warning = undef;
+    my $success = 0;
+    
+    try {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_dependency_update',
+            "Starting dependency update");
+        
+        # Change to application directory
+        my $app_path = $c->path_to();
+        $output .= "Updating dependencies in: $app_path\n\n";
+        
+        # Install/update dependencies using cpanm
+        $output .= "Installing/updating Perl dependencies...\n";
+        my $cpanm_output = `cd $app_path && cpanm --installdeps . 2>&1`;
+        $output .= $cpanm_output;
+        
+        # Check if dependency installation was successful
+        if ($? == 0) {
+            $success = 1;
+            $output .= "\nDependency update completed successfully.\n";
+        } else {
+            $output .= "\nDependency update had issues. Exit code: $?\n";
+            $warning = "Some dependencies may not have installed correctly. Check the output for details.";
+        }
+        
+        # Also try to update npm dependencies if package.json exists
+        my $package_json = $c->path_to('package.json');
+        if (-e $package_json) {
+            $output .= "\nUpdating Node.js dependencies...\n";
+            my $npm_output = `cd $app_path && npm install 2>&1`;
+            $output .= $npm_output;
+            
+            if ($? != 0) {
+                $warning = ($warning ? "$warning " : "") . "NPM dependency update had issues.";
+            }
+        }
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_dependency_update',
+            "Dependency update completed with success: $success");
+            
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_dependency_update',
+            "Error during dependency update: $error");
+        $output .= "Error: $error\n";
+        return (0, $output, undef);
+    };
+    
+    return ($success, $output, $warning);
+}
+
+# Get current system status for upgrade overview
+sub get_upgrade_system_status {
+    my ($self, $c) = @_;
+    
+    my $status = {
+        git_status => 'unknown',
+        git_branch => 'unknown',
+        git_last_commit => 'unknown',
+        dev_server_running => 0,
+        starman_running => 0,
+        disk_space => 'unknown',
+        perl_version => $^V ? $^V->stringify : 'unknown'
+    };
+    
+    # Get Git status
+    eval {
+        my $git_status = `cd ${\$c->path_to()} && git status --porcelain 2>/dev/null`;
+        $status->{git_status} = $git_status ? 'modified' : 'clean';
+        
+        my $git_branch = `cd ${\$c->path_to()} && git branch --show-current 2>/dev/null`;
+        chomp($git_branch);
+        $status->{git_branch} = $git_branch || 'unknown';
+        
+        my $git_commit = `cd ${\$c->path_to()} && git log -1 --format="%h %s" 2>/dev/null`;
+        chomp($git_commit);
+        $status->{git_last_commit} = $git_commit || 'unknown';
+    };
+    
+    # Check if development server is running
+    eval {
+        my $dev_processes = `ps aux | grep 'comserv_server.pl' | grep -v grep`;
+        $status->{dev_server_running} = $dev_processes ? 1 : 0;
+    };
+    
+    # Check if Starman is running
+    eval {
+        my $starman_processes = `ps aux | grep starman | grep -v grep`;
+        $status->{starman_running} = $starman_processes ? 1 : 0;
+    };
+    
+    # Get disk space
+    eval {
+        my $df_output = `df -h . | tail -1`;
+        if ($df_output =~ /(\S+)\s+(\S+)\s+(\S+)\s+(\d+)%/) {
+            $status->{disk_space} = "$4% used ($3 available)";
+        }
+    };
+    
+    return $status;
 }
 
 __PACKAGE__->meta->make_immutable;

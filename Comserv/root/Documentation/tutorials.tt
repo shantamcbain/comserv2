@@ -6,24 +6,22 @@
 [% META title = 'Tutorials' %]
 
 <!-- Documentation page for Tutorials -->
-<div class="documentation-content">
-
 [% IF categories.tutorials %]
-    <section class="doc-section">
-        <h2 class="section-toggle">Tutorials</h2>
-        <p>Step-by-step instructions for common tasks.</p>
-        <div class="section-content">
-            [% FOREACH page_name IN categories.tutorials.pages.sort %]
-                [% IF structured_pages.$page_name %]
-                    [% page = structured_pages.$page_name %]
-                    <a href="[% page.url %]" class="doc-card">
-                        <h3>[% page.title %]</h3>
-                        <p>[% page.description || 'Step-by-step tutorial for Comserv users.' %]</p>
-                    </a>
+    <section class="section">
+        <h2 class="section-header toggle">Tutorials</h2>
+        <div class="section-content collapsible">
+            <p>Step-by-step instructions for common tasks.</p>
+            <div class="grid">
+                [% FOREACH page_name IN categories.tutorials.pages.sort %]
+                    [% IF structured_pages.$page_name %]
+                        [% page = structured_pages.$page_name %]
+                        <a href="[% page.url %]" class="card">
+                            <h3>[% page.title %]</h3>
+                            <p>[% page.description || 'Step-by-step tutorial for Comserv users.' %]</p>
+                        </a>
+                    [% END %]
                 [% END %]
-            [% END %]
+            </div>
         </div>
     </section>
 [% END %]
-
-</div>

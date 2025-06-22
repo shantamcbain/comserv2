@@ -1,0 +1,413 @@
+[% PageVersion = 'css_theme_guidelines.tt,v 1.0 2025/01/27 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="documentation-container">
+    <header class="documentation-header">
+        <h1><i class="fas fa-palette"></i>CSS Theme System Guidelines</h1>
+        <div class="user-context">
+            <span class="context-item"><strong>For:</strong> Developers & AI Assistants</span>
+            <span class="context-item"><strong>Status:</strong> <span class="status-active">Mandatory Policy</span></span>
+        </div>
+    </header>
+
+    <div class="alert alert-warning">
+        <i class="fas fa-exclamation-triangle"></i>
+        <div>
+            <h3>CRITICAL RULE: NO INLINE CSS</h3>
+            <p>All styling MUST use the theme system. Inline CSS and individual CSS files outside the theme system are prohibited.</p>
+        </div>
+    </div>
+
+    <section class="doc-section">
+        <h2 class="section-toggle">Why Use the Theme System?</h2>
+        <div class="section-content">
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <h3><i class="fas fa-users feature-icon"></i>Site Owner Control</h3>
+                    </div>
+                    <div class="feature-content">
+                        <p>Each SiteName owner can choose from available themes, ensuring their site looks exactly how they want it.</p>
+                    </div>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <h3><i class="fas fa-sync-alt feature-icon"></i>Consistency</h3>
+                    </div>
+                    <div class="feature-content">
+                        <p>All pages use the same styling approach, creating a cohesive user experience across the entire application.</p>
+                    </div>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <h3><i class="fas fa-tools feature-icon"></i>Maintainability</h3>
+                    </div>
+                    <div class="feature-content">
+                        <p>One or two CSS files per theme instead of scattered styles across hundreds of templates.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="doc-section">
+        <h2 class="section-toggle">Current Theme System Architecture</h2>
+        <div class="section-content">
+            <div class="feature-card">
+                <div class="feature-header">
+                    <h3><i class="fas fa-folder-tree feature-icon"></i>File Structure</h3>
+                </div>
+                <div class="feature-content">
+                    <pre class="server-output">/static/css/themes/
+├── base-containers.css     # Universal container system
+├── admin.css              # Admin theme
+├── csc.css                # CSC theme  
+├── apis.css               # APIS theme
+├── usbm.css               # USBM theme
+├── apiary.css             # Apiary theme
+├── documentation.css      # Documentation components
+└── theme_definitions.json # Theme configuration</pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="doc-section">
+        <h2 class="section-toggle">How to Add New Styles</h2>
+        <div class="section-content">
+            <div class="changelog-summary">
+                <h3>Step 1: Identify the Component Type</h3>
+                <p>Determine what type of component you're styling:</p>
+                <ul class="feature-list">
+                    <li><strong>Container:</strong> Main page layout, sections, cards</li>
+                    <li><strong>Navigation:</strong> Menus, breadcrumbs, pagination</li>
+                    <li><strong>Form:</strong> Inputs, buttons, validation messages</li>
+                    <li><strong>Data Display:</strong> Tables, lists, stats</li>
+                    <li><strong>Feedback:</strong> Alerts, notifications, loading states</li>
+                </ul>
+            </div>
+
+            <div class="changelog-summary">
+                <h3>Step 2: Use Existing Classes First</h3>
+                <p>Check if existing theme classes can be used:</p>
+                <ul class="feature-list">
+                    <li><code>.admin-container</code> or <code>.apiary-container</code> for main containers</li>
+                    <li><code>.feature-card</code> for card layouts</li>
+                    <li><code>.btn</code> variants for buttons</li>
+                    <li><code>.alert</code> variants for messages</li>
+                    <li><code>.stat-card</code> for dashboard statistics</li>
+                </ul>
+            </div>
+
+            <div class="changelog-summary">
+                <h3>Step 3: Add to Appropriate Theme File</h3>
+                <p>If new styles are needed, add them to the correct theme file:</p>
+                <ul class="feature-list">
+                    <li><strong>Component-specific:</strong> Add to <code>/static/css/themes/[component].css</code></li>
+                    <li><strong>Theme-specific:</strong> Add to <code>/static/css/themes/[theme-name].css</code></li>
+                    <li><strong>Universal:</strong> Add to <code>/static/css/themes/base-containers.css</code></li>
+                </ul>
+            </div>
+
+            <div class="changelog-summary">
+                <h3>Step 4: Use Theme Variables</h3>
+                <p>Always use CSS custom properties for consistency:</p>
+                <pre class="server-output">/* GOOD - Uses theme variables */
+.my-component {
+    background: var(--background-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
+
+/* BAD - Hard-coded values */
+.my-component {
+    background: #ffffff;
+    color: #333333;
+    border: 1px solid #dddddd;
+}</pre>
+            </div>
+        </div>
+    </section>
+
+    <section class="doc-section">
+        <h2 class="section-toggle">Available Theme Variables</h2>
+        <div class="section-content">
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <h4>Colors</h4>
+                    </div>
+                    <div class="feature-content">
+                        <ul class="feature-list">
+                            <li><code>--primary-color</code></li>
+                            <li><code>--secondary-color</code></li>
+                            <li><code>--accent-color</code></li>
+                            <li><code>--background-color</code></li>
+                            <li><code>--text-color</code></li>
+                            <li><code>--border-color</code></li>
+                            <li><code>--link-color</code></li>
+                            <li><code>--link-hover-color</code></li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <h4>Status Colors</h4>
+                    </div>
+                    <div class="feature-content">
+                        <ul class="feature-list">
+                            <li><code>--success-color</code></li>
+                            <li><code>--warning-color</code></li>
+                            <li><code>--danger-color</code></li>
+                            <li><code>--info-color</code></li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <h4>Layout</h4>
+                    </div>
+                    <div class="feature-content">
+                        <ul class="feature-list">
+                            <li><code>--table-header-bg</code></li>
+                            <li><code>--container-padding</code></li>
+                            <li><code>--border-radius</code></li>
+                            <li><code>--box-shadow</code></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="doc-section">
+        <h2 class="section-toggle">Common Mistakes to Avoid</h2>
+        <div class="section-content">
+            <div class="alert alert-danger">
+                <i class="fas fa-times-circle"></i>
+                <div>
+                    <h3>NEVER Do This:</h3>
+                    <pre class="server-output">&lt;style&gt;
+.my-custom-style {
+    background: red;
+}
+&lt;/style&gt;</pre>
+                    <p>Inline styles break theme consistency and cannot be overridden by site owners.</p>
+                </div>
+            </div>
+
+            <div class="alert alert-danger">
+                <i class="fas fa-times-circle"></i>
+                <div>
+                    <h3>NEVER Create Individual CSS Files:</h3>
+                    <pre class="server-output">&lt;link rel="stylesheet" href="/static/css/my-page.css"&gt;</pre>
+                    <p>Individual CSS files create maintenance nightmares and break theme consistency.</p>
+                </div>
+            </div>
+
+            <div class="alert alert-success">
+                <i class="fas fa-check-circle"></i>
+                <div>
+                    <h3>ALWAYS Do This Instead:</h3>
+                    <p>Add styles to the appropriate theme file and use existing classes:</p>
+                    <pre class="server-output">&lt;div class="feature-card"&gt;
+    &lt;div class="feature-header"&gt;
+        &lt;h3&gt;My Component&lt;/h3&gt;
+    &lt;/div&gt;
+    &lt;div class="feature-content"&gt;
+        &lt;p&gt;Content here&lt;/p&gt;
+    &lt;/div&gt;
+&lt;/div&gt;</pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="doc-section">
+        <h2 class="section-toggle">Migration Process</h2>
+        <div class="section-content">
+            <div class="changelog-summary">
+                <h3>Current Status</h3>
+                <p>We are gradually migrating from scattered CSS files to the consolidated theme system.</p>
+            </div>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <h4><i class="fas fa-check-circle feature-icon"></i>Completed</h4>
+                    </div>
+                    <div class="feature-content">
+                        <ul class="feature-list">
+                            <li>Documentation route CSS moved to theme system</li>
+                            <li>Base container system established</li>
+                            <li>Theme variable system implemented</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <h4><i class="fas fa-clock feature-icon"></i>In Progress</h4>
+                    </div>
+                    <div class="feature-content">
+                        <ul class="feature-list">
+                            <li>Admin theme consolidation</li>
+                            <li>Apiary theme refinement</li>
+                            <li>Individual CSS file removal</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <h4><i class="fas fa-list feature-icon"></i>Planned</h4>
+                    </div>
+                    <div class="feature-content">
+                        <ul class="feature-list">
+                            <li>CSC theme consolidation</li>
+                            <li>USBM theme consolidation</li>
+                            <li>Legacy CSS cleanup</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="doc-section">
+        <h2 class="section-toggle">For AI Assistants</h2>
+        <div class="section-content">
+            <div class="alert alert-info">
+                <i class="fas fa-robot"></i>
+                <div>
+                    <h3>AI Development Guidelines</h3>
+                    <p>When creating or modifying templates, ALWAYS follow these rules:</p>
+                </div>
+            </div>
+
+            <div class="changelog-summary">
+                <h3>1. Use Existing Classes</h3>
+                <p>Before creating new styles, check if existing theme classes can be used:</p>
+                <pre class="server-output"># Check existing classes in:
+/static/css/themes/base-containers.css
+/static/css/themes/[current-theme].css
+/static/css/themes/documentation.css</pre>
+            </div>
+
+            <div class="changelog-summary">
+                <h3>2. Add New Styles to Theme Files</h3>
+                <p>If new styles are absolutely necessary:</p>
+                <ul class="feature-list">
+                    <li>Add them to the appropriate theme CSS file</li>
+                    <li>Use theme variables for all colors and spacing</li>
+                    <li>Follow existing naming conventions</li>
+                    <li>Include responsive design considerations</li>
+                </ul>
+            </div>
+
+            <div class="changelog-summary">
+                <h3>3. Never Use Inline Styles</h3>
+                <p>NEVER add &lt;style&gt; blocks or style="" attributes to templates.</p>
+            </div>
+
+            <div class="changelog-summary">
+                <h3>4. Test Across Themes</h3>
+                <p>Ensure new components work with all available themes by using theme variables.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="doc-section">
+        <h2 class="section-toggle">Quick Reference</h2>
+        <div class="section-content">
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <h4>Container Classes</h4>
+                    </div>
+                    <div class="feature-content">
+                        <ul class="feature-list">
+                            <li><code>.admin-container</code> - Main page container</li>
+                            <li><code>.feature-card</code> - Content cards</li>
+                            <li><code>.feature-grid</code> - Grid layouts</li>
+                            <li><code>.dashboard-stats</code> - Statistics grid</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <h4>Button Classes</h4>
+                    </div>
+                    <div class="feature-content">
+                        <ul class="feature-list">
+                            <li><code>.btn .btn-primary</code> - Primary action</li>
+                            <li><code>.btn .btn-secondary</code> - Secondary action</li>
+                            <li><code>.btn .btn-success</code> - Success action</li>
+                            <li><code>.btn .btn-warning</code> - Warning action</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <h4>Alert Classes</h4>
+                    </div>
+                    <div class="feature-content">
+                        <ul class="feature-list">
+                            <li><code>.alert .alert-info</code> - Information</li>
+                            <li><code>.alert .alert-success</code> - Success message</li>
+                            <li><code>.alert .alert-warning</code> - Warning message</li>
+                            <li><code>.alert .alert-danger</code> - Error message</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+
+<script>
+// Reuse the existing toggle functionality from the main documentation page
+document.addEventListener('DOMContentLoaded', function() {
+    // Add click event listeners to all toggle headers
+    const toggleHeaders = document.querySelectorAll('.section-toggle');
+    
+    toggleHeaders.forEach(header => {
+        header.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Toggle the expanded class on the header
+            header.classList.toggle('expanded');
+            
+            // Find the content section
+            const section = header.closest('.doc-section');
+            if (!section) return;
+            
+            const content = section.querySelector('.section-content');
+            if (!content) return;
+            
+            // Toggle the expanded state
+            if (content.classList.contains('expanded')) {
+                content.style.maxHeight = '0px';
+                content.classList.remove('expanded');
+            } else {
+                content.classList.add('expanded');
+                content.style.maxHeight = content.scrollHeight + 'px';
+            }
+        });
+    });
+    
+    // Start with all sections closed
+    document.querySelectorAll('.section-content').forEach(content => {
+        content.classList.remove('expanded');
+        content.style.maxHeight = '0px';
+    });
+});
+</script>

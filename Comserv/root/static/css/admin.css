@@ -1,83 +1,14 @@
 /**
- * Admin styles for Comserv
- * Version: 0.01
- * Date: 2025/08/31
+ * Admin styles for Comserv - DEPRECATED
+ * Version: 0.02
+ * Date: 2025/01/15
  * Author: shanta
+ * 
+ * NOTE: All admin styles have been moved to the themes system.
+ * See: /static/css/themes/admin.css
+ * 
+ * This file is kept for backward compatibility but should not be used.
+ * All new admin styles should be added to the admin theme file.
  */
 
-/* Network Diagnostics Styles */
-.command-output {
-    background-color: #f8f9fa;
-    padding: 15px;
-    border-radius: 4px;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    max-height: 400px;
-    overflow-y: auto;
-    font-family: monospace;
-    margin: 0;
-}
-
-.quick-nav {
-    margin-bottom: 15px;
-    padding: 10px 0;
-    border-bottom: 1px solid #eee;
-}
-
-.btn-sm {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.875rem;
-    line-height: 1.5;
-    border-radius: 0.2rem;
-}
-
-/* Admin Dashboard Styles */
-.admin-card {
-    margin-bottom: 20px;
-    border-radius: 5px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    transition: all 0.3s ease;
-}
-
-.admin-card:hover {
-    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-    transform: translateY(-2px);
-}
-
-.admin-card-header {
-    padding: 15px;
-    border-bottom: 1px solid rgba(0,0,0,0.1);
-    font-weight: bold;
-}
-
-.admin-card-body {
-    padding: 15px;
-}
-
-/* Debug Information Styles */
-.debug-footer {
-    margin-top: 30px;
-    padding: 10px;
-    background-color: #f8f9fa;
-    border-radius: 4px;
-    border: 1px solid #ddd;
-}
-
-.debug-footer details {
-    margin-bottom: 0;
-}
-
-.debug-footer summary {
-    cursor: pointer;
-    font-weight: bold;
-    padding: 5px 0;
-}
-
-.debug-footer ul {
-    margin-top: 10px;
-    padding-left: 20px;
-}
-
-.debug-footer li {
-    margin-bottom: 5px;
-}
+/* This file is deprecated - all styles moved to themes/admin.css */

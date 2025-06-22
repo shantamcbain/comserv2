@@ -2,12 +2,9 @@
 /* File: /home/shanta/PycharmProjects/comserv2/Comserv/root/static/css/themes/admin.css */
 
 :root {
-  /* Admin-specific variables */
-  --admin-section-border: #ddd;
-  --admin-deployment-bg: #fff3cd;
-  --admin-deployment-border: #ffc107;
-  --admin-deployment-text: #856404;
-  --dev-server-link-color: #28a745;
+  /* Admin-specific variables - inherit from theme */
+  --admin-section-border: var(--border-color, #ddd);
+  --dev-server-link-color: var(--success-color, #28a745);
 }
 
 /* Admin Dashboard Styles */
@@ -30,16 +27,18 @@
   font-weight: bold;
 }
 
+
+
 /* Production Deployment Section Highlighting */
 .admin-section:nth-child(4) {
-  border: 2px solid var(--admin-deployment-border);
+  border: 2px solid var(--warning-color, #ffc107);
   padding: 15px;
   border-radius: 5px;
-  background-color: var(--admin-deployment-bg);
+  background-color: var(--warning-color, #fff3cd);
 }
 
 .admin-section:nth-child(4) h3 {
-  color: var(--admin-deployment-text);
+  color: var(--text-color, #856404);
 }
 
 /* Server output styling */
@@ -94,4 +93,634 @@
 
 .dev-server-status a:hover {
   text-decoration: underline;
+}
+
+/* Admin Dashboard Card Styles (moved from admin.css) */
+.admin-card {
+  margin-bottom: 20px;
+  border-radius: 5px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  transition: all 0.3s ease;
+}
+
+.admin-card:hover {
+  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+  transform: translateY(-2px);
+}
+
+.admin-card-header {
+  padding: 15px;
+  border-bottom: 1px solid rgba(0,0,0,0.1);
+  font-weight: bold;
+}
+
+.admin-card-body {
+  padding: 15px;
+}
+
+/* Debug Information Styles (moved from admin.css) */
+.debug-footer {
+  margin-top: 30px;
+  padding: 10px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+}
+
+.debug-footer details {
+  margin-bottom: 0;
+}
+
+.debug-footer summary {
+  cursor: pointer;
+  font-weight: bold;
+  padding: 5px 0;
+}
+
+.debug-footer ul {
+  margin-top: 10px;
+  padding-left: 20px;
+}
+
+.debug-footer li {
+  margin-bottom: 5px;
+}
+
+/* Software Upgrade Manager Styles */
+.software-upgrade-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.upgrade-header {
+  text-align: center;
+  margin-bottom: 30px;
+  padding: 20px;
+  background: linear-gradient(135deg, var(--primary-color, #007bff), var(--secondary-color, #6c757d));
+  color: white;
+  border-radius: 8px;
+}
+
+.upgrade-header h1 {
+  margin: 0 0 10px 0;
+  font-size: 2.5rem;
+}
+
+.server-info {
+  font-size: 1.1rem;
+  opacity: 0.9;
+}
+
+.server-label {
+  font-weight: bold;
+}
+
+.server-name {
+  color: #ffd700;
+  font-weight: bold;
+}
+
+.server-path {
+  font-style: italic;
+}
+
+/* System Status Grid */
+.system-status {
+  margin-bottom: 30px;
+  padding: 20px;
+  background: var(--background-color, #f8f9fa);
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #dee2e6);
+}
+
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.status-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  background: white;
+  border-radius: 4px;
+  border: 1px solid var(--border-color, #dee2e6);
+}
+
+.status-item label {
+  font-weight: bold;
+  margin: 0;
+}
+
+.status-value {
+  font-family: monospace;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.status-good {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-warning {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.status-error {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+/* Progress Steps */
+.upgrade-progress {
+  margin-bottom: 30px;
+}
+
+.progress-steps {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 20px;
+  position: relative;
+}
+
+.progress-steps::before {
+  content: '';
+  position: absolute;
+  top: 25px;
+  left: 25px;
+  right: 25px;
+  height: 2px;
+  background: var(--border-color, #dee2e6);
+  z-index: 1;
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  flex: 1;
+  position: relative;
+  z-index: 2;
+}
+
+.step-number {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 1.2rem;
+  margin-bottom: 10px;
+  background: var(--background-color, #f8f9fa);
+  border: 2px solid var(--border-color, #dee2e6);
+  color: var(--text-muted, #6c757d);
+}
+
+.step.active .step-number {
+  background: var(--primary-color, #007bff);
+  border-color: var(--primary-color, #007bff);
+  color: white;
+}
+
+.step.completed .step-number {
+  background: var(--success-color, #28a745);
+  border-color: var(--success-color, #28a745);
+  color: white;
+}
+
+.step.completed .step-number::after {
+  content: '✓';
+  font-size: 1rem;
+}
+
+.step-content h3 {
+  margin: 0 0 5px 0;
+  font-size: 1rem;
+}
+
+.step-content p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-muted, #6c757d);
+}
+
+/* Step Sections */
+.step-section {
+  margin-bottom: 30px;
+  padding: 25px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #dee2e6);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.step-section h2 {
+  margin-top: 0;
+  color: var(--primary-color, #007bff);
+  border-bottom: 2px solid var(--primary-color, #007bff);
+  padding-bottom: 10px;
+}
+
+.step-description {
+  margin-bottom: 20px;
+}
+
+.step-description ul {
+  margin: 10px 0;
+  padding-left: 20px;
+}
+
+.step-description li {
+  margin-bottom: 5px;
+}
+
+.warning-box {
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  color: #856404;
+  padding: 15px;
+  border-radius: 4px;
+  margin: 15px 0;
+}
+
+.warning-box strong {
+  color: #b45309;
+}
+
+/* Step Output */
+.step-output {
+  margin: 20px 0;
+  background: #f8f9fa;
+  border: 1px solid var(--border-color, #dee2e6);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.step-output h3 {
+  margin: 0;
+  padding: 10px 15px;
+  background: var(--secondary-color, #6c757d);
+  color: white;
+  font-size: 1rem;
+}
+
+.step-output pre {
+  margin: 0;
+  padding: 15px;
+  background: #f8f9fa;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  max-height: 400px;
+  overflow-y: auto;
+  font-family: 'Courier New', monospace;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+/* Step Completion */
+.step-completed {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  background: #d4edda;
+  border: 1px solid #c3e6cb;
+  border-radius: 4px;
+  color: #155724;
+}
+
+.checkmark {
+  font-size: 1.5rem;
+  color: var(--success-color, #28a745);
+  font-weight: bold;
+}
+
+/* Development Server Running */
+.dev-server-running {
+  background: #cce5ff;
+  border: 1px solid #99ccff;
+  padding: 20px;
+  border-radius: 4px;
+  margin: 20px 0;
+}
+
+.dev-server-running h3 {
+  margin-top: 0;
+  color: var(--primary-color, #007bff);
+}
+
+.test-link {
+  font-weight: bold;
+  color: var(--primary-color, #007bff);
+  text-decoration: none;
+  padding: 2px 6px;
+  background: rgba(0,123,255,0.1);
+  border-radius: 3px;
+}
+
+.test-link:hover {
+  text-decoration: underline;
+  background: rgba(0,123,255,0.2);
+}
+
+/* Completion Summary */
+.completion-summary {
+  text-align: center;
+  padding: 30px;
+}
+
+.success-message {
+  margin-bottom: 30px;
+}
+
+.success-message .checkmark {
+  font-size: 3rem;
+  display: block;
+  margin-bottom: 15px;
+}
+
+.success-message h3 {
+  color: var(--success-color, #28a745);
+  font-size: 1.8rem;
+  margin: 0;
+}
+
+.completion-details, .next-steps {
+  text-align: left;
+  margin: 20px 0;
+  padding: 20px;
+  background: var(--background-color, #f8f9fa);
+  border-radius: 4px;
+}
+
+.completion-details h4, .next-steps h4 {
+  margin-top: 0;
+  color: var(--primary-color, #007bff);
+}
+
+.completion-actions {
+  margin-top: 30px;
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* Upgrade Log */
+.upgrade-log {
+  margin-top: 30px;
+}
+
+.log-entries {
+  margin-top: 15px;
+}
+
+.log-entry {
+  margin-bottom: 15px;
+  border: 1px solid var(--border-color, #dee2e6);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.log-entry.log-success {
+  border-left: 4px solid var(--success-color, #28a745);
+}
+
+.log-entry.log-error {
+  border-left: 4px solid var(--danger-color, #dc3545);
+}
+
+.log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  background: var(--background-color, #f8f9fa);
+  border-bottom: 1px solid var(--border-color, #dee2e6);
+  font-size: 0.875rem;
+}
+
+.log-timestamp {
+  color: var(--text-muted, #6c757d);
+}
+
+.log-step {
+  font-weight: bold;
+}
+
+.log-status {
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-weight: bold;
+  font-size: 0.75rem;
+}
+
+.log-success .log-status {
+  background: var(--success-color, #28a745);
+  color: white;
+}
+
+.log-error .log-status {
+  background: var(--danger-color, #dc3545);
+  color: white;
+}
+
+.log-warning {
+  padding: 10px 15px;
+  background: #fff3cd;
+  color: #856404;
+  border-bottom: 1px solid var(--border-color, #dee2e6);
+}
+
+.log-output {
+  padding: 0;
+}
+
+.log-output pre {
+  margin: 0;
+  padding: 15px;
+  background: #f8f9fa;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  max-height: 300px;
+  overflow-y: auto;
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+  line-height: 1.3;
+}
+
+/* Navigation */
+.upgrade-navigation {
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-color, #dee2e6);
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.nav-link {
+  color: var(--primary-color, #007bff);
+  text-decoration: none;
+  padding: 8px 15px;
+  border: 1px solid var(--primary-color, #007bff);
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.nav-link:hover {
+  background: var(--primary-color, #007bff);
+  color: white;
+  text-decoration: none;
+}
+
+/* Button Styles */
+.btn {
+  display: inline-block;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  text-decoration: none;
+  font-weight: bold;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 1rem;
+}
+
+.btn-primary {
+  background: var(--primary-color, #007bff);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--primary-dark, #0056b3);
+  color: white;
+  text-decoration: none;
+}
+
+.btn-secondary {
+  background: var(--secondary-color, #6c757d);
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: var(--secondary-dark, #545b62);
+  color: white;
+  text-decoration: none;
+}
+
+.btn-success {
+  background: var(--success-color, #28a745);
+  color: white;
+}
+
+.btn-success:hover {
+  background: var(--success-dark, #1e7e34);
+  color: white;
+  text-decoration: none;
+}
+
+.btn-warning {
+  background: var(--warning-color, #ffc107);
+  color: var(--dark, #212529);
+}
+
+.btn-warning:hover {
+  background: var(--warning-dark, #e0a800);
+  color: var(--dark, #212529);
+  text-decoration: none;
+}
+
+.btn-danger {
+  background: var(--danger-color, #dc3545);
+  color: white;
+}
+
+.btn-danger:hover {
+  background: var(--danger-dark, #c82333);
+  color: white;
+  text-decoration: none;
+}
+
+/* Access Denied Styles */
+.access-denied {
+  text-align: center;
+  padding: 50px 20px;
+  background: var(--background-color, #f8f9fa);
+  border: 1px solid var(--border-color, #dee2e6);
+  border-radius: 8px;
+  margin: 20px auto;
+  max-width: 600px;
+}
+
+.access-denied h1 {
+  color: var(--danger-color, #dc3545);
+  margin-bottom: 20px;
+}
+
+.access-denied p {
+  margin-bottom: 15px;
+  color: var(--text-color, #495057);
+}
+
+.access-denied a {
+  color: var(--primary-color, #007bff);
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.access-denied a:hover {
+  text-decoration: underline;
+}
+
+/* Upgrade Link Highlighting */
+.upgrade-link {
+  color: var(--success-color, #28a745) !important;
+  font-weight: bold;
+}
+
+.upgrade-link:hover {
+  color: var(--success-dark, #1e7e34) !important;
+  text-decoration: none;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .progress-steps {
+    flex-direction: column;
+    gap: 20px;
+  }
+  
+  .progress-steps::before {
+    display: none;
+  }
+  
+  .status-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .completion-actions {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .log-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+  
+  .upgrade-navigation {
+    flex-direction: column;
+  }
 }

@@ -1,13 +1,18 @@
 [% META title = 'Admin Dashboard' %]
-[% PageVersion = 'admin/index.tt,v 0.02 2025/01/15 shanta Exp shanta ' %]
+[% PageVersion = 'admin/index.tt,v 0.03 2025/01/15 shanta Exp shanta ' %]
 
 <!-- Include admin-specific CSS -->
-<link rel="stylesheet" type="text/css" href="[% c.uri_for('/static/css/themes/admin.css') %]">
+<!--<link rel="stylesheet" type="text/css" href="[% c.uri_for('/static/css/themes/admin.css') %]">
+-->
 
+[% IF is_admin %]
 <h1>Admin Dashboard</h1>
 
 [% IF debug_mode == 1 %]
     [% PageVersion %]
+    <div class="debug">
+        <p>Admin access confirmed: is_admin=[% is_admin %], user=[% c.session.username || 'unknown' %]</p>
+    </div>
 [% END %]
 
 <div class="admin-menu">
@@ -41,6 +46,7 @@
   <div class="admin-section">
     <h3>Production Deployment (CSC Admin + Install Branch Only)</h3>
     <ul>
+      <li><a href="[% c.uri_for('/admin/software_upgrade') %]" class="upgrade-link"><strong>Software Upgrade Manager</strong></a> - Complete step-by-step upgrade process</li>
       <li><a href="[% c.uri_for('/admin/start_dev_server') %]">Start Development Server for Testing</a></li>
       <li><a href="[% c.uri_for('/admin/restart_starman') %]">Restart Production Server (Starman)</a></li>
       [% IF c.session.dev_server %]
@@ -57,5 +63,13 @@
     </ul>
   </div>
 </div>
+
+[% ELSE %]
+<div class="access-denied">
+    <h1>Access Denied</h1>
+    <p>You need administrator privileges to access this area.</p>
+    <p><a href="[% c.uri_for('/user/login') %]">Please log in</a> with an administrator account.</p>
+</div>
+[% END %]
 
 <!-- CSS now handled by admin.css theme file -->

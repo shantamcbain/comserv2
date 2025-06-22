@@ -1,0 +1,232 @@
+[% META title = 'Software Upgrade Manager Implementation' %]
+[% META description = 'Added comprehensive step-by-step software upgrade management system for production deployments' %]
+[% META author = 'shanta' %]
+[% META date = '2025-01-15' %]
+
+<div class="changelog-entry">
+    <header class="changelog-header">
+        <h1>Software Upgrade Manager Implementation</h1>
+        <div class="changelog-meta">
+            <span class="date">January 15, 2025</span>
+            <span class="author">by shanta</span>
+            <span class="type">Feature Addition</span>
+        </div>
+    </header>
+
+    <section class="changelog-summary">
+        <h2>Summary</h2>
+        <p>Implemented a comprehensive Software Upgrade Manager that provides a step-by-step guided process for safely upgrading the production server. This addresses the need for a more organized and safer approach to software updates on computersystemconsulting.ca.</p>
+    </section>
+
+    <section class="changelog-details">
+        <h2>What's New</h2>
+        
+        <h3>Software Upgrade Manager (/admin/software_upgrade)</h3>
+        <ul>
+            <li><strong>Step-by-step guided process</strong> for production upgrades</li>
+            <li><strong>System status overview</strong> showing current Git branch, commit, server status, and disk space</li>
+            <li><strong>Progress tracking</strong> with visual indicators for each upgrade step</li>
+            <li><strong>Comprehensive logging</strong> of all upgrade actions and outputs</li>
+            <li><strong>Safety checks</strong> requiring CSC admin privileges and install branch</li>
+        </ul>
+
+        <h3>Upgrade Process Steps</h3>
+        <ol>
+            <li><strong>Git Pull</strong> - Pulls latest code from GitHub repository with backup handling</li>
+            <li><strong>Dependency Update</strong> - Updates Perl modules and Node.js packages</li>
+            <li><strong>Development Server Testing</strong> - Starts test server for verification</li>
+            <li><strong>Production Restart</strong> - Applies changes to production Starman server</li>
+        </ol>
+
+        <h3>Security Features</h3>
+        <ul>
+            <li>CSC administrator privileges required</li>
+            <li>Must be on 'install' branch for production upgrades</li>
+            <li>Confirmation dialogs for critical operations</li>
+            <li>Session-based upgrade state tracking</li>
+            <li>Comprehensive audit logging</li>
+        </ul>
+
+        <h3>User Interface Improvements</h3>
+        <ul>
+            <li>Modern, responsive design with progress indicators</li>
+            <li>Real-time system status monitoring</li>
+            <li>Color-coded status indicators (good/warning/error)</li>
+            <li>Detailed output display for each step</li>
+            <li>Mobile-friendly responsive layout</li>
+        </ul>
+    </section>
+
+    <section class="changelog-technical">
+        <h2>Technical Implementation</h2>
+        
+        <h3>Controller Changes</h3>
+        <ul>
+            <li>Added <code>software_upgrade</code> method to Admin controller</li>
+            <li>Implemented <code>process_upgrade_action</code> for step handling</li>
+            <li>Added <code>execute_dependency_update</code> method</li>
+            <li>Enhanced <code>get_upgrade_system_status</code> for monitoring</li>
+            <li>Integrated with existing git_pull, start_dev_server, and restart_starman functionality</li>
+        </ul>
+
+        <h3>Template System</h3>
+        <ul>
+            <li>Created comprehensive <code>admin/software_upgrade.tt</code> template</li>
+            <li>Added role-based access control to admin templates</li>
+            <li>Enhanced admin index template with proper security checks</li>
+        </ul>
+
+        <h3>CSS Theme Integration</h3>
+        <ul>
+            <li>Added extensive styling to <code>admin.css</code> theme file</li>
+            <li>Implemented responsive design patterns</li>
+            <li>Used CSS custom properties for theme consistency</li>
+            <li>Added specialized styles for upgrade progress, status indicators, and logging</li>
+        </ul>
+    </section>
+
+    <section class="changelog-usage">
+        <h2>How to Use</h2>
+        
+        <h3>Prerequisites</h3>
+        <ul>
+            <li>CSC administrator account</li>
+            <li>Must be on 'install' branch</li>
+            <li>SSH access to production server</li>
+            <li>Sufficient disk space for updates</li>
+        </ul>
+
+        <h3>Access</h3>
+        <ol>
+            <li>Log in as CSC administrator</li>
+            <li>Navigate to Admin Dashboard (/admin)</li>
+            <li>Click "Software Upgrade Manager" in Production Deployment section</li>
+            <li>Follow the step-by-step guided process</li>
+        </ol>
+
+        <h3>Best Practices</h3>
+        <ul>
+            <li>Always test thoroughly with the development server</li>
+            <li>Monitor system status before starting upgrade</li>
+            <li>Ensure adequate disk space is available</li>
+            <li>Perform upgrades during low-traffic periods</li>
+            <li>Keep upgrade logs for troubleshooting</li>
+        </ul>
+    </section>
+
+    <section class="changelog-benefits">
+        <h2>Benefits</h2>
+        <ul>
+            <li><strong>Safer Deployments</strong> - Guided process reduces human error</li>
+            <li><strong>Better Testing</strong> - Mandatory development server testing step</li>
+            <li><strong>Audit Trail</strong> - Complete logging of all upgrade actions</li>
+            <li><strong>Status Monitoring</strong> - Real-time system status visibility</li>
+            <li><strong>User-Friendly</strong> - Intuitive interface with clear instructions</li>
+            <li><strong>Industry Standard</strong> - Follows DevOps best practices for deployment</li>
+        </ul>
+    </section>
+
+    <section class="changelog-files">
+        <h2>Files Modified/Added</h2>
+        <ul>
+            <li><code>Comserv/lib/Comserv/Controller/Admin.pm</code> - Added upgrade functionality</li>
+            <li><code>Comserv/root/admin/index.tt</code> - Added role checks and upgrade link</li>
+            <li><code>Comserv/root/admin/software_upgrade.tt</code> - New upgrade interface template</li>
+            <li><code>Comserv/root/static/css/themes/admin.css</code> - Added comprehensive styling</li>
+            <li><code>Comserv/root/Documentation/changelog/2025-01-15-software-upgrade-manager.tt</code> - This documentation</li>
+        </ul>
+    </section>
+
+    <section class="changelog-future">
+        <h2>Future Enhancements</h2>
+        <ul>
+            <li>Email notifications for upgrade completion/failures</li>
+            <li>Rollback functionality for failed upgrades</li>
+            <li>Integration with monitoring systems</li>
+            <li>Scheduled upgrade capabilities</li>
+            <li>Multi-server deployment support</li>
+        </ul>
+    </section>
+</div>
+
+<style>
+/* Changelog-specific styling */
+.changelog-entry {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.changelog-header {
+    border-bottom: 3px solid var(--primary-color, #007bff);
+    padding-bottom: 20px;
+    margin-bottom: 30px;
+}
+
+.changelog-header h1 {
+    color: var(--primary-color, #007bff);
+    margin-bottom: 10px;
+}
+
+.changelog-meta {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    color: var(--text-muted, #6c757d);
+}
+
+.changelog-meta span {
+    padding: 4px 8px;
+    background: var(--background-color, #f8f9fa);
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.changelog-summary {
+    background: var(--info-bg, #d1ecf1);
+    border: 1px solid var(--info-border, #bee5eb);
+    border-radius: 4px;
+    padding: 20px;
+    margin-bottom: 30px;
+}
+
+.changelog-summary h2 {
+    color: var(--info-color, #0c5460);
+    margin-top: 0;
+}
+
+section {
+    margin-bottom: 30px;
+}
+
+section h2 {
+    color: var(--primary-color, #007bff);
+    border-bottom: 2px solid var(--primary-color, #007bff);
+    padding-bottom: 5px;
+}
+
+section h3 {
+    color: var(--secondary-color, #6c757d);
+    margin-top: 20px;
+}
+
+code {
+    background: var(--code-bg, #f8f9fa);
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    color: var(--code-color, #e83e8c);
+}
+
+ul, ol {
+    padding-left: 20px;
+}
+
+li {
+    margin-bottom: 5px;
+}
+
+strong {
+    color: var(--text-color, #495057);
+}
+</style>
