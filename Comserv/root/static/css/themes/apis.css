@@ -1,22 +1,47 @@
-/* Theme: apis */
+/* Theme: apis - Beemaster Theme with Honey/Bee Colors */
 :root {
-  --accent-color: #FFB900;
-  --background-color: #FFE082;
-  --border-color: #FFD54F;
-  --footer-bg: #FFE082;
-  --footer-text-color: #2C2C2C;
-  --header-bg: #FFE082;
-  --link-color: #B88A00;
-  --link-hover-color: #805F00;
+  /* Core Universal Container Variables - Bee/Honey Themed */
+  --primary-color: #FFB300;        /* Rich honey gold */
+  --secondary-color: #FF8F00;      /* Darker honey orange */
+  --accent-color: #FFC107;         /* Bright golden yellow */
+  --text-color: #3E2723;           /* Dark brown (like bee stripes) */
+  --background-color: #FFF8E1;     /* Light cream (like honeycomb) */
+  --warning-color: #FF6F00;        /* Orange warning */
+  --success-color: #689F38;        /* Natural green */
+  --link-color: #E65100;           /* Deep orange */
+  --link-hover-color: #BF360C;     /* Darker orange on hover */
+  --border-color: #FFD54F;         /* Light golden border */
+  --table-header-bg: #FFECB3;      /* Light honey background */
+  
+  /* Additional variables for complete theme support */
+  --error-color: #D32F2F;          /* Red for errors */
+  --muted-text-color: #8D6E63;     /* Muted brown text */
+  --primary-color-rgb: 255, 179, 0; /* RGB values for rgba usage */
+  
+  /* Navigation and UI specific */
   --nav-bg: #FFE082;
-  --nav-link-color: #2C2C2C;
-  --nav-text: #2C2C2C;
-  --primary-color: #FFF8E1;
-  --secondary-color: #FFE8B8;
-  --success-color: #27ae60;
-  --table-header-bg: #FFE082;
-  --text-color: #2C2C2C;
-  --warning-color: #f39c12;
+  --nav-link-color: #3E2723;
+  --nav-text: #3E2723;
+  --nav-hover-bg: #FFD54F;
+  --dropdown-bg: #FFECB3;
+  
+  /* Header and Footer */
+  --header-bg: #FFE082;
+  --footer-bg: #FFE082;
+  --footer-text-color: #3E2723;
+  
+  /* Button theming */
+  --button-bg: #FFB300;
+  --button-text: #3E2723;
+  --button-border: #FF8F00;
+  --button-hover-bg: #FF8F00;
+  
+  /* Bee-themed accent colors for special elements */
+  --bee-yellow: #FDD835;           /* Bright bee yellow */
+  --bee-black: #212121;            /* Bee black stripes */
+  --hive-brown: #8D6E63;           /* Hive wood brown */
+  --honey-gold: #FFB300;           /* Pure honey color */
+  --pollen-orange: #FF8F00;        /* Pollen orange */
 }
 
 body {

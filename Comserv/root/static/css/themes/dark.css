@@ -1,15 +1,39 @@
-/* Theme: dark */
+/* Theme: dark - Dark Mode Theme */
 :root {
-  --accent-color: #6200ee;
-  --background-color: #121212;
-  --border-color: #333333;
-  --link-color: #bb86fc;
-  --link-hover-color: #3700b3;
-  --primary-color: #1a1a1a;
-  --secondary-color: #2c2c2c;
-  --success-color: #4caf50;
-  --table-header-bg: #2c2c2c;
-  --text-color: #e0e0e0;
-  --warning-color: #ff9800;
+  /* Core Universal Container Variables - Dark Mode */
+  --primary-color: #bb86fc;        /* Purple primary */
+  --secondary-color: #03dac6;      /* Teal secondary */
+  --accent-color: #cf6679;         /* Pink accent */
+  --text-color: #e0e0e0;           /* Light text */
+  --background-color: #121212;     /* Dark background */
+  --warning-color: #ff9800;        /* Orange warning */
+  --success-color: #4caf50;        /* Green success */
+  --link-color: #bb86fc;           /* Purple links */
+  --link-hover-color: #985eff;     /* Lighter purple on hover */
+  --border-color: #333333;         /* Dark border */
+  --table-header-bg: #1e1e1e;      /* Darker header */
+  
+  /* Additional variables for complete theme support */
+  --error-color: #cf6679;          /* Pink for errors */
+  --muted-text-color: #a0a0a0;     /* Muted light text */
+  --primary-color-rgb: 187, 134, 252; /* RGB values for rgba usage */
+  
+  /* Navigation and UI specific */
+  --nav-bg: #1e1e1e;
+  --nav-link-color: #e0e0e0;
+  --nav-text: #e0e0e0;
+  --nav-hover-bg: #333333;
+  --dropdown-bg: #2c2c2c;
+  
+  /* Header and Footer */
+  --header-bg: #1e1e1e;
+  --footer-bg: #1e1e1e;
+  --footer-text-color: #e0e0e0;
+  
+  /* Button theming */
+  --button-bg: #bb86fc;
+  --button-text: #000000;
+  --button-border: #bb86fc;
+  --button-hover-bg: #985eff;
 }
 

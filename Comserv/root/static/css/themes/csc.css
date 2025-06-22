@@ -1,21 +1,39 @@
-/* Theme: csc */
+/* Theme: csc - Cyan/Blue Ocean Theme */
 :root {
-  --accent-color: #FF9900;
-  --background-color: #ccffff;
-  --border-color: #99cccc;
-  --footer-bg: #ccffff;
-  --footer-text-color: #000000;
-  --header-bg: #ccffff;
-  --link-color: #0000FF;
-  --link-hover-color: #000099;
-  --nav-bg: #ccffff;
-  --nav-link-color: #000000;
-  --nav-text: #000000;
-  --primary-color: #ccffff;
-  --secondary-color: #e6ffff;
-  --success-color: #27ae60;
-  --table-header-bg: #ccffff;
-  --text-color: #000000;
-  --warning-color: #f39c12;
+  /* Core Universal Container Variables - Cyan/Blue Ocean Themed */
+  --primary-color: #0097A7;        /* Deep cyan */
+  --secondary-color: #00BCD4;      /* Bright cyan */
+  --accent-color: #26C6DA;         /* Light cyan accent */
+  --text-color: #006064;           /* Dark cyan text */
+  --background-color: #E0F7FA;     /* Very light cyan background */
+  --warning-color: #FF9800;        /* Orange warning for contrast */
+  --success-color: #4CAF50;        /* Green success */
+  --link-color: #1976D2;           /* Blue links */
+  --link-hover-color: #0D47A1;     /* Darker blue on hover */
+  --border-color: #80DEEA;         /* Light cyan border */
+  --table-header-bg: #B2EBF2;      /* Light cyan header */
+  
+  /* Additional variables for complete theme support */
+  --error-color: #D32F2F;          /* Red for errors */
+  --muted-text-color: #00838F;     /* Muted cyan text */
+  --primary-color-rgb: 0, 151, 167; /* RGB values for rgba usage */
+  
+  /* Navigation and UI specific */
+  --nav-bg: #0097A7;
+  --nav-link-color: #ffffff;
+  --nav-text: #ffffff;
+  --nav-hover-bg: #006064;
+  --dropdown-bg: #00BCD4;
+  
+  /* Header and Footer */
+  --header-bg: #0097A7;
+  --footer-bg: #0097A7;
+  --footer-text-color: #ffffff;
+  
+  /* Button theming */
+  --button-bg: #00BCD4;
+  --button-text: #ffffff;
+  --button-border: #0097A7;
+  --button-hover-bg: #00ACC1;
 }
 

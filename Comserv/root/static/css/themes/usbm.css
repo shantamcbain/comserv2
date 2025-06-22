@@ -1,21 +1,39 @@
-/* Theme: usbm */
+/* Theme: usbm - Green Nature Theme */
 :root {
-  --accent-color: #006622;
-  --background-color: #ffffff;
-  --border-color: #00cc44;
-  --footer-bg: #009933;
-  --footer-text-color: #ffffff;
-  --header-bg: #009933;
-  --link-color: #006622;
-  --link-hover-color: #004d1a;
-  --nav-bg: #009933;
+  /* Core Universal Container Variables - Green Nature Themed */
+  --primary-color: #2E7D32;        /* Forest green */
+  --secondary-color: #4CAF50;      /* Bright green */
+  --accent-color: #66BB6A;         /* Light green accent */
+  --text-color: #1B5E20;           /* Dark green text */
+  --background-color: #F1F8E9;     /* Very light green background */
+  --warning-color: #FF8F00;        /* Orange warning */
+  --success-color: #388E3C;        /* Success green */
+  --link-color: #1976D2;           /* Blue links for contrast */
+  --link-hover-color: #0D47A1;     /* Darker blue on hover */
+  --border-color: #A5D6A7;         /* Light green border */
+  --table-header-bg: #E8F5E8;      /* Very light green header */
+  
+  /* Additional variables for complete theme support */
+  --error-color: #D32F2F;          /* Red for errors */
+  --muted-text-color: #689F38;     /* Muted green text */
+  --primary-color-rgb: 46, 125, 50; /* RGB values for rgba usage */
+  
+  /* Navigation and UI specific */
+  --nav-bg: #2E7D32;
   --nav-link-color: #ffffff;
   --nav-text: #ffffff;
-  --primary-color: #009933;
-  --secondary-color: #00cc44;
-  --success-color: #27ae60;
-  --table-header-bg: #00cc44;
-  --text-color: #333333;
-  --warning-color: #f39c12;
+  --nav-hover-bg: #1B5E20;
+  --dropdown-bg: #4CAF50;
+  
+  /* Header and Footer */
+  --header-bg: #2E7D32;
+  --footer-bg: #2E7D32;
+  --footer-text-color: #ffffff;
+  
+  /* Button theming */
+  --button-bg: #4CAF50;
+  --button-text: #ffffff;
+  --button-border: #2E7D32;
+  --button-hover-bg: #388E3C;
 }
 
