@@ -83,6 +83,7 @@ requires 'Email::Simple';
 requires 'Email::Simple::Creator';
 requires 'Email::Sender::Simple';
 requires 'Email::Sender::Transport::SMTP';
+requires 'MIME::Lite';
 
 # Utility modules
 requires 'URI::Escape';
