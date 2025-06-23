@@ -4,3 +4,12 @@ workspace.xml
 .idea/workspace.xml
 .idea/vcs.xml
 /db_config.json
+
+# Application runtime directories and files
+local/
+logs/
+../logs/
+
+# Backup files created by the application
+*.bak
+root/static/config/theme_mappings.json.bak

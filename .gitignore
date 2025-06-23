@@ -68,15 +68,6 @@ Comserv/comserv.psgi
 
 # Development systemd service files (personal setup)
 *.service
-
-# Application runtime directories and files
-local/
-logs/
-../logs/
-
-# Backup files created by the application
-*.bak
-root/static/config/theme_mappings.json.bak
 /aimanager/__init__.py
 /aimanager/__init__.py
 /.idea/externalDependencies.xml
