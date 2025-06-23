@@ -606,6 +606,7 @@ sub send_email {
             require Net::SMTP;
             require MIME::Lite;
             require Authen::SASL;
+            require IO::Socket::SSL;
             
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
                 "Falling back to hardcoded email config using Net::SMTP");
@@ -637,12 +638,14 @@ sub send_email {
                 Data    => $params->{body}
             );
             
-            # Connect to the SMTP server with debug enabled
+            # Connect to the SMTP server with debug enabled and SSL support
             my $smtp = Net::SMTP->new(
                 $smtp_host,
                 Port => $smtp_port,
                 Debug => 1,
-                Timeout => 30
+                Timeout => 30,
+                SSL_verify_mode => 0,  # Disable certificate verification for now
+                SSL_version => 'TLSv1_2:!SSLv2:!SSLv3'  # Use secure TLS versions only
             );
             
             unless ($smtp) {
@@ -652,11 +655,27 @@ sub send_email {
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
                 "Connected to SMTP server $smtp_host:$smtp_port");
             
-            # Start TLS if needed
+            # Start TLS if needed with improved error handling
             if ($smtp_ssl eq 'starttls') {
                 $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
-                    "Starting TLS");
-                $smtp->starttls() or die "STARTTLS failed: " . $smtp->message();
+                    "Starting TLS negotiation");
+                
+                # Use IO::Socket::SSL for better TLS support
+                my $tls_result = $smtp->starttls(
+                    SSL_verify_mode => 0,  # Disable certificate verification
+                    SSL_version => 'TLSv1_2:!SSLv2:!SSLv3',  # Use secure TLS versions
+                    SSL_cipher_list => 'HIGH:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!SRP:!CAMELLIA'
+                );
+                
+                unless ($tls_result) {
+                    my $error_msg = $smtp->message() || "Unknown TLS error";
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email',
+                        "STARTTLS failed: $error_msg");
+                    die "STARTTLS failed: $error_msg";
+                }
+                
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
+                    "TLS negotiation successful");
             }
             
             # Authenticate if credentials are provided

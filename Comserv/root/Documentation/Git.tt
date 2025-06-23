@@ -1,17 +1,16 @@
+
 [% PageVersion = 'Documentation/Git.tt,v 0.03 2025-06-23 10:00 Shanta Exp shanta ' %]
 [%# PageVersion = 'Documentation/Git.tt,v 0.02 2024/12/18 Shanta Exp shanta ' %]
-[
-%
-IF c.session.debug_mode == 1 %]
+[%IF c.session.debug_mode == 1 %]
     [% PageVersion %]
-[
-% END %]
+[% END %]
 <h1>Git Usage Guide for PyCharm</h1>
 <nav>
     <a href="#basic-operations">Basic Git Operations</a> |
     <a href="#pycharm-integration">PyCharm Integration</a> |
     <a href="#workflows">Common Workflows</a> |
-    <a href="#troubleshooting">Troubleshooting</a>
+    <a href="#troubleshooting">Troubleshooting</a> |
+    <a href="#divergentbuild">Divergent Branches During Pull</a>
 </nav>
 <h2 id="basic-operations">Basic Git Operations</h2>
 <ol>
@@ -254,5 +253,41 @@ git push origin <branch_name></code></pre>
         </ol>
     </li>
 </ul>
+<h3 id="divergentbuild" >Divergent Branches During Pull</h3>
+<ul>
+    <li>Error: <code>fatal: Need to specify how to reconcile divergent branches</code>
+        <ol>
+            <li>Check for differences:
+                <pre><code>git status</code></pre>
+            </li>
+            <li>If on a production server, reset to remote state:
+                <pre><code>git fetch origin
+git reset --hard origin/<branch_name>
+git clean -fd
+git pull origin <branch_name></code></pre>
+            </li>
+            <li>Alternatively, choose a reconciliation strategy:
+                <ul>
+                    <li>Merge (preserves history):
+                        <pre><code>git pull --no-rebase origin <branch_name></code></pre>
+                    </li>
+                    <li>Rebase (linear history):
+                        <pre><code>git pull --rebase origin <branch_name></code></pre>
+                    </li>
+                    <li>Fast-forward only:
+                        <pre><code>git pull --ff-only origin <branch_name></code></pre>
+                    </li>
+                </ul>
+            </li>
+            <li>Set a default pull strategy:
+                <pre><code>git config pull.rebase false  # merge
+# or
+git config pull.ff only       # fast-forward only</code></pre>
+            </li>
+        </ol>
+    </li>
+</ul>
+
+
 
 

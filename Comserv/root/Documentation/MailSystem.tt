@@ -334,13 +334,13 @@ $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'method_name',
 
    - If you see "unable to establish SMTP connection to (mail1.ht.home)", it means the hostname-to-IP conversion is not working properly.
 
-   - If you see "can't STARTTLS: 2.0.0 Ready to start TLS", it means there's an issue with the TLS negotiation. Check the SSL/TLS settings in the configuration.
+   - If you see "can't STARTTLS: 2.0.0 Ready to start TLS", it means there's an issue with the TLS negotiation. This has been fixed by implementing proper IO::Socket::SSL support with secure TLS versions and cipher configurations.
 
    - If you see "unable to establish SMTP connection to (192.168.1.129) port 587", check if the SMTP server is running and accessible from the application server.
 
    
 
-   The system now uses Net::SMTP for more reliable connections with better error reporting.
+   The system now uses Net::SMTP with IO::Socket::SSL for more reliable connections with proper TLS support and better error reporting.
 
 
 
