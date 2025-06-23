@@ -13,3 +13,5 @@ logs/
 # Backup files created by the application
 *.bak
 root/static/config/theme_mappings.json.bak
+logs/
+../logs/
