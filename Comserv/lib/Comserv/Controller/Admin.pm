@@ -3589,7 +3589,7 @@ sub git_pull :Path('/admin/git_pull') :Args(0) {
         "Completed git_pull action");
 }
 
-# Execute the git pull operation
+# Execute the git pull operation with divergent branch handling
 sub execute_git_pull {
     my ($self, $c) = @_;
     my $output = '';
@@ -3612,7 +3612,22 @@ sub execute_git_pull {
             $output .= "Backed up theme_mappings.json to $backup_path\n";
         }
         
-        # Check if there are local changes to theme_mappings.json
+        # Check Git status and handle divergent branches
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_git_pull', 
+            "Checking Git status for divergent branches");
+        
+        # First, fetch the latest changes from remote
+        my $fetch_output = `git -C ${\$c->path_to()} fetch origin 2>&1`;
+        $output .= "Git fetch output:\n$fetch_output\n";
+        
+        # Check for divergent branches
+        my $status_output = `git -C ${\$c->path_to()} status --porcelain=v1 2>&1`;
+        my $branch_status = `git -C ${\$c->path_to()} status -b --porcelain=v1 2>&1`;
+        
+        $output .= "Git status output:\n$status_output\n";
+        $output .= "Branch status:\n$branch_status\n";
+        
+        # Check if there are local changes that need to be stashed
         my $has_local_changes = 0;
         if ($theme_mappings_exists) {
             my $git_status = `git -C ${\$c->path_to()} status --porcelain root/static/config/theme_mappings.json`;
@@ -3624,20 +3639,72 @@ sub execute_git_pull {
                 $output .= "Local changes detected in theme_mappings.json\n";
                 
                 # Stash the changes
-                my $stash_output = `git -C ${\$c->path_to()} stash push -- root/static/config/theme_mappings.json 2>&1`;
+                my $stash_output = `git -C ${\$c->path_to()} stash push -m "Auto-stash before git pull" -- root/static/config/theme_mappings.json 2>&1`;
                 $output .= "Stashed changes: $stash_output\n";
             }
         }
         
-        # Execute git pull
+        # Check if we have divergent branches by comparing local and remote
+        my $local_commit = `git -C ${\$c->path_to()} rev-parse HEAD 2>&1`;
+        my $remote_commit = `git -C ${\$c->path_to()} rev-parse origin/master 2>&1`;
+        chomp($local_commit);
+        chomp($remote_commit);
+        
+        $output .= "Local commit: $local_commit\n";
+        $output .= "Remote commit: $remote_commit\n";
+        
+        # Check if branches have diverged
+        my $merge_base = `git -C ${\$c->path_to()} merge-base HEAD origin/master 2>&1`;
+        chomp($merge_base);
+        
+        my $diverged = 0;
+        if ($local_commit ne $remote_commit && $merge_base ne $local_commit && $merge_base ne $remote_commit) {
+            $diverged = 1;
+            $output .= "Divergent branches detected - local and remote have different commits\n";
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'execute_git_pull', 
+                "Divergent branches detected");
+        }
+        
+        # Execute git pull with appropriate strategy
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_git_pull', 
-            "Executing git pull");
-        my $pull_output = `git -C ${\$c->path_to()} pull 2>&1`;
+            "Executing git pull with merge strategy");
+        
+        # Use merge strategy to handle divergent branches safely
+        my $pull_output = `git -C ${\$c->path_to()} pull --no-rebase origin master 2>&1`;
         $output .= "Git pull output:\n$pull_output\n";
         
-        # Check if pull was successful
-        if ($pull_output =~ /Already up to date|Fast-forward|Updating/) {
+        # Check if pull was successful or if we need to handle divergent branches
+        if ($pull_output =~ /Already up to date|Fast-forward|Updating|Merge made by/) {
             $success = 1;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_git_pull', 
+                "Git pull completed successfully");
+        } elsif ($pull_output =~ /divergent branches|Need to specify how to reconcile/) {
+            # Handle divergent branches with explicit merge strategy
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_git_pull', 
+                "Handling divergent branches with merge strategy");
+            
+            # Configure git to use merge strategy for divergent branches
+            my $config_output = `git -C ${\$c->path_to()} config pull.rebase false 2>&1`;
+            $output .= "Git config output: $config_output\n";
+            
+            # Try pull again with explicit merge strategy
+            $pull_output = `git -C ${\$c->path_to()} pull --no-rebase origin master 2>&1`;
+            $output .= "Git pull (retry) output:\n$pull_output\n";
+            
+            if ($pull_output =~ /Already up to date|Fast-forward|Updating|Merge made by/) {
+                $success = 1;
+                $warning = "Divergent branches were successfully merged. Local changes have been preserved.";
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_git_pull', 
+                    "Divergent branches resolved successfully");
+            } else {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_git_pull', 
+                    "Git pull failed after handling divergent branches: $pull_output");
+                return (0, $output, "Git pull failed after attempting to resolve divergent branches. Manual intervention may be required.");
+            }
+        } elsif ($pull_output =~ /CONFLICT/) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_git_pull', 
+                "Git pull resulted in conflicts: $pull_output");
+            return (0, $output, "Git pull resulted in merge conflicts. Manual resolution required.");
         } else {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_git_pull', 
                 "Git pull failed: $pull_output");
@@ -3665,14 +3732,260 @@ sub execute_git_pull {
             }
         }
         
+        # Final status check
+        my $final_status = `git -C ${\$c->path_to()} status --porcelain 2>&1`;
+        if ($final_status) {
+            $output .= "Final git status:\n$final_status\n";
+            if ($final_status =~ /^UU|^AA|^DD/) {
+                $warning = "There may be unresolved merge conflicts. Please check the repository status.";
+            }
+        }
+        
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_git_pull', 
-            "Git pull completed successfully");
+            "Git pull operation completed");
+            
     } catch {
         my $error = $_;
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_git_pull', 
             "Error during git pull: $error");
         $output .= "Error: $error\n";
         return (0, $output, undef);
+    };
+    
+    return ($success, $output, $warning);
+}
+
+# Emergency Git operations for production servers
+sub git_emergency :Path('/admin/git_emergency') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_emergency', 
+        "Starting git_emergency action");
+    
+    # Check if the user has admin role
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_emergency', 
+            "Access denied: User does not have admin role");
+        
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        $c->response->redirect($c->uri_for('/user/login', {
+            destination => $c->req->uri
+        }));
+        return;
+    }
+    
+    # Check if this is a POST request with specific action
+    if ($c->req->method eq 'POST') {
+        my $action = $c->req->param('action') || '';
+        my ($success, $output, $warning) = (0, '', undef);
+        
+        if ($action eq 'reset_hard') {
+            ($success, $output, $warning) = $self->execute_git_reset_hard($c);
+        } elsif ($action eq 'force_pull') {
+            ($success, $output, $warning) = $self->execute_git_force_pull($c);
+        } elsif ($action eq 'status_check') {
+            ($success, $output, $warning) = $self->execute_git_status_check($c);
+        }
+        
+        $c->stash(
+            output => $output,
+            success_msg => $success ? "Operation completed successfully." : undef,
+            error_msg => $success ? undef : "Operation failed. See output for details.",
+            warning_msg => $warning,
+            action_performed => $action
+        );
+    }
+    
+    # Set the template
+    $c->stash(template => 'admin/git_emergency.tt');
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_emergency', 
+        "Completed git_emergency action");
+}
+
+# Execute Git status check for diagnostics
+sub execute_git_status_check {
+    my ($self, $c) = @_;
+    my $output = '';
+    my $warning = undef;
+    my $success = 1;
+    
+    try {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_git_status_check', 
+            "Performing comprehensive Git status check");
+        
+        # Get current branch
+        my $current_branch = `git -C ${\$c->path_to()} branch --show-current 2>&1`;
+        chomp($current_branch);
+        $output .= "Current branch: $current_branch\n\n";
+        
+        # Get Git status
+        my $status = `git -C ${\$c->path_to()} status 2>&1`;
+        $output .= "Git status:\n$status\n\n";
+        
+        # Get local and remote commit info
+        my $local_commit = `git -C ${\$c->path_to()} rev-parse HEAD 2>&1`;
+        my $remote_commit = `git -C ${\$c->path_to()} rev-parse origin/master 2>&1`;
+        chomp($local_commit);
+        chomp($remote_commit);
+        
+        $output .= "Local commit (HEAD): $local_commit\n";
+        $output .= "Remote commit (origin/master): $remote_commit\n\n";
+        
+        # Check if branches have diverged
+        if ($local_commit ne $remote_commit) {
+            my $merge_base = `git -C ${\$c->path_to()} merge-base HEAD origin/master 2>&1`;
+            chomp($merge_base);
+            
+            if ($merge_base ne $local_commit && $merge_base ne $remote_commit) {
+                $output .= "⚠️  DIVERGENT BRANCHES DETECTED\n";
+                $output .= "Merge base: $merge_base\n";
+                $warning = "Branches have diverged. Local and remote have different commits.";
+            } elsif ($merge_base eq $local_commit) {
+                $output .= "✅ Local branch is behind remote (safe to pull)\n";
+            } else {
+                $output .= "✅ Local branch is ahead of remote\n";
+            }
+        } else {
+            $output .= "✅ Local and remote are in sync\n";
+        }
+        
+        # Get recent commits
+        my $recent_commits = `git -C ${\$c->path_to()} log --oneline -5 2>&1`;
+        $output .= "\nRecent commits:\n$recent_commits\n";
+        
+        # Check for uncommitted changes
+        my $uncommitted = `git -C ${\$c->path_to()} diff --name-only 2>&1`;
+        if ($uncommitted) {
+            $output .= "\nUncommitted changes:\n$uncommitted\n";
+        }
+        
+        # Check for untracked files
+        my $untracked = `git -C ${\$c->path_to()} ls-files --others --exclude-standard 2>&1`;
+        if ($untracked) {
+            $output .= "\nUntracked files (first 10):\n";
+            my @untracked_lines = split(/\n/, $untracked);
+            for my $i (0..9) {
+                last unless $untracked_lines[$i];
+                $output .= "$untracked_lines[$i]\n";
+            }
+            if (@untracked_lines > 10) {
+                $output .= "... and " . (@untracked_lines - 10) . " more files\n";
+            }
+        }
+        
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_git_status_check', 
+            "Error during Git status check: $error");
+        $output .= "Error: $error\n";
+        $success = 0;
+    };
+    
+    return ($success, $output, $warning);
+}
+
+# Execute Git force pull (dangerous - use with caution)
+sub execute_git_force_pull {
+    my ($self, $c) = @_;
+    my $output = '';
+    my $warning = "⚠️  FORCE PULL PERFORMED - Local changes may be lost!";
+    my $success = 0;
+    
+    try {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'execute_git_force_pull', 
+            "Performing FORCE PULL - this may lose local changes");
+        
+        # Backup theme_mappings.json if it exists
+        my $theme_mappings_path = $c->path_to('root', 'static', 'config', 'theme_mappings.json');
+        my $backup_path = "$theme_mappings_path.bak";
+        
+        if (-e $theme_mappings_path) {
+            copy($theme_mappings_path, $backup_path);
+            $output .= "Backed up theme_mappings.json to $backup_path\n";
+        }
+        
+        # Fetch latest changes
+        my $fetch_output = `git -C ${\$c->path_to()} fetch origin 2>&1`;
+        $output .= "Git fetch output:\n$fetch_output\n\n";
+        
+        # Reset to remote state (DANGEROUS)
+        my $reset_output = `git -C ${\$c->path_to()} reset --hard origin/master 2>&1`;
+        $output .= "Git reset --hard output:\n$reset_output\n\n";
+        
+        # Clean untracked files
+        my $clean_output = `git -C ${\$c->path_to()} clean -fd 2>&1`;
+        $output .= "Git clean output:\n$clean_output\n\n";
+        
+        # Verify final state
+        my $final_status = `git -C ${\$c->path_to()} status 2>&1`;
+        $output .= "Final status:\n$final_status\n";
+        
+        $success = 1;
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'execute_git_force_pull', 
+            "Force pull completed - local changes were discarded");
+        
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_git_force_pull', 
+            "Error during force pull: $error");
+        $output .= "Error: $error\n";
+    };
+    
+    return ($success, $output, $warning);
+}
+
+# Execute Git reset hard (very dangerous - use only in emergencies)
+sub execute_git_reset_hard {
+    my ($self, $c) = @_;
+    my $output = '';
+    my $warning = "⚠️  HARD RESET PERFORMED - All local changes have been discarded!";
+    my $success = 0;
+    
+    try {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'execute_git_reset_hard', 
+            "Performing HARD RESET - this will discard ALL local changes");
+        
+        # Get current commit for reference
+        my $current_commit = `git -C ${\$c->path_to()} rev-parse HEAD 2>&1`;
+        chomp($current_commit);
+        $output .= "Current commit before reset: $current_commit\n\n";
+        
+        # Backup theme_mappings.json if it exists
+        my $theme_mappings_path = $c->path_to('root', 'static', 'config', 'theme_mappings.json');
+        my $backup_path = "$theme_mappings_path.bak";
+        
+        if (-e $theme_mappings_path) {
+            copy($theme_mappings_path, $backup_path);
+            $output .= "Backed up theme_mappings.json to $backup_path\n";
+        }
+        
+        # Fetch latest changes first
+        my $fetch_output = `git -C ${\$c->path_to()} fetch origin 2>&1`;
+        $output .= "Git fetch output:\n$fetch_output\n\n";
+        
+        # Hard reset to remote master
+        my $reset_output = `git -C ${\$c->path_to()} reset --hard origin/master 2>&1`;
+        $output .= "Git reset --hard origin/master output:\n$reset_output\n\n";
+        
+        # Get new commit for reference
+        my $new_commit = `git -C ${\$c->path_to()} rev-parse HEAD 2>&1`;
+        chomp($new_commit);
+        $output .= "New commit after reset: $new_commit\n\n";
+        
+        # Final status
+        my $final_status = `git -C ${\$c->path_to()} status 2>&1`;
+        $output .= "Final status:\n$final_status\n";
+        
+        $success = 1;
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'execute_git_reset_hard', 
+            "Hard reset completed - repository is now at origin/master");
+        
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_git_reset_hard', 
+            "Error during hard reset: $error");
+        $output .= "Error: $error\n";
     };
     
     return ($success, $output, $warning);

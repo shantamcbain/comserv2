@@ -1,0 +1,229 @@
+[% META title = 'Git Divergent Branches Fix - Production Deployment Solution' %]
+
+# Git Divergent Branches Fix - Production Deployment Solution
+
+**Date:** 2025-01-15  
+**Category:** Deployment & Git Management  
+**Priority:** High  
+**Status:** Implemented  
+
+## Problem Description
+
+Production server at `/opt/comserv/` was experiencing Git divergent branches error when attempting to pull latest changes from GitHub:
+
+```
+Backed up theme_mappings.json to /opt/comserv/Comserv/root/static/config/theme_mappings.json.bak 
+Git pull output: From https://github.com/shantamcbain/comserv2 
+86dc11e..1f2c575 master -> origin/master 
+hint: You have divergent branches and need to specify how to reconcile them. 
+hint: You can do so by running one of the following commands sometime before 
+hint: your next pull: 
+hint: 
+hint: git config pull.rebase false # merge 
+hint: git config pull.rebase true # rebase 
+hint: git config pull.ff only # fast-forward only 
+hint: 
+hint: You can replace "git config" with "git config --global" to set a default 
+hint: preference for all repositories. You can also pass --rebase, --no-rebase, 
+hint: or --ff-only on the command line to override the configured default per 
+hint: invocation. 
+fatal: Need to specify how to reconcile divergent branches.
+```
+
+## Root Cause Analysis
+
+1. **Divergent Branches**: Local production repository had commits that differed from the remote GitHub repository
+2. **Git Configuration**: Production server's Git was not configured with a default strategy for handling divergent branches
+3. **Deployment Process**: The existing Git pull functionality didn't handle divergent branch scenarios
+4. **Recent Changes**: Menu link fixes (commits 86dc11e to 1f2c575) needed to be deployed but were blocked by this issue
+
+## Solution Implemented
+
+### 1. Enhanced Git Pull Functionality
+
+**File Modified:** `Comserv/lib/Comserv/Controller/Admin.pm`
+
+**Method Updated:** `execute_git_pull`
+
+**Key Improvements:**
+- **Divergent Branch Detection**: Added logic to detect when local and remote branches have diverged
+- **Automatic Resolution**: Configures Git to use merge strategy (`pull.rebase false`) when divergent branches are detected
+- **Safe Merge Process**: Uses `--no-rebase` flag to ensure merge strategy is applied
+- **Enhanced Logging**: Comprehensive logging of Git operations for debugging
+- **Backup Protection**: Maintains existing theme_mappings.json backup functionality
+
+**Code Changes:**
+```perl
+# Check if we have divergent branches by comparing local and remote
+my $local_commit = `git -C ${\$c->path_to()} rev-parse HEAD 2>&1`;
+my $remote_commit = `git -C ${\$c->path_to()} rev-parse origin/master 2>&1`;
+
+# Detect divergent branches
+my $merge_base = `git -C ${\$c->path_to()} merge-base HEAD origin/master 2>&1`;
+if ($local_commit ne $remote_commit && $merge_base ne $local_commit && $merge_base ne $remote_commit) {
+    $diverged = 1;
+    # Handle divergent branches with explicit merge strategy
+    my $config_output = `git -C ${\$c->path_to()} config pull.rebase false 2>&1`;
+    $pull_output = `git -C ${\$c->path_to()} pull --no-rebase origin master 2>&1`;
+}
+```
+
+### 2. Emergency Git Operations
+
+**New File Created:** `Comserv/root/admin/git_emergency.tt`
+
+**New Method Added:** `git_emergency` in Admin controller
+
+**Features:**
+- **Git Status Check**: Comprehensive repository diagnostics
+- **Force Pull**: Dangerous operation to reset to remote state
+- **Hard Reset**: Nuclear option for extreme emergencies
+- **Safety Warnings**: Multiple confirmation dialogs for dangerous operations
+
+**Emergency Operations Available:**
+1. **Status Check**: Safe diagnostic tool
+2. **Force Pull**: Resets to remote state (loses local changes)
+3. **Hard Reset**: Complete repository reset (permanent data loss)
+
+### 3. Production Deployment Strategy
+
+**Recommended Approach for Production:**
+
+1. **First Attempt**: Use the enhanced normal Git Pull
+   - Navigate to `/admin/git_pull`
+   - The enhanced functionality will automatically handle divergent branches
+   - Uses merge strategy to preserve both local and remote changes
+
+2. **If Normal Pull Fails**: Use Emergency Git Status Check
+   - Navigate to `/admin/git_emergency`
+   - Click "Check Git Status" to diagnose the issue
+   - Review the output to understand the repository state
+
+3. **If Safe to Proceed**: Use Force Pull (with caution)
+   - Only if local changes are not critical
+   - Backs up theme_mappings.json automatically
+   - Resets repository to match remote exactly
+
+4. **Last Resort**: Hard Reset
+   - Only in extreme emergencies
+   - Permanently destroys all local changes
+   - Requires double confirmation
+
+## Technical Details
+
+### Git Commands Used
+
+**Normal Enhanced Pull:**
+```bash
+git fetch origin
+git config pull.rebase false
+git pull --no-rebase origin master
+```
+
+**Force Pull:**
+```bash
+git fetch origin
+git reset --hard origin/master
+git clean -fd
+```
+
+**Hard Reset:**
+```bash
+git fetch origin
+git reset --hard origin/master
+```
+
+### Safety Measures
+
+1. **Automatic Backups**: theme_mappings.json is always backed up before operations
+2. **Comprehensive Logging**: All Git operations are logged with detailed output
+3. **Status Verification**: Final repository status is checked after operations
+4. **Conflict Detection**: Merge conflicts are detected and reported
+5. **User Confirmation**: Dangerous operations require explicit confirmation
+
+## Files Modified/Created
+
+### Modified Files:
+- `Comserv/lib/Comserv/Controller/Admin.pm`
+  - Enhanced `execute_git_pull` method
+  - Added `git_emergency` method
+  - Added `execute_git_status_check` method
+  - Added `execute_git_force_pull` method
+  - Added `execute_git_reset_hard` method
+
+### New Files:
+- `Comserv/root/admin/git_emergency.tt` - Emergency Git operations interface
+- `Comserv/root/Documentation/changelog/2025-01-15-git-divergent-branches-fix.tt` - This documentation
+
+## Testing Instructions
+
+### Development Environment Testing:
+1. Create a divergent branch scenario
+2. Test the enhanced Git pull functionality
+3. Verify emergency operations work correctly
+4. Confirm backup and restore functionality
+
+### Production Deployment:
+1. Deploy the updated Admin.pm controller
+2. Deploy the new git_emergency.tt template
+3. Test with Git status check first
+4. Proceed with normal Git pull
+5. Monitor logs for any issues
+
+## Deployment Commands for Production
+
+```bash
+# On production server (/opt/comserv/)
+cd /opt/comserv
+
+# First, try the enhanced Git pull through web interface
+# Navigate to: https://your-domain/admin/git_pull
+
+# Or manually resolve if needed:
+git config pull.rebase false
+git pull --no-rebase origin master
+```
+
+## Expected Results
+
+After implementing this fix:
+
+1. **Automatic Resolution**: Divergent branches will be automatically resolved using merge strategy
+2. **Successful Deployment**: Latest changes (commits 86dc11e to 1f2c575) will be successfully pulled
+3. **Menu Fixes Deployed**: Back, Hosted, and Member functionality fixes will be active
+4. **Future-Proof**: Production server will handle future divergent branch scenarios automatically
+
+## Monitoring and Maintenance
+
+1. **Log Monitoring**: Check application logs for Git operation results
+2. **Backup Verification**: Ensure theme_mappings.json backups are created successfully
+3. **Repository Health**: Periodically use Git status check to monitor repository health
+4. **Documentation Updates**: Keep this documentation updated with any future changes
+
+## Rollback Plan
+
+If issues occur:
+1. **Restore Backup**: Use the automatically created theme_mappings.json.bak
+2. **Revert Controller**: Replace Admin.pm with previous version
+3. **Manual Git Reset**: Use `git reset --hard` to previous known good commit
+4. **Emergency Access**: Use emergency Git operations interface for recovery
+
+## Related Issues
+
+- **Menu Link Fixes**: This deployment enables the menu link fixes for Back, Hosted, and Member functionality
+- **Production Stability**: Resolves ongoing deployment issues on production server
+- **Git Workflow**: Establishes proper Git workflow for production deployments
+
+## Future Improvements
+
+1. **Automated Testing**: Add automated tests for Git operations
+2. **Deployment Pipeline**: Consider implementing CI/CD pipeline
+3. **Monitoring Integration**: Add monitoring alerts for Git operation failures
+4. **Documentation**: Create user guide for production deployments
+
+---
+
+**Implementation Status:** ✅ Complete  
+**Testing Status:** ✅ Ready for Production  
+**Documentation Status:** ✅ Complete  
+**Deployment Status:** 🔄 Ready for Production Deployment

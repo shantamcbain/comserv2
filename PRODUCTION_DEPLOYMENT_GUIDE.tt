@@ -1,0 +1,161 @@
+# Production Server Git Divergent Branches - Quick Fix Guide
+
+## IMMEDIATE SOLUTION FOR PRODUCTION SERVER
+
+**Server Location:** `/opt/comserv/`  
+**Issue:** Git divergent branches preventing deployment  
+**Target Commits:** 86dc11e to 1f2c575 (Menu link fixes)  
+
+## Step-by-Step Resolution
+
+### Option 1: Use Updated Web Interface (Recommended)
+
+1. **Deploy the Fix First:**
+   ```bash
+   # On production server
+   cd /opt/comserv
+   
+   # Manually configure Git to handle divergent branches
+   git config pull.rebase false
+   
+   # Try the pull with explicit merge strategy
+   git pull --no-rebase origin master
+   ```
+
+2. **If successful, then deploy the web interface updates:**
+   - The enhanced Admin controller will handle future divergent branches automatically
+   - New emergency Git operations will be available at `/admin/git_emergency`
+
+### Option 2: Manual Command Line Fix
+
+```bash
+# On production server (/opt/comserv/)
+cd /opt/comserv
+
+# Step 1: Backup important files
+cp Comserv/root/static/config/theme_mappings.json Comserv/root/static/config/theme_mappings.json.bak
+
+# Step 2: Configure Git for divergent branches
+git config pull.rebase false
+
+# Step 3: Fetch latest changes
+git fetch origin
+
+# Step 4: Check status
+git status
+
+# Step 5: Pull with merge strategy
+git pull --no-rebase origin master
+
+# Step 6: Verify success
+git log --oneline -5
+```
+
+### Option 3: Force Reset (If Safe)
+
+**⚠️ WARNING: This will lose any local changes**
+
+```bash
+# On production server (/opt/comserv/)
+cd /opt/comserv
+
+# Backup critical files
+cp Comserv/root/static/config/theme_mappings.json Comserv/root/static/config/theme_mappings.json.bak
+
+# Force reset to remote state
+git fetch origin
+git reset --hard origin/master
+
+# Restore theme mappings if needed
+cp Comserv/root/static/config/theme_mappings.json.bak Comserv/root/static/config/theme_mappings.json
+```
+
+## Expected Results
+
+After successful resolution:
+- Repository will be at commit `1f2c575`
+- Menu link fixes will be deployed (Back, Hosted, Member functionality)
+- Future Git pulls will work automatically
+- Web interface will have enhanced Git management tools
+
+## Verification Commands
+
+```bash
+# Check current commit
+git rev-parse HEAD
+
+# Should show: 1f2c575...
+
+# Check status
+git status
+
+# Should show: "On branch master, Your branch is up to date with 'origin/master'"
+
+# Check recent commits
+git log --oneline -3
+
+# Should show the menu link fixes
+```
+
+## Files That Will Be Updated
+
+- `Comserv/lib/Comserv/Controller/Admin.pm` - Enhanced Git pull functionality
+- `Comserv/root/admin/git_emergency.tt` - New emergency Git operations interface
+- Various menu-related files with the link fixes
+
+## Troubleshooting
+
+### If Git Pull Still Fails:
+```bash
+# Check what's blocking
+git status --porcelain
+
+# Check divergent branches
+git log --oneline --graph --all -10
+
+# Force merge if safe
+git merge origin/master --no-ff
+```
+
+### If Conflicts Occur:
+```bash
+# List conflicted files
+git diff --name-only --diff-filter=U
+
+# For each conflicted file, choose version:
+git checkout --theirs <filename>  # Use remote version
+# OR
+git checkout --ours <filename>    # Use local version
+
+# After resolving all conflicts:
+git add .
+git commit -m "Resolve merge conflicts"
+```
+
+## Post-Deployment Verification
+
+1. **Web Interface Test:**
+   - Navigate to `/admin/git_pull`
+   - Should show enhanced interface with divergent branch handling
+
+2. **Emergency Operations Test:**
+   - Navigate to `/admin/git_emergency`
+   - Should show new emergency Git operations interface
+
+3. **Menu Functionality Test:**
+   - Test Back button functionality
+   - Test Hosted section access
+   - Test Member functionality
+
+## Contact Information
+
+If issues persist:
+- Check application logs in `/opt/comserv/Comserv/script/logs/`
+- Review Git operation output for specific error messages
+- Use the new Git Status Check feature in `/admin/git_emergency`
+
+---
+
+**Priority:** HIGH - Production Issue  
+**Impact:** Blocks deployment of critical menu fixes  
+**Solution Status:** Ready for immediate deployment

@@ -1,0 +1,300 @@
+[% META title = 'Emergency Git Operations' %]
+<!-- File: /home/shanta/PycharmProjects/comserv2/Comserv/root/admin/git_emergency.tt -->
+[% PageVersion = 'admin/git_emergency.tt,v 1.00 2025/01/15 shanta Exp shanta ' %]
+
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<!-- Quick Navigation -->
+<div class="quick-nav">
+    <a href="[% c.uri_for('/admin') %]" class="btn btn-sm btn-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Admin Dashboard
+    </a>
+    <a href="[% c.uri_for('/admin/git_pull') %]" class="btn btn-sm btn-info">
+        <i class="fas fa-code-branch"></i> Normal Git Pull
+    </a>
+</div>
+
+<div class="apiary-container">
+    <div class="apiary-header">
+        <h1><i class="fas fa-exclamation-triangle"></i> Emergency Git Operations</h1>
+        <div class="apiary-context">
+            <div class="context-item">
+                <strong>⚠️ DANGER ZONE</strong> - Use with extreme caution
+            </div>
+        </div>
+    </div>
+    
+    [% IF debug_msg || c.session.debug_mode == 1 %]
+        <div class="alert alert-info">
+            <strong>Debug Information:</strong>
+            [% IF debug_msg %]
+                [% FOREACH msg IN debug_msg %]
+                    <p>[% msg %]</p>
+                [% END %]
+            [% END %]
+            <p>User exists: [% c.user_exists ? 'Yes' : 'No' %]</p>
+            <p>Username: [% c.user.username || 'Not logged in' %]</p>
+            <p>Session roles: [% c.session.roles.join(', ') || 'None' %]</p>
+            <p>Is admin: [% c.session.roles.grep('^admin$').size ? 'Yes' : 'No' %]</p>
+        </div>
+    [% END %]
+    
+    [% IF error_msg %]
+        <div class="alert alert-danger">
+            <h3><i class="fas fa-exclamation-circle"></i> Error</h3>
+            <p>[% error_msg %]</p>
+        </div>
+    [% END %]
+    
+    [% IF success_msg %]
+        <div class="alert alert-success">
+            <h3><i class="fas fa-check-circle"></i> Success</h3>
+            <p>[% success_msg %]</p>
+        </div>
+    [% END %]
+    
+    [% IF warning_msg %]
+        <div class="alert alert-warning">
+            <h3><i class="fas fa-exclamation-triangle"></i> Warning</h3>
+            <p>[% warning_msg %]</p>
+        </div>
+    [% END %]
+    
+    [% IF output %]
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-terminal"></i> Command Output</h3>
+                [% IF action_performed %]
+                    <p>Action performed: <strong>[% action_performed %]</strong></p>
+                [% END %]
+            </div>
+            <div class="feature-content">
+                <pre class="git-output">[% output | html %]</pre>
+            </div>
+        </div>
+    [% END %]
+    
+    <!-- Git Status Check -->
+    <div class="feature-card">
+        <div class="feature-header">
+            <h3><i class="fas fa-search"></i> Git Status Check</h3>
+        </div>
+        <div class="feature-content">
+            <p>Perform a comprehensive Git status check to diagnose repository issues.</p>
+            <ul class="feature-list">
+                <li>Check current branch and commit status</li>
+                <li>Compare local and remote commits</li>
+                <li>Detect divergent branches</li>
+                <li>List uncommitted and untracked files</li>
+                <li>Show recent commit history</li>
+            </ul>
+        </div>
+        <div class="feature-actions">
+            <form method="POST" action="[% c.uri_for('/admin/git_emergency') %]" style="display: inline;">
+                <input type="hidden" name="action" value="status_check">
+                <button type="submit" class="btn btn-info">
+                    <i class="fas fa-search"></i> Check Git Status
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Force Pull -->
+    <div class="feature-card">
+        <div class="feature-header">
+            <h3><i class="fas fa-download"></i> Force Pull</h3>
+        </div>
+        <div class="feature-content">
+            <p><strong>⚠️ CAUTION:</strong> This will discard local changes and force update to remote state.</p>
+            <ul class="feature-list">
+                <li>Backs up theme_mappings.json</li>
+                <li>Fetches latest remote changes</li>
+                <li>Resets local repository to remote state</li>
+                <li>Cleans untracked files</li>
+                <li><strong>Local changes will be lost!</strong></li>
+            </ul>
+        </div>
+        <div class="feature-actions">
+            <form method="POST" action="[% c.uri_for('/admin/git_emergency') %]" 
+                  onsubmit="return confirm('⚠️ WARNING: This will discard ALL local changes! Are you absolutely sure?')" 
+                  style="display: inline;">
+                <input type="hidden" name="action" value="force_pull">
+                <button type="submit" class="btn btn-warning">
+                    <i class="fas fa-download"></i> Force Pull (Dangerous)
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Hard Reset -->
+    <div class="feature-card">
+        <div class="feature-header">
+            <h3><i class="fas fa-bomb"></i> Hard Reset</h3>
+        </div>
+        <div class="feature-content">
+            <p><strong>🚨 EXTREME DANGER:</strong> Nuclear option - use only in absolute emergencies!</p>
+            <ul class="feature-list">
+                <li>Backs up theme_mappings.json</li>
+                <li>Fetches latest remote changes</li>
+                <li>Performs hard reset to origin/master</li>
+                <li>Completely discards all local changes</li>
+                <li><strong>NO RECOVERY POSSIBLE!</strong></li>
+            </ul>
+        </div>
+        <div class="feature-actions">
+            <form method="POST" action="[% c.uri_for('/admin/git_emergency') %]" 
+                  onsubmit="return confirm('🚨 FINAL WARNING: This will PERMANENTLY destroy all local changes and reset to remote state! This action CANNOT be undone! Type YES in the next dialog to confirm.') && prompt('Type YES to confirm hard reset:') === 'YES'" 
+                  style="display: inline;">
+                <input type="hidden" name="action" value="reset_hard">
+                <button type="submit" class="btn btn-danger">
+                    <i class="fas fa-bomb"></i> Hard Reset (NUCLEAR)
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Information Section -->
+    <div class="feature-card">
+        <div class="feature-header">
+            <h3><i class="fas fa-info-circle"></i> About Divergent Branches</h3>
+        </div>
+        <div class="feature-content">
+            <p>Divergent branches occur when your local repository and the remote repository have different commits that don't share a common ancestor.</p>
+            
+            <h4>Common Causes:</h4>
+            <ul class="feature-list">
+                <li>Local commits made on production server</li>
+                <li>Force pushes to remote repository</li>
+                <li>Repository history rewriting</li>
+                <li>Incorrect merge operations</li>
+            </ul>
+            
+            <h4>Resolution Strategy:</h4>
+            <ul class="feature-list">
+                <li><strong>First:</strong> Try the normal Git Pull (handles most cases)</li>
+                <li><strong>If that fails:</strong> Use Git Status Check to diagnose</li>
+                <li><strong>If safe:</strong> Use Force Pull to reset to remote</li>
+                <li><strong>Last resort:</strong> Use Hard Reset (destroys all local changes)</li>
+            </ul>
+            
+            <h4>Production Server Specific:</h4>
+            <p>The error you're seeing indicates that Git needs to know how to reconcile divergent branches. The updated Git Pull functionality now handles this automatically by:</p>
+            <ul class="feature-list">
+                <li>Detecting divergent branches</li>
+                <li>Configuring Git to use merge strategy</li>
+                <li>Safely merging remote changes with local changes</li>
+                <li>Preserving important local files like theme_mappings.json</li>
+            </ul>
+        </div>
+    </div>
+    
+    [% IF output %]
+        <div class="feature-actions" style="text-align: center; margin-top: 30px;">
+            <a href="[% c.uri_for('/admin/git_emergency') %]" class="btn btn-primary">
+                <i class="fas fa-sync"></i> Perform Another Operation
+            </a>
+            <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Admin Dashboard
+            </a>
+        </div>
+    [% END %]
+</div>
+
+<style>
+    .git-output {
+        background-color: #1e1e1e;
+        color: #f8f8f2;
+        padding: 20px;
+        border-radius: 8px;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        max-height: 500px;
+        overflow-y: auto;
+        font-family: 'Courier New', monospace;
+        font-size: 0.9rem;
+        line-height: 1.4;
+        margin: 0;
+        border: 1px solid #444;
+    }
+    
+    .quick-nav {
+        margin-bottom: 20px;
+        padding: 15px 0;
+        border-bottom: 2px solid var(--border-color);
+    }
+    
+    .btn-sm {
+        padding: 0.375rem 0.75rem;
+        font-size: 0.875rem;
+        line-height: 1.5;
+        border-radius: 0.25rem;
+    }
+    
+    .alert {
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+    
+    .alert h3 {
+        margin-top: 0;
+        margin-bottom: 10px;
+    }
+    
+    .alert-danger {
+        background-color: #f8d7da;
+        border-color: #f5c6cb;
+        color: #721c24;
+    }
+    
+    .alert-warning {
+        background-color: #fff3cd;
+        border-color: #ffeaa7;
+        color: #856404;
+    }
+    
+    .alert-success {
+        background-color: #d4edda;
+        border-color: #c3e6cb;
+        color: #155724;
+    }
+    
+    .alert-info {
+        background-color: #d1ecf1;
+        border-color: #bee5eb;
+        color: #0c5460;
+    }
+    
+    .feature-card {
+        margin-bottom: 25px;
+    }
+    
+    .feature-card h4 {
+        color: var(--primary-color);
+        margin-top: 20px;
+        margin-bottom: 10px;
+    }
+    
+    .btn-danger {
+        background-color: #dc3545;
+        border-color: #dc3545;
+        color: white;
+    }
+    
+    .btn-danger:hover {
+        background-color: #c82333;
+        border-color: #bd2130;
+    }
+    
+    .btn-warning {
+        background-color: #ffc107;
+        border-color: #ffc107;
+        color: #212529;
+    }
+    
+    .btn-warning:hover {
+        background-color: #e0a800;
+        border-color: #d39e00;
+    }
+</style>
