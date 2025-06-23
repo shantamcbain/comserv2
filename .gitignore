@@ -79,6 +79,13 @@ Comserv/comserv.psgi
 /db_config.json
 # Config directory with sensitive configuration files
 /Comserv/config/
+
+# Log directories and files
+logs/
+*/logs/
+**/logs/
+*.log
+/Comserv/logs/
 /git_commit_message.txt
 /grokpromts.txt
 /main.py
