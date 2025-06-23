@@ -35,10 +35,13 @@ if ($@ || !defined $config_file) {
     
     # Try multiple possible locations
     my @possible_paths = (
-        File::Spec->catfile($FindBin::Bin, 'db_config.json'),         # In the same directory as the script
-        File::Spec->catfile($FindBin::Bin, '..', 'db_config.json'),   # One level up from the script
-        '/opt/comserv/db_config.json',                                # In the /opt/comserv directory
-        '/etc/comserv/db_config.json'                                 # In the /etc/comserv directory
+        File::Spec->catfile($FindBin::Bin, 'config', 'db_config.json'),         # In the config directory
+        File::Spec->catfile($FindBin::Bin, '..', 'config', 'db_config.json'),   # One level up, then config
+        File::Spec->catfile($FindBin::Bin, 'db_config.json'),                   # Legacy: In the same directory as the script
+        File::Spec->catfile($FindBin::Bin, '..', 'db_config.json'),             # Legacy: One level up from the script
+        '/opt/comserv/config/db_config.json',                                   # In the /opt/comserv/config directory
+        '/opt/comserv/db_config.json',                                          # Legacy: In the /opt/comserv directory
+        '/etc/comserv/db_config.json'                                           # In the /etc/comserv directory
     );
     
     foreach my $path (@possible_paths) {

@@ -77,6 +77,8 @@ Comserv/comserv.psgi
 /AI_ASSISTANT_GUIDELINES.md
 /_Deparsed_XSubs.pm
 /db_config.json
+# Config directory with sensitive configuration files
+/Comserv/config/
 /git_commit_message.txt
 /grokpromts.txt
 /main.py

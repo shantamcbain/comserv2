@@ -75,7 +75,13 @@ sub test_connection {
 sub save_config {
     my ($self, $c, $config) = @_;
     
-    open my $fh, '>', $c->path_to('db_config.json') or die $!;
+    # Create config directory if it doesn't exist
+    my $config_dir = $c->path_to('config');
+    unless (-d $config_dir) {
+        mkdir $config_dir or die "Cannot create config directory: $!";
+    }
+    
+    open my $fh, '>', $c->path_to('config', 'db_config.json') or die $!;
     print $fh encode_json($config);
     close $fh;
 }

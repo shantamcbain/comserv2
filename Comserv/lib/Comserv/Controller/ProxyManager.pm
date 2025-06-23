@@ -1727,12 +1727,8 @@ sub install_docker_api :Local :Args(0) {
     my $install_id = time() . '-' . int(rand(1000000));
     $c->session->{docker_install_id} = $install_id;
     
-    # Create a file to store installation progress
-    my $progress_file = Catalyst::Utils::home('Comserv') . "/tmp/docker_install_$install_id.log";
-    
-    # Make sure the tmp directory exists
-    my $tmp_dir = Catalyst::Utils::home('Comserv') . "/tmp";
-    mkdir $tmp_dir unless -d $tmp_dir;
+    # Create a file to store installation progress in system temp directory
+    my $progress_file = "/tmp/comserv_docker_install_$install_id.log";
     
     # Create installation script
     my ($fh, $filename) = tempfile(SUFFIX => '.sh', UNLINK => 1);
@@ -1892,12 +1888,8 @@ sub install_kubernetes :Local :Args(0) {
     my $install_id = time() . '-' . int(rand(1000000));
     $c->session->{kubernetes_install_id} = $install_id;
     
-    # Create a file to store installation progress
-    my $progress_file = Catalyst::Utils::home('Comserv') . "/tmp/k8s_install_$install_id.log";
-    
-    # Make sure the tmp directory exists
-    my $tmp_dir = Catalyst::Utils::home('Comserv') . "/tmp";
-    mkdir $tmp_dir unless -d $tmp_dir;
+    # Create a file to store installation progress in system temp directory
+    my $progress_file = "/tmp/comserv_k8s_install_$install_id.log";
     
     # Create installation script for MicroK8s (a lightweight Kubernetes distribution)
     my ($fh, $filename) = tempfile(SUFFIX => '.sh', UNLINK => 1);
@@ -2037,12 +2029,8 @@ sub install_npm :Local :Args(0) {
     my $install_id = time() . '-' . int(rand(1000000));
     $c->session->{npm_install_id} = $install_id;
     
-    # Create a file to store installation progress
-    my $progress_file = Catalyst::Utils::home('Comserv') . "/tmp/npm_install_$install_id.log";
-    
-    # Make sure the tmp directory exists
-    my $tmp_dir = Catalyst::Utils::home('Comserv') . "/tmp";
-    mkdir $tmp_dir unless -d $tmp_dir;
+    # Create a file to store installation progress in system temp directory
+    my $progress_file = "/tmp/comserv_npm_install_$install_id.log";
     
     # Initialize the progress file
     open my $progress_fh, '>', $progress_file or die "Cannot open $progress_file: $!";
@@ -2288,11 +2276,11 @@ sub installation_progress :Local :Args(1) {
     # Determine the log file path based on the installation type
     my $log_file = '';
     if ($install_type eq 'docker') {
-        $log_file = Catalyst::Utils::home('Comserv') . "/tmp/docker_install_$install_id.log";
+        $log_file = "/tmp/comserv_docker_install_$install_id.log";
     } elsif ($install_type eq 'kubernetes') {
-        $log_file = Catalyst::Utils::home('Comserv') . "/tmp/k8s_install_$install_id.log";
+        $log_file = "/tmp/comserv_k8s_install_$install_id.log";
     } elsif ($install_type eq 'npm') {
-        $log_file = Catalyst::Utils::home('Comserv') . "/tmp/npm_install_$install_id.log";
+        $log_file = "/tmp/comserv_npm_install_$install_id.log";
     }
     
     # Check if the log file exists

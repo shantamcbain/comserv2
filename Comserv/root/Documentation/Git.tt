@@ -1,114 +1,258 @@
-[% PageVersion = 'Documentation/Git.tt,v 0.02 2024/12/18 Shanta Exp shanta ' %]
-[%# PageVersion = 'Documentation/Git.tt,v 0.01 2024/03/10 Shanta Exp shanta ' %]
-[% IF c.session.debug_mode == 1 %]
+[% PageVersion = 'Documentation/Git.tt,v 0.03 2025-06-23 10:00 Shanta Exp shanta ' %]
+[%# PageVersion = 'Documentation/Git.tt,v 0.02 2024/12/18 Shanta Exp shanta ' %]
+[
+%
+IF c.session.debug_mode == 1 %]
     [% PageVersion %]
-[% END %]
-
+[
+% END %]
 <h1>Git Usage Guide for PyCharm</h1>
-
 <nav>
     <a href="#basic-operations">Basic Git Operations</a> |
     <a href="#pycharm-integration">PyCharm Integration</a> |
     <a href="#workflows">Common Workflows</a> |
     <a href="#troubleshooting">Troubleshooting</a>
 </nav>
-
+<h2 id="basic-operations">Basic Git Operations</h2>
+<ol>
+    <li>Check Repository Status:
+        <pre><code>git status</code></pre>
+        <p>Shows modified, staged, and untracked files.</p>
+    </li>
+    <li>Add Files to Staging:
+        <pre><code>git add <file_name></code></pre>
+        <p>Stages a specific file (e.g., <code>git add Forager.pm</code>). To stage all changes:</p>
+        <pre><code>git add .</code></pre>
+    </li>
+    <li>Commit Changes:
+        <pre><code>git commit -m "Your commit message"</code></pre>
+        <p>Saves staged changes with a descriptive message.</p>
+    </li>
+    <li>Push to Remote:
+        <pre><code>git push origin <branch_name></code></pre>
+        <p>Uploads local commits to the remote branch.</p>
+    </li>
+    <li>Pull from Remote:
+        <pre><code>git pull origin <branch_name></code></pre>
+        <p>Downloads and merges changes from the remote branch.</p>
+    </li>
+    <li>Create a Branch:
+        <pre><code>git checkout -b <branch_name></code></pre>
+        <p>Creates and switches to a new branch (e.g., <code>git checkout -b feature/forager-controller</code>).</p>
+    </li>
+    <li>Switch Branches:
+        <pre><code>git checkout <branch_name></code></pre>
+        <p>Switches to an existing branch (e.g., <code>git checkout development</code>).</p>
+    </li>
+    <li>Merge Branches:
+        <pre><code>git merge <branch_name></code></pre>
+        <p>Merges the specified branch into the current branch (e.g., <code>git merge feature/forager-controller</code>).</p>
+    </li>
+    <li>Fetch Remote Changes:
+        <pre><code>git fetch origin</code></pre>
+        <p>Retrieves updates from the remote without merging.</p>
+    </li>
+</ol>
 <h2 id="pycharm-integration">PyCharm Git Integration</h2>
 <ol>
     <li>Enable Version Control:
         <ul>
-            <li>Go to VCS → Enable Version Control Integration</li>
-            <li>Select "Git" from the dropdown menu</li>
+            <li>Go to <code>VCS → Enable Version Control Integration</code></li>
+            <li>Select "Git" from the dropdown</li>
+            <li>Command-line equivalent:
+                <pre><code>git init</code></pre>
+            </li>
+        </ul>
+    </li>
+    <li>Clone a Repository:
+        <ul>
+            <li>Go to <code>VCS → Get from Version Control</code>, enter the repository URL</li>
+            <li>Command-line equivalent:
+                <pre><code>git clone <repository_url></code></pre>
+            </li>
         </ul>
     </li>
     <li>Commit Changes:
         <ul>
-            <li>Use Alt+0 (Command+0 on Mac) to open the Commit tool window</li>
-            <li>Select changed files to commit (e.g., Forager.pm)</li>
-            <li>Write a descriptive commit message (e.g., "Add Forager controller for handling forager.com routes")</li>
+            <li>Open Commit tool window: <code>Alt+0</code> (Windows/Linux) or <code>Command+0</code> (Mac)</li>
+            <li>Select files to commit (e.g., <code>Forager.pm</code>)</li>
+            <li>Write a commit message (e.g., "Add Forager controller for handling forager.com routes")</li>
             <li>Click "Commit" or "Commit and Push"</li>
+            <li>Command-line equivalent:
+                <pre><code>git add Forager.pm
+git commit -m "Add Forager controller for handling forager.com routes"
+git push origin <branch_name></code></pre>
+            </li>
         </ul>
     </li>
 </ol>
-
 <h2 id="workflows">Common Workflows</h2>
-
 <h3>Adding New Features to Production</h3>
 <ol>
-    <li>Create a New Branch:
+    <li>Create a Feature Branch:
         <pre><code>git checkout -b feature/forager-controller</code></pre>
+        <p>Creates and switches to a new branch for development.</p>
     </li>
     <li>Add and Commit Changes:
         <pre><code>git add Forager.pm
 git commit -m "Add Forager controller for handling forager.com routes"</code></pre>
+        <p>Stage and commit your changes.</p>
     </li>
     <li>Push to Remote:
         <pre><code>git push origin feature/forager-controller</code></pre>
+        <p>Upload the branch to the remote repository.</p>
     </li>
-    <li>Deploy to Staging for Testing:
+    <li>Deploy to Staging:
         <ul>
-            <li>Use your deployment tool to push to staging environment</li>
-            <li>Test thoroughly for correct site information and route handling</li>
+            <li>Use your deployment tool to deploy to staging</li>
+            <li>Command-line (if merging to staging branch):
+                <pre><code>git checkout staging
+git pull origin staging
+git merge feature/forager-controller
+git push origin staging</code></pre>
+            </li>
+            <li>Test routes and site information thoroughly</li>
         </ul>
     </li>
-    <li>Merge to Development/Staging:
+    <li>Merge to Development:
         <ul>
-            <li>Create a Pull Request if using GitHub or similar</li>
-            <li>Or directly merge:
+            <li>Create a Pull Request on GitHub or similar</li>
+            <li>Or merge directly:
                 <pre><code>git checkout development
-git merge feature/forager-controller</code></pre>
+git pull origin development
+git merge feature/forager-controller
+git push origin development</code></pre>
             </li>
         </ul>
     </li>
-    <li>Final Test on Staging:
+    <li>Test on Staging Again:
         <ul>
-            <li>Re-run tests to ensure no issues post-merge</li>
+            <li>Re-run tests to confirm no issues post-merge</li>
+            <li>Command-line (if needed):
+                <pre><code>git checkout staging
+git pull origin staging</code></pre>
+            </li>
         </ul>
     </li>
     <li>Merge to Production:
         <pre><code>git checkout production
+git pull origin production
 git merge development
 git push origin production</code></pre>
+        <p>Ensure production is up-to-date before merging.</p>
     </li>
-    <li>Monitor Post-Deployment:
+    <li>Monitor Production:
         <ul>
-            <li>Watch for any live site issues</li>
+            <li>Watch for live site issues using monitoring tools</li>
+            <li>Rollback if needed:
+                <pre><code>git checkout production
+git revert <commit_hash>
+git push origin production</code></pre>
+            </li>
         </ul>
     </li>
+    <li>Clean Up:
+        <pre><code>git branch -d feature/forager-controller
+git push origin --delete feature/forager-controller</code></pre>
+        <p>Delete the feature branch locally and remotely.</p>
+    </li>
 </ol>
-
-<h2>Remove .idea Directory from a Git Branch</h2>
+<h3>Remove .idea Directory from a Git Branch</h3>
 <ol>
-    <li>
-        <p>Fetch the branch from the remote repository:</p>
-        <pre><code>git fetch origin branch_name:branch_name</code></pre>
+    <li>Fetch the Branch:
+        <pre><code>git fetch origin <branch_name>:<branch_name></code></pre>
+        <p>Retrieve the latest branch from the remote.</p>
     </li>
-    <li>
-        <p>Remove the .idea directory from your local working directory:</p>
-        <pre><code>rm -rf .idea</code></pre>
+    <li>Switch to the Branch:
+        <pre><code>git checkout <branch_name></code></pre>
+        <p>Switch to the target branch.</p>
     </li>
-    <li>
-        <p>Switch to the fetched branch:</p>
-        <pre><code>git checkout branch_name</code></pre>
+    <li>Remove .idea Directory:
+        <pre><code>rm -rf .idea
+git rm -r --cached .idea</code></pre>
+        <p>Delete the directory and remove it from Git tracking.</p>
     </li>
-    <li>
-        <p>Remove the .idea directory and commit the change:</p>
-        <pre><code>git rm -r .idea
-git commit -m "Remove .idea directory"</code></pre>
+    <li>Update .gitignore:
+        <pre><code>echo ".idea/" >> .gitignore
+git add .gitignore</code></pre>
+        <p>Add .idea/ to .gitignore to prevent future tracking.</p>
     </li>
-    <li>
-        <p>Push the changes to the remote branch:</p>
-        <pre><code>git push origin branch_name</code></pre>
+    <li>Commit Changes:
+        <pre><code>git commit -m "Remove .idea directory and update .gitignore"</code></pre>
+        <p>Commit the removal and .gitignore update.</p>
+    </li>
+    <li>Push to Remote:
+        <pre><code>git push origin <branch_name></code></pre>
+        <p>Push changes to the remote branch.</p>
     </li>
 </ol>
-<p>Replace <code>branch_name</code> with the name of the branch you want to remove the .idea directory from.</p>
-
+<p>Replace <code><branch_name></code> with the actual branch name (e.g., <code>feature/forager-controller</code>).</p>
 <h2 id="troubleshooting">Troubleshooting Common Issues</h2>
 <ul>
-    <li>If PyCharm doesn't detect Git:
+    <li>PyCharm Doesn't Detect Git:
         <ol>
-            <li>Go to Settings/Preferences → Version Control → Git</li>
-            <li>Verify the path to Git executable</li>
+            <li>Go to <code>Settings/Preferences → Version Control → Git</code></li>
+            <li>Verify the path to Git executable (e.g., <code>/usr/bin/git</code>)</li>
+            <li>Test in terminal:
+                <pre><code>git --version</code></pre>
+            </li>
+            <li>Install Git if missing and update the path</li>
+        </ol>
+    </li>
+    <li>Git Pull Fails Due to Local Changes:
+        <ol>
+            <li>Check for local changes:
+                <pre><code>git status</code></pre>
+            </li>
+            <li>Stash changes if they’re needed later:
+                <pre><code>git stash</code></pre>
+            </li>
+            <li>Pull remote changes:
+                <pre><code>git pull origin <branch_name></code></pre>
+            </li>
+            <li>Apply stashed changes (if needed):
+                <pre><code>git stash pop</code></pre>
+            </li>
+            <li>Or discard unwanted local changes:
+                <pre><code>git reset --hard
+git clean -fd</code></pre>
+            </li>
+            <li>Resolve conflicts if any:
+                <pre><code>git mergetool
+git add <resolved_files>
+git commit</code></pre>
+            </li>
+        </ol>
+    </li>
+    <li>Preventing Local Changes on Production Server:
+        <ol>
+            <li>Ensure no manual edits occur on production</li>
+            <li>Restrict write permissions on the repository directory:
+                <pre><code>chmod -R u-w /path/to/repo</code></pre>
+            </li>
+            <li>Use a deployment script to reset any changes before pulling:
+                <pre><code>git fetch origin
+git reset --hard origin/production
+git clean -fd</code></pre>
+            </li>
+            <li>Verify the pull:
+                <pre><code>git pull origin production</code></pre>
+            </li>
+            <li>Consider using a CI/CD pipeline to automate deployments and avoid manual pulls</li>
+        </ol>
+    </li>
+    <li>Push Rejected (Non-Fast-Forward):
+        <ol>
+            <li>Pull changes to resolve conflicts:
+                <pre><code>git pull origin <branch_name></code></pre>
+            </li>
+            <li>Resolve conflicts, then push:
+                <pre><code>git add <resolved_files>
+git commit
+git push origin <branch_name></code></pre>
+            </li>
         </ol>
     </li>
 </ul>
+
+
