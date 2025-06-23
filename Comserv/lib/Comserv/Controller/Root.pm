@@ -1084,6 +1084,268 @@ sub reset_session :Global {
 }
 
 
+# Route for the "Back" functionality
+sub back :Path('/back') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'back',
+        "Back navigation requested");
+    
+    # Check if we have a return URL in session
+    my $return_url = $c->session->{return_url} || $c->req->referer || '/';
+    
+    # Avoid infinite loops - don't redirect back to /back
+    if ($return_url =~ m{/back$}) {
+        $return_url = '/';
+    }
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'back',
+        "Redirecting back to: $return_url");
+    
+    $c->response->redirect($return_url);
+}
+
+# Route for the "Hosted" functionality
+sub hosted :Path('/hosted') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'hosted',
+        "Hosted accounts page requested");
+    
+    # Store current URL as return URL for back navigation
+    $c->session->{return_url} = $c->req->uri->as_string;
+    
+    # Get site name and domain for context
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'Comserv';
+    my $site_domain = '';
+    
+    # Get the actual domain from the database
+    eval {
+        if ($c->model('Site')) {
+            my $domain = $c->req->uri->host;
+            my $site_domain_obj = $c->model('Site')->get_site_domain($c, $domain);
+            if ($site_domain_obj) {
+                my $site = $c->model('Site')->get_site_details($c, $site_domain_obj->site_id);
+                if ($site && $site->domain) {
+                    $site_domain = $site->domain;
+                }
+            }
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'hosted',
+            "Could not fetch site domain: $@");
+    }
+    
+    # Fallback to current domain if not found in database
+    $site_domain = $site_domain || $c->req->uri->host;
+    
+    # Get hosted accounts from the database (if available)
+    my $hosted_accounts = [];
+    eval {
+        # Try to get hosted accounts from database
+        if ($c->model('DB') && $c->model('DB')->resultset('HostedAccount')) {
+            $hosted_accounts = [$c->model('DB')->resultset('HostedAccount')->search(
+                { site_name => $site_name },
+                { order_by => 'account_name' }
+            )->all];
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'hosted',
+            "Could not fetch hosted accounts from database: $@");
+    }
+    
+    $c->stash(
+        template => 'hosted/index.tt',
+        site_name => $site_name,
+        site_domain => $site_domain,
+        hosted_accounts => $hosted_accounts,
+        page_title => "Hosted Accounts - $site_domain"
+    );
+}
+
+# Route for the "Member" functionality  
+sub membership :Path('/membership') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'membership',
+        "Membership page requested");
+    
+    # Store current URL as return URL for back navigation
+    $c->session->{return_url} = $c->req->uri->as_string;
+    
+    # Get site name and domain for context
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'Comserv';
+    my $site_domain = '';
+    
+    # Get the actual domain from the database
+    eval {
+        if ($c->model('Site')) {
+            my $domain = $c->req->uri->host;
+            my $site_domain_obj = $c->model('Site')->get_site_domain($c, $domain);
+            if ($site_domain_obj) {
+                my $site = $c->model('Site')->get_site_details($c, $site_domain_obj->site_id);
+                if ($site && $site->domain) {
+                    $site_domain = $site->domain;
+                }
+            }
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'membership',
+            "Could not fetch site domain: $@");
+    }
+    
+    # Fallback to current domain if not found in database
+    $site_domain = $site_domain || $c->req->uri->host;
+    
+    # Check if user is already a member
+    my $is_member = 0;
+    my $user_membership = {};
+    
+    if ($c->session->{user_id}) {
+        eval {
+            # Try to get user membership info from database
+            if ($c->model('DB') && $c->model('DB')->resultset('Membership')) {
+                my $membership = $c->model('DB')->resultset('Membership')->find({
+                    user_id => $c->session->{user_id},
+                    site_name => $site_name
+                });
+                if ($membership) {
+                    $is_member = 1;
+                    $user_membership = {
+                        type => $membership->membership_type,
+                        status => $membership->status,
+                        expires => $membership->expires_date
+                    };
+                }
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'membership',
+                "Could not fetch membership info: $@");
+        }
+    }
+    
+    $c->stash(
+        template => 'membership/index.tt',
+        site_name => $site_name,
+        site_domain => $site_domain,
+        is_member => $is_member,
+        user_membership => $user_membership,
+        page_title => "Membership - $site_domain"
+    );
+}
+
+# Route for membership application
+sub applymembership :Path('/applymembership') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'applymembership',
+        "Membership application requested");
+    
+    # Store current URL as return URL for back navigation
+    $c->session->{return_url} = $c->req->uri->as_string;
+    
+    # Get site name and domain for context
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'Comserv';
+    my $site_domain = '';
+    
+    # Get the actual domain from the database
+    eval {
+        if ($c->model('Site')) {
+            my $domain = $c->req->uri->host;
+            my $site_domain_obj = $c->model('Site')->get_site_domain($c, $domain);
+            if ($site_domain_obj) {
+                my $site = $c->model('Site')->get_site_details($c, $site_domain_obj->site_id);
+                if ($site && $site->domain) {
+                    $site_domain = $site->domain;
+                }
+            }
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'applymembership',
+            "Could not fetch site domain: $@");
+    }
+    
+    # Fallback to current domain if not found in database
+    $site_domain = $site_domain || $c->req->uri->host;
+    
+    if ($c->req->method eq 'POST') {
+        # Process membership application
+        my $params = $c->req->params;
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'applymembership',
+            "Processing membership application for: " . ($params->{email} || 'unknown'));
+        
+        # Basic validation
+        my @errors;
+        push @errors, "Name is required" unless $params->{name};
+        push @errors, "Email is required" unless $params->{email};
+        push @errors, "Membership type is required" unless $params->{membership_type};
+        
+        if (@errors) {
+            $c->stash(
+                template => 'membership/apply.tt',
+                site_name => $site_name,
+                site_domain => $site_domain,
+                errors => \@errors,
+                form_data => $params,
+                page_title => "Apply for Membership - $site_domain"
+            );
+            return;
+        }
+        
+        # Try to save the application
+        eval {
+            if ($c->model('DB') && $c->model('DB')->resultset('MembershipApplication')) {
+                $c->model('DB')->resultset('MembershipApplication')->create({
+                    name => $params->{name},
+                    email => $params->{email},
+                    phone => $params->{phone} || '',
+                    membership_type => $params->{membership_type},
+                    site_name => $site_name,
+                    application_date => DateTime->now,
+                    status => 'pending'
+                });
+                
+                $c->stash(
+                    template => 'membership/application_success.tt',
+                    site_name => $site_name,
+                    site_domain => $site_domain,
+                    applicant_name => $params->{name},
+                    page_title => "Application Submitted - $site_domain"
+                );
+                return;
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'applymembership',
+                "Failed to save membership application: $@");
+            push @errors, "Failed to submit application. Please try again.";
+        }
+        
+        $c->stash(
+            template => 'membership/apply.tt',
+            site_name => $site_name,
+            site_domain => $site_domain,
+            errors => \@errors,
+            form_data => $params,
+            page_title => "Apply for Membership - $site_domain"
+        );
+    } else {
+        # Show application form
+        $c->stash(
+            template => 'membership/apply.tt',
+            site_name => $site_name,
+            site_domain => $site_domain,
+            page_title => "Apply for Membership - $site_domain"
+        );
+    }
+}
+
 sub end : ActionClass('RenderView') {}
 
 # Default action for handling 404 errors

@@ -2,7 +2,7 @@
 <nav>
     <ul class="horizontal-menu">
         <li class="horizontal-dropdown">
-            <a href="[% c.session.return_url %]" class="dropbtn">Back</a>
+            <a href="javascript:history.back()" class="dropbtn">Back</a>
         </li>
     [% INCLUDE 'Navigation/TopDropListMain.tt' %]
     [% INCLUDE 'Navigation/TopDropListLogin.tt' %]
