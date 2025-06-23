@@ -5125,3 +5125,8 @@ Comserv/comserv.psgi
 /local/man/man3/YAML::Tag.3pm
 /local/man/man3/YAML::Tiny.3pm
 /local/man/man3/YAML::Types.3pm
+logs/*
+../logs/*
+local/*
+root/static/config/*
+*.log
