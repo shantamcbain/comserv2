@@ -83,9 +83,9 @@ sub  create_project :Local :Args(0) {
     my $project_rs = $schema->resultset('Project');
     my $date_time_posted = DateTime->now;
 
-    # Get username safely
+    # Get username safely - check both user_exists AND that user object is defined
     my $username = '';
-    if ($c->user_exists) {
+    if ($c->user_exists && $c->user) {
         $username = $c->user->username;
     } elsif ($c->session->{username}) {
         $username = $c->session->{username};

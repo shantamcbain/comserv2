@@ -262,7 +262,7 @@ sub admin :Chained('base') :PathPart('admin') :Args(0) {
     # Check if user has admin role
     unless ($c->session->{roles} && grep { $_ eq 'admin' } @{$c->session->{roles}}) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'admin', 
-            "Unauthorized access attempt to HelpDesk admin by user: " . ($c->user_exists ? $c->user->username : 'Guest'));
+            "Unauthorized access attempt to HelpDesk admin by user: " . (($c->user_exists && $c->user) ? $c->user->username : ($c->session->{username} || 'Guest')));
         
         # Redirect to main HelpDesk page with error message
         $c->stash->{error_msg} = "You don't have permission to access the HelpDesk admin area.";

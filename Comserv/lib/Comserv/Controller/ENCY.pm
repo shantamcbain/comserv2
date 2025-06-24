@@ -399,7 +399,7 @@ sub delete_herb :Path('/ENCY/delete_herb') :Args(1) {
     
     # Check if user has admin privileges
     unless ($c->user_exists && $c->check_user_roles('admin')) {
-        my $username = $c->user_exists ? $c->user->username : 'Guest';
+        my $username = ($c->user_exists && $c->user) ? $c->user->username : ($c->session->{username} || 'Guest');
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'delete_herb',
             "Unauthorized delete attempt by user: $username");
         $c->response->status(403);
