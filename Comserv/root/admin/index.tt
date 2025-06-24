@@ -33,6 +33,10 @@
       <li><a href="[% c.uri_for('/admin/theme') %]">Theme Management</a></li>
       <li><a href="[% c.uri_for('/admin/view_log') %]">View Application Log</a></li>
       <li><a href="[% c.uri_for('/admin/network_diagnostics') %]">Network Diagnostics</a></li>
+      <li><a href="[% c.uri_for('/admin/access_control_help') %]">Access Control Help</a></li>
+      [% IF has_csc_access %]
+      <li><a href="[% c.uri_for('/admin/backup') %]">Backup Management</a> <span class="csc-only">(CSC Only)</span></li>
+      [% END %]
     </ul>
   </div>
 

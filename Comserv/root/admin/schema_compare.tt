@@ -1,4 +1,4 @@
-[% PageVersion = 'admin/schema_compare.tt,v 4.0 2024/12/19 shanta Exp shanta ' %]
+[% PageVersion = 'admin/schema_compare.tt,v 4.1 2025/01/15 shanta Exp shanta - Added access control schema status' %]
 
 <head>
     <link rel="stylesheet" href="[% c.uri_for('/static/css/themes/schema_compare.css') %]">
@@ -48,6 +48,127 @@
             </div>
         </div>
     </div>
+
+    <!-- Access Control Schema Status -->
+    [% IF access_control_status %]
+        <div class="access-control-status">
+            <h3><i class="fas fa-shield-alt"></i> Access Control Schema Status</h3>
+            
+            [% IF access_control_status.overall_status == 'ok' %]
+                <div class="status-card status-ok">
+                    <i class="fas fa-check-circle"></i>
+                    <strong>Schema Status: OK</strong>
+                    <p>Access control schema is up to date and fully functional.</p>
+                </div>
+            [% ELSIF access_control_status.overall_status == 'migration_available' %]
+                <div class="status-card status-info">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Enhanced Features Available</strong>
+                    <p>Optional schema enhancements are available for advanced access control features.</p>
+                    <p><em>Current system continues to work normally using backward compatibility.</em></p>
+                </div>
+            [% ELSIF access_control_status.overall_status == 'error' %]
+                <div class="status-card status-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Schema Compatibility Mode</strong>
+                    <p>System is running in compatibility mode due to schema differences.</p>
+                    <p><em>All functionality continues to work normally.</em></p>
+                </div>
+            [% END %]
+            
+            <!-- Detailed Status -->
+            <div class="schema-details">
+                <div class="table-status-grid">
+                    <!-- Users Table Status -->
+                    <div class="table-status-card">
+                        <h4><i class="fas fa-users"></i> Users Table</h4>
+                        [% IF access_control_status.users_table.exists %]
+                            <div class="status-ok"><i class="fas fa-check"></i> Table exists</div>
+                            [% IF access_control_status.users_table.missing_columns.size > 0 %]
+                                <div class="missing-features">
+                                    <strong>Optional enhancements available:</strong>
+                                    <ul>
+                                        [% FOREACH col IN access_control_status.users_table.missing_columns %]
+                                            <li>[% col %] column</li>
+                                        [% END %]
+                                    </ul>
+                                </div>
+                            [% END %]
+                        [% ELSE %]
+                            <div class="status-error"><i class="fas fa-times"></i> Table not found</div>
+                        [% END %]
+                        
+                        [% IF access_control_status.users_table.errors.size > 0 %]
+                            <div class="table-errors">
+                                <strong>Issues:</strong>
+                                <ul>
+                                    [% FOREACH error IN access_control_status.users_table.errors %]
+                                        <li>[% error %]</li>
+                                    [% END %]
+                                </ul>
+                            </div>
+                        [% END %]
+                    </div>
+                    
+                    <!-- User Site Roles Table Status -->
+                    <div class="table-status-card">
+                        <h4><i class="fas fa-key"></i> Site Roles Table</h4>
+                        [% IF access_control_status.user_site_roles_table.exists %]
+                            <div class="status-ok"><i class="fas fa-check"></i> Table exists</div>
+                        [% ELSE %]
+                            [% IF access_control_status.user_site_roles_table.missing_columns.0 == 'entire_table' %]
+                                <div class="status-info"><i class="fas fa-info"></i> Optional table (advanced features)</div>
+                            [% ELSE %]
+                                <div class="status-error"><i class="fas fa-times"></i> Table not found</div>
+                            [% END %]
+                        [% END %]
+                        
+                        [% IF access_control_status.user_site_roles_table.errors.size > 0 %]
+                            <div class="table-errors">
+                                <strong>Issues:</strong>
+                                <ul>
+                                    [% FOREACH error IN access_control_status.user_site_roles_table.errors %]
+                                        <li>[% error %]</li>
+                                    [% END %]
+                                </ul>
+                            </div>
+                        [% END %]
+                    </div>
+                </div>
+                
+                <!-- Recommendations -->
+                [% IF access_control_status.recommendations.size > 0 %]
+                    <div class="recommendations">
+                        <h4><i class="fas fa-lightbulb"></i> Recommendations</h4>
+                        <ul>
+                            [% FOREACH rec IN access_control_status.recommendations %]
+                                <li>[% rec %]</li>
+                            [% END %]
+                        </ul>
+                    </div>
+                [% END %]
+                
+                <!-- Migration Information -->
+                [% IF access_control_status.migration_needed %]
+                    <div class="migration-info">
+                        <h4><i class="fas fa-arrow-up"></i> Optional Schema Enhancements</h4>
+                        <p>The following enhancements can be applied to enable advanced features:</p>
+                        <ul>
+                            [% IF access_control_status.users_table.missing_columns.size > 0 %]
+                                [% FOREACH col IN access_control_status.users_table.missing_columns %]
+                                    <li>Add '[% col %]' column to users table</li>
+                                [% END %]
+                            [% END %]
+                            [% IF access_control_status.user_site_roles_table.missing_columns.0 == 'entire_table' %]
+                                <li>Create user_site_roles table for site-specific permissions</li>
+                            [% END %]
+                        </ul>
+                        <p><strong>Note:</strong> Migration is completely optional. Current system works perfectly without these enhancements.</p>
+                    </div>
+                [% END %]
+            </div>
+        </div>
+    [% END %]
 
     <!-- Debug Information -->
     [% IF c.session.debug_mode %]

@@ -185,6 +185,7 @@ sub psgi_app {
                     return ($c->session->{username} && $c->session->{user_id}) ? 1 : 0;
                 }
 
+                # Legacy check_user_roles method - maintained for backward compatibility
                 sub check_user_roles {
                     my ($c, $role) = @_;
                     
@@ -248,6 +249,44 @@ sub psgi_app {
                     
                     # Role not found
                     return 0;
+                }
+
+                # Enhanced access control methods
+                sub check_user_roles_enhanced {
+                    my ($c, $role, $site_id) = @_;
+                    
+                    # Load the access control utility
+                    require Comserv::Util::AccessControl;
+                    my $access_control = Comserv::Util::AccessControl->new();
+                    
+                    return $access_control->check_user_roles_enhanced($c, $role, $site_id);
+                }
+
+                sub get_user_site_context {
+                    my ($c) = @_;
+                    
+                    require Comserv::Util::AccessControl;
+                    my $access_control = Comserv::Util::AccessControl->new();
+                    
+                    return $access_control->get_user_site_context($c);
+                }
+
+                sub set_user_site_context {
+                    my ($c, $site_id) = @_;
+                    
+                    require Comserv::Util::AccessControl;
+                    my $access_control = Comserv::Util::AccessControl->new();
+                    
+                    return $access_control->set_user_site_context($c, $site_id);
+                }
+
+                sub get_user_accessible_sites {
+                    my ($c) = @_;
+                    
+                    require Comserv::Util::AccessControl;
+                    my $access_control = Comserv::Util::AccessControl->new();
+                    
+                    return $access_control->get_user_accessible_sites($c);
                 }
 
                 __PACKAGE__->setup();

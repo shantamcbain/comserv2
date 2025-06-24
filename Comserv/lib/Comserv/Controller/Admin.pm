@@ -17,6 +17,7 @@ use File::Spec;
 use Digest::SHA qw(sha256_hex);
 use File::Find;
 use Module::Load;
+use Cwd;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -164,13 +165,17 @@ sub index :Path :Args(0) {
         push @{$c->stash->{debug_msg}}, "Admin controller index view - Template: admin/index.tt";
     }
     
+    # Check if user has CSC backup access
+    my $has_csc_access = $self->check_csc_access($c);
+    
     # Pass data to the template
     $c->stash(
         template => 'admin/index.tt',
         stats => $stats,
         recent_activity => $recent_activity,
         notifications => $notifications,
-        is_admin => 1  # User has already passed admin check to get here
+        is_admin => 1,  # User has already passed admin check to get here
+        has_csc_access => $has_csc_access
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
@@ -1092,77 +1097,17 @@ sub backup :Path('/admin/backup') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'backup',
         "Starting backup action");
 
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
+    # Check if the user has CSC backup access
+    unless ($self->check_csc_access($c)) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'backup',
-            "Access denied: User does not have admin role");
+            "Access denied: User does not have CSC backup access");
 
-        $c->response->redirect($c->uri_for('/user/login', {
-            destination => $c->req->uri,
-            mid => $c->set_error_msg("You need to be an administrator to access this area.")
-        }));
+        $c->flash->{error_msg} = "You need CSC administrator privileges to access backup functionality.";
+        $c->response->redirect($c->uri_for('/admin'));
         return;
     }
 
-    # Handle backup creation
-    if ($c->req->method eq 'POST' && $c->req->param('action') eq 'create_backup') {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'backup',
-            "Creating backup");
-
-        my $backup_type = $c->req->param('backup_type') || 'full';
-        my $backup_name = $c->req->param('backup_name') || 'backup_' . time();
-
-        # Create backup directory if it doesn't exist
-        my $backup_dir = $c->path_to('backups');
-        unless (-d $backup_dir) {
-            eval { make_path($backup_dir) };
-            if ($@) {
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'backup',
-                    "Error creating backup directory: $@");
-
-                $c->flash->{error_msg} = "Error creating backup directory: $@";
-                $c->response->redirect($c->uri_for('/admin/backup'));
-                return;
-            }
-        }
-
-        # Create backup
-        my $backup_file = "$backup_dir/$backup_name.tar.gz";
-        my $backup_command = '';
-
-        if ($backup_type eq 'full') {
-            # Full backup (files + database)
-            $backup_command = "tar -czf $backup_file --exclude='backups' --exclude='tmp' --exclude='logs/*.log' .";
-        }
-        elsif ($backup_type eq 'files') {
-            # Files only backup
-            $backup_command = "tar -czf $backup_file --exclude='backups' --exclude='tmp' --exclude='logs/*.log' --exclude='db' .";
-        }
-        elsif ($backup_type eq 'database') {
-            # Database only backup
-            # This is a simplified example - you'd need to customize for your database
-            $backup_command = "mysqldump -u username -p'password' database_name > $backup_dir/db_dump.sql && tar -czf $backup_file $backup_dir/db_dump.sql && rm $backup_dir/db_dump.sql";
-        }
-
-        # Execute backup command
-        my $result = system($backup_command);
-
-        if ($result == 0) {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'backup',
-                "Backup created successfully: $backup_file");
-
-            $c->flash->{success_msg} = "Backup created successfully: $backup_name.tar.gz";
-        }
-        else {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'backup',
-                "Error creating backup: $!");
-
-            $c->flash->{error_msg} = "Error creating backup: $!";
-        }
-
-        $c->response->redirect($c->uri_for('/admin/backup'));
-        return;
-    }
+    # Backup creation is now handled by the separate 'create' action method
 
     # Handle backup restoration
     if ($c->req->method eq 'POST' && $c->req->param('action') eq 'restore_backup') {
@@ -1258,36 +1203,506 @@ sub backup :Path('/admin/backup') :Args(0) {
         return;
     }
 
-    # Get available backups
-    my @backups = ();
-    eval {
-        my $backup_dir = $c->path_to('backups');
-        if (-d $backup_dir) {
-            opendir(my $dh, $backup_dir) or die "Cannot open backups directory: $!";
-            @backups = grep { -f "$backup_dir/$_" && $_ =~ /\.tar\.gz$/ } readdir($dh);
-            closedir($dh);
-
-            # Sort backups by modification time (newest first)
-            @backups = sort {
-                (stat("$backup_dir/$b"))[9] <=> (stat("$backup_dir/$a"))[9]
-            } @backups;
-        }
-    };
+    # Clean up any orphaned backup files first
+    $self->cleanup_orphaned_backups($c);
+    
+    # Get available backups with detailed information
+    my $backups = $self->get_backup_list($c);
 
     # Use the standard debug message system
     if ($c->session->{debug_mode}) {
         push @{$c->stash->{debug_msg}}, "Admin controller backup view - Template: admin/backup.tt";
-        push @{$c->stash->{debug_msg}}, "Available backups: " . join(', ', @backups);
+        push @{$c->stash->{debug_msg}}, "Available backups: " . scalar(@$backups);
     }
 
     # Pass data to the template
     $c->stash(
         template => 'admin/backup.tt',
-        backups => \@backups
+        backups => $backups
     );
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'backup',
         "Completed backup action");
+}
+
+# Handle backup creation (separate action for cleaner URL handling)
+sub create :Path('/admin/backup/create') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create',
+        "Starting backup creation");
+    
+    # Check if the user has CSC backup access
+    unless ($self->check_csc_access($c)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create',
+            "Access denied: User does not have CSC backup access");
+        
+        $c->flash->{error_msg} = "You need CSC administrator privileges to create backups.";
+        $c->response->redirect($c->uri_for('/admin/backup'));
+        return;
+    }
+    
+    # Only handle POST requests
+    unless ($c->req->method eq 'POST') {
+        $c->response->redirect($c->uri_for('/admin/backup'));
+        return;
+    }
+    
+    my $backup_type = $c->req->param('type') || 'full';
+    my $description = $c->req->param('description') || '';
+    
+    # Generate backup name with timestamp and type
+    my $timestamp = time();
+    my ($sec, $min, $hour, $mday, $mon, $year) = localtime($timestamp);
+    my $date_str = sprintf("%04d%02d%02d_%02d%02d%02d", $year + 1900, $mon + 1, $mday, $hour, $min, $sec);
+    my $backup_name = "backup_${date_str}_${backup_type}";
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create',
+        "Creating $backup_type backup: $backup_name");
+    
+    # Create backup directory if it doesn't exist
+    my $backup_dir = $c->path_to('backups');
+    unless (-d $backup_dir) {
+        eval { make_path($backup_dir) };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create',
+                "Error creating backup directory: $@");
+            
+            $c->flash->{error_msg} = "Error creating backup directory: $@";
+            $c->response->redirect($c->uri_for('/admin/backup'));
+            return;
+        }
+    }
+    
+    # Create backup
+    my $backup_file = "$backup_dir/$backup_name.tar.gz";
+    my $backup_command = '';
+    my $backup_success = 0;
+    
+    if ($backup_type eq 'full') {
+        # Full backup (files + database)
+        $backup_command = "tar -czf '$backup_file' --exclude='backups' --exclude='tmp' --exclude='logs/*.log' .";
+        
+    } elsif ($backup_type eq 'config') {
+        # Configuration files only
+        $backup_command = "tar -czf '$backup_file' --exclude='backups' --exclude='tmp' config/ lib/Comserv.pm *.conf *.yml *.yaml 2>/dev/null || true";
+        
+    } elsif ($backup_type eq 'database') {
+        # Database only backup
+        my $db_backup_result = $self->create_database_backup($c, $backup_dir, $backup_name);
+        
+        if ($db_backup_result->{success}) {
+            # Get the application root directory for relative path calculation
+            my $app_root = $c->path_to('.');
+            # Use relative path from app root for tar command
+            my $relative_dump_file = File::Spec->abs2rel($db_backup_result->{dump_file}, $app_root);
+            $backup_command = "tar -czf '$backup_file' '$relative_dump_file' && rm '$db_backup_result->{dump_file}'";
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create',
+                "Database backup dump file: $db_backup_result->{dump_file}");
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create',
+                "Relative dump file path: $relative_dump_file");
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create',
+                "Failed to create database backup: " . $db_backup_result->{error});
+            
+            $c->flash->{error_msg} = "Failed to create database backup: " . $db_backup_result->{error};
+            $c->response->redirect($c->uri_for('/admin/backup'));
+            return;
+        }
+    }
+    
+    # Execute backup command
+    if ($backup_command) {
+        # Get the application root directory for proper tar execution
+        my $app_root = $c->path_to('.');
+        
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create',
+            "Executing backup command from directory: $app_root");
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create',
+            "Backup command: $backup_command");
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create',
+            "Target backup file: $backup_file");
+        
+        # Change to application root directory and execute command
+        my $original_dir = Cwd::getcwd();
+        chdir($app_root) or do {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create',
+                "Cannot change to application directory: $app_root - $!");
+            $c->flash->{error_msg} = "Cannot change to application directory: $!";
+            $c->response->redirect($c->uri_for('/admin/backup'));
+            return;
+        };
+        
+        my $result = system($backup_command);
+        
+        # Change back to original directory
+        chdir($original_dir);
+        
+        if ($result == 0) {
+            # Add a small delay to ensure file is fully written
+            sleep(1);
+            
+            # Verify backup file was created and has content
+            if (-f $backup_file && -s $backup_file) {
+                $backup_success = 1;
+                
+                my $file_size = -s $backup_file;
+                my $formatted_size = $self->format_file_size($file_size);
+                
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create',
+                    "Backup created successfully: $backup_file ($formatted_size)");
+                
+                # Force a debug message to appear in the UI
+                if ($c->session->{debug_mode}) {
+                    $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
+                    push @{$c->stash->{debug_msg}}, "DEBUG: Backup file created at: $backup_file (Size: $formatted_size)";
+                }
+                
+                my $success_msg = "Backup created successfully: $backup_name.tar.gz ($formatted_size)";
+                $success_msg .= " - $description" if $description;
+                
+                $c->flash->{success_msg} = $success_msg;
+            } else {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create',
+                    "Backup file was not created or is empty: $backup_file");
+                
+                # Additional debugging
+                if (-f $backup_file) {
+                    my $size = -s $backup_file;
+                    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create',
+                        "Backup file exists but has size: $size bytes");
+                    
+                    # Force debug message to UI
+                    if ($c->session->{debug_mode}) {
+                        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
+                        push @{$c->stash->{debug_msg}}, "DEBUG: Backup file exists but empty: $backup_file ($size bytes)";
+                    }
+                } else {
+                    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create',
+                        "Backup file does not exist at: $backup_file");
+                    
+                    # Force debug message to UI
+                    if ($c->session->{debug_mode}) {
+                        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
+                        push @{$c->stash->{debug_msg}}, "DEBUG: Backup file does not exist: $backup_file";
+                    }
+                }
+                
+                $c->flash->{error_msg} = "Backup file was not created or is empty";
+            }
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create',
+                "Error creating backup (exit code: $result): $!");
+            
+            # Force debug message to UI
+            if ($c->session->{debug_mode}) {
+                $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
+                push @{$c->stash->{debug_msg}}, "DEBUG: Backup command failed with exit code: $result";
+            }
+            
+            $c->flash->{error_msg} = "Error creating backup (exit code: $result)";
+        }
+    }
+    
+    $c->response->redirect($c->uri_for('/admin/backup'));
+}
+
+# Cleanup orphaned backup files (like .meta files without corresponding .tar.gz)
+sub cleanup_orphaned_backups {
+    my ($self, $c) = @_;
+    
+    my $backup_dir = $c->path_to('backups');
+    return unless -d $backup_dir;
+    
+    eval {
+        opendir(my $dh, $backup_dir) or die "Cannot open backup directory: $!";
+        my @all_files = readdir($dh);
+        closedir($dh);
+        
+        # Find .meta files
+        my @meta_files = grep { $_ =~ /\.tar\.gz\.meta$/ } @all_files;
+        
+        foreach my $meta_file (@meta_files) {
+            my $backup_file = $meta_file;
+            $backup_file =~ s/\.meta$//; # Remove .meta extension
+            
+            # If the corresponding .tar.gz file doesn't exist, remove the .meta file
+            unless (-f "$backup_dir/$backup_file") {
+                my $meta_path = "$backup_dir/$meta_file";
+                if (unlink($meta_path)) {
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'cleanup_orphaned_backups',
+                        "Removed orphaned meta file: $meta_file");
+                }
+            }
+        }
+    };
+    
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'cleanup_orphaned_backups',
+            "Error during cleanup: $@");
+    }
+}
+
+# Debug endpoint to check backup directory contents
+sub debug_backups :Path('/admin/backup/debug') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Check if the user has CSC backup access
+    unless ($self->check_csc_access($c)) {
+        $c->response->body("Access denied");
+        return;
+    }
+    
+    my $backup_dir = $c->path_to('backups');
+    my $debug_info = {
+        backup_dir => "$backup_dir",
+        dir_exists => (-d $backup_dir) ? 1 : 0,
+        files => [],
+        error => ''
+    };
+    
+    if (-d $backup_dir) {
+        eval {
+            opendir(my $dh, $backup_dir) or die "Cannot open directory: $!";
+            my @all_files = readdir($dh);
+            closedir($dh);
+            
+            foreach my $file (@all_files) {
+                next if $file eq '.' || $file eq '..';
+                my $filepath = "$backup_dir/$file";
+                my @stat = stat($filepath);
+                
+                push @{$debug_info->{files}}, {
+                    name => $file,
+                    is_file => (-f $filepath) ? 1 : 0,
+                    size => $stat[7] || 0,
+                    mtime => $stat[9] || 0,
+                    matches_pattern => ($file =~ /\.tar\.gz$/) ? 1 : 0
+                };
+            }
+        };
+        $debug_info->{error} = $@ if $@;
+    }
+    
+    $c->response->content_type('application/json');
+    $c->response->body(JSON::encode_json($debug_info));
+}
+
+# Test backup creation manually
+sub test_create :Path('/admin/backup/test_create') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Check if the user has CSC backup access
+    unless ($self->check_csc_access($c)) {
+        $c->response->body("Access denied");
+        return;
+    }
+    
+    my $result = {
+        steps => [],
+        success => 0,
+        error => ''
+    };
+    
+    eval {
+        push @{$result->{steps}}, "Starting manual backup test...";
+        
+        my $backup_dir = $c->path_to('backups');
+        my $app_root = $c->path_to('.');
+        my $timestamp = time();
+        my ($sec, $min, $hour, $mday, $mon, $year) = localtime($timestamp);
+        my $date_str = sprintf("%04d%02d%02d_%02d%02d%02d", $year + 1900, $mon + 1, $mday, $hour, $min, $sec);
+        my $backup_name = "test_backup_${date_str}_database";
+        my $backup_file = "$backup_dir/$backup_name.tar.gz";
+        
+        push @{$result->{steps}}, "Backup directory: $backup_dir";
+        push @{$result->{steps}}, "App root: $app_root";
+        push @{$result->{steps}}, "Backup name: $backup_name";
+        push @{$result->{steps}}, "Backup file: $backup_file";
+        
+        # Test database backup creation
+        my $db_backup_result = $self->create_database_backup($c, $backup_dir, $backup_name);
+        
+        if ($db_backup_result->{success}) {
+            push @{$result->{steps}}, "✅ Database dump created: " . $db_backup_result->{dump_file};
+            
+            # Check if dump file exists
+            if (-f $db_backup_result->{dump_file}) {
+                my $dump_size = -s $db_backup_result->{dump_file};
+                push @{$result->{steps}}, "✅ Dump file exists with size: $dump_size bytes";
+                
+                # Create tar command
+                my $relative_dump_file = File::Spec->abs2rel($db_backup_result->{dump_file}, $app_root);
+                my $backup_command = "tar -czf '$backup_file' '$relative_dump_file' && rm '$db_backup_result->{dump_file}'";
+                
+                push @{$result->{steps}}, "Relative dump file: $relative_dump_file";
+                push @{$result->{steps}}, "Backup command: $backup_command";
+                
+                # Change to app root and execute
+                my $original_dir = Cwd::getcwd();
+                chdir($app_root);
+                push @{$result->{steps}}, "Changed to directory: " . Cwd::getcwd();
+                
+                my $cmd_result = system($backup_command);
+                chdir($original_dir);
+                
+                push @{$result->{steps}}, "Command exit code: $cmd_result";
+                
+                if ($cmd_result == 0) {
+                    if (-f $backup_file && -s $backup_file) {
+                        my $backup_size = -s $backup_file;
+                        push @{$result->{steps}}, "✅ Backup created successfully: $backup_size bytes";
+                        $result->{success} = 1;
+                        
+                        # Clean up test file
+                        unlink($backup_file);
+                        push @{$result->{steps}}, "Test backup file cleaned up";
+                    } else {
+                        push @{$result->{steps}}, "❌ Backup file not created or empty";
+                    }
+                } else {
+                    push @{$result->{steps}}, "❌ Backup command failed";
+                }
+            } else {
+                push @{$result->{steps}}, "❌ Dump file does not exist";
+            }
+        } else {
+            push @{$result->{steps}}, "❌ Database backup failed: " . $db_backup_result->{error};
+        }
+    };
+    
+    if ($@) {
+        $result->{error} = $@;
+        push @{$result->{steps}}, "❌ Exception: $@";
+    }
+    
+    $c->response->content_type('application/json');
+    $c->response->body(JSON::encode_json($result));
+}
+
+# Handle backup download
+sub download :Path('/admin/backup/download') :Args(1) {
+    my ($self, $c, $filename) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'download',
+        "Starting backup download: $filename");
+    
+    # Check if the user has CSC backup access
+    unless ($self->check_csc_access($c)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'download',
+            "Access denied: User does not have CSC backup access");
+        
+        $c->flash->{error_msg} = "You need CSC administrator privileges to download backups.";
+        $c->response->redirect($c->uri_for('/admin/backup'));
+        return;
+    }
+    
+    # Validate filename (security check)
+    unless ($filename && $filename =~ /^[a-zA-Z0-9_\-\.]+\.tar\.gz$/) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'download',
+            "Invalid filename: $filename");
+        
+        $c->flash->{error_msg} = "Invalid backup filename.";
+        $c->response->redirect($c->uri_for('/admin/backup'));
+        return;
+    }
+    
+    # Check if backup file exists
+    my $backup_file = $c->path_to('backups', $filename);
+    unless (-f $backup_file) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'download',
+            "Backup file not found: $backup_file");
+        
+        $c->flash->{error_msg} = "Backup file not found: $filename";
+        $c->response->redirect($c->uri_for('/admin/backup'));
+        return;
+    }
+    
+    # Serve the file for download
+    $c->response->content_type('application/gzip');
+    $c->response->header('Content-Disposition' => "attachment; filename=\"$filename\"");
+    $c->response->header('Content-Length' => -s $backup_file);
+    
+    # Stream the file
+    $c->serve_static_file($backup_file);
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'download',
+        "Backup download completed: $filename");
+}
+
+# Handle backup deletion
+sub delete :Path('/admin/backup/delete') :Args(1) {
+    my ($self, $c, $filename) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete',
+        "Starting backup deletion: $filename");
+    
+    # Check if the user has CSC backup access
+    unless ($self->check_csc_access($c)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'delete',
+            "Access denied: User does not have CSC backup access");
+        
+        $c->flash->{error_msg} = "You need CSC administrator privileges to delete backups.";
+        $c->response->redirect($c->uri_for('/admin/backup'));
+        return;
+    }
+    
+    # Validate filename (security check)
+    unless ($filename && $filename =~ /^[a-zA-Z0-9_\-\.]+\.tar\.gz$/) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'delete',
+            "Invalid filename: $filename");
+        
+        $c->flash->{error_msg} = "Invalid backup filename.";
+        $c->response->redirect($c->uri_for('/admin/backup'));
+        return;
+    }
+    
+    # Check if backup file exists
+    my $backup_file = $c->path_to('backups', $filename);
+    unless (-f $backup_file) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'delete',
+            "Backup file not found: $backup_file");
+        
+        $c->flash->{error_msg} = "Backup file not found: $filename";
+        $c->response->redirect($c->uri_for('/admin/backup'));
+        return;
+    }
+    
+    # Delete the backup file
+    if (unlink($backup_file)) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete',
+            "Backup deleted successfully: $backup_file");
+        
+        $c->flash->{success_msg} = "Backup deleted successfully: $filename";
+    } else {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'delete',
+            "Error deleting backup: $!");
+        
+        $c->flash->{error_msg} = "Error deleting backup: $!";
+    }
+    
+    $c->response->redirect($c->uri_for('/admin/backup'));
+}
+
+# Test database connection (AJAX endpoint)
+sub test_db :Path('/admin/backup/test_db') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Check if the user has CSC backup access
+    unless ($self->check_csc_access($c)) {
+        my $result = {
+            success => 0,
+            message => "Access denied: CSC administrator privileges required"
+        };
+        $c->response->content_type('application/json');
+        $c->response->body(JSON::encode_json($result));
+        return;
+    }
+    
+    # This method already exists further down in the file, so we'll just redirect to it
+    # or we can implement it here if needed
+    $self->test_database_connection($c);
 }
 
 # Keeping it here for backward compatibility
@@ -1348,6 +1763,9 @@ sub schema_compare :Path('/admin/schema_compare') :Args(0) {
     # Get database comparison data
     my $database_comparison = $self->get_database_comparison($c);
     
+    # Add access control schema status
+    my $access_control_status = $self->check_access_control_schema($c);
+    
     # Debug: Log the structure of database_comparison
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare', 
         "Database comparison structure: " . Data::Dumper::Dumper($database_comparison));
@@ -1365,11 +1783,200 @@ sub schema_compare :Path('/admin/schema_compare') :Args(0) {
     # Set the template and data
     $c->stash(
         template => 'admin/schema_compare.tt',
-        database_comparison => $database_comparison
+        database_comparison => $database_comparison,
+        access_control_status => $access_control_status
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare', 
         "Completed schema_compare action");
+}
+
+# Check access control schema status
+sub check_access_control_schema {
+    my ($self, $c) = @_;
+    
+    my $status = {
+        overall_status => 'unknown',
+        users_table => {},
+        user_site_roles_table => {},
+        migration_needed => 0,
+        errors => [],
+        recommendations => []
+    };
+    
+    # Check User table columns
+    $status->{users_table} = $self->check_users_table_schema($c);
+    
+    # Check UserSiteRole table
+    $status->{user_site_roles_table} = $self->check_user_site_roles_table_schema($c);
+    
+    # Determine overall status
+    my $has_errors = 0;
+    my $needs_migration = 0;
+    
+    if ($status->{users_table}->{has_errors}) {
+        $has_errors = 1;
+        push @{$status->{errors}}, @{$status->{users_table}->{errors}};
+    }
+    
+    if ($status->{user_site_roles_table}->{has_errors}) {
+        $has_errors = 1;
+        push @{$status->{errors}}, @{$status->{user_site_roles_table}->{errors}};
+    }
+    
+    if ($status->{users_table}->{needs_migration} || $status->{user_site_roles_table}->{needs_migration}) {
+        $needs_migration = 1;
+    }
+    
+    # Set overall status
+    if ($has_errors) {
+        $status->{overall_status} = 'error';
+        push @{$status->{recommendations}}, 'Database schema errors detected. System is using fallback compatibility mode.';
+    } elsif ($needs_migration) {
+        $status->{overall_status} = 'migration_available';
+        $status->{migration_needed} = 1;
+        push @{$status->{recommendations}}, 'Enhanced access control features are available. Migration is optional.';
+    } else {
+        $status->{overall_status} = 'ok';
+        push @{$status->{recommendations}}, 'Access control schema is up to date.';
+    }
+    
+    return $status;
+}
+
+# Check users table schema for access control enhancements
+sub check_users_table_schema {
+    my ($self, $c) = @_;
+    
+    my $table_status = {
+        exists => 0,
+        has_errors => 0,
+        needs_migration => 0,
+        columns => {},
+        missing_columns => [],
+        errors => []
+    };
+    
+    try {
+        # Try to describe the users table
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        my $sth = $dbh->prepare("DESCRIBE users");
+        $sth->execute();
+        
+        $table_status->{exists} = 1;
+        
+        # Get existing columns
+        while (my $row = $sth->fetchrow_hashref) {
+            $table_status->{columns}->{lc($row->{Field})} = {
+                type => $row->{Type},
+                null => $row->{Null},
+                default => $row->{Default},
+                key => $row->{Key}
+            };
+        }
+        
+        # Check for required columns
+        my @required_columns = qw(id username password email roles);
+        foreach my $col (@required_columns) {
+            unless (exists $table_status->{columns}->{$col}) {
+                push @{$table_status->{errors}}, "Missing required column: $col";
+                $table_status->{has_errors} = 1;
+            }
+        }
+        
+        # Check for optional enhancement columns
+        my @optional_columns = qw(status created_at last_login);
+        foreach my $col (@optional_columns) {
+            unless (exists $table_status->{columns}->{$col}) {
+                push @{$table_status->{missing_columns}}, $col;
+                $table_status->{needs_migration} = 1;
+            }
+        }
+        
+    } catch {
+        my $error = $_;
+        push @{$table_status->{errors}}, "Error checking users table: $error";
+        $table_status->{has_errors} = 1;
+        
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'check_users_table_schema',
+            "Error checking users table schema: $error");
+    };
+    
+    return $table_status;
+}
+
+# Check user_site_roles table schema
+sub check_user_site_roles_table_schema {
+    my ($self, $c) = @_;
+    
+    my $table_status = {
+        exists => 0,
+        has_errors => 0,
+        needs_migration => 0,
+        columns => {},
+        missing_columns => [],
+        errors => []
+    };
+    
+    try {
+        # Try to describe the user_site_roles table
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        my $sth = $dbh->prepare("DESCRIBE user_site_roles");
+        $sth->execute();
+        
+        $table_status->{exists} = 1;
+        
+        # Get existing columns
+        while (my $row = $sth->fetchrow_hashref) {
+            $table_status->{columns}->{lc($row->{Field})} = {
+                type => $row->{Type},
+                null => $row->{Null},
+                default => $row->{Default},
+                key => $row->{Key}
+            };
+        }
+        
+    } catch {
+        my $error = $_;
+        if ($error =~ /doesn't exist/i) {
+            # Table doesn't exist - this is expected for basic installations
+            $table_status->{needs_migration} = 1;
+            push @{$table_status->{missing_columns}}, 'entire_table';
+        } else {
+            push @{$table_status->{errors}}, "Error checking user_site_roles table: $error";
+            $table_status->{has_errors} = 1;
+        }
+    };
+    
+    return $table_status;
+}
+
+# Access control help page
+sub access_control_help :Path('/admin/access_control_help') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Check if the user has admin role
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        $c->response->redirect($c->uri_for('/user/login', {
+            destination => $c->req->uri
+        }));
+        return;
+    }
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'access_control_help',
+        "Displaying access control help page");
+    
+    # Use the standard debug message system
+    if ($c->session->{debug_mode}) {
+        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
+        push @{$c->stash->{debug_msg}}, "Admin controller access_control_help view - Template: admin/access_control_help.tt";
+    }
+    
+    $c->stash(
+        template => 'admin/access_control_help.tt',
+        title => 'Multi-Site Access Control Help'
+    );
 }
 
 # AJAX endpoint to get table schema details
@@ -5816,6 +6423,592 @@ sub get_upgrade_system_status {
     };
     
     return $status;
+}
+
+
+
+# Create a new backup
+# Format file size for display
+sub format_file_size {
+    my ($self, $size) = @_;
+    
+    return '0 B' unless $size;
+    
+    my @units = ('B', 'KB', 'MB', 'GB', 'TB');
+    my $unit_index = 0;
+    
+    while ($size >= 1024 && $unit_index < $#units) {
+        $size /= 1024;
+        $unit_index++;
+    }
+    
+    return sprintf("%.1f %s", $size, $units[$unit_index]);
+}
+
+# Check if user has CSC (hosting company) access
+sub check_csc_access {
+    my ($self, $c) = @_;
+    
+    # First check if user exists
+    return 0 unless $c->user_exists;
+    
+    my $username = $c->session->{username} || '';
+    
+    # Check hardcoded CSC usernames first (most reliable)
+    my @csc_users = qw(shanta csc_admin backup_admin);
+    if (grep { lc($_) eq lc($username) } @csc_users) {
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'check_csc_access',
+            "CSC access granted to hardcoded user: $username");
+        return 1;
+    }
+    
+    # Try enhanced role checking with comprehensive fallback
+    my $enhanced_check_result = 0;
+    eval {
+        $enhanced_check_result = 1 if $c->check_user_roles_enhanced('backup_admin');
+        $enhanced_check_result = 1 if $c->check_user_roles_enhanced('csc_admin');
+        $enhanced_check_result = 1 if $c->check_user_roles_enhanced('super_admin');
+    };
+    
+    if ($@) {
+        # Enhanced role checking failed (likely schema issue)
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_csc_access',
+            "Enhanced role checking failed, using legacy fallback: $@");
+        
+        # Fall back to legacy admin check for known CSC users
+        if ($c->check_user_roles('admin')) {
+            # Additional verification for CSC users
+            if (grep { lc($_) eq lc($username) } @csc_users) {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_csc_access',
+                    "CSC access granted via legacy admin role for user: $username");
+                return 1;
+            }
+        }
+        
+        # Check session roles directly as final fallback
+        my $roles = $c->session->{roles};
+        if ($roles) {
+            my @session_roles = ref($roles) eq 'ARRAY' ? @$roles : split(/,/, $roles);
+            foreach my $role (@session_roles) {
+                $role =~ s/^\s+|\s+$//g; # trim whitespace
+                if (lc($role) eq 'admin' && grep { lc($_) eq lc($username) } @csc_users) {
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_csc_access',
+                        "CSC access granted via session admin role for user: $username");
+                    return 1;
+                }
+            }
+        }
+    } else {
+        # Enhanced role checking succeeded
+        if ($enhanced_check_result) {
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'check_csc_access',
+                "CSC access granted via enhanced role checking for user: $username");
+            return 1;
+        }
+    }
+    
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'check_csc_access',
+        "CSC access denied for user: $username");
+    return 0;
+}
+
+# Check backup system status
+sub check_backup_system_status {
+    my ($self, $c) = @_;
+    
+    my $status = {
+        database_connection => 'unknown',
+        mysqldump_available => 'unknown',
+        backup_directory => 'unknown',
+        access_control => 'unknown',
+        overall_status => 'unknown'
+    };
+    
+    # Check database connection
+    eval {
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        if ($dbh && $dbh->ping) {
+            $status->{database_connection} = 'ok';
+        } else {
+            $status->{database_connection} = 'failed';
+        }
+    };
+    if ($@) {
+        $status->{database_connection} = 'error: ' . $@;
+    }
+    
+    # Check mysqldump availability
+    my $mysqldump_check = `which mysqldump 2>/dev/null`;
+    if ($mysqldump_check && $mysqldump_check =~ /mysqldump/) {
+        $status->{mysqldump_available} = 'ok';
+    } else {
+        $status->{mysqldump_available} = 'not found';
+    }
+    
+    # Check backup directory
+    my $backup_dir = $self->get_backup_directory($c);
+    if (-d $backup_dir && -w $backup_dir) {
+        $status->{backup_directory} = 'ok';
+    } elsif (-d $backup_dir) {
+        $status->{backup_directory} = 'not writable';
+    } else {
+        $status->{backup_directory} = 'does not exist';
+    }
+    
+    # Check access control
+    if ($self->check_csc_access($c)) {
+        $status->{access_control} = 'ok';
+    } else {
+        $status->{access_control} = 'access denied';
+    }
+    
+    # Determine overall status
+    if ($status->{database_connection} eq 'ok' && 
+        $status->{mysqldump_available} eq 'ok' && 
+        $status->{backup_directory} eq 'ok' && 
+        $status->{access_control} eq 'ok') {
+        $status->{overall_status} = 'ok';
+    } else {
+        $status->{overall_status} = 'issues detected';
+    }
+    
+    return $status;
+}
+
+# Test database connection for debugging backup issues
+sub test_database_connection :Path('/admin/backup/test_db') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Check if the user has CSC access
+    unless ($self->check_csc_access($c)) {
+        $c->flash->{error_msg} = "Backup management is restricted to CSC hosting administrators only.";
+        $c->response->redirect($c->uri_for('/admin'));
+        return;
+    }
+    
+    my $result = { 
+        success => 0, 
+        message => '', 
+        databases => {},
+        overall_status => 'failed'
+    };
+    
+    # Test all available database models
+    my @db_models = ('DBEncy', 'DBForager');
+    my $successful_tests = 0;
+    
+    foreach my $model_name (@db_models) {
+        my $db_result = {
+            model => $model_name,
+            success => 0,
+            message => '',
+            details => {}
+        };
+        
+        eval {
+            # Check if model exists
+            my $model = eval { $c->model($model_name) };
+            if (!$model) {
+                $db_result->{message} = "Model $model_name not available";
+                $result->{databases}->{$model_name} = $db_result;
+                return;
+            }
+            
+            # Get database connection info using the application's method (same as backup function)
+            my $connect_info = $model->config->{connect_info};
+            my ($dsn, $user, $password);
+            
+            if (ref($connect_info) eq 'HASH') {
+                $dsn = $connect_info->{dsn};
+                $user = $connect_info->{user};
+                $password = $connect_info->{password};
+            } else {
+                die "Unexpected connect_info format: " . ref($connect_info);
+            }
+            
+            $db_result->{details}->{dsn} = $dsn;
+            $db_result->{details}->{user} = $user || 'none';
+            $db_result->{details}->{connect_info_type} = ref($connect_info);
+            $db_result->{details}->{config_source} = "$model_name model config";
+            
+            # Test database connection
+            my $dbh = $model->schema->storage->dbh;
+            my $version = $dbh->selectrow_array("SELECT VERSION()");
+            
+            $db_result->{success} = 1;
+            $db_result->{message} = "Database connection successful";
+            $db_result->{details}->{version} = $version;
+            $successful_tests++;
+            
+            # Test mysqldump availability if this is a MySQL database
+            if ($dsn =~ /^dbi:mysql:/i) {
+                my $mysqldump_path = `which mysqldump 2>/dev/null`;
+                chomp($mysqldump_path);
+                
+                if ($mysqldump_path) {
+                    my $mysqldump_version = `mysqldump --version 2>&1`;
+                    chomp($mysqldump_version);
+                    $db_result->{details}->{mysqldump_path} = $mysqldump_path;
+                    $db_result->{details}->{mysqldump_version} = $mysqldump_version;
+                    $db_result->{details}->{mysqldump_available} = 1;
+                } else {
+                    $db_result->{details}->{mysqldump_available} = 0;
+                    $db_result->{details}->{mysqldump_error} = "mysqldump command not found. Install mysql-client package.";
+                }
+            } else {
+                $db_result->{details}->{mysqldump_note} = "Not applicable for non-MySQL databases";
+            }
+            
+        };
+        
+        if ($@) {
+            $db_result->{message} = "Database connection failed: $@";
+        }
+        
+        $result->{databases}->{$model_name} = $db_result;
+    }
+    
+    # Set overall result
+    if ($successful_tests > 0) {
+        $result->{success} = 1;
+        $result->{overall_status} = 'success';
+        $result->{message} = "Successfully tested $successful_tests out of " . scalar(@db_models) . " databases";
+    } else {
+        $result->{message} = "All database connection tests failed";
+    }
+    
+    $c->response->content_type('application/json');
+    $c->response->body(JSON::encode_json($result));
+}
+
+# Get list of available backups with detailed information
+sub get_backup_list {
+    my ($self, $c) = @_;
+    
+    my @backups = ();
+    
+    eval {
+        my $backup_dir = $c->path_to('backups');
+        
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_backup_list',
+            "Looking for backups in directory: $backup_dir");
+        
+        unless (-d $backup_dir) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_backup_list',
+                "Backup directory does not exist: $backup_dir");
+            return \@backups;
+        }
+        
+        opendir(my $dh, $backup_dir) or die "Cannot open backups directory: $!";
+        my @all_files = readdir($dh);
+        closedir($dh);
+        
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_backup_list',
+            "All files in backup directory: " . join(', ', @all_files));
+        
+        # Filter for .tar.gz files only (exclude .meta files and other artifacts)
+        my @files = grep { -f "$backup_dir/$_" && $_ =~ /\.tar\.gz$/ && $_ !~ /\.meta$/ } @all_files;
+        
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_backup_list',
+            "Filtered .tar.gz files: " . join(', ', @files));
+        
+        foreach my $filename (@files) {
+            my $filepath = "$backup_dir/$filename";
+            my @stat = stat($filepath);
+            
+            # Parse backup information from filename
+            my $backup_info = {
+                filename => $filename,
+                filepath => $filepath,
+                size => $self->format_file_size($stat[7]),
+                mtime => $stat[9],
+                type => 'unknown'
+            };
+            
+            # Determine backup type from filename
+            if ($filename =~ /_full\.tar\.gz$/) {
+                $backup_info->{type} = 'full';
+            } elsif ($filename =~ /_database\.tar\.gz$/ || $filename =~ /_db\.tar\.gz$/) {
+                $backup_info->{type} = 'database';
+            } elsif ($filename =~ /_config\.tar\.gz$/) {
+                $backup_info->{type} = 'config';
+            } elsif ($filename =~ /_files\.tar\.gz$/) {
+                $backup_info->{type} = 'files';
+            } else {
+                # Try to guess from filename patterns
+                if ($filename =~ /config/i) {
+                    $backup_info->{type} = 'config';
+                } elsif ($filename =~ /db|database/i) {
+                    $backup_info->{type} = 'database';
+                } elsif ($filename =~ /full/i) {
+                    $backup_info->{type} = 'full';
+                } else {
+                    $backup_info->{type} = 'full'; # Default assumption
+                }
+            }
+            
+            # Format date and time
+            my ($sec, $min, $hour, $mday, $mon, $year) = localtime($backup_info->{mtime});
+            $backup_info->{date} = sprintf("%04d-%02d-%02d", $year + 1900, $mon + 1, $mday);
+            $backup_info->{time} = sprintf("%02d:%02d:%02d", $hour, $min, $sec);
+            
+            push @backups, $backup_info;
+        }
+        
+        # Sort backups by modification time (newest first)
+        @backups = sort { $b->{mtime} <=> $a->{mtime} } @backups;
+        
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_backup_list',
+            "Found " . scalar(@backups) . " backup files");
+        
+    };
+    
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_backup_list',
+            "Error reading backup directory: $@");
+    }
+    
+    return \@backups;
+}
+
+# Create database backup with proper error handling for multiple databases
+sub create_database_backup {
+    my ($self, $c, $backup_dir, $backup_name) = @_;
+    
+    my $result = {
+        success => 0,
+        error => '',
+        dump_file => '',
+        databases_backed_up => []
+    };
+    
+    eval {
+        # Get all available database models
+        my @db_models = ('DBEncy', 'DBForager');
+        my @successful_backups = ();
+        my @backup_files = ();
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_database_backup',
+            "Starting multi-database backup for models: " . join(', ', @db_models));
+        
+        foreach my $model_name (@db_models) {
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_database_backup',
+                "Processing database model: $model_name");
+            
+            # Check if model exists
+            my $model = eval { $c->model($model_name) };
+            if (!$model) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_database_backup',
+                    "Model $model_name not available, skipping");
+                next;
+            }
+            
+            my $connect_info = $model->config->{connect_info};
+            my ($dsn, $user, $password);
+            
+            # The database models store connection info as a hash with dsn, user, password keys
+            if (ref($connect_info) eq 'HASH') {
+                $dsn = $connect_info->{dsn};
+                $user = $connect_info->{user};
+                $password = $connect_info->{password};
+                
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_database_backup',
+                    "Retrieved connection info from $model_name - DSN: $dsn, User: " . ($user || 'none'));
+            } else {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_database_backup',
+                    "Unexpected connection info format in $model_name model: " . ref($connect_info));
+                next;
+            }
+            
+            # Validate required connection parameters
+            unless ($dsn) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_database_backup',
+                    "DSN not found in $model_name configuration, skipping");
+                next;
+            }
+            
+            # Ensure user and password are defined (even if empty)
+            $user = '' unless defined $user;
+            $password = '' unless defined $password;
+            
+            # Test database connection before attempting backup
+            eval {
+                my $test_schema = $model->schema;
+                my $test_dbh = $test_schema->storage->dbh;
+                # Simple test query
+                $test_dbh->do('SELECT 1');
+                
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_database_backup',
+                    "Database connection test successful for $model_name");
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_database_backup',
+                    "Database connection test failed for $model_name: $@");
+                next;
+            }
+            
+            # Parse DSN to get database name and type
+            my ($db_type, $db_name, $host, $port);
+            
+            if ($dsn =~ /^dbi:mysql:database=([^;]+)(?:;host=([^;]+))?(?:;port=(\d+))?/i) {
+                $db_type = 'mysql';
+                $db_name = $1;
+                $host = $2 || 'localhost';
+                $port = $3 || 3306;
+                
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_database_backup',
+                    "Parsed MySQL DSN for $model_name - Database: $db_name, Host: $host, Port: $port");
+                    
+            } elsif ($dsn =~ /^dbi:sqlite:(.+)$/i) {
+                $db_type = 'sqlite';
+                $db_name = $1;
+                
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_database_backup',
+                    "Parsed SQLite DSN for $model_name - Database file: $db_name");
+                    
+            } elsif ($dsn =~ /^dbi:(\w+):/i) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_database_backup',
+                    "Unsupported database type '$1' for $model_name, skipping");
+                next;
+            } else {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_database_backup',
+                    "Invalid DSN format for $model_name: $dsn, skipping");
+                next;
+            }
+            
+            # Create individual dump file for this database
+            my $individual_dump_file = "$backup_dir/${backup_name}_${model_name}_${db_name}.sql";
+            push @backup_files, $individual_dump_file;
+            
+            # Create backup command based on database type
+            my $backup_command;
+            
+            if ($db_type eq 'mysql') {
+                # MySQL backup
+                my $host_param = ($host && $host ne 'localhost') ? "-h '$host'" : '';
+                my $port_param = ($port && $port != 3306) ? "-P $port" : '';
+                my $user_param = $user ? "-u '$user'" : '';
+                
+                # Handle password parameter more securely
+                my $password_param = '';
+                if ($password) {
+                    # Escape single quotes in password for shell safety
+                    my $escaped_password = $password;
+                    $escaped_password =~ s/'/'"'"'/g;
+                    $password_param = "-p'$escaped_password'";
+                }
+                
+                $backup_command = "mysqldump $host_param $port_param $user_param $password_param --single-transaction --routines --triggers '$db_name' > '$individual_dump_file' 2>&1";
+                
+                # Test mysqldump availability
+                my $mysqldump_test = `which mysqldump 2>/dev/null`;
+                chomp($mysqldump_test);
+                unless ($mysqldump_test) {
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_database_backup',
+                        "mysqldump command not found for $model_name, skipping");
+                    next;
+                }
+                
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_database_backup',
+                    "MySQL backup command prepared for $model_name database: $db_name, host: " . ($host || 'localhost') . 
+                    ", user: " . ($user || 'none') . ", mysqldump path: $mysqldump_test");
+                
+            } elsif ($db_type eq 'sqlite') {
+                # SQLite backup - just copy the database file
+                if (-f $db_name) {
+                    $backup_command = "cp '$db_name' '$individual_dump_file'";
+                } else {
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_database_backup',
+                        "SQLite database file not found for $model_name: $db_name, skipping");
+                    next;
+                }
+            }
+            
+            # Execute backup command for this database
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_database_backup',
+                "Executing backup command for $model_name ($db_type database)");
+            
+            my $backup_output = `$backup_command`;
+            my $backup_result = $?;
+            
+            if ($backup_result != 0) {
+                my $error_msg = "Backup command failed for $model_name with exit code: $backup_result";
+                if ($backup_output) {
+                    $error_msg .= "\nCommand output: $backup_output";
+                }
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_database_backup',
+                    $error_msg);
+                next; # Continue with next database instead of failing completely
+            }
+            
+            # Log any output from the backup command (even on success)
+            if ($backup_output) {
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_database_backup',
+                    "Backup command output for $model_name: $backup_output");
+            }
+            
+            # Verify backup file was created
+            unless (-f $individual_dump_file && -s $individual_dump_file) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_database_backup',
+                    "Backup file for $model_name was not created or is empty: $individual_dump_file");
+                next;
+            }
+            
+            # Record successful backup
+            push @successful_backups, {
+                model => $model_name,
+                database => $db_name,
+                file => $individual_dump_file,
+                size => -s $individual_dump_file
+            };
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_database_backup',
+                "Successfully backed up $model_name database ($db_name) to $individual_dump_file");
+        }
+        
+        # Check if we have any successful backups
+        if (@successful_backups == 0) {
+            die "No databases were successfully backed up";
+        }
+        
+        # Create a combined dump file containing all individual backups
+        my $combined_dump_file = "$backup_dir/${backup_name}_all_databases.sql";
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_database_backup',
+            "Creating combined backup file: $combined_dump_file");
+        
+        # Combine all individual backup files
+        my $combine_command = "cat " . join(' ', map { "'$_'" } @backup_files) . " > '$combined_dump_file'";
+        my $combine_result = system($combine_command);
+        
+        if ($combine_result == 0 && -f $combined_dump_file && -s $combined_dump_file) {
+            # Clean up individual files after successful combination
+            foreach my $individual_file (@backup_files) {
+                unlink $individual_file if -f $individual_file;
+            }
+            
+            $result->{dump_file} = $combined_dump_file;
+        } else {
+            # If combination failed, keep individual files and use the first one as primary
+            $result->{dump_file} = $backup_files[0] if @backup_files;
+        }
+        
+        $result->{success} = 1;
+        $result->{databases_backed_up} = \@successful_backups;
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_database_backup',
+            "Multi-database backup completed successfully. Backed up " . scalar(@successful_backups) . 
+            " databases to: " . $result->{dump_file});
+        
+    };
+    
+    if ($@) {
+        $result->{error} = $@;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_database_backup',
+            "Database backup failed: $@");
+    }
+    
+    return $result;
 }
 
 __PACKAGE__->meta->make_immutable;
