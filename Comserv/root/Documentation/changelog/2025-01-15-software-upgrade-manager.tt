@@ -1,3 +1,8 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2025-01-15-software-upgrade-manager.tt,v 0.01 2025/01/15 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
 [% META title = 'Software Upgrade Manager Implementation' %]
 [% META description = 'Added comprehensive step-by-step software upgrade management system for production deployments' %]
 [% META author = 'shanta' %]
