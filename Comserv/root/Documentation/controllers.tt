@@ -1,53 +1,72 @@
-[% PageVersion = 'Comserv/root/Documentation/controllers.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% PageVersion = 'Comserv/root/Documentation/controllers.tt,v 0.02 2025/01/20 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
-[% META title = 'Controllers' %]
+[% META title = 'Controller Documentation' %]
 
-<!-- Documentation page for Controllers -->
-<div class="documentation-content">
-
+<!-- Controller Documentation Section -->
 [% IF categories.controllers %]
-<section class="doc-section admin-only">
-    <h2 class="section-toggle">Controller Documentation</h2>
-    <p>Technical details for system controllers. <span class="admin-badge">Admin Only</span></p>
-    <div class="section-content">
-        <a href="[% c.uri_for('/Documentation/controllers/index') %]" class="doc-card special-card">
-            <h3>All Controllers</h3>
-            <p>View a complete list of all controllers in the system.</p>
-            <span class="file-type-badge template">template</span>
-            <span class="role-badge">Admin Only</span>
-        </a>
+    <div class="admin-section">
+        <h3><i class="fas fa-cogs"></i>Controller Documentation</h3>
+        <p>Technical details for system controllers. <span class="admin-badge">Admin Only</span></p>
+    </div>
+    
+    <div class="feature-grid">
+        <div class="feature-card">
+            <div class="feature-header">
+                <h4><i class="fas fa-list feature-icon"></i>System Overview</h4>
+            </div>
+            <div class="feature-content">
+                <p>Complete list and status of all controllers in the system.</p>
+            </div>
+            <div class="feature-actions">
+                <a href="[% c.uri_for('/Documentation/controllers/index') %]" class="btn btn-primary">All Controllers</a>
+                <a href="[% c.uri_for('/Documentation/controllers/controller_list') %]" class="btn btn-secondary">Documentation Status</a>
+            </div>
+        </div>
         
-        <div class="controller-grid">
-            [% controller_count = 0 %]
-            [% # Debug output %]
-                <div class="debug-info">
+        [% controller_count = 0 %]
+        [% IF c.session.debug_mode == 1 %]
+            <div class="feature-card">
+                <div class="feature-header">
+                    <h4><i class="fas fa-bug feature-icon"></i>Debug Information</h4>
+                </div>
+                <div class="feature-content">
                     <p>Controller pages: [% categories.controllers.pages.size %]</p>
-                    <p>Controller pages: [% categories.controllers.pages.join(", ") %]</p>
-                [% END %]</div>
-            [% FOREACH page_name IN categories.controllers.pages.sort %]
-                [% IF structured_pages.$page_name %]
-                    [% page = structured_pages.$page_name %]
-                    [% controller_count = controller_count + 1 %]
-                    <a href="[% page.url %]" class="doc-card">
-                        <h3>[% page.title %]</h3>
+                    <p>Pages: [% categories.controllers.pages.join(", ") %]</p>
+                </div>
+            </div>
+        [% END %]
+        
+        [% FOREACH page_name IN categories.controllers.pages.sort %]
+            [% IF structured_pages.$page_name %]
+                [% page = structured_pages.$page_name %]
+                [% controller_count = controller_count + 1 %]
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <h4><i class="fas fa-file-code feature-icon"></i>[% page.title %]</h4>
+                    </div>
+                    <div class="feature-content">
                         <p>[% page.description || 'Controller documentation.' %]</p>
                         <span class="role-badge">Admin Only</span>
-                    </a>
-        [% END %]</div>
+                    </div>
+                    <div class="feature-actions">
+                        <a href="[% page.url %]" class="btn btn-primary">View Documentation</a>
+                    </div>
+                </div>
+            [% END %]
+        [% END %]
         
         [% IF controller_count == 0 %]
-        <div class="no-docs-message">
-            <p>No controller documentation files found. Please check the Documentation controller configuration.</p>
-        [% END %]</div>
-        
-        <a href="[% c.uri_for('/Documentation/controllers/controller_list') %]" class="doc-card special-card">
-            <h3>Controller Documentation Status</h3>
-            <p>View the documentation status of all controllers in the system.</p>
-            <span class="file-type-badge markdown">markdown</span>
-            <span class="role-badge">Admin Only</span>
-        </a>
-    [% END %]</div>
-</section>
+            <div class="feature-card">
+                <div class="feature-header">
+                    <h4><i class="fas fa-exclamation-triangle feature-icon"></i>No Documentation Found</h4>
+                </div>
+                <div class="feature-content">
+                    <p>No controller documentation files found. Please check the Documentation controller configuration.</p>
+                </div>
+            </div>
+        [% END %]
+    </div>
+[% END %]

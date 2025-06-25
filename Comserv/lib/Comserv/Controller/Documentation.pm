@@ -44,7 +44,7 @@ has 'logging' => (
 
 # Store documentation pages with metadata
 has 'documentation_pages' => (
-    is => 'ro',
+    is => 'rw',
     default => sub { {} },
     lazy => 1,
 );
@@ -52,7 +52,7 @@ has 'documentation_pages' => (
 # Store documentation categories
 # Updated to include all necessary categories and ensure proper organization
 has 'documentation_categories' => (
-    is => 'ro',
+    is => 'rw',
     default => sub {
         {
             'user_guides' => {
@@ -148,7 +148,7 @@ sub BUILD {
     my $generate_key = sub {
         my ($path, $filename) = @_;
 
-        # Remove problematic characters
+        # Remove problematic characters (preserve dashes)
         $filename =~ s/[^a-zA-Z0-9\-_\.]//g;
 
         # Split filename and extension
@@ -183,7 +183,16 @@ sub BUILD {
                 return unless /\.(md|tt|html|txt)$/i;
 
                 my $full_path = $File::Find::name;
-                my $rel_path = $full_path =~ s/^root\///r;
+                # Calculate relative path from the application root
+                # The full_path will be something like: /absolute/path/to/root/Documentation/file.tt
+                # We want to store: Documentation/file.tt
+                my $rel_path = $full_path;
+                if ($rel_path =~ m{/root/(.+)$}) {
+                    $rel_path = $1;  # Extract everything after /root/
+                } else {
+                    # Fallback - this shouldn't happen but just in case
+                    $rel_path = basename($full_path);
+                }
                 my $filename = basename($full_path);
 
                 # Log file found
@@ -256,7 +265,7 @@ sub BUILD {
     # Scan main documentation directory
     # Modified to properly categorize all documentation files and avoid duplicates
     $scan_dirs->(
-        "root/Documentation",
+        File::Spec->catdir($FindBin::Bin, "..", "root", "Documentation"),
         sub {
             my ($key, $meta) = @_;
 
@@ -332,7 +341,7 @@ sub BUILD {
     # Scan role-specific documentation
     # Modified to ensure proper categorization and admin access, avoiding duplicates
     $scan_dirs->(
-        "root/Documentation/roles",
+        File::Spec->catdir($FindBin::Bin, "..", "root", "Documentation", "roles"),
         sub {
             my ($key, $meta) = @_;
 
@@ -511,6 +520,78 @@ sub BUILD {
             $meta->{roles} = ['admin', 'developer'];
         }
     );
+
+    # Scan additional documentation directories that were missing
+    my @additional_dirs = qw(general features docs migration system cloudflare themes tutorials changelog scripts admin proxmox);
+    
+    foreach my $dir_name (@additional_dirs) {
+        my $dir_path = File::Spec->catdir($FindBin::Bin, "..", "root", "Documentation", $dir_name);
+        next unless -d $dir_path;
+        
+        $scan_dirs->(
+            $dir_path,
+            sub {
+                my ($key, $meta) = @_;
+
+                # Skip if already categorized
+                return if $categorized_files{$key};
+
+                # Determine category based on directory name
+                my $category = 'general'; # default
+                
+                if ($dir_name eq 'tutorials') {
+                    $category = 'tutorials';
+                } elsif ($dir_name eq 'changelog') {
+                    $category = 'changelog';
+                } elsif ($dir_name eq 'admin') {
+                    $category = 'admin_guides';
+                } elsif ($dir_name eq 'proxmox') {
+                    $category = 'proxmox';
+                } elsif ($dir_name eq 'features' || $dir_name eq 'system') {
+                    $category = 'developer_guides';
+                } elsif ($dir_name eq 'themes') {
+                    $category = 'developer_guides';
+                } elsif ($dir_name eq 'migration' || $dir_name eq 'scripts') {
+                    $category = 'admin_guides';
+                }
+                
+                # Add to appropriate category
+                if (exists $self->documentation_categories->{$category}) {
+                    push @{$self->documentation_categories->{$category}{pages}}, $key;
+                    $categorized_files{$key} = 1;
+                }
+
+                # Always add to general category for complete list
+                push @{$self->documentation_categories->{general}{pages}}, $key;
+
+                # Log categorization
+                $logger->log_to_file("Added $key from $dir_name directory to $category category", undef, 'DEBUG');
+            },
+            sub {
+                my ($meta, $path) = @_;
+
+                # Add file type detection
+                my $filename = basename($path);
+                $meta->{file_type} = ($filename =~ /\.tt$/i) ? 'template' :
+                                   ($filename =~ /\.md$/i) ? 'markdown' : 'other';
+
+                # Format title from filename
+                $meta->{title} = $self->_format_title(basename($path));
+
+                # Add description based on directory
+                $meta->{description} = "Documentation from $dir_name: " . $meta->{title};
+
+                # Set appropriate roles based on directory
+                if ($dir_name eq 'admin' || $dir_name eq 'migration' || $dir_name eq 'scripts' || $dir_name eq 'proxmox') {
+                    $meta->{roles} = ['admin', 'developer'];
+                } elsif ($dir_name eq 'features' || $dir_name eq 'system' || $dir_name eq 'themes') {
+                    $meta->{roles} = ['developer', 'admin'];
+                } else {
+                    $meta->{roles} = ['normal', 'editor', 'admin', 'developer'];
+                }
+            }
+        );
+    }
 
     # Post-process categories
     foreach my $category (values %{$self->documentation_categories}) {
@@ -718,8 +799,10 @@ sub index :Path('/Documentation') :Args(0) {
         my $path = $metadata->{path};
         my $title = $self->_format_title($page_name);
 
-        # Always use the view action with the page name as parameter
-        my $url = $c->uri_for($self->action_for('view'), [$page_name]);
+        # Generate URL that matches the routing pattern: /Documentation/view/page_name
+        # The view action is configured as :Path('/Documentation/view') :Args(1)
+        # So we need to create URLs in the format /Documentation/view/page_name
+        my $url = $c->uri_for('/Documentation/view', $page_name);
 
         $structured_pages->{$page_name} = {
             title => $title,
@@ -997,6 +1080,296 @@ sub _generate_doc_url {
     }
     
     return $url;
+}
+
+# Search API endpoint
+sub search :Path('/Documentation/search') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Get search query from parameters
+    my $query = $c->request->param('q') || '';
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'search', 
+        "Documentation search requested: $query");
+    
+    # Return empty results if no query (allow single character searches for debugging)
+    if (!$query || length($query) < 1) {
+        $c->response->content_type('application/json');
+        $c->response->body('{"results": [], "message": "Query too short"}');
+        return;
+    }
+    
+    # Get all documentation pages
+    my $pages = $self->documentation_pages;
+    my @results;
+    
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'search', 
+        "Total pages available for search: " . scalar(keys %$pages));
+    
+    # If no pages found, try to reinitialize
+    if (scalar(keys %$pages) == 0) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'search', 
+            "No documentation pages found - attempting to reinitialize");
+        
+        # Force rebuild of documentation pages
+        $self->BUILD();
+        $pages = $self->documentation_pages;
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'search', 
+            "After reinitialize: " . scalar(keys %$pages) . " pages available");
+    }
+    
+
+    
+    # Search through pages
+    foreach my $page_name (keys %$pages) {
+        my $metadata = $pages->{$page_name};
+        my $title = $self->_format_title($page_name);
+        
+        # Initialize match tracking
+        my $title_match = $title =~ /\Q$query\E/i;
+        my $path_match = $metadata->{path} =~ /\Q$query\E/i;
+        my $name_match = $page_name =~ /\Q$query\E/i;
+        my $content_match = 0;
+        my $match_context = '';
+        
+        # Always search file content for comprehensive results
+        my $file_content = $self->_read_file_content($c, $metadata->{path});
+        
+
+        
+        if ($file_content && $file_content =~ /\Q$query\E/i) {
+            $content_match = 1;
+            # Extract context around the match (up to 150 characters)
+            $match_context = $self->_extract_match_context($file_content, $query, 150);
+            
+        }
+        
+        # Include if any match found
+        if ($title_match || $path_match || $name_match || $content_match) {
+            my $result = {
+                name => $page_name,
+                title => $title,
+                path => $metadata->{path},
+                url => $c->uri_for('/Documentation/view', $page_name)->as_string,
+                site => $metadata->{site} || 'all',
+                match_type => $title_match ? 'title' : 
+                             $path_match ? 'path' : 
+                             $name_match ? 'name' : 'content'
+            };
+            
+            # Add context for content matches
+            if ($content_match && $match_context) {
+                $result->{context} = $match_context;
+            }
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'search', 
+                "MATCH FOUND: $page_name (type: $result->{match_type}) -> URL: $result->{url}");
+            
+            push @results, $result;
+        } else {
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'search', 
+                "NO MATCH: $page_name (title:$title_match, path:$path_match, name:$name_match, content:$content_match)");
+        }
+    }
+    
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'search', 
+        "Search results found: " . scalar(@results));
+    
+    # Sort results by relevance (title matches first, then path, then name, then content)
+    @results = sort {
+        my %match_priority = (title => 4, path => 3, name => 2, content => 1);
+        my $a_priority = $match_priority{$a->{match_type}} || 0;
+        my $b_priority = $match_priority{$b->{match_type}} || 0;
+        $b_priority <=> $a_priority || $a->{title} cmp $b->{title};
+    } @results;
+    
+    # Limit results to 100 for comprehensive search
+    @results = splice(@results, 0, 100);
+    
+    # Return JSON response
+    eval {
+        require JSON;
+        my $json_response = JSON::encode_json({
+            results => \@results,
+            query => $query,
+            count => scalar(@results)
+        });
+        
+        $c->response->content_type('application/json');
+        $c->response->body($json_response);
+        
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'search', 
+            "JSON response sent successfully");
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'search', 
+            "Error encoding JSON response: $@");
+        $c->response->content_type('application/json');
+        $c->response->body('{"results": [], "error": "JSON encoding failed"}');
+    }
+}
+
+# Force rebuild endpoint for testing
+sub force_rebuild :Path('force_rebuild') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Clear existing pages and categories
+    $self->documentation_pages({});
+    $self->documentation_categories({
+        'user_guides' => {
+            title => 'User Guides',
+            description => 'Documentation for end users of the system',
+            pages => [],
+            roles => ['normal', 'editor', 'admin', 'developer'],
+            site_specific => 0,
+        },
+        'admin_guides' => {
+            title => 'Administrator Guides',
+            description => 'Documentation for system administrators',
+            pages => [],
+            roles => ['admin'],
+            site_specific => 0,
+        },
+        'developer_guides' => {
+            title => 'Developer Documentation',
+            description => 'Documentation for developers',
+            pages => [],
+            roles => ['developer'],
+            site_specific => 0,
+        },
+        'tutorials' => {
+            title => 'Tutorials',
+            description => 'Step-by-step guides for common tasks',
+            pages => [],
+            roles => ['normal', 'editor', 'admin', 'developer'],
+            site_specific => 0,
+        },
+        'site_specific' => {
+            title => 'Site-Specific Documentation',
+            description => 'Documentation specific to this site',
+            pages => [],
+            roles => ['normal', 'editor', 'admin', 'developer'],
+            site_specific => 1,
+        },
+        'modules' => {
+            title => 'Module Documentation',
+            description => 'Documentation for specific system modules',
+            pages => [],
+            roles => ['admin', 'developer'],
+            site_specific => 0,
+        },
+        'proxmox' => {
+            title => 'Proxmox Documentation',
+            description => 'Documentation for Proxmox virtualization environment',
+            pages => [],
+            roles => ['admin'],
+            site_specific => 0,
+        },
+        'controllers' => {
+            title => 'Controller Documentation',
+            description => 'Documentation for system controllers',
+            pages => [],
+            roles => ['admin', 'developer'],
+            site_specific => 0,
+        },
+        'models' => {
+            title => 'Model Documentation',
+            description => 'Documentation for system models',
+            pages => [],
+            roles => ['admin', 'developer'],
+            site_specific => 0,
+        },
+        'changelog' => {
+            title => 'Changelog',
+            description => 'System changes and updates',
+            pages => [],
+            roles => ['admin', 'developer'],
+            site_specific => 0,
+        },
+        'general' => {
+            title => 'All Documentation',
+            description => 'Complete list of all documentation files',
+            pages => [],
+            roles => ['admin', 'developer'],
+            site_specific => 0,
+        },
+    });
+    
+    # Force rebuild
+    $self->BUILD();
+    
+    my $pages = $self->documentation_pages;
+    my $total_count = scalar(keys %$pages);
+    
+    # Get sample of pages from different directories
+    my %dir_samples;
+    foreach my $page_name (keys %$pages) {
+        my $path = $pages->{$page_name}->{path};
+        if ($path =~ m{Documentation/([^/]+)/}) {
+            my $dir = $1;
+            $dir_samples{$dir} ||= [];
+            push @{$dir_samples{$dir}}, $page_name if @{$dir_samples{$dir}} < 3;
+        }
+    }
+    
+    $c->response->content_type('application/json');
+    eval {
+        require JSON;
+        my $json_response = JSON::encode_json({
+            total_pages => $total_count,
+            directory_samples => \%dir_samples,
+            message => "Rebuild completed"
+        });
+        $c->response->body($json_response);
+    };
+    if ($@) {
+        $c->response->body('{"error": "JSON encoding failed"}');
+    }
+}
+
+# Debug endpoint to test file reading
+sub debug_search :Path('debug_search') :Args(0) {
+    my ($self, $c) = @_;
+    
+    my $query = $c->request->param('q') || 'account';
+    
+    # Get all documentation pages
+    my $pages = $self->documentation_pages;
+    my @debug_results;
+    
+    # Test reading a few files
+    my $count = 0;
+    foreach my $page_name (keys %$pages) {
+        last if $count >= 3;
+        
+        my $metadata = $pages->{$page_name};
+        my $file_content = $self->_read_file_content($c, $metadata->{path});
+        
+        push @debug_results, {
+            page_name => $page_name,
+            path => $metadata->{path},
+            content_length => defined $file_content ? length($file_content) : 0,
+            has_query => defined $file_content ? ($file_content =~ /\Q$query\E/i ? 1 : 0) : 0,
+            sample_content => defined $file_content ? substr($file_content, 0, 100) : 'No content'
+        };
+        
+        $count++;
+    }
+    
+    $c->response->content_type('application/json');
+    eval {
+        require JSON;
+        my $json_response = JSON::encode_json({
+            query => $query,
+            total_pages => scalar(keys %$pages),
+            debug_results => \@debug_results
+        });
+        $c->response->body($json_response);
+    };
+    if ($@) {
+        $c->response->body('{"error": "JSON encoding failed"}');
+    }
 }
 
 # Display specific documentation page
@@ -1281,7 +1654,7 @@ sub documentation_update_summary :Path('documentation_update_summary') :Args(0) 
 
 
 # Handle view for both uppercase and lowercase routes
-sub view :Path('/Documentation') :Args(1) {
+sub view :Path('/Documentation/view') :Args(1) {
     my ($self, $c, $page) = @_;
 
     # Log the action with detailed information
@@ -1289,6 +1662,8 @@ sub view :Path('/Documentation') :Args(1) {
         "Accessing documentation page: $page, Username: " . ($c->session->{username} || 'unknown') . 
         ", Site: " . ($c->stash->{SiteName} || 'default') . 
         ", Session roles: " . (ref $c->session->{roles} eq 'ARRAY' ? join(', ', @{$c->session->{roles}}) : 'none'));
+    
+
 
     # Get all user roles and determine admin status
     # IMPORTANT: The $is_admin flag determines if a user has admin privileges
@@ -1394,8 +1769,8 @@ sub view :Path('/Documentation') :Args(1) {
     # Get the current site name
     my $site_name = $c->stash->{SiteName} || 'default';
 
-    # Sanitize the page name to prevent directory traversal
-    $page =~ s/[^a-zA-Z0-9_\.]//g;
+    # Sanitize the page name to prevent directory traversal (preserve dashes)
+    $page =~ s/[^a-zA-Z0-9_\.\-]//g;
     
     # SPECIAL CASE: Always allow access to FAQ page regardless of roles or site
     # This ensures the FAQ is accessible to everyone
@@ -1566,6 +1941,22 @@ sub view :Path('/Documentation') :Args(1) {
                 }
             }
         }
+        
+        # If we reach here, access is granted - use the metadata path as template
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
+            "Access granted to documentation: $page, using template: $metadata->{path}");
+        
+        $c->stash(
+            template => $metadata->{path},
+            user_role => $user_role,
+            user_roles => \@user_roles,
+            site_name => $site_name,
+            page_name => $page,
+            display_role => $user_role eq 'admin' ? 'Administrator' : 
+                           $user_role eq 'developer' ? 'Developer' : 
+                           $user_role eq 'editor' ? 'Editor' : 'User'
+        );
+        return $c->forward($c->view('TT'));
     }
 
     # First check if it's a direct file request (with extension)
@@ -2096,8 +2487,10 @@ sub all_changelog :Path('all_changelog') :Args(0) {
         my $path = $metadata->{path};
         my $title = $self->_format_title($page_name);
         
-        # Always use the view action with the page name as parameter
-        my $url = $c->uri_for($self->action_for('view'), [$page_name]);
+        # Generate URL that matches the routing pattern: /Documentation/view/page_name
+        # The view action is configured as :Path('/Documentation/view') :Args(1)
+        # So we need to create URLs in the format /Documentation/view/page_name
+        my $url = $c->uri_for('/Documentation/view', $page_name);
         
         $structured_pages->{$page_name} = {
             title => $title,
@@ -2290,6 +2683,107 @@ sub faq_handler :Path('/faq') :Args(0) {
     
     # Forward to the view action with 'faq' as the page parameter
     $c->forward('view', ['faq']);
+}
+
+# Helper method to read file content for search
+sub _read_file_content {
+    my ($self, $c, $file_path) = @_;
+    
+    # Convert relative path to absolute path
+    # The file_path stored in metadata is relative to root/ (e.g., 'Documentation/file.tt')
+    # We need to construct the full path correctly
+    my $full_path = $c->path_to('root', $file_path)->stringify;
+    
+    # Debug logging
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_read_file_content',
+        "Attempting to read file: $file_path -> $full_path");
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_read_file_content',
+        "File exists: " . (-f $full_path ? 'YES' : 'NO') . ", Readable: " . (-r $full_path ? 'YES' : 'NO'));
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_read_file_content',
+        "Full path type: " . ref($full_path) . ", String value: '$full_path'");
+    
+    # Check if file exists and is readable
+    unless (-f $full_path && -r $full_path) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_read_file_content',
+            "File not found or not readable: $full_path (exists: " . (-e $full_path ? 'YES' : 'NO') . 
+            ", is_file: " . (-f $full_path ? 'YES' : 'NO') . 
+            ", readable: " . (-r $full_path ? 'YES' : 'NO') . ")");
+        return;
+    }
+    
+    # Read file content
+    my $content;
+    eval {
+        open my $fh, '<:encoding(UTF-8)', $full_path or die "Cannot open $full_path: $!";
+        $content = do { local $/; <$fh> };
+        close $fh;
+        
+        # Clean up content for searching (remove Template Toolkit directives and HTML tags)
+        $content = $self->_clean_content_for_search($content);
+        
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_read_file_content',
+            "Successfully read file $file_path, content length: " . length($content || ''));
+    };
+    
+    if ($@) {
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_read_file_content',
+            "Error reading file $file_path: $@");
+        return;
+    }
+    
+    return $content;
+}
+
+# Helper method to clean content for searching
+sub _clean_content_for_search {
+    my ($self, $content) = @_;
+    
+    return unless $content;
+    
+    # Remove Template Toolkit directives
+    $content =~ s/\[%.*?%\]//gs;
+    
+    # Remove HTML tags but keep the content
+    $content =~ s/<[^>]+>/ /g;
+    
+    # Remove multiple whitespace and normalize
+    $content =~ s/\s+/ /g;
+    $content =~ s/^\s+|\s+$//g;
+    
+    return $content;
+}
+
+# Helper method to extract context around search matches
+sub _extract_match_context {
+    my ($self, $content, $query, $context_length) = @_;
+    
+    return unless $content && $query;
+    
+    $context_length ||= 150;
+    
+    # Find the position of the first match
+    my $pos = index(lc($content), lc($query));
+    return unless $pos >= 0;
+    
+    # Calculate start and end positions for context
+    my $start = $pos - int($context_length / 2);
+    $start = 0 if $start < 0;
+    
+    my $end = $start + $context_length;
+    $end = length($content) if $end > length($content);
+    
+    # Extract context
+    my $context = substr($content, $start, $end - $start);
+    
+    # Add ellipsis if we're not at the beginning/end
+    $context = "..." . $context if $start > 0;
+    $context = $context . "..." if $end < length($content);
+    
+    # Clean up any remaining whitespace issues
+    $context =~ s/\s+/ /g;
+    $context =~ s/^\s+|\s+$//g;
+    
+    return $context;
 }
 
 __PACKAGE__->meta->make_immutable;

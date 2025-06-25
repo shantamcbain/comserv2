@@ -1,74 +1,77 @@
-[% PageVersion = 'Comserv/root/Documentation/changelog.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% PageVersion = 'Comserv/root/Documentation/changelog.tt,v 0.03 2025/01/20 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
-[% META title = 'Changelog' %]
+[% META title = 'System Changelog' %]
 
-<!-- Documentation page for Changelog -->
-<div class="documentation-content">
-
-<section id="changelog" class="doc-section admin-only">
-    <h2 class="section-toggle">Changelog</h2>
-    <p>System updates and changes. <span class="admin-badge">Admin Only</span></p>
+<!-- Changelog Documentation Section -->
+<div class="section">
+    <div class="section-header">
+        <h3><i class="fas fa-history"></i>System Changelog</h3>
+    </div>
     <div class="section-content">
-        <div class="changelog-header">
-            <h3>Recent Documentation Updates</h3>
-            <a href="[% c.uri_for('/Documentation/all_changelog') %]" class="view-all-link">View All Documentation</a>
+        <p>System updates and changes. <span class="admin-badge">Admin Only</span></p>
+        
+        <div class="card-actions" style="margin-bottom: 20px;">
+            <a href="[% c.uri_for('/Documentation/all_changelog') %]" class="btn btn-primary">
+                <i class="fas fa-list"></i>View All Documentation
+            </a>
         </div>
+    
+    [% # Get all changelog pages from the structured_pages hash %]
+    [% changelog_pages = [] %]
+    [% FOREACH page_name IN structured_pages.keys %]
+        [% # Check if the page is in the changelog directory %]
+        [% IF structured_pages.$page_name.path.match('Documentation/changelog/') %]
+            [% changelog_pages.push(page_name) %]
+        [% END %]
+    [% END %]
+    
+    [% # Sort changelog pages by date in the filename or file modification time %]
+    [% date_sorted_pages = [] %]
+    [% FOREACH page_name IN changelog_pages %]
+        [% page = structured_pages.$page_name %]
+        [% # Extract date from filename if it exists (format: YYYY-MM-DD) %]
+        [% date_match = page_name.match('(\d{4}-\d{2}(-\d{2})?)') %]
         
-        [% # Get all changelog pages from the structured_pages hash %]
-        [% changelog_pages = [] %]
-        [% FOREACH page_name IN structured_pages.keys %]
-            [% # Check if the page is in the changelog directory %]
-            [% IF structured_pages.$page_name.path.match('Documentation/changelog/') %]
-                [% changelog_pages.push(page_name) %]
+        [% # Ensure we have a sortable date format %]
+        [% IF date_match %]
+            [% # Normalize date format to ensure proper sorting %]
+            [% sort_date = date_match.0 %]
+            [% # If we only have YYYY-MM, add -01 for the day to ensure proper sorting %]
+            [% IF sort_date.length == 7 %]
+                [% sort_date = sort_date _ '-01' %]
+            [% END %]
+            [% # Ensure no spaces or other characters that might affect sorting %]
+            [% sort_date = sort_date.replace(' ', '') %]
+        [% ELSE %]
+            [% # For files without dates, use a very old date to sort them last %]
+            [% sort_date = '0000-00-00' %]
+        [% END %]
+        
+        [% # Use date from filename, or fallback to page metadata date if available %]
+        [% sort_date = date_match ? sort_date : (page.date ? page.date : '0000-00-00') %]
+        
+        [% # Ensure consistent format for sorting %]
+        [% IF sort_date.length < 10 && sort_date != '0000-00-00' %]
+            [% # If we only have YYYY-MM, add -01 for the day %]
+            [% IF sort_date.length == 7 %]
+                [% sort_date = sort_date _ '-01' %]
             [% END %]
         [% END %]
         
-        [% # Sort changelog pages by date in the filename or file modification time %]
-        [% date_sorted_pages = [] %]
-        [% FOREACH page_name IN changelog_pages %]
-            [% page = structured_pages.$page_name %]
-            [% # Extract date from filename if it exists (format: YYYY-MM-DD) %]
-            [% date_match = page_name.match('(\d{4}-\d{2}(-\d{2})?)') %]
-            
-            [% # Ensure we have a sortable date format %]
-            [% IF date_match %]
-                [% # Normalize date format to ensure proper sorting %]
-                [% sort_date = date_match.0 %]
-                [% # If we only have YYYY-MM, add -01 for the day to ensure proper sorting %]
-                [% IF sort_date.length == 7 %]
-                    [% sort_date = sort_date _ '-01' %]
-                [% END %]
-                [% # Ensure no spaces or other characters that might affect sorting %]
-                [% sort_date = sort_date.replace(' ', '') %]
-            [% ELSE %]
-                [% # For files without dates, use a very old date to sort them last %]
-                [% sort_date = '0000-00-00' %]
-            [% END %]
-            
-            [% # Use date from filename, or fallback to page metadata date if available %]
-            [% sort_date = date_match ? sort_date : (page.date ? page.date : '0000-00-00') %]
-            
-            [% # Ensure consistent format for sorting %]
-            [% IF sort_date.length < 10 && sort_date != '0000-00-00' %]
-                [% # If we only have YYYY-MM, add -01 for the day %]
-                [% IF sort_date.length == 7 %]
-                    [% sort_date = sort_date _ '-01' %]
-                [% END %]
-            [% END %]
-            
-            [% date_sorted_pages.push({ 
-                name => page_name, 
-                sort_key => sort_date,
-                display_date => date_match ? date_match.0 : (page.date ? page.date : 'Unknown Date')
-            }) %]
-        [% END %]
+        [% date_sorted_pages.push({ 
+            name => page_name, 
+            sort_key => sort_date,
+            display_date => date_match ? date_match.0 : (page.date ? page.date : 'Unknown Date')
+        }) %]
+    [% END %]
 
-        [% # Sort by the extracted date in reverse order (newest first) %]
-        [% date_sorted_pages = date_sorted_pages.sort('sort_key').reverse %]
-        
+    [% # Sort by the extracted date in reverse order (newest first) %]
+    [% date_sorted_pages = date_sorted_pages.sort('sort_key').reverse %]
+    
+    <div class="admin-grid">
         [% # Display only the 5 most recent entries %]
         [% recent_count = 0 %]
         [% FOREACH page_info IN date_sorted_pages %]
@@ -82,66 +85,26 @@
             [% # Replace hyphens with slashes for better display %]
             [% changelog_date = changelog_date.replace('-', '/') %]
             
-            <a href="[% page.url %]" class="doc-card">
-                <h3>[% page.title %]</h3>
+            <div class="admin-card">
+                <h4><i class="fas fa-calendar-alt"></i>[% page.title %]</h4>
                 <div class="changelog-meta">
-                    <span class="date">[% changelog_date %]</span>
+                    <span class="date"><strong>Date:</strong> [% changelog_date %]</span>
                 </div>
                 <p>[% page.description || 'System change documentation.' %]</p>
                 <span class="role-badge">Admin Only</span>
-            </a>
+                <ul>
+                    <li><a href="[% page.url %]">View Details</a></li>
+                </ul>
+            </div>
         [% END %]
         
         [% IF recent_count == 0 %]
-            <p class="no-content">No changelog entries available.</p>
+            <div class="admin-card">
+                <h4><i class="fas fa-info-circle"></i>No Changelog Entries</h4>
+                <p>No changelog entries available.</p>
+            </div>
         [% END %]
     </div>
-</section>
-
-<style>
-    .changelog-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 20px;
-        padding-bottom: 10px;
-        border-bottom: 1px solid #dee2e6;
-    }
-    
-    .changelog-header h3 {
-        margin: 0;
-        color: #333;
-    }
-    
-    .view-all-link {
-        background-color: #0066cc;
-        color: white;
-        padding: 8px 15px;
-        border-radius: 4px;
-        text-decoration: none;
-        font-size: 14px;
-        transition: background-color 0.3s;
-    }
-    
-    .view-all-link:hover {
-        background-color: #0055aa;
-        text-decoration: none;
-        color: white;
-    }
-    
-    .changelog-meta {
-        color: #666;
-        font-size: 0.9em;
-        margin-bottom: 10px;
-    }
-    
-    .changelog-meta .date {
-        font-weight: bold;
-        margin-right: 10px;
-    }
-    
-    .changelog-meta .author {
-        font-style: italic;
-    }
-</style>
 </div>
+
+<!-- CSS moved to theme system - NO INLINE STYLES ALLOWED -->

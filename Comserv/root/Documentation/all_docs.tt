@@ -1,26 +1,33 @@
-[% PageVersion = 'Comserv/root/Documentation/all_docs.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% PageVersion = 'Comserv/root/Documentation/all_docs.tt,v 0.02 2025/01/20 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
-[% META title = 'All Docs' %]
+[% META title = 'All Documentation Files' %]
 
-<!-- Documentation page for All Docs -->
-<div class="documentation-content">
-
+<!-- All Documentation Files Section -->
 [% IF categories.general && categories.general.pages.size > 0 %]
-    <section class="doc-section admin-only">
-        <h2 class="section-toggle">All Documentation Files</h2>
+    <div class="admin-section">
+        <h3><i class="fas fa-folder-open"></i>All Documentation Files</h3>
         <p>Complete list of all documentation files. <span class="admin-badge">Admin Only</span></p>
-        <div class="file-type-tabs">
-            <button class="file-type-tab active" onclick="showFileType(event, 'all-docs')">All Files</button>
-            <button class="file-type-tab" onclick="showFileType(event, 'template-docs')">Template Files</button>
-            <button class="file-type-tab" onclick="showFileType(event, 'markdown-docs')">Markdown Files</button>
-            <button class="file-type-tab" onclick="showFileType(event, 'other-docs')">Other Files</button>
+        
+        <div class="feature-actions" style="margin-bottom: 20px;">
+            <button class="btn btn-primary active" onclick="showFileType(event, 'all-docs')">
+                <i class="fas fa-list"></i>All Files
+            </button>
+            <button class="btn btn-secondary" onclick="showFileType(event, 'template-docs')">
+                <i class="fas fa-file-code"></i>Template Files
+            </button>
+            <button class="btn btn-secondary" onclick="showFileType(event, 'markdown-docs')">
+                <i class="fas fa-file-alt"></i>Markdown Files
+            </button>
+            <button class="btn btn-secondary" onclick="showFileType(event, 'other-docs')">
+                <i class="fas fa-file"></i>Other Files
+            </button>
         </div>
         
         <!-- All Documents Tab -->
-        <div class="section-content file-type-content" id="all-docs">
+        <div class="admin-grid file-type-content" id="all-docs">
             [% sorted_pages = [] %]
             [% FOREACH page_name IN categories.general.pages %]
                 [% IF structured_pages.$page_name %]
@@ -32,15 +39,18 @@
             [% FOREACH page_info IN sorted_pages %]
                 [% page_name = page_info.name %]
                 [% page = structured_pages.$page_name %]
-                <a href="[% page.url %]" class="doc-card">
-                    <h3>[% page.title %]</h3>
+                <div class="admin-card">
+                    <h4><i class="fas fa-file-alt"></i>[% page.title %]</h4>
                     <p>[% page.description || 'Documentation file.' %]</p>
-                </a>
+                    <ul>
+                        <li><a href="[% page.url %]">View Documentation</a></li>
+                    </ul>
+                </div>
             [% END %]
         </div>
         
         <!-- Template Documents Tab -->
-        <div class="section-content file-type-content" id="template-docs" style="display: none;">
+        <div class="admin-grid file-type-content" id="template-docs" style="display: none;">
             [% template_pages = [] %]
             [% FOREACH page_name IN categories.general.pages %]
                 [% IF structured_pages.$page_name && structured_pages.$page_name.file_type == 'template' %]
@@ -53,19 +63,25 @@
                 [% FOREACH page_info IN template_pages %]
                     [% page_name = page_info.name %]
                     [% page = structured_pages.$page_name %]
-                    <a href="[% page.url %]" class="doc-card">
-                        <h3>[% page.title %]</h3>
+                    <div class="admin-card">
+                        <h4><i class="fas fa-file-code"></i>[% page.title %]</h4>
                         <p>[% page.description || 'Template documentation file.' %]</p>
                         <span class="file-type-badge template">template</span>
-                    </a>
+                        <ul>
+                            <li><a href="[% page.url %]">View Template</a></li>
+                        </ul>
+                    </div>
                 [% END %]
             [% ELSE %]
-                <p class="no-content">No template files found.</p>
+                <div class="admin-card">
+                    <h4><i class="fas fa-info-circle"></i>No Template Files</h4>
+                    <p>No template files found.</p>
+                </div>
             [% END %]
         </div>
         
         <!-- Markdown Documents Tab -->
-        <div class="section-content file-type-content" id="markdown-docs" style="display: none;">
+        <div class="admin-grid file-type-content" id="markdown-docs" style="display: none;">
             [% markdown_pages = [] %]
             [% FOREACH page_name IN categories.general.pages %]
                 [% IF structured_pages.$page_name && structured_pages.$page_name.file_type == 'markdown' %]
@@ -78,19 +94,25 @@
                 [% FOREACH page_info IN markdown_pages %]
                     [% page_name = page_info.name %]
                     [% page = structured_pages.$page_name %]
-                    <a href="[% page.url %]" class="doc-card">
-                        <h3>[% page.title %]</h3>
+                    <div class="admin-card">
+                        <h4><i class="fas fa-file-alt"></i>[% page.title %]</h4>
                         <p>[% page.description || 'Markdown documentation file.' %]</p>
                         <span class="file-type-badge markdown">markdown</span>
-                    </a>
+                        <ul>
+                            <li><a href="[% page.url %]">View Markdown</a></li>
+                        </ul>
+                    </div>
                 [% END %]
             [% ELSE %]
-                <p class="no-content">No markdown files found.</p>
+                <div class="admin-card">
+                    <h4><i class="fas fa-info-circle"></i>No Markdown Files</h4>
+                    <p>No markdown files found.</p>
+                </div>
             [% END %]
         </div>
         
         <!-- Other Documents Tab -->
-        <div class="section-content file-type-content" id="other-docs" style="display: none;">
+        <div class="admin-grid file-type-content" id="other-docs" style="display: none;">
             [% other_pages = [] %]
             [% FOREACH page_name IN categories.general.pages %]
                 [% IF structured_pages.$page_name && structured_pages.$page_name.file_type == 'other' %]
@@ -103,20 +125,24 @@
                 [% FOREACH page_info IN other_pages %]
                     [% page_name = page_info.name %]
                     [% page = structured_pages.$page_name %]
-                    <a href="[% page.url %]" class="doc-card">
-                        <h3>[% page.title %]</h3>
+                    <div class="admin-card">
+                        <h4><i class="fas fa-file"></i>[% page.title %]</h4>
                         <p>[% page.description || 'Other documentation file.' %]</p>
                         <span class="file-type-badge other">other</span>
-                    </a>
+                        <ul>
+                            <li><a href="[% page.url %]">View File</a></li>
+                        </ul>
+                    </div>
                 [% END %]
             [% ELSE %]
-                <p class="no-content">No other files found.</p>
+                <div class="admin-card">
+                    <h4><i class="fas fa-info-circle"></i>No Other Files</h4>
+                    <p>No other files found.</p>
+                </div>
             [% END %]
         </div>
-    </section>
+    </div>
 [% END %]
-
-</div>
 
 <!-- JavaScript for tab switching -->
 <script>
@@ -127,18 +153,19 @@ function showFileType(evt, fileTypeId) {
         contents[i].style.display = 'none';
     }
     
-    // Remove active class from all tabs
-    var tabs = document.getElementsByClassName('file-type-tab');
-    for (var i = 0; i < tabs.length; i++) {
-        tabs[i].className = tabs[i].className.replace(' active', '');
+    // Remove active class from all buttons and set to secondary
+    var buttons = document.querySelectorAll('.feature-actions button');
+    for (var i = 0; i < buttons.length; i++) {
+        buttons[i].className = buttons[i].className.replace(' active', '').replace('btn-primary', 'btn-secondary');
     }
     
-    // Show the selected file type content and mark the tab as active
+    // Show the selected file type content and mark the button as active
     var fileTypeElement = document.getElementById(fileTypeId);
     if (fileTypeElement) {
-        fileTypeElement.style.display = 'block';
+        fileTypeElement.style.display = 'grid'; // Use grid for admin-grid
     }
     
-    evt.currentTarget.className += ' active';
+    // Set the clicked button as active and primary
+    evt.currentTarget.className = evt.currentTarget.className.replace('btn-secondary', 'btn-primary') + ' active';
 }
 </script>

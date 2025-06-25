@@ -178,7 +178,7 @@ View a documentation page
 
 =cut
 
-sub view :Path('view') :Args(1) {
+sub view :Path('config_view') :Args(1) {
     my ($self, $c, $page_id) = @_;
     
     # Log the action

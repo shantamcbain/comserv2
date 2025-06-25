@@ -891,12 +891,18 @@ sub setup_site {
                                "This is a configuration error that needs to be fixed for proper site operation."
                 };
 
-                if ($self->send_email($c, $email_params)) {
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site',
-                        "Sent admin notification email about domain error for $domain");
-                } else {
+                eval {
+                    if ($self->send_email($c, $email_params)) {
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site',
+                            "Sent admin notification email about domain error for $domain");
+                    } else {
+                        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'setup_site',
+                            "Failed to send admin email notification about domain error for $domain");
+                    }
+                };
+                if ($@) {
                     $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'setup_site',
-                        "Failed to send admin email notification about domain error for $domain");
+                        "Email notification failed with error: $@");
                 }
             }
 
@@ -915,9 +921,20 @@ sub setup_site {
             # Set flash error message to ensure it's displayed
             $c->flash->{error_msg} = "Domain Error: This domain ($domain) is not properly configured in the system.";
 
-            # Forward to the error template and stop processing
-            $c->forward($c->view('TT'));
-            $c->detach(); # Ensure we stop processing here and show the error page
+            # Check if this is an API endpoint that should continue processing
+            my $path = $c->req->path;
+            if ($path =~ m{^Documentation/search$} || 
+                $path =~ m{^Documentation/debug_search$} ||
+                $path =~ m{/api/} ||
+                $path =~ m{\.json$}) {
+                # Allow API endpoints to continue processing
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site',
+                    "Allowing API endpoint $path to continue despite domain configuration issue");
+            } else {
+                # Forward to the error template and stop processing for regular pages
+                $c->forward($c->view('TT'));
+                $c->detach(); # Ensure we stop processing here and show the error page
+            }
         }
     }
 

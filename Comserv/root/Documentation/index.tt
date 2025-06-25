@@ -1,11 +1,10 @@
-<!-- File: /home/shanta/PycharmProjects/comserv/Comserv/root/Documentation/index.tt -->
-[% PageVersion = 'Documentation/index.tt,v 1.6 2025/04/08 shanta Exp shanta ' %]
+<!-- File: /home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/index.tt -->
+[% PageVersion = 'Documentation/index.tt,v 1.7 2025/01/20 shanta Exp shanta ' %]
+[% META title = 'Comserv Documentation' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
-<head>
-    <!-- <link rel="stylesheet" href="[% c.uri_for('/static/css/components/documentation.css') %]"> -->
-</head>
+
 [%# Determine user role for display %]
 [% SET display_role = 'Guest' %]
 [% IF c.session.roles %]
@@ -81,42 +80,57 @@
 </div>
 [% END %]
 
-<div class="container">
-    <header class="header">
-        <h1>Comserv Documentation</h1>
-        <div class="context">
+<div class="apiary-container">
+    <header class="apiary-header">
+        <h1><i class="fas fa-book"></i>Comserv Documentation</h1>
+        <div class="apiary-context">
             <span class="context-item"><strong>Site:</strong> [% site_name || 'Comserv' %]</span>
             <span class="context-item"><strong>Role:</strong> [% display_role %]</span>
+            [% IF is_admin %]
+                <span class="context-item status-active"><strong>Access:</strong> Administrator</span>
+            [% END %]
         </div>
     </header>
-    <p class="intro">Comprehensive guides and resources for the Comserv system, tailored to your role and site.</p>
+    
+    <!-- Search Box Section -->
+    <div class="admin-section">
+        <h2><i class="fas fa-search"></i>Search Documentation</h2>
+        <div class="admin-container">
+            <input type="text" id="doc-search-input" placeholder="Search all documentation..." class="search-input">
+            <button type="button" id="doc-search-btn" class="search-button">
+                <i class="fas fa-search"></i>Search
+            </button>
+            <button type="button" id="doc-clear-btn" class="clear-button">
+                <i class="fas fa-times"></i>Clear
+            </button>
+        </div>
+        <div id="search-results" class="admin-container" style="display: none;">
+            <h3><i class="fas fa-list"></i>Search Results</h3>
+            <div id="search-results-list" class="admin-grid"></div>
+        </div>
+    </div>
     
     [% IF is_admin %]
-    <!-- Quick Access Links for Admins -->
-    <div class="highlight-section">
-        <h2>Quick Access for Administrators</h2>
-        <div class="grid">
-            <a href="[% c.uri_for('/Documentation/proxmox_commands.tt') %]" class="card">
-                <h3>Proxmox Command Reference</h3>
-                <p>Essential commands for managing Proxmox VE environments</p>
-                <span class="badge badge-warning">Admin Only</span>
-            </a>
-            <a href="[% c.uri_for('/Documentation/api') %]" class="card">
-                <h3>API Documentation</h3>
-                <p>Comprehensive API reference and usage guide</p>
-                <span class="badge badge-warning">Admin Only</span>
-            </a>
-            <a href="[% c.uri_for('/api_credentials') %]" class="card">
-                <h3>API Credentials Management</h3>
-                <p>Manage credentials for external service integrations</p>
-                <span class="badge badge-warning">Admin Only</span>
-            </a>
-            <a href="[% c.uri_for('/Documentation/developer/css_theme_system_rules.tt') %]" class="card">
-                <h3>CSS Theme System Rules</h3>
-                <p>Mandatory guidelines for CSS and theme development</p>
-                <span class="badge badge-warning">Developer Guide</span>
-            </a>
-            <!-- Add more quick links here as needed -->
+    <!-- Quick Access Links for Administrators -->
+    <div class="admin-section">
+        <h3><i class="fas fa-tools"></i>Quick Access for Administrators</h3>
+        <div class="admin-grid">
+            <div class="admin-card">
+                <h4><i class="fas fa-server"></i>System Management</h4>
+                <ul>
+                    <li><a href="[% c.uri_for('/Documentation/view/proxmox_commands') %]">Proxmox Command Reference</a></li>
+                    <li><a href="[% c.uri_for('/api_credentials') %]">API Credentials Management</a></li>
+                    <li><a href="[% c.uri_for('/admin') %]">System Administration</a></li>
+                </ul>
+            </div>
+            <div class="admin-card">
+                <h4><i class="fas fa-code"></i>Developer Resources</h4>
+                <ul>
+                    <li><a href="[% c.uri_for('/Documentation/view/css_theme_system_rules') %]">CSS Theme System Rules</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/api') %]">API Documentation</a></li>
+                    <li><a href="[% c.uri_for('/Documentation/view/architecture') %]">System Architecture</a></li>
+                </ul>
+            </div>
         </div>
     </div>
     [% END %]
@@ -149,136 +163,364 @@
         [% INCLUDE 'Documentation/system_info.tt' %]
     [% END %]
 
-    [% # Recent Updates Section with direct changelog entries %]
-    <section class="section">
-        <h2 class="section-header toggle">Recent Updates</h2>
-        <div class="section-content collapsible">
-            <div class="changelog-header">
-                <h3>Latest changes and improvements to the system</h3>
-                <a href="[% c.uri_for('/Documentation/all_changelog') %]" class="view-all-link">View All Documentation</a>
-            </div>
-            
-            [% # Get all changelog pages from the structured_pages hash %]
-            [% changelog_pages = [] %]
-            [% FOREACH page_name IN structured_pages.keys %]
-                [% # Check if the page is in the changelog directory %]
-                [% IF structured_pages.$page_name.path.match('Documentation/changelog/') %]
-                    [% changelog_pages.push(page_name) %]
-                [% END %]
+    <!-- Recent Updates Section -->
+    <div class="quick-actions">
+        <h3><i class="fas fa-history"></i>Recent Updates</h3>
+        <p>Latest changes and improvements to the system</p>
+        <div class="action-buttons">
+            <a href="[% c.uri_for('/Documentation/all_changelog') %]" class="btn btn-primary">
+                <i class="fas fa-list"></i>View All Documentation
+            </a>
+        </div>
+    </div>
+    
+    <!-- Recent Updates Grid -->
+    <div class="feature-grid">
+        [% # Get all changelog pages from the structured_pages hash %]
+        [% changelog_pages = [] %]
+        [% FOREACH page_name IN structured_pages.keys %]
+            [% # Check if the page is in the changelog directory %]
+            [% IF structured_pages.$page_name.path.match('Documentation/changelog/') %]
+                [% changelog_pages.push(page_name) %]
             [% END %]
+        [% END %]
+        
+        [% # Sort changelog pages by date in the filename (if available) %]
+        [% date_sorted_pages = [] %]
+        [% FOREACH page_name IN changelog_pages %]
+            [% # Extract date from filename if it exists (format: YYYY-MM-DD) %]
+            [% date_match = page_name.match('(\d{4}-\d{2}(-\d{2})?)') %]
+            [% sort_key = date_match ? date_match.0 : page_name %]
+            [% date_sorted_pages.push({ name => page_name, sort_key => sort_key }) %]
+        [% END %]
+        
+        [% # Sort by the extracted date in reverse order (newest first) %]
+        [% date_sorted_pages = date_sorted_pages.sort('sort_key').reverse %]
+        
+        [% # Display only the 5 most recent entries %]
+        [% recent_count = 0 %]
+        [% FOREACH page_info IN date_sorted_pages %]
+            [% LAST IF recent_count >= 5 %]
+            [% page_name = page_info.name %]
+            [% page = structured_pages.$page_name %]
+            [% recent_count = recent_count + 1 %]
             
-            [% # Sort changelog pages by date in the filename (if available) %]
-            [% date_sorted_pages = [] %]
-            [% FOREACH page_name IN changelog_pages %]
-                [% # Extract date from filename if it exists (format: YYYY-MM-DD) %]
-                [% date_match = page_name.match('(\d{4}-\d{2}(-\d{2})?)') %]
-                [% sort_key = date_match ? date_match.0 : page_name %]
-                [% date_sorted_pages.push({ name => page_name, sort_key => sort_key }) %]
-            [% END %]
+            [% # Extract date from filename if it exists (format: YYYY-MM-DD) %]
+            [% date_match = page_name.match('(\d{4}-\d{2}(-\d{2})?)') %]
+            [% changelog_date = date_match ? date_match.0 : 'Recent' %]
+            [% # Replace hyphens with slashes for better display %]
+            [% changelog_date = changelog_date.replace('-', '/') %]
             
-            [% # Sort by the extracted date in reverse order (newest first) %]
-            [% date_sorted_pages = date_sorted_pages.sort('sort_key').reverse %]
-            
-            [% # Display only the 5 most recent entries %]
-            [% recent_count = 0 %]
-            [% FOREACH page_info IN date_sorted_pages %]
-                [% LAST IF recent_count >= 5 %]
-                [% page_name = page_info.name %]
-                [% page = structured_pages.$page_name %]
-                [% recent_count = recent_count + 1 %]
-                
-                [% # Extract date from filename if it exists (format: YYYY-MM-DD) %]
-                [% date_match = page_name.match('(\d{4}-\d{2}(-\d{2})?)') %]
-                [% changelog_date = date_match ? date_match.0 : 'Recent' %]
-                [% # Replace hyphens with slashes for better display %]
-                [% changelog_date = changelog_date.replace('-', '/') %]
-                
-                <div class="changelog-summary">
-                    <h3>[% page.title %]</h3>
+            <div class="feature-card">
+                <div class="feature-header">
+                    <h4><i class="fas fa-calendar feature-icon"></i>[% page.title %]</h4>
+                </div>
+                <div class="feature-content">
                     <div class="changelog-meta">
-                        <span class="date">[% changelog_date %]</span>
-                        [% IF page.author %]<span class="author">by [% page.author %]</span>[% END %]
+                        <span class="date"><strong>Date:</strong> [% changelog_date %]</span>
+                        [% IF page.author %]<span class="author"><strong>Author:</strong> [% page.author %]</span>[% END %]
                     </div>
                     <p>[% page.description || 'System update' %]</p>
-                    <a href="[% page.url %]" class="read-more">Read full details</a>
                 </div>
-            [% END %]
-            
-            [% IF recent_count == 0 %]
-                <p>No recent updates available.</p>
-            [% END %]
-        </div>
-    </section>
+                <div class="feature-actions">
+                    <a href="[% page.url %]" class="btn btn-primary">
+                        <i class="fas fa-arrow-right"></i>Read Details
+                    </a>
+                </div>
+            </div>
+        [% END %]
+        
+        [% IF recent_count == 0 %]
+            <div class="feature-card">
+                <div class="feature-content">
+                    <p>No recent updates available.</p>
+                </div>
+            </div>
+        [% END %]
+    </div>
 </div>
 
 <!-- CSS moved to /static/css/themes/documentation.css for theme consistency -->
 
 <script>
-    // Universal toggle functionality for collapsible sections
-    document.addEventListener('DOMContentLoaded', function() {
-        // Add click event listeners to all toggle headers
-        const toggleHeaders = document.querySelectorAll('.section-header.toggle');
-        
-        toggleHeaders.forEach(header => {
-            header.addEventListener('click', function(e) {
-                e.preventDefault();
-                
-                // Toggle the expanded class on the header
-                header.classList.toggle('expanded');
-                
-                // Find the content section
-                const section = header.closest('.section');
-                if (!section) return;
-                
-                const content = section.querySelector('.section-content.collapsible');
-                if (!content) return;
-                
-                // Toggle the expanded state
-                if (content.classList.contains('expanded')) {
-                    content.style.maxHeight = '0px';
-                    content.classList.remove('expanded');
-                } else {
-                    content.classList.add('expanded');
-                    content.style.maxHeight = content.scrollHeight + 'px';
-                }
-            });
-        });
-        
-        // Start with all collapsible sections closed
-        document.querySelectorAll('.section-content.collapsible').forEach(content => {
-            content.classList.remove('expanded');
-            content.style.maxHeight = '0px';
-        });
-    });
-
-    // Function for the file type tabs
-    function showFileType(evt, fileType) {
-        console.log("Showing file type:", fileType);
-        
-        // Hide all file type content sections
-        var contents = document.querySelectorAll('.file-type-content');
-        contents.forEach(content => {
-            content.style.display = 'none';
-            content.classList.remove('active');
-        });
-        
-        // Deactivate all tabs
-        var tabs = document.querySelectorAll('.file-type-tab');
-        tabs.forEach(tab => {
-            tab.classList.remove('active');
-        });
-        
-        // Show and activate the selected content and tab
-        var activeContent = document.getElementById(fileType);
-        if (activeContent) {
-            activeContent.style.display = 'grid';
-            activeContent.classList.add('active');
-            evt.currentTarget.classList.add('active');
-            console.log("Activated content:", fileType);
-        } else {
-            console.log("Content not found for:", fileType);
-        }
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('doc-search-input');
+    const searchBtn = document.getElementById('doc-search-btn');
+    const clearBtn = document.getElementById('doc-clear-btn');
+    const searchResults = document.getElementById('search-results');
+    const searchResultsList = document.getElementById('search-results-list');
+    
+    // Get all documentation pages for searching - simplified approach without JSON plugin
+    const allPages = [
+        [% IF sorted_page_names %]
+            [% FOREACH page_name IN sorted_page_names %]
+                [% page = structured_pages.$page_name %]
+                {
+                    name: "[% page_name | html %]",
+                    title: "[% page.title | html %]",
+                    path: "[% page.path | html %]",
+                    url: "[% page.url | html %]",
+                    site: "[% page.site || 'all' | html %]"
+                }[% UNLESS loop.last %],[% END %]
+            [% END %]
+        [% END %]
+    ];
+    
+    // Debug: Log the data to console
+    console.log('Documentation pages loaded:', allPages.length);
+    console.log('sorted_page_names available:', [% sorted_page_names ? 'true' : 'false' %]);
+    console.log('sorted_page_names length:', [% sorted_page_names ? sorted_page_names.size : 0 %]);
+    if (allPages.length > 0) {
+        console.log('Sample page data:', allPages[0]);
+        console.log('All pages:', allPages);
+    } else {
+        console.warn('No documentation pages loaded - this may cause search issues');
+        console.warn('Will rely on backend search only');
     }
+    
+    function performSearch() {
+        const searchTerm = searchInput.value.trim();
+        console.log('Searching for:', searchTerm);
+        
+        if (searchTerm === '') {
+            searchResults.style.display = 'none';
+            return;
+        }
+        
+        if (searchTerm.length < 1) {
+            displaySearchResults([], searchTerm, 'Please enter at least 1 character');
+            return;
+        }
+        
+        // Show loading message
+        searchResultsList.innerHTML = '<p class="loading">Searching...</p>';
+        searchResults.style.display = 'block';
+        
+        // Always try backend search first since it's more reliable
+        performBackendSearch(searchTerm)
+            .then(results => {
+                console.log('Backend search results:', results.length);
+                if (results.length > 0) {
+                    console.log('Sample result:', results[0]);
+                }
+                displaySearchResults(results, searchTerm);
+            })
+            .catch(error => {
+                console.error('Backend search failed:', error);
+                // Show error message to user
+                displaySearchResults([], searchTerm, 'Search service temporarily unavailable. Please try again.');
+            });
+    }
+    
+    function performBackendSearch(searchTerm) {
+        const searchUrl = '[% c.uri_for("/Documentation/search") %]?q=' + encodeURIComponent(searchTerm);
+        console.log('Backend search URL:', searchUrl);
+        
+        return fetch(searchUrl)
+            .then(response => {
+                console.log('Backend search response status:', response.status);
+                if (!response.ok) {
+                    throw new Error('Network response was not ok: ' + response.status);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Backend search data received:', data);
+                if (data.error) {
+                    throw new Error('Backend error: ' + data.error);
+                }
+                return data.results || [];
+            })
+            .catch(error => {
+                console.error('Backend search error:', error);
+                throw error;
+            });
+    }
+    
+    function performClientSearch(searchTerm) {
+        let results = [];
+        const searchTermLower = searchTerm.toLowerCase();
+        
+        // First try to search the allPages array if it exists and has data
+        if (allPages && allPages.length > 0) {
+            results = allPages.filter(page => {
+                const titleMatch = page.title && page.title.toLowerCase().includes(searchTermLower);
+                const pathMatch = page.path && page.path.toLowerCase().includes(searchTermLower);
+                const nameMatch = page.name && page.name.toLowerCase().includes(searchTermLower);
+                return titleMatch || pathMatch || nameMatch;
+            });
+        } else {
+            // Fallback: search through visible page elements on the page
+            console.log('Using DOM search method');
+            results = searchVisibleElements(searchTermLower);
+        }
+        
+        console.log('Client search results:', results.length);
+        displaySearchResults(results, searchTerm);
+    }
+    
+    function searchVisibleElements(searchTerm) {
+        const results = [];
+        
+        // Search through feature cards
+        const featureCards = document.querySelectorAll('.feature-card');
+        featureCards.forEach(card => {
+            const titleElement = card.querySelector('h4');
+            const linkElement = card.querySelector('a');
+            
+            if (titleElement && linkElement) {
+                const title = titleElement.textContent.toLowerCase();
+                if (title.includes(searchTerm)) {
+                    results.push({
+                        name: titleElement.textContent,
+                        title: titleElement.textContent,
+                        path: 'Feature Card',
+                        url: linkElement.href,
+                        site: 'all'
+                    });
+                }
+            }
+        });
+        
+        // Search through admin cards
+        const adminCards = document.querySelectorAll('.admin-card');
+        adminCards.forEach(card => {
+            const titleElement = card.querySelector('h4');
+            const links = card.querySelectorAll('a');
+            
+            if (titleElement) {
+                const title = titleElement.textContent.toLowerCase();
+                if (title.includes(searchTerm)) {
+                    links.forEach(link => {
+                        results.push({
+                            name: link.textContent,
+                            title: link.textContent,
+                            path: 'Admin Section',
+                            url: link.href,
+                            site: 'all'
+                        });
+                    });
+                }
+            }
+        });
+        
+        return results;
+    }
+    
+    function displaySearchResults(results, searchTerm, message) {
+        searchResultsList.innerHTML = '';
+        
+        if (message) {
+            searchResultsList.innerHTML = '<p class="no-results">' + escapeHtml(message) + '</p>';
+        } else if (results.length === 0) {
+            searchResultsList.innerHTML = '<p class="no-results">No documentation found matching "' + escapeHtml(searchTerm) + '"</p>';
+        } else {
+            // Use global naming convention - results displayed as admin-cards in admin-grid
+            results.forEach(page => {
+                const resultItem = document.createElement('div');
+                resultItem.className = 'admin-card';
+                
+                const title = highlightSearchTerm(escapeHtml(page.title || page.name || 'Untitled'), searchTerm);
+                const path = highlightSearchTerm(escapeHtml(page.path || ''), searchTerm);
+                
+                // Build the result HTML using admin-card structure
+                let resultHTML = `
+                    <h4><a href="${escapeHtml(page.url)}"><i class="fas fa-file-alt"></i>${title}</a></h4>
+                    <p class="result-path"><i class="fas fa-folder"></i>${path}</p>
+                `;
+                
+                // Add context for content matches
+                if (page.context && page.context.trim()) {
+                    const context = highlightSearchTerm(escapeHtml(page.context), searchTerm);
+                    resultHTML += `<p class="result-context"><i class="fas fa-quote-left"></i>${context}</p>`;
+                }
+                
+                // Add match type badge
+                if (page.match_type) {
+                    const matchTypeLabels = {
+                        'title': 'Title Match',
+                        'path': 'Path Match', 
+                        'name': 'Name Match',
+                        'content': 'Content Match'
+                    };
+                    const matchLabel = matchTypeLabels[page.match_type] || page.match_type;
+                    resultHTML += `<span class="match-type-badge match-type-${page.match_type}">${matchLabel}</span>`;
+                }
+                
+                // Add site badge
+                if (page.site && page.site !== 'all') {
+                    resultHTML += `<span class="site-badge">Site: ${escapeHtml(page.site)}</span>`;
+                }
+                
+                resultItem.innerHTML = resultHTML;
+                searchResultsList.appendChild(resultItem);
+                
+                // Debug log for each result
+                console.log('Displaying result:', {
+                    title: page.title,
+                    path: page.path,
+                    match_type: page.match_type,
+                    has_context: !!page.context
+                });
+            });
+            
+            // Add results count at the top
+            const resultsCount = document.createElement('p');
+            resultsCount.className = 'results-count';
+            resultsCount.innerHTML = `<i class="fas fa-info-circle"></i>Found ${results.length} document${results.length !== 1 ? 's' : ''} matching "${escapeHtml(searchTerm)}"`;
+            
+            searchResultsList.insertBefore(resultsCount, searchResultsList.firstChild);
+        }
+        
+        searchResults.style.display = 'block';
+        searchResults.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    
+    function highlightSearchTerm(text, term) {
+        const regex = new RegExp(`(${escapeRegex(term)})`, 'gi');
+        return text.replace(regex, '<mark>$1</mark>');
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    function escapeRegex(string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+    
+    function clearSearch() {
+        searchInput.value = '';
+        searchResults.style.display = 'none';
+    }
+    
+    // Event listeners
+    searchBtn.addEventListener('click', function() {
+        console.log('Search button clicked');
+        performSearch();
+    });
+    clearBtn.addEventListener('click', function() {
+        console.log('Clear button clicked');
+        clearSearch();
+    });
+    
+    searchInput.addEventListener('keyup', function(e) {
+        if (e.key === 'Enter') {
+            performSearch();
+        } else if (e.key === 'Escape') {
+            clearSearch();
+        }
+    });
+    
+    // Real-time search as user types (with debounce)
+    let searchTimeout;
+    searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(performSearch, 300);
+    });
+});
 </script>
 
 <!-- All CSS moved to theme system - NO INLINE STYLES ALLOWED -->

@@ -1,65 +1,91 @@
-[% PageVersion = 'Comserv/root/Documentation/proxmox.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% PageVersion = 'Comserv/root/Documentation/proxmox.tt,v 0.02 2025/01/20 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
 [% META title = 'Proxmox Documentation' %]
 
-<!-- Documentation page for proxmox -->
-<div class="documentation-content">
-
-
-
-
-<!-- Documentation CSS is now included in the theme system -->
-
-<div class="markdown-content">
-
-
-This page provides access to all Proxmox-related documentation in the Comserv system.
-
-
-
-<h2>Available Documentation</h2>
-
-
-
-<h3><a href="/Documentation/proxmox_commands.tt">Proxmox Command Reference</a></h3>
-
-Comprehensive list of command-line operations for managing Proxmox VE environments.
-
-
-
-<h3><a href="/Documentation/proxmox_integration.tt">Proxmox Integration</a></h3>
-
-Documentation on how Proxmox is integrated with the Comserv system.
-
-
-
-<h3><a href="/Documentation/proxmox/api.tt">Proxmox API</a></h3>
-
-Information about the Proxmox API and how to use it.
-
-
-
-<h3><a href="/Documentation/proxmox/authentication.tt">Proxmox Authentication</a></h3>
-
-Details about authentication methods and security for Proxmox.
-
-
-
-<h3><a href="/Documentation/proxmox/ip_configuration.tt">Proxmox IP Configuration</a></h3>
-
-Guide for configuring IP addresses in Proxmox VMs and containers.
-
-
-
-<h2>Quick Links</h2>
-
-
-
-<ul><li><a href="/Documentation">Back to Documentation Index</a></li></ul>
-
-<ul><li><a href="/Documentation/proxmox_commands.tt">Proxmox Command Reference</a> (Most frequently used)</li></ul>
-
-</div>
+<!-- Proxmox Documentation Section -->
+[% IF categories.proxmox %]
+    <div class="admin-section">
+        <h3><i class="fas fa-server"></i>Proxmox Documentation</h3>
+        <p>Comprehensive Proxmox VE management resources. <span class="admin-badge">Admin Only</span></p>
+    </div>
+    
+    <div class="feature-grid">
+        <div class="feature-card">
+            <div class="feature-header">
+                <h4><i class="fas fa-terminal feature-icon"></i>Command Reference</h4>
+            </div>
+            <div class="feature-content">
+                <p>Essential command-line operations for managing Proxmox VE environments.</p>
+            </div>
+            <div class="feature-actions">
+                <a href="[% c.uri_for('/Documentation/view/proxmox_commands') %]" class="btn btn-primary">Proxmox Command Reference</a>
+            </div>
+        </div>
+        
+        <div class="feature-card">
+            <div class="feature-header">
+                <h4><i class="fas fa-plug feature-icon"></i>Integration & API</h4>
+            </div>
+            <div class="feature-content">
+                <p>System integration and API documentation.</p>
+            </div>
+            <div class="feature-actions">
+                <a href="[% c.uri_for('/Documentation/view/proxmox_integration') %]" class="btn btn-primary">Proxmox Integration</a>
+                <a href="[% c.uri_for('/Documentation/view/proxmox_api') %]" class="btn btn-secondary">Proxmox API</a>
+            </div>
+        </div>
+        
+        <div class="feature-card">
+            <div class="feature-header">
+                <h4><i class="fas fa-shield-alt feature-icon"></i>Security & Configuration</h4>
+            </div>
+            <div class="feature-content">
+                <p>Authentication and network configuration guides.</p>
+            </div>
+            <div class="feature-actions">
+                <a href="[% c.uri_for('/Documentation/view/proxmox_authentication') %]" class="btn btn-primary">Authentication Methods</a>
+                <a href="[% c.uri_for('/Documentation/view/proxmox_ip_configuration') %]" class="btn btn-secondary">IP Configuration</a>
+            </div>
+        </div>
+        
+        <div class="feature-card">
+            <div class="feature-header">
+                <h4><i class="fas fa-link feature-icon"></i>Quick Access</h4>
+            </div>
+            <div class="feature-content">
+                <p>Frequently used resources and navigation.</p>
+            </div>
+            <div class="feature-actions">
+                <a href="[% c.uri_for('/Documentation') %]" class="btn btn-secondary">Back to Documentation Index</a>
+                <a href="[% c.uri_for('/Documentation/view/proxmox_commands') %]" class="btn btn-primary">Command Reference (Most Used)</a>
+            </div>
+        </div>
+    </div>
+[% ELSE %]
+    <!-- Fallback if categories not available -->
+    <div class="admin-section">
+        <h3><i class="fas fa-server"></i>Proxmox Documentation</h3>
+        <p>Comprehensive Proxmox VE management resources. <span class="admin-badge">Admin Only</span></p>
+    </div>
+    
+    <div class="feature-grid">
+        <div class="feature-card">
+            <div class="feature-header">
+                <h4><i class="fas fa-terminal feature-icon"></i>Available Documentation</h4>
+            </div>
+            <div class="feature-content">
+                <p>Access all available Proxmox documentation.</p>
+            </div>
+            <div class="feature-actions">
+                <a href="[% c.uri_for('/Documentation/view/proxmox_commands') %]" class="btn btn-primary">Proxmox Command Reference</a>
+                <a href="[% c.uri_for('/Documentation/view/proxmox_integration') %]" class="btn btn-secondary">Proxmox Integration</a>
+                <a href="[% c.uri_for('/Documentation/view/proxmox_api') %]" class="btn btn-secondary">Proxmox API</a>
+                <a href="[% c.uri_for('/Documentation/view/proxmox_authentication') %]" class="btn btn-secondary">Authentication Methods</a>
+                <a href="[% c.uri_for('/Documentation/view/proxmox_ip_configuration') %]" class="btn btn-secondary">IP Configuration</a>
+            </div>
+        </div>
+    </div>
+[% END %]

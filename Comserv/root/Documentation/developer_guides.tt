@@ -1,30 +1,36 @@
-[% PageVersion = 'Comserv/root/Documentation/developer_guides.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% PageVersion = 'Comserv/root/Documentation/developer_guides.tt,v 0.02 2025/01/20 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
 [% META title = 'Developer Guides' %]
 
-<!-- Documentation page for Developer Guides -->
-<div class="documentation-content">
-
+<!-- Developer Documentation Section -->
 [% IF categories.developer_guides %]
-    <section class="doc-section developer-only">
-        <h2 class="section-toggle">Developer Documentation</h2>
+    <div class="quick-actions">
+        <h3><i class="fas fa-code"></i>Developer Documentation</h3>
         <p>Resources for system developers. <span class="developer-badge">Developer Resources</span></p>
-        <div class="section-content">
-            [% FOREACH page_name IN categories.developer_guides.pages.sort %]
-                [% IF structured_pages.$page_name %]
-                    [% page = structured_pages.$page_name %]
-                    <a href="[% page.url %]" class="doc-card">
-                        <h3>[% page.title %]</h3>
+    </div>
+    
+    <div class="feature-grid">
+        [% FOREACH page_name IN categories.developer_guides.pages.sort %]
+            [% IF structured_pages.$page_name %]
+                [% page = structured_pages.$page_name %]
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <h4><i class="fas fa-terminal feature-icon"></i>[% page.title %]</h4>
+                    </div>
+                    <div class="feature-content">
                         <p>[% page.description || 'Developer documentation.' %]</p>
                         <span class="role-badge">Developer</span>
-                    </a>
-                [% END %]
+                    </div>
+                    <div class="feature-actions">
+                        <a href="[% page.url %]" class="btn btn-primary">
+                            <i class="fas fa-arrow-right"></i>View Guide
+                        </a>
+                    </div>
+                </div>
             [% END %]
-        </div>
-    </section>
+        [% END %]
+    </div>
 [% END %]
-
-</div>

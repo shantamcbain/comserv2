@@ -1,19 +1,21 @@
-[% PageVersion = 'Comserv/root/Documentation/system_info.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% PageVersion = 'Comserv/root/Documentation/system_info.tt,v 0.02 2025/01/20 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
-[% META title = 'System Info' %]
+[% META title = 'Documentation System' %]
 
-<!-- Documentation page for System Info -->
-<div class="documentation-content">
-
-<section class="doc-section system-info">
-    <h2 class="section-toggle expanded">Documentation System</h2>
-    <div class="section-content expanded">
-        <p>The Comserv documentation system is transitioning to a modular structure. Legacy documentation is available below and will be migrated over time.</p>
-        <a href="/Documentation/Documentation" class="legacy-link">Access Legacy Documentation</a>
+<!-- Documentation System Section -->
+<div class="feature-card">
+    <div class="feature-header">
+        <h3><i class="fas fa-cogs feature-icon"></i>Documentation System</h3>
     </div>
-</section>
-
+    <div class="feature-content">
+        <p>The Comserv documentation system uses a modular structure with role-based access control. All documentation is now template-based (.tt files) for consistency and maintainability.</p>
+    </div>
+    <div class="feature-actions">
+        <a href="[% c.uri_for('/Documentation/all_docs') %]" class="btn btn-primary">
+            <i class="fas fa-list"></i>View All Documentation
+        </a>
+    </div>
 </div>

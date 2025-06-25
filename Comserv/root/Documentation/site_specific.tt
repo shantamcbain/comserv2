@@ -1,30 +1,36 @@
-[% PageVersion = 'Comserv/root/Documentation/site_specific.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% PageVersion = 'Comserv/root/Documentation/site_specific.tt,v 0.02 2025/01/20 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
-[% META title = 'Site Specific' %]
+[% META title = 'Site Specific Documentation' %]
 
-<!-- Documentation page for Site Specific -->
-<div class="documentation-content">
-
+<!-- Site Specific Documentation Section -->
 [% IF categories.site_specific %]
-    <section class="doc-section site-specific">
-        <h2 class="section-toggle">[% site_name || 'Comserv' %] Documentation</h2>
+    <div class="quick-actions">
+        <h3><i class="fas fa-building"></i>[% site_name || 'Comserv' %] Documentation</h3>
         <p>Documentation specific to [% site_name || 'Comserv' %].</p>
-        <div class="section-content">
-            [% FOREACH page_name IN categories.site_specific.pages.sort %]
-                [% IF structured_pages.$page_name %]
-                    [% page = structured_pages.$page_name %]
-                    <a href="[% page.url %]" class="doc-card">
-                        <h3>[% page.title %]</h3>
+    </div>
+    
+    <div class="feature-grid">
+        [% FOREACH page_name IN categories.site_specific.pages.sort %]
+            [% IF structured_pages.$page_name %]
+                [% page = structured_pages.$page_name %]
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <h4><i class="fas fa-file-alt feature-icon"></i>[% page.title %]</h4>
+                    </div>
+                    <div class="feature-content">
                         <p>[% page.description || 'Site-specific documentation.' %]</p>
                         <span class="site-badge">[% page.site %]</span>
-                    </a>
-                [% END %]
+                    </div>
+                    <div class="feature-actions">
+                        <a href="[% page.url %]" class="btn btn-primary">
+                            <i class="fas fa-arrow-right"></i>View Documentation
+                        </a>
+                    </div>
+                </div>
             [% END %]
-        </div>
-    </section>
+        [% END %]
+    </div>
 [% END %]
-
-</div>
