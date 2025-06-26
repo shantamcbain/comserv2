@@ -98,31 +98,31 @@ sub todo :Path('/todo') :Args(0) {
 
     # Build the search conditions
     my $search_conditions = {
-        sitename => $c->session->{SiteName},  # filter by site
+        'me.sitename' => $c->session->{SiteName},  # filter by site (specify table alias)
     };
 
     # Only show non-completed todos by default (unless explicitly filtering for completed)
     if ($status_filter eq 'completed') {
-        $search_conditions->{status} = 3;  # completed status
+        $search_conditions->{'me.status'} = 3;  # completed status
     } elsif ($status_filter eq 'in_progress') {
-        $search_conditions->{status} = 2;  # in progress status
+        $search_conditions->{'me.status'} = 2;  # in progress status
     } elsif ($status_filter eq 'new') {
-        $search_conditions->{status} = 1;  # new status
+        $search_conditions->{'me.status'} = 1;  # new status
     } elsif ($status_filter ne 'all') {
-        $search_conditions->{status} = { '!=' => 3 };  # exclude completed todos
+        $search_conditions->{'me.status'} = { '!=' => 3 };  # exclude completed todos
     }
 
     # Add project filter if specified
     if ($project_id) {
-        $search_conditions->{project_id} = $project_id;
+        $search_conditions->{'me.project_id'} = $project_id;
     }
 
     # Add search term filter if specified
     if ($search_term) {
         $search_conditions->{'-or'} = [
-            { subject => { 'like', "%$search_term%" } },
-            { description => { 'like', "%$search_term%" } },
-            { comments => { 'like', "%$search_term%" } }
+            { 'me.subject' => { 'like', "%$search_term%" } },
+            { 'me.description' => { 'like', "%$search_term%" } },
+            { 'me.comments' => { 'like', "%$search_term%" } }
         ];
     }
 
@@ -133,11 +133,11 @@ sub todo :Path('/todo') :Args(0) {
     if ($filter_type eq 'day' || $filter_type eq 'today') {
         # Today's todos: show todos that are due today, start today, or are active and overdue
         $search_conditions->{'-or'} = [
-            { due_date => $today },                    # Due today
-            { start_date => $today },                  # Starting today
+            { 'me.due_date' => $today },                    # Due today
+            { 'me.start_date' => $today },                  # Starting today
             { '-and' => [                              # Overdue but not completed
-                { due_date => { '<' => $today } },
-                { status => { '!=' => 3 } }
+                { 'me.due_date' => { '<' => $today } },
+                { 'me.status' => { '!=' => 3 } }
             ]}
         ];
     } elsif ($filter_type eq 'week') {
@@ -146,10 +146,10 @@ sub todo :Path('/todo') :Args(0) {
         my $end_of_week = $now->clone->add(days => 7 - $now->day_of_week)->ymd;
 
         $search_conditions->{'-and'} = [
-            { start_date => { '<=' => $end_of_week } },
+            { 'me.start_date' => { '<=' => $end_of_week } },
             { '-or' => [
-                { due_date => { '>=' => $start_of_week } },
-                { status => { '!=' => 3 } }  # Not completed
+                { 'me.due_date' => { '>=' => $start_of_week } },
+                { 'me.status' => { '!=' => 3 } }  # Not completed
             ]}
         ];
     } elsif ($filter_type eq 'month') {
@@ -158,10 +158,10 @@ sub todo :Path('/todo') :Args(0) {
         my $end_of_month = $now->clone->set_day($now->month_length)->ymd;
 
         $search_conditions->{'-and'} = [
-            { start_date => { '<=' => $end_of_month } },
+            { 'me.start_date' => { '<=' => $end_of_month } },
             { '-or' => [
-                { due_date => { '>=' => $start_of_month } },
-                { status => { '!=' => 3 } }  # Not completed
+                { 'me.due_date' => { '>=' => $start_of_month } },
+                { 'me.status' => { '!=' => 3 } }  # Not completed
             ]}
         ];
     }
@@ -169,7 +169,10 @@ sub todo :Path('/todo') :Args(0) {
     # Fetch todos with the applied filters
     my @todos = $rs->search(
         $search_conditions,
-        { order_by => { -asc => ['priority', 'start_date'] } }
+        { 
+            order_by => { -asc => ['me.priority', 'me.start_date'] },
+            prefetch => 'project'  # Include project data for better integration
+        }
     );
 
     # Fetch all projects for the filter dropdown
@@ -186,6 +189,9 @@ sub todo :Path('/todo') :Args(0) {
             "Error fetching projects: $@");
     }
 
+    # Get overdue todos for dashboard
+    my $overdue_todos = $self->get_overdue_todos($c);
+
     # Add the todos and filter info to the stash
     $c->stash(
         todos => \@todos,
@@ -195,6 +201,7 @@ sub todo :Path('/todo') :Args(0) {
         project_id => $project_id,
         status_filter => $status_filter,
         projects => $projects,
+        overdue_todos => $overdue_todos,
         template => 'todo/todo.tt',
     );
 
@@ -705,12 +712,32 @@ sub week :Path('/todo/week') :Args {
 
     # Calculate the start and end of the week
     my $dt = DateTime::Format::ISO8601->parse_datetime($date);
-    my $start_of_week = $dt->clone->subtract(days => $dt->day_of_week - 1)->strftime('%Y-%m-%d');
-    my $end_of_week = $dt->clone->add(days => 7 - $dt->day_of_week)->strftime('%Y-%m-%d');
+    
+    # Calculate start of week (Sunday)
+    my $start_dt = $dt->clone;
+    if ($start_dt->day_of_week != 7) { # If not Sunday
+        $start_dt = $start_dt->subtract(days => $start_dt->day_of_week);
+    }
+    
+    my $start_of_week = $start_dt->strftime('%Y-%m-%d');
+    my $end_of_week = $start_dt->clone->add(days => 6)->strftime('%Y-%m-%d');
 
     # Calculate previous and next week dates
-    my $prev_week_date = $dt->clone->subtract(days => 7)->strftime('%Y-%m-%d');
-    my $next_week_date = $dt->clone->add(days => 7)->strftime('%Y-%m-%d');
+    my $prev_week_date = $start_dt->clone->subtract(days => 7)->strftime('%Y-%m-%d');
+    my $next_week_date = $start_dt->clone->add(days => 7)->strftime('%Y-%m-%d');
+    
+    # Create week calendar structure with all 7 days
+    my @week_days = ();
+    for my $day_offset (0..6) {
+        my $current_date = $start_dt->clone->add(days => $day_offset);
+        push @week_days, {
+            date => $current_date->strftime('%Y-%m-%d'),
+            day_name => $current_date->day_name,
+            day_number => $current_date->day,
+            month_name => $current_date->month_name,
+            is_today => ($current_date->ymd eq DateTime->now->ymd) ? 1 : 0
+        };
+    }
 
     # Fetch todos for the site within the week, ordered by start_date
     my $todos = $todo_model->get_top_todos($c, $c->session->{SiteName});
@@ -725,6 +752,7 @@ sub week :Path('/todo/week') :Args {
     # Add the todos to the stash
     $c->stash(
         todos => \@filtered_todos,
+        week_days => \@week_days,
         sitename => $c->session->{SiteName},
         start_of_week => $start_of_week,
         end_of_week => $end_of_week,
@@ -768,8 +796,20 @@ sub month :Path('/todo/month') :Args {
         ($_->due_date && $_->due_date lt $start_of_month && $_->status ne '3')                     # Overdue but not completed
     } @$todos;
 
+    # Fetch logs for the month
+    my $schema = $c->model('DBEncy');
+    my @logs = $schema->resultset('Log')->search(
+        {
+            'me.sitename' => $c->session->{SiteName},
+            start_date => { '>=' => $start_of_month, '<=' => $end_of_month }
+        },
+        { order_by => { -asc => 'start_date' } }
+    );
+
     # Organize todos by day of month (use due_date if available, otherwise start_date)
     my %todos_by_day;
+    my %logs_by_day;
+    
     foreach my $todo (@filtered_todos) {
         my $display_date = $todo->due_date || $todo->start_date;
         if ($display_date) {
@@ -778,6 +818,17 @@ sub month :Path('/todo/month') :Args {
             if ($todo_date->year == $dt->year && $todo_date->month == $dt->month) {
                 my $day = $todo_date->day;
                 push @{$todos_by_day{$day}}, $todo;
+            }
+        }
+    }
+    
+    # Organize logs by day
+    foreach my $log (@logs) {
+        if ($log->start_date) {
+            my $log_date = DateTime::Format::ISO8601->parse_datetime($log->start_date);
+            if ($log_date->year == $dt->year && $log_date->month == $dt->month) {
+                my $day = $log_date->day;
+                push @{$logs_by_day{$day}}, $log;
             }
         }
     }
@@ -797,7 +848,8 @@ sub month :Path('/todo/month') :Args {
         push @calendar, {
             day => $day,
             date => sprintf("%04d-%02d-%02d", $dt->year, $dt->month, $day),
-            todos => $todos_by_day{$day} || []
+            todos => $todos_by_day{$day} || [],
+            logs => $logs_by_day{$day} || []
         };
     }
 
@@ -817,4 +869,28 @@ sub month :Path('/todo/month') :Args {
 
     $c->forward($c->view('TT'));
 }
+
+# Get overdue todos for dashboard display
+sub get_overdue_todos :Private {
+    my ($self, $c) = @_;
+    
+    my $schema = $c->model('DBEncy');
+    my $sitename = $c->session->{SiteName};
+    my $today = DateTime->now->ymd;
+    
+    my @overdue_todos = $schema->resultset('Todo')->search(
+        {
+            'me.sitename' => $sitename,
+            'me.due_date' => { '<' => $today },
+            'me.status' => { '!=' => 3 } # Not completed
+        },
+        { 
+            order_by => { -asc => 'me.due_date' },
+            prefetch => 'project'
+        }
+    );
+    
+    return \@overdue_todos;
+}
+
 1;

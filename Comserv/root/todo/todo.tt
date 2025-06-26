@@ -9,6 +9,28 @@
 <h1>ToDo List</h1>
 <h2>[% date_today %]</h2>
 
+[% IF overdue_todos.size > 0 %]
+<div class="overdue-section" style="background: #ffebee; border: 1px solid #f44336; border-radius: 4px; padding: 1rem; margin-bottom: 1rem;">
+    <h3 style="color: #d32f2f; margin: 0 0 0.5rem 0;">⚠️ Overdue TODOs ([% overdue_todos.size %])</h3>
+    <div class="overdue-list">
+        [% FOREACH todo IN overdue_todos %]
+        <div style="background: white; padding: 0.5rem; margin-bottom: 0.5rem; border-radius: 4px; border-left: 4px solid #f44336;">
+            <strong>[% todo.subject %]</strong>
+            <span style="color: #666; margin-left: 1rem;">Due: [% todo.due_date %]</span>
+            [% IF todo.project %]
+                <span style="color: #666; margin-left: 1rem;">Project: [% todo.project.name %]</span>
+            [% END %]
+            <div style="margin-top: 0.25rem;">
+                <a href="/todo/details?record_id=[% todo.record_id %]" style="margin-right: 0.5rem;">View</a>
+                <a href="/todo/edit/[% todo.record_id %]" style="margin-right: 0.5rem;">Edit</a>
+                <a href="/log/log_form?todo_record_id=[% todo.record_id %]">Log Time</a>
+            </div>
+        </div>
+        [% END %]
+    </div>
+</div>
+[% END %]
+
 
 
 <div class="filter-container">
@@ -125,7 +147,7 @@
     [% END %]
     <tr>
       <td>[% task.get_column('sitename') %]</td>
-      <td>[% task.get_column('project_id') %]</td>
+      <td>[% IF task.project %][% task.project.name %][% ELSE %][% task.get_column('project_id') %][% END %]</td>
       <td>[% task.get_column('parent_todo') %]</td>
       <td>[% task.get_column('start_date') %]</td>
       <td>[% task.get_column('due_date') %]</td>
@@ -133,7 +155,13 @@
       <td>[% task.get_column('description') %]</td>
       <td>[% task.get_column('developer') %]</td>
       <td>[% task.get_column('priority') %]</td>
-      <td>[% task.get_column('status') %]</td>
+      <td>
+        [% IF task.get_column('status') == 1 %]New
+        [% ELSIF task.get_column('status') == 2 %]In Progress
+        [% ELSIF task.get_column('status') == 3 %]Completed
+        [% ELSE %][% task.get_column('status') %]
+        [% END %]
+      </td>
       <td>[% task.get_column('comments') %]</td>
       <td>[% task.get_column('accumulative_time') %]</td>
       <td class="action-buttons-cell">

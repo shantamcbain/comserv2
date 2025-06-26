@@ -157,29 +157,17 @@
 
     <!-- Create a row for the dates -->
     <tr>
-        [% # Calculate the start date of the week (Sunday) %]
-        [% start_dt = DateTime::Format::ISO8601->parse_datetime(start_of_week) %]
-        [% # Adjust if the start date is not a Sunday %]
-        [% IF start_dt.day_of_week != 7 %]
-            [% start_dt = start_dt.subtract(days => start_dt.day_of_week) %]
-        [% END %]
-
-        [% # Generate the 7 days of the week %]
-        [% FOREACH day_offset IN [0..6] %]
-            [% current_date = start_dt.clone.add(days => day_offset) %]
-            [% date_str = current_date.strftime('%Y-%m-%d') %]
-            [% is_today = (date_str == DateTime.now.strftime('%Y-%m-%d')) %]
-
-            <td style="[% IF is_today %]background-color: #e6f7ff;[% END %]">
+        [% # Use pre-calculated week days from controller %]
+        [% FOREACH day IN week_days %]
+            <td style="[% IF day.is_today %]background-color: #e6f7ff;[% END %]">
                 <div style="font-weight: bold; text-align: right; margin-bottom: 5px;">
-                    <a href="/todo/day/[% date_str %]">[% current_date.day %]</a>
+                    <a href="/todo/day/[% day.date %]">[% day.day_number %]</a>
                 </div>
 
                 [% # Find todos for this day %]
                 [% day_todos = [] %]
                 [% FOREACH todo IN todos %]
-                    [% todo_date = DateTime::Format::ISO8601->parse_datetime(todo.start_date) %]
-                    [% IF todo_date.strftime('%Y-%m-%d') == date_str %]
+                    [% IF todo.start_date == day.date || todo.due_date == day.date %]
                         [% day_todos.push(todo) %]
                     [% END %]
                 [% END %]
@@ -195,7 +183,7 @@
                 [% END %]
 
                 <form action="/todo/addtodo" method="post">
-                    <input type="hidden" name="start_date" value="[% date_str %]">
+                    <input type="hidden" name="start_date" value="[% day.date %]">
                     <button type="submit" class="add-button">+ Add</button>
                 </form>
             </td>

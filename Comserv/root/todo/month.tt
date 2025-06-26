@@ -120,13 +120,37 @@
                 
                 [% IF cell.todos.size > 0 %]
                     [% FOREACH todo IN cell.todos %]
-                        <div class="todo-item priority-[% todo.priority %]" title="[% todo.description %]">
-                            <form action="/todo/details" method="POST">
-                                <input type="hidden" name="record_id" value="[% todo.record_id %]">
-                                <button type="submit" style="background:none; border:none; padding:0; color:inherit; text-decoration:underline; cursor:pointer; text-align:left; width:100%; overflow:hidden; text-overflow:ellipsis;">
-                                    [% todo.subject %]
-                                </button>
-                            </form>
+                        <div class="calendar-item todo-item [% IF todo.due_date == cell.date %]due[% END %]" 
+                             data-todo-id="[% todo.record_id %]"
+                             title="[% todo.subject %] - [% todo.description | truncate(50) %] [% IF todo.project %]| Project: [% todo.project.name %][% END %]">
+                            <div class="item-indicator status-[% todo.status %]"></div>
+                            <div class="item-text">
+                                [% IF todo.due_date == cell.date %]
+                                    <i class="fas fa-flag" style="color: #f44336;"></i>
+                                [% ELSE %]
+                                    <i class="fas fa-play" style="color: #4CAF50;"></i>
+                                [% END %]
+                                [% todo.subject | truncate(15) %]
+                                [% IF todo.project %]
+                                    <small class="project-badge">[% todo.project.name | truncate(10) %]</small>
+                                [% END %]
+                            </div>
+                        </div>
+                    [% END %]
+                [% END %]
+                
+                [% # Show logs for this day if any %]
+                [% IF cell.logs.size > 0 %]
+                    [% FOREACH log IN cell.logs %]
+                        <div class="calendar-item log-item" 
+                             data-log-id="[% log.record_id %]"
+                             title="[% log.abstract %] - [% log.time || '00:00' %]">
+                            <div class="log-indicator"></div>
+                            <div class="item-text">
+                                <i class="fas fa-clock"></i>
+                                [% log.abstract | truncate(12) %]
+                                <small>([% log.time || '00:00' %])</small>
+                            </div>
                         </div>
                     [% END %]
                 [% END %]
@@ -157,3 +181,21 @@
     <a href="/todo">Back to Todo List</a>
     <a href="/todo/month/[% next_month_date %]">Next Month</a>
 </div>
+
+<script>
+// Handle todo item clicks
+document.querySelectorAll('.todo-item').forEach(item => {
+    item.addEventListener('click', function() {
+        const todoId = this.dataset.todoId;
+        window.location.href = '/todo/details?record_id=' + todoId;
+    });
+});
+
+// Handle log item clicks
+document.querySelectorAll('.log-item').forEach(item => {
+    item.addEventListener('click', function() {
+        const logId = this.dataset.logId;
+        window.location.href = '/log/details?record_id=' + logId;
+    });
+});
+</script>
