@@ -1,0 +1,239 @@
+[% PageVersion = 'Comserv/root/Documentation/TODO_SYSTEM_DOCUMENTATION.tt,v 0.01 2025/01/15 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Enhanced TODO System Documentation' %]
+
+<!-- Documentation page for TODO_SYSTEM_DOCUMENTATION -->
+<div class="documentation-content">
+
+<div class="markdown-content">
+
+# Enhanced TODO System Documentation
+
+## 📋 System Overview
+
+The enhanced TODO system provides a comprehensive task management solution that integrates Projects, TODOs, and Logs into a unified interface. The system features calendar views, project integration, overdue detection, and enhanced filtering capabilities.
+
+## 🎯 Key Features
+
+### Core Functionality
+- **Task Management**: Create, edit, and track todos with priorities and status
+- **Project Integration**: Link todos to projects with visual project badges
+- **Calendar Views**: Day, week, and month calendar interfaces
+- **Overdue Detection**: Prominent display of overdue tasks with warning styling
+- **Status Tracking**: Clear status indicators (New, In Progress, Completed)
+- **Time Logging**: Integration with time logging system
+
+### Enhanced Features
+- **Visual Indicators**: Color-coded priority and status displays
+- **Quick Actions**: One-click access to common operations
+- **Responsive Design**: Mobile-friendly interface
+- **Cross-System Navigation**: Seamless navigation between todos, projects, and logs
+
+## 🗂️ System Architecture
+
+### Controllers
+- **`Comserv::Controller::Todo`**: Main todo management controller
+  - `todo()`: Main todo list with filtering and overdue detection
+  - `month()`: Calendar month view with todos and logs integration
+  - `week()`: Calendar week view with enhanced date handling
+  - `get_overdue_todos()`: Private method for overdue todo detection
+
+### Templates
+- **`todo/todo.tt`**: Main todo list interface
+- **`todo/month.tt`**: Monthly calendar view
+- **`todo/week.tt`**: Weekly calendar view
+- **`todo/day.tt`**: Daily view (existing)
+
+### Database Integration
+- **Todo Table**: Main todo storage with project relationships
+- **Projects Table**: Project information with todo relationships
+- **Logs Table**: Time logging with todo integration
+
+## 🎨 User Interface
+
+### Main TODO Page (`/todo`)
+
+#### Overdue Section
+- **Prominent Display**: Red-bordered section at top of page
+- **Count Display**: Shows number of overdue todos
+- **Quick Actions**: View, Edit, and Log Time buttons
+- **Project Information**: Shows associated project names
+
+#### Filtering System
+- **Status Filters**: New, In Progress, Completed, All
+- **Project Filters**: Filter by specific projects
+- **Date Filters**: Today, Week, Month, All
+- **Search**: Text search across subject, description, and comments
+
+#### Enhanced Table Display
+- **Project Names**: Shows project names instead of IDs
+- **Status Labels**: Clear text labels instead of numbers
+- **Action Buttons**: Styled buttons for common operations
+- **Priority Indicators**: Color-coded priority display
+
+### Calendar Views
+
+#### Month View (`/todo/month`)
+- **Calendar Grid**: Traditional month calendar layout
+- **Todo Items**: Visual todo indicators with status colors
+- **Log Items**: Time log entries with distinct styling
+- **Click Navigation**: Click items to view details
+- **Quick Add**: Add todos directly from calendar dates
+
+#### Week View (`/todo/week`)
+- **7-Day Layout**: Sunday through Saturday display
+- **Daily Todos**: Todos organized by day
+- **Priority Styling**: Color-coded priority indicators
+- **Navigation**: Previous/Next week navigation
+
+## 🔧 Technical Implementation
+
+### Database Queries
+```perl
+# Enhanced query with project prefetching
+my @todos = $rs->search(
+    {
+        'me.sitename' => $sitename,
+        'me.status' => { '!=' => 3 }
+    },
+    { 
+        order_by => { -asc => ['me.priority', 'me.start_date'] },
+        prefetch => 'project'
+    }
+);
+```
+
+### Template Integration
+```perl
+# Controller data preparation
+$c->stash(
+    todos => \@todos,
+    overdue_todos => $overdue_todos,
+    projects => $projects,
+    week_days => \@week_days  # Pre-calculated date data
+);
+```
+
+### CSS Styling
+```css
+/* Overdue section styling */
+.overdue-section {
+    background: #ffebee;
+    border: 1px solid #f44336;
+    border-radius: 4px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+/* Calendar item styling */
+.calendar-item {
+    margin-bottom: 0.25rem;
+    padding: 0.25rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+```
+
+## 📊 Data Flow
+
+### Todo Creation Flow
+1. User clicks "Add Todo" or uses calendar quick-add
+2. Form submission to `/todo/addtodo`
+3. Database insertion with project relationship
+4. Redirect to appropriate view with success message
+
+### Overdue Detection Flow
+1. `get_overdue_todos()` method called on page load
+2. Query for todos with `due_date < today` and `status != completed`
+3. Results passed to template for prominent display
+4. Visual warning indicators applied
+
+### Calendar Integration Flow
+1. Controller fetches todos and logs for date range
+2. Data organized by date in controller
+3. Template receives pre-organized data structures
+4. Visual rendering with appropriate styling
+
+## 🎯 Usage Guidelines
+
+### For Users
+
+#### Managing Todos
+1. **View Todos**: Navigate to `/todo` for main todo list
+2. **Filter Todos**: Use filter controls to narrow down display
+3. **Handle Overdue**: Address overdue todos shown in warning section
+4. **Use Calendar**: Switch to month/week views for timeline perspective
+
+#### Project Integration
+1. **Link to Projects**: Assign todos to projects during creation
+2. **Filter by Project**: Use project filter to see project-specific todos
+3. **Project Navigation**: Click project badges to view project details
+
+#### Time Logging
+1. **Log Time**: Use "Log Time" buttons for quick time entry
+2. **View Logs**: Calendar views show time logs alongside todos
+3. **Track Progress**: Monitor accumulated time on todos
+
+### For Developers
+
+#### Extending Functionality
+1. **Follow Existing Patterns**: Use established controller and template patterns
+2. **Maintain Table Aliases**: Use `me.column` format for joined queries
+3. **Pre-calculate in Controllers**: Avoid complex logic in templates
+4. **Use Existing CSS Classes**: Leverage established styling system
+
+#### Database Considerations
+1. **Use Prefetching**: Include `prefetch => 'project'` for project data
+2. **Handle Ambiguity**: Always use table aliases in joined queries
+3. **Optimize Queries**: Consider performance impact of complex filters
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+#### Database Ambiguity Errors
+**Problem**: "Column 'sitename' in WHERE is ambiguous"
+**Solution**: Use table aliases (`me.sitename` instead of `sitename`)
+
+#### Template Parsing Errors
+**Problem**: "unexpected token (DateTime::Format::ISO8601)"
+**Solution**: Move date calculations to controller, pass results to template
+
+#### Missing Project Names
+**Problem**: Project IDs showing instead of names
+**Solution**: Ensure `prefetch => 'project'` is included in query
+
+### Performance Considerations
+- **Large Datasets**: Consider pagination for sites with many todos
+- **Complex Filters**: Monitor query performance with multiple filters
+- **Calendar Views**: Optimize date range queries for better performance
+
+## 🔄 Integration Points
+
+### Project System Integration
+- **Bidirectional Relationship**: Todos link to projects, projects show todos
+- **Consistent Navigation**: Seamless movement between systems
+- **Shared Styling**: Consistent visual design across systems
+
+### Logging System Integration
+- **Time Tracking**: Direct integration with time logging
+- **Calendar Display**: Logs appear in calendar views
+- **Cross-Reference**: Easy navigation between todos and related logs
+
+### Theme System Integration
+- **CSS Variables**: Uses established theme color variables
+- **Responsive Design**: Follows theme responsive patterns
+- **Consistent Styling**: Maintains visual consistency with rest of application
+
+---
+
+**Version:** 2.0  
+**Last Updated:** 2025-01-15  
+**Maintainer:** Development Team
+
+</div>
+</div>

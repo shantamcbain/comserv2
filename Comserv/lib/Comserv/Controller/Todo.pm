@@ -786,29 +786,30 @@ sub month :Path('/todo/month') :Args {
     my $prev_month_date = $dt->clone->subtract(months => 1)->set_day(1)->strftime('%Y-%m-%d');
     my $next_month_date = $dt->clone->add(months => 1)->set_day(1)->strftime('%Y-%m-%d');
 
-    # Fetch todos for the site
-    my $todos = $todo_model->get_top_todos($c, $c->session->{SiteName});
+    # Fetch ALL todos for the site directly from database
+    my $schema = $c->model('DBEncy');
+    my @all_todos = $schema->resultset('Todo')->search(
+        {
+            'me.sitename' => $c->session->{SiteName},
+        },
+        { 
+            order_by => { -asc => 'me.start_date' },
+            prefetch => 'project'
+        }
+    );
 
     # Filter todos for the given month: starting this month, due this month, or overdue but not completed
     my @filtered_todos = grep { 
         ($_->start_date && $_->start_date ge $start_of_month && $_->start_date le $end_of_month) ||  # Starting this month
         ($_->due_date && $_->due_date ge $start_of_month && $_->due_date le $end_of_month) ||      # Due this month
         ($_->due_date && $_->due_date lt $start_of_month && $_->status ne '3')                     # Overdue but not completed
-    } @$todos;
+    } @all_todos;
 
-    # Fetch logs for the month
-    my $schema = $c->model('DBEncy');
-    my @logs = $schema->resultset('Log')->search(
-        {
-            'me.sitename' => $c->session->{SiteName},
-            start_date => { '>=' => $start_of_month, '<=' => $end_of_month }
-        },
-        { order_by => { -asc => 'start_date' } }
-    );
+    # Debug logging
+    $c->log->info("Month view debug: Found " . scalar(@all_todos) . " total todos, " . scalar(@filtered_todos) . " filtered todos for month $start_of_month to $end_of_month");
 
     # Organize todos by day of month (use due_date if available, otherwise start_date)
     my %todos_by_day;
-    my %logs_by_day;
     
     foreach my $todo (@filtered_todos) {
         my $display_date = $todo->due_date || $todo->start_date;
@@ -818,17 +819,6 @@ sub month :Path('/todo/month') :Args {
             if ($todo_date->year == $dt->year && $todo_date->month == $dt->month) {
                 my $day = $todo_date->day;
                 push @{$todos_by_day{$day}}, $todo;
-            }
-        }
-    }
-    
-    # Organize logs by day
-    foreach my $log (@logs) {
-        if ($log->start_date) {
-            my $log_date = DateTime::Format::ISO8601->parse_datetime($log->start_date);
-            if ($log_date->year == $dt->year && $log_date->month == $dt->month) {
-                my $day = $log_date->day;
-                push @{$logs_by_day{$day}}, $log;
             }
         }
     }
@@ -848,8 +838,7 @@ sub month :Path('/todo/month') :Args {
         push @calendar, {
             day => $day,
             date => sprintf("%04d-%02d-%02d", $dt->year, $dt->month, $day),
-            todos => $todos_by_day{$day} || [],
-            logs => $logs_by_day{$day} || []
+            todos => $todos_by_day{$day} || []
         };
     }
 

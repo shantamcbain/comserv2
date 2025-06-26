@@ -269,6 +269,34 @@
     border-left: 3px solid #FF9800;
 }
 
+/* Override for month calendar - ensure todos are prominent */
+.month-calendar .calendar-item.todo-item {
+    background: rgba(76, 175, 80, 0.2) !important;
+    border-left: 4px solid #4CAF50 !important;
+    font-size: 0.85em !important;
+    font-weight: 600 !important;
+    padding: 4px 6px !important;
+    margin-bottom: 4px !important;
+    min-height: 22px !important;
+}
+
+.month-calendar .calendar-item.todo-item.due {
+    background: rgba(244, 67, 54, 0.2) !important;
+    border-left: 4px solid #f44336 !important;
+    animation: pulse-due 2s infinite;
+}
+
+.month-calendar .calendar-item.log-item {
+    background: rgba(255, 152, 0, 0.05) !important;
+    border-left: 2px solid #FF9800 !important;
+    font-size: 0.65em !important;
+    font-weight: 300 !important;
+    opacity: 0.7 !important;
+    padding: 2px 4px !important;
+    margin-bottom: 2px !important;
+    max-height: 18px !important;
+}
+
 .item-indicator {
     width: 8px;
     height: 8px;
@@ -312,6 +340,206 @@
 .status-in-progress { background: #fff3e0; color: #f57c00; }
 .status-completed { background: #e8f5e8; color: #388e3c; }
 
+/* Month Calendar Styles */
+.month-calendar {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+    table-layout: fixed;
+}
+
+.month-calendar th, .month-calendar td {
+    border: 1px solid var(--border-color, #ddd);
+    padding: 8px;
+    text-align: center;
+    vertical-align: top;
+    height: 120px;
+    width: 14.28%;
+}
+
+.month-calendar th {
+    background-color: var(--primary-color, #4CAF50);
+    color: white;
+    height: auto;
+    font-weight: bold;
+}
+
+.month-cell {
+    position: relative;
+    background-color: var(--card-bg, #ffffff);
+}
+
+.month-cell.today {
+    background-color: var(--success-color, #e6f7ff);
+    border: 2px solid var(--primary-color, #4CAF50);
+}
+
+.month-cell.empty-cell {
+    background-color: var(--bg-color, #f9f9f9);
+}
+
+.day-number {
+    font-weight: bold;
+    float: right;
+    margin-bottom: 5px;
+    color: var(--text-color, #333);
+    font-size: 0.9em;
+}
+
+.cell-content {
+    clear: both;
+    height: calc(100% - 35px);
+    overflow-y: auto;
+    padding-top: 5px;
+}
+
+/* TODOS SECTION - Primary prominence */
+.todos-section {
+    margin-bottom: 8px;
+}
+
+.month-calendar .todos-section .todo-item {
+    background: rgba(76, 175, 80, 0.15) !important;
+    border-left: 4px solid var(--primary-color, #4CAF50) !important;
+    margin-bottom: 4px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    font-size: 0.85em !important;
+    font-weight: 600 !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    min-height: 20px;
+}
+
+.month-calendar .todos-section .todo-item.due {
+    background: rgba(244, 67, 54, 0.15) !important;
+    border-left: 4px solid var(--danger-color, #f44336) !important;
+    animation: pulse-due 2s infinite;
+}
+
+@keyframes pulse-due {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.todo-due-icon {
+    color: var(--danger-color, #f44336);
+    margin-right: 4px;
+}
+
+.todo-icon {
+    color: var(--primary-color, #4CAF50);
+    margin-right: 4px;
+}
+
+.todo-subject {
+    font-weight: 600;
+    color: var(--text-color, #333);
+}
+
+/* Month calendar specific text styling */
+.month-calendar .todo-subject {
+    font-weight: 700 !important;
+    color: #2e7d32 !important;
+    font-size: 1em !important;
+}
+
+.month-calendar .log-text {
+    font-weight: 300 !important;
+    color: #666 !important;
+    font-size: 0.9em !important;
+}
+
+.month-calendar .log-time {
+    font-weight: 200 !important;
+    color: #999 !important;
+    font-size: 0.8em !important;
+}
+
+/* LOGS SECTION - Secondary/subtle */
+.logs-section {
+    margin-top: 6px;
+    border-top: 1px dotted var(--border-color, #ddd);
+    padding-top: 4px;
+}
+
+.month-calendar .logs-section .log-item {
+    background: rgba(255, 152, 0, 0.05) !important;
+    border-left: 2px solid var(--warning-color, #FF9800) !important;
+    margin-bottom: 2px;
+    padding: 2px 4px;
+    border-radius: 2px;
+    font-size: 0.65em !important;
+    opacity: 0.7 !important;
+    font-weight: 300 !important;
+    max-height: 16px;
+}
+
+.log-icon {
+    color: var(--warning-color, #FF9800);
+    margin-right: 3px;
+    font-size: 0.8em;
+}
+
+.log-text {
+    color: var(--text-color, #555);
+}
+
+.log-time {
+    color: var(--text-color, #777);
+    font-size: 0.9em;
+}
+
+/* Month Navigation */
+.month-navigation {
+    display: flex;
+    justify-content: space-between;
+    margin: 15px 0;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.month-navigation a {
+    padding: 10px 16px;
+    background-color: var(--primary-color, #4CAF50);
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+    font-weight: 500;
+    transition: background-color 0.2s;
+}
+
+.month-navigation a:hover {
+    background-color: var(--primary-color, #45a049);
+    transform: translateY(-1px);
+}
+
+/* Add Todo Form */
+.add-todo-form {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+}
+
+.add-todo-btn {
+    background-color: var(--primary-color, #4CAF50);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    font-size: 0.8em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.add-todo-btn:hover {
+    background-color: var(--primary-color, #45a049);
+    transform: scale(1.1);
+}
+
 /* Responsive design for mobile */
 @media (max-width: 768px) {
     .filter-row {
@@ -335,5 +563,29 @@
         display: block;
         margin-left: 0;
         margin-top: 0.25rem;
+    }
+    
+    .month-calendar th, .month-calendar td {
+        height: 100px;
+        font-size: 0.9em;
+    }
+    
+    .todos-section .todo-item {
+        font-size: 0.75em;
+        padding: 3px 4px;
+    }
+    
+    .logs-section .log-item {
+        font-size: 0.65em;
+        padding: 1px 3px;
+    }
+    
+    .month-navigation {
+        justify-content: center;
+    }
+    
+    .month-navigation a {
+        padding: 8px 12px;
+        font-size: 0.9em;
     }
 }
