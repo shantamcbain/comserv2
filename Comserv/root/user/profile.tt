@@ -45,6 +45,25 @@
             </div>
         </div>
         
+        [% IF user.subscriptions.size > 0 %]
+        <div class="profile-section">
+            <h2>Mailing List Subscriptions</h2>
+            <div class="subscriptions-list">
+                [% FOREACH subscription IN user.subscriptions %]
+                <div class="subscription-item">
+                    <span class="subscription-name">[% subscription.mailing_list.name | html %]</span>
+                    [% IF subscription.mailing_list.description %]
+                    <small class="subscription-description">[% subscription.mailing_list.description | html %]</small>
+                    [% END %]
+                </div>
+                [% END %]
+            </div>
+            <p class="manage-subscriptions">
+                <a href="[% c.uri_for('/user/settings') %]">Manage your subscriptions</a>
+            </p>
+        </div>
+        [% END %]
+        
         <div class="profile-actions">
             <a href="[% c.uri_for('/user/settings') %]" class="action-button">Edit Profile</a>
             <a href="[% c.uri_for('/user/change_password') %]" class="action-button">Change Password</a>
@@ -157,6 +176,46 @@
         color: #666;
         font-style: italic;
         padding: 10px 0;
+    }
+    
+    .subscriptions-list {
+        margin-top: 15px;
+    }
+    
+    .subscription-item {
+        background-color: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 5px;
+        padding: 10px;
+        margin-bottom: 10px;
+    }
+    
+    .subscription-name {
+        font-weight: bold;
+        color: #0066cc;
+        display: block;
+    }
+    
+    .subscription-description {
+        color: #666;
+        font-size: 0.9em;
+        margin-top: 5px;
+        display: block;
+    }
+    
+    .manage-subscriptions {
+        margin-top: 15px;
+        text-align: center;
+    }
+    
+    .manage-subscriptions a {
+        color: #0066cc;
+        text-decoration: none;
+        font-weight: bold;
+    }
+    
+    .manage-subscriptions a:hover {
+        text-decoration: underline;
     }
     
     /* Mobile responsiveness */

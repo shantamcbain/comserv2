@@ -1,0 +1,57 @@
+[% PageVersion = 'Comserv/root/mail/create_list.tt,v 1.0 2025/01/15 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Create Mailing List' %]
+
+<div class="admin-content">
+    <div class="admin-header">
+        <h1>Create New Mailing List</h1>
+        <div class="admin-actions">
+            <a href="[% c.uri_for('/mail/lists') %]" class="btn btn-secondary">Back to Lists</a>
+        </div>
+    </div>
+
+    [% IF debug_msg %]
+        <div class="alert alert-danger">[% debug_msg %]</div>
+    [% END %]
+
+    <div class="admin-card">
+        <form method="post" action="[% c.uri_for('/mail/lists/create') %]" class="admin-form">
+            <div class="form-group">
+                <label for="name" class="required">List Name</label>
+                <input type="text" id="name" name="name" required 
+                       placeholder="e.g., Newsletter, Workshop Updates">
+                <small class="form-help">A descriptive name for your mailing list</small>
+            </div>
+
+            <div class="form-group">
+                <label for="description">Description</label>
+                <textarea id="description" name="description" rows="3" 
+                          placeholder="Brief description of what this list is for"></textarea>
+                <small class="form-help">Optional description to help users understand the list purpose</small>
+            </div>
+
+            <div class="form-group">
+                <label for="list_email">List Email Address</label>
+                <input type="email" id="list_email" name="list_email" 
+                       placeholder="newsletter@yoursite.com">
+                <small class="form-help">Optional: Email address for the list (if using Virtualmin)</small>
+            </div>
+
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="is_software_only" value="1" checked>
+                    Software-only list (no server-side mailing list)
+                </label>
+                <small class="form-help">Check this for application-managed lists. Uncheck if using Virtualmin server lists.</small>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Create Mailing List</button>
+                <a href="[% c.uri_for('/mail/lists') %]" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>

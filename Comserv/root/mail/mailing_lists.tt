@@ -1,0 +1,80 @@
+[% PageVersion = 'Comserv/root/mail/mailing_lists.tt,v 1.0 2025/01/15 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Mailing Lists Management' %]
+
+<div class="admin-content">
+    <div class="admin-header">
+        <h1>Mailing Lists Management</h1>
+        <div class="admin-actions">
+            <a href="[% c.uri_for('/mail/lists/create') %]" class="btn btn-primary">Create New List</a>
+        </div>
+    </div>
+
+    [% IF status_msg %]
+        <div class="alert alert-success">[% status_msg %]</div>
+    [% END %]
+    
+    [% IF debug_msg %]
+        <div class="alert alert-danger">[% debug_msg %]</div>
+    [% END %]
+
+    [% IF mailing_lists && mailing_lists.size > 0 %]
+    <div class="admin-card">
+        <h2>Active Mailing Lists</h2>
+        <div class="table-responsive">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th>List Email</th>
+                        <th>Type</th>
+                        <th>Subscribers</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    [% FOREACH list IN mailing_lists %]
+                    <tr>
+                        <td><strong>[% list.name | html %]</strong></td>
+                        <td>[% list.description | html %]</td>
+                        <td>[% list.list_email | html %]</td>
+                        <td>
+                            [% IF list.is_software_only %]
+                                <span class="badge badge-info">Software Only</span>
+                            [% ELSE %]
+                                <span class="badge badge-success">Virtualmin</span>
+                            [% END %]
+                        </td>
+                        <td>
+                            <a href="/mail/lists/[% list.id %]/subscribers">
+                                [% list.subscriber_count || 0 %] subscribers
+                            </a>
+                        </td>
+                        <td>[% list.created_at.strftime('%Y-%m-%d') %]</td>
+                        <td class="actions">
+                            <a href="[% c.uri_for('/mail/lists', list.id, 'edit') %]" class="btn btn-sm btn-secondary">Edit</a>
+                            <a href="[% c.uri_for('/mail/compose', list.id) %]" class="btn btn-sm btn-primary">Compose</a>
+                            <a href="[% c.uri_for('/mail/lists', list.id, 'delete') %]" class="btn btn-sm btn-danger" 
+                               onclick="return confirm('Are you sure you want to delete this mailing list?')">Delete</a>
+                        </td>
+                    </tr>
+                    [% END %]
+                </tbody>
+            </table>
+        </div>
+    </div>
+    [% ELSE %]
+    <div class="admin-card">
+        <div class="empty-state">
+            <h3>No Mailing Lists Found</h3>
+            <p>You haven't created any mailing lists yet.</p>
+            <a href="[% c.uri_for('/mail/lists/create') %]" class="btn btn-primary">Create Your First List</a>
+        </div>
+    </div>
+    [% END %]
+</div>

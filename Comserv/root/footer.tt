@@ -4,6 +4,9 @@
  <br><a href="/reset_session">Reset Session</a></br>
 [% END %]
 
+<!-- Newsletter signup for non-logged-in users -->
+[% INCLUDE 'mail/newsletter_signup.tt' %]
+
 <!-- Live chat implementation -->
 <script type="text/javascript" src="/static/js/local-chat.js"></script>
 

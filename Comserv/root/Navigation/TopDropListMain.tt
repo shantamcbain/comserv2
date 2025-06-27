@@ -34,7 +34,7 @@
 [% ELSE %]
     <A HREF="[% c.session.MailServer.replace(':3000', '') %]" target="_Blank">Mail</a>
 [% END %]
-
+                    <a href="#" onclick="showNewsletterModal(); return false;"><i class="icon-newsletter"></i>Newsletter Signup</a>
  </div>
             </div>
                     <ul>

@@ -129,5 +129,47 @@
                 }
             }
         }
+        
+        // Newsletter modal functions - defined early to be available for navigation
+        function showNewsletterModal() {
+            var modal = document.getElementById('newsletterModal');
+            if (modal) {
+                modal.style.display = 'block';
+                // Track modal opens for analytics
+                trackNewsletterModalOpen();
+            } else {
+                console.warn('Newsletter modal not found');
+            }
+        }
+
+        function hideNewsletterModal() {
+            var modal = document.getElementById('newsletterModal');
+            if (modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        // Enhanced tracking with domain-specific localStorage
+        function trackNewsletterModalOpen() {
+            var domain = window.location.hostname;
+            var storageKey = 'newsletter_modal_opens_' + domain;
+            var opens = parseInt(localStorage.getItem(storageKey) || '0') + 1;
+            localStorage.setItem(storageKey, opens.toString());
+            
+            // Log for debugging if available
+            if (typeof console !== 'undefined' && console.log) {
+                console.log('Newsletter modal opened ' + opens + ' times on ' + domain);
+            }
+        }
+        
+        // Close modal when clicking outside of it
+        document.addEventListener('DOMContentLoaded', function() {
+            window.onclick = function(event) {
+                var modal = document.getElementById('newsletterModal');
+                if (event.target == modal) {
+                    hideNewsletterModal();
+                }
+            }
+        });
     </script>
 </head>

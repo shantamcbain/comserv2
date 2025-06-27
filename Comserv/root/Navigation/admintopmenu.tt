@@ -208,6 +208,7 @@
                     <a href="/display_schema"><i class="icon-schema"></i>Database Schema</a>
                     <a href="/admin/schema_compare"><i class="icon-compare"></i>Schema Comparison</a>
                     <a href="/mail/add_mail_config_form"><i class="icon-mail-config"></i>Mail Configuration</a>
+                    <a href="[% c.uri_for('/mail/lists') %]"><i class="icon-mail"></i>Mailing Lists</a>
                     <a href="/ApiCredentials"><i class="icon-key"></i>API Credentials</a>
                     <a href="/cloudflareapi"><i class="icon-cloud"></i>Cloudflare DNS</a>
                 </div>

@@ -561,7 +561,7 @@ sub logout :Local {
         qr{^/about},          # About page
         qr{^/contact},        # Contact page
         qr{^/user/login},     # Login page
-        qr{^/user/create_account}, # Registration page
+        qr{^/user/register}, # Registration page
         qr{^/mcoop},          # MCoop pages
         qr{^/csc},            # CSC pages
         qr{^/usbm},           # USBM pages
@@ -664,6 +664,17 @@ sub profile :Local {
         return;
     }
 
+    # Get user's current mailing list subscriptions
+    my $site_id = $c->session->{site_id} || 1;
+    my @user_subscriptions = $user->mailing_list_subscriptions->search({
+        'mailing_list.site_id' => $site_id,
+        'mailing_list.is_active' => 1,
+        'me.is_active' => 1
+    }, {
+        join => 'mailing_list',
+        prefetch => 'mailing_list'
+    });
+
     # Prepare user data for display
     my $user_data = {
         username => $user->username,
@@ -671,6 +682,7 @@ sub profile :Local {
         last_name => $user->last_name,
         email => $user->email,
         roles => $c->session->{roles} || [],
+        subscriptions => \@user_subscriptions,
         # Add other fields as needed
     };
 
@@ -707,6 +719,22 @@ sub settings :Local {
         return;
     }
 
+    # Get available mailing lists for the site
+    my $site_id = $c->session->{site_id} || 1;
+    my $available_lists = $c->forward('/mail/get_available_lists', [$site_id]) || [];
+    
+    # Get user's current subscriptions
+    my @current_subscriptions = $user->mailing_list_subscriptions->search({
+        'mailing_list.site_id' => $site_id,
+        'mailing_list.is_active' => 1,
+        'me.is_active' => 1
+    }, {
+        join => 'mailing_list'
+    });
+    
+    # Create a hash of subscribed list IDs for easy lookup
+    my %subscribed_lists = map { $_->mailing_list_id => 1 } @current_subscriptions;
+
     # Set template and stash data
     $c->stash(
         user => {
@@ -714,9 +742,11 @@ sub settings :Local {
             first_name => $user->first_name,
             last_name => $user->last_name,
             email => $user->email,
-            email_notifications => $user->email_notifications || 0,
+            email_notifications => $self->_user_has_email_notifications($user, $c->session->{site_id} || 1),
             # Add other fields as needed
         },
+        available_mailing_lists => $available_lists,
+        subscribed_lists => \%subscribed_lists,
         template => 'user/settings.tt'
     );
 
@@ -775,9 +805,11 @@ sub update_settings :Local {
             first_name => $first_name,
             last_name => $last_name,
             email => $email,
-            email_notifications => $email_notifications,
             # Add other fields as needed
         });
+        
+        # Handle email_notifications through default announcement mailing list
+        $self->_update_user_email_notifications($user, $email_notifications, $c->session->{site_id} || 1);
     };
 
     if ($@) {
@@ -788,6 +820,144 @@ sub update_settings :Local {
         $c->flash->{error_msg} = "An error occurred while updating your settings. Please try again.";
         $c->response->redirect($c->uri_for('/user/settings'));
         return;
+    }
+
+    # Handle mailing list subscription updates
+    my $site_id = $c->session->{site_id} || 1;
+    
+    # Get current subscriptions (outside eval for later use)
+    my @current_subscriptions = $user->mailing_list_subscriptions->search({
+        'mailing_list.site_id' => $site_id,
+        'mailing_list.is_active' => 1
+    }, {
+        join => 'mailing_list'
+    });
+    
+    # Process radio button selections for mailing lists
+    my @selected_list_ids = ();
+    my $params = $c->req->params;
+    
+    # Find all mailing list subscription parameters (format: list_{id}_subscription)
+    foreach my $param_name (keys %$params) {
+        if ($param_name =~ /^list_(\d+)_subscription$/) {
+            my $list_id = $1;
+            my $subscription_status = $params->{$param_name};
+            
+            # Only add to selected if user chose "subscribed"
+            if ($subscription_status eq 'subscribed') {
+                push @selected_list_ids, $list_id;
+            }
+        }
+    }
+    
+    eval {
+        my $schema = $c->model('DBEncy');
+        
+        # Create hash of current subscriptions
+        my %current_subs = map { $_->mailing_list_id => $_ } @current_subscriptions;
+        
+        # Add new subscriptions
+        foreach my $list_id (@selected_list_ids) {
+            unless ($current_subs{$list_id}) {
+                my $list = $schema->resultset('MailingList')->find({
+                    id => $list_id,
+                    site_id => $site_id,
+                    is_active => 1
+                });
+                
+                if ($list) {
+                    $schema->resultset('MailingListSubscription')->create({
+                        mailing_list_id => $list_id,
+                        user_id => $user->id,
+                        subscription_source => 'profile_update',
+                        is_active => 1,
+                    });
+                    
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_settings',
+                        "User " . $user->username . " subscribed to mailing list: " . $list->name);
+                }
+            }
+        }
+        
+        # Remove unselected subscriptions (deactivate rather than delete)
+        my %selected_hash = map { $_ => 1 } @selected_list_ids;
+        foreach my $list_id (keys %current_subs) {
+            unless ($selected_hash{$list_id}) {
+                $current_subs{$list_id}->update({ is_active => 0 });
+                
+                my $list_name = $current_subs{$list_id}->mailing_list->name;
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_settings',
+                    "User " . $user->username . " unsubscribed from mailing list: $list_name");
+            }
+        }
+    };
+    
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_settings',
+            "Error updating mailing list subscriptions: $@");
+        # Don't fail the entire update for mailing list errors
+    }
+    
+    # Send admin notification if there were mailing list changes
+    my @new_subscriptions = ();
+    my @removed_subscriptions = ();
+    
+    # Collect changes for admin notification
+    my %selected_hash = map { $_ => 1 } @selected_list_ids;
+    my %current_subs = map { $_->mailing_list_id => $_ } @current_subscriptions;
+    
+    # Find new subscriptions
+    foreach my $list_id (@selected_list_ids) {
+        unless ($current_subs{$list_id}) {
+            my $list = $c->model('DBEncy')->resultset('MailingList')->find($list_id);
+            push @new_subscriptions, $list->name if $list;
+        }
+    }
+    
+    # Find removed subscriptions
+    foreach my $list_id (keys %current_subs) {
+        unless ($selected_hash{$list_id}) {
+            push @removed_subscriptions, $current_subs{$list_id}->mailing_list->name;
+        }
+    }
+    
+    # Send admin notification if there were changes
+    if (@new_subscriptions || @removed_subscriptions) {
+        my $mail_to_admin = $c->stash->{mail_to_admin};
+        
+        if ($mail_to_admin && $mail_to_admin =~ /\@/) {
+            eval {
+                my $mail_from = $c->stash->{mail_from} || 'noreply@computersystemconsulting.ca';
+                my $timestamp = scalar localtime;
+                
+                $c->stash->{email} = {
+                    to       => $mail_to_admin,
+                    from     => $mail_from,
+                    subject  => 'Comserv - User Mailing List Subscription Changes',
+                    template => 'email/admin_subscription_notification.tt',
+                    template_vars => {
+                        username   => $user->username,
+                        first_name => $first_name,
+                        last_name  => $last_name,
+                        email      => $email,
+                        updated_at => $timestamp,
+                        site_name  => $c->stash->{ScriptDisplayName} || 'Comserv',
+                        new_subscriptions => \@new_subscriptions,
+                        removed_subscriptions => \@removed_subscriptions,
+                    },
+                };
+                
+                $c->forward($c->view('Email::Template'));
+                
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_settings',
+                    "Admin notification sent for mailing list changes by user: " . $user->username);
+            };
+            
+            if ($@) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_settings',
+                    "Error sending admin notification for mailing list changes: $@");
+            }
+        }
     }
 
     # Update session data
@@ -806,12 +976,7 @@ sub update_settings :Local {
     $c->response->redirect($c->uri_for('/user/profile'));
     return;
 }
-sub create_account :Local {
-    my ($self, $c) = @_;
 
-    # Display the account creation form
-    $c->stash(template => '/user/create_account.tt');
-}
 sub do_create_account :Local {
     my ($self, $c) = @_;
 
@@ -835,7 +1000,7 @@ sub do_create_account :Local {
 
         $c->stash(
             error_msg => 'All fields are required to create an account',
-            template  => 'user/create_account.tt',
+            template  => 'user/register.tt',
         );
         return;
     }
@@ -847,7 +1012,7 @@ sub do_create_account :Local {
 
         $c->stash(
             error_msg => 'Passwords do not match',
-            template  => 'user/create_account.tt',
+            template  => 'user/register.tt',
         );
         return;
     }
@@ -863,7 +1028,7 @@ sub do_create_account :Local {
 
         $c->stash(
             error_msg => 'Username already exists. Please choose another.',
-            template  => 'user/create_account.tt',
+            template  => 'user/register.tt',
         );
         return;
     }
@@ -893,7 +1058,7 @@ sub do_create_account :Local {
             
         $c->stash(
             error_msg => "An error occurred while creating the account: $@",
-            template  => 'user/create_account.tt',
+            template  => 'user/register.tt',
         );
         return;
     }
@@ -950,6 +1115,83 @@ sub do_create_account :Local {
             "Error sending welcome email: $@");
     }
     
+    # Handle mailing list subscriptions first so we can include them in admin notification
+    my $selected_lists = $c->req->params->{mailing_lists};
+    my @subscribed_list_names = ();
+    
+    if ($selected_lists && $new_user) {
+        $selected_lists = [$selected_lists] unless ref($selected_lists) eq 'ARRAY';
+        
+        eval {
+            my $schema = $c->model('DBEncy');
+            
+            foreach my $list_id (@$selected_lists) {
+                next unless $list_id && $list_id =~ /^\d+$/;
+                
+                my $list = $schema->resultset('MailingList')->find({
+                    id => $list_id,
+                    site_id => $c->session->{site_id} || 1,
+                    is_active => 1
+                });
+                
+                if ($list) {
+                    $schema->resultset('MailingListSubscription')->create({
+                        mailing_list_id => $list_id,
+                        user_id => $new_user->id,
+                        subscription_source => 'registration',
+                        is_active => 1,
+                    });
+                    
+                    push @subscribed_list_names, $list->name;
+                    
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
+                        "User $username subscribed to mailing list: " . $list->name);
+                }
+            }
+        };
+        
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_create_account',
+                "Error processing mailing list subscriptions: $@");
+        }
+    }
+    
+    # Always ensure new user is subscribed to the default announcement list (SiteName Announcements)
+    if ($new_user) {
+        eval {
+            my $site_id = $c->session->{site_id} || 1;
+            my $announcement_list = $self->_get_or_create_announcement_list($new_user, $site_id);
+            
+            if ($announcement_list) {
+                # Check if already subscribed (might be in the selected lists above)
+                my $schema = $c->model('DBEncy');
+                my $existing_announcement_sub = $schema->resultset('MailingListSubscription')->find({
+                    mailing_list_id => $announcement_list->id,
+                    user_id => $new_user->id,
+                });
+                
+                unless ($existing_announcement_sub) {
+                    $schema->resultset('MailingListSubscription')->create({
+                        mailing_list_id => $announcement_list->id,
+                        user_id => $new_user->id,
+                        subscription_source => 'registration_default_announcement',
+                        is_active => 1,
+                    });
+                    
+                    push @subscribed_list_names, $announcement_list->name;
+                    
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
+                        "User $username auto-subscribed to default announcement list: " . $announcement_list->name);
+                }
+            }
+        };
+        
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_create_account',
+                "Error subscribing to default announcement list: $@");
+        }
+    }
+
     # Get the admin email from the stash (set by site_setup in Root.pm)
     # This variable is set in Root.pm's site_setup method for each site
     my $mail_to_admin = $c->stash->{mail_to_admin};
@@ -983,6 +1225,7 @@ sub do_create_account :Local {
                     roles      => $roles,
                     created_at => $timestamp,
                     site_name  => $c->stash->{ScriptDisplayName} || 'Comserv',
+                    mailing_lists => \@subscribed_list_names,
                 },
             };
             
@@ -1002,6 +1245,9 @@ sub do_create_account :Local {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_create_account',
             "Error sending admin notification email: $@");
     }
+    
+    # Clear newsletter email from session if it was used
+    delete $c->session->{newsletter_email} if $c->session->{newsletter_email};
 
     # Set success message and redirect to the login page
     $c->flash->{success_msg} = "Your account has been created successfully. You can now log in.";
@@ -1084,8 +1330,93 @@ sub do_edit_user :Local :Args(1) {
 sub register :Local {
     my ($self, $c) = @_;
 
-    # Display the registration form
-    $c->stash(template => 'user/register.tt');
+    # Get available mailing lists for the site
+    my $site_id = $c->session->{site_id} || 1;
+    my $available_lists = $c->forward('/mail/get_available_lists', [$site_id]) || [];
+    
+    # Debug logging
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'register',
+        "Site ID: $site_id, Available lists count: " . scalar(@$available_lists));
+    
+    # Additional debug - let's also try direct database query
+    eval {
+        my $schema = $c->model('DBEncy');
+        my @direct_lists = $schema->resultset('MailingList')->search(
+            { 
+                site_id => $site_id,
+                is_active => 1 
+            },
+            { order_by => 'name' }
+        )->all;
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'register',
+            "Direct DB query found " . scalar(@direct_lists) . " lists");
+            
+        # If forward didn't work, use direct query
+        if (!@$available_lists && @direct_lists) {
+            $available_lists = \@direct_lists;
+        }
+    };
+    
+    # Pre-fill email if coming from newsletter signup
+    my $prefill_email = $c->session->{newsletter_email} || '';
+    
+    $c->stash(
+        available_mailing_lists => $available_lists,
+        prefill_email => $prefill_email,
+        template => 'user/register.tt'
+    );
+}
+
+sub debug_create_lists :Local {
+    my ($self, $c) = @_;
+    
+    my $site_id = $c->session->{site_id} || 1;
+    my $user_id = $c->session->{user_id} || 1;
+    
+    eval {
+        my $schema = $c->model('DBEncy');
+        
+        # Check if lists already exist
+        my $existing_count = $schema->resultset('MailingList')->search({
+            site_id => $site_id
+        })->count;
+        
+        if ($existing_count == 0) {
+            # Create test mailing lists
+            my @test_lists = (
+                {
+                    name => 'Newsletter',
+                    description => 'General newsletter with updates and announcements',
+                    is_software_only => 1,
+                },
+                {
+                    name => 'Workshop Notifications',
+                    description => 'Notifications about upcoming workshops and events',
+                    is_software_only => 1,
+                }
+            );
+            
+            foreach my $list_data (@test_lists) {
+                $schema->resultset('MailingList')->create({
+                    site_id => $site_id,
+                    name => $list_data->{name},
+                    description => $list_data->{description},
+                    is_software_only => $list_data->{is_software_only},
+                    is_active => 1,
+                    created_by => $user_id,
+                });
+            }
+            
+            $c->response->body("Created " . scalar(@test_lists) . " test mailing lists for site $site_id");
+        } else {
+            $c->response->body("Mailing lists already exist ($existing_count found)");
+        }
+    };
+    
+    if ($@) {
+        $c->response->body("Error: $@");
+    }
 }
 sub welcome :Local {
     my ($self, $c) = @_;
@@ -1188,6 +1519,83 @@ sub do_change_password_request :Path('/do_change_password_request') :Args(0) {
         template => 'user/change_password_request.tt'
     );
     $c->forward($c->view('TT'));
+}
+
+# Helper method to check if user has email notifications enabled
+# This is determined by subscription to the default announcement mailing list
+sub _user_has_email_notifications {
+    my ($self, $user, $site_id) = @_;
+    
+    # Find or create the default announcement list for the site
+    my $announcement_list = $self->_get_or_create_announcement_list($user, $site_id);
+    return 0 unless $announcement_list;
+    
+    # Check if user is subscribed to the announcement list
+    my $subscription = $user->mailing_list_subscriptions->find({
+        mailing_list_id => $announcement_list->id,
+        is_active => 1
+    });
+    
+    return $subscription ? 1 : 0;
+}
+
+# Helper method to update user email notifications through mailing list subscription
+sub _update_user_email_notifications {
+    my ($self, $user, $enable_notifications, $site_id) = @_;
+    
+    # Find or create the default announcement list for the site
+    my $announcement_list = $self->_get_or_create_announcement_list($user, $site_id);
+    return unless $announcement_list;
+    
+    # Find existing subscription
+    my $subscription = $user->mailing_list_subscriptions->find({
+        mailing_list_id => $announcement_list->id,
+    });
+    
+    if ($enable_notifications) {
+        if ($subscription) {
+            # Reactivate if exists
+            $subscription->update({ is_active => 1 });
+        } else {
+            # Create new subscription
+            $user->mailing_list_subscriptions->create({
+                mailing_list_id => $announcement_list->id,
+                subscription_source => 'email_notifications',
+                is_active => 1,
+            });
+        }
+    } else {
+        if ($subscription) {
+            # Deactivate subscription
+            $subscription->update({ is_active => 0 });
+        }
+    }
+}
+
+# Helper method to get or create the default announcement mailing list for a site
+sub _get_or_create_announcement_list {
+    my ($self, $user, $site_id) = @_;
+    
+    # Get site name for the announcement list
+    my $site_name = "Site $site_id"; # Default fallback
+    
+    # Try to get actual site name if available
+    # This would need to be implemented based on your site configuration
+    
+    my $list_name = "$site_name Announcements";
+    
+    # Find or create the announcement list
+    my $schema = $user->result_source->schema;
+    my $announcement_list = $schema->resultset('MailingList')->find_or_create({
+        site_id => $site_id,
+        name => $list_name,
+        description => "Default announcement list for $site_name",
+        is_software_only => 1,
+        is_active => 1,
+        created_by => 1, # System created
+    });
+    
+    return $announcement_list;
 }
 
 __PACKAGE__->meta->make_immutable;

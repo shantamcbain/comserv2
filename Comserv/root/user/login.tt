@@ -15,7 +15,7 @@
 [% END %]
 
 <!-- root/src/login.tt2 -->
-<form method="post" action="/user/do_login">
+<form method="post" action="do_login">
     <label for="username">Username</label>
     <input type="text" id="username" name="username" required>
 

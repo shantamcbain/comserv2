@@ -76,7 +76,7 @@
             <a href="/user/login" class="menu-item">
                 <i class="icon-sign-in-alt"></i> Login
             </a>
-            <a href="/user/create_account" class="menu-item">
+            <a href="/user/register" class="menu-item">
                 <i class="icon-user-plus"></i> Register
             </a>
             <a href="/user/forgot_password" class="menu-item">

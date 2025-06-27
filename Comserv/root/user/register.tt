@@ -3,6 +3,21 @@
   [% PageVersion %]
 
 [% END %]
+
+<!-- DEBUG: Show mailing list data -->
+[% IF c.session.debug_mode == 1 %]
+<div style="background: #ffffcc; border: 1px solid #ccc; padding: 10px; margin: 10px 0;">
+    <strong>DEBUG INFO:</strong><br>
+    Available mailing lists: [% available_mailing_lists.size || 0 %]<br>
+    [% IF available_mailing_lists && available_mailing_lists.size > 0 %]
+        [% FOREACH list IN available_mailing_lists %]
+        - ID: [% list.id %], Name: [% list.name %], Active: [% list.is_active %]<br>
+        [% END %]
+    [% ELSE %]
+        No mailing lists found or available_mailing_lists is empty/undefined
+    [% END %]
+</div>
+[% END %]
 <!-- Display error message if it exists -->
 [% IF c.stash.error_msg %]
     <p class="error">[% c.stash.error_msg %]</p>
@@ -11,7 +26,7 @@
     <p class="error">[% errors.general %]</p>
 [% END %]
 
-<form method="post" action="/user/do_create_account">
+<form method="post" action="do_create_account">
     <label for="username" class="[% IF errors.username %]error-label[% END %]">Username</label>
     <input type="text" id="username" name="username" value="[% username | html %]"><br>
     [% IF errors.username %]
@@ -28,7 +43,7 @@
     [% END %]
 
     <label for="email" class="[% IF errors.email %]error-label[% END %]">Email</label>
-    <input type="email" id="email" name="email" value="[% email | html %]"><br>
+    <input type="email" id="email" name="email" value="[% email | html %][% prefill_email | html %]"><br>
     [% IF errors.email %]
         <span class="error">[% errors.email %]</span><br>
     [% END %]
@@ -38,6 +53,35 @@
 
     <label for="last_name">Last Name</label>
     <input type="text" id="last_name" name="last_name" value="[% last_name | html %]"><br>
+
+    <!-- Always show this section for testing -->
+    <fieldset class="mailing-lists-section">
+        <legend>Mailing List Subscriptions (Optional)</legend>
+        [% IF available_mailing_lists && available_mailing_lists.size > 0 %]
+            <p>Select the mailing lists you'd like to subscribe to:</p>
+            [% FOREACH list IN available_mailing_lists %]
+            <div class="mailing-list-option">
+                <input type="checkbox" id="list_[% list.id %]" name="mailing_lists" value="[% list.id %]"
+                       [% IF list.name == 'Newsletter' %]checked[% END %]>
+                <label for="list_[% list.id %]">
+                    <strong>[% list.name | html %]</strong>
+                    [% IF list.description %]
+                    <br><small>[% list.description | html %]</small>
+                    [% END %]
+                </label>
+            </div>
+            [% END %]
+            <small>You can change your subscriptions at any time after registration.</small>
+        [% ELSE %]
+            <p style="color: #666;">No mailing lists available. 
+            [% IF c.check_user_roles('admin') %]
+                <a href="[% c.uri_for('/mail/lists/create') %]">Click here to create a mailing list</a>
+            [% ELSE %]
+                Please contact an administrator to set up mailing lists.
+            [% END %]
+            </p>
+        [% END %]
+    </fieldset>
 
     <input type="submit" value="Register">
 </form>
@@ -49,6 +93,45 @@
     }
     .error-label {
         color: red;
+    }
+    
+    .mailing-lists-section {
+        margin: 20px 0;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        background-color: #f9f9f9;
+    }
+    
+    .mailing-lists-section legend {
+        font-weight: bold;
+        color: #0066cc;
+        padding: 0 10px;
+    }
+    
+    .mailing-list-option {
+        margin: 10px 0;
+        padding: 10px;
+        background-color: white;
+        border: 1px solid #e9ecef;
+        border-radius: 4px;
+    }
+    
+    .mailing-list-option input[type="checkbox"] {
+        margin-right: 10px;
+    }
+    
+    .mailing-list-option label {
+        cursor: pointer;
+        display: inline-block;
+        margin-left: 5px;
+    }
+    
+    .mailing-list-option small {
+        color: #666;
+        font-size: 0.9em;
+        margin-top: 5px;
+        display: block;
     }
 </style>
 
