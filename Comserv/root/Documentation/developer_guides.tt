@@ -7,12 +7,14 @@
 
 <!-- Developer Documentation Section -->
 [% IF categories.developer_guides %]
-    <div class="quick-actions">
-        <h3><i class="fas fa-code"></i>Developer Documentation</h3>
-        <p>Resources for system developers. <span class="developer-badge">Developer Resources</span></p>
-    </div>
-    
-    <div class="feature-grid">
+    <div class="section">
+        <div class="section-header collapsible-header" onclick="toggleSection('developer-guides-section')">
+            <h3><i class="fas fa-code"></i>Developer Documentation <span class="toggle-icon"></span></h3>
+        </div>
+        <div id="developer-guides-section" class="section-content collapsible-content" style="display: none;">
+            <p>Resources for system developers. <span class="developer-badge">Developer Resources</span></p>
+            
+            <div class="feature-grid">
         [% FOREACH page_name IN categories.developer_guides.pages.sort %]
             [% IF structured_pages.$page_name %]
                 [% page = structured_pages.$page_name %]
@@ -32,5 +34,7 @@
                 </div>
             [% END %]
         [% END %]
+            </div>
+        </div>
     </div>
 [% END %]

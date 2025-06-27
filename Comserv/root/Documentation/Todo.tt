@@ -1,68 +1,137 @@
 
-[% PageVersion = 'Documentation/Todo.tt,v 0.02 2024/11/21 Shanta Exp shanta ' %]
+[% PageVersion = 'Comserv/root/Documentation/Todo.tt,v 0.03 2025/01/15 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
-    [%# "Debugging HostName: " _ HostName %]
-    [%# INCLUDE 'debug.tt' %]
 [% END %]
-<h1>Todo System</h1>
-<p>
-    The Todo System uses two different date management systems:
-    <ul>
-        <li><strong>DateTime::Format::ISO8601:</strong> This is used for handling dates in the ISO 8601 format, which is an international standard for date and time representations. We use this for the day and future calendar functionalities.</li>
-        <li><strong>DateTime::Format::Strptime:</strong> This provides more flexibility in terms of the date and time formats it can handle. We use this for calculating the time spent on projects in the logs.</li>
-    </ul>
-</p>
-<h2>Calendar Functionality</h2>
-<p>
-    The Calendar functionality provides a visual representation of the tasks in the Todo System. It includes three views: day, week, and month. Each view displays the tasks scheduled for the respective time period.
-</p>
-<h3>Day View</h3>
-<p>
-    The day view shows all tasks scheduled for a specific day. Each task is represented as an event on the calendar. The start and end times of the task correspond to the start and end times of the event on the calendar.
-</p>
-<h3>Week and Month Views</h3>
-<p>
-    The week and month views show an overview of the tasks scheduled for the respective time period. Each day in these views contains a summary of the tasks scheduled for that day.
-</p>
-<h3>Adapting the Day View</h3>
-<p>
-    The day view is adapted to work in the week and month views by summarizing the tasks for each day. Instead of showing each task as an individual event, the day view in the week and month views shows a summary of the tasks for that day. This summary includes the number of tasks and the total time scheduled for those tasks.
-</p>
-<h2>Adding a Log: Step-by-Step</h2>
-<ol>
-    <li>Click button. It will pass the todo record id and sitename to the log_form.</li>
-    <li>log_form will use the record id to find the table and fill in the following:</li>
-    <li>The todo record id will go into todo_record id.</li>
-    <li>sitename will go into sitename.</li>
-    <li>subject will go into abstract.</li>
-    <li>description will go into details.</li>
-    <li>start_date will go into start_date.</li>
-    <li>due_date will go into due_date.</li>
-    <li>start_time puts the time the form is open into the start time field.</li>
-    <li>end_time is selected by user.</li>
-    <li>admin is filled in from session role of the user.</li>
-    <li>priority is pulled from the todo record.</li>
-    <li>status is selected in with value todo record the word open.</li>
-</ol>
-</p>
-<h2 id="controller">Controller</h2>
-<p>The <code>Comserv::Controller::Todo</code> module handles the routing and logic for todo-related actions:</p>
-<ul>
-    <li><strong>Index:</strong> Fetches all todo records and stores them in the stash.</li>
-    <li><strong>Todo:</strong> Fetches todos for the site, ordered by priority and start date, excluding status 3.</li>
-    <li><strong>Details:</strong> Fetches a specific todo by record ID and calculates accumulative time.</li>
-    <li><strong>Add Todo:</strong> Prepares data for adding a new todo, including fetching projects and sub-projects.</li>
-    <li><strong>Modify:</strong> Updates a todo record with new data, calculates total log time, and updates accumulative time.</li>
-    <li><strong>Create:</strong> Creates a new todo record with form data, handles project code, and validates user ID.</li>
-    <li><strong>Day:</strong> Fetches todos for a specific day, excluding status 3, and calculates previous and next dates.</li>
-    <li><strong>Week:</strong> Fetches todos for a specific week, excluding status 3, and calculates start and end of the week.</li>
-</ul>
 
-<h2 id="model">Model</h2>
-<p>The <code>Comserv::Model::Todo</code> module provides methods for interacting with the todo data:</p>
-<ul>
-    <li><strong>Get Top Todos:</strong> Retrieves the top 10 todos for a site, ordered by priority and start date, excluding status 3.</li>
-    <li><strong>Get Todos for Date:</strong> Retrieves todos for a specific date, ordered by priority and start date, excluding status 3.</li>
-    <li><strong>Fetch Todo Record:</strong> Retrieves a specific todo record by ID.</li>
-</ul>
+[% META title = 'Todo System Documentation' %]
+
+<!-- Main Todo system documentation -->
+<div class="documentation-content">
+
+<div class="markdown-content">
+
+# Todo System Overview
+
+The Todo system in Comserv provides comprehensive task management capabilities integrated with projects and logging functionality.
+
+## Key Features
+
+### Task Management
+- **Create, Edit, Delete** todos with detailed information
+- **Project Integration** - Associate todos with specific projects and subprojects
+- **Status Tracking** - New, In Progress, Completed status management
+- **Due Date Management** - Set and track due dates with overdue detection
+- **Priority Levels** - Organize tasks by importance
+
+### Calendar Integration
+- **Month View** - Visual calendar display of todos and related logs
+- **Week View** - Detailed weekly task planning
+- **Day View** - Daily task scheduling and management
+- **Date-based Filtering** - View todos by specific date ranges
+
+### Project Integration
+- **Project Association** - Link todos to specific projects
+- **Hierarchical Projects** - Support for projects and subprojects
+- **Project-based Filtering** - Filter todos by project selection
+
+### Logging Integration
+- **Activity Logs** - Track time and activities related to todos
+- **Integrated Display** - View todos and logs together in calendar views
+- **Time Tracking** - Accumulative time calculation for tasks
+
+## Calendar Functionality
+
+The Calendar functionality provides a visual representation of tasks with three main views:
+
+### Day View
+Shows all tasks scheduled for a specific day. Each task is represented as an event with start and end times corresponding to the calendar display.
+
+### Week and Month Views
+Provide overview of tasks for the respective time periods. Each day contains a summary of scheduled tasks including count and total time.
+
+### Date Management Systems
+- **DateTime::Format::ISO8601** - Used for day and calendar functionalities (ISO 8601 standard)
+- **DateTime::Format::Strptime** - Used for flexible date/time handling in project logs
+
+## Adding a Log: Step-by-Step Process
+1. Click the log button (passes todo record ID and sitename to log_form)
+2. Log form uses record ID to populate fields:
+   - Todo record ID → todo_record_id
+   - Sitename → sitename
+   - Subject → abstract
+   - Description → details
+   - Start_date → start_date
+   - Due_date → due_date
+   - Current time → start_time field
+   - User selects → end_time
+   - Session role → admin field
+   - Todo priority → priority field
+   - Default "open" → status field
+
+## Technical Implementation
+
+### Controller (Comserv::Controller::Todo)
+The Todo controller handles routing and logic for todo-related actions:
+
+- **Index** - Fetches all todo records and stores them in the stash
+- **Todo** - Fetches todos for the site, ordered by priority and start date, excluding completed (status 3)
+- **Details** - Fetches specific todo by record ID and calculates accumulative time
+- **Add Todo** - Prepares data for adding new todo, including fetching projects and sub-projects
+- **Modify** - Updates todo record with new data, calculates total log time, and updates accumulative time
+- **Create** - Creates new todo record with form data, handles project code, and validates user ID
+- **Edit** - Provides edit interface with pre-populated form data
+- **Day** - Fetches todos for specific day, excluding completed, calculates previous and next dates
+- **Week** - Fetches todos for specific week, excluding completed, calculates start and end of week
+- **Month** - Provides monthly calendar view with todos and logs integration
+
+### Model (Comserv::Model::Todo)
+The Todo model provides methods for interacting with todo data:
+
+- **Get Top Todos** - Retrieves top 10 todos for site, ordered by priority and start date, excluding completed
+- **Get Todos for Date** - Retrieves todos for specific date, ordered by priority and start date, excluding completed
+- **Fetch Todo Record** - Retrieves specific todo record by ID
+- **Project Integration** - Handles hierarchical project relationships
+- **Status Management** - Manages todo status transitions
+
+## Recent Enhancements (2025-01-15)
+
+### Month Calendar Display Fix
+- **Fixed Database Ambiguity** - Resolved MySQL "Column 'start_date' in ORDER BY is ambiguous" error
+- **Enhanced Visual Hierarchy** - Todos prominently displayed over logs in month view
+- **Improved Template Structure** - Separate sections for todos and logs with better organization
+- **Added CSS Styling** - Enhanced visual prominence with pulse animations for due todos
+
+### Project Selection Fix
+- **Resolved Primary Key Issues** - Fixed DBIx::Class constraint errors in project fetching
+- **Improved Error Handling** - Better error management and logging throughout system
+- **Enhanced Template Robustness** - Defensive coding against undefined values
+
+### Edit Functionality Enhancement
+- **Complete Edit Interface** - Full todo editing capabilities with user-friendly forms
+- **Form Pre-population** - Current data properly displayed in edit forms
+- **Project Dropdowns** - Easy project selection in edit mode with hierarchical display
+
+## Usage Guidelines
+
+### For All Users
+- Use main todo page for daily task management
+- Utilize project filtering to focus on specific work areas
+- Check overdue section regularly for missed deadlines
+- Use calendar views for planning and overview
+
+### For Administrators
+- Monitor system usage through integrated logging
+- Manage project hierarchies for better organization
+- Review overdue tasks across all users
+- Configure project structures for optimal workflow
+
+### For Developers
+- Follow existing patterns when extending functionality
+- Use proper error handling and logging methods
+- Maintain theme system compliance for styling
+- Test calendar views thoroughly for date edge cases
+- Reference technical documentation for implementation details
+
+</div>
+</div>

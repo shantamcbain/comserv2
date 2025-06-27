@@ -7,9 +7,12 @@
 
 <!-- All Documentation Files Section -->
 [% IF categories.general && categories.general.pages.size > 0 %]
-    <div class="admin-section">
-        <h3><i class="fas fa-folder-open"></i>All Documentation Files</h3>
-        <p>Complete list of all documentation files. <span class="admin-badge">Admin Only</span></p>
+    <div class="section">
+        <div class="section-header collapsible-header" onclick="toggleSection('all-docs-section')">
+            <h3><i class="fas fa-folder-open"></i>All Documentation Files <span class="toggle-icon"></span></h3>
+        </div>
+        <div id="all-docs-section" class="section-content collapsible-content" style="display: none;">
+            <p>Complete list of all documentation files. <span class="admin-badge">Admin Only</span></p>
         
         <div class="feature-actions" style="margin-bottom: 20px;">
             <button class="btn btn-primary active" onclick="showFileType(event, 'all-docs')">
@@ -140,6 +143,7 @@
                     <p>No other files found.</p>
                 </div>
             [% END %]
+            </div>
         </div>
     </div>
 [% END %]

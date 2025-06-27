@@ -130,35 +130,35 @@ sub psgi_app {
                 # This ensures the application works even if modules are missing
                 
                 # First, try to load email modules
-                my $email_modules_loaded = 1;
-                eval {
-                    require Comserv::View::Email;
-                    require Comserv::View::Email::Template;
-                };
-                if ($@) {
-                    warn "Warning: Could not load Comserv email view modules: $@\n";
+                my $email_modules_loaded = 0;  # Temporarily disabled for development
+                # eval {
+                #     require Comserv::View::Email;
+                #     require Comserv::View::Email::Template;
+                # };
+                # if ($@) {
+                    warn "Warning: Email modules temporarily disabled for development\n";
                     warn "Email functionality may not work correctly.\n";
-                    $email_modules_loaded = 0;
+                    # $email_modules_loaded = 0;
                     
                     # Try to auto-install the modules if we're in development mode
-                    if ($ENV{CATALYST_DEBUG}) {
-                        warn "Attempting to auto-install email modules...\n";
-                        eval {
-                            require App::cpanminus;
-                            my $local_lib = __PACKAGE__->path_to('local');
-                            system("cpanm --local-lib=$local_lib --notest Catalyst::View::Email Catalyst::View::Email::Template");
-                            
-                            # Try loading again after installation
-                            require Comserv::View::Email;
-                            require Comserv::View::Email::Template;
-                            $email_modules_loaded = 1;
-                        };
-                        if ($@) {
-                            warn "Auto-installation failed: $@\n";
-                            warn "Email functionality will be limited.\n";
-                        }
-                    }
-                }
+                    # Temporarily disabled for development
+                    # if ($ENV{CATALYST_DEBUG}) {
+                    #     warn "Attempting to auto-install email modules...\n";
+                    #     eval {
+                    #         require App::cpanminus;
+                    #         my $local_lib = __PACKAGE__->path_to('local');
+                    #         system("cpanm --local-lib=$local_lib --notest Catalyst::View::Email Catalyst::View::Email::Template");
+                    #         
+                    #         # Try loading again after installation
+                    #         require Comserv::View::Email;
+                    #         require Comserv::View::Email::Template;
+                    #         $email_modules_loaded = 1;
+                    #     };
+                    #     if ($@) {
+                    #         warn "Auto-installation failed: $@\n";
+                    #         warn "Email functionality will be limited.\n";
+                    #     }
+                    # }
                 
                 # Check for session store modules
                 my $session_modules_loaded = 1;

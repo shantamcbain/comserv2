@@ -1,0 +1,184 @@
+[% PageVersion = 'Comserv/root/Documentation/roles/admin/todo_admin_guide.tt,v 0.01 2025/01/15 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Todo System Administrator Guide' %]
+
+<!-- Todo admin guide for administrators -->
+<div class="documentation-content">
+
+<div class="markdown-content">
+
+# Todo System Administrator Guide
+
+This guide provides administrators with comprehensive information for managing the Todo system, monitoring usage, and maintaining optimal performance.
+
+## System Overview
+
+### Architecture Components
+- **Controller**: `Comserv::Controller::Todo` - Handles routing and business logic
+- **Model**: `Comserv::Model::Todo` - Data access and manipulation
+- **Database**: Todo table with project integration and status management
+- **Templates**: Modular template system with theme integration
+
+### Integration Points
+- **Project System** - Hierarchical project relationships
+- **Logging System** - Time tracking and activity logs
+- **User Management** - Role-based access and permissions
+- **Calendar System** - Multi-view calendar integration
+
+## Administrative Functions
+
+### User Management
+- **Access Control** - Manage user permissions for todo system
+- **Role Assignment** - Assign appropriate roles (normal, editor, admin, developer)
+- **Site Access** - Control which sites users can create todos for
+- **Project Permissions** - Manage project-level access rights
+
+### System Monitoring
+- **Usage Statistics** - Monitor todo creation, completion rates
+- **Performance Metrics** - Track system response times and database queries
+- **Error Monitoring** - Review logs for system errors and issues
+- **User Activity** - Monitor user engagement and system adoption
+
+### Data Management
+- **Database Maintenance** - Regular cleanup of completed todos and old logs
+- **Backup Procedures** - Ensure todo data is included in backup routines
+- **Data Integrity** - Monitor for orphaned records and referential integrity
+- **Archive Management** - Establish policies for long-term data retention
+
+## Project Hierarchy Management
+
+### Project Structure
+- **Main Projects** - Top-level project organization
+- **Sub-Projects** - Detailed project breakdown for better organization
+- **Project Codes** - Unique identifiers for project tracking
+- **Site Association** - Projects linked to specific sites
+
+### Administrative Tasks
+- **Create Project Hierarchies** - Set up logical project structures
+- **Manage Project Access** - Control which users can access which projects
+- **Project Cleanup** - Remove obsolete projects and reorganize as needed
+- **Project Reporting** - Generate reports on project-based todo activity
+
+## System Configuration
+
+### Performance Optimization
+- **Database Indexing** - Ensure proper indexes on frequently queried fields
+- **Query Optimization** - Monitor and optimize slow database queries
+- **Caching Strategy** - Implement appropriate caching for calendar views
+- **Resource Management** - Monitor system resources during peak usage
+
+### Security Considerations
+- **Access Controls** - Implement proper role-based access controls
+- **Data Validation** - Ensure all user inputs are properly validated
+- **Audit Trails** - Maintain logs of administrative actions
+- **Session Management** - Proper session handling and timeout policies
+
+## Troubleshooting Common Issues
+
+### Database Issues
+- **Ambiguous Column Errors** - Resolved in recent updates with proper table aliases
+- **Primary Key Constraints** - Fixed project fetching issues with explicit ID handling
+- **Performance Issues** - Monitor query execution times and optimize as needed
+
+### User Interface Issues
+- **Calendar Loading Problems** - Check JavaScript errors and template rendering
+- **Project Selection Errors** - Verify project hierarchy integrity
+- **Form Submission Issues** - Validate form data and error handling
+
+### Integration Issues
+- **Project System Integration** - Ensure project data consistency
+- **Logging System Integration** - Verify log creation and time tracking
+- **Theme System Compliance** - Maintain consistent styling across updates
+
+## Maintenance Procedures
+
+### Regular Maintenance
+- **Weekly**: Review error logs and user feedback
+- **Monthly**: Analyze usage statistics and performance metrics
+- **Quarterly**: Review project hierarchies and cleanup obsolete data
+- **Annually**: Comprehensive system review and optimization
+
+### Update Procedures
+- **Code Updates** - Follow proper deployment procedures for todo system updates
+- **Database Migrations** - Ensure proper backup before schema changes
+- **Template Updates** - Maintain theme system compliance during updates
+- **Documentation Updates** - Keep documentation current with system changes
+
+## Recent System Enhancements (2025-01-15)
+
+### Month Calendar Display Fix
+- **Issue**: Visual hierarchy problems with todos vs logs in month view
+- **Resolution**: Enhanced template structure with separate sections
+- **Impact**: Improved user experience and visual clarity
+- **Admin Action**: Monitor user feedback on new calendar display
+
+### Project Selection Fix
+- **Issue**: DBIx::Class constraint errors in project fetching
+- **Resolution**: Refactored project fetching with explicit error handling
+- **Impact**: More reliable project selection and filtering
+- **Admin Action**: Verify project hierarchies are working correctly
+
+### Edit Functionality Enhancement
+- **Issue**: Missing edit interface for todos
+- **Resolution**: Complete edit system with form pre-population
+- **Impact**: Improved user workflow and task management
+- **Admin Action**: Train users on new edit capabilities
+
+## Monitoring and Reporting
+
+### Key Metrics to Track
+- **Todo Creation Rate** - Number of new todos created per period
+- **Completion Rate** - Percentage of todos completed vs created
+- **Overdue Rate** - Percentage of todos that become overdue
+- **User Engagement** - Active users and usage patterns
+- **System Performance** - Response times and error rates
+
+### Reporting Tools
+- **Usage Reports** - Generate reports on system usage by user, project, date
+- **Performance Reports** - Database query performance and system metrics
+- **Error Reports** - System errors and resolution tracking
+- **User Activity Reports** - Individual and aggregate user activity
+
+## Best Practices for Administrators
+
+### System Management
+- **Regular Monitoring** - Check system health and performance regularly
+- **Proactive Maintenance** - Address issues before they impact users
+- **User Training** - Provide adequate training and documentation
+- **Feedback Collection** - Regularly collect and act on user feedback
+
+### Data Management
+- **Backup Strategy** - Ensure comprehensive backup coverage
+- **Data Cleanup** - Regular cleanup of obsolete data
+- **Performance Monitoring** - Track and optimize system performance
+- **Security Reviews** - Regular security assessments and updates
+
+### User Support
+- **Documentation Maintenance** - Keep user documentation current
+- **Training Programs** - Provide regular training sessions
+- **Support Procedures** - Establish clear support escalation procedures
+- **User Feedback** - Create channels for user feedback and suggestions
+
+## Emergency Procedures
+
+### System Outages
+1. **Immediate Response** - Assess scope and impact of outage
+2. **Communication** - Notify users of known issues and expected resolution
+3. **Diagnosis** - Identify root cause using logs and monitoring tools
+4. **Resolution** - Implement fix following change management procedures
+5. **Post-Incident** - Conduct post-incident review and documentation
+
+### Data Recovery
+1. **Assessment** - Determine scope of data loss or corruption
+2. **Backup Restoration** - Restore from most recent clean backup
+3. **Data Validation** - Verify restored data integrity
+4. **User Communication** - Inform users of any data loss or changes
+5. **Prevention** - Implement measures to prevent recurrence
+
+Remember: As an administrator, your role is crucial in maintaining a reliable, efficient todo system that supports user productivity and organizational goals.
+
+</div>
+</div>

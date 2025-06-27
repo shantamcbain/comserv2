@@ -7,12 +7,14 @@
 
 <!-- Controller Documentation Section -->
 [% IF categories.controllers %]
-    <div class="admin-section">
-        <h3><i class="fas fa-cogs"></i>Controller Documentation</h3>
-        <p>Technical details for system controllers. <span class="admin-badge">Admin Only</span></p>
-    </div>
-    
-    <div class="feature-grid">
+    <div class="section">
+        <div class="section-header collapsible-header" onclick="toggleSection('controllers-section')">
+            <h3><i class="fas fa-cogs"></i>Controller Documentation <span class="toggle-icon"></span></h3>
+        </div>
+        <div id="controllers-section" class="section-content collapsible-content" style="display: none;">
+            <p>Technical details for system controllers. <span class="admin-badge">Admin Only</span></p>
+            
+            <div class="feature-grid">
         <div class="feature-card">
             <div class="feature-header">
                 <h4><i class="fas fa-list feature-icon"></i>System Overview</h4>
@@ -68,5 +70,7 @@
                 </div>
             </div>
         [% END %]
+            </div>
+        </div>
     </div>
 [% END %]

@@ -1,0 +1,52 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/main_changelog.tt,v 0.02 2025/01/20 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Comserv System Changelog' %]
+
+<!-- Documentation page for main_changelog -->
+<div class="documentation-content">
+
+<div class="markdown-content">
+
+This document tracks major changes to the Comserv system.
+
+<h2>2025</h2>
+
+<h3>May 2025</h3>
+
+<ul><li>**<a href="2025-05-31-server-ip-display.tt">Server IP Display Enhancement</a>** - Added server hostname and IP address display to help administrators verify which server is handling requests (May 31, 2025)</li></ul>
+
+<ul><li>**<a href="2025-05-30-documentation-structure-simplification.tt">Documentation Structure Simplification</a>** - Simplified documentation structure for easier maintenance (May 30, 2025)</li></ul>
+
+<h3>April 2025</h3>
+
+<ul><li>**<a href="2025-04-pagetop-hostname-display.tt">Pagetop Server Information Display</a>** - Added server and IP information display to help administrators identify which server they are connected to (April 9, 2025)</li></ul>
+
+<ul><li>**<a href="2025-04-mcoop-admin-menu-restriction.tt">MCoop Admin Menu Restriction</a>** - Restricted MCoop admin menu items to only appear when the current site is MCOOP (April 1, 2025)</li></ul>
+
+<h3>January 2025</h3>
+
+<ul><li>**Pure Directory-Based Documentation System** - Removed JSON config dependency and implemented automatic directory scanning for scalable documentation management (January 20, 2025)</li></ul>
+
+<h2>2024</h2>
+
+<h3>July 2024</h3>
+
+<ul><li>**<a href="2024-07-project-id-fix.tt">Project ID Fix</a>** - Fixed issues with project ID handling</li></ul>
+
+<h3>June 2024</h3>
+
+<ul><li>**<a href="2024-06-project-edit-fix.tt">Project Edit Fix</a>** - Fixed project editing functionality</li></ul>
+
+<h2>Earlier Changes</h2>
+
+<ul><li>**<a href="../fix_project_edit_form.tt">Fix Project Edit Form</a>**</li></ul>
+<ul><li>**<a href="../todo_edit_functionality.tt">Todo Edit Functionality</a>**</li></ul>
+<ul><li>**<a href="../enhanced_todo_navigation.tt">Enhanced Todo Navigation</a>**</li></ul>
+<ul><li>**<a href="../theme_system_implementation.tt">Theme System Implementation</a>**</li></ul>
+
+</div>
+
+</div>

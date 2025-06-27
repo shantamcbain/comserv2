@@ -1,0 +1,216 @@
+[% PageVersion = 'Comserv/root/Documentation/Documentation_System.tt,v 1.0 2025/01/15 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Documentation System Architecture' %]
+
+<div class="documentation-content">
+
+<div class="markdown-content">
+
+# Documentation System Architecture
+
+## Overview
+
+The Comserv Documentation system is a **pure directory-based system** that automatically organizes and serves documentation based on file placement and naming conventions. No JSON configuration files are required for basic operation.
+
+## Core Architecture
+
+### Directory-Based Organization
+```
+/Documentation/
+├── changelog/          # System changes and updates (admin, developer)
+├── roles/
+│   ├── normal/        # End-user documentation (normal, editor, admin, developer)
+│   ├── admin/         # Administrator guides (admin, developer)
+│   └── developer/     # Technical documentation (developer only)
+├── sites/
+│   └── {site_name}/   # Site-specific documentation
+├── modules/           # System module documentation (admin, developer)
+├── controllers/       # Controller documentation (admin, developer)
+├── models/           # Model documentation (admin, developer)
+├── tutorials/        # Step-by-step guides (all roles)
+├── proxmox/          # Proxmox documentation (admin only)
+└── [root files]      # General documentation (all roles)
+```
+
+### Role-Based Access Control
+
+**USER ROLES**:
+- **normal** - Basic users, access to user guides and tutorials
+- **editor** - Content editors, access to user guides and some admin content
+- **admin** - System administrators, access to admin guides and system management
+- **developer** - Technical staff, access to all documentation including technical details
+
+**ACCESS PERMISSIONS**:
+- **user_guides** - End-user documentation (normal, editor, admin, developer)
+- **admin_guides** - Administrative documentation (admin, developer)
+- **developer_guides** - Technical documentation (developer only)
+- **tutorials** - Step-by-step guides (all roles)
+- **modules** - System module documentation (admin, developer)
+- **site_specific** - Site-specific content (all roles, filtered by site)
+
+## File Standards
+
+### Template Files (.tt)
+- **ALL DOCUMENTATION** must be .tt files (not .md)
+- **MANDATORY PageVersion headers**: 
+  ```
+  [% PageVersion = 'Comserv/root/Documentation/path/file.tt,v 0.01 YYYY/MM/DD author Exp author ' %]
+  ```
+- **ALWAYS update PageVersion path** when moving files
+- Include debug mode check: `[% IF c.session.debug_mode == 1 %]`
+
+### Naming Conventions
+- Use descriptive, lowercase filenames with underscores
+- Match existing patterns in the directory
+- Include proper file extensions (.tt for templates)
+
+## Controller Architecture
+
+### Documentation.pm Controller
+**Location**: `Comserv/lib/Comserv/Controller/Documentation.pm`
+
+**Key Features**:
+- Automatic directory scanning and page discovery
+- Role-based content filtering
+- Site-specific documentation support
+- CSS loading via `additional_css` stash parameter
+- Comprehensive logging with `log_with_details` method
+
+**Route Handling**:
+- `/Documentation` - Main documentation index
+- `/documentation` - Lowercase route (forwards to main)
+- `/Documentation/view/{page}` - Individual page viewing
+
+### CSS Integration
+The controller automatically loads documentation-specific CSS:
+```perl
+$c->stash(
+    additional_css => ['/static/css/themes/documentation.css'],
+    # ... other stash variables
+);
+```
+
+## CSS Theme Integration
+
+### Theme System Architecture
+Documentation CSS integrates with the universal theme system:
+
+**File**: `/static/css/themes/documentation.css`
+```css
+/* Import base container system for toggle icons and universal styles */
+@import url('base-containers.css');
+```
+
+**Base Containers**: `/static/css/themes/base-containers.css`
+- Universal toggle icon system
+- Collapsible section styling
+- Cross-browser compatibility
+
+### Toggle Icon System
+**Simple Unicode-based system** (no FontAwesome dependency):
+```css
+.toggle-icon::before {
+    content: "▼";  /* Collapsed state */
+    font-family: Arial, sans-serif;
+}
+
+.toggle-icon.expanded::before {
+    content: "▲";  /* Expanded state */
+}
+```
+
+## JavaScript Functionality
+
+### Toggle System
+**File**: Embedded in Documentation templates
+
+**Key Functions**:
+- `toggleSection(sectionId)` - Toggle section visibility
+- Automatic icon state management
+- Smooth transitions and animations
+
+## Search System
+
+### Full-Text Search
+- **Content matching** through documentation files
+- **Role-based filtering** of search results
+- **Match type indicators** (Title, Path, Name, Content)
+- **Context snippets** for content matches
+- **Relevance-based sorting**
+
+### Search Implementation
+- Real-time search through JavaScript
+- Server-side content filtering
+- Enhanced error handling with detailed logging
+
+## Development Guidelines
+
+### Adding New Documentation
+1. **Choose appropriate directory** based on target audience
+2. **Create .tt file** with proper PageVersion header
+3. **Follow naming conventions** (lowercase, underscores)
+4. **Test role-based access** with different user types
+5. **Verify CSS styling** loads correctly
+
+### CSS Development
+- **Use existing theme variables** from theme system
+- **Add styles to themes directory** (`/static/css/themes/`)
+- **Import base-containers.css** for universal components
+- **Test across different themes** and browsers
+
+### Controller Modifications
+- **Use `log_with_details`** for all logging
+- **Follow existing route patterns**
+- **Maintain role-based access control**
+- **Add CSS via `additional_css` stash parameter**
+
+## Troubleshooting
+
+### Common Issues
+1. **CSS not loading**: Check `additional_css` in controller stash
+2. **Icons not visible**: Verify base-containers.css import
+3. **Access denied**: Check role-based permissions
+4. **Search not working**: Verify file indexing and permissions
+
+### Debug Mode
+Enable debug mode in session to see:
+- Role determination logic
+- File access permissions
+- CSS loading status
+- Search indexing information
+
+## Recent Enhancements
+
+### Toggle Icon System (2025-01-15)
+- **Simplified from FontAwesome to Unicode** for reliability
+- **Added CSS loading via controller** stash parameter
+- **Guaranteed visibility** across all browsers and themes
+- **No external dependencies** required
+
+### Architecture Benefits
+- **Self-organizing** - new files automatically indexed
+- **Role-based security** - content filtered by user permissions
+- **Theme integration** - consistent styling across system
+- **Search functionality** - full-text search with context
+- **Maintenance-free** - no configuration files to maintain
+
+## Version History
+
+**Version 1.0** (2025-01-15)
+- Initial comprehensive documentation
+- Toggle icon system implementation
+- CSS theme integration
+- Role-based access control
+
+---
+
+**Author**: Development Team  
+**Last Updated**: 2025-01-15  
+**Status**: Active System
+
+</div>
+
+</div>

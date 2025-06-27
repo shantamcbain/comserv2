@@ -7,29 +7,33 @@
 
 <!-- User Documentation Section -->
 [% IF categories.user_guides %]
-    <div class="quick-actions">
-        <h3><i class="fas fa-users"></i>User Documentation</h3>
-        <p>Essential guides for Comserv users.</p>
-    </div>
-    
-    <div class="feature-grid">
-        [% FOREACH page_name IN categories.user_guides.pages.sort %]
-            [% IF structured_pages.$page_name %]
-                [% page = structured_pages.$page_name %]
-                <div class="feature-card">
-                    <div class="feature-header">
-                        <h4><i class="fas fa-file-alt feature-icon"></i>[% page.title %]</h4>
-                    </div>
-                    <div class="feature-content">
-                        <p>[% page.description || 'User guide for Comserv functionality.' %]</p>
-                    </div>
-                    <div class="feature-actions">
-                        <a href="[% page.url %]" class="btn btn-primary">
-                            <i class="fas fa-arrow-right"></i>View Guide
-                        </a>
-                    </div>
-                </div>
-            [% END %]
-        [% END %]
+    <div class="section">
+        <div class="section-header collapsible-header" onclick="toggleSection('user-docs-section')">
+            <h3><i class="fas fa-users"></i>User Documentation <span class="toggle-icon"></span></h3>
+        </div>
+        <div id="user-docs-section" class="section-content collapsible-content" style="display: none;">
+            <p>Essential guides for Comserv users.</p>
+            
+            <div class="feature-grid">
+                [% FOREACH page_name IN categories.user_guides.pages.sort %]
+                    [% IF structured_pages.$page_name %]
+                        [% page = structured_pages.$page_name %]
+                        <div class="feature-card">
+                            <div class="feature-header">
+                                <h4><i class="fas fa-file-alt feature-icon"></i>[% page.title %]</h4>
+                            </div>
+                            <div class="feature-content">
+                                <p>[% page.description || 'User guide for Comserv functionality.' %]</p>
+                            </div>
+                            <div class="feature-actions">
+                                <a href="[% page.url %]" class="btn btn-primary">
+                                    <i class="fas fa-arrow-right"></i>View Guide
+                                </a>
+                            </div>
+                        </div>
+                    [% END %]
+                [% END %]
+            </div>
+        </div>
     </div>
 [% END %]

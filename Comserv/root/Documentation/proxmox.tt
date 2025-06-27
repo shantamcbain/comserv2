@@ -7,12 +7,14 @@
 
 <!-- Proxmox Documentation Section -->
 [% IF categories.proxmox %]
-    <div class="admin-section">
-        <h3><i class="fas fa-server"></i>Proxmox Documentation</h3>
-        <p>Comprehensive Proxmox VE management resources. <span class="admin-badge">Admin Only</span></p>
-    </div>
-    
-    <div class="feature-grid">
+    <div class="section">
+        <div class="section-header collapsible-header" onclick="toggleSection('proxmox-section')">
+            <h3><i class="fas fa-server"></i>Proxmox Documentation <span class="toggle-icon"></span></h3>
+        </div>
+        <div id="proxmox-section" class="section-content collapsible-content" style="display: none;">
+            <p>Comprehensive Proxmox VE management resources. <span class="admin-badge">Admin Only</span></p>
+            
+            <div class="feature-grid">
         <div class="feature-card">
             <div class="feature-header">
                 <h4><i class="fas fa-terminal feature-icon"></i>Command Reference</h4>
@@ -61,6 +63,7 @@
             <div class="feature-actions">
                 <a href="[% c.uri_for('/Documentation') %]" class="btn btn-secondary">Back to Documentation Index</a>
                 <a href="[% c.uri_for('/Documentation/view/proxmox_commands') %]" class="btn btn-primary">Command Reference (Most Used)</a>
+            </div>
             </div>
         </div>
     </div>

@@ -169,6 +169,46 @@
       "roles": ["admin", "developer"],
       "site": "all",
       "format": "template"
+    },
+    {
+      "id": "todo_system",
+      "title": "Todo System Overview",
+      "description": "Complete Todo system documentation",
+      "path": "Documentation/Todo.tt",
+      "categories": ["modules"],
+      "roles": ["admin", "developer"],
+      "site": "all",
+      "format": "template"
+    },
+    {
+      "id": "todo_user_guide",
+      "title": "Todo User Guide",
+      "description": "How to use the Todo system effectively",
+      "path": "Documentation/roles/normal/todo_user_guide.tt",
+      "categories": ["user_guides", "tutorials"],
+      "roles": ["normal", "editor", "admin", "developer"],
+      "site": "all",
+      "format": "template"
+    },
+    {
+      "id": "todo_admin_guide",
+      "title": "Todo Administrator Guide",
+      "description": "Administrative guide for Todo system management",
+      "path": "Documentation/roles/admin/todo_admin_guide.tt",
+      "categories": ["admin_guides"],
+      "roles": ["admin", "developer"],
+      "site": "all",
+      "format": "template"
+    },
+    {
+      "id": "todo_developer_guide",
+      "title": "Todo Developer Guide",
+      "description": "Technical documentation for Todo system development",
+      "path": "Documentation/roles/developer/todo_developer_guide.tt",
+      "categories": ["developer_guides", "modules"],
+      "roles": ["developer"],
+      "site": "all",
+      "format": "template"
     }
   ]
 }

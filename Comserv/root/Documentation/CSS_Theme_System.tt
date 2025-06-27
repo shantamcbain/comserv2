@@ -1,0 +1,313 @@
+[% PageVersion = 'Comserv/root/Documentation/CSS_Theme_System.tt,v 1.0 2025/01/15 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'CSS Theme System Documentation' %]
+
+<div class="documentation-content">
+
+<div class="markdown-content">
+
+# CSS Theme System Documentation
+
+## Overview
+
+The Comserv CSS Theme System provides a unified approach to styling across all modules and components. It uses JSON-based theme definitions with CSS variable injection for consistent theming.
+
+## Architecture
+
+### Theme Directory Structure
+```
+/static/css/themes/
+├── theme_definitions.json    # Theme variable definitions
+├── base-containers.css      # Universal container components
+├── documentation.css        # Documentation-specific styles
+├── default.css             # Default theme
+├── apis.css               # Site-specific themes
+├── csc.css
+├── usbm.css
+└── [other theme files]
+```
+
+### Theme Loading Process
+1. **Controller sets theme** via stash or site detection
+2. **Wrapper.tt loads theme CSS** from `/static/css/themes/{theme_name}.css`
+3. **Additional CSS loaded** via `additional_css` stash parameter
+4. **CSS variables applied** from theme_definitions.json
+
+## Theme Definitions
+
+### JSON Structure
+**File**: `/static/css/themes/theme_definitions.json`
+
+```json
+{
+  "themes": {
+    "default": {
+      "variables": {
+        "primary-color": "#ccffff",
+        "secondary-color": "#f9f9f9",
+        "text-color": "#000000",
+        "background-color": "#ffffff",
+        "border-color": "#cccccc",
+        "success-color": "#009900",
+        "warning-color": "#ff0000",
+        "accent-color": "#FF9900"
+      },
+      "name": "Default Theme",
+      "description": "The default system theme"
+    }
+  }
+}
+```
+
+### CSS Variables Usage
+```css
+.component {
+    color: var(--text-color);
+    background-color: var(--background-color);
+    border: 1px solid var(--border-color);
+}
+```
+
+## Universal Components
+
+### Base Containers System
+**File**: `/static/css/themes/base-containers.css`
+
+**Purpose**: Provides universal styling for collapsible containers, toggle icons, and common UI components used across all modules.
+
+**Key Components**:
+- **Toggle Icon System** - Universal expand/collapse indicators
+- **Section Headers** - Consistent header styling
+- **Collapsible Content** - Smooth transitions and animations
+- **Container Layouts** - Grid and card systems
+
+### Toggle Icon Implementation
+```css
+/* Simple Toggle Icon System - No FontAwesome dependency */
+.toggle-icon {
+    font-size: 1.2em;
+    transition: all 0.3s ease;
+    display: inline-block !important;
+    color: #007bff !important;
+    margin-left: 10px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.toggle-icon::before {
+    content: "▼";
+    font-family: Arial, sans-serif;
+}
+
+.toggle-icon.expanded::before {
+    content: "▲";
+}
+```
+
+## Module-Specific CSS
+
+### Documentation CSS
+**File**: `/static/css/themes/documentation.css`
+
+**Integration**:
+```css
+/* Import base container system for toggle icons and universal styles */
+@import url('base-containers.css');
+
+/* Documentation-specific overrides and badges */
+.site-badge, .file-type-badge, .role-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75em;
+    margin: 0 5px 5px 0;
+    color: white;
+    font-weight: 500;
+}
+```
+
+### Loading Module CSS
+Controllers can load additional CSS via stash:
+```perl
+$c->stash(
+    additional_css => ['/static/css/themes/documentation.css'],
+    # ... other stash variables
+);
+```
+
+## Wrapper Integration
+
+### CSS Loading in wrapper.tt
+```html
+<!-- Theme CSS: [% theme_name %] -->
+<link rel="stylesheet" type="text/css" href="/static/css/themes/[% theme_name %].css">
+
+<!-- Additional CSS -->
+[% IF additional_css %]
+[% FOREACH css_file IN additional_css %]
+<link rel="stylesheet" href="[% css_file %]">
+[% END %]
+[% END %]
+```
+
+### Theme Selection Logic
+```perl
+# Default theme
+IF !theme_name;
+    theme_name = 'default';
+    
+    # Set theme based on site name (lowercase)
+    site_name_lower = c.session.SiteName | lower;
+    
+    # Check if we have a CSS file for this site
+    IF site_name_lower == 'csc' || site_name_lower == 'apis' || site_name_lower == 'usbm';
+        theme_name = site_name_lower;
+    END;
+END;
+```
+
+## Development Guidelines
+
+### Creating New Themes
+1. **Add theme definition** to theme_definitions.json
+2. **Create CSS file** in `/static/css/themes/`
+3. **Use CSS variables** for consistent theming
+4. **Test across modules** to ensure compatibility
+
+### CSS Best Practices
+- **NO INLINE CSS ALLOWED** - Use theme system files
+- **Use existing CSS variables** from theme definitions
+- **Import base-containers.css** for universal components
+- **Follow existing naming patterns**
+- **Test with multiple themes**
+
+### Variable Naming Conventions
+```css
+/* Core Colors */
+--primary-color
+--secondary-color
+--text-color
+--background-color
+--border-color
+
+/* Status Colors */
+--success-color
+--warning-color
+--danger-color
+--accent-color
+
+/* Layout */
+--font-size-base
+--spacing-small
+--spacing-medium
+--spacing-large
+```
+
+## Common CSS Classes
+
+### Reusable Components
+```css
+/* Cards and Containers */
+.feature-card, .admin-card
+.feature-grid, .admin-grid
+
+/* Buttons */
+.btn, .btn-primary, .btn-secondary
+
+/* Forms */
+.search-input, .search-button
+
+/* Layout */
+.section-header, .section-content
+.collapsible-header, .collapsible-content
+```
+
+### Toggle System Classes
+```css
+.toggle-icon           /* Toggle indicator */
+.toggle-icon.expanded  /* Expanded state */
+.collapsible-header    /* Clickable header */
+.collapsible-content   /* Collapsible content area */
+```
+
+## FontAwesome Integration
+
+### Local Installation
+**Location**: `/static/css/fontawesome/all.min.css`
+**Fonts**: `/static/webfonts/`
+
+**Loading**:
+```html
+<!-- Font Awesome - Local Installation -->
+<link rel="stylesheet" href="/static/css/fontawesome/all.min.css">
+```
+
+**Usage**:
+```html
+<i class="fas fa-search"></i>
+<i class="fas fa-tools"></i>
+<i class="fas fa-graduation-cap"></i>
+```
+
+## Troubleshooting
+
+### Common Issues
+1. **CSS not loading**: Check file paths and additional_css stash
+2. **Variables not working**: Verify theme_definitions.json syntax
+3. **Icons not showing**: Check FontAwesome paths or use Unicode fallbacks
+4. **Theme not applying**: Verify theme name and file existence
+
+### Debug Techniques
+- **Browser dev tools** - Check CSS loading and variable values
+- **Debug mode** - Enable in session for detailed logging
+- **CSS validation** - Ensure proper syntax and imports
+- **Cross-browser testing** - Verify compatibility
+
+## Recent Enhancements
+
+### Toggle Icon System (2025-01-15)
+- **Simplified to Unicode characters** for reliability
+- **Removed FontAwesome dependency** for toggle icons
+- **Added universal base-containers.css** system
+- **Improved cross-browser compatibility**
+
+### CSS Loading Improvements
+- **Controller-based CSS loading** via additional_css stash
+- **Automatic theme detection** based on site names
+- **Enhanced error handling** and logging
+- **Consistent import patterns** across modules
+
+## Migration Guide
+
+### From Inline CSS
+1. **Move styles** to appropriate theme file
+2. **Use CSS variables** instead of hardcoded colors
+3. **Import base-containers.css** for universal components
+4. **Test with multiple themes**
+
+### From FontAwesome Dependencies
+1. **Use Unicode characters** for simple icons (▼, ▲, ★, etc.)
+2. **Keep FontAwesome** for complex icons only
+3. **Add fallbacks** for critical UI elements
+4. **Test icon visibility** across browsers
+
+## Version History
+
+**Version 1.0** (2025-01-15)
+- Initial comprehensive documentation
+- Toggle icon system standardization
+- Base containers architecture
+- Module CSS integration patterns
+
+---
+
+**Author**: Development Team  
+**Last Updated**: 2025-01-15  
+**Status**: Active System
+
+</div>
+
+</div>

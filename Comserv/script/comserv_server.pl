@@ -92,7 +92,12 @@ unless (-d "$FindBin::Bin/../local") {
 }
 
 # Automatically install dependencies locally
-print "Installing dependencies from cpanfile...\n";
+unless ($ENV{SKIP_DEPS}) {
+    print "Installing dependencies from cpanfile...\n";
+} else {
+    print "Skipping dependency installation (SKIP_DEPS=1)...\n";
+    goto SKIP_DEPENDENCY_INSTALLATION;
+}
 my $cpanfile_path = "$FindBin::Bin/../cpanfile";
 if (-e $cpanfile_path) {
     print "Found cpanfile at: $cpanfile_path\n";
@@ -222,6 +227,8 @@ if (-e $cpanfile_path) {
 } else {
     warn "cpanfile not found at $cpanfile_path. Skipping dependency installation.\n";
 }
+
+SKIP_DEPENDENCY_INSTALLATION:
 
 # Specifically install Catalyst::ScriptRunner if not already installed
 eval { require Catalyst::ScriptRunner; };

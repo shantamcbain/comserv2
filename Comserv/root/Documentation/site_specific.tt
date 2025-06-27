@@ -7,12 +7,14 @@
 
 <!-- Site Specific Documentation Section -->
 [% IF categories.site_specific %]
-    <div class="quick-actions">
-        <h3><i class="fas fa-building"></i>[% site_name || 'Comserv' %] Documentation</h3>
-        <p>Documentation specific to [% site_name || 'Comserv' %].</p>
-    </div>
-    
-    <div class="feature-grid">
+    <div class="section">
+        <div class="section-header collapsible-header" onclick="toggleSection('site-specific-section')">
+            <h3><i class="fas fa-building"></i>[% site_name || 'Comserv' %] Documentation <span class="toggle-icon"></span></h3>
+        </div>
+        <div id="site-specific-section" class="section-content collapsible-content" style="display: none;">
+            <p>Documentation specific to [% site_name || 'Comserv' %].</p>
+            
+            <div class="feature-grid">
         [% FOREACH page_name IN categories.site_specific.pages.sort %]
             [% IF structured_pages.$page_name %]
                 [% page = structured_pages.$page_name %]
@@ -32,5 +34,7 @@
                 </div>
             [% END %]
         [% END %]
+            </div>
+        </div>
     </div>
 [% END %]

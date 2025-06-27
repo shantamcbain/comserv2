@@ -93,43 +93,51 @@
     </header>
     
     <!-- Search Box Section -->
-    <div class="admin-section">
-        <h2><i class="fas fa-search"></i>Search Documentation</h2>
-        <div class="admin-container">
-            <input type="text" id="doc-search-input" placeholder="Search all documentation..." class="search-input">
-            <button type="button" id="doc-search-btn" class="search-button">
-                <i class="fas fa-search"></i>Search
-            </button>
-            <button type="button" id="doc-clear-btn" class="clear-button">
-                <i class="fas fa-times"></i>Clear
-            </button>
+    <div class="section">
+        <div class="section-header collapsible-header" onclick="toggleSection('search-section')">
+            <h2><i class="fas fa-search"></i>Search Documentation <span class="toggle-icon"></span></h2>
         </div>
-        <div id="search-results" class="admin-container" style="display: none;">
-            <h3><i class="fas fa-list"></i>Search Results</h3>
-            <div id="search-results-list" class="admin-grid"></div>
+        <div id="search-section" class="section-content collapsible-content" style="display: none;">
+            <div class="admin-container">
+                <input type="text" id="doc-search-input" placeholder="Search all documentation..." class="search-input">
+                <button type="button" id="doc-search-btn" class="search-button">
+                    <i class="fas fa-search"></i>Search
+                </button>
+                <button type="button" id="doc-clear-btn" class="clear-button">
+                    <i class="fas fa-times"></i>Clear
+                </button>
+            </div>
+            <div id="search-results" class="admin-container" style="display: none;">
+                <h3><i class="fas fa-list"></i>Search Results</h3>
+                <div id="search-results-list" class="admin-grid"></div>
+            </div>
         </div>
     </div>
     
     [% IF is_admin %]
     <!-- Quick Access Links for Administrators -->
-    <div class="admin-section">
-        <h3><i class="fas fa-tools"></i>Quick Access for Administrators</h3>
-        <div class="admin-grid">
-            <div class="admin-card">
-                <h4><i class="fas fa-server"></i>System Management</h4>
-                <ul>
-                    <li><a href="[% c.uri_for('/Documentation/view/proxmox_commands') %]">Proxmox Command Reference</a></li>
-                    <li><a href="[% c.uri_for('/api_credentials') %]">API Credentials Management</a></li>
-                    <li><a href="[% c.uri_for('/admin') %]">System Administration</a></li>
-                </ul>
-            </div>
-            <div class="admin-card">
-                <h4><i class="fas fa-code"></i>Developer Resources</h4>
-                <ul>
-                    <li><a href="[% c.uri_for('/Documentation/view/css_theme_system_rules') %]">CSS Theme System Rules</a></li>
-                    <li><a href="[% c.uri_for('/Documentation/api') %]">API Documentation</a></li>
-                    <li><a href="[% c.uri_for('/Documentation/view/architecture') %]">System Architecture</a></li>
-                </ul>
+    <div class="section">
+        <div class="section-header collapsible-header" onclick="toggleSection('quick-access-section')">
+            <h3><i class="fas fa-tools"></i>Quick Access for Administrators <span class="toggle-icon"></span></h3>
+        </div>
+        <div id="quick-access-section" class="section-content collapsible-content" style="display: none;">
+            <div class="admin-grid">
+                <div class="admin-card">
+                    <h4><i class="fas fa-server"></i>System Management</h4>
+                    <ul>
+                        <li><a href="[% c.uri_for('/Documentation/view/proxmox_commands') %]">Proxmox Command Reference</a></li>
+                        <li><a href="[% c.uri_for('/api_credentials') %]">API Credentials Management</a></li>
+                        <li><a href="[% c.uri_for('/admin') %]">System Administration</a></li>
+                    </ul>
+                </div>
+                <div class="admin-card">
+                    <h4><i class="fas fa-code"></i>Developer Resources</h4>
+                    <ul>
+                        <li><a href="[% c.uri_for('/Documentation/view/css_theme_system_rules') %]">CSS Theme System Rules</a></li>
+                        <li><a href="[% c.uri_for('/Documentation/api') %]">API Documentation</a></li>
+                        <li><a href="[% c.uri_for('/Documentation/view/architecture') %]">System Architecture</a></li>
+                    </ul>
+                </div>
             </div>
         </div>
     </div>
@@ -154,7 +162,104 @@
         [% INCLUDE 'Documentation/proxmox.tt' %]
         [% INCLUDE 'Documentation/controllers.tt' %]
         [% INCLUDE 'Documentation/models.tt' %]
-        [% INCLUDE 'Documentation/changelog.tt' %]
+        <!-- Pure Directory-Based Changelog Section -->
+        <div class="section">
+            <div class="section-header collapsible-header" onclick="toggleSection('changelog-section')">
+                <h3><i class="fas fa-history"></i>System Changelog <span class="toggle-icon"></span></h3>
+            </div>
+            <div id="changelog-section" class="section-content collapsible-content" style="display: none;">
+                <p>System updates and changes. <span class="admin-badge">Admin Only</span></p>
+                
+                [% # Get changelog pages from the categories and sort by date %]
+                [% IF categories.changelog.pages.size > 0 %]
+                    [% # Create array with date sorting info %]
+                    [% changelog_with_dates = [] %]
+                    [% FOREACH page_key IN categories.changelog.pages %]
+                        [% page = structured_pages.$page_key %]
+                        [% NEXT UNLESS page %]
+                        
+                        [% # Extract date from filename for sorting %]
+                        [% date_match = page_key.match('(\d{4}-\d{2}(-\d{2})?)') %]
+                        [% IF date_match %]
+                            [% sort_date = date_match.0 %]
+                            [% # Normalize to YYYY-MM-DD format for proper sorting %]
+                            [% IF sort_date.length == 7 %]
+                                [% sort_date = sort_date _ '-01' %]
+                            [% END %]
+                        [% ELSE %]
+                            [% sort_date = '0000-00-00' %]
+                        [% END %]
+                        
+                        [% changelog_with_dates.push({
+                            key => page_key,
+                            page => page,
+                            sort_date => sort_date,
+                            display_date => date_match ? date_match.0.replace('-', '/') : 'Recent'
+                        }) %]
+                    [% END %]
+                    
+                    [% # Sort by date (newest first) %]
+                    [% sorted_changelog = changelog_with_dates.sort('sort_date').reverse %]
+                    
+                    [% # Set display limit %]
+                    [% display_limit = 5 %]
+                    [% total_count = sorted_changelog.size %]
+                    
+                    <div class="admin-grid">
+                        [% # Display recent entries %]
+                        [% FOREACH entry IN sorted_changelog %]
+                            [% LAST IF loop.index >= display_limit %]
+                            
+                            <div class="admin-card [% IF loop.index >= display_limit %]changelog-hidden[% END %]">
+                                <h4><i class="fas fa-calendar-alt"></i>[% entry.page.title %]</h4>
+                                <div class="changelog-meta">
+                                    <span class="date"><strong>Date:</strong> [% entry.display_date %]</span>
+                                </div>
+                                <p>[% entry.page.description || 'System change documentation.' %]</p>
+                                <span class="role-badge">Admin Only</span>
+                                <ul>
+                                    <li><a href="[% c.uri_for('/Documentation/view/' _ entry.key) %]">View Details</a></li>
+                                </ul>
+                            </div>
+                        [% END %]
+                        
+                        [% # Hidden entries for "show all" functionality %]
+                        [% IF total_count > display_limit %]
+                            [% FOREACH entry IN sorted_changelog %]
+                                [% NEXT IF loop.index < display_limit %]
+                                
+                                <div class="admin-card changelog-hidden" style="display: none;">
+                                    <h4><i class="fas fa-calendar-alt"></i>[% entry.page.title %]</h4>
+                                    <div class="changelog-meta">
+                                        <span class="date"><strong>Date:</strong> [% entry.display_date %]</span>
+                                    </div>
+                                    <p>[% entry.page.description || 'System change documentation.' %]</p>
+                                    <span class="role-badge">Admin Only</span>
+                                    <ul>
+                                        <li><a href="[% c.uri_for('/Documentation/view/' _ entry.key) %]">View Details</a></li>
+                                    </ul>
+                                </div>
+                            [% END %]
+                        [% END %]
+                    </div>
+                    
+                    [% # Show "View All" button if there are more than display_limit entries %]
+                    [% IF total_count > display_limit %]
+                        <div class="changelog-controls">
+                            <button onclick="toggleAllChangelogs()" id="changelog-toggle-btn" class="btn btn-secondary">
+                                <i class="fas fa-expand-alt"></i>Show All ([% total_count %] entries)
+                            </button>
+                        </div>
+                    [% END %]
+                    
+                [% ELSE %]
+                    <div class="admin-card">
+                        <h4><i class="fas fa-info-circle"></i>No Changelog Entries</h4>
+                        <p>No changelog entries available in the changelog directory.</p>
+                    </div>
+                [% END %]
+            </div>
+        </div>
         [% INCLUDE 'Documentation/all_docs.tt' %]
     [% END %]
 
@@ -164,18 +269,20 @@
     [% END %]
 
     <!-- Recent Updates Section -->
-    <div class="quick-actions">
-        <h3><i class="fas fa-history"></i>Recent Updates</h3>
-        <p>Latest changes and improvements to the system</p>
-        <div class="action-buttons">
-            <a href="[% c.uri_for('/Documentation/all_changelog') %]" class="btn btn-primary">
-                <i class="fas fa-list"></i>View All Documentation
-            </a>
+    <div class="section">
+        <div class="section-header collapsible-header" onclick="toggleSection('recent-updates-section')">
+            <h3><i class="fas fa-history"></i>Recent Updates <span class="toggle-icon"></span></h3>
         </div>
-    </div>
-    
-    <!-- Recent Updates Grid -->
-    <div class="feature-grid">
+        <div id="recent-updates-section" class="section-content collapsible-content" style="display: none;">
+            <p>Latest changes and improvements to the system</p>
+            <div class="action-buttons">
+                <a href="[% c.uri_for('/Documentation/all_changelog') %]" class="btn btn-primary">
+                    <i class="fas fa-list"></i>View All Documentation
+                </a>
+            </div>
+            
+            <!-- Recent Updates Grid -->
+            <div class="feature-grid">
         [% # Get all changelog pages from the structured_pages hash %]
         [% changelog_pages = [] %]
         [% FOREACH page_name IN structured_pages.keys %]
@@ -237,6 +344,8 @@
                 </div>
             </div>
         [% END %]
+            </div>
+        </div>
     </div>
 </div>
 
@@ -521,6 +630,86 @@ document.addEventListener('DOMContentLoaded', function() {
         searchTimeout = setTimeout(performSearch, 300);
     });
 });
+
+// Collapsible section functionality with proper toggle icon handling
+function toggleSection(sectionId) {
+    console.log('Toggling section:', sectionId);
+    const section = document.getElementById(sectionId);
+    
+    if (!section) {
+        console.error('Section not found:', sectionId);
+        return;
+    }
+    
+    // Find the header - it should be the previous sibling
+    const header = section.previousElementSibling;
+    if (!header) {
+        console.error('Header not found for section:', sectionId);
+        return;
+    }
+    
+    const toggleIcon = header.querySelector('.toggle-icon');
+    if (!toggleIcon) {
+        console.error('Toggle icon not found in header for section:', sectionId);
+        return;
+    }
+    
+    // Check current state and toggle
+    const isHidden = section.style.display === 'none' || section.style.display === '';
+    
+    if (isHidden) {
+        // Show section
+        section.style.display = 'block';
+        toggleIcon.classList.add('expanded');
+        console.log('Opened section:', sectionId);
+    } else {
+        // Hide section
+        section.style.display = 'none';
+        toggleIcon.classList.remove('expanded');
+        console.log('Closed section:', sectionId);
+    }
+}
+
+// Initialize all sections to be closed on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Find all collapsible sections and ensure they start closed
+    const collapsibleSections = document.querySelectorAll('.collapsible-content');
+    collapsibleSections.forEach(function(section) {
+        section.style.display = 'none';
+        
+        // Find the corresponding toggle icon and ensure it's in the correct state
+        const header = section.previousElementSibling;
+        if (header) {
+            const toggleIcon = header.querySelector('.toggle-icon');
+            if (toggleIcon) {
+                toggleIcon.classList.remove('expanded');
+            }
+        }
+    });
+    
+    console.log('Initialized', collapsibleSections.length, 'collapsible sections to closed state');
+});
+
+// Changelog "show all" functionality
+function toggleAllChangelogs() {
+    const hiddenEntries = document.querySelectorAll('.changelog-hidden');
+    const toggleBtn = document.getElementById('changelog-toggle-btn');
+    const isShowingAll = toggleBtn.textContent.includes('Show Less');
+    
+    hiddenEntries.forEach(entry => {
+        if (isShowingAll) {
+            entry.style.display = 'none';
+        } else {
+            entry.style.display = 'block';
+        }
+    });
+    
+    if (isShowingAll) {
+        toggleBtn.innerHTML = '<i class="fas fa-expand-alt"></i>Show All (' + hiddenEntries.length + ' more entries)';
+    } else {
+        toggleBtn.innerHTML = '<i class="fas fa-compress-alt"></i>Show Less';
+    }
+}
 </script>
 
 <!-- All CSS moved to theme system - NO INLINE STYLES ALLOWED -->

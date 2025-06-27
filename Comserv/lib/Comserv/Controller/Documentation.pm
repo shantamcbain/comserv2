@@ -929,6 +929,7 @@ sub index :Path('/Documentation') :Args(0) {
         is_admin => $is_admin,
         site_name => $site_name,
         debug_msg => $debug_msg,
+        additional_css => ['/static/css/themes/documentation.css'],
         template => 'Documentation/index.tt'
     );
 

@@ -7,54 +7,58 @@
 
 <!-- Model Documentation Section -->
 [% IF categories.models %]
-    <div class="admin-section">
-        <h3><i class="fas fa-database"></i>Model Documentation</h3>
-        <p>Technical details for system models. <span class="admin-badge">Admin Only</span></p>
-    </div>
-    
-    <div class="feature-grid">
-        <div class="feature-card">
-            <div class="feature-header">
-                <h4><i class="fas fa-list feature-icon"></i>System Overview</h4>
-            </div>
-            <div class="feature-content">
-                <p>Complete list and status of all models in the system.</p>
-            </div>
-            <div class="feature-actions">
-                <a href="[% c.uri_for('/Documentation/models/index') %]" class="btn btn-primary">All Models</a>
-                <a href="[% c.uri_for('/Documentation/models/model_list') %]" class="btn btn-secondary">Documentation Status</a>
-            </div>
+    <div class="section">
+        <div class="section-header collapsible-header" onclick="toggleSection('models-section')">
+            <h3><i class="fas fa-database"></i>Model Documentation <span class="toggle-icon"></span></h3>
         </div>
-        
-        [% model_count = 0 %]
-        [% FOREACH page_name IN categories.models.pages.sort %]
-            [% IF structured_pages.$page_name %]
-                [% page = structured_pages.$page_name %]
-                [% model_count = model_count + 1 %]
+        <div id="models-section" class="section-content collapsible-content" style="display: none;">
+            <p>Technical details for system models. <span class="admin-badge">Admin Only</span></p>
+            
+            <div class="feature-grid">
                 <div class="feature-card">
                     <div class="feature-header">
-                        <h4><i class="fas fa-table feature-icon"></i>[% page.title %]</h4>
+                        <h4><i class="fas fa-list feature-icon"></i>System Overview</h4>
                     </div>
                     <div class="feature-content">
-                        <p>[% page.description || 'Model documentation.' %]</p>
-                        <span class="role-badge">Admin Only</span>
+                        <p>Complete list and status of all models in the system.</p>
                     </div>
                     <div class="feature-actions">
-                        <a href="[% page.url %]" class="btn btn-primary">View Documentation</a>
+                        <a href="[% c.uri_for('/Documentation/models/index') %]" class="btn btn-primary">All Models</a>
+                        <a href="[% c.uri_for('/Documentation/models/model_list') %]" class="btn btn-secondary">Documentation Status</a>
                     </div>
                 </div>
-            [% END %]
-        [% END %]
-        
-        [% IF model_count == 0 %]
-            <div class="feature-card">
-                <div class="feature-header">
-                    <h4><i class="fas fa-exclamation-triangle feature-icon"></i>No Documentation Found</h4>
-                </div>
-                <div class="feature-content">
-                    <p>No model documentation files found. Please check the Documentation controller configuration.</p>
-                </div>
+                
+                [% model_count = 0 %]
+                [% FOREACH page_name IN categories.models.pages.sort %]
+                    [% IF structured_pages.$page_name %]
+                        [% page = structured_pages.$page_name %]
+                        [% model_count = model_count + 1 %]
+                        <div class="feature-card">
+                            <div class="feature-header">
+                                <h4><i class="fas fa-table feature-icon"></i>[% page.title %]</h4>
+                            </div>
+                            <div class="feature-content">
+                                <p>[% page.description || 'Model documentation.' %]</p>
+                                <span class="role-badge">Admin Only</span>
+                            </div>
+                            <div class="feature-actions">
+                                <a href="[% page.url %]" class="btn btn-primary">View Documentation</a>
+                            </div>
+                        </div>
+                    [% END %]
+                [% END %]
+                
+                [% IF model_count == 0 %]
+                    <div class="feature-card">
+                        <div class="feature-header">
+                            <h4><i class="fas fa-exclamation-triangle feature-icon"></i>No Documentation Found</h4>
+                        </div>
+                        <div class="feature-content">
+                            <p>No model documentation files found. Please check the Documentation controller configuration.</p>
+                        </div>
+                    </div>
+                [% END %]
             </div>
-        [% END %]
+        </div>
     </div>
 [% END %]

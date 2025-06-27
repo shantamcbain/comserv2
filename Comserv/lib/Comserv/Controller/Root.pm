@@ -734,6 +734,17 @@ sub setup_site {
     if (!defined $SiteName || $SiteName eq 'none' || $SiteName eq 'root') {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site', "SiteName is either undefined, 'none', or 'root'. Proceeding with domain extraction and site domain retrieval");
 
+        # Development bypass for localhost
+        if ($domain eq 'localhost' && ($ENV{CATALYST_DEBUG} || $ENV{CATALYST_ENV} eq 'development')) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site', "Development mode: bypassing domain check for localhost");
+            $SiteName = 'CSC';  # Default site for development
+            $c->stash->{SiteName} = $SiteName;
+            $c->session->{SiteName} = $SiteName;
+            $c->stash->{ControllerName} = 'CSC';
+            $c->session->{ControllerName} = 'CSC';
+            return;  # Skip the rest of the domain lookup
+        }
+
         # Get the domain from the sitedomain table
         my $site_domain = $c->model('Site')->get_site_domain($c, $domain);
 
