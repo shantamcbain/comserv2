@@ -1511,11 +1511,87 @@ function syncTable(tableName, database) {
 }
 
 function createTableFromResult(resultName, database) {
-    alert('Create table functionality not yet implemented for ' + resultName + ' (' + database + ')');
+    if (!confirm('Are you sure you want to create table "' + resultName + '" from the Result file? This will modify the database schema.')) {
+        return;
+    }
+    
+    // Show loading state
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+    button.disabled = true;
+    
+    fetch('[% c.uri_for("/admin/create_table_from_result") %]', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            result_name: resultName,
+            database: database
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        
+        if (data.success) {
+            alert('Table "' + resultName + '" created successfully!');
+            // Refresh the comparison to show the new table
+            refreshComparison();
+        } else {
+            alert('Error creating table: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        alert('Failed to create table. Please try again.');
+        console.error('Error:', error);
+    });
 }
 
 function createResultFromTable(tableName, database) {
-    alert('Create result functionality not yet implemented for ' + tableName + ' (' + database + ')');
+    if (!confirm('Are you sure you want to create a Result file for table "' + tableName + '"? This will create a new .pm file.')) {
+        return;
+    }
+    
+    // Show loading state
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+    button.disabled = true;
+    
+    fetch('[% c.uri_for("/admin/create_result_from_table") %]', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            table_name: tableName,
+            database: database
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        
+        if (data.success) {
+            alert('Result file for table "' + tableName + '" created successfully!');
+            // Refresh the comparison to show the new result file
+            refreshComparison();
+        } else {
+            alert('Error creating result file: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        alert('Failed to create result file. Please try again.');
+        console.error('Error:', error);
+    });
 }
 
 // Create field in result file (add missing field from table to result)

@@ -1,0 +1,414 @@
+[% PageVersion = 'Comserv/root/Documentation/Mailing_List_System_Plan.tt,v 1.0 2025/01/15 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Mailing List System Implementation Plan' %]
+
+<div class="documentation-content">
+
+<div class="markdown-content">
+
+# Mailing List System Implementation Plan
+
+## Overview
+
+A comprehensive mailing list system that extends the existing Mail.pm controller to provide subscription management, role-based grouping, and integration with the Workshop system and other modules.
+
+## Requirements Analysis
+
+### Core Requirements
+1. **Admin-Created Lists**: Mailing lists created by admin users
+2. **Virtualmin Integration**: API integration for server-side list creation
+3. **Site-Based Lists**: Multiple mailing lists per site
+4. **Software-Only Option**: Pure application-based lists (no server lists required)
+5. **Role-Based Grouping**: Send to subsets based on user roles
+6. **Workshop Integration**: Attendee-based mailing groups
+
+### Workshop System Use Case
+- **Workshop Attendees**: Users who attend workshops become list members
+- **Multiple Workshop Membership**: Users can be members of multiple workshop lists
+- **Admin Flexibility**: Workshop admins can email specific workshop groups or all workshops
+- **Dynamic Membership**: Membership changes as users attend new workshops
+
+## Database Schema Design
+
+### New Tables Required
+
+#### 1. mailing_lists
+```sql
+CREATE TABLE mailing_lists (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    site_id INT NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    list_email VARCHAR(255), -- e.g., workshop-pottery@site.com
+    virtualmin_list_id VARCHAR(255), -- If using Virtualmin
+    is_software_only BOOLEAN DEFAULT 1,
+    is_active BOOLEAN DEFAULT 1,
+    created_by INT NOT NULL, -- user_id of admin who created it
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (site_id) REFERENCES Site(id),
+    FOREIGN KEY (created_by) REFERENCES User(id),
+    UNIQUE KEY unique_site_name (site_id, name)
+);
+```
+
+#### 2. mailing_list_subscriptions
+```sql
+CREATE TABLE mailing_list_subscriptions (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    mailing_list_id INT NOT NULL,
+    user_id INT NOT NULL,
+    subscription_source VARCHAR(50), -- 'manual', 'workshop', 'auto'
+    source_id INT, -- workshop_id if source is 'workshop'
+    subscribed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_active BOOLEAN DEFAULT 1,
+    
+    FOREIGN KEY (mailing_list_id) REFERENCES mailing_lists(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES User(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_subscription (mailing_list_id, user_id, source_id)
+);
+```
+
+#### 3. mailing_list_campaigns
+```sql
+CREATE TABLE mailing_list_campaigns (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    mailing_list_id INT NOT NULL,
+    subject VARCHAR(500) NOT NULL,
+    body_text TEXT,
+    body_html TEXT,
+    sent_by INT NOT NULL, -- user_id
+    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    recipient_count INT DEFAULT 0,
+    role_filter VARCHAR(255), -- JSON array of roles to filter by
+    source_filter VARCHAR(255), -- JSON array of sources to filter by
+    
+    FOREIGN KEY (mailing_list_id) REFERENCES mailing_lists(id),
+    FOREIGN KEY (sent_by) REFERENCES User(id)
+);
+```
+
+### Site Table Enhancement
+```sql
+ALTER TABLE Site ADD COLUMN mailing_domain VARCHAR(255);
+-- e.g., 'lists.coopworkshop.ca' for workshop lists
+```
+
+## Controller Architecture
+
+### Enhanced Mail.pm Controller
+
+#### New Actions Required
+```perl
+# Mailing List Management
+sub mailing_lists :Path('lists') :Args(0)           # List all lists for site
+sub create_list :Path('lists/create') :Args(0)      # Create new mailing list
+sub edit_list :Path('lists/edit') :Args(1)          # Edit existing list
+sub delete_list :Path('lists/delete') :Args(1)      # Delete mailing list
+
+# Subscription Management  
+sub subscribers :Path('lists') :Args(1)             # View list subscribers
+sub add_subscriber :Path('lists') :Args(2)          # Add user to list
+sub remove_subscriber :Path('lists') :Args(2)       # Remove user from list
+sub bulk_subscribe :Path('lists/bulk') :Args(1)     # Bulk subscription management
+
+# Campaign Management
+sub compose :Path('compose') :Args(1)               # Compose email to list
+sub send_campaign :Path('send') :Args(0)            # Send campaign
+sub campaign_history :Path('campaigns') :Args(0)    # View sent campaigns
+
+# User Subscription Interface
+sub my_subscriptions :Path('subscriptions') :Args(0) # User's subscription management
+sub subscribe :Path('subscribe') :Args(1)           # User subscribe to list
+sub unsubscribe :Path('unsubscribe') :Args(1)       # User unsubscribe from list
+```
+
+### Workshop.pm Integration
+
+#### New Methods for Workshop Lists
+```perl
+sub workshop_mailing_list :Private {
+    # Create/update mailing list for workshop
+    # Auto-subscribe attendees
+}
+
+sub add_attendee_to_list :Private {
+    # Called when user registers for workshop
+    # Automatically subscribes to workshop mailing list
+}
+```
+
+## Model Architecture
+
+### New Models Required
+
+#### 1. Comserv::Model::MailingList
+```perl
+package Comserv::Model::MailingList;
+use Moose;
+extends 'Catalyst::Model::DBIC::Schema';
+
+# Methods:
+sub create_list($site_id, $name, $description, $created_by)
+sub get_site_lists($site_id)
+sub add_subscriber($list_id, $user_id, $source, $source_id)
+sub remove_subscriber($list_id, $user_id)
+sub get_subscribers($list_id, $role_filter, $source_filter)
+sub send_campaign($list_id, $subject, $body, $filters)
+```
+
+#### 2. Comserv::Model::VirtualminAPI (Optional)
+```perl
+package Comserv::Model::VirtualminAPI;
+use Moose;
+extends 'Catalyst::Model';
+
+# Methods for Virtualmin integration:
+sub create_mailing_list($domain, $list_name)
+sub delete_mailing_list($domain, $list_name)
+sub add_list_member($domain, $list_name, $email)
+sub remove_list_member($domain, $list_name, $email)
+```
+
+## User Interface Design
+
+### Admin Interface
+
+#### 1. Mailing Lists Dashboard (`/Mail/lists`)
+```
+┌─ Mailing Lists for [Site Name] ─────────────────────┐
+│ [+ Create New List]                    [Search: ___]│
+│                                                     │
+│ ┌─ Workshop Lists ─────────────────────────────────┐│
+│ │ • Pottery Workshop (45 subscribers)              ││
+│ │ • Woodworking Basics (23 subscribers)            ││
+│ │ • Advanced Ceramics (12 subscribers)             ││
+│ └─────────────────────────────────────────────────┘│
+│                                                     │
+│ ┌─ General Lists ──────────────────────────────────┐│
+│ │ • Site Announcements (156 subscribers)           ││
+│ │ • Newsletter (89 subscribers)                    ││
+│ └─────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────┘
+```
+
+#### 2. Compose Email Interface (`/Mail/compose/{list_id}`)
+```
+┌─ Compose Email to: Pottery Workshop ───────────────┐
+│ To: [Pottery Workshop ▼] [Filter Options ▼]       │
+│                                                     │
+│ Filters:                                           │
+│ ☐ All Subscribers (45)                            │
+│ ☐ Admin Role Only (2)                             │
+│ ☐ Recent Attendees (Last 30 days) (12)           │
+│                                                     │
+│ Subject: [________________________________]        │
+│                                                     │
+│ Message:                                           │
+│ ┌─────────────────────────────────────────────────┐│
+│ │                                                 ││
+│ │ [Rich text editor area]                        ││
+│ │                                                 ││
+│ └─────────────────────────────────────────────────┘│
+│                                                     │
+│ [Preview] [Save Draft] [Send Now]                  │
+└─────────────────────────────────────────────────────┘
+```
+
+### User Interface
+
+#### 1. My Subscriptions (`/Mail/subscriptions`)
+```
+┌─ My Mailing List Subscriptions ────────────────────┐
+│                                                     │
+│ ┌─ Workshop Lists ─────────────────────────────────┐│
+│ │ ✓ Pottery Workshop        [Unsubscribe]         ││
+│ │ ✓ Woodworking Basics      [Unsubscribe]         ││
+│ │ ✗ Advanced Ceramics       [Subscribe]           ││
+│ └─────────────────────────────────────────────────┘│
+│                                                     │
+│ ┌─ Site Lists ─────────────────────────────────────┐│
+│ │ ✓ Site Announcements      [Unsubscribe]         ││
+│ │ ✗ Newsletter              [Subscribe]           ││
+│ └─────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────┘
+```
+
+## Integration Points
+
+### 1. Workshop System Integration
+```perl
+# In WorkShop.pm - when user registers for workshop
+sub register_attendee {
+    my ($self, $c, $workshop_id, $user_id) = @_;
+    
+    # Existing registration logic...
+    
+    # Auto-subscribe to workshop mailing list
+    my $workshop = $c->model('DBEncy::WorkShop')->find($workshop_id);
+    my $mailing_list = $c->model('MailingList')->find_or_create_workshop_list(
+        $workshop->site_id,
+        $workshop->name
+    );
+    
+    $c->model('MailingList')->add_subscriber(
+        $mailing_list->id,
+        $user_id,
+        'workshop',
+        $workshop_id
+    );
+}
+```
+
+### 2. User Registration Integration
+```perl
+# In User.pm - when new user registers
+sub create_user {
+    my ($self, $c, $user_data) = @_;
+    
+    # Create user...
+    
+    # Auto-subscribe to site announcement list if exists
+    my $announcement_list = $c->model('MailingList')->find_site_announcement_list(
+        $user_data->{site_id}
+    );
+    
+    if ($announcement_list) {
+        $c->model('MailingList')->add_subscriber(
+            $announcement_list->id,
+            $new_user->id,
+            'auto',
+            undef
+        );
+    }
+}
+```
+
+## API Design
+
+### RESTful Endpoints
+```
+GET    /Mail/api/lists                    # Get all lists for site
+POST   /Mail/api/lists                    # Create new list
+GET    /Mail/api/lists/{id}               # Get list details
+PUT    /Mail/api/lists/{id}               # Update list
+DELETE /Mail/api/lists/{id}               # Delete list
+
+GET    /Mail/api/lists/{id}/subscribers   # Get subscribers
+POST   /Mail/api/lists/{id}/subscribers   # Add subscriber
+DELETE /Mail/api/lists/{id}/subscribers/{user_id} # Remove subscriber
+
+POST   /Mail/api/lists/{id}/campaigns     # Send campaign
+GET    /Mail/api/campaigns                # Get campaign history
+```
+
+## Configuration
+
+### Site Configuration
+```perl
+# In site configuration or database
+mailing_config => {
+    virtualmin_enabled => 1,
+    virtualmin_api_url => 'https://server.com:10000',
+    virtualmin_api_key => 'secret_key',
+    default_from_email => 'noreply@site.com',
+    mailing_domain => 'lists.site.com',
+    auto_subscribe_new_users => 1,
+    max_campaign_size => 1000,
+}
+```
+
+## Implementation Phases
+
+### Phase 1: Core Infrastructure (Week 1)
+- [ ] Database schema creation
+- [ ] Basic MailingList model
+- [ ] Enhanced Mail.pm controller with list management
+- [ ] Admin interface for list creation/management
+
+### Phase 2: Subscription Management (Week 2)
+- [ ] User subscription interface
+- [ ] Bulk subscription tools
+- [ ] Workshop integration for auto-subscription
+- [ ] Role-based filtering
+
+### Phase 3: Campaign System (Week 3)
+- [ ] Email composition interface
+- [ ] Campaign sending functionality
+- [ ] Campaign history and tracking
+- [ ] Template system for emails
+
+### Phase 4: Advanced Features (Week 4)
+- [ ] Virtualmin API integration (optional)
+- [ ] Advanced filtering and segmentation
+- [ ] Email analytics and reporting
+- [ ] API endpoints for external integration
+
+## Security Considerations
+
+### Access Control
+- **Admin Only**: List creation, deletion, campaign sending
+- **List Owners**: Can manage their own lists
+- **Users**: Can manage their own subscriptions only
+- **Role-Based**: Filtering respects user role permissions
+
+### Data Protection
+- **Email Validation**: Ensure valid email addresses
+- **Unsubscribe Links**: Required in all campaigns
+- **Rate Limiting**: Prevent spam/abuse
+- **Audit Trail**: Log all mailing list activities
+
+## Testing Strategy
+
+### Unit Tests
+- Model methods for list management
+- Subscription logic
+- Email sending functionality
+- Role-based filtering
+
+### Integration Tests
+- Workshop registration → auto-subscription
+- User registration → auto-subscription
+- Campaign sending end-to-end
+- Virtualmin API integration
+
+### User Acceptance Tests
+- Admin can create and manage lists
+- Users can subscribe/unsubscribe
+- Workshop attendees automatically subscribed
+- Campaigns sent to correct recipients
+
+## Future Enhancements
+
+### Advanced Features
+- **Email Templates**: Pre-designed email templates
+- **Scheduled Campaigns**: Send emails at specific times
+- **A/B Testing**: Test different email versions
+- **Analytics**: Open rates, click tracking
+- **Import/Export**: Bulk subscriber management
+- **GDPR Compliance**: Data export, deletion requests
+
+### Integration Opportunities
+- **Calendar Integration**: Event-based mailing lists
+- **E-commerce**: Product announcement lists
+- **Support System**: Ticket notification lists
+- **Social Features**: Discussion group notifications
+
+---
+
+**Next Steps**: 
+1. Review and approve this plan
+2. Create database migration scripts
+3. Begin Phase 1 implementation
+4. Set up development/testing environment
+
+**Estimated Timeline**: 4 weeks for full implementation
+**Resources Required**: 1 developer, access to Virtualmin server (optional)
+
+</div>
+
+</div>

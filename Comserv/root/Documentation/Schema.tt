@@ -1,4 +1,4 @@
-[% PageVersion  = 'documents/schema.tt,v 0.1 2024/04/04 Shanta Exp Shanta'; %]
+[% PageVersion  = 'Comserv/root/Documentation/Schema.tt,v 0.2 2025/01/15 Shanta Exp Shanta - Fixed dynamic table creation system'; %]
 [% IF debug_mode == 1 %]
     <p>Error: [% error_msg %]</p>
     [% PageVersion %]
@@ -83,9 +83,70 @@
 
 <h2 id="schemam-troubleshooting"><a href="#schemam-top">8. Troubleshooting and Common Issues</a></h2>
 <p>Solutions for common problems encountered during schema management and synchronization:</p>
+
+<h3 id="dynamic-table-creation-not-working">Dynamic Table Creation Not Working</h3>
+<p><strong>Problem:</strong> Schema comparison shows Result files without corresponding database tables, but clicking "Create" buttons shows "functionality not yet implemented" alerts instead of creating tables.</p>
+
+<p><strong>Root Cause:</strong> JavaScript functions in <code>/admin/schema_compare.tt</code> template are showing placeholder alerts instead of calling backend endpoints.</p>
+
+<p><strong>Solution:</strong> Update JavaScript functions to call proper backend endpoints:</p>
+
+<h4>Files to Check:</h4>
+<ul>
+    <li><strong>Template:</strong> <code>Comserv/root/admin/schema_compare.tt</code></li>
+    <li><strong>Backend:</strong> <code>Comserv/lib/Comserv/Controller/Admin.pm</code></li>
+    <li><strong>Model:</strong> <code>Comserv/lib/Comserv/Model/DBEncy.pm</code></li>
+</ul>
+
+<h4>JavaScript Functions to Fix:</h4>
+<ol>
+    <li><strong>createTableFromResult(resultName, database)</strong>
+        <ul>
+            <li>Should call: <code>/admin/create_table_from_result</code></li>
+            <li>Method: POST with JSON body: <code>{"result_name": resultName, "database": database}</code></li>
+            <li>If showing alert instead of AJAX call, replace with proper fetch() implementation</li>
+        </ul>
+    </li>
+    <li><strong>createResultFromTable(tableName, database)</strong>
+        <ul>
+            <li>Should call: <code>/admin/create_result_from_table</code></li>
+            <li>Method: POST with JSON body: <code>{"table_name": tableName, "database": database}</code></li>
+            <li>If showing alert instead of AJAX call, replace with proper fetch() implementation</li>
+        </ul>
+    </li>
+</ol>
+
+<h4>Backend Endpoints (should exist):</h4>
+<ul>
+    <li><code>sub create_table_from_result :Path('/admin/create_table_from_result') :Args(0)</code> in Admin.pm</li>
+    <li><code>sub create_result_from_table :Path('/admin/create_result_from_table') :Args(0)</code> in Admin.pm</li>
+    <li><code>sub create_table_from_result</code> method in DBEncy.pm model</li>
+</ul>
+
+<h4>How the System Works:</h4>
+<ol>
+    <li><strong>Schema Comparison:</strong> Admin controller compares database tables with Result files</li>
+    <li><strong>Missing Tables Identified:</strong> Result files without corresponding database tables are flagged</li>
+    <li><strong>Dynamic Creation:</strong> "Create" buttons call backend endpoints</li>
+    <li><strong>Table Generation:</strong> DBEncy model uses SQL::Translator to generate CREATE TABLE SQL from Result class definitions</li>
+    <li><strong>Database Update:</strong> Generated SQL is executed to create missing tables</li>
+</ol>
+
+<h4>Testing the Fix:</h4>
+<ol>
+    <li>Go to <code>/admin/schema_compare</code></li>
+    <li>Look for Result files without corresponding tables (red "Create" buttons)</li>
+    <li>Click "Create" button - should show confirmation dialog, not "not implemented" alert</li>
+    <li>Confirm creation - should show loading spinner and success message</li>
+    <li>Page should refresh showing the new table in the comparison</li>
+</ol>
+
+<h3 id="other-schema-issues">Other Common Schema Issues</h3>
 <ol>
     <li>Identify and resolve database conflicts during schema synchronization.</li>
     <li>Address performance issues resulting from schema changes.</li>
+    <li>Result file loading errors - check Perl syntax and package names</li>
+    <li>Database connection issues - verify credentials in db_config.json</li>
 </ol>
 
 <h2 id="schemam-references"><a href="#schemam-top">9. References</a></h2>

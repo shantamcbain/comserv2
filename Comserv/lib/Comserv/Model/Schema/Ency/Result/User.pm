@@ -50,6 +50,25 @@ __PACKAGE__->has_many(
     'user_id'
 );
 
+# Mailing List Relationships
+__PACKAGE__->has_many(
+    mailing_list_subscriptions => 'Comserv::Model::Schema::Ency::Result::MailingListSubscription',
+    'user_id'
+);
+
+__PACKAGE__->has_many(
+    created_mailing_lists => 'Comserv::Model::Schema::Ency::Result::MailingList',
+    'created_by'
+);
+
+__PACKAGE__->has_many(
+    sent_campaigns => 'Comserv::Model::Schema::Ency::Result::MailingListCampaign',
+    'sent_by'
+);
+
+# Many-to-many relationship with mailing lists through subscriptions
+__PACKAGE__->many_to_many(subscribed_mailing_lists => 'mailing_list_subscriptions', 'mailing_list');
+
 # Enhanced helper methods for role checking with backward compatibility
 sub has_global_role {
     my ($self, $role) = @_;
@@ -158,6 +177,49 @@ sub can_manage_backups {
     
     # Only CSC admins can manage backups
     return $self->is_csc_admin;
+}
+
+# Mailing List Helper Methods
+sub can_create_mailing_lists {
+    my ($self, $site_id) = @_;
+    
+    # CSC admins can create lists on any site
+    return 1 if $self->is_csc_admin;
+    
+    # Site admins can create lists on their sites
+    return 1 if $self->has_site_role($site_id, 'site_admin');
+    
+    return 0;
+}
+
+sub can_manage_mailing_list {
+    my ($self, $mailing_list) = @_;
+    
+    return 0 unless $mailing_list;
+    
+    # CSC admins can manage any list
+    return 1 if $self->is_csc_admin;
+    
+    # List creator can manage their own list
+    return 1 if $mailing_list->created_by == $self->id;
+    
+    # Site admins can manage lists on their sites
+    return 1 if $self->has_site_role($mailing_list->site_id, 'site_admin');
+    
+    return 0;
+}
+
+sub is_subscribed_to_list {
+    my ($self, $mailing_list_id) = @_;
+    
+    return 0 unless $mailing_list_id;
+    
+    my $subscription = $self->mailing_list_subscriptions->search({
+        mailing_list_id => $mailing_list_id,
+        is_active => 1
+    })->first;
+    
+    return $subscription ? 1 : 0;
 }
 
 # Private helper methods
