@@ -3,7 +3,7 @@
 [% IF debug_mode == 1 %]
 [% END %]
   [% PageVersion %]
-    [% INCLUDE 'debug.tt' %]
+
 <form method="POST" action="/user/do_edit_user/[% user.id %]">
     <label for="username">Username:</label><br>
     <input type="text" id="username" name="username" value="[% user.username %]"><br>
@@ -13,7 +13,24 @@
     <input type="text" id="last_name" name="last_name" value="[% user.last_name %]"><br>
     <label for="email">Email:</label><br>
     <input type="text" id="email" name="email" value="[% user.email %]"><br>
-    <label for="roles">Roles:</label><br>
-    <input type="text" id="roles" name="roles" value="[% user.roles %]"><br>
+    
+    [% # Only show roles field to site admins %]
+    [% SET current_site_id = c.session.site_id || 1 %]
+    [% IF c.check_user_roles_enhanced('admin', current_site_id) || c.check_user_roles_enhanced('site_admin', current_site_id) || c.check_user_roles_enhanced('csc_admin') %]
+        <label for="roles">Roles:</label><br>
+        <input type="text" id="roles" name="roles" value="[% user.roles %]"><br>
+        <small style="color: #666;">
+            Format: "admin,user" or "global:super_admin,site:[% current_site_id %]:site_admin"<br>
+            Only site administrators can modify user roles.
+        </small><br><br>
+    [% ELSE %]
+        [% # Hide the roles field but show current roles as read-only %]
+        <label>Current Roles:</label><br>
+        <span style="color: #666; font-style: italic;">[% user.roles || 'No roles assigned' %]</span><br>
+        <small style="color: #999;">Contact a site administrator to modify roles.</small><br><br>
+        [% # Include hidden field to preserve existing roles %]
+        <input type="hidden" name="roles" value="[% user.roles %]">
+    [% END %]
+    
     <input type="submit" value="Submit">
 </form>

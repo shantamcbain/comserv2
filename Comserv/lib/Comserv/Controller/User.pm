@@ -7,6 +7,7 @@ use Email::Sender::Simple qw(sendmail);
 use Email::Simple;
 use Email::Simple::Creator;
 use Email::Sender::Transport::SMTP;
+use JSON;
 
 BEGIN { extends 'Catalyst::Controller'; }
 # Apply restrictions to the entire controller
@@ -184,12 +185,43 @@ sub do_login :Local {
     # Clear any existing session data
     $c->session({});
 
+    # CRITICAL: Validate site access before setting session
+    my $current_site_id = $c->session->{site_id} || 1;
+    
+    # Check if user has access to the current site
+    unless ($c->model('User')->has_site_access($user, $current_site_id)) {
+        # User doesn't have access to current site
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
+            "User '$username' denied access to site_id: $current_site_id");
+            
+        # Get user's accessible sites
+        my $accessible_sites = $c->model('User')->get_accessible_sites($user);
+        
+        if (@$accessible_sites) {
+            # Redirect to first accessible site
+            my $primary_site = $accessible_sites->[0];
+            $current_site_id = $primary_site->id;
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login',
+                "Redirecting user '$username' to accessible site_id: $current_site_id");
+        } else {
+            # User has no site access at all
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_login',
+                "User '$username' has no site access - login denied");
+                
+            $c->flash->{error_msg} = 'Your account does not have access to any sites. Please contact an administrator.';
+            $c->response->redirect($c->uri_for('/user/login'));
+            return;
+        }
+    }
+
     # Set new session data
     $c->session->{username} = $user->username;
     $c->session->{user_id}  = $user->id;
     $c->session->{first_name} = $user->first_name;
     $c->session->{last_name}  = $user->last_name;
     $c->session->{email}    = $user->email;
+    $c->session->{site_id}  = $current_site_id;  # Ensure correct site_id is set
 
     # Fetch user role(s)
     my $roles = $user->roles;
@@ -1033,11 +1065,14 @@ sub do_create_account :Local {
         return;
     }
 
+    # Get the current site ID from session
+    my $site_id = $c->session->{site_id} || 1;
+    
     # Create the new user in the database
     my $new_user;
     eval {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
-            "Creating new user: $username with roles: $roles");
+            "Creating new user: $username with roles: $roles for site_id: $site_id");
 
         $new_user = $c->model('DBEncy::User')->create({
             username    => $username,
@@ -1049,6 +1084,30 @@ sub do_create_account :Local {
             active      => 1,
             created_at  => \'NOW()',
         });
+        
+        # CRITICAL: Create user-site relationship immediately after user creation
+        if ($new_user) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
+                "Creating user-site relationship for user_id: " . $new_user->id . ", site_id: $site_id");
+                
+            # Create entry in user_sites table
+            $c->model('DBEncy::UserSite')->create({
+                user_id => $new_user->id,
+                site_id => $site_id,
+            });
+            
+            # Create default site role entry for proper role management
+            $c->model('DBEncy::UserSiteRole')->create({
+                user_id => $new_user->id,
+                site_id => $site_id,
+                role => 'site_user',  # Default role for new users
+                granted_by => undef,  # System-granted during registration
+                is_active => 1,
+            });
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
+                "User-site relationship created successfully for user: $username");
+        }
     };
 
     if ($@) {
@@ -1266,6 +1325,28 @@ sub list_users :Local :Args(0) {
 sub edit_user :Local :Args(1) {
     my ($self, $c) = @_;
 
+    # Check if user is logged in
+    unless ($c->user_exists) {
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    # Get current site context
+    my $current_site_id = $c->session->{site_id} || 1;
+    
+    # Check if user has permission to edit users on this site
+    unless ($c->check_user_roles_enhanced('admin', $current_site_id) || 
+            $c->check_user_roles_enhanced('site_admin', $current_site_id) || 
+            $c->check_user_roles_enhanced('csc_admin')) {
+        
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'edit_user',
+            "Access denied: User " . $c->session->{username} . " attempted to edit user without proper permissions");
+        
+        $c->stash(error_msg => 'Access denied. You do not have permission to edit users.');
+        $c->stash(template => 'error.tt');
+        return;
+    }
+
     # Retrieve the user ID from the URL
     my $user_id = $c->request->arguments->[0];
 
@@ -1279,6 +1360,10 @@ sub edit_user :Local :Args(1) {
     my $user = $rs->find($user_id);
 
     if ($user) {
+        # Log the access
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_user',
+            "User " . $c->session->{username} . " accessing edit form for user ID: $user_id");
+        
         # The user was found, so store the user object in the stash
         $c->stash(user => $user);
 
@@ -1286,11 +1371,34 @@ sub edit_user :Local :Args(1) {
         $c->stash(template => 'user/edit_user.tt');
     } else {
         # The user was not found, so display an error message
-        $c->response->body('User not found');
+        $c->stash(error_msg => 'User not found');
+        $c->stash(template => 'error.tt');
     }
 }
 sub do_edit_user :Local :Args(1) {
     my ($self, $c) = @_;
+
+    # Check if user is logged in
+    unless ($c->user_exists) {
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    # Get current site context
+    my $current_site_id = $c->session->{site_id} || 1;
+    
+    # Check if user has permission to edit users on this site
+    unless ($c->check_user_roles_enhanced('admin', $current_site_id) || 
+            $c->check_user_roles_enhanced('site_admin', $current_site_id) || 
+            $c->check_user_roles_enhanced('csc_admin')) {
+        
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_edit_user',
+            "Access denied: User " . $c->session->{username} . " attempted to update user without proper permissions");
+        
+        $c->stash(error_msg => 'Access denied. You do not have permission to edit users.');
+        $c->stash(template => 'error.tt');
+        return;
+    }
 
     # Retrieve the user ID from the URL
     my $user_id = $c->request->arguments->[0];
@@ -1308,23 +1416,67 @@ sub do_edit_user :Local :Args(1) {
         # The user was found, so retrieve the form data
         my $form_data = $c->request->body_parameters;
 
-        # Print the form data
-        print "Form data: " . Dumper($form_data);
+        # Log the update attempt
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_edit_user',
+            "User " . $c->session->{username} . " updating user ID: $user_id");
 
-        # Update the user record with the new data
-        $user->update({
+        # Prepare update data
+        my $update_data = {
             username   => $form_data->{username},
             first_name => $form_data->{first_name},
             last_name  => $form_data->{last_name},
             email      => $form_data->{email},
-            roles      => $form_data->{roles},
-        });
+        };
+
+        # Handle roles field with proper access control
+        my $can_edit_roles = $c->check_user_roles_enhanced('admin', $current_site_id) || 
+                           $c->check_user_roles_enhanced('site_admin', $current_site_id) || 
+                           $c->check_user_roles_enhanced('csc_admin');
+
+        if ($can_edit_roles) {
+            # User has permission to edit roles
+            my $new_roles = $form_data->{roles};
+            
+            # Log role change if different
+            if (($user->roles || '') ne ($new_roles || '')) {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_edit_user',
+                    "Role change for user ID $user_id: '" . ($user->roles || 'none') . "' -> '" . ($new_roles || 'none') . "'");
+            }
+            
+            $update_data->{roles} = $new_roles;
+        } else {
+            # User doesn't have permission to edit roles - preserve existing roles
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_edit_user',
+                "Preserving existing roles for user ID $user_id (no role edit permission)");
+        }
+
+        # Update the user record with the new data
+        eval {
+            $user->update($update_data);
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_edit_user',
+                "Successfully updated user ID: $user_id");
+            
+            # Set success message
+            $c->flash->{success_msg} = "User updated successfully.";
+        };
+        
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_edit_user',
+                "Error updating user ID $user_id: $@");
+            
+            $c->flash->{error_msg} = "Error updating user: $@";
+        }
 
         # Redirect the user back to the list of users
         $c->response->redirect($c->uri_for($self->action_for('list_users')));
     } else {
         # The user was not found, so display an error message
-        $c->response->body('User not found');
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_edit_user',
+            "User not found for ID: $user_id");
+        
+        $c->stash(error_msg => 'User not found');
+        $c->stash(template => 'error.tt');
     }
 }
 sub register :Local {
@@ -1424,6 +1576,193 @@ sub welcome :Local {
     # Display the welcome page
     $c->stash(template => 'user/welcome.tt');
     $c->forward($c->view('TT'));
+}
+
+# Administrative method to fix existing users without site relationships
+sub fix_user_site_relationships :Local {
+    my ($self, $c) = @_;
+    
+    # Only allow CSC admins to run this
+    unless ($c->check_user_roles('admin')) {
+        $c->response->status(403);
+        $c->response->body('Access denied: Admin role required');
+        return;
+    }
+    
+    my $fixed_count = 0;
+    my $error_count = 0;
+    my @messages;
+    
+    eval {
+        my $schema = $c->model('DBEncy');
+        
+        # Find all users without any site relationships
+        my @users_without_sites = $schema->resultset('User')->search({
+            'user_sites.user_id' => undef
+        }, {
+            join => { user_sites => 'site' },
+            prefetch => 'user_sites'
+        })->all;
+        
+        push @messages, "Found " . scalar(@users_without_sites) . " users without site relationships";
+        
+        foreach my $user (@users_without_sites) {
+            eval {
+                # Default to site_id = 1 for existing users
+                my $default_site_id = 1;
+                
+                # Create user-site relationship
+                $schema->resultset('UserSite')->create({
+                    user_id => $user->id,
+                    site_id => $default_site_id,
+                });
+                
+                # Create default site role
+                $schema->resultset('UserSiteRole')->create({
+                    user_id => $user->id,
+                    site_id => $default_site_id,
+                    role => 'site_user',
+                    granted_by => undef,  # System-granted
+                    is_active => 1,
+                });
+                
+                $fixed_count++;
+                push @messages, "Fixed user: " . $user->username . " (ID: " . $user->id . ")";
+                
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fix_user_site_relationships',
+                    "Fixed site relationship for user: " . $user->username);
+            };
+            
+            if ($@) {
+                $error_count++;
+                push @messages, "Error fixing user " . $user->username . ": $@";
+                
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'fix_user_site_relationships',
+                    "Error fixing user " . $user->username . ": $@");
+            }
+        }
+    };
+    
+    if ($@) {
+        push @messages, "General error: $@";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'fix_user_site_relationships',
+            "General error in fix_user_site_relationships: $@");
+    }
+    
+    # Return results
+    my $result = {
+        fixed_count => $fixed_count,
+        error_count => $error_count,
+        messages => \@messages,
+    };
+    
+    $c->response->content_type('application/json');
+    $c->response->body(JSON::encode_json($result));
+}
+
+# Administrative interface for managing user-site relationships
+sub manage_site_access :Local {
+    my ($self, $c) = @_;
+    
+    # Only allow CSC admins to access this
+    unless ($c->check_user_roles('admin')) {
+        $c->response->status(403);
+        $c->stash(
+            error_msg => 'Access denied: Admin role required',
+            template => 'error/403.tt'
+        );
+        return;
+    }
+    
+    my $action = $c->req->param('action') || 'list';
+    
+    if ($action eq 'add' && $c->req->method eq 'POST') {
+        # Add site access for a user
+        my $user_id = $c->req->param('user_id');
+        my $site_id = $c->req->param('site_id');
+        my $role = $c->req->param('role') || 'site_user';
+        
+        if ($user_id && $site_id) {
+            my $user = $c->model('DBEncy::User')->find($user_id);
+            if ($user) {
+                my $success = $c->model('User')->add_site_access($user, $site_id, $role, $c->session->{user_id});
+                if ($success) {
+                    $c->flash->{success_msg} = "Site access granted successfully";
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'manage_site_access',
+                        "Granted site access: user_id=$user_id, site_id=$site_id, role=$role");
+                } else {
+                    $c->flash->{error_msg} = "Failed to grant site access";
+                }
+            } else {
+                $c->flash->{error_msg} = "User not found";
+            }
+        } else {
+            $c->flash->{error_msg} = "Missing required parameters";
+        }
+        
+        $c->response->redirect($c->uri_for('/user/manage_site_access'));
+        return;
+    }
+    
+    if ($action eq 'remove' && $c->req->method eq 'POST') {
+        # Remove site access for a user
+        my $user_id = $c->req->param('user_id');
+        my $site_id = $c->req->param('site_id');
+        
+        if ($user_id && $site_id) {
+            my $user = $c->model('DBEncy::User')->find($user_id);
+            if ($user) {
+                my $success = $c->model('User')->remove_site_access($user, $site_id);
+                if ($success) {
+                    $c->flash->{success_msg} = "Site access removed successfully";
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'manage_site_access',
+                        "Removed site access: user_id=$user_id, site_id=$site_id");
+                } else {
+                    $c->flash->{error_msg} = "Failed to remove site access";
+                }
+            } else {
+                $c->flash->{error_msg} = "User not found";
+            }
+        } else {
+            $c->flash->{error_msg} = "Missing required parameters";
+        }
+        
+        $c->response->redirect($c->uri_for('/user/manage_site_access'));
+        return;
+    }
+    
+    # Default: List all users and their site access
+    eval {
+        my $schema = $c->model('DBEncy');
+        
+        # Get all users with their site relationships
+        my @users = $schema->resultset('User')->search(
+            {},
+            {
+                prefetch => ['user_sites', 'user_site_roles'],
+                order_by => 'username'
+            }
+        )->all;
+        
+        # Get all available sites
+        my @sites = $schema->resultset('Project')->search(
+            { is_active => 1 },
+            { order_by => 'name' }
+        )->all;
+        
+        $c->stash(
+            users => \@users,
+            sites => \@sites,
+            template => 'user/manage_site_access.tt'
+        );
+    };
+    
+    if ($@) {
+        $c->stash(
+            error_msg => "Error loading data: $@",
+            template => 'error/500.tt'
+        );
+    }
 }
 sub forgot_password :Local {
     my ($self, $c) = @_;
