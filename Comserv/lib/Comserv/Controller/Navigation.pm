@@ -212,6 +212,523 @@ sub get_admin_links {
     return \@results;
 }
 
+# Method to get private links for a specific user
+sub get_private_links {
+    my ($self, $c, $username, $site_name) = @_;
+    
+    $c->log->debug("Getting private links for user: $username, site: $site_name");
+    
+    # Initialize results array
+    my @results;
+    
+    # Use eval to catch any database errors
+    eval {
+        # Try to use the DBIx::Class API first
+        my $rs = $c->model('DBEncy')->resultset('InternalLinksTb')->search({
+            category => 'Private_links',
+            description => $username,  # Using description field to store username
+            sitename => [ $site_name, 'All' ]
+        }, {
+            order_by => { -asc => 'link_order' }
+        });
+        
+        while (my $row = $rs->next) {
+            push @results, { $row->get_columns };
+        }
+        
+        # If no results and we might need to fall back to direct SQL
+        if (!@results) {
+            # Get the database handle from the DBEncy model
+            my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+            
+            # Prepare and execute the query
+            my $query = "SELECT * FROM internal_links_tb WHERE category = 'Private_links' AND description = ? AND (sitename = ? OR sitename = 'All') ORDER BY link_order";
+            my $sth = $dbh->prepare($query);
+            $sth->execute($username, $site_name);
+            
+            # Fetch all results
+            while (my $row = $sth->fetchrow_hashref) {
+                push @results, $row;
+            }
+        }
+        
+        $c->log->debug("Found " . scalar(@results) . " private links for user: $username");
+    };
+    if ($@) {
+        $c->log->error("Error getting private links: $@");
+    }
+    
+    return \@results;
+}
+
+# Method to add a private link
+sub add_private_link :Path('/navigation/add_private_link') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Check if user is logged in
+    unless ($c->user_exists && $c->session->{username}) {
+        $c->flash->{error_msg} = "You must be logged in to add private links.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    if ($c->req->method eq 'POST') {
+        my $name = $c->req->param('name');
+        my $url = $c->req->param('url');
+        my $target = $c->req->param('target') || '_self';
+        my $site_name = $c->session->{SiteName} || 'All';
+        my $username = $c->session->{username};
+        
+        # Validate required fields
+        unless ($name && $url) {
+            $c->flash->{error_msg} = "Name and URL are required fields.";
+            $c->stash->{template} = 'navigation/add_private_link.tt';
+            return;
+        }
+        
+        # Get the next link order
+        my $max_order = 0;
+        eval {
+            my $rs = $c->model('DBEncy')->resultset('InternalLinksTb')->search({
+                category => 'Private_links',
+                description => $username,
+                sitename => $site_name
+            }, {
+                select => [{ max => 'link_order' }],
+                as => ['max_order']
+            });
+            
+            my $row = $rs->first;
+            $max_order = $row ? ($row->get_column('max_order') || 0) : 0;
+        };
+        
+        # Add the private link
+        eval {
+            $c->model('DBEncy')->resultset('InternalLinksTb')->create({
+                category => 'Private_links',
+                sitename => $site_name,
+                name => $name,
+                url => $url,
+                target => $target,
+                description => $username,  # Store username in description field
+                link_order => $max_order + 1,
+                status => 1
+            });
+            
+            $c->flash->{success_msg} = "Private link '$name' added successfully.";
+        };
+        if ($@) {
+            $c->log->error("Error adding private link: $@");
+            $c->flash->{error_msg} = "Error adding private link. Please try again.";
+        }
+        
+        $c->response->redirect($c->uri_for('/navigation/manage_private_links'));
+        return;
+    }
+    
+    # Show the add form
+    $c->stash->{template} = 'navigation/add_private_link.tt';
+}
+
+# Method to manage private links
+sub manage_private_links :Path('/navigation/manage_private_links') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Check if user is logged in
+    unless ($c->user_exists && $c->session->{username}) {
+        $c->flash->{error_msg} = "You must be logged in to manage private links.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    my $username = $c->session->{username};
+    my $site_name = $c->session->{SiteName} || 'All';
+    
+    # Get user's private links
+    $c->stash->{private_links} = $self->get_private_links($c, $username, $site_name);
+    $c->stash->{template} = 'navigation/manage_private_links.tt';
+}
+
+# Method to edit a private link
+sub edit_private_link :Path('/navigation/edit_private_link') :Args(1) {
+    my ($self, $c, $link_id) = @_;
+    
+    # Check if user is logged in
+    unless ($c->user_exists && $c->session->{username}) {
+        $c->flash->{error_msg} = "You must be logged in to edit private links.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    my $username = $c->session->{username};
+    
+    # Get the link to edit
+    my $link;
+    eval {
+        $link = $c->model('DBEncy')->resultset('InternalLinksTb')->find({
+            id => $link_id,
+            category => 'Private_links',
+            description => $username
+        });
+    };
+    
+    unless ($link) {
+        $c->flash->{error_msg} = "Link not found or you don't have permission to edit it.";
+        $c->response->redirect($c->uri_for('/navigation/manage_private_links'));
+        return;
+    }
+    
+    if ($c->req->method eq 'POST') {
+        my $name = $c->req->param('name');
+        my $url = $c->req->param('url');
+        my $target = $c->req->param('target') || '_self';
+        
+        # Validate required fields
+        unless ($name && $url) {
+            $c->flash->{error_msg} = "Name and URL are required fields.";
+            $c->stash->{link} = { $link->get_columns };
+            $c->stash->{template} = 'navigation/edit_private_link.tt';
+            return;
+        }
+        
+        # Update the private link
+        eval {
+            $link->update({
+                name => $name,
+                url => $url,
+                target => $target
+            });
+            
+            $c->flash->{success_msg} = "Private link '$name' updated successfully.";
+        };
+        if ($@) {
+            $c->log->error("Error updating private link: $@");
+            $c->flash->{error_msg} = "Error updating private link. Please try again.";
+        }
+        
+        $c->response->redirect($c->uri_for('/navigation/manage_private_links'));
+        return;
+    }
+    
+    # Show the edit form
+    $c->stash->{link} = { $link->get_columns };
+    $c->stash->{template} = 'navigation/edit_private_link.tt';
+}
+
+# Method to delete a private link
+sub delete_private_link :Path('/navigation/delete_private_link') :Args(1) {
+    my ($self, $c, $link_id) = @_;
+    
+    # Check if user is logged in
+    unless ($c->user_exists && $c->session->{username}) {
+        $c->flash->{error_msg} = "You must be logged in to delete private links.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    my $username = $c->session->{username};
+    
+    # Verify the link belongs to the current user
+    eval {
+        my $link = $c->model('DBEncy')->resultset('InternalLinksTb')->find({
+            id => $link_id,
+            category => 'Private_links',
+            description => $username
+        });
+        
+        if ($link) {
+            $link->delete;
+            $c->flash->{success_msg} = "Private link deleted successfully.";
+        } else {
+            $c->flash->{error_msg} = "Link not found or you don't have permission to delete it.";
+        }
+    };
+    if ($@) {
+        $c->log->error("Error deleting private link: $@");
+        $c->flash->{error_msg} = "Error deleting private link. Please try again.";
+    }
+    
+    $c->response->redirect($c->uri_for('/navigation/manage_private_links'));
+}
+
+# Admin method to add links to any menu
+sub add_link :Path('/navigation/add_link') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Check if user is admin
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $c->flash->{error_msg} = "You must be an administrator to add menu links.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    my $menu_type = $c->req->param('menu') || 'admin';
+    
+    if ($c->req->method eq 'POST') {
+        my $category = $c->req->param('category');
+        my $name = $c->req->param('name');
+        my $url = $c->req->param('url');
+        my $target = $c->req->param('target') || '_self';
+        my $site_name = $c->req->param('sitename') || $c->session->{SiteName} || 'All';
+        my $view_name = $c->req->param('view_name') || $name;
+        my $page_code = $c->req->param('page_code') || '';
+        
+        # Validate required fields
+        unless ($category && $name && $url) {
+            $c->flash->{error_msg} = "Category, Name and URL are required fields.";
+            $c->stash->{menu_type} = $menu_type;
+            $c->stash->{template} = 'navigation/add_link.tt';
+            return;
+        }
+        
+        # SECURITY: Site-specific permissions validation
+        my $current_site = $c->session->{SiteName} || '';
+        if ($current_site ne 'SiteName' && $current_site ne 'CSC') {
+            # Non-privileged sites can only modify their own site
+            if ($site_name ne $current_site && $site_name ne 'All') {
+                $c->flash->{error_msg} = "You can only add links for your current site ($current_site).";
+                $c->stash->{menu_type} = $menu_type;
+                $c->stash->{template} = 'navigation/add_link.tt';
+                return;
+            }
+            # Force site_name to current site for non-privileged sites
+            $site_name = $current_site;
+        }
+        # SiteName and CSC sites can modify any site (no restrictions)
+        
+        # Get the next link order
+        my $max_order = 0;
+        eval {
+            my $rs = $c->model('DBEncy')->resultset('InternalLinksTb')->search({
+                category => $category,
+                sitename => $site_name
+            }, {
+                select => [{ max => 'link_order' }],
+                as => ['max_order']
+            });
+            
+            my $row = $rs->first;
+            $max_order = $row ? ($row->get_column('max_order') || 0) : 0;
+        };
+        
+        # Add the link
+        eval {
+            $c->model('DBEncy')->resultset('InternalLinksTb')->create({
+                category => $category,
+                sitename => $site_name,
+                name => $name,
+                url => $url,
+                target => $target,
+                view_name => $view_name,
+                page_code => $page_code,
+                link_order => $max_order + 1,
+                status => 1
+            });
+            
+            $c->flash->{success_msg} = "Link '$name' added successfully to $category.";
+        };
+        if ($@) {
+            $c->log->error("Error adding link: $@");
+            $c->flash->{error_msg} = "Error adding link. Please try again.";
+        }
+        
+        $c->response->redirect($c->uri_for('/navigation/manage_links'));
+        return;
+    }
+    
+    # Show the add form
+    $c->stash->{menu_type} = $menu_type;
+    $c->stash->{template} = 'navigation/add_link.tt';
+}
+
+# Admin method to manage all menu links
+sub manage_links :Path('/navigation/manage_links') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Check if user is admin
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $c->flash->{error_msg} = "You must be an administrator to manage menu links.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    my $site_name = $c->session->{SiteName} || 'All';
+    
+    # Get all link categories with site-specific permissions
+    my %links_by_category = ();
+    eval {
+        my $search_criteria;
+        
+        if ($site_name eq 'SiteName' || $site_name eq 'CSC') {
+            # SiteName and CSC sites can see all links from all sites
+            $search_criteria = {};
+        } else {
+            # Other sites can only see their own links and 'All' links
+            $search_criteria = {
+                sitename => [ $site_name, 'All' ]
+            };
+        }
+        
+        my $rs = $c->model('DBEncy')->resultset('InternalLinksTb')->search($search_criteria, {
+            order_by => ['category', 'link_order']
+        });
+        
+        while (my $row = $rs->next) {
+            my $data = { $row->get_columns };
+            push @{$links_by_category{$data->{category}}}, $data;
+        }
+    };
+    if ($@) {
+        $c->log->error("Error getting links: $@");
+        $c->flash->{error_msg} = "Error retrieving links.";
+    }
+    
+    $c->stash->{links_by_category} = \%links_by_category;
+    $c->stash->{template} = 'navigation/manage_links.tt';
+}
+
+# Admin method to delete any menu link
+sub delete_link :Path('/navigation/delete_link') :Args(1) {
+    my ($self, $c, $link_id) = @_;
+    
+    # Check if user is admin
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $c->flash->{error_msg} = "You must be an administrator to delete menu links.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    # Delete the link
+    eval {
+        my $link = $c->model('DBEncy')->resultset('InternalLinksTb')->find($link_id);
+        
+        if ($link) {
+            # SECURITY: Check if user can delete this link based on site permissions
+            my $current_site = $c->session->{SiteName} || '';
+            my $link_site = $link->sitename || '';
+            
+            if ($current_site ne 'SiteName' && $current_site ne 'CSC') {
+                # Non-privileged sites can only delete their own site's links
+                if ($link_site ne $current_site && $link_site ne 'All') {
+                    $c->flash->{error_msg} = "You can only delete links for your current site ($current_site).";
+                    $c->response->redirect($c->uri_for('/navigation/manage_links'));
+                    return;
+                }
+            }
+            # SiteName and CSC sites can delete any link (no restrictions)
+            
+            my $name = $link->name;
+            my $category = $link->category;
+            $link->delete;
+            $c->flash->{success_msg} = "Link '$name' deleted from $category successfully.";
+        } else {
+            $c->flash->{error_msg} = "Link not found.";
+        }
+    };
+    if ($@) {
+        $c->log->error("Error deleting link: $@");
+        $c->flash->{error_msg} = "Error deleting link. Please try again.";
+    }
+    
+    $c->response->redirect($c->uri_for('/navigation/manage_links'));
+}
+
+# Admin method to edit any menu link
+sub edit_link :Path('/navigation/edit_link') :Args(1) {
+    my ($self, $c, $link_id) = @_;
+    
+    # Check if user is admin
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $c->flash->{error_msg} = "You must be an administrator to edit menu links.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    # Get the link
+    my $link;
+    eval {
+        $link = $c->model('DBEncy')->resultset('InternalLinksTb')->find($link_id);
+    };
+    
+    unless ($link) {
+        $c->flash->{error_msg} = "Link not found.";
+        $c->response->redirect($c->uri_for('/navigation/manage_links'));
+        return;
+    }
+    
+    # SECURITY: Check if user can edit this link based on site permissions
+    my $current_site = $c->session->{SiteName} || '';
+    my $link_site = $link->sitename || '';
+    
+    if ($current_site ne 'SiteName' && $current_site ne 'CSC') {
+        # Non-privileged sites can only edit their own site's links
+        if ($link_site ne $current_site && $link_site ne 'All') {
+            $c->flash->{error_msg} = "You can only edit links for your current site ($current_site).";
+            $c->response->redirect($c->uri_for('/navigation/manage_links'));
+            return;
+        }
+    }
+    # SiteName and CSC sites can edit any link (no restrictions)
+    
+    if ($c->req->method eq 'POST') {
+        my $category = $c->req->param('category');
+        my $name = $c->req->param('name');
+        my $url = $c->req->param('url');
+        my $target = $c->req->param('target') || '_self';
+        my $site_name = $c->req->param('sitename') || 'All';
+        my $view_name = $c->req->param('view_name') || $name;
+        my $page_code = $c->req->param('page_code') || '';
+        
+        # Validate required fields
+        unless ($category && $name && $url) {
+            $c->flash->{error_msg} = "Category, Name and URL are required fields.";
+            $c->stash->{link} = { $link->get_columns };
+            $c->stash->{template} = 'navigation/edit_link.tt';
+            return;
+        }
+        
+        # SECURITY: Site-specific permissions validation for updates
+        if ($current_site ne 'SiteName' && $current_site ne 'CSC') {
+            # Non-privileged sites can only modify their own site
+            if ($site_name ne $current_site && $site_name ne 'All') {
+                $c->flash->{error_msg} = "You can only update links for your current site ($current_site).";
+                $c->stash->{link} = { $link->get_columns };
+                $c->stash->{template} = 'navigation/edit_link.tt';
+                return;
+            }
+            # Force site_name to current site for non-privileged sites
+            $site_name = $current_site;
+        }
+        # SiteName and CSC sites can modify any site (no restrictions)
+        
+        # Update the link
+        eval {
+            $link->update({
+                category => $category,
+                sitename => $site_name,
+                name => $name,
+                url => $url,
+                target => $target,
+                view_name => $view_name,
+                page_code => $page_code
+            });
+            
+            $c->flash->{success_msg} = "Link '$name' updated successfully.";
+        };
+        if ($@) {
+            $c->log->error("Error updating link: $@");
+            $c->flash->{error_msg} = "Error updating link. Please try again.";
+        }
+        
+        $c->response->redirect($c->uri_for('/navigation/manage_links'));
+        return;
+    }
+    
+    # Show the edit form
+    $c->stash->{link} = { $link->get_columns };
+    $c->stash->{template} = 'navigation/edit_link.tt';
+}
+
 # Method to populate navigation data in the stash
 sub populate_navigation_data {
     my ($self, $c) = @_;
@@ -321,6 +838,11 @@ sub populate_navigation_data {
         if ($is_admin) {
             $c->stash->{admin_pages} = $self->get_admin_pages($c, $site_name);
             $c->stash->{admin_links} = $self->get_admin_links($c, $site_name);
+        }
+        
+        # Populate private links for logged-in users
+        if ($c->user_exists && $c->session->{username}) {
+            $c->stash->{private_links} = $self->get_private_links($c, $c->session->{username}, $site_name);
         }
         
         $c->log->debug("Navigation data populated successfully");

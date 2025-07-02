@@ -11,6 +11,31 @@
         <a href="/it/network">Network</a>
         <a href="/it/servers">Servers</a>
         <a href="/it/security">Security</a>
+        
+        <!-- Private Links Section - Available to ALL logged-in users -->
+        [% IF c.user_exists && private_links && private_links.size %]
+            <div class="dropdown-divider"></div>
+            <div class="submenu-section">
+                <span class="submenu-section-title">Private Links</span>
+                [% FOREACH link IN private_links %]
+                    <a href="[% link.url %]" target="[% link.target %]" title="[% link.name %]">
+                        <i class="icon-link"></i> [% link.name %]
+                    </a>
+                [% END %]
+            </div>
+        [% END %]
+        
+        <!-- Link Management -->
+        [% IF c.user_exists %]
+            <div class="dropdown-divider"></div>
+            <a href="/navigation/add_private_link"><i class="icon-plus"></i> Add Private Link</a>
+            <a href="/navigation/manage_private_links"><i class="icon-link"></i> Manage Private Links</a>
+        [% END %]
+        
+        [% IF c.session.group == 'admin' %]
+            <div class="dropdown-divider"></div>
+            <a href="/navigation/add_link?menu=it"><i class="icon-add"></i> Add Menu Link</a>
+        [% END %]
     </div>
 </li>
 

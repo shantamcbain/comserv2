@@ -3384,12 +3384,21 @@ sub get_ency_database_tables {
     
     try {
         my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        
+        # Log database connection info
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_ency_database_tables',
+            "Connected to database: " . $dbh->{Name});
+        
         my $sth = $dbh->prepare("SHOW TABLES");
         $sth->execute();
         
         while (my ($table) = $sth->fetchrow_array()) {
             push @tables, $table;
         }
+        
+        # Log the number of tables found
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_ency_database_tables',
+            "Found " . scalar(@tables) . " tables: " . join(', ', @tables));
         
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_ency_database_tables', 

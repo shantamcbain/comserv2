@@ -72,7 +72,7 @@
                     [% END %]
                     
                     [% IF c.session.group == 'admin' %]
-                        <a href="/add_link?menu=weather">Add Weather Link</a>
+                        <a href="/navigation/add_link?menu=weather"><i class="icon-plus"></i> Add Menu Link</a>
                     [% END %]
                 </div>
         </li>

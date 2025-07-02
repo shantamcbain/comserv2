@@ -6,7 +6,14 @@
 <li class="horizontal-dropdown">
     <a href="/admin" class="dropbtn"><i class="icon-admin"></i>Admin</a>
     <div class="dropdown-content">
-        <a href="/add_link?menu=admin"><i class="icon-add"></i>Add New Link</a>
+        <!-- Menu Management Section -->
+        <div class="submenu-item">
+            <span class="submenu-header"><i class="icon-link"></i>Menu Management</span>
+            <div class="submenu">
+                <a href="/navigation/manage_links"><i class="icon-list"></i>Manage All Menu Links</a>
+                <a href="/navigation/add_link?menu=admin"><i class="icon-add"></i>Add New Menu Link</a>
+            </div>
+        </div>
         
         <div class="submenu-item">
             <span class="submenu-header"><a href="/admin" class="dropbtn"><i class="icon-admin"></i>Admin</a></span>

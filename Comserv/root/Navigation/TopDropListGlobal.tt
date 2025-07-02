@@ -29,8 +29,6 @@
     [% END %]
     <a href="http://[% HostName %]/cgi-bin/index.cgi?site=[% SiteName %]" target="_Blank" name="DevSite" title="DevSite See what we are working on."><font   class="HeaderBarNavStyle">What we are working on.</font></a>
     [% END %]
-    [% IF c.session.group == 'admin' %]
-
                [% IF c.session.global_links.size %]
                     [% FOREACH link IN c.session.global_links %]
                         <a href="[% link.url %]">[% link.name %]</a>
@@ -39,10 +37,31 @@
                         [% END %]
                     [% END %]
                 [% END %]
-                [% IF c.session.group == 'admin' %]
-                    <a href="/add_link?menu=global">Add</a>
+                
+                <!-- Private Links Section - Available to ALL logged-in users -->
+                [% IF c.user_exists && private_links && private_links.size %]
+                    <div class="dropdown-divider"></div>
+                    <div class="submenu-section">
+                        <span class="submenu-section-title">Private Links</span>
+                        [% FOREACH link IN private_links %]
+                            <a href="[% link.url %]" target="[% link.target %]" title="[% link.name %]">
+                                <i class="icon-link"></i> [% link.name %]
+                            </a>
+                        [% END %]
+                    </div>
                 [% END %]
-    [% END %]
+                
+                <!-- Link Management -->
+                [% IF c.user_exists %]
+                    <div class="dropdown-divider"></div>
+                    <a href="/navigation/add_private_link"><i class="icon-plus"></i> Add Private Link</a>
+                    <a href="/navigation/manage_private_links"><i class="icon-link"></i> Manage Private Links</a>
+                [% END %]
+                
+                [% IF c.session.group == 'admin' %]
+                    <div class="dropdown-divider"></div>
+                    <a href="/navigation/add_link?menu=global"><i class="icon-plus"></i> Add Menu Link</a>
+                [% END %]
         <!-- Global menu -->
              </div>
         </li>

@@ -40,6 +40,28 @@
                 <i class="icon-cog"></i> Account Settings
             </a>
 
+            <!-- Private Links Section - Available to ALL logged-in users -->
+            [% IF private_links && private_links.size %]
+                <div class="dropdown-divider"></div>
+                <div class="submenu-section">
+                    <span class="submenu-section-title">Private Links</span>
+                    [% FOREACH link IN private_links %]
+                        <a href="[% link.url %]" class="menu-item" target="[% link.target %]" title="[% link.name %]">
+                            <i class="icon-link"></i> [% link.name %]
+                        </a>
+                    [% END %]
+                </div>
+            [% END %]
+            
+            <!-- Private Links Management - Available to ALL logged-in users -->
+            <div class="dropdown-divider"></div>
+            <a href="/navigation/manage_private_links" class="menu-item">
+                <i class="icon-link"></i> Manage Private Links
+            </a>
+            <a href="/navigation/add_private_link" class="menu-item">
+                <i class="icon-plus"></i> Add Private Link
+            </a>
+
             [% IF c.session.roles.grep('admin').size || c.session.roles.grep('developer').size %]
                 <div class="dropdown-divider"></div>
                 <a href="/admin" class="menu-item">
@@ -50,6 +72,11 @@
                         <i class="icon-sync"></i> Reset Session
                     </a>
                 [% END %]
+            [% END %]
+
+            [% IF c.session.roles.grep('admin').size %]
+                <div class="dropdown-divider"></div>
+                <a href="/navigation/add_link?menu=login" class="menu-item"><i class="icon-plus"></i> Add Menu Link</a>
             [% END %]
 
             <div class="dropdown-divider"></div>
@@ -94,9 +121,5 @@
                 <a href="/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
             [% END %]
         [% END %]
-    [% END %]
-
-    [% IF c.session.roles.grep('admin').size %]
-        <a href="/add_link?menu=login" class="add-link">Add Link</a>
     [% END %]
 </li>
