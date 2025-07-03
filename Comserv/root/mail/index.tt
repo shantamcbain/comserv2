@@ -1,0 +1,124 @@
+[% PageVersion = 'Comserv/root/mail/index.tt,v 1.0 2025/01/27 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Mail System Dashboard' %]
+
+<div class="apiary-container">
+    <div class="apiary-header">
+        <h1><i class="fas fa-envelope"></i> Mail System Dashboard</h1>
+        <p>Manage your email communications and mailing lists</p>
+    </div>
+
+    <div class="feature-grid">
+        <!-- User Mail Access -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="feature-icon fas fa-inbox"></i> Your Email</h3>
+            </div>
+            <div class="feature-content">
+                [% IF c.session.username %]
+                    <p>Access your email account for <strong>[% c.session.first_name %] [% c.session.last_name %]</strong></p>
+                    [% SiteName = c.session.SiteName %]
+                    [% IF SiteName == 'CSC' OR SiteName == 'CSCDev' OR SiteName == 'Extropia' %]
+                        [% MailServerName = 'webmail.computersystemconsulting.ca:20000' %]
+                        [% MailServer = 'mail.computersystemconsulting.ca' %]
+                    [% ELSIF SiteName == 'USBM' OR SiteName == '3d' OR SiteName == 'ENCY' %]
+                        [% MailServerName = 'webmail.usbm.ca:20000' %]
+                        [% MailServer = 'mail.usbm.ca' %]
+                    [% ELSE %]
+                        [% MailServerName = 'webmail.beemaster.ca:20000' %]
+                        [% MailServer = 'mail.beemaster.ca' %]
+                    [% END %]
+                    <p>Your email address: [% c.session.username %]@[% MailServer %]</p>
+                [% ELSE %]
+                    <p>Please log in to access your email account.</p>
+                [% END %]
+            </div>
+            <div class="feature-actions">
+                [% IF c.session.username %]
+                    <a href="https://[% MailServerName %]" target="_blank" class="btn btn-primary">
+                        <i class="fas fa-external-link-alt"></i> Access Webmail
+                    </a>
+                [% ELSE %]
+                    <a href="/user/login" class="btn btn-primary">
+                        <i class="fas fa-sign-in-alt"></i> Login
+                    </a>
+                [% END %]
+            </div>
+        </div>
+
+        <!-- Mailing Lists - Admin Only -->
+        [% IF c.check_user_roles('admin') || c.check_user_roles('developer') %]
+            <div class="feature-card">
+                <div class="feature-header">
+                    <h3><i class="feature-icon fas fa-list"></i> Mailing Lists</h3>
+                </div>
+                <div class="feature-content">
+                    <p>Manage newsletter subscriptions and mailing list preferences</p>
+                </div>
+                <div class="feature-actions">
+                    <a href="/mail/lists" class="btn btn-secondary">
+                        <i class="fas fa-list"></i> View Mailing Lists
+                    </a>
+                </div>
+            </div>
+
+            <!-- Mail Administration -->
+            <div class="feature-card">
+                <div class="feature-header">
+                    <h3><i class="feature-icon fas fa-cog"></i> Mail Administration</h3>
+                </div>
+                <div class="feature-content">
+                    <p>Administrative tools for managing the mail system</p>
+                </div>
+                <div class="feature-actions">
+                    <a href="/mail/mass_email" class="btn btn-warning">
+                        <i class="fas fa-envelope-bulk"></i> Mass Email
+                    </a>
+                    <a href="/mail/add_mail_config_form" class="btn btn-secondary">
+                        <i class="fas fa-server"></i> SMTP Config
+                    </a>
+                    <a href="/mail/create_mail_account" class="btn btn-secondary">
+                        <i class="fas fa-user-plus"></i> Create Account
+                    </a>
+                </div>
+            </div>
+        [% END %]
+
+        <!-- Help & Documentation -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="feature-icon fas fa-question-circle"></i> Help & Support</h3>
+            </div>
+            <div class="feature-content">
+                <p>Get help with email setup and troubleshooting</p>
+            </div>
+            <div class="feature-actions">
+                <a href="/Documentation/roles/normal/mail_user_guide" class="btn btn-info">
+                    <i class="fas fa-book"></i> User Guide
+                </a>
+                [% IF c.check_user_roles('admin') || c.check_user_roles('developer') %]
+                    <a href="/Documentation/roles/admin/mail_admin_guide" class="btn btn-info">
+                        <i class="fas fa-tools"></i> Admin Guide
+                    </a>
+                [% END %]
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Stats for Admin -->
+    [% IF c.check_user_roles('admin') || c.check_user_roles('developer') %]
+        <div class="dashboard-stats">
+            <div class="stat-card">
+                <h3><i class="fas fa-users"></i> Total Users</h3>
+                <div class="stat-number">[% user_count || 0 %]</div>
+            </div>
+            <div class="stat-card">
+                <h3><i class="fas fa-list"></i> Mailing Lists</h3>
+                <div class="stat-number">[% mailing_list_count || 0 %]</div>
+            </div>
+        </div>
+    [% END %]
+</div>

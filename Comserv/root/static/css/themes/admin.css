@@ -571,72 +571,87 @@
   text-decoration: none;
 }
 
-/* Button Styles */
+/* Button Styles - Consistent with base-containers.css */
 .btn {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   padding: 10px 20px;
   border: none;
-  border-radius: 4px;
+  border-radius: 8px;
   text-decoration: none;
-  font-weight: bold;
-  text-align: center;
+  font-weight: 500;
+  transition: all 0.3s ease;
   cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 1rem;
+  font-size: 0.95rem;
+}
+
+.btn i {
+  margin-right: 8px;
 }
 
 .btn-primary {
-  background: var(--primary-color, #007bff);
-  color: white;
+  background: var(--primary-color);
+  color: var(--text-color);
 }
 
 .btn-primary:hover {
-  background: var(--primary-dark, #0056b3);
-  color: white;
+  background: var(--link-hover-color);
+  transform: translateY(-2px);
   text-decoration: none;
 }
 
 .btn-secondary {
-  background: var(--secondary-color, #6c757d);
-  color: white;
+  background: var(--secondary-color);
+  color: var(--text-color);
 }
 
 .btn-secondary:hover {
-  background: var(--secondary-dark, #545b62);
-  color: white;
+  background: var(--accent-color);
+  transform: translateY(-2px);
   text-decoration: none;
 }
 
 .btn-success {
-  background: var(--success-color, #28a745);
+  background: var(--success-color);
   color: white;
 }
 
 .btn-success:hover {
-  background: var(--success-dark, #1e7e34);
-  color: white;
+  background: #218838;
+  transform: translateY(-2px);
   text-decoration: none;
 }
 
 .btn-warning {
-  background: var(--warning-color, #ffc107);
-  color: var(--dark, #212529);
+  background: var(--warning-color);
+  color: var(--text-color);
 }
 
 .btn-warning:hover {
-  background: var(--warning-dark, #e0a800);
-  color: var(--dark, #212529);
+  background: #e0a800;
+  transform: translateY(-2px);
+  text-decoration: none;
+}
+
+.btn-info {
+  background: var(--link-color);
+  color: white;
+}
+
+.btn-info:hover {
+  background: var(--link-hover-color);
+  transform: translateY(-2px);
   text-decoration: none;
 }
 
 .btn-danger {
-  background: var(--danger-color, #dc3545);
+  background: #dc3545;
   color: white;
 }
 
 .btn-danger:hover {
-  background: var(--danger-dark, #c82333);
-  color: white;
+  background: #c82333;
+  transform: translateY(-2px);
   text-decoration: none;
 }
 

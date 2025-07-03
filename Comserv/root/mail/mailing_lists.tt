@@ -9,6 +9,9 @@
     <div class="admin-header">
         <h1>Mailing Lists Management</h1>
         <div class="admin-actions">
+            <a href="[% c.uri_for('/mail/mass_email') %]" class="btn btn-success">
+                <i class="fas fa-envelope-bulk"></i> Mass Email All Users
+            </a>
             <a href="[% c.uri_for('/mail/lists/create') %]" class="btn btn-primary">Create New List</a>
         </div>
     </div>

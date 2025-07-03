@@ -16,11 +16,37 @@ sub index :Path :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
         "Accessing mail index page");
     
-    # Set the template to users/index .tt
-    $c->stash(template => 'user/mail.tt');
-
-    # Forward to the TT view to render the template
-    $c->forward($c->view('TT'));
+    # Get statistics for admin users
+    if ($c->check_user_roles('admin') || $c->check_user_roles('developer')) {
+        my $site_id = $c->session->{site_id} || 1;
+        
+        try {
+            my $schema = $c->model('DBEncy');
+            
+            # Get user count for current site
+            my $user_count = $schema->resultset('User')->search({
+                'user_sites.site_id' => $site_id
+            }, {
+                join => 'user_sites'
+            })->count;
+            
+            # Get mailing list count
+            my $mailing_list_count = $schema->resultset('MailingList')->search({
+                site_id => $site_id
+            })->count;
+            
+            $c->stash(
+                user_count => $user_count,
+                mailing_list_count => $mailing_list_count
+            );
+        } catch {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index', 
+                "Error loading mail statistics: $_");
+        };
+    }
+    
+    # Set the template to the new mail dashboard
+    $c->stash(template => 'mail/index.tt');
 }
 
 sub send_welcome_email :Local {
@@ -157,10 +183,203 @@ sub create_mail_account :Local {
     }
 }
 
+# Mass Email Functionality
+sub mass_email_form :Path('mass_email') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Check admin permissions
+    unless ($c->check_user_roles('admin') || $c->check_user_roles('developer')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'mass_email_form', 
+            "Unauthorized access attempt by user: " . ($c->user->username || 'unknown'));
+        $c->stash->{error_msg} = "Access denied. Admin privileges required.";
+        $c->res->redirect($c->uri_for('/'));
+        return;
+    }
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'mass_email_form', 
+        "Accessing mass email form");
+    
+    my $site_id = $c->session->{site_id} || 1;
+    
+    try {
+        my $schema = $c->model('DBEncy');
+        
+        # Get user count for current site
+        my $user_count = $schema->resultset('User')->search({
+            'user_sites.site_id' => $site_id
+        }, {
+            join => 'user_sites'
+        })->count;
+        
+        # Get available mailing lists for tracking
+        my @mailing_lists = $schema->resultset('MailingList')->search(
+            { site_id => $site_id, is_active => 1 },
+            { order_by => 'name' }
+        )->all;
+        
+        $c->stash(
+            user_count => $user_count,
+            mailing_lists => \@mailing_lists,
+            template => 'mail/mass_email_form.tt'
+        );
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'mass_email_form', 
+            "Error loading mass email form: $_");
+        $c->stash->{debug_msg} = "Error loading form: $_";
+    };
+}
+
+sub send_mass_email :Path('send_mass_email') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Check admin permissions
+    unless ($c->check_user_roles('admin') || $c->check_user_roles('developer')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'send_mass_email', 
+            "Unauthorized mass email attempt by user: " . ($c->user->username || 'unknown'));
+        $c->stash->{error_msg} = "Access denied. Admin privileges required.";
+        $c->res->redirect($c->uri_for('/'));
+        return;
+    }
+    
+    if ($c->req->method eq 'POST') {
+        my $params = $c->req->params;
+        my $site_id = $c->session->{site_id} || 1;
+        my $user_id = $c->session->{user_id} || 1;
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_mass_email', 
+            "Processing mass email request for site_id $site_id");
+        
+        # Validate required fields
+        unless ($params->{subject} && $params->{body}) {
+            $c->stash->{error_msg} = "Subject and message body are required";
+            $c->res->redirect($c->uri_for($self->action_for('mass_email_form')));
+            return;
+        }
+        
+        try {
+            my $schema = $c->model('DBEncy');
+            
+            # Get all users for the current site
+            my @users = $schema->resultset('User')->search({
+                'user_sites.site_id' => $site_id,
+                'email' => { '!=' => undef },
+                'email' => { '!=' => '' }
+            }, {
+                join => 'user_sites',
+                columns => [qw/id email first_name last_name/]
+            })->all;
+            
+            unless (@users) {
+                $c->stash->{error_msg} = "No users found with email addresses for this site";
+                $c->res->redirect($c->uri_for($self->action_for('mass_email_form')));
+                return;
+            }
+            
+            # Parse BCC addresses
+            my @bcc_addresses;
+            if ($params->{bcc_addresses}) {
+                @bcc_addresses = split(/[,;\s]+/, $params->{bcc_addresses});
+                @bcc_addresses = grep { $_ && $_ =~ /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/ } @bcc_addresses;
+            }
+            
+            # Create campaign record for tracking (if table exists)
+            my $campaign;
+            eval {
+                $campaign = $schema->resultset('MailingListCampaign')->create({
+                    site_id => $site_id,
+                    name => "Mass Email: " . $params->{subject},
+                    subject => $params->{subject},
+                    body => $params->{body},
+                    created_by => $user_id,
+                    sent_at => \'NOW()',
+                    recipient_count => scalar(@users) + scalar(@bcc_addresses),
+                    status => 'sending'
+                });
+            };
+            
+            my $success_count = 0;
+            my $error_count = 0;
+            my @errors;
+            
+            # Send to all users
+            foreach my $user (@users) {
+                my $personalized_body = $params->{body};
+                $personalized_body =~ s/\[FIRST_NAME\]/$user->first_name || 'User'/g;
+                $personalized_body =~ s/\[LAST_NAME\]/$user->last_name || ''/g;
+                $personalized_body =~ s/\[EMAIL\]/$user->email/g;
+                
+                if ($c->model('Mail')->send_email($c, $user->email, $params->{subject}, $personalized_body, $site_id)) {
+                    $success_count++;
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_mass_email', 
+                        "Email sent successfully to " . $user->email);
+                } else {
+                    $error_count++;
+                    push @errors, "Failed to send to " . $user->email;
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_mass_email', 
+                        "Failed to send email to " . $user->email);
+                }
+            }
+            
+            # Send to BCC addresses
+            foreach my $bcc_email (@bcc_addresses) {
+                if ($c->model('Mail')->send_email($c, $bcc_email, $params->{subject}, $params->{body}, $site_id)) {
+                    $success_count++;
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_mass_email', 
+                        "Email sent successfully to BCC: $bcc_email");
+                } else {
+                    $error_count++;
+                    push @errors, "Failed to send to BCC: $bcc_email";
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_mass_email', 
+                        "Failed to send email to BCC: $bcc_email");
+                }
+            }
+            
+            # Update campaign status
+            if ($campaign) {
+                $campaign->update({
+                    status => $error_count > 0 ? 'completed_with_errors' : 'completed',
+                    success_count => $success_count,
+                    error_count => $error_count
+                });
+            }
+            
+            # Set status messages
+            if ($success_count > 0) {
+                $c->stash->{status_msg} = "Mass email sent successfully to $success_count recipients";
+            }
+            if ($error_count > 0) {
+                $c->stash->{error_msg} = "Failed to send to $error_count recipients";
+                if ($c->session->{debug_mode}) {
+                    $c->stash->{debug_msg} = \@errors;
+                }
+            }
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_mass_email', 
+                "Mass email completed: $success_count successful, $error_count failed");
+            
+        } catch {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_mass_email', 
+                "Error processing mass email: $_");
+            $c->stash->{error_msg} = "Error sending mass email: $_";
+        };
+    }
+    
+    $c->res->redirect($c->uri_for($self->action_for('mass_email_form')));
+}
+
 # Mailing List Management Actions
 
 sub mailing_lists :Path('lists') :Args(0) {
     my ($self, $c) = @_;
+    
+    # Check admin permissions
+    unless ($c->check_user_roles('admin') || $c->check_user_roles('developer')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'mailing_lists', 
+            "Unauthorized access attempt by user: " . ($c->user->username || 'unknown'));
+        $c->stash->{error_msg} = "Access denied. Admin privileges required.";
+        $c->res->redirect($c->uri_for('/mail'));
+        return;
+    }
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'mailing_lists', 
         "Accessing mailing lists management");
@@ -338,98 +557,7 @@ sub newsletter_signup :Local {
     $c->res->redirect($c->req->referer || '/');
 }
 
-sub mailing_lists :Path('lists') :Args(0) {
-    my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'mailing_lists', 
-        "Accessing mailing lists management");
-    
-    my $site_id = $c->session->{site_id} || 1;
-    
-    eval {
-        my $schema = $c->model('DBEncy');
-        my @lists = $schema->resultset('MailingList')->search(
-            { site_id => $site_id },
-            { order_by => 'name' }
-        )->all;
-        
-        $c->stash(
-            mailing_lists => \@lists,
-            template => 'mail/mailing_lists.tt'
-        );
-    };
-    
-    if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'mailing_lists', 
-            "Error fetching mailing lists: $@");
-        $c->stash->{error_msg} = "Error loading mailing lists: $@";
-    }
-}
 
-sub create_list :Path('lists/create') :Args(0) {
-    my ($self, $c) = @_;
-    
-    if ($c->req->method eq 'POST') {
-        my $params = $c->req->params;
-        my $site_id = $c->session->{site_id} || 1;
-        my $user_id = $c->session->{user_id} || 1;
-        
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_list', 
-            "Creating mailing list: " . ($params->{name} || 'unnamed'));
-        
-        eval {
-            my $schema = $c->model('DBEncy');
-            my $new_list = $schema->resultset('MailingList')->create({
-                site_id => $site_id,
-                name => $params->{name},
-                description => $params->{description},
-                list_email => $params->{list_email},
-                is_software_only => $params->{is_software_only} || 1,
-                is_active => 1,
-                created_by => $user_id,
-            });
-            
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_list', 
-                "Mailing list created successfully: " . $new_list->id);
-            $c->stash->{status_msg} = "Mailing list created successfully";
-            
-            $c->res->redirect($c->uri_for($self->action_for('mailing_lists')));
-            return;
-        };
-        
-        if ($@) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_list', 
-                "Error creating mailing list: $@");
-            $c->stash->{error_msg} = "Error creating mailing list: $@";
-        }
-    }
-    
-    $c->stash(template => 'mail/create_list.tt');
-}
-
-sub get_available_lists :Private {
-    my ($self, $c, $site_id) = @_;
-    
-    my @lists;
-    eval {
-        my $schema = $c->model('DBEncy');
-        @lists = $schema->resultset('MailingList')->search(
-            { 
-                site_id => $site_id,
-                is_active => 1 
-            },
-            { order_by => 'name' }
-        )->all;
-    };
-    
-    if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_available_lists', 
-            "Error fetching available lists: $@");
-        return [];
-    }
-    
-    return \@lists;
-}
 
 sub init_default_lists :Path('init_defaults') :Args(0) {
     my ($self, $c) = @_;

@@ -14,21 +14,23 @@ body[class*="theme-"] a:not(.dropbtn):not(.dropdown-content a):not(.submenu a):h
   color: var(--link-hover-color) !important;
 }
 
-/* Button styles */
-body[class*="theme-"] button,
-body[class*="theme-"] .button,
-body[class*="theme-"] input[type="submit"],
-body[class*="theme-"] input[type="button"] {
-  background-color: var(--button-bg) !important;
-  color: var(--button-text) !important;
-  border: 1px solid var(--button-border) !important;
+/* Button styles - Removed conflicting overrides that interfere with base-containers.css */
+/* The .btn, .btn-primary, .btn-secondary classes are properly handled by base-containers.css */
+/* Only override legacy button elements that don't use the new button classes */
+body[class*="theme-"] button:not([class*="btn"]),
+body[class*="theme-"] .button:not([class*="btn"]),
+body[class*="theme-"] input[type="submit"]:not([class*="btn"]),
+body[class*="theme-"] input[type="button"]:not([class*="btn"]) {
+  background-color: var(--primary-color);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
 }
 
-body[class*="theme-"] button:hover,
-body[class*="theme-"] .button:hover,
-body[class*="theme-"] input[type="submit"]:hover,
-body[class*="theme-"] input[type="button"]:hover {
-  background-color: var(--button-hover-bg) !important;
+body[class*="theme-"] button:not([class*="btn"]):hover,
+body[class*="theme-"] .button:not([class*="btn"]):hover,
+body[class*="theme-"] input[type="submit"]:not([class*="btn"]):hover,
+body[class*="theme-"] input[type="button"]:not([class*="btn"]):hover {
+  background-color: var(--link-hover-color);
 }
 
 /* Menu styles */

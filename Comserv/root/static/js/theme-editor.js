@@ -42,9 +42,9 @@ class ThemeEditor {
             this.themeVariables[property] = input.value;
         });
         
-        // Add additional variables
-        this.themeVariables['button-bg'] = this.themeVariables['accent-color'] || '#FF9900';
-        this.themeVariables['button-text'] = this.themeVariables['text-color'] || '#000000';
+        // Add additional variables - DO NOT override button colors, let theme handle them
+        // this.themeVariables['button-bg'] = this.themeVariables['accent-color'] || '#FF9900';
+        // this.themeVariables['button-text'] = this.themeVariables['text-color'] || '#000000';
         this.themeVariables['nav-bg'] = this.themeVariables['primary-color'] || '#ffffff';
         this.themeVariables['nav-text'] = this.themeVariables['text-color'] || '#000000';
         this.themeVariables['heading-color'] = this.themeVariables['text-color'] || '#000000';
