@@ -514,24 +514,43 @@ sub modify :Path('/todo/modify') :Args(1) {
             last_mod_by          => $c->session->{username} || 'system',
             last_mod_date        => DateTime->now->ymd,
             user_id              => $form_data->{user_id} || 1,
-            project_id           => $form_data->{project_id},
+            project_id           => $form_data->{project_id} || $todo->project_id,
             date_time_posted     => $form_data->{date_time_posted},
         });
     };
     if ($@) {
+        my $error_msg = $@;
+        my $user_friendly_msg = "An error occurred while updating the record.";
+        
+        # Provide more specific error messages for common issues
+        if ($error_msg =~ /Incorrect integer value.*for column.*project_id/) {
+            $user_friendly_msg = "Invalid project selection. Please choose a valid project or leave it blank.";
+        } elsif ($error_msg =~ /Incorrect integer value.*for column.*user_id/) {
+            $user_friendly_msg = "Invalid user selection. Please choose a valid user.";
+        } elsif ($error_msg =~ /Data too long for column/) {
+            $user_friendly_msg = "One or more fields contain too much text. Please shorten your input.";
+        } elsif ($error_msg =~ /cannot be null/) {
+            $user_friendly_msg = "Required fields are missing. Please fill in all required information.";
+        }
+        
         $self->logging->log_with_details(
             $c,
             'error',
             __FILE__,
             __LINE__,
             'modify.update_failure',
-            "Failed to update todo item for record ID: $record_id. Error: $@"
+            "Failed to update todo item for record ID: $record_id. Error: $error_msg"
         );
+        
+        # Send email notification to admin for database errors
+        $self->_notify_admin_of_error($c, $record_id, $error_msg, $form_data);
+        
         $c->stash(
-            error_msg => "An error occurred while updating the record: $@",
-            form_data => $form_data,          # Preserve form values
-            record    => $todo,              # Pass the current todo item
-            template  => 'todo/details.tt',   # Re-render the form
+            error_msg => $user_friendly_msg,
+            technical_error => $error_msg,      # For debugging if needed
+            form_data => $form_data,            # Preserve form values
+            record    => $todo,                 # Pass the current todo item
+            template  => 'todo/details.tt',     # Re-render the form
         );
         return; # Early exit on database error
     }
@@ -880,6 +899,97 @@ sub get_overdue_todos :Private {
     );
     
     return \@overdue_todos;
+}
+
+# Private method to notify admin of database errors
+sub _notify_admin_of_error :Private {
+    my ($self, $c, $record_id, $error_msg, $form_data) = @_;
+    
+    # Log the notification attempt
+    $self->logging->log_with_details(
+        $c,
+        'info',
+        __FILE__,
+        __LINE__,
+        'notify_admin',
+        "Attempting to notify admin of database error for record ID: $record_id"
+    );
+    
+    # Prepare error details for admin notification
+    my $user = $c->session->{username} || 'Unknown User';
+    my $sitename = $c->session->{SiteName} || 'Unknown Site';
+    my $timestamp = DateTime->now->strftime('%Y-%m-%d %H:%M:%S');
+    my $url = $c->req->uri;
+    
+    # Create a summary of form data (excluding sensitive information)
+    my $form_summary = '';
+    if ($form_data && ref $form_data eq 'HASH') {
+        for my $key (sort keys %$form_data) {
+            next if $key =~ /password|token|session/i; # Skip sensitive fields
+            my $value = $form_data->{$key} || '';
+            $value = substr($value, 0, 100) . '...' if length($value) > 100; # Truncate long values
+            $form_summary .= "  $key: $value\n";
+        }
+    }
+    
+    my $error_details = qq{
+Database Error in Todo System
+
+Time: $timestamp
+User: $user
+Site: $sitename
+URL: $url
+Record ID: $record_id
+
+Error Message:
+$error_msg
+
+Form Data Submitted:
+$form_summary
+
+This error has been logged and requires administrator attention.
+    };
+    
+    # Try to send email notification if email system is available
+    eval {
+        if ($c->can('model') && $c->model('Email')) {
+            $c->model('Email')->send(
+                to      => 'admin@' . ($c->config->{domain} || 'localhost'),
+                subject => "Database Error in Todo System - Record ID: $record_id",
+                body    => $error_details,
+            );
+            
+            $self->logging->log_with_details(
+                $c,
+                'info',
+                __FILE__,
+                __LINE__,
+                'notify_admin.email_sent',
+                "Admin notification email sent for record ID: $record_id"
+            );
+        }
+    };
+    
+    if ($@) {
+        $self->logging->log_with_details(
+            $c,
+            'warn',
+            __FILE__,
+            __LINE__,
+            'notify_admin.email_failed',
+            "Failed to send admin notification email: $@"
+        );
+    }
+    
+    # Always log the full error details for admin review
+    $self->logging->log_with_details(
+        $c,
+        'error',
+        __FILE__,
+        __LINE__,
+        'notify_admin.full_details',
+        $error_details
+    );
 }
 
 1;
