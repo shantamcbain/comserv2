@@ -140,7 +140,7 @@ $c->stash(
 
 ## Wrapper Integration
 
-### CSS Loading in wrapper.tt
+### CSS Loading in wrapper.tt.notusedbyapplication
 ```html
 <!-- Theme CSS: [% theme_name %] -->
 <link rel="stylesheet" type="text/css" href="/static/css/themes/[% theme_name %].css">

@@ -90,6 +90,24 @@ sub todo :Path('/todo') :Args(0) {
     my $project_id = $c->request->query_parameters->{project_id} || '';
     my $status_filter = $c->request->query_parameters->{status} || '';
 
+    # ROUTING FIX: Redirect to dedicated views when using specific filters without other parameters
+    # This ensures consistency between /todo?filter=day and /todo/day
+    if (!$search_term && !$project_id && !$status_filter) {
+        if ($filter_type eq 'day' || $filter_type eq 'today') {
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'todo', 'Redirecting to dedicated day view');
+            $c->res->redirect($c->uri_for('/todo/day'));
+            $c->detach;
+        } elsif ($filter_type eq 'week') {
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'todo', 'Redirecting to dedicated week view');
+            $c->res->redirect($c->uri_for('/todo/week'));
+            $c->detach;
+        } elsif ($filter_type eq 'month') {
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'todo', 'Redirecting to dedicated month view');
+            $c->res->redirect($c->uri_for('/todo/month'));
+            $c->detach;
+        }
+    }
+
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
 
@@ -516,6 +534,7 @@ sub modify :Path('/todo/modify') :Args(1) {
             user_id              => $form_data->{user_id} || 1,
             project_id           => $form_data->{project_id} || $todo->project_id,
             date_time_posted     => $form_data->{date_time_posted},
+            time_of_day          => $form_data->{time_of_day},
         });
     };
     if ($@) {
@@ -602,6 +621,7 @@ sub create :Local {
     my $project_id = $c->request->params->{project_id};
     my $manual_project_id = $c->request->params->{manual_project_id};
     my $date_time_posted = $c->request->params->{date_time_posted};
+    my $time_of_day = $c->request->params->{time_of_day};
 
     # If manual_project_id is not empty, use it as the project ID
     my $selected_project_id = $manual_project_id ? $manual_project_id : $project_id;
@@ -659,6 +679,7 @@ sub create :Local {
         group_of_poster => $group_of_poster,
         project_id => $selected_project_id,
         date_time_posted => $date_time_posted,
+        time_of_day => $time_of_day,
     });
 
     # Redirect the user to the index action
@@ -668,47 +689,100 @@ sub create :Local {
 sub day :Path('/todo/day') :Args {
     my ( $self, $c, $date_arg ) = @_;
 
-    # Validate the date_arg if it's defined
+    # Validate and parse the date_arg
     my $date;
-    if (defined $date_arg) {
-        my $iso8601 = DateTime::Format::ISO8601->new;
-        eval { $date = $iso8601->parse_datetime($date_arg) };
-        $date = DateTime->now->ymd unless $date;  # Use today's date if $date_arg is not valid
+    my $dt;
+    if (defined $date_arg && $date_arg =~ /^\d{4}-\d{2}-\d{2}$/) {
+        $date = $date_arg;
+        eval { $dt = DateTime->new(year => substr($date, 0, 4), month => substr($date, 5, 2), day => substr($date, 8, 2)) };
+        if ($@) {
+            $dt = DateTime->now;
+            $date = $dt->ymd;
+        }
     } else {
-        $date = DateTime->now->ymd;  # Use today's date if $date_arg is not defined
+        $dt = DateTime->now;
+        $date = $dt->ymd;
     }
+    
     # Calculate the previous and next dates
-    my $dt = DateTime::Format::ISO8601->parse_datetime($date);
-    my $previous_date = $dt->clone->subtract(days => 1)->strftime('%Y-%m-%d');
-    my $next_date = $dt->clone->add(days => 1)->strftime('%Y-%m-%d');
+    my $previous_date = $dt->clone->subtract(days => 1)->ymd;
+    my $next_date = $dt->clone->add(days => 1)->ymd;
 
-    # Get the Todo model
-    my $todo_model = $c->model('Todo');
+    # Fetch ALL todos for the site directly from database (like month view)
+    my $schema = $c->model('DBEncy');
+    my @all_todos = $schema->resultset('Todo')->search(
+        {
+            'me.sitename' => $c->session->{SiteName},
+        },
+        { 
+            order_by => { -asc => 'me.start_date' },
+            prefetch => 'project'
+        }
+    );
 
-    # Fetch todos for the site, ordered by start_date
-    my $todos = $todo_model->get_top_todos($c, $c->session->{SiteName});
-
-    # Filter todos for the given day: due today or starting today only
+    # Filter todos for the given day: due today or starting today
     my @filtered_todos = grep { 
         ($_->due_date && $_->due_date eq $date) ||           # Due today
         ($_->start_date && $_->start_date eq $date)          # Starting today  
-    } @$todos;
+    } @all_todos;
+    
+    # Sort todos by time_of_day: NULL times first, then chronological order
+    @filtered_todos = sort {
+        # Handle NULL time_of_day values - put them at the top
+        return -1 if (!defined $a->time_of_day && defined $b->time_of_day);
+        return 1 if (defined $a->time_of_day && !defined $b->time_of_day);
+        return 0 if (!defined $a->time_of_day && !defined $b->time_of_day);
+        
+        # Both have time values - sort chronologically
+        return $a->time_of_day cmp $b->time_of_day;
+    } @filtered_todos;
+    
+    # Organize todos by hour for time-slot display
+    my %todos_by_hour = ();
+    my @unscheduled_todos = ();
+    
+    foreach my $todo (@filtered_todos) {
+        # Safely check for time_of_day field (might not exist in database yet)
+        my $time_of_day;
+        eval { $time_of_day = $todo->time_of_day; };
+        
+        # Debug logging for this specific todo
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day', 
+            "Processing todo: " . $todo->subject . ", time_of_day: " . ($time_of_day || 'NULL') . 
+            ", length: " . (defined $time_of_day ? length($time_of_day) : 'N/A'));
+        
+        if (defined $time_of_day && $time_of_day ne '' && $time_of_day =~ /^(\d{1,2}):/) {
+            my $hour = int($1);
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day', 
+                "Scheduling todo '" . $todo->subject . "' at hour: $hour");
+            push @{$todos_by_hour{$hour}}, $todo;
+        } else {
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day', 
+                "Adding todo '" . $todo->subject . "' to unscheduled (time: " . ($time_of_day || 'NULL') . ")");
+            push @unscheduled_todos, $todo;
+        }
+    }
     
     # Debug logging
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day', 
-        "Filtering for date: $date, Total todos: " . scalar(@$todos) . ", Filtered todos: " . scalar(@filtered_todos));
+        "Day view debug: Found " . scalar(@all_todos) . " total todos, " . scalar(@filtered_todos) . " filtered todos for date: $date");
     
     if ($c->session->{debug_mode}) {
-        foreach my $todo (@$todos) {
+        foreach my $todo (@all_todos) {
+            my $time_of_day;
+            eval { $time_of_day = $todo->time_of_day; };
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day', 
                 "Todo: " . $todo->subject . ", Start: " . ($todo->start_date || 'NULL') . 
-                ", Due: " . ($todo->due_date || 'NULL') . ", Status: " . $todo->status);
+                ", Due: " . ($todo->due_date || 'NULL') . ", Status: " . $todo->status . 
+                ", Time: " . ($time_of_day || 'NULL'));
         }
     }
 
     # Add the todos to the stash
     $c->stash(
         todos => \@filtered_todos,
+        todos_by_hour => \%todos_by_hour,
+        unscheduled_todos => \@unscheduled_todos,
         sitename => $c->session->{SiteName},
         date => $date,
         previous_date => $previous_date,
@@ -901,7 +975,232 @@ sub get_overdue_todos :Private {
     return \@overdue_todos;
 }
 
-# Private method to notify admin of database errors
+# AI-driven todo creation from natural language prompts
+sub ai_create_todo :Path('/todo/ai_create') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Get the AI prompt from request parameters
+    my $ai_prompt = $c->request->params->{prompt} || '';
+    my $auto_assign = $c->request->params->{auto_assign} || 0;
+    
+    $self->logging->log_with_details(
+        $c, 'info', __FILE__, __LINE__, 'ai_create_todo',
+        "AI todo creation requested with prompt: $ai_prompt"
+    );
+    
+    # Validate input
+    unless ($ai_prompt) {
+        $c->stash(
+            error_msg => 'AI prompt is required for todo creation.',
+            template => 'todo/ai_create.tt'
+        );
+        return;
+    }
+    
+    # Parse the AI prompt to extract todo details
+    my $todo_data = $self->_parse_ai_prompt($c, $ai_prompt);
+    
+    if ($todo_data->{error}) {
+        $c->stash(
+            error_msg => $todo_data->{error},
+            template => 'todo/ai_create.tt'
+        );
+        return;
+    }
+    
+    # Create the todo using parsed data
+    my $result = $self->_create_todo_from_data($c, $todo_data, 'ai_prompt');
+    
+    if ($result->{success}) {
+        $c->stash(
+            success_msg => "Todo successfully created from AI prompt. Record ID: " . $result->{record_id},
+            todo_record => $result->{todo},
+            template => 'todo/ai_create.tt'
+        );
+        
+        $self->logging->log_with_details(
+            $c, 'info', __FILE__, __LINE__, 'ai_create_todo.success',
+            "AI todo created successfully with ID: " . $result->{record_id}
+        );
+    } else {
+        $c->stash(
+            error_msg => $result->{error},
+            template => 'todo/ai_create.tt'
+        );
+    }
+}
+
+# Parse AI prompt to extract todo details
+sub _parse_ai_prompt :Private {
+    my ($self, $c, $prompt) = @_;
+    
+    $self->logging->log_with_details(
+        $c, 'debug', __FILE__, __LINE__, 'parse_ai_prompt',
+        "Parsing AI prompt: $prompt"
+    );
+    
+    # Initialize default values
+    my $todo_data = {
+        sitename => $c->session->{SiteName} || 'default',
+        start_date => DateTime->now->ymd,
+        due_date => DateTime->now->add(days => 7)->ymd,
+        priority => 2, # Medium priority by default
+        status => 1,   # New status
+        username_of_poster => $c->session->{username} || 'AI_System',
+        last_mod_by => $c->session->{username} || 'AI_System',
+        user_id => $c->session->{user_id} || 1,
+        project_id => undef,
+        share => 0,
+        accumulative_time => 0,
+        estimated_man_hours => 1,
+        parent_todo => '', # Default empty parent_todo to fix database constraint
+        project_code => 'default', # Default project_code to fix database constraint
+    };
+    
+    # Extract subject from prompt
+    if ($prompt =~ /create\s+(?:a\s+)?todo\s+(?:for\s+)?(.+?)(?:\s+to\s+(.+))?$/i) {
+        my $subject_part = $1;
+        my $description_part = $2 || '';
+        
+        # Clean up subject
+        $subject_part =~ s/\s+for\s+(.+?)$//i;
+        my $assignee_part = $1 || '';
+        
+        $todo_data->{subject} = $subject_part;
+        $todo_data->{description} = $description_part;
+        
+        # Try to extract assignee information
+        if ($assignee_part) {
+            $todo_data->{owner} = $assignee_part;
+            $todo_data->{developer} = $assignee_part;
+        }
+    } else {
+        # Fallback: use the entire prompt as subject
+        $todo_data->{subject} = $prompt;
+        $todo_data->{description} = "Auto-generated todo from AI prompt: $prompt";
+    }
+    
+    # Extract priority keywords
+    if ($prompt =~ /\b(urgent|critical|high|important)\b/i) {
+        $todo_data->{priority} = 1; # High priority
+        $todo_data->{due_date} = DateTime->now->add(days => 1)->ymd; # Due tomorrow
+    } elsif ($prompt =~ /\b(low|minor|later)\b/i) {
+        $todo_data->{priority} = 3; # Low priority
+        $todo_data->{due_date} = DateTime->now->add(days => 14)->ymd; # Due in 2 weeks
+    }
+    
+    # Extract specific assignees
+    if ($prompt =~ /\b(?:for|assign(?:ed)?\s+to)\s+([A-Za-z]+(?:\s+[A-Za-z]+)*)/i) {
+        my $assignee = $1;
+        $todo_data->{owner} = $assignee;
+        $todo_data->{developer} = $assignee;
+        
+        # Try to find user_id for the assignee
+        my $schema = $c->model('DBEncy');
+        my $user = $schema->resultset('User')->search({ username => $assignee })->first;
+        if ($user) {
+            $todo_data->{user_id} = $user->id;
+        }
+    }
+    
+    # Extract project information
+    if ($prompt =~ /\b(?:project|for)\s+([A-Za-z0-9_\-]+)/i) {
+        my $project_name = $1;
+        my $schema = $c->model('DBEncy');
+        my $project = $schema->resultset('Project')->search({ 
+            -or => [
+                { name => { 'like', "%$project_name%" } },
+                { project_code => { 'like', "%$project_name%" } }
+            ]
+        })->first;
+        
+        if ($project) {
+            $todo_data->{project_id} = $project->id;
+            $todo_data->{project_code} = $project->project_code;
+        }
+    }
+    
+    # Validate required fields
+    unless ($todo_data->{subject}) {
+        return { error => "Could not extract a valid subject from the AI prompt." };
+    }
+    
+    $self->logging->log_with_details(
+        $c, 'debug', __FILE__, __LINE__, 'parse_ai_prompt.result',
+        "Parsed todo data: Subject=" . $todo_data->{subject} . 
+        ", Priority=" . $todo_data->{priority} . 
+        ", Assignee=" . ($todo_data->{owner} || 'none')
+    );
+    
+    return $todo_data;
+}
+
+# Create todo from structured data (used by both AI and error systems)
+sub _create_todo_from_data :Private {
+    my ($self, $c, $todo_data, $source) = @_;
+    
+    $source ||= 'manual';
+    
+    $self->logging->log_with_details(
+        $c, 'info', __FILE__, __LINE__, 'create_todo_from_data',
+        "Creating todo from $source with subject: " . $todo_data->{subject}
+    );
+    
+    # Get current date for timestamps
+    my $current_date = DateTime->now->ymd;
+    
+    # Ensure required fields have defaults
+    $todo_data->{sitename} ||= $c->session->{SiteName} || 'default';
+    $todo_data->{start_date} ||= $current_date;
+    $todo_data->{due_date} ||= DateTime->now->add(days => 7)->ymd;
+    $todo_data->{last_mod_date} = $current_date;
+    $todo_data->{date_time_posted} ||= DateTime->now->strftime('%Y-%m-%d %H:%M:%S');
+    $todo_data->{username_of_poster} ||= $c->session->{username} || 'System';
+    $todo_data->{last_mod_by} ||= $c->session->{username} || 'System';
+    $todo_data->{user_id} ||= $c->session->{user_id} || 1;
+    $todo_data->{group_of_poster} ||= join(',', @{$c->session->{roles} || ['system']});
+    $todo_data->{parent_todo} ||= ''; # Ensure parent_todo is always set to avoid database constraint error
+    $todo_data->{project_code} ||= 'default'; # Ensure project_code is always set to avoid database constraint error
+    
+    # Set project_code if project_id is provided but project_code is missing
+    if ($todo_data->{project_id} && !$todo_data->{project_code}) {
+        my $schema = $c->model('DBEncy');
+        my $project = $schema->resultset('Project')->find($todo_data->{project_id});
+        $todo_data->{project_code} = $project ? $project->project_code : 'default_code';
+    }
+    
+    # Attempt to create the todo record
+    eval {
+        my $schema = $c->model('DBEncy');
+        my $todo = $schema->resultset('Todo')->create($todo_data);
+        
+        $self->logging->log_with_details(
+            $c, 'info', __FILE__, __LINE__, 'create_todo_from_data.success',
+            "Todo created successfully with ID: " . $todo->record_id . " from source: $source"
+        );
+        
+        return {
+            success => 1,
+            record_id => $todo->record_id,
+            todo => $todo
+        };
+    };
+    
+    if ($@) {
+        my $error_msg = $@;
+        $self->logging->log_with_details(
+            $c, 'error', __FILE__, __LINE__, 'create_todo_from_data.failure',
+            "Failed to create todo from $source. Error: $error_msg"
+        );
+        
+        return {
+            success => 0,
+            error => "Failed to create todo: $error_msg"
+        };
+    }
+}
+
+# Enhanced error notification that also creates todos for critical errors
 sub _notify_admin_of_error :Private {
     my ($self, $c, $record_id, $error_msg, $form_data) = @_;
     
@@ -950,6 +1249,9 @@ $form_summary
 This error has been logged and requires administrator attention.
     };
     
+    # Create a todo for critical database errors
+    $self->_create_error_todo($c, $error_msg, $record_id, $user, $sitename, $url);
+    
     # Try to send email notification if email system is available
     eval {
         if ($c->can('model') && $c->model('Email')) {
@@ -990,6 +1292,69 @@ This error has been logged and requires administrator attention.
         'notify_admin.full_details',
         $error_details
     );
+}
+
+# Create a todo for system errors
+sub _create_error_todo :Private {
+    my ($self, $c, $error_msg, $record_id, $user, $sitename, $url) = @_;
+    
+    # Determine if this is a critical error that needs immediate attention
+    my $is_critical = $error_msg =~ /\b(database|connection|timeout|deadlock|constraint|foreign key)\b/i;
+    
+    my $priority = $is_critical ? 1 : 2; # High priority for critical errors
+    my $due_days = $is_critical ? 1 : 3; # Due tomorrow for critical, 3 days for others
+    
+    # Create todo data for the error
+    my $todo_data = {
+        sitename => $sitename,
+        start_date => DateTime->now->ymd,
+        due_date => DateTime->now->add(days => $due_days)->ymd,
+        subject => "System Error: " . substr($error_msg, 0, 100),
+        description => qq{
+AUTOMATED TODO: System Error Detected
+
+Error Details:
+- Time: } . DateTime->now->strftime('%Y-%m-%d %H:%M:%S') . qq{
+- User: $user
+- Site: $sitename
+- URL: $url
+- Record ID: $record_id
+
+Error Message:
+$error_msg
+
+This todo was automatically created by the error handling system.
+Please investigate and resolve this issue.
+        },
+        priority => $priority,
+        status => 1, # New
+        owner => 'admin',
+        developer => 'admin',
+        reporter => 'System',
+        username_of_poster => 'Error_System',
+        last_mod_by => 'Error_System',
+        user_id => 1, # Default admin user
+        estimated_man_hours => $is_critical ? 4 : 2,
+        comments => "Auto-generated from system error. Priority: " . ($is_critical ? "CRITICAL" : "Normal"),
+    };
+    
+    # Create the error todo
+    my $result = $self->_create_todo_from_data($c, $todo_data, 'error_system');
+    
+    if ($result->{success}) {
+        $self->logging->log_with_details(
+            $c, 'info', __FILE__, __LINE__, 'create_error_todo.success',
+            "Error todo created successfully with ID: " . $result->{record_id} . 
+            " for error: " . substr($error_msg, 0, 50)
+        );
+    } else {
+        $self->logging->log_with_details(
+            $c, 'warn', __FILE__, __LINE__, 'create_error_todo.failure',
+            "Failed to create error todo: " . $result->{error}
+        );
+    }
+    
+    return $result;
 }
 
 1;

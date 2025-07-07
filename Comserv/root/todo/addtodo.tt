@@ -3,43 +3,7 @@
     Version: [% PageVersion %]
 [% END %]
 
-<style>
-    /* Form styling */
-    form div {
-        margin-bottom: 15px;
-    }
 
-    label {
-        display: block;
-        margin-bottom: 5px;
-        font-weight: bold;
-    }
-
-    input[type="text"],
-    input[type="date"],
-    input[type="number"],
-    select {
-        width: 100%;
-        padding: 8px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        box-sizing: border-box;
-    }
-
-    input[type="submit"] {
-        background-color: #4CAF50;
-        color: white;
-        padding: 10px 15px;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        font-weight: bold;
-    }
-
-    input[type="submit"]:hover {
-        background-color: #45a049;
-    }
-</style>
 
 <h1>Add a New To-do Item</h1>
 
@@ -65,6 +29,39 @@
         <label for="due_date">Due Date:</label>
         <input type="date" id="due_date" name="due_date" value="[% todo.due_date OR '' %]">
     </div>
+    <div>
+        <label for="time_of_day">Time of Day (optional):</label>
+        <div class="time-input-container">
+            <select id="time_preset" class="time-preset" onchange="setTimeFromPreset()" style="margin-bottom: 5px; padding: 5px; width: 100%;">
+                <option value="">-- Select Common Time --</option>
+                <option value="08:00">8:00 AM</option>
+                <option value="09:00">9:00 AM</option>
+                <option value="10:00">10:00 AM</option>
+                <option value="11:00">11:00 AM</option>
+                <option value="12:00">12:00 PM</option>
+                <option value="13:00">1:00 PM</option>
+                <option value="14:00">2:00 PM</option>
+                <option value="15:00">3:00 PM</option>
+                <option value="16:00">4:00 PM</option>
+                <option value="17:00">5:00 PM</option>
+                <option value="18:00">6:00 PM</option>
+                <option value="19:00">7:00 PM</option>
+                <option value="20:00">8:00 PM</option>
+            </select>
+            <input type="time" id="time_of_day" name="time_of_day" value="[% todo.time_of_day OR '' %]" placeholder="HH:MM" style="width: 100%; padding: 5px;">
+        </div>
+        <small style="color: #666; font-size: 0.9em;">Select from common times or enter manually for day view organization</small>
+    </div>
+
+    <script>
+    function setTimeFromPreset() {
+        var preset = document.getElementById('time_preset');
+        var manual = document.getElementById('time_of_day');
+        if (preset.value) {
+            manual.value = preset.value;
+        }
+    }
+    </script>
     <div>
         <label for="subject">Subject:</label>
         <input type="text" id="subject" name="subject" value="[% todo.subject OR '' %]">

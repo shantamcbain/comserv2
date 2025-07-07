@@ -266,7 +266,7 @@ sub index :Path :Args(0) {
     $c->stash->{using_json_themes} = 1;
     $c->stash->{info_msg} = "The theme system is using JSON-based theme definitions. Database integration will be available in a future update.";
 
-    # Make sure the theme_name is set in the stash for the wrapper.tt template
+    # Make sure the theme_name is set in the stash for the wrapper.tt.notusedbyapplication template
     $c->stash->{theme_name} = $theme_name;
 
     # Log the template path

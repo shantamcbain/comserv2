@@ -78,6 +78,10 @@ __PACKAGE__->add_columns(
     project_id => {
         data_type => 'integer',
     },
+    time_of_day => {
+        data_type => 'time',
+        is_nullable => 1,
+    },
     "date_time_posted",
     { data_type => "varchar", default_value => "", is_nullable => 1, size => 30 },
 );

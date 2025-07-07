@@ -2,48 +2,36 @@
     width: 100%;
 }
 
-/* Todo action buttons */
+/* Todo action buttons - HORIZONTAL LAYOUT */
+.todo-actions-horizontal {
+    display: flex;
+    flex-direction: row;
+    gap: 5px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.todo-actions-horizontal form {
+    margin: 0;
+}
+
+/* Legacy vertical layout - DEPRECATED */
 .action-buttons-cell {
     display: flex;
     flex-direction: column;
     gap: 5px;
 }
 
-.action-button {
-    padding: 5px 10px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: bold;
-    width: 100%;
-}
-
-.log-button {
-    background-color: #4CAF50;
-    color: white;
-}
-
-.details-button {
-    background-color: #2196F3;
-    color: white;
-}
-
-.edit-button {
-    background-color: #FF9800;
-    color: white;
-}
-
-.action-button:hover {
-    opacity: 0.9;
-}
+/* Legacy action buttons - DEPRECATED - use theme system instead */
 
 /* Todo filter container */
 .filter-container {
-    background-color: #f8f9fa;
+    background-color: var(--table-header-bg);
     padding: 15px;
     border-radius: 5px;
     margin-bottom: 20px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: 1px solid var(--border-color);
 }
 
 .filter-row {
@@ -68,60 +56,29 @@
 .filter-group input[type="text"] {
     width: 100%;
     padding: 8px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color, #ddd);
     border-radius: 4px;
 }
 
+/* Remove hardcoded filter button colors - use theme system */
 .filter-buttons {
     display: flex;
     gap: 10px;
     margin-top: 10px;
 }
 
-.filter-buttons button {
-    padding: 8px 15px;
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-.filter-buttons button:hover {
-    background-color: #45a049;
-}
-
-.filter-buttons .reset-button {
-    background-color: #f44336;
-}
-
-.filter-buttons .reset-button:hover {
-    background-color: #d32f2f;
-}
-
-/* Todo view buttons */
+/* Todo view buttons - USE THEME SYSTEM */
 .view-buttons {
     display: flex;
     gap: 10px;
     margin-bottom: 15px;
+    flex-wrap: wrap;
 }
 
-.view-buttons a {
-    padding: 8px 15px;
-    background-color: #2196F3;
-    color: white;
-    text-decoration: none;
-    border-radius: 4px;
-    text-align: center;
-}
-
-.view-buttons a:hover {
-    background-color: #0b7dda;
-}
-
+/* Remove hardcoded colors - let theme system handle button styling */
 .view-buttons a.active {
-    background-color: #0b7dda;
     font-weight: bold;
+    opacity: 0.8;
 }
 
 /* Day view specific styles */
@@ -130,6 +87,313 @@
     border-collapse: collapse;
     table-layout: fixed;
     margin-top: 20px;
+}
+
+/* Time-based organization styles */
+.time-cell {
+    text-align: center;
+    font-weight: bold;
+    vertical-align: middle;
+}
+
+.time-display {
+    color: var(--primary-color, #4CAF50);
+    font-family: 'Courier New', monospace;
+    font-size: 1.1em;
+    font-weight: bold;
+    background-color: var(--success-color, #e8f5e8);
+    padding: 4px 8px;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+.no-time {
+    color: var(--text-color, #999);
+    font-style: italic;
+    font-size: 0.9em;
+}
+
+/* Hourly Schedule Layout */
+.unscheduled-section {
+    background-color: var(--warning-color, #fff3cd);
+    border: 1px solid var(--warning-color, #ffeaa7);
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+.unscheduled-section h3 {
+    margin: 0 0 15px 0;
+    color: var(--text-color, #333);
+    font-size: 1.2em;
+}
+
+.unscheduled-todos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.hourly-schedule {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    background-color: var(--border-color, #ddd);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.hour-slot {
+    display: flex;
+    background-color: var(--card-bg, #ffffff);
+    min-height: 80px;
+}
+
+.hour-label {
+    width: 100px;
+    background-color: var(--primary-color, #4CAF50);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 0.9em;
+    text-align: center;
+    padding: 10px 5px;
+}
+
+.hour-content {
+    flex: 1;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background-color: var(--card-bg, #ffffff);
+}
+
+.empty-hour {
+    color: var(--text-color, #999);
+    font-style: italic;
+    text-align: center;
+    padding: 20px;
+    background-color: var(--bg-color, #f9f9f9);
+    border-radius: 4px;
+}
+
+.scheduled-todo {
+    background-color: var(--card-bg, #ffffff);
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 6px;
+    padding: 10px;
+    display: flex;
+    gap: 10px;
+    transition: all 0.2s ease;
+}
+
+.scheduled-todo:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+}
+
+.todo-time {
+    background-color: var(--primary-color, #4CAF50);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    font-size: 0.9em;
+    min-width: 50px;
+    text-align: center;
+    align-self: flex-start;
+}
+
+.todo-details {
+    flex: 1;
+}
+
+.todo-subject {
+    font-weight: bold;
+    color: var(--text-color, #333);
+    margin-bottom: 5px;
+    font-size: 1.1em;
+}
+
+.todo-meta {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 8px;
+    font-size: 0.9em;
+}
+
+.todo-status {
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.8em;
+    font-weight: bold;
+}
+
+.todo-priority {
+    background-color: var(--secondary-color, #6c757d);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.8em;
+    font-weight: bold;
+}
+
+.todo-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* Remove hardcoded button styling - let theme system handle it */
+.todo-actions a {
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+/* Priority-based styling for scheduled todos */
+.scheduled-todo.priority-1 {
+    border-left: 4px solid var(--danger-color, #f44336);
+}
+
+.scheduled-todo.priority-2 {
+    border-left: 4px solid var(--warning-color, #FF9800);
+}
+
+.scheduled-todo.priority-3 {
+    border-left: 4px solid var(--success-color, #4CAF50);
+}
+
+.scheduled-todo.priority-4,
+.scheduled-todo.priority-5 {
+    border-left: 4px solid var(--primary-color, #2196F3);
+}
+
+/* Unscheduled todo items */
+.todo-item {
+    background-color: var(--card-bg, #ffffff);
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 6px;
+    padding: 10px;
+    min-width: 250px;
+    transition: all 0.2s ease;
+}
+
+.todo-item:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+}
+
+.todo-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.todo-item .todo-subject {
+    font-weight: bold;
+    color: var(--text-color, #333);
+}
+
+.todo-item .todo-priority {
+    background-color: var(--secondary-color, #6c757d);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.8em;
+    font-weight: bold;
+}
+
+/* Priority-based styling for unscheduled todos */
+.todo-item.priority-1 {
+    border-left: 4px solid var(--danger-color, #f44336);
+}
+
+.todo-item.priority-2 {
+    border-left: 4px solid var(--warning-color, #FF9800);
+}
+
+.todo-item.priority-3 {
+    border-left: 4px solid var(--success-color, #4CAF50);
+}
+
+/* Status-based styling */
+.todo-status {
+    background-color: var(--secondary-color, #6c757d);
+    color: white;
+}
+
+/* Time Input Components */
+.time-input-container {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.time-preset {
+    background-color: var(--card-bg, #ffffff);
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 4px;
+    padding: 8px;
+    font-size: 0.9em;
+    color: var(--text-color, #333);
+}
+
+.time-preset:focus {
+    border-color: var(--primary-color, #4CAF50);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+}
+
+.time-manual {
+    background-color: var(--card-bg, #ffffff);
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 4px;
+    padding: 8px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+    color: var(--text-color, #333);
+}
+
+.time-manual:focus {
+    border-color: var(--primary-color, #4CAF50);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+}
+
+/* Responsive design for hourly schedule */
+@media (max-width: 768px) {
+    .hour-slot {
+        flex-direction: column;
+    }
+    
+    .hour-label {
+        width: 100%;
+        padding: 8px;
+        font-size: 0.8em;
+    }
+    
+    .scheduled-todo {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .todo-time {
+        align-self: flex-start;
+        min-width: auto;
+    }
+    
+    .unscheduled-todos {
+        flex-direction: column;
+    }
+    
+    .todo-item {
+        min-width: auto;
+    }
 }
 
 .day-view-table th, .day-view-table td {
@@ -144,72 +408,54 @@
     text-align: left;
 }
 
+/* Day navigation - use theme system */
 .day-navigation {
     display: flex;
     justify-content: space-between;
     margin: 20px 0;
+    gap: 10px;
+    flex-wrap: wrap;
 }
 
-.day-navigation a {
-    padding: 8px 15px;
-    background-color: var(--button-bg, #f2f2f2);
-    color: var(--button-text, #000000);
-    text-decoration: none;
-    border-radius: 4px;
-    border: 1px solid var(--button-border, #cccccc);
-}
-
-.day-navigation a:hover {
-    background-color: var(--button-hover-bg, #e0e0e0);
-}
-
+/* Legacy action-cell - DEPRECATED - use theme system instead */
 .action-cell {
     display: flex;
     flex-direction: column;
     gap: 5px;
 }
 
-.action-cell button {
-    padding: 5px 10px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: bold;
-    width: 100%;
-}
-
 .priority-1 {
-    background-color: #ffcccc;
+    background-color: var(--danger-color-light, #ffcccc);
 }
 
 .priority-2 {
-    background-color: #ffffcc;
+    background-color: var(--warning-color-light, #ffffcc);
 }
 
 .priority-3 {
-    background-color: #ccffcc;
+    background-color: var(--success-color-light, #ccffcc);
 }
 
 /* Unified Todo System Enhancements */
 .overdue-section {
-    background: #ffebee;
-    border: 1px solid #f44336;
+    background: var(--danger-color-light, #ffebee);
+    border: 1px solid var(--danger-color, #f44336);
     border-radius: 4px;
     padding: 1rem;
     margin-bottom: 1rem;
 }
 
 .overdue-section h3 {
-    color: #d32f2f;
+    color: var(--danger-color-dark, #d32f2f);
     margin: 0 0 0.5rem 0;
 }
 
 .overdue-list .overdue-item {
-    background: white;
+    background: var(--card-bg, white);
     padding: 0.5rem;
     margin-bottom: 0.5rem;
     border-radius: 4px;
-    border-left: 4px solid #f44336;
+    border-left: 4px solid var(--danger-color, #f44336);
 }
 
 .overdue-item strong {
@@ -218,7 +464,7 @@
 }
 
 .overdue-item .meta-info {
-    color: #666;
+    color: var(--text-color-muted, #666);
     margin-left: 1rem;
 }
 
@@ -228,7 +474,7 @@
 
 .overdue-item .actions a {
     margin-right: 0.5rem;
-    color: #1976d2;
+    color: var(--link-color, #1976d2);
     text-decoration: none;
 }
 
@@ -276,19 +522,48 @@
     font-size: 0.85em !important;
     font-weight: 600 !important;
     padding: 4px 6px !important;
-    margin-bottom: 4px !important;
-    min-height: 22px !important;
 }
 
+/* Todo navigation and action buttons using theme system */
+.todo-nav-buttons {
+    display: flex;
+    gap: 10px;
+    margin: 20px 0;
+    flex-wrap: wrap;
+}
+
+.todo-action-buttons {
+    display: flex;
+    gap: 10px;
+    margin: 20px 0;
+    flex-wrap: wrap;
+}
+
+/* Small button variant for table actions */
+.btn-sm {
+    padding: 4px 8px;
+    font-size: 0.875em;
+    line-height: 1.2;
+}
+
+/* Inline form styling for action buttons */
+.inline-form {
+    display: inline;
+    margin: 0;
+}
+
+/* TODO SYSTEM - LET THEME SYSTEM HANDLE BUTTONS */
+/* Remove all forced overrides - let base-containers.css handle button styling */
+
 .month-calendar .calendar-item.todo-item.due {
-    background: rgba(244, 67, 54, 0.2) !important;
-    border-left: 4px solid #f44336 !important;
+    background: var(--danger-color-light, rgba(244, 67, 54, 0.2)) !important;
+    border-left: 4px solid var(--danger-color, #f44336) !important;
     animation: pulse-due 2s infinite;
 }
 
 .month-calendar .calendar-item.log-item {
-    background: rgba(255, 152, 0, 0.05) !important;
-    border-left: 2px solid #FF9800 !important;
+    background: var(--warning-color-light, rgba(255, 152, 0, 0.05)) !important;
+    border-left: 2px solid var(--warning-color, #FF9800) !important;
     font-size: 0.65em !important;
     font-weight: 300 !important;
     opacity: 0.7 !important;
@@ -304,12 +579,12 @@
     flex-shrink: 0;
 }
 
-.status-1 { background: #9E9E9E; }
-.status-2 { background: #FF9800; }
-.status-3 { background: #4CAF50; }
+.status-1 { background: var(--secondary-color, #9E9E9E); }
+.status-2 { background: var(--warning-color, #FF9800); }
+.status-3 { background: var(--success-color, #4CAF50); }
 
 .log-indicator {
-    background: #FF9800;
+    background: var(--warning-color, #FF9800);
 }
 
 .item-text {
@@ -321,8 +596,8 @@
 
 /* Project integration styles */
 .project-badge {
-    background: #e3f2fd;
-    color: #1976d2;
+    background: var(--info-color-light, #e3f2fd);
+    color: var(--info-color, #1976d2);
     padding: 0.2rem 0.4rem;
     border-radius: 3px;
     font-size: 0.8rem;
@@ -336,9 +611,9 @@
     font-weight: bold;
 }
 
-.status-new { background: #e8f5e8; color: #2e7d32; }
-.status-in-progress { background: #fff3e0; color: #f57c00; }
-.status-completed { background: #e8f5e8; color: #388e3c; }
+.status-new { background: var(--secondary-color-light, #e8f5e8); color: var(--secondary-color-dark, #2e7d32); }
+.status-in-progress { background: var(--warning-color-light, #fff3e0); color: var(--warning-color-dark, #f57c00); }
+.status-completed { background: var(--success-color-light, #e8f5e8); color: var(--success-color-dark, #388e3c); }
 
 /* Month Calendar Styles */
 .month-calendar {

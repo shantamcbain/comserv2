@@ -1,29 +1,31 @@
-[% PageVersion  = 'todo.tt,v 0.1 2023/11/09 Shanta Exp Shanta' %]
+[% PageVersion  = 'todo.tt,v 1.1 2025/01/27 Shanta Exp Shanta' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
     [%# "Debugging HostName: " _ HostName %]
     [%# INCLUDE 'debug.tt' %]
 [% END %]
 
-
-<h1>ToDo List</h1>
-<h2>[% date_today %]</h2>
+<div class="apiary-container">
+    <div class="feature-header">
+        <h1>ToDo List</h1>
+        <h2>[% date_today %]</h2>
+    </div>
 
 [% IF overdue_todos.size > 0 %]
-<div class="overdue-section" style="background: #ffebee; border: 1px solid #f44336; border-radius: 4px; padding: 1rem; margin-bottom: 1rem;">
-    <h3 style="color: #d32f2f; margin: 0 0 0.5rem 0;">⚠️ Overdue TODOs ([% overdue_todos.size %])</h3>
+<div class="overdue-section">
+    <h3>⚠️ Overdue TODOs ([% overdue_todos.size %])</h3>
     <div class="overdue-list">
         [% FOREACH todo IN overdue_todos %]
-        <div style="background: white; padding: 0.5rem; margin-bottom: 0.5rem; border-radius: 4px; border-left: 4px solid #f44336;">
+        <div class="overdue-item">
             <strong>[% todo.subject %]</strong>
-            <span style="color: #666; margin-left: 1rem;">Due: [% todo.due_date %]</span>
+            <span class="meta-info">Due: [% todo.due_date %]</span>
             [% IF todo.project %]
-                <span style="color: #666; margin-left: 1rem;">Project: [% todo.project.name %]</span>
+                <span class="meta-info">Project: [% todo.project.name %]</span>
             [% END %]
-            <div style="margin-top: 0.25rem;">
-                <a href="/todo/details?record_id=[% todo.record_id %]" style="margin-right: 0.5rem;">View</a>
-                <a href="/todo/edit/[% todo.record_id %]" style="margin-right: 0.5rem;">Edit</a>
-                <a href="/log/log_form?todo_record_id=[% todo.record_id %]">Log Time</a>
+            <div class="actions">
+                <a href="/todo/details?record_id=[% todo.record_id %]" class="btn btn-info btn-sm">View</a>
+                <a href="/todo/edit/[% todo.record_id %]" class="btn btn-warning btn-sm">Edit</a>
+                <a href="/log/log_form?todo_record_id=[% todo.record_id %]" class="btn btn-success btn-sm">Log Time</a>
             </div>
         </div>
         [% END %]
@@ -86,18 +88,21 @@
         </div>
 
         <div class="filter-buttons">
-            <button type="submit">Apply Filters</button>
-            <button type="button" class="reset-button" onclick="window.location.href='/todo'">Reset Filters</button>
+            <button type="submit" class="btn btn-primary">Apply Filters</button>
+            <button type="button" class="btn btn-secondary" onclick="window.location.href='/todo'">Reset Filters</button>
         </div>
     </form>
 </div>
 
 <div class="view-buttons">
-    <a href="/todo" class="[% IF !filter_type || filter_type == 'all' %]active[% END %]">List View</a>
-    <a href="/todo/day">Day View</a>
-    <a href="/todo/week">Week View</a>
-    <a href="/todo/month">Month View</a>
-    <a href="/todo/addtodo" style="margin-left: auto;">Add New Todo</a>
+    <a href="/todo" class="btn btn-secondary [% IF !filter_type || filter_type == 'all' %]active[% END %]">List View</a>
+    <a href="/todo/day" class="btn btn-secondary">Day View</a>
+    <a href="/todo/week" class="btn btn-secondary">Week View</a>
+    <a href="/todo/month" class="btn btn-secondary">Month View</a>
+    <a href="/todo/ai_create" class="btn btn-primary">
+        <i class="fas fa-robot"></i> AI Create Todo
+    </a>
+    <a href="/todo/addtodo" class="btn btn-success">Add New Todo</a>
 </div>
 <table class="week-view-table">
   <tr>
@@ -121,10 +126,10 @@
         <tr>
         <td colspan="13">
             <div class="top-controls">
-                <button type="button" onclick="window.scrollTo(0, 0);">Return to top</button>
+                <button type="button" class="btn btn-secondary" onclick="window.scrollTo(0, 0);">Return to top</button>
                 <!-- Add the form next to the "Return to top" button -->
-                <form action="/todo/addtodo" method="post">
-                    <button type="submit">Add New Record</button>
+                <form action="/todo/addtodo" method="post" class="inline-form">
+                    <button type="submit" class="btn btn-success">Add New Record</button>
                 </form>
             </div>
         </td>
@@ -164,8 +169,8 @@
       </td>
       <td>[% task.get_column('comments') %]</td>
       <td>[% task.get_column('accumulative_time') %]</td>
-      <td class="action-buttons-cell">
-        <form action="/log/log_form" method="POST" target="_blank">
+      <td class="todo-actions-horizontal">
+        <form action="/log/log_form" method="POST" target="_blank" class="inline-form">
           <input type="hidden" name="todo_record_id" value="[% task.get_column('record_id') %]">
           <input type="hidden" name="site_name" value="[% task.get_column('sitename') %]">
           <input type="hidden" name="start_date" value="[% task.get_column('start_date') %]">
@@ -175,23 +180,26 @@
           <input type="hidden" name="priority" value="[% task.get_column('priority') %]">
           <input type="hidden" name="status" value="[% task.get_column('status') %]">
           <input type="hidden" name="comments" value="[% task.get_column('comments') %]">
-          <button type="submit" class="action-button log-button">Add Log</button>
+          <button type="submit" class="btn btn-success btn-sm">Log</button>
         </form>
-        <form action="/todo/details" method="POST">
+        <form action="/todo/details" method="POST" class="inline-form">
           <input type="hidden" name="record_id" value="[% task.get_column('record_id') %]">
-          <button type="submit" class="action-button details-button">Details</button>
+          <button type="submit" class="btn btn-info btn-sm">Details</button>
         </form>
-        <form action="/todo/edit/[% task.get_column('record_id') %]" method="POST">
+        <form action="/todo/edit/[% task.get_column('record_id') %]" method="POST" class="inline-form">
           <input type="hidden" name="record_id" value="[% task.get_column('record_id') %]">
-          <button type="submit" class="action-button edit-button">Edit</button>
+          <button type="submit" class="btn btn-warning btn-sm">Edit</button>
         </form>
       </td>
     </tr>
     [% counter = counter + 1 %]
 [% END %]
 </table>
+
 <script>document.querySelectorAll('.week-view-table tbody tr').forEach(row => {
     row.addEventListener('click', () => {
         row.classList.toggle('highlight');
     });
 });</script>
+
+</div> <!-- Close apiary-container -->

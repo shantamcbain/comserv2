@@ -3,90 +3,7 @@
     [% PageVersion %]
 [% END %]
 
-<style>
-    .form-container {
-        max-width: 800px;
-        margin: 0 auto;
-    }
 
-    .form-group {
-        margin-bottom: 15px;
-    }
-
-    .form-group label {
-        display: block;
-        margin-bottom: 5px;
-        font-weight: bold;
-    }
-
-    .form-group input[type="text"],
-    .form-group input[type="date"],
-    .form-group input[type="number"],
-    .form-group select,
-    .form-group textarea {
-        width: 100%;
-        padding: 8px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-    }
-
-    .form-group textarea {
-        min-height: 100px;
-    }
-
-    .action-buttons {
-        margin: 20px 0;
-        display: flex;
-        gap: 10px;
-    }
-
-    .action-buttons button,
-    .form-group input[type="submit"] {
-        padding: 10px 15px;
-        background-color: #4CAF50;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        font-weight: bold;
-    }
-
-    .action-buttons button:hover,
-    .form-group input[type="submit"]:hover {
-        background-color: #45a049;
-    }
-
-    .return-button {
-        background-color: #2196F3 !important;
-    }
-
-    .return-button:hover {
-        background-color: #0b7dda !important;
-    }
-
-    .return-nav {
-        margin-bottom: 20px;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-
-    .return-nav a {
-        padding: 8px 15px;
-        background-color: #2196F3;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        font-weight: bold;
-        text-decoration: none;
-        display: inline-block;
-    }
-
-    .return-nav a:hover {
-        background-color: #0b7dda;
-    }
-</style>
 
 <div class="form-container">
     <h1>Edit Todo</h1>
@@ -106,12 +23,12 @@
     [% END %]
 
     <!-- Return navigation buttons -->
-    <div class="return-nav">
-        <a href="/todo">Return to List View</a>
-        <a href="/todo/day">Return to Day View</a>
-        <a href="/todo/week">Return to Week View</a>
-        <a href="/todo/month">Return to Month View</a>
-        <button type="button" class="return-button" onclick="window.history.back();">Return to Previous Page</button>
+    <div class="todo-nav-buttons">
+        <a href="/todo" class="btn btn-secondary">Return to List View</a>
+        <a href="/todo/day" class="btn btn-secondary">Return to Day View</a>
+        <a href="/todo/week" class="btn btn-secondary">Return to Week View</a>
+        <a href="/todo/month" class="btn btn-secondary">Return to Month View</a>
+        <button type="button" class="btn btn-secondary" onclick="window.history.back();">Return to Previous Page</button>
     </div>
     
     <p>Record ID: [% record.get_column('record_id') %]</p>
@@ -137,6 +54,55 @@
             <label for="due_date">Due Date:</label>
             <input type="date" id="due_date" name="due_date" value="[% record.get_column('due_date') %]" required>
         </div>
+        
+        <div class="form-group">
+            <label for="time_of_day">Time of Day (optional):</label>
+            <div class="time-input-container">
+                <select id="time_preset" class="time-preset" onchange="setTimeFromPreset()" style="margin-bottom: 5px; padding: 5px; width: 100%;">
+                    <option value="">-- Select Common Time --</option>
+                    <option value="08:00">8:00 AM</option>
+                    <option value="09:00">9:00 AM</option>
+                    <option value="10:00">10:00 AM</option>
+                    <option value="11:00">11:00 AM</option>
+                    <option value="12:00">12:00 PM</option>
+                    <option value="13:00">1:00 PM</option>
+                    <option value="14:00">2:00 PM</option>
+                    <option value="15:00">3:00 PM</option>
+                    <option value="16:00">4:00 PM</option>
+                    <option value="17:00">5:00 PM</option>
+                    <option value="18:00">6:00 PM</option>
+                    <option value="19:00">7:00 PM</option>
+                    <option value="20:00">8:00 PM</option>
+                </select>
+                <input type="time" id="time_of_day" name="time_of_day" value="[% record.get_column('time_of_day') %]" placeholder="HH:MM" style="width: 100%; padding: 5px;">
+            </div>
+            <small style="color: #666; font-size: 0.9em;">Select from common times or enter manually for day view organization</small>
+        </div>
+
+        <script>
+        function setTimeFromPreset() {
+            var preset = document.getElementById('time_preset');
+            var manual = document.getElementById('time_of_day');
+            if (preset.value) {
+                manual.value = preset.value;
+            }
+        }
+        
+        // Set the preset dropdown to match current time value on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            var currentTime = document.getElementById('time_of_day').value;
+            var preset = document.getElementById('time_preset');
+            if (currentTime) {
+                // Try to match the current time with a preset option
+                for (var i = 0; i < preset.options.length; i++) {
+                    if (preset.options[i].value === currentTime) {
+                        preset.selectedIndex = i;
+                        break;
+                    }
+                }
+            }
+        });
+        </script>
         
         <div class="form-group">
             <label for="subject">Subject:</label>
@@ -229,12 +195,12 @@
         <input type="hidden" name="share" value="[% record.get_column('share') %]">
         
         <div class="form-group">
-            <input type="submit" value="Update Todo">
+            <input type="submit" value="Update Todo" class="btn btn-primary">
         </div>
     </form>
     
-    <div class="action-buttons">
-        <form action="/log/log_form" method="POST" target="_blank">
+    <div class="todo-action-buttons">
+        <form action="/log/log_form" method="POST" target="_blank" style="display: inline;">
             <input type="hidden" name="todo_record_id" value="[% record.get_column('record_id') %]">
             <input type="hidden" name="site_name" value="[% record.get_column('sitename') %]">
             <input type="hidden" name="start_date" value="[% record.get_column('start_date') %]">
@@ -244,16 +210,16 @@
             <input type="hidden" name="priority" value="[% record.get_column('priority') %]">
             <input type="hidden" name="status" value="[% record.get_column('status') %]">
             <input type="hidden" name="comments" value="[% record.get_column('comments') %]">
-            <button type="submit">Add Log Entry</button>
+            <button type="submit" class="btn btn-success">Add Log Entry</button>
         </form>
     </div>
     
     <!-- Return navigation buttons -->
-    <div class="return-nav">
-        <a href="/todo">Return to List View</a>
-        <a href="/todo/day">Return to Day View</a>
-        <a href="/todo/week">Return to Week View</a>
-        <a href="/todo/month">Return to Month View</a>
-        <button type="button" class="return-button" onclick="window.history.back();">Return to Previous Page</button>
+    <div class="todo-nav-buttons">
+        <a href="/todo" class="btn btn-secondary">Return to List View</a>
+        <a href="/todo/day" class="btn btn-secondary">Return to Day View</a>
+        <a href="/todo/week" class="btn btn-secondary">Return to Week View</a>
+        <a href="/todo/month" class="btn btn-secondary">Return to Month View</a>
+        <button type="button" class="btn btn-secondary" onclick="window.history.back();">Return to Previous Page</button>
     </div>
 </div>

@@ -571,89 +571,9 @@
   text-decoration: none;
 }
 
-/* Button Styles - Consistent with base-containers.css */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  padding: 10px 20px;
-  border: none;
-  border-radius: 8px;
-  text-decoration: none;
-  font-weight: 500;
-  transition: all 0.3s ease;
-  cursor: pointer;
-  font-size: 0.95rem;
-}
-
-.btn i {
-  margin-right: 8px;
-}
-
-.btn-primary {
-  background: var(--primary-color);
-  color: var(--text-color);
-}
-
-.btn-primary:hover {
-  background: var(--link-hover-color);
-  transform: translateY(-2px);
-  text-decoration: none;
-}
-
-.btn-secondary {
-  background: var(--secondary-color);
-  color: var(--text-color);
-}
-
-.btn-secondary:hover {
-  background: var(--accent-color);
-  transform: translateY(-2px);
-  text-decoration: none;
-}
-
-.btn-success {
-  background: var(--success-color);
-  color: white;
-}
-
-.btn-success:hover {
-  background: #218838;
-  transform: translateY(-2px);
-  text-decoration: none;
-}
-
-.btn-warning {
-  background: var(--warning-color);
-  color: var(--text-color);
-}
-
-.btn-warning:hover {
-  background: #e0a800;
-  transform: translateY(-2px);
-  text-decoration: none;
-}
-
-.btn-info {
-  background: var(--link-color);
-  color: white;
-}
-
-.btn-info:hover {
-  background: var(--link-hover-color);
-  transform: translateY(-2px);
-  text-decoration: none;
-}
-
-.btn-danger {
-  background: #dc3545;
-  color: white;
-}
-
-.btn-danger:hover {
-  background: #c82333;
-  transform: translateY(-2px);
-  text-decoration: none;
-}
+/* Button Styles - REMOVED - Let base-containers.css handle all button styling */
+/* All button styles (.btn, .btn-primary, .btn-success, .btn-info, etc.) are now handled by base-containers.css */
+/* This prevents conflicts and ensures proper theme compliance across all sites */
 
 /* Access Denied Styles */
 .access-denied {

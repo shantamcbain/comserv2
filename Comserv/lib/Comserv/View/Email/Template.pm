@@ -96,7 +96,7 @@ around 'process' => sub {
             INCLUDE_PATH => [
                 eval { Comserv->path_to('root') } || 'root',
             ],
-            WRAPPER => 'email/wrapper.tt',
+            WRAPPER => 'email/wrapper.tt.notusedbyapplication',
         });
         my $template = $args->{template};
         my $vars = $args->{template_vars} || {};
@@ -121,7 +121,7 @@ __PACKAGE__->config(
         INCLUDE_PATH => [
             eval { Comserv->path_to('root') } || 'root',
         ],
-        WRAPPER => 'email/wrapper.tt',
+        WRAPPER => 'email/wrapper.tt.notusedbyapplication',
     },
     sender => {
         mailer => 'SMTP',

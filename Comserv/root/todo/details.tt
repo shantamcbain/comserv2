@@ -6,59 +6,17 @@
     [% PageVersion %]
 [% END %]
 
-<style>
-    .action-buttons {
-        margin: 20px 0;
-        display: flex;
-        gap: 10px;
-    }
 
-    .action-buttons button {
-        padding: 8px 15px;
-        background-color: #4CAF50;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        font-weight: bold;
-    }
-
-    .action-buttons button:hover {
-        background-color: #45a049;
-    }
-
-    .return-nav {
-        margin-bottom: 20px;
-        display: flex;
-        gap: 10px;
-    }
-
-    .return-button {
-        padding: 8px 15px;
-        background-color: #2196F3;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        font-weight: bold;
-        text-decoration: none;
-        display: inline-block;
-    }
-
-    .return-button:hover {
-        background-color: #0b7dda;
-    }
-</style>
 
 <h1>Record Details View.</h1>
 
 <!-- Return navigation buttons -->
-<div class="return-nav">
-    <a href="/todo" class="return-button">Return to List View</a>
-    <a href="/todo/day" class="return-button">Return to Day View</a>
-    <a href="/todo/week" class="return-button">Return to Week View</a>
-    <a href="/todo/month" class="return-button">Return to Month View</a>
-    <button type="button" class="return-button" onclick="window.history.back();">Return to Previous Page</button>
+<div class="todo-nav-buttons">
+    <a href="/todo" class="btn btn-secondary">Return to List View</a>
+    <a href="/todo/day" class="btn btn-secondary">Return to Day View</a>
+    <a href="/todo/week" class="btn btn-secondary">Return to Week View</a>
+    <a href="/todo/month" class="btn btn-secondary">Return to Month View</a>
+    <button type="button" class="btn btn-secondary" onclick="window.history.back();">Return to Previous Page</button>
 </div>
 
 <p>Record ID: [% record.get_column('record_id') %]</p>
@@ -83,6 +41,16 @@
     <div>
         <label for="due_date">Due Date:</label>
         <input type="date" id="due_date" name="due_date" value="[% record.get_column('due_date') %]">
+    </div>
+
+    <div>
+        <label for="time_of_day">Time of Day:</label>
+        <input type="time" id="time_of_day" name="time_of_day" value="[% record.get_column('time_of_day') %]">
+        [% IF record.get_column('time_of_day') %]
+            <span class="time-display">Scheduled for: [% record.get_column('time_of_day') %]</span>
+        [% ELSE %]
+            <span class="no-time">No specific time set</span>
+        [% END %]
     </div>
 
     <div>
@@ -149,8 +117,8 @@
     </div>
 </form>
 
-<div class="action-buttons">
-    <form action="/log/log_form" method="POST" target="_blank">
+<div class="todo-action-buttons">
+    <form action="/log/log_form" method="POST" target="_blank" style="display: inline;">
         <input type="hidden" name="todo_record_id" value="[% record.get_column('record_id') %]">
         <input type="hidden" name="site_name" value="[% record.get_column('sitename') %]">
         <input type="hidden" name="start_date" value="[% record.get_column('start_date') %]">
@@ -160,18 +128,18 @@
         <input type="hidden" name="priority" value="[% record.get_column('priority') %]">
         <input type="hidden" name="status" value="[% record.get_column('status') %]">
         <input type="hidden" name="comments" value="[% record.get_column('comments') %]">
-        <button type="submit">Add Log Entry</button>
+        <button type="submit" class="btn btn-success">Add Log Entry</button>
     </form>
-    <form action="/todo/edit/[% record.get_column('record_id') %]" method="POST">
+    <form action="/todo/edit/[% record.get_column('record_id') %]" method="POST" style="display: inline;">
         <input type="hidden" name="record_id" value="[% record.get_column('record_id') %]">
-        <button type="submit">Edit Todo</button>
+        <button type="submit" class="btn btn-warning">Edit Todo</button>
     </form>
 </div>
 <!-- Return navigation buttons -->
-<div class="return-nav">
-    <a href="/todo" class="return-button">Return to List View</a>
-    <a href="/todo/day" class="return-button">Return to Day View</a>
-    <a href="/todo/week" class="return-button">Return to Week View</a>
-    <a href="/todo/month" class="return-button">Return to Month View</a>
-    <button type="button" class="return-button" onclick="window.history.back();">Return to Previous Page</button>
+<div class="todo-nav-buttons">
+    <a href="/todo" class="btn btn-secondary">Return to List View</a>
+    <a href="/todo/day" class="btn btn-secondary">Return to Day View</a>
+    <a href="/todo/week" class="btn btn-secondary">Return to Week View</a>
+    <a href="/todo/month" class="btn btn-secondary">Return to Month View</a>
+    <button type="button" class="btn btn-secondary" onclick="window.history.back();">Return to Previous Page</button>
 </div>

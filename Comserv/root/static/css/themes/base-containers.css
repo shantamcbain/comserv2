@@ -289,14 +289,17 @@
     flex-wrap: wrap;
 }
 
-/* Button Styles */
-.btn {
+/* Button Styles - THEME COMPLIANT - Override link colors */
+body[class*="theme-"] .btn,
+body[class*="theme-"] a.btn,
+.btn,
+a.btn {
     display: inline-flex;
     align-items: center;
     padding: 10px 20px;
     border: none;
     border-radius: 8px;
-    text-decoration: none;
+    text-decoration: none !important;
     font-weight: 500;
     transition: all 0.3s ease;
     cursor: pointer;
@@ -305,8 +308,11 @@
     color: var(--text-color) !important;
 }
 
-.btn:hover {
+.btn:hover,
+a.btn:hover,
+body[class*="theme-"] a.btn:hover {
     background: var(--primary-color) !important;
+    color: var(--text-color) !important;
     transform: translateY(-2px);
 }
 
@@ -315,20 +321,27 @@
 }
 
 .btn-primary,
+a.btn-primary,
+body[class*="theme-"] a.btn-primary,
 .feature-actions .btn-primary,
 .apiary-container .btn-primary {
     background: var(--primary-color) !important;
-    color: var(--text-color) !important;
+    color: white !important;
 }
 
 .btn-primary:hover,
+a.btn-primary:hover,
+body[class*="theme-"] a.btn-primary:hover,
 .feature-actions .btn-primary:hover,
 .apiary-container .btn-primary:hover {
     background: var(--link-hover-color) !important;
+    color: white !important;
     transform: translateY(-2px);
 }
 
 .btn-secondary,
+a.btn-secondary,
+body[class*="theme-"] a.btn-secondary,
 .feature-actions .btn-secondary,
 .apiary-container .btn-secondary {
     background: var(--secondary-color) !important;
@@ -336,13 +349,19 @@
 }
 
 .btn-secondary:hover,
+a.btn-secondary:hover,
+body[class*="theme-"] a.btn-secondary:hover,
 .feature-actions .btn-secondary:hover,
 .apiary-container .btn-secondary:hover {
     background: var(--primary-color) !important;
+    color: var(--text-color) !important;
     transform: translateY(-2px);
 }
 
+body[class*="theme-"] .btn-success,
+body[class*="theme-"] a.btn-success,
 .btn-success,
+a.btn-success,
 .feature-actions .btn-success,
 .apiary-container .btn-success {
     background: var(--success-color) !important;
@@ -350,13 +369,19 @@
 }
 
 .btn-success:hover,
+a.btn-success:hover,
+body[class*="theme-"] a.btn-success:hover,
 .feature-actions .btn-success:hover,
 .apiary-container .btn-success:hover {
-    background: #218838 !important;
+    background: var(--primary-color) !important;
+    color: white !important;
     transform: translateY(-2px);
 }
 
+body[class*="theme-"] .btn-info,
+body[class*="theme-"] a.btn-info,
 .btn-info,
+a.btn-info,
 .feature-actions .btn-info,
 .apiary-container .btn-info {
     background: var(--link-color) !important;
@@ -364,13 +389,19 @@
 }
 
 .btn-info:hover,
+a.btn-info:hover,
+body[class*="theme-"] a.btn-info:hover,
 .feature-actions .btn-info:hover,
 .apiary-container .btn-info:hover {
     background: var(--link-hover-color) !important;
+    color: white !important;
     transform: translateY(-2px);
 }
 
+body[class*="theme-"] .btn-warning,
+body[class*="theme-"] a.btn-warning,
 .btn-warning,
+a.btn-warning,
 .feature-actions .btn-warning,
 .apiary-container .btn-warning {
     background: var(--warning-color) !important;
@@ -378,9 +409,12 @@
 }
 
 .btn-warning:hover,
+a.btn-warning:hover,
+body[class*="theme-"] a.btn-warning:hover,
 .feature-actions .btn-warning:hover,
 .apiary-container .btn-warning:hover {
-    background: #e0a800 !important;
+    background: var(--primary-color) !important;
+    color: var(--text-color) !important;
     transform: translateY(-2px);
 }
 
@@ -398,6 +432,58 @@
 .btn-sm {
     padding: 8px 16px;
     font-size: 0.9rem;
+}
+
+/* Todo-specific button overrides for theme compliance */
+.todo-actions .btn-warning,
+.todo-actions a.btn-warning,
+.todo-item .btn-warning,
+.todo-item a.btn-warning,
+.overdue-item .btn-warning,
+.overdue-item a.btn-warning,
+.scheduled-todo .btn-warning,
+.scheduled-todo a.btn-warning,
+.unscheduled-todos .btn-warning,
+.unscheduled-todos a.btn-warning,
+table .btn-warning,
+table a.btn-warning {
+    background: var(--warning-color) !important;
+    color: var(--text-color) !important;
+    border: none !important;
+}
+
+.todo-actions .btn-info,
+.todo-actions a.btn-info,
+.todo-item .btn-info,
+.todo-item a.btn-info,
+.overdue-item .btn-info,
+.overdue-item a.btn-info,
+.scheduled-todo .btn-info,
+.scheduled-todo a.btn-info,
+.unscheduled-todos .btn-info,
+.unscheduled-todos a.btn-info,
+table .btn-info,
+table a.btn-info {
+    background: var(--link-color) !important;
+    color: white !important;
+    border: none !important;
+}
+
+.todo-actions .btn-success,
+.todo-actions a.btn-success,
+.todo-item .btn-success,
+.todo-item a.btn-success,
+.overdue-item .btn-success,
+.overdue-item a.btn-success,
+.scheduled-todo .btn-success,
+.scheduled-todo a.btn-success,
+.unscheduled-todos .btn-success,
+.unscheduled-todos a.btn-success,
+table .btn-success,
+table a.btn-success {
+    background: var(--success-color) !important;
+    color: white !important;
+    border: none !important;
 }
 
 /* Alert Styles */

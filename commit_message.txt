@@ -1,12 +1,43 @@
-[Cleanup] Remove unnecessary files from application root
+feat: Navigation system consolidation and CSS form restoration
 
-- Removed all "Formatting title from:" files that were incorrectly created
-- Removed all "Added ... to ... category" files that were incorrectly created
-- Cleaned up empty directory entries that were created without permission
-- No functional changes to the application code
+CRITICAL FIXES:
+- Consolidated duplicate navigation directories (navigation/ → Navigation/)
+- Restored proper Navigation/navigation.tt with correct menu includes
+- Fixed navigation menu order: Main, Login, Global, Hosted, Member, Weather, IT, Admin, HelpDesk
+- Fixed CSS form system route /admin/theme/edit/{theme_name}
 
-These files were created by an AI assistant without proper permission and
-were cluttering the application root directory. This cleanup improves the
-repository organization and makes it easier to navigate the codebase.
+NAVIGATION SYSTEM:
+- Removed duplicate navigation/ directory structure
+- Rebuilt Navigation/navigation.tt with proper TopDropList includes
+- Maintained role-based access (admin-only, site-specific menus)
+- Restored all missing navigation menus and functionality
 
-This change is ready for deployment to the production server.
+CSS FORM SYSTEM:
+- Renamed edit_css method to edit in Admin::Theme controller
+- Updated admin/theme/edit_css.tt form action route
+- Fixed CSS editing form display and save functionality
+
+DOCUMENTATION:
+- Complete rewrite of navigation system documentation
+- Updated all file path references to correct Navigation/ directory
+- Added comprehensive changelog for navigation consolidation
+- Updated AI development guidelines with completed tasks
+
+FILES MODIFIED:
+- Comserv/root/Navigation/navigation.tt (rebuilt)
+- Comserv/lib/Comserv/Controller/Admin/Theme.pm (method rename)
+- Comserv/root/admin/theme/edit_css.tt (route fix)
+- Comserv/root/Documentation/general/navigation_system.tt (rewritten)
+- Comserv/root/Documentation/general/menu_system.tt (path updates)
+- Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.tt (task updates)
+
+FILES CREATED:
+- Comserv/root/Documentation/changelog/2025-07-07-navigation-system-consolidation.tt
+
+FILES REMOVED:
+- Comserv/root/navigation/ (entire duplicate directory)
+
+TESTING REQUIRED:
+- Verify navigation menu order and functionality
+- Test CSS form system at /admin/theme/edit/{theme_name}
+- Confirm role-based menu visibility works properly

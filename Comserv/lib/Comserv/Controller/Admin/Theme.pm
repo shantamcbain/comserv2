@@ -201,10 +201,10 @@ sub update_theme :Path('/admin/theme/update') :Args(0) {
 }
 
 # Edit theme CSS
-sub edit_css :Path('/admin/theme/edit') :Args(1) {
+sub edit :Path('/admin/theme/edit') :Args(1) {
     my ($self, $c, $theme_name) = @_;
     
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_css', "Editing CSS for theme: $theme_name");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit', "Editing CSS for theme: $theme_name");
 
     my $theme_dir = $c->model('ThemeConfig')->get_theme_css_directory($c);
     my $css_file = "$theme_dir/$theme_name.css";
@@ -213,7 +213,7 @@ sub edit_css :Path('/admin/theme/edit') :Args(1) {
         my $css_content = $c->req->params->{css_content};
         try {
             write_file($css_file, $css_content);
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_css', "CSS file updated successfully for theme: $theme_name");
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit', "CSS file updated successfully for theme: $theme_name");
             $c->flash->{success} = 'CSS file updated successfully';
         } catch {
             $c->flash->{error} = "Error saving CSS: $_";
@@ -228,7 +228,7 @@ sub edit_css :Path('/admin/theme/edit') :Args(1) {
 
     # If no variables were found, set an error
     if (scalar(keys %$theme_variables) == 0) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'edit_css',
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'edit',
             "No theme variables found for theme '$theme_name'");
         $theme_variables = { error => "No theme variables found for theme '$theme_name'" };
     }
@@ -246,19 +246,19 @@ sub edit_css :Path('/admin/theme/edit') :Args(1) {
     }
 
     # Log the variables for debugging
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_css',
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit',
         "Theme variables: " . join(", ", keys %$theme_variables));
 
     # Log the theme data for debugging
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_css',
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit',
         "Theme data keys: " . join(", ", keys %$theme_data));
 
     # Log the CSS content for debugging
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_css',
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit',
         "CSS content length: " . length($css_content));
 
     # Log available images
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_css',
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit',
         "Available image directories: " . join(", ", keys %available_images));
 
     $c->stash(
