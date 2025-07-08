@@ -24,14 +24,22 @@
 
 /* Legacy action buttons - DEPRECATED - use theme system instead */
 
-/* Todo filter container */
+/* Todo filter container - Use feature-card style */
 .filter-container {
-    background-color: var(--table-header-bg);
-    padding: 15px;
-    border-radius: 5px;
-    margin-bottom: 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    background: var(--background-color);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border-top: 3px solid var(--accent-color);
     border: 1px solid var(--border-color);
+    margin-bottom: 20px;
+    padding: 20px;
+}
+
+.filter-container:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
 .filter-row {
@@ -75,10 +83,312 @@
     flex-wrap: wrap;
 }
 
+/* Container-based Todo Layout - Use feature-card style from base-containers.css */
+.todo-container {
+    background: var(--background-color);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border-top: 3px solid var(--accent-color);
+    border: 1px solid var(--border-color);
+    margin-bottom: 15px;
+}
+
+.todo-container:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.todo-header {
+    background: linear-gradient(135deg, var(--table-header-bg) 0%);
+    padding: 20px;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background-color 0.3s ease;
+}
+
+.todo-header:hover {
+    background-color: var(--nav-hover-bg, rgba(0, 0, 0, 0.1));
+}
+
+.todo-header-left {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex: 1;
+}
+
+.todo-header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.todo-subject {
+    font-weight: bold;
+    font-size: 1.1em;
+    color: var(--text-color, #000);
+}
+
+.todo-meta {
+    display: flex;
+    gap: 15px;
+    font-size: 0.9em;
+    color: var(--text-color, #666);
+}
+
+.todo-details {
+    padding: 20px;
+    display: none;
+    background-color: var(--background-color);
+}
+
+.todo-details.expanded {
+    display: block;
+}
+
+.todo-details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.todo-field {
+    display: flex;
+    flex-direction: column;
+}
+
+.todo-field-label {
+    font-weight: bold;
+    color: var(--text-color, #333);
+    margin-bottom: 5px;
+    font-size: 0.9em;
+}
+
+.todo-field-value {
+    color: var(--text-color, #000);
+    padding: 5px 0;
+}
+
+.todo-expand-icon {
+    transition: transform 0.3s ease;
+    font-size: 1.2em;
+    color: var(--text-color, #666);
+}
+
+.todo-expand-icon.expanded {
+    transform: rotate(180deg);
+}
+
+/* Priority and Status styling */
+.priority-badge, .status-badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.priority-badge.high {
+    background-color: var(--warning-color, #ff4444);
+    color: white;
+}
+
+.priority-badge.medium {
+    background-color: var(--accent-color, #ff9900);
+    color: white;
+}
+
+.priority-badge.normal {
+    background-color: var(--success-color, #4CAF50);
+    color: white;
+}
+
+.status-badge.new {
+    background-color: var(--info-color, #2196F3);
+    color: white;
+}
+
+.status-badge.in-progress {
+    background-color: var(--accent-color, #ff9900);
+    color: white;
+}
+
+.status-badge.completed {
+    background-color: var(--success-color, #4CAF50);
+    color: white;
+}
+
+/* Let base-containers.css handle button theming - remove conflicting styles */
+/* Only keep todo-specific layout adjustments */
+
 /* Remove hardcoded colors - let theme system handle button styling */
 .view-buttons a.active {
     font-weight: bold;
     opacity: 0.8;
+}
+
+/* Top controls styling - Use feature-card style */
+.top-controls {
+    background: var(--background-color);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border-top: 3px solid var(--accent-color);
+    border: 1px solid var(--border-color);
+    margin: 20px 0;
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.top-controls:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.top-controls .inline-form {
+    margin: 0;
+}
+
+/* Todos container */
+.todos-container {
+    margin-top: 20px;
+}
+
+/* Inline form styling */
+.inline-form {
+    display: inline-block;
+    margin: 0 2px;
+}
+
+/* Action buttons in todo containers */
+.todo-actions {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+}
+
+.todo-actions .btn {
+    font-size: 0.8em;
+    padding: 4px 8px;
+}
+
+/* Prevent action buttons from triggering header click */
+.todo-header-right {
+    pointer-events: none;
+}
+
+.todo-header-right > * {
+    pointer-events: auto;
+}
+
+/* Floating Header Bar */
+.todo-floating-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: var(--table-header-bg);
+    border-bottom: 2px solid var(--border-color);
+    padding: 10px 20px;
+    z-index: 1000;
+    display: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+}
+
+.todo-floating-header.visible {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.floating-header-fields {
+    display: flex;
+    gap: 20px;
+    font-size: 0.9em;
+    color: var(--text-color);
+    font-weight: bold;
+}
+
+.floating-header-field {
+    padding: 5px 10px;
+    background: var(--background-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+/* Sticky Back to Top Button */
+.back-to-top {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    background: var(--primary-color) !important;
+    color: white !important;
+    border: none;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    font-size: 1.2em;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 1001;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.back-to-top.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.back-to-top:hover {
+    background: var(--link-hover-color) !important;
+    transform: translateY(-3px);
+}
+
+/* Row-like structure within containers */
+.todo-header-left {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 20px;
+    align-items: center;
+    flex: 1;
+}
+
+.todo-subject {
+    font-weight: bold;
+    font-size: 1.1em;
+    color: var(--text-color);
+}
+
+.todo-meta {
+    display: flex;
+    gap: 15px;
+    font-size: 0.9em;
+    color: var(--text-color);
+    justify-content: flex-end;
+}
+
+/* Make todo containers look more like table rows */
+.todos-container {
+    margin-top: 20px;
+}
+
+.todo-container + .todo-container {
+    margin-top: 2px; /* Tighter spacing like table rows */
 }
 
 /* Day view specific styles */
@@ -113,13 +423,76 @@
     font-size: 0.9em;
 }
 
+/* Overdue Section - Use feature-card style */
+.overdue-section {
+    background: var(--background-color);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border-top: 3px solid var(--warning-color);
+    border: 1px solid var(--border-color);
+    margin-bottom: 20px;
+}
+
+.overdue-section:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.overdue-header {
+    background: linear-gradient(135deg, var(--table-header-bg) 0%);
+    padding: 20px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color 0.3s ease;
+    margin: 0;
+}
+
+.overdue-header:hover {
+    background-color: var(--nav-hover-bg, rgba(0, 0, 0, 0.1));
+}
+
+.overdue-list {
+    padding: 20px;
+    display: none; /* Default to closed */
+}
+
+.overdue-item {
+    background: var(--background-color);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 10px;
+    border-left: 3px solid var(--warning-color);
+}
+
+.overdue-item:last-child {
+    margin-bottom: 0;
+}
+
+.overdue-item .meta-info {
+    font-size: 0.9em;
+    color: var(--text-color);
+    margin-top: 5px;
+}
+
+.overdue-item .meta-info span {
+    margin-right: 15px;
+}
+
 /* Hourly Schedule Layout */
 .unscheduled-section {
-    background-color: var(--warning-color, #fff3cd);
-    border: 1px solid var(--warning-color, #ffeaa7);
+    background: var(--background-color);
+    border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 15px;
     margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border-top: 3px solid var(--warning-color);
 }
 
 .unscheduled-section h3 {
@@ -438,24 +811,109 @@
 
 /* Unified Todo System Enhancements */
 .overdue-section {
-    background: var(--danger-color-light, #ffebee);
-    border: 1px solid var(--danger-color, #f44336);
+    background: var(--danger-color-light, var(--card-bg, var(--background-color)));
+    border: 1px solid var(--danger-color, var(--border-color));
     border-radius: 4px;
     padding: 1rem;
     margin-bottom: 1rem;
 }
 
 .overdue-section h3 {
-    color: var(--danger-color-dark, #d32f2f);
+    color: var(--danger-color-dark, var(--text-color));
     margin: 0 0 0.5rem 0;
 }
 
+/* Overdue section toggle functionality */
+.overdue-header {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.2s ease;
+    padding: 0.5rem;
+    border-radius: 4px;
+}
+
+.overdue-header:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.overdue-toggle-icon {
+    transition: transform 0.2s ease;
+    margin-left: 0.5rem;
+}
+
+.overdue-list {
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+/* Site-specific icon styling - Theme overrideable */
+.site-icon {
+    margin-right: 0.5rem;
+    font-size: 1.1em;
+}
+
+/* Icon text elements - can be styled by themes */
+.overdue-icon-text,
+.ai-create-icon-text,
+.priority-icon-text,
+.status-icon-text {
+    font-weight: inherit;
+}
+
+/* Theme-overrideable icon colors */
+.priority-icon-text {
+    color: var(--priority-icon-color, inherit);
+}
+
+.status-icon-text {
+    color: var(--status-icon-color, inherit);
+}
+
+.overdue-icon-text {
+    color: var(--overdue-icon-color, var(--danger-color, var(--accent-color)));
+}
+
+.ai-create-icon-text {
+    color: var(--ai-create-icon-color, var(--primary-color));
+}
+
+/* BMaster bee theme icon colors - can be overridden in theme CSS */
+:root[data-theme="bmaster"] .priority-icon-text,
+:root[data-theme="bmaster"] .status-icon-text {
+    color: var(--bmaster-icon-color, #ffd700);
+}
+
+/* CSC tech theme icon colors - can be overridden in theme CSS */
+:root[data-theme="csc"] .priority-icon-text,
+:root[data-theme="csc"] .status-icon-text {
+    color: var(--csc-icon-color, #00bcd4);
+}
+
+/* CSC theme specific button colors - black buttons */
+body.theme-csc .view-buttons a.btn,
+body.theme-csc .filter-buttons .btn,
+body.theme-csc .todo-actions-horizontal .btn {
+    background: #000000 !important;
+    color: #ffffff !important;
+    border: 1px solid #333333 !important;
+}
+
+body.theme-csc .view-buttons a.btn:hover,
+body.theme-csc .filter-buttons .btn:hover,
+body.theme-csc .todo-actions-horizontal .btn:hover {
+    background: #333333 !important;
+    color: #ffffff !important;
+}
+
 .overdue-list .overdue-item {
-    background: var(--card-bg, white);
+    background: var(--card-bg, var(--background-color));
     padding: 0.5rem;
     margin-bottom: 0.5rem;
     border-radius: 4px;
-    border-left: 4px solid var(--danger-color, #f44336);
+    border-left: 4px solid var(--danger-color, var(--accent-color, var(--border-color)));
 }
 
 .overdue-item strong {
@@ -464,7 +922,7 @@
 }
 
 .overdue-item .meta-info {
-    color: var(--text-color-muted, #666);
+    color: var(--text-color-muted, var(--text-color));
     margin-left: 1rem;
 }
 
@@ -474,7 +932,7 @@
 
 .overdue-item .actions a {
     margin-right: 0.5rem;
-    color: var(--link-color, #1976d2);
+    color: var(--link-color, var(--primary-color));
     text-decoration: none;
 }
 

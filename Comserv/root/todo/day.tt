@@ -44,11 +44,12 @@
                     <span class="todo-subject">[% todo.subject %]</span>
                     <span class="todo-priority">P[% todo.priority %]</span>
                 </div>
-                <div class="todo-actions">
-                    <a href="/todo/edit/[% todo.record_id %]" class="btn btn-warning btn-sm">Edit</a>
-                    <a href="/todo/details?record_id=[% todo.record_id %]" class="btn btn-info btn-sm">Details</a>
-                    <a href="/log/log_form?todo_record_id=[% todo.record_id %]" class="btn btn-success btn-sm" target="_blank">Log</a>
-                </div>
+                [% INCLUDE 'include/todo_actions.tt' 
+                   todo = todo 
+                   action_type = 'links'
+                   target = '_blank'
+                   site_name = sitename || c.session.SiteName || 'default'
+                   css_classes = 'todo-actions' %]
             </div>
         [% END %]
     </div>
@@ -92,11 +93,12 @@
                                     </span>
                                     <span class="todo-priority">P[% todo.priority %]</span>
                                 </div>
-                                <div class="todo-actions">
-                                    <a href="/todo/edit/[% todo.record_id %]" class="btn btn-warning btn-sm">Edit</a>
-                                    <a href="/todo/details?record_id=[% todo.record_id %]" class="btn btn-info btn-sm">Details</a>
-                                    <a href="/log/log_form?todo_record_id=[% todo.record_id %]" class="btn btn-success btn-sm" target="_blank">Log</a>
-                                </div>
+                                [% INCLUDE 'include/todo_actions.tt' 
+                                   todo = todo 
+                                   action_type = 'links'
+                                   target = '_blank'
+                                   site_name = sitename || c.session.SiteName || 'default'
+                                   css_classes = 'todo-actions' %]
                             </div>
                         </div>
                     [% END %]
