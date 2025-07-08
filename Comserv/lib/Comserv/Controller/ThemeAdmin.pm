@@ -126,6 +126,195 @@ HTML
     $c->response->content_type('text/html');
 }
 
+# CSS Settings form - main entry point from admin navigation
+sub css_form :Path('/css_form') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Log that we've entered the css_form method
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'css_form', "***** ENTERED CSS_FORM METHOD *****");
+
+    # Check if the user is logged in
+    if (!$c->user_exists && !$c->session->{user_id}) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'css_form', "User not logged in, redirecting to login page");
+        $c->flash->{error} = 'You must be logged in to access this page';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    # Check if the user has the admin role
+    my $roles = $c->session->{roles};
+    if (!defined $roles || ref $roles ne 'ARRAY' || !grep { $_ eq 'admin' } @$roles) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'css_form',
+            "User does not have admin role, redirecting to home page. Roles: " .
+            (defined $roles ? (ref $roles eq 'ARRAY' ? join(", ", @$roles) : ref($roles)) : "undefined"));
+        $c->flash->{error} = 'You do not have permission to access this page. Required role: admin.';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    # Get current site
+    my $site_name = $c->session->{SiteName};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'css_form', "Site name: $site_name");
+
+    # Get the theme for this site from our theme config
+    my $theme_name = $c->model('ThemeConfig')->get_site_theme($c, $site_name);
+
+    # Get available themes from the themes directory
+    my $themes_dir = $c->path_to('root', 'static', 'css', 'themes');
+    my @available_themes;
+    
+    if (-d $themes_dir) {
+        opendir(my $dh, $themes_dir) or die "Cannot open themes directory: $!";
+        @available_themes = grep { 
+            /\.css$/ && $_ ne 'base-containers.css' && -f "$themes_dir/$_" 
+        } readdir($dh);
+        closedir($dh);
+        
+        # Remove .css extension for display
+        @available_themes = map { s/\.css$//r } @available_themes;
+        @available_themes = sort @available_themes;
+    }
+
+    # Add basic themes if not found
+    my @basic_themes = qw(default csc apis usbm dark admin apiary);
+    foreach my $basic_theme (@basic_themes) {
+        if (!grep { $_ eq $basic_theme } @available_themes) {
+            push @available_themes, $basic_theme;
+        }
+    }
+
+    # Pass data to template
+    $c->stash->{current_theme} = $theme_name || 'default';
+    $c->stash->{available_themes} = \@available_themes;
+    $c->stash->{site_name} = $site_name;
+    $c->stash->{template} = 'admin/css_settings.tt';
+
+    # Log that we're rendering the template
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'css_form', "***** RENDERING TEMPLATE: admin/css_settings.tt *****");
+
+    # Explicitly forward to the TT view
+    $c->forward($c->view('TT'));
+}
+
+# Update theme from CSS Settings form
+sub update_theme_from_css_form :Path('/css_form/update_theme') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Check if the user is logged in and has admin role
+    if (!$c->user_exists && !$c->session->{user_id}) {
+        $c->flash->{error} = 'You must be logged in to access this page';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    my $roles = $c->session->{roles};
+    if (!defined $roles || ref $roles ne 'ARRAY' || !grep { $_ eq 'admin' } @$roles) {
+        $c->flash->{error} = 'You do not have permission to access this page. Required role: admin.';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    # Get the selected theme
+    my $theme = $c->request->params->{theme};
+    my $site_name = $c->session->{SiteName};
+
+    if (!$theme) {
+        $c->flash->{error} = 'No theme selected';
+        $c->response->redirect($c->uri_for('/css_form'));
+        return;
+    }
+
+    # Update the theme using ThemeConfig model
+    try {
+        $c->model('ThemeConfig')->set_site_theme($c, $site_name, $theme);
+        $c->flash->{success} = "Theme updated to '$theme' successfully";
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_theme_from_css_form', 
+            "Theme updated to '$theme' for site '$site_name'");
+    } catch {
+        $c->flash->{error} = "Failed to update theme: $_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_theme_from_css_form', 
+            "Failed to update theme: $_");
+    };
+
+    $c->response->redirect($c->uri_for('/css_form'));
+}
+
+# Customize theme colors from CSS Settings form
+sub customize_theme :Path('/css_form/customize_theme') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Check if the user is logged in and has admin role
+    if (!$c->user_exists && !$c->session->{user_id}) {
+        $c->flash->{error} = 'You must be logged in to access this page';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    my $roles = $c->session->{roles};
+    if (!defined $roles || ref $roles ne 'ARRAY' || !grep { $_ eq 'admin' } @$roles) {
+        $c->flash->{error} = 'You do not have permission to access this page. Required role: admin.';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    # Get the custom colors from the form
+    my $params = $c->request->params;
+    my $site_name = $c->session->{SiteName};
+
+    my $custom_colors = {
+        'primary-color' => $params->{primary_color},
+        'secondary-color' => $params->{secondary_color},
+        'success-color' => $params->{success_color},
+        'warning-color' => $params->{warning_color},
+        'danger-color' => $params->{danger_color},
+        'bg-color' => $params->{bg_color},
+        'card-bg' => $params->{card_bg},
+        'text-color' => $params->{text_color},
+        'border-color' => $params->{border_color},
+    };
+
+    # Generate custom theme CSS
+    try {
+        my $custom_theme_name = $site_name . '_custom';
+        my $themes_dir = $c->path_to('root', 'static', 'css', 'themes');
+        my $custom_theme_file = "$themes_dir/$custom_theme_name.css";
+
+        # Create custom CSS content
+        my $css_content = "/* Custom theme for $site_name */\n";
+        $css_content .= ":root {\n";
+        
+        foreach my $property (keys %$custom_colors) {
+            my $value = $custom_colors->{$property};
+            if ($value) {
+                $css_content .= "    --$property: $value;\n";
+            }
+        }
+        
+        $css_content .= "}\n\n";
+        $css_content .= "/* Import base containers for styling */\n";
+        $css_content .= "\@import url('base-containers.css');\n";
+
+        # Write the custom theme file
+        open(my $fh, '>', $custom_theme_file) or die "Cannot open $custom_theme_file: $!";
+        print $fh $css_content;
+        close($fh);
+
+        # Set the custom theme as active
+        $c->model('ThemeConfig')->set_site_theme($c, $site_name, $custom_theme_name);
+
+        $c->flash->{success} = "Custom theme created and applied successfully";
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'customize_theme', 
+            "Custom theme '$custom_theme_name' created for site '$site_name'");
+
+    } catch {
+        $c->flash->{error} = "Failed to create custom theme: $_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'customize_theme', 
+            "Failed to create custom theme: $_");
+    };
+
+    $c->response->redirect($c->uri_for('/css_form'));
+}
+
 # Theme management page
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
