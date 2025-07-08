@@ -1,0 +1,571 @@
+[% PageVersion = 'Comserv/root/Documentation/developer/offline_mode_system.tt,v 0.01 2025/01/28 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Offline Mode System - Primary Documentation' %]
+
+<!-- Primary documentation for Comserv Offline Mode System -->
+<div class="documentation-content">
+
+<div class="apiary-container">
+
+<header class="feature-header">
+    <h1><i class="fas fa-wifi-slash"></i> Comserv Offline Mode System</h1>
+    <p class="context-info">Primary documentation for offline functionality development</p>
+    <div class="version-info">
+        <span class="badge badge-info">Version 0.02</span>
+        <span class="badge badge-warning">Development Phase</span>
+        <span class="last-updated">Last Updated: 2025-01-28</span>
+        <span class="badge badge-success">Mobile/Web Analysis Added</span>
+    </div>
+</header>
+
+<div class="markdown-content">
+
+<section id="overview" class="feature-section">
+    <h2><i class="fas fa-info-circle"></i> System Overview</h2>
+    <div class="feature-content">
+        <p><strong>Objective:</strong> Create hybrid database architecture allowing users to choose between local MySQL and SQLite, with robust synchronization to production MySQL system.</p>
+        
+        <div class="alert alert-success">
+            <strong>Current Status:</strong> Foundation phase complete - Ready for hybrid database implementation
+        </div>
+        
+        <h3>🔄 REVISED ARCHITECTURE: Hybrid Database System</h3>
+        <div class="alert alert-warning">
+            <strong>CRITICAL DESIGN CHANGE:</strong> User-selectable database backend with production safety priority
+        </div>
+        
+        <h3>Core Requirements - UPDATED</h3>
+        <ul class="feature-list">
+            <li><strong>🎯 Code Reuse:</strong> Maximum reuse of existing codebase - minimal breaking changes</li>
+            <li><strong>🛡️ Production Safety:</strong> Robust updates to production MySQL - no data loss</li>
+            <li><strong>⚙️ User Choice:</strong> Option to use local MySQL OR SQLite backend</li>
+            <li><strong>🔍 Auto-Detection:</strong> Detect active local MySQL server availability</li>
+            <li><strong>🔄 Bidirectional Sync:</strong> Reliable synchronization with production database</li>
+            <li><strong>⚡ Seamless Operation:</strong> Transparent database switching for user</li>
+        </ul>
+        
+        <h3>Database Backend Options</h3>
+        <div class="info-grid">
+            <div class="info-item">
+                <strong>Option 1: Local MySQL</strong><br>
+                - Use when local MySQL server is available<br>
+                - Full feature compatibility<br>
+                - Easier synchronization with production
+            </div>
+            <div class="info-item">
+                <strong>Option 2: SQLite Fallback</strong><br>
+                - Use when no local MySQL available<br>
+                - Portable, no server required<br>
+                - Schema mapping required
+            </div>
+        </div>
+    </div>
+</section>
+
+<section id="implementation-approach" class="feature-section">
+    <h2><i class="fas fa-cogs"></i> Hybrid Implementation Approach</h2>
+    <div class="feature-content">
+        
+        <div class="alert alert-success">
+            <h4>✅ FOUNDATION ISSUES RESOLVED</h4>
+            <p>Database lock timeout fixed with retry logic - Ready for core implementation</p>
+        </div>
+        
+        <h3>🏗️ Implementation Strategy</h3>
+        <div class="implementation-phases">
+            <div class="phase-item">
+                <h4>Phase 1: Database Abstraction Layer</h4>
+                <ul>
+                    <li>Create database backend detection system</li>
+                    <li>Implement connection manager for MySQL/SQLite switching</li>
+                    <li>Preserve existing DBIx::Class schema structure</li>
+                </ul>
+            </div>
+            
+            <div class="phase-item">
+                <h4>Phase 2: User Interface Integration</h4>
+                <ul>
+                    <li>Add database selection interface</li>
+                    <li>Auto-detect local MySQL availability</li>
+                    <li>Provide manual override options</li>
+                </ul>
+            </div>
+            
+            <div class="phase-item">
+                <h4>Phase 3: Synchronization Engine</h4>
+                <ul>
+                    <li>Robust production MySQL update system</li>
+                    <li>Conflict detection and resolution</li>
+                    <li>Data integrity verification</li>
+                </ul>
+            </div>
+        </div>
+        
+        <h3>🛡️ Production Safety Measures</h3>
+        <div class="safety-measures">
+            <div class="alert alert-danger">
+                <strong>CRITICAL:</strong> All production updates must be transactional with rollback capability
+            </div>
+            <ul class="safety-list">
+                <li><strong>Backup Before Sync:</strong> Automatic backup before any production updates</li>
+                <li><strong>Transaction Wrapping:</strong> All updates in atomic transactions</li>
+                <li><strong>Validation Checks:</strong> Data integrity verification before commit</li>
+                <li><strong>Rollback Capability:</strong> Immediate rollback on any error</li>
+                <li><strong>Audit Logging:</strong> Complete audit trail of all changes</li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<section id="architecture" class="feature-section">
+    <h2><i class="fas fa-sitemap"></i> Proposed Architecture</h2>
+    <div class="feature-content">
+        
+        <h3>Local Storage Strategy</h3>
+        <div class="architecture-options">
+            <div class="option-card">
+                <h4><i class="fas fa-database"></i> Option 1: Local MySQL Instance</h4>
+                <ul>
+                    <li><strong>Pros:</strong> Same schema, familiar tools, full compatibility</li>
+                    <li><strong>Cons:</strong> Resource intensive, requires MySQL installation</li>
+                </ul>
+            </div>
+            
+            <div class="option-card">
+                <h4><i class="fas fa-cube"></i> Option 2: SQLite Database</h4>
+                <ul>
+                    <li><strong>Pros:</strong> Lightweight, file-based, no server required</li>
+                    <li><strong>Cons:</strong> Schema differences, limited concurrent access</li>
+                </ul>
+            </div>
+            
+            <div class="option-card recommended">
+                <h4><i class="fas fa-star"></i> Recommended: Hybrid Approach</h4>
+                <ul>
+                    <li>SQLite for local storage during offline mode</li>
+                    <li>Schema mapping layer for MySQL compatibility</li>
+                    <li>Transaction queue for sync operations</li>
+                </ul>
+            </div>
+        </div>
+        
+        <h3>Synchronization Components</h3>
+        <div class="component-grid">
+            <div class="component-card">
+                <h4>Offline Detector</h4>
+                <p>Monitor internet connectivity and switch modes automatically</p>
+            </div>
+            <div class="component-card">
+                <h4>Local Data Manager</h4>
+                <p>Handle local database operations and change tracking</p>
+            </div>
+            <div class="component-card">
+                <h4>Sync Engine</h4>
+                <p>Bidirectional synchronization with conflict resolution</p>
+            </div>
+            <div class="component-card">
+                <h4>Conflict Resolver</h4>
+                <p>Handle data conflicts during merge operations</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section id="hybrid-evaluation" class="feature-section">
+    <h2><i class="fas fa-balance-scale"></i> Evaluation of Hybrid Approach (SQLite + MySQL Schema Mapping)</h2>
+    <div class="feature-content">
+        <div class="alert alert-info">
+            <strong>Added: 2025-01-28</strong> - Incorporates evaluation and mobile/web transportability analysis
+        </div>
+        
+        <h3><i class="fas fa-thumbs-up"></i> Advantages</h3>
+        <div class="pros-grid">
+            <div class="pro-item">
+                <h4>Lightweight Resource Usage</h4>
+                <p>SQLite reduces resource usage on client devices, ideal for low-spec environments and mobile constraints</p>
+            </div>
+            <div class="pro-item">
+                <h4>MySQL Compatibility</h4>
+                <p>Schema mapping ensures compatibility with existing MySQL production database, minimizing code changes</p>
+            </div>
+            <div class="pro-item">
+                <h4>Reliable Synchronization</h4>
+                <p>Transaction queue supports reliable synchronization, reducing data loss risks during network interruptions</p>
+            </div>
+            <div class="pro-item">
+                <h4>Flexible Mode Switching</h4>
+                <p>Automated offline/online detection enhances user experience with seamless transitions</p>
+            </div>
+            <div class="pro-item">
+                <h4>Conflict-Free Merging</h4>
+                <p>UUID-based keys and sync metadata enable robust, conflict-free data merging</p>
+            </div>
+        </div>
+        
+        <h3><i class="fas fa-exclamation-triangle"></i> Challenges</h3>
+        <div class="cons-grid">
+            <div class="con-item">
+                <h4>Development Complexity</h4>
+                <p>Schema mapping introduces complexity due to SQL dialect differences between SQLite and MySQL</p>
+            </div>
+            <div class="con-item">
+                <h4>Concurrent Access Limitations</h4>
+                <p>SQLite's limited concurrent write support may cause issues in multi-user scenarios</p>
+            </div>
+            <div class="con-item">
+                <h4>Application Complexity</h4>
+                <p>Hybrid setup increases application complexity and memory usage</p>
+            </div>
+            <div class="con-item">
+                <h4>Conflict Resolution Scalability</h4>
+                <p>User-prompt conflict resolution may not scale for large datasets, risking user overload</p>
+            </div>
+            <div class="con-item">
+                <h4>Testing Coverage Gaps</h4>
+                <p>Testing strategy lacks specifics for edge cases like partial sync failures or network interruptions</p>
+            </div>
+        </div>
+        
+        <h3><i class="fas fa-tools"></i> Mitigation Strategies</h3>
+        <div class="mitigation-list">
+            <div class="mitigation-item">
+                <i class="fas fa-tachometer-alt"></i>
+                <strong>Optimize Schema Mapping:</strong> Implement performance-optimized mapping layer with caching
+            </div>
+            <div class="mitigation-item">
+                <i class="fas fa-users"></i>
+                <strong>Concurrent Access Handling:</strong> Implement queue-based write operations for SQLite
+            </div>
+            <div class="mitigation-item">
+                <i class="fas fa-robot"></i>
+                <strong>Automated Conflict Resolution:</strong> Develop rule-based conflict resolution with user fallback
+            </div>
+            <div class="mitigation-item">
+                <i class="fas fa-mobile-alt"></i>
+                <strong>Mobile Edge Case Testing:</strong> Expand testing to cover mobile-specific scenarios
+            </div>
+        </div>
+    </div>
+</section>
+
+<section id="mobile-transportability" class="feature-section">
+    <h2><i class="fas fa-mobile-alt"></i> Transportability to Mobile Platforms (Android and iOS)</h2>
+    <div class="feature-content">
+        
+        <h3><i class="fas fa-check-circle"></i> Feasibility Assessment</h3>
+        <div class="alert alert-success">
+            <strong>High Feasibility:</strong> The hybrid approach is transportable to Android and iOS due to native SQLite support and platform-agnostic sync components.
+        </div>
+        
+        <div class="platform-support">
+            <div class="platform-item">
+                <h4><i class="fab fa-android"></i> Android Support</h4>
+                <p>Native SQLite support via Android's core libraries and Room persistence library</p>
+            </div>
+            <div class="platform-item">
+                <h4><i class="fab fa-apple"></i> iOS Support</h4>
+                <p>SQLite integration through Core Data framework and native SQLite APIs</p>
+            </div>
+        </div>
+        
+        <h3><i class="fas fa-star"></i> Mobile Advantages</h3>
+        <div class="mobile-advantages">
+            <div class="advantage-item">
+                <h4>Storage Efficiency</h4>
+                <p>SQLite's lightweight nature suits mobile storage constraints and battery optimization</p>
+            </div>
+            <div class="advantage-item">
+                <h4>Network API Integration</h4>
+                <p>Sync engine can leverage mobile APIs (Android's ConnectivityManager, iOS's Network framework)</p>
+            </div>
+            <div class="advantage-item">
+                <h4>Theme System Compatibility</h4>
+                <p>Existing theme system (base-containers.css) adaptable for mobile UI using React Native or Flutter</p>
+            </div>
+        </div>
+        
+        <h3><i class="fas fa-exclamation-circle"></i> Mobile Challenges</h3>
+        <div class="mobile-challenges">
+            <div class="challenge-item priority-high">
+                <h4>Database Lock Resolution</h4>
+                <p>Resolve critical database lock timeout error (Todo.pm, line 656) for mobile stability</p>
+            </div>
+            <div class="challenge-item">
+                <h4>Language Compatibility</h4>
+                <p>Rewrite Perl-based components in mobile-compatible languages (Java/Kotlin, Swift) or use cross-platform frameworks</p>
+            </div>
+            <div class="challenge-item">
+                <h4>Storage Path Adaptation</h4>
+                <p>Adjust file paths for mobile storage (Android: /data/data/&lt;package&gt;/databases/, iOS: Application Support directory)</p>
+            </div>
+            <div class="challenge-item">
+                <h4>Battery Optimization</h4>
+                <p>Optimize sync intervals for mobile battery policies (Android's Doze mode, iOS's Background App Refresh)</p>
+            </div>
+            <div class="challenge-item">
+                <h4>Network Instability</h4>
+                <p>Handle mobile network instability with robust retry logic and partial sync support</p>
+            </div>
+        </div>
+        
+        <h3><i class="fas fa-lightbulb"></i> Mobile Recommendations</h3>
+        <div class="mobile-recommendations">
+            <div class="recommendation-item">
+                <i class="fas fa-code-branch"></i>
+                <strong>Cross-Platform Framework:</strong> Adopt React Native or Flutter to share code across platforms
+            </div>
+            <div class="recommendation-item">
+                <i class="fas fa-database"></i>
+                <strong>Performance Optimization:</strong> Optimize SQLite database size and queries for mobile performance
+            </div>
+            <div class="recommendation-item">
+                <i class="fas fa-shield-alt"></i>
+                <strong>Security Implementation:</strong> Implement encrypted SQLite storage and HTTPS for API endpoints
+            </div>
+            <div class="recommendation-item">
+                <i class="fas fa-vial"></i>
+                <strong>Mobile Testing:</strong> Expand testing strategy to include mobile scenarios (network interruptions, low storage, app suspension)
+            </div>
+        </div>
+        
+        <h4><i class="fas fa-globe"></i> Web-Based Interface Considerations</h4>
+        <div class="web-interface-section">
+            <div class="alert alert-info">
+                <strong>PWA Compatibility:</strong> Offline mode system accessible via web-based interface using Progressive Web App capabilities
+            </div>
+            
+            <h5>Web Advantages</h5>
+            <ul class="web-advantages-list">
+                <li><strong>Service Worker Support:</strong> PWAs support offline functionality via Service Workers, aligning with SQLite storage and sync engine</li>
+                <li><strong>API Reusability:</strong> Existing API endpoints (/offline/enable, /offline/sync) can be reused for web-based access</li>
+                <li><strong>Theme Compatibility:</strong> Theme system (base-containers.css) compatible with web rendering on mobile browsers</li>
+            </ul>
+            
+            <h5>Web Challenges</h5>
+            <ul class="web-challenges-list">
+                <li><strong>Storage Limits:</strong> Browser storage limits (IndexedDB/localStorage) may constrain SQLite database size</li>
+                <li><strong>Service Worker Optimization:</strong> Caching must handle offline data and sync operations efficiently</li>
+                <li><strong>Mobile UI Components:</strong> Web-based conflict resolution requires mobile-friendly UI components</li>
+            </ul>
+            
+            <h5>Web Recommendations</h5>
+            <ul class="web-recommendations-list">
+                <li><strong>PWA Implementation:</strong> Implement PWA with Service Workers to cache SQLite data and API responses</li>
+                <li><strong>Database Size Optimization:</strong> Optimize database size for browser storage constraints</li>
+                <li><strong>Cross-Browser Testing:</strong> Test PWA offline behavior across Android/iOS browsers</li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<section id="implementation-plan" class="feature-section">
+    <h2><i class="fas fa-tasks"></i> Implementation Roadmap</h2>
+    <div class="feature-content">
+        
+        <h3>Phase 1: Foundation (Current)</h3>
+        <div class="phase-tasks">
+            <div class="task-item priority-high completed">
+                <i class="fas fa-check-circle"></i>
+                <strong>Fix Database Lock Issue</strong> - Resolve Todo controller timeout ✅
+            </div>
+            <div class="task-item completed">
+                <i class="fas fa-check-circle"></i>
+                <strong>Complete Documentation</strong> - Finalize offline mode specifications ✅
+            </div>
+            <div class="task-item">
+                <i class="fas fa-cogs"></i>
+                <strong>Design Local Schema</strong> - Create SQLite schema mapping
+            </div>
+            <div class="task-item mobile-added">
+                <i class="fas fa-mobile-alt"></i>
+                <strong>Evaluate Mobile Storage</strong> - Assess mobile storage paths and browser compatibility for SQLite
+            </div>
+        </div>
+        
+        <h3>Phase 2: Core Development</h3>
+        <div class="phase-tasks">
+            <div class="task-item">
+                <i class="fas fa-database"></i>
+                <strong>Local Database Setup</strong> - Implement SQLite integration
+            </div>
+            <div class="task-item">
+                <i class="fas fa-exchange-alt"></i>
+                <strong>Mode Switching</strong> - Online/offline detection and switching
+            </div>
+            <div class="task-item">
+                <i class="fas fa-edit"></i>
+                <strong>Offline Operations</strong> - Enable CRUD operations in offline mode
+            </div>
+            <div class="task-item mobile-added">
+                <i class="fas fa-code-branch"></i>
+                <strong>Cross-Platform Framework</strong> - Implement React Native/Flutter for mobile UI and PWA support
+            </div>
+            <div class="task-item mobile-added">
+                <i class="fas fa-tachometer-alt"></i>
+                <strong>Mobile Optimization</strong> - Optimize SQLite queries and database size for mobile/web constraints
+            </div>
+        </div>
+        
+        <h3>Phase 3: Synchronization</h3>
+        <div class="phase-tasks">
+            <div class="task-item">
+                <i class="fas fa-sync"></i>
+                <strong>Basic Sync</strong> - Implement one-way sync (offline → online)
+            </div>
+            <div class="task-item">
+                <i class="fas fa-sync-alt"></i>
+                <strong>Bidirectional Sync</strong> - Full two-way synchronization
+            </div>
+            <div class="task-item">
+                <i class="fas fa-balance-scale"></i>
+                <strong>Conflict Resolution</strong> - Handle merge conflicts
+            </div>
+            <div class="task-item mobile-added">
+                <i class="fas fa-wifi"></i>
+                <strong>Mobile Network Handling</strong> - Enhance sync engine for mobile network instability and PWA caching
+            </div>
+        </div>
+        
+        <h3>Phase 4: Testing & Optimization</h3>
+        <div class="phase-tasks">
+            <div class="task-item">
+                <i class="fas fa-vial"></i>
+                <strong>Integration Testing</strong> - Test offline/online transitions
+            </div>
+            <div class="task-item">
+                <i class="fas fa-tachometer-alt"></i>
+                <strong>Performance Optimization</strong> - Optimize sync performance
+            </div>
+            <div class="task-item">
+                <i class="fas fa-shield-alt"></i>
+                <strong>Data Integrity</strong> - Ensure data consistency
+            </div>
+            <div class="task-item mobile-added">
+                <i class="fas fa-mobile-alt"></i>
+                <strong>Mobile Testing</strong> - Test mobile-specific scenarios (network interruptions, battery optimization)
+            </div>
+            <div class="task-item mobile-added">
+                <i class="fas fa-globe"></i>
+                <strong>PWA Testing</strong> - Test PWA offline behavior across Android/iOS browsers
+            </div>
+        </div>
+    </div>
+</section>
+
+<section id="technical-specifications" class="feature-section">
+    <h2><i class="fas fa-code"></i> Technical Specifications</h2>
+    <div class="feature-content">
+        
+        <h3>Database Schema Considerations</h3>
+        <div class="spec-grid">
+            <div class="spec-item">
+                <h4>Primary Keys</h4>
+                <p>UUID-based keys for conflict-free merging</p>
+            </div>
+            <div class="spec-item">
+                <h4>Timestamps</h4>
+                <p>Created/modified timestamps for sync ordering</p>
+            </div>
+            <div class="spec-item">
+                <h4>Sync Metadata</h4>
+                <p>Track sync status and conflict resolution</p>
+            </div>
+            <div class="spec-item">
+                <h4>Change Tracking</h4>
+                <p>Log all modifications for sync processing</p>
+            </div>
+        </div>
+        
+        <h3>Configuration Requirements</h3>
+        <pre><code># Offline Mode Configuration - Updated with Mobile/Web Support
+offline_mode:
+  enabled: true
+  local_db_path:
+    desktop: /var/lib/comserv/offline.db
+    android: /data/data/&lt;package&gt;/databases/offline.db
+    ios: &lt;app_support&gt;/offline.db
+    web: indexeddb://comserv/offline
+  sync_interval: 300  # seconds, adjustable for mobile battery optimization
+  conflict_resolution: user_prompt
+  auto_switch: true
+  mobile_optimizations:
+    max_db_size: 50MB  # Limit for mobile/web storage
+    network_retry_count: 3  # Retry attempts for mobile networks
+    battery_aware_sync: true  # Respect mobile battery policies
+  pwa_support:
+    enabled: true
+    cache_strategy: network_first  # Service Worker caching policy
+    offline_fallback: true
+    sync_on_reconnect: true
+</code></pre>
+        
+        <h3>API Endpoints</h3>
+        <div class="api-list">
+            <div class="api-item">
+                <code>POST /offline/enable</code> - Switch to offline mode
+            </div>
+            <div class="api-item">
+                <code>POST /offline/disable</code> - Switch to online mode
+            </div>
+            <div class="api-item">
+                <code>POST /offline/sync</code> - Trigger manual synchronization
+            </div>
+            <div class="api-item">
+                <code>GET /offline/status</code> - Get current mode and sync status
+            </div>
+        </div>
+    </div>
+</section>
+
+<section id="development-notes" class="feature-section">
+    <h2><i class="fas fa-sticky-note"></i> Development Notes</h2>
+    <div class="feature-content">
+        
+        <div class="alert alert-warning">
+            <h4>Critical Development Guidelines</h4>
+            <ul>
+                <li><strong>Follow AI Guidelines:</strong> Maximum 3-4 prompts per task</li>
+                <li><strong>Database Lock Fixed:</strong> Todo controller timeout resolved ✅</li>
+                <li><strong>Theme Compliance:</strong> All UI components must use theme system</li>
+                <li><strong>No New CSS:</strong> Use existing base-containers.css classes only</li>
+                <li><strong>Mobile/Web Compatibility:</strong> Prioritize cross-platform frameworks and PWA support</li>
+                <li><strong>Resource Optimization:</strong> Optimize database and sync operations for mobile constraints</li>
+            </ul>
+        </div>
+        
+        <h3>Files to Monitor</h3>
+        <ul class="file-list">
+            <li><code>Comserv/lib/Comserv/Controller/Todo.pm</code> - Database lock issue resolved ✅</li>
+            <li><code>Comserv/lib/Comserv/Schema/</code> - Database schema definitions</li>
+            <li><code>Comserv/lib/Comserv/Model/</code> - Data model implementations</li>
+            <li><code>manifest.json</code> - PWA manifest configuration (mobile/web)</li>
+            <li><code>service-worker.js</code> - Service Worker scripts (PWA support)</li>
+            <li><code>build.gradle</code> - Android configuration (mobile)</li>
+            <li><code>Info.plist</code> - iOS configuration (mobile)</li>
+        </ul>
+        
+        <h3>Testing Strategy</h3>
+        <ul class="test-list">
+            <li><strong>Unit Tests:</strong> Individual component testing</li>
+            <li><strong>Integration Tests:</strong> Online/offline mode switching</li>
+            <li><strong>Sync Tests:</strong> Data synchronization scenarios</li>
+            <li><strong>Conflict Tests:</strong> Merge conflict resolution</li>
+        </ul>
+    </div>
+</section>
+
+</div>
+
+<footer class="documentation-footer">
+    <div class="footer-info">
+        <p><strong>Document Status:</strong> Active Development | <strong>Priority:</strong> High | <strong>Owner:</strong> Development Team</p>
+        <p><strong>Next Review:</strong> 2025-02-28 | <strong>Related:</strong> AI_DEVELOPMENT_GUIDELINES.tt</p>
+        <p><strong>Mobile/Web Analysis:</strong> Added 2025-01-28 | <strong>Database Lock Issue:</strong> Resolved ✅</p>
+    </div>
+</footer>
+
+</div>
+</div>

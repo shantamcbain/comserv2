@@ -15,7 +15,7 @@
 [% END %]
 
 
-<select id="project_id" name="project_id">
-    <option value="" [% IF !selected_project_id %]selected[% END %]>None</option>
+<select id="parent_id" name="parent_id">
+    <option value="" [% IF !selected_project_id %]selected[% END %]>None (Top-level Project)</option>
     [% display_project_options(projects, selected_project_id, 0) %]
 </select>

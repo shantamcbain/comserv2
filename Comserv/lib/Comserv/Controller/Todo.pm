@@ -652,35 +652,77 @@ sub create :Local {
         return;
     }
 
-    # Create a new todo record
-    my $todo = $schema->resultset('Todo')->create({
-        record_id => $record_id,
-        sitename => $sitename,
-        start_date => $start_date,
-        parent_todo => $parent_todo,
-        due_date => $due_date,
-        subject => $subject,
-        description => $description,
-        estimated_man_hours => $estimated_man_hours,
-        comments => $comments,
-        accumulative_time => $accumulative_time,
-        reporter => $reporter,
-        company_code => $company_code,
-        owner => $owner,
-        project_code => $project_code, # Ensure this is set
-        developer => $developer,
-        username_of_poster => $username_of_poster,
-        status => $status,
-        priority => $priority,
-        share => $share,
-        last_mod_by => $last_mod_by,
-        last_mod_date => $current_date,
-        user_id => $user_id, # Ensure this is set
-        group_of_poster => $group_of_poster,
-        project_id => $selected_project_id,
-        date_time_posted => $date_time_posted,
-        time_of_day => $time_of_day,
-    });
+    # Create a new todo record with retry logic for lock timeouts
+    my $todo;
+    my $max_retries = 3;
+    my $retry_count = 0;
+    
+    while ($retry_count < $max_retries) {
+        eval {
+            $schema->txn_do(sub {
+                $todo = $schema->resultset('Todo')->create({
+                    record_id => $record_id,
+                    sitename => $sitename,
+                    start_date => $start_date,
+                    parent_todo => $parent_todo,
+                    due_date => $due_date,
+                    subject => $subject,
+                    description => $description,
+                    estimated_man_hours => $estimated_man_hours,
+                    comments => $comments,
+                    accumulative_time => $accumulative_time,
+                    reporter => $reporter,
+                    company_code => $company_code,
+                    owner => $owner,
+                    project_code => $project_code, # Ensure this is set
+                    developer => $developer,
+                    username_of_poster => $username_of_poster,
+                    status => $status,
+                    priority => $priority,
+                    share => $share,
+                    last_mod_by => $last_mod_by,
+                    last_mod_date => $current_date,
+                    user_id => $user_id, # Ensure this is set
+                    group_of_poster => $group_of_poster,
+                    project_id => $selected_project_id,
+                    date_time_posted => $date_time_posted,
+                    time_of_day => $time_of_day,
+                });
+            });
+        };
+        
+        if ($@) {
+            $retry_count++;
+            if ($@ =~ /Lock wait timeout exceeded/ && $retry_count < $max_retries) {
+                # Log the retry attempt
+                $self->logging->log_with_details(
+                    $c,
+                    'warn',
+                    __FILE__,
+                    __LINE__,
+                    'todo.create.retry',
+                    "Database lock timeout, retrying ($retry_count/$max_retries): $@"
+                );
+                # Wait briefly before retry (exponential backoff)
+                sleep(0.1 * (2 ** $retry_count));
+                next;
+            } else {
+                # Log the final error and re-throw
+                $self->logging->log_with_details(
+                    $c,
+                    'error',
+                    __FILE__,
+                    __LINE__,
+                    'todo.create.failed',
+                    "Failed to create todo after $retry_count retries: $@"
+                );
+                die $@;
+            }
+        } else {
+            # Success - break out of retry loop
+            last;
+        }
+    }
 
     # Redirect the user to the index action
     $c->response->redirect($c->uri_for($self->action_for('index')));

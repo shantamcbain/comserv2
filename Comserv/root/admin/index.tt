@@ -21,6 +21,7 @@
   <div class="admin-section">
     <h3>Database Management</h3>
     <ul>
+      <li><a href="[% c.uri_for('/admin/database_mode') %]"><i class="icon-database"></i>Database Backend Selection</a></li>
       <li><a href="[% c.uri_for('/admin/schema_manager') %]">Schema Manager</a></li>
       <li><a href="[% c.uri_for('/admin/compare_schema') %]">Compare Schema</a></li>
       <li><a href="[% c.uri_for('/admin/migrate_schema') %]">Migrate Schema</a></li>

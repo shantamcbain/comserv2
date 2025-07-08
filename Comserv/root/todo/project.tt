@@ -1,6 +1,10 @@
 
 [% META title = 'Project Management' %]
 [% PageVersion = 'todo/project.tt,v 0.08 2024/08/25 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    <!-- [% PageVersion %] -->
+[% END %]
+
 [% # Note: additional_css is now set in the controller with a timestamp to force reload %]
 
 <!-- Critical inline styles to ensure cards display correctly -->

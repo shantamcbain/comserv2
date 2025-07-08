@@ -335,7 +335,10 @@ sub fetch_projects_with_subprojects :Private {
         @top_projects = $schema->resultset('Project')->search(
             {
                 'sitename' => $SiteName,
-                'parent_id' => undef
+                -or => [
+                    'parent_id' => undef,
+                    'parent_id' => ''
+                ]
             },
             {
                 order_by => { -asc => 'name' }
@@ -360,6 +363,7 @@ sub fetch_projects_with_subprojects :Private {
         my $project_hash = {
             id => $project->id,
             name => $project->name,
+            description => $project->description || '',
             parent_id => $project->parent_id,
             status => $project->status || 1, # Default to 'New' status
             start_date => $project->start_date,
@@ -392,6 +396,7 @@ sub fetch_projects_with_subprojects :Private {
             my $subproject1_hash = {
                 id => $subproject1->id,
                 name => $subproject1->name,
+                description => $subproject1->description || '',
                 parent_id => $subproject1->parent_id,
                 status => $subproject1->status || 1, # Default to 'New' status
                 start_date => $subproject1->start_date,
@@ -424,6 +429,7 @@ sub fetch_projects_with_subprojects :Private {
                 push @{$subproject1_hash->{sub_projects}}, {
                     id => $subproject2->id,
                     name => $subproject2->name,
+                    description => $subproject2->description || '',
                     parent_id => $subproject2->parent_id,
                     status => $subproject2->status || 1, # Default to 'New' status
                     start_date => $subproject2->start_date,

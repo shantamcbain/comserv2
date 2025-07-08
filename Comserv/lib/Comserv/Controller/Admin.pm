@@ -7020,6 +7020,33 @@ sub create_database_backup {
     return $result;
 }
 
+# Database mode selection - forward to DatabaseMode controller
+sub database_mode :Path('database_mode') :Args {
+    my ($self, $c, @args) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'database_mode',
+        "Forwarding to DatabaseMode controller with args: " . join(', ', @args));
+    
+    # Handle sub-routes
+    if (@args) {
+        my $action = shift @args;
+        
+        if ($action eq 'switch_backend' && @args) {
+            $c->forward('Controller::DatabaseMode', 'switch_backend', \@args);
+        } elsif ($action eq 'test_connection' && @args) {
+            $c->forward('Controller::DatabaseMode', 'test_connection', \@args);
+        } elsif ($action eq 'status') {
+            $c->forward('Controller::DatabaseMode', 'status', \@args);
+        } else {
+            # Unknown sub-route, forward to index with all args
+            $c->forward('Controller::DatabaseMode', 'index', [$action, @args]);
+        }
+    } else {
+        # No args, forward to index
+        $c->forward('Controller::DatabaseMode', 'index', \@args);
+    }
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;

@@ -2,7 +2,7 @@
 [% IF debug_mode == 1 %]
     [% PageVersion %]
     [%# "Debugging HostName: " _ HostName %]
-    [%# INCLUDE 'debug.tt' %]
+    [% INCLUDE 'debug.tt' %]
 [% END %]
 
 <div class="apiary-container">
