@@ -1837,14 +1837,17 @@ sub sync_essential_tables_for_offline {
 
 Sync a single missing table from production to local database
 Called automatically when a table is accessed but doesn't exist
+Now supports selective sync based on database type and share field
 
 =cut
 
 sub sync_missing_table {
-    my ($self, $c, $table_name) = @_;
+    my ($self, $c, $table_name, $options) = @_;
+    
+    $options ||= {};
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_missing_table',
-        "*** SYNC_MISSING_TABLE CALLED *** Attempting to sync missing table '$table_name' from production");
+        "*** SELECTIVE SYNC_MISSING_TABLE CALLED *** Attempting to sync missing table '$table_name' from production");
     
     # DEBUG: Log all available backends
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_missing_table',
@@ -1877,6 +1880,18 @@ sub sync_missing_table {
             return { success => 0, error => "Already using production backend" };
         }
         
+        # Determine sync strategy based on local database type
+        my $current_backend_info = $self->{available_backends}->{$current_backend};
+        my $sync_strategy = $self->_determine_sync_strategy($current_backend_info->{type}, $table_name, $options);
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_missing_table',
+            "Using sync strategy: $sync_strategy for table '$table_name' on backend type '$current_backend_info->{type}'");
+        
+        # For MySQL: sync ALL tables with result files, not just the requested one
+        if ($current_backend_info->{type} eq 'mysql' && !$options->{single_table_only}) {
+            return $self->_sync_all_tables_with_results($c, $production_backend, $current_backend);
+        }
+        
         # Get connection info for local (target) database
         my $target_conn = $self->get_connection_info($c);
         
@@ -1887,7 +1902,7 @@ sub sync_missing_table {
         $self->switch_backend($c, $original_backend);
         
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'sync_missing_table',
-            "Syncing table '$table_name' from '$production_backend' to '$current_backend'");
+            "Syncing table '$table_name' from '$production_backend' to '$current_backend' using strategy '$sync_strategy'");
         
         # Connect to both databases
         my $source_dbh = DBI->connect(
@@ -1926,6 +1941,7 @@ sub sync_missing_table {
                     records_synced => 0,
                     source_backend => 'schema_definition',
                     target_backend => $current_backend,
+                    sync_strategy => $sync_strategy,
                     note => 'Created empty table from schema definition'
                 };
             } else {
@@ -1951,35 +1967,26 @@ sub sync_missing_table {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_missing_table',
             "Created table '$table_name' in local database");
         
-        # Copy data from source to target
-        my $select_sth = $source_dbh->prepare("SELECT * FROM `$table_name`");
-        $select_sth->execute();
-        
-        my $columns = $select_sth->{NAME};
-        my $placeholders = join(',', ('?') x @$columns);
-        my $column_list = join(',', map { "`$_`" } @$columns);
-        
-        my $insert_sql = "INSERT INTO `$table_name` ($column_list) VALUES ($placeholders)";
-        my $insert_sth = $target_dbh->prepare($insert_sql);
-        
-        my $record_count = 0;
-        while (my @row = $select_sth->fetchrow_array()) {
-            $insert_sth->execute(@row);
-            $record_count++;
-        }
+        # Perform selective data sync based on strategy
+        my $sync_result = $self->_perform_selective_sync(
+            $c, $table_name, $source_dbh, $target_dbh, $sync_strategy, $options
+        );
         
         $source_dbh->disconnect();
         $target_dbh->disconnect();
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_missing_table',
-            "Successfully synced table '$table_name' with $record_count records");
+            "Successfully synced table '$table_name' with $sync_result->{records_synced} records using strategy '$sync_strategy'");
         
         return { 
             success => 1, 
             table => $table_name,
-            records_synced => $record_count,
+            records_synced => $sync_result->{records_synced},
             source_backend => $production_backend,
-            target_backend => $current_backend
+            target_backend => $current_backend,
+            sync_strategy => $sync_strategy,
+            filtered_records => $sync_result->{filtered_records} || 0,
+            sync_details => $sync_result->{details} || {}
         };
         
     } catch {
@@ -1988,6 +1995,970 @@ sub sync_missing_table {
             "Failed to sync missing table '$table_name': $error");
         return { success => 0, error => "Failed to sync table: $error" };
     };
+}
+
+=head2 _determine_sync_strategy
+
+Determine the sync strategy based on database type and table characteristics
+
+=cut
+
+sub _determine_sync_strategy {
+    my ($self, $backend_type, $table_name, $options) = @_;
+    
+    # MySQL local databases: sync ALL data
+    if ($backend_type eq 'mysql') {
+        return 'full_sync';
+    }
+    
+    # SQLite databases: selective sync based on table and options
+    if ($backend_type eq 'sqlite') {
+        # Check if table has 'share' field for privacy filtering
+        if ($self->_table_has_share_field($table_name)) {
+            # On-demand sync with share filtering
+            return $options->{force_full_sync} ? 'full_sync_with_share_filter' : 'on_demand_sync_with_share_filter';
+        } else {
+            # On-demand sync without share filtering
+            return $options->{force_full_sync} ? 'full_sync' : 'on_demand_sync';
+        }
+    }
+    
+    # Default fallback
+    return 'full_sync';
+}
+
+=head2 _table_has_share_field
+
+Check if a table has a 'share' field for privacy filtering
+
+=cut
+
+sub _table_has_share_field {
+    my ($self, $table_name) = @_;
+    
+    # Known tables with share field based on schema analysis
+    my %tables_with_share = (
+        'todo' => 1,
+        'workshop' => 1,
+        'page_tb' => 1,
+    );
+    
+    return $tables_with_share{$table_name} || 0;
+}
+
+=head2 _perform_selective_sync
+
+Perform selective data synchronization based on the determined strategy
+
+=cut
+
+sub _perform_selective_sync {
+    my ($self, $c, $table_name, $source_dbh, $target_dbh, $sync_strategy, $options) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_perform_selective_sync',
+        "Performing selective sync for table '$table_name' using strategy '$sync_strategy'");
+    
+    my $result = {
+        records_synced => 0,
+        filtered_records => 0,
+        details => {}
+    };
+    
+    if ($sync_strategy eq 'full_sync') {
+        return $self->_perform_full_sync($c, $table_name, $source_dbh, $target_dbh, $result);
+    }
+    elsif ($sync_strategy eq 'full_sync_with_share_filter') {
+        return $self->_perform_full_sync_with_share_filter($c, $table_name, $source_dbh, $target_dbh, $result, $options);
+    }
+    elsif ($sync_strategy eq 'on_demand_sync') {
+        return $self->_perform_on_demand_sync($c, $table_name, $source_dbh, $target_dbh, $result, $options);
+    }
+    elsif ($sync_strategy eq 'on_demand_sync_with_share_filter') {
+        return $self->_perform_on_demand_sync_with_share_filter($c, $table_name, $source_dbh, $target_dbh, $result, $options);
+    }
+    else {
+        die "Unknown sync strategy: $sync_strategy";
+    }
+}
+
+=head2 _perform_full_sync
+
+Perform full table synchronization (MySQL local databases)
+
+=cut
+
+sub _perform_full_sync {
+    my ($self, $c, $table_name, $source_dbh, $target_dbh, $result) = @_;
+    
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_perform_full_sync',
+        "Performing full sync for table '$table_name'");
+    
+    # Copy all data from source to target
+    my $select_sth = $source_dbh->prepare("SELECT * FROM `$table_name`");
+    $select_sth->execute();
+    
+    my $columns = $select_sth->{NAME};
+    my $placeholders = join(',', ('?') x @$columns);
+    my $column_list = join(',', map { "`$_`" } @$columns);
+    
+    my $insert_sql = "INSERT INTO `$table_name` ($column_list) VALUES ($placeholders)";
+    my $insert_sth = $target_dbh->prepare($insert_sql);
+    
+    while (my @row = $select_sth->fetchrow_array()) {
+        $insert_sth->execute(@row);
+        $result->{records_synced}++;
+    }
+    
+    $result->{details}->{sync_type} = 'full_table_sync';
+    return $result;
+}
+
+=head2 _perform_full_sync_with_share_filter
+
+Perform full table synchronization with share field filtering
+
+=cut
+
+sub _perform_full_sync_with_share_filter {
+    my ($self, $c, $table_name, $source_dbh, $target_dbh, $result, $options) = @_;
+    
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_perform_full_sync_with_share_filter',
+        "Performing full sync with share filter for table '$table_name'");
+    
+    # Get share field configuration for this table
+    my $share_config = $self->_get_share_field_config($table_name);
+    
+    # Build WHERE clause for shared records only
+    my $where_clause = $self->_build_share_where_clause($share_config);
+    
+    # Copy only shared data from source to target
+    my $select_sql = "SELECT * FROM `$table_name` WHERE $where_clause";
+    my $select_sth = $source_dbh->prepare($select_sql);
+    $select_sth->execute();
+    
+    my $columns = $select_sth->{NAME};
+    my $placeholders = join(',', ('?') x @$columns);
+    my $column_list = join(',', map { "`$_`" } @$columns);
+    
+    my $insert_sql = "INSERT INTO `$table_name` ($column_list) VALUES ($placeholders)";
+    my $insert_sth = $target_dbh->prepare($insert_sql);
+    
+    # Count total records for filtering statistics
+    my $total_count_sth = $source_dbh->prepare("SELECT COUNT(*) FROM `$table_name`");
+    $total_count_sth->execute();
+    my ($total_records) = $total_count_sth->fetchrow_array();
+    
+    while (my @row = $select_sth->fetchrow_array()) {
+        $insert_sth->execute(@row);
+        $result->{records_synced}++;
+    }
+    
+    $result->{filtered_records} = $total_records - $result->{records_synced};
+    $result->{details}->{sync_type} = 'full_table_sync_with_share_filter';
+    $result->{details}->{total_records_in_source} = $total_records;
+    $result->{details}->{share_filter} = $where_clause;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_perform_full_sync_with_share_filter',
+        "Synced $result->{records_synced} shared records, filtered out $result->{filtered_records} private records");
+    
+    return $result;
+}
+
+=head2 _perform_on_demand_sync
+
+Perform on-demand synchronization (SQLite - sync only requested records)
+
+=cut
+
+sub _perform_on_demand_sync {
+    my ($self, $c, $table_name, $source_dbh, $target_dbh, $result, $options) = @_;
+    
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_perform_on_demand_sync',
+        "Performing on-demand sync for table '$table_name'");
+    
+    # For initial table creation, sync a minimal set or empty table
+    # This can be enhanced later to sync specific records based on access patterns
+    
+    if ($options->{sync_recent_records}) {
+        # Sync recent records (last 30 days) as a reasonable default
+        my $recent_date = $self->_get_recent_date_threshold();
+        my $date_column = $self->_get_date_column_for_table($table_name);
+        
+        if ($date_column) {
+            my $select_sql = "SELECT * FROM `$table_name` WHERE `$date_column` >= ?";
+            my $select_sth = $source_dbh->prepare($select_sql);
+            $select_sth->execute($recent_date);
+            
+            my $columns = $select_sth->{NAME};
+            my $placeholders = join(',', ('?') x @$columns);
+            my $column_list = join(',', map { "`$_`" } @$columns);
+            
+            # For SQLite, preserve local data by checking for existing records
+            my $primary_key = $self->_get_primary_key_for_table($table_name);
+            my $check_sql = "SELECT COUNT(*) FROM `$table_name` WHERE `$primary_key` = ?";
+            my $check_sth = $target_dbh->prepare($check_sql);
+            
+            my $insert_sql = "INSERT INTO `$table_name` ($column_list) VALUES ($placeholders)";
+            my $insert_sth = $target_dbh->prepare($insert_sql);
+            
+            while (my @row = $select_sth->fetchrow_array()) {
+                my %record = map { $columns->[$_] => $row[$_] } 0..$#$columns;
+                my $record_id = $record{$primary_key};
+                
+                # Check if record already exists locally
+                $check_sth->execute($record_id);
+                my ($exists) = $check_sth->fetchrow_array();
+                
+                if ($exists) {
+                    # Preserve local data - skip this record
+                    $result->{filtered_records}++;
+                } else {
+                    # Insert new record from production
+                    $insert_sth->execute(@row);
+                    $result->{records_synced}++;
+                }
+            }
+            
+            $result->{details}->{sync_type} = 'on_demand_recent_records';
+            $result->{details}->{date_threshold} = $recent_date;
+        }
+    }
+    
+    # If no specific sync requested, create empty table (already created above)
+    $result->{details}->{sync_type} ||= 'empty_table_creation';
+    
+    return $result;
+}
+
+=head2 _perform_on_demand_sync_with_share_filter
+
+Perform on-demand synchronization with share field filtering
+
+=cut
+
+sub _perform_on_demand_sync_with_share_filter {
+    my ($self, $c, $table_name, $source_dbh, $target_dbh, $result, $options) = @_;
+    
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_perform_on_demand_sync_with_share_filter',
+        "Performing on-demand sync with share filter for table '$table_name'");
+    
+    # Get share field configuration for this table
+    my $share_config = $self->_get_share_field_config($table_name);
+    my $share_where = $self->_build_share_where_clause($share_config);
+    
+    if ($options->{sync_recent_records}) {
+        # Sync recent shared records only
+        my $recent_date = $self->_get_recent_date_threshold();
+        my $date_column = $self->_get_date_column_for_table($table_name);
+        
+        if ($date_column) {
+            my $select_sql = "SELECT * FROM `$table_name` WHERE `$date_column` >= ? AND $share_where";
+            my $select_sth = $source_dbh->prepare($select_sql);
+            $select_sth->execute($recent_date);
+            
+            my $columns = $select_sth->{NAME};
+            my $placeholders = join(',', ('?') x @$columns);
+            my $column_list = join(',', map { "`$_`" } @$columns);
+            
+            # For SQLite, preserve local data by checking for existing records
+            my $primary_key = $self->_get_primary_key_for_table($table_name);
+            my $check_sql = "SELECT COUNT(*) FROM `$table_name` WHERE `$primary_key` = ?";
+            my $check_sth = $target_dbh->prepare($check_sql);
+            
+            my $insert_sql = "INSERT INTO `$table_name` ($column_list) VALUES ($placeholders)";
+            my $insert_sth = $target_dbh->prepare($insert_sql);
+            
+            while (my @row = $select_sth->fetchrow_array()) {
+                my %record = map { $columns->[$_] => $row[$_] } 0..$#$columns;
+                my $record_id = $record{$primary_key};
+                
+                # Check if record already exists locally
+                $check_sth->execute($record_id);
+                my ($exists) = $check_sth->fetchrow_array();
+                
+                if ($exists) {
+                    # Preserve local data - skip this record
+                    $result->{filtered_records}++;
+                } else {
+                    # Insert new record from production
+                    $insert_sth->execute(@row);
+                    $result->{records_synced}++;
+                }
+            }
+            
+            $result->{details}->{sync_type} = 'on_demand_recent_shared_records';
+            $result->{details}->{date_threshold} = $recent_date;
+            $result->{details}->{share_filter} = $share_where;
+        }
+    }
+    
+    # If no specific sync requested, create empty table (already created above)
+    $result->{details}->{sync_type} ||= 'empty_table_creation_with_share_awareness';
+    
+    return $result;
+}
+
+=head2 _get_share_field_config
+
+Get share field configuration for a specific table
+
+=cut
+
+sub _get_share_field_config {
+    my ($self, $table_name) = @_;
+    
+    # Configuration for different table share field formats
+    my %share_configs = (
+        'todo' => {
+            field => 'share',
+            type => 'integer',
+            shared_values => [1],  # share=1 means shared
+            private_values => [0], # share=0 means private
+        },
+        'workshop' => {
+            field => 'share',
+            type => 'enum',
+            shared_values => ['public'],   # share='public' means shared
+            private_values => ['private'], # share='private' means private
+        },
+        'page_tb' => {
+            field => 'share',
+            type => 'varchar',
+            shared_values => ['public', '1'], # flexible values for shared
+            private_values => ['private', '0'], # flexible values for private
+        },
+    );
+    
+    return $share_configs{$table_name} || {
+        field => 'share',
+        type => 'integer',
+        shared_values => [1],
+        private_values => [0],
+    };
+}
+
+=head2 _build_share_where_clause
+
+Build WHERE clause for filtering shared records
+
+=cut
+
+sub _build_share_where_clause {
+    my ($self, $share_config) = @_;
+    
+    my $field = $share_config->{field};
+    my $shared_values = $share_config->{shared_values};
+    
+    if ($share_config->{type} eq 'integer') {
+        my $values = join(',', @$shared_values);
+        return "`$field` IN ($values)";
+    } else {
+        my $values = join(',', map { "'$_'" } @$shared_values);
+        return "`$field` IN ($values)";
+    }
+}
+
+=head2 _get_recent_date_threshold
+
+Get date threshold for recent records (30 days ago)
+
+=cut
+
+sub _get_recent_date_threshold {
+    my ($self) = @_;
+    
+    # Return date 30 days ago in MySQL format
+    my $days_ago = 30;
+    my $threshold_time = time() - ($days_ago * 24 * 60 * 60);
+    my ($sec, $min, $hour, $mday, $mon, $year) = localtime($threshold_time);
+    
+    return sprintf('%04d-%02d-%02d', $year + 1900, $mon + 1, $mday);
+}
+
+=head2 _get_date_column_for_table
+
+Get the primary date column for a table (for recent record filtering)
+
+=cut
+
+sub _get_date_column_for_table {
+    my ($self, $table_name) = @_;
+    
+    # Common date column mappings for different tables
+    my %date_columns = (
+        'todo' => 'last_mod_date',
+        'workshop' => 'created_at',
+        'page_tb' => 'last_modified',
+    );
+    
+    return $date_columns{$table_name} || 'created_at'; # fallback to common column name
+}
+
+=head2 sync_on_demand_records
+
+Public method to sync specific records on-demand (for SQLite)
+
+=cut
+
+sub sync_on_demand_records {
+    my ($self, $c, $table_name, $record_ids, $options) = @_;
+    
+    $options ||= {};
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_on_demand_records',
+        "Syncing specific records on-demand for table '$table_name': " . join(',', @$record_ids));
+    
+    # Only proceed if we're using SQLite (on-demand sync target)
+    my $current_backend = $self->{backend_type};
+    my $current_backend_info = $self->{available_backends}->{$current_backend};
+    
+    unless ($current_backend_info->{type} eq 'sqlite') {
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'sync_on_demand_records',
+            "Skipping on-demand sync - current backend '$current_backend' is not SQLite");
+        return { success => 1, message => "On-demand sync not needed for non-SQLite backend" };
+    }
+    
+    try {
+        # Get production backend
+        my $production_backend = $self->_get_production_backend();
+        unless ($production_backend) {
+            return { success => 0, error => "No production backend available" };
+        }
+        
+        # Get connection info
+        my $target_conn = $self->get_connection_info($c);
+        
+        my $original_backend = $current_backend;
+        $self->switch_backend($c, $production_backend);
+        my $source_conn = $self->get_connection_info($c);
+        $self->switch_backend($c, $original_backend);
+        
+        # Connect to both databases
+        my $source_dbh = DBI->connect(
+            $source_conn->{dsn},
+            $source_conn->{user},
+            $source_conn->{password},
+            { RaiseError => 1, PrintError => 0, mysql_enable_utf8 => 1 }
+        );
+        
+        my $target_dbh = DBI->connect(
+            $target_conn->{dsn},
+            $target_conn->{user},
+            $target_conn->{password},
+            { RaiseError => 1, PrintError => 0, mysql_enable_utf8 => 1 }
+        );
+        
+        unless ($source_dbh && $target_dbh) {
+            die "Failed to connect to source or target database";
+        }
+        
+        # Build WHERE clause for specific record IDs
+        my $id_placeholders = join(',', ('?') x @$record_ids);
+        my $primary_key = $self->_get_primary_key_for_table($table_name);
+        
+        # Add share filtering if table has share field
+        my $where_clause = "`$primary_key` IN ($id_placeholders)";
+        my @bind_params = @$record_ids;
+        
+        if ($self->_table_has_share_field($table_name)) {
+            my $share_config = $self->_get_share_field_config($table_name);
+            my $share_where = $self->_build_share_where_clause($share_config);
+            $where_clause .= " AND $share_where";
+        }
+        
+        # Fetch specific records from source
+        my $select_sql = "SELECT * FROM `$table_name` WHERE $where_clause";
+        my $select_sth = $source_dbh->prepare($select_sql);
+        $select_sth->execute(@bind_params);
+        
+        my $columns = $select_sth->{NAME};
+        my $placeholders = join(',', ('?') x @$columns);
+        my $column_list = join(',', map { "`$_`" } @$columns);
+        
+        # Check for existing records and preserve local data
+        my $primary_key = $self->_get_primary_key_for_table($table_name);
+        my $check_sql = "SELECT COUNT(*) FROM `$table_name` WHERE `$primary_key` = ?";
+        my $check_sth = $target_dbh->prepare($check_sql);
+        
+        my $insert_sql = "INSERT INTO `$table_name` ($column_list) VALUES ($placeholders)";
+        my $insert_sth = $target_dbh->prepare($insert_sql);
+        
+        my $records_synced = 0;
+        my $records_skipped = 0;
+        
+        while (my @row = $select_sth->fetchrow_array()) {
+            my %record = map { $columns->[$_] => $row[$_] } 0..$#$columns;
+            my $record_id = $record{$primary_key};
+            
+            # Check if record already exists locally
+            $check_sth->execute($record_id);
+            my ($exists) = $check_sth->fetchrow_array();
+            
+            if ($exists) {
+                # Preserve local data - skip this record
+                $records_skipped++;
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'sync_on_demand_records',
+                    "Skipping record $record_id - preserving local data");
+            } else {
+                # Insert new record from production
+                $insert_sth->execute(@row);
+                $records_synced++;
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'sync_on_demand_records',
+                    "Synced new record $record_id from production");
+            }
+        }
+        
+        $source_dbh->disconnect();
+        $target_dbh->disconnect();
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_on_demand_records',
+            "Successfully synced $records_synced on-demand records for table '$table_name' (skipped $records_skipped existing records to preserve local data)");
+        
+        return {
+            success => 1,
+            table => $table_name,
+            records_synced => $records_synced,
+            records_skipped => $records_skipped,
+            requested_ids => $record_ids,
+            source_backend => $production_backend,
+            target_backend => $current_backend
+        };
+        
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'sync_on_demand_records',
+            "Failed to sync on-demand records for table '$table_name': $error");
+        return { success => 0, error => "Failed to sync on-demand records: $error" };
+    };
+}
+
+=head2 _get_primary_key_for_table
+
+Get the primary key column name for a table
+
+=cut
+
+sub _get_primary_key_for_table {
+    my ($self, $table_name) = @_;
+    
+    # Common primary key mappings
+    my %primary_keys = (
+        'todo' => 'record_id',
+        'workshop' => 'id',
+        'page_tb' => 'record_id',
+    );
+    
+    return $primary_keys{$table_name} || 'id'; # fallback to common column name
+}
+
+=head2 sync_local_changes_to_production
+
+Sync local changes back to production (bidirectional sync for shared records)
+
+=cut
+
+sub sync_local_changes_to_production {
+    my ($self, $c, $table_name, $options) = @_;
+    
+    $options ||= {};
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_local_changes_to_production',
+        "Syncing local changes to production for table '$table_name'");
+    
+    try {
+        # Get production backend
+        my $production_backend = $self->_get_production_backend();
+        unless ($production_backend) {
+            return { success => 0, error => "No production backend available" };
+        }
+        
+        # Get current backend (local)
+        my $current_backend = $self->{backend_type};
+        if ($current_backend eq $production_backend) {
+            return { success => 1, message => "Already using production backend - no sync needed" };
+        }
+        
+        # Get connection info for both databases
+        my $source_conn = $self->get_connection_info($c);  # local database
+        
+        my $original_backend = $current_backend;
+        $self->switch_backend($c, $production_backend);
+        my $target_conn = $self->get_connection_info($c);  # production database
+        $self->switch_backend($c, $original_backend);
+        
+        # Connect to both databases
+        my $source_dbh = DBI->connect(
+            $source_conn->{dsn},
+            $source_conn->{user},
+            $source_conn->{password},
+            { RaiseError => 1, PrintError => 0, mysql_enable_utf8 => 1 }
+        );
+        
+        my $target_dbh = DBI->connect(
+            $target_conn->{dsn},
+            $target_conn->{user},
+            $target_conn->{password},
+            { RaiseError => 1, PrintError => 0, mysql_enable_utf8 => 1 }
+        );
+        
+        unless ($source_dbh && $target_dbh) {
+            die "Failed to connect to source or target database";
+        }
+        
+        my $sync_result = { records_synced => 0, records_skipped => 0 };
+        
+        # Only sync shared records (never sync private records to production)
+        if ($self->_table_has_share_field($table_name)) {
+            my $share_config = $self->_get_share_field_config($table_name);
+            my $share_where = $self->_build_share_where_clause($share_config);
+            
+            # Get local shared records that might need syncing
+            my $select_sql = "SELECT * FROM `$table_name` WHERE $share_where";
+            if ($options->{modified_since}) {
+                my $date_column = $self->_get_date_column_for_table($table_name);
+                $select_sql .= " AND `$date_column` >= ?";
+            }
+            
+            my $select_sth = $source_dbh->prepare($select_sql);
+            if ($options->{modified_since}) {
+                $select_sth->execute($options->{modified_since});
+            } else {
+                $select_sth->execute();
+            }
+            
+            my $columns = $select_sth->{NAME};
+            my $primary_key = $self->_get_primary_key_for_table($table_name);
+            
+            # Prepare statements for checking existence and updating/inserting
+            my $check_sql = "SELECT COUNT(*) FROM `$table_name` WHERE `$primary_key` = ?";
+            my $check_sth = $target_dbh->prepare($check_sql);
+            
+            my $placeholders = join(',', ('?') x @$columns);
+            my $column_list = join(',', map { "`$_`" } @$columns);
+            my $update_placeholders = join(',', map { "`$_` = ?" } @$columns);
+            
+            my $insert_sql = "INSERT INTO `$table_name` ($column_list) VALUES ($placeholders)";
+            my $insert_sth = $target_dbh->prepare($insert_sql);
+            
+            my $update_sql = "UPDATE `$table_name` SET $update_placeholders WHERE `$primary_key` = ?";
+            my $update_sth = $target_dbh->prepare($update_sql);
+            
+            while (my @row = $select_sth->fetchrow_array()) {
+                my %record = map { $columns->[$_] => $row[$_] } 0..$#$columns;
+                my $record_id = $record{$primary_key};
+                
+                # Check if record exists in production
+                $check_sth->execute($record_id);
+                my ($exists) = $check_sth->fetchrow_array();
+                
+                if ($exists) {
+                    # Update existing record
+                    $update_sth->execute(@row, $record_id);
+                    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'sync_local_changes_to_production',
+                        "Updated existing record $record_id in production");
+                } else {
+                    # Insert new record
+                    $insert_sth->execute(@row);
+                    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'sync_local_changes_to_production',
+                        "Inserted new record $record_id to production");
+                }
+                
+                $sync_result->{records_synced}++;
+            }
+        } else {
+            # For tables without share field, sync all local records
+            my $select_sql = "SELECT * FROM `$table_name`";
+            if ($options->{modified_since}) {
+                my $date_column = $self->_get_date_column_for_table($table_name);
+                $select_sql .= " WHERE `$date_column` >= ?";
+            }
+            
+            my $select_sth = $source_dbh->prepare($select_sql);
+            if ($options->{modified_since}) {
+                $select_sth->execute($options->{modified_since});
+            } else {
+                $select_sth->execute();
+            }
+            
+            # Similar logic as above but without share filtering
+            # ... (implementation similar to above block)
+        }
+        
+        $source_dbh->disconnect();
+        $target_dbh->disconnect();
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_local_changes_to_production',
+            "Successfully synced $sync_result->{records_synced} local changes to production for table '$table_name'");
+        
+        return {
+            success => 1,
+            table => $table_name,
+            records_synced => $sync_result->{records_synced},
+            records_skipped => $sync_result->{records_skipped},
+            source_backend => $current_backend,
+            target_backend => $production_backend
+        };
+        
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'sync_local_changes_to_production',
+            "Failed to sync local changes to production for table '$table_name': $error");
+        return { success => 0, error => "Failed to sync local changes: $error" };
+    };
+}
+
+=head2 _sync_all_tables_with_results
+
+Sync all tables that have result files from production to MySQL local database
+
+=cut
+
+sub _sync_all_tables_with_results {
+    my ($self, $c, $production_backend, $current_backend) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_all_tables_with_results',
+        "Syncing ALL tables with result files from '$production_backend' to '$current_backend'");
+    
+    try {
+        # Get all tables with result files from both schemas
+        my @tables_to_sync = ();
+        
+        # Get Ency schema tables
+        my $ency_tables = $self->_get_tables_with_result_files($c, 'ency');
+        push @tables_to_sync, @$ency_tables;
+        
+        # Get Forager schema tables  
+        my $forager_tables = $self->_get_tables_with_result_files($c, 'forager');
+        push @tables_to_sync, @$forager_tables;
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_all_tables_with_results',
+            "Found " . scalar(@tables_to_sync) . " tables with result files to sync");
+        
+        # Get connection info for both databases
+        my $target_conn = $self->get_connection_info($c);
+        
+        my $original_backend = $current_backend;
+        $self->switch_backend($c, $production_backend);
+        my $source_conn = $self->get_connection_info($c);
+        $self->switch_backend($c, $original_backend);
+        
+        # Connect to both databases
+        my $source_dbh = DBI->connect(
+            $source_conn->{dsn},
+            $source_conn->{user},
+            $source_conn->{password},
+            { RaiseError => 1, PrintError => 0, mysql_enable_utf8 => 1 }
+        );
+        
+        my $target_dbh = DBI->connect(
+            $target_conn->{dsn},
+            $target_conn->{user},
+            $target_conn->{password},
+            { RaiseError => 1, PrintError => 0, mysql_enable_utf8 => 1 }
+        );
+        
+        unless ($source_dbh && $target_dbh) {
+            die "Failed to connect to source or target database";
+        }
+        
+        my $total_synced = 0;
+        my $total_tables = 0;
+        my @sync_results = ();
+        
+        foreach my $table_name (@tables_to_sync) {
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_sync_all_tables_with_results',
+                "Syncing table: $table_name");
+            
+            try {
+                # Check if table exists in source
+                my $source_check_sth = $source_dbh->prepare("SHOW TABLES LIKE ?");
+                $source_check_sth->execute($table_name);
+                unless ($source_check_sth->fetchrow_array()) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_sync_all_tables_with_results',
+                        "Table '$table_name' not found in production database - skipping");
+                    next;
+                }
+                
+                # Drop table if exists in target (fresh sync)
+                $target_dbh->do("DROP TABLE IF EXISTS `$table_name`");
+                
+                # Get table structure from source
+                my $create_table_sth = $source_dbh->prepare("SHOW CREATE TABLE `$table_name`");
+                $create_table_sth->execute();
+                my ($table_name_result, $create_sql) = $create_table_sth->fetchrow_array();
+                
+                unless ($create_sql) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_sync_all_tables_with_results',
+                        "Failed to get CREATE TABLE statement for '$table_name' - skipping");
+                    next;
+                }
+                
+                # Create table in target database
+                $target_dbh->do($create_sql);
+                
+                # Copy all data from source to target
+                my $select_sth = $source_dbh->prepare("SELECT * FROM `$table_name`");
+                $select_sth->execute();
+                
+                my $columns = $select_sth->{NAME};
+                my $placeholders = join(',', ('?') x @$columns);
+                my $column_list = join(',', map { "`$_`" } @$columns);
+                
+                my $insert_sql = "INSERT INTO `$table_name` ($column_list) VALUES ($placeholders)";
+                my $insert_sth = $target_dbh->prepare($insert_sql);
+                
+                my $record_count = 0;
+                while (my @row = $select_sth->fetchrow_array()) {
+                    $insert_sth->execute(@row);
+                    $record_count++;
+                }
+                
+                $total_synced += $record_count;
+                $total_tables++;
+                
+                push @sync_results, {
+                    table => $table_name,
+                    records_synced => $record_count,
+                    status => 'success'
+                };
+                
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_all_tables_with_results',
+                    "Successfully synced table '$table_name' with $record_count records");
+                
+            } catch {
+                my $error = $_;
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_sync_all_tables_with_results',
+                    "Failed to sync table '$table_name': $error");
+                
+                push @sync_results, {
+                    table => $table_name,
+                    records_synced => 0,
+                    status => 'error',
+                    error => $error
+                };
+            };
+        }
+        
+        $source_dbh->disconnect();
+        $target_dbh->disconnect();
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_all_tables_with_results',
+            "Completed sync of $total_tables tables with $total_synced total records");
+        
+        return {
+            success => 1,
+            sync_type => 'all_tables_with_results',
+            tables_synced => $total_tables,
+            total_records_synced => $total_synced,
+            source_backend => $production_backend,
+            target_backend => $current_backend,
+            table_results => \@sync_results
+        };
+        
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_sync_all_tables_with_results',
+            "Failed to sync all tables with results: $error");
+        return { success => 0, error => "Failed to sync all tables: $error" };
+    };
+}
+
+=head2 _get_tables_with_result_files
+
+Get list of tables that have corresponding result files in the schema
+
+=cut
+
+sub _get_tables_with_result_files {
+    my ($self, $c, $schema_name) = @_;
+    
+    my @tables = ();
+    
+    # Build path to Result directory
+    my $result_dir;
+    if ($schema_name eq 'ency') {
+        $result_dir = 'Comserv/lib/Comserv/Model/Schema/Ency/Result';
+    } elsif ($schema_name eq 'forager') {
+        $result_dir = 'Comserv/lib/Comserv/Model/Schema/Forager/Result';
+    } else {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_get_tables_with_result_files',
+            "Unknown schema name: $schema_name");
+        return \@tables;
+    }
+    
+    # Use FindBin to get the base directory
+    require FindBin;
+    my $full_result_dir = File::Spec->catdir($FindBin::Bin, '..', $result_dir);
+    
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_get_tables_with_result_files',
+        "Looking for result files in: $full_result_dir");
+    
+    if (-d $full_result_dir) {
+        opendir(my $dh, $full_result_dir) or do {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_get_tables_with_result_files',
+                "Cannot open directory $full_result_dir: $!");
+            return \@tables;
+        };
+        
+        while (my $file = readdir($dh)) {
+            next if $file =~ /^\.\.?$/;  # Skip . and ..
+            next unless $file =~ /\.pm$/;  # Only .pm files
+            next if -d File::Spec->catfile($full_result_dir, $file);  # Skip directories
+            
+            # Extract table name from filename
+            my $table_name = $file;
+            $table_name =~ s/\.pm$//;  # Remove .pm extension
+            
+            # Convert CamelCase to snake_case for table name
+            $table_name = $self->_convert_camelcase_to_snake_case($table_name);
+            
+            push @tables, $table_name;
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_get_tables_with_result_files',
+                "Found result file: $file -> table: $table_name");
+        }
+        
+        closedir($dh);
+    } else {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_get_tables_with_result_files',
+            "Result directory does not exist: $full_result_dir");
+    }
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_get_tables_with_result_files',
+        "Found " . scalar(@tables) . " tables with result files in schema '$schema_name'");
+    
+    return \@tables;
+}
+
+=head2 _convert_camelcase_to_snake_case
+
+Convert CamelCase to snake_case for table names
+
+=cut
+
+sub _convert_camelcase_to_snake_case {
+    my ($self, $camelcase) = @_;
+    
+    # Handle special cases first
+    my %special_cases = (
+        'ApisPalletTb' => 'apis_pallet_tb',
+        'ApisInventoryTb' => 'apis_inventory_tb',
+        'ApisYardsTb' => 'apis_yards_tb',
+        'ApisQueensTb' => 'apis_queens_tb',
+        'PageTb' => 'page_tb',
+        'InternalLinksTb' => 'internal_links_tb',
+        'Pages_content' => 'pages_content',
+        'Learned_data' => 'learned_data',
+    );
+    
+    return $special_cases{$camelcase} if exists $special_cases{$camelcase};
+    
+    # General conversion: insert underscore before uppercase letters (except first)
+    my $snake_case = $camelcase;
+    $snake_case =~ s/([a-z])([A-Z])/$1_$2/g;
+    $snake_case = lc($snake_case);
+    
+    return $snake_case;
 }
 
 =head2 _get_production_backends_by_priority

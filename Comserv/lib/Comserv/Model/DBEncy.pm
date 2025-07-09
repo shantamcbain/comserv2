@@ -541,7 +541,7 @@ sub safe_search {
                 
                 if ($@) {
                     # Even after sync, still failing
-                    $self->_handle_table_error($c, $missing_tables[0], $source_name, $error, "Search still failing after successful sync: $@");
+                    $self->_handle_table_error($c, $source_name, $source_name, $error, "Search still failing after successful sync: $@");
                     return ();
                 }
             } else {
@@ -571,12 +571,12 @@ sub safe_search {
                     
                     if ($@) {
                         # Still failing after table creation
-                        $self->_handle_table_error($c, $missing_tables[0], $source_name, $error, "Table created but search still failing: $@");
+                        $self->_handle_table_error($c, $source_name, $source_name, $error, "Table created but search still failing: $@");
                         return ();
                     }
                 } else {
                     # Both sync and table creation failed - handle gracefully for admin users
-                    $self->_handle_table_error($c, $missing_tables[0], $source_name, $error, $sync_result ? $sync_result->{error} : "Sync returned no result");
+                    $self->_handle_table_error($c, $source_name, $source_name, $error, $sync_result ? $sync_result->{error} : "Sync returned no result");
                     return ();
                 }
             }
