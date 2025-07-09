@@ -587,9 +587,9 @@ sub _get_apiary_todo_stats {
         
         if ($schema) {
             # Get the apiary project ID first
-            my $apiary_project = $schema->resultset('Project')->search({
+            my $apiary_project = $schema->safe_search($c, 'Project', {
                 name => { 'like' => '%apiary%' }
-            })->first;
+            }, {})->first;
             
             my $project_id;
             if ($apiary_project) {

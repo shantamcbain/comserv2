@@ -5,6 +5,7 @@ use JSON;
 use base 'Catalyst::Model::DBIC::Schema';
 use Catalyst::Utils;  # For path_to
 use Data::Dumper;
+use Try::Tiny;
 
 # Load the database configuration from db_config.json
 my $config_file;
@@ -69,11 +70,11 @@ print "Host: $config->{shanta_forager}->{host}\n";
 print "Database: $config->{shanta_forager}->{database}\n";
 print "Username: $config->{shanta_forager}->{username}\n";
 
-# Set the schema_class and connect_info attributes
+# Default configuration - will be overridden by ACCEPT_CONTEXT
 __PACKAGE__->config(
     schema_class => 'Comserv::Model::Schema::Forager',
     connect_info => {
-        # Fixed DSN format for MySQL - most common format
+        # Default fallback to shanta_forager configuration
         dsn => "dbi:mysql:database=$config->{shanta_forager}->{database};host=$config->{shanta_forager}->{host};port=$config->{shanta_forager}->{port}",
         user => $config->{shanta_forager}->{username},
         password => $config->{shanta_forager}->{password},
@@ -82,6 +83,88 @@ __PACKAGE__->config(
         quote_char => '`',
     }
 );
+
+=head2 ACCEPT_CONTEXT
+
+Dynamic connection setup based on HybridDB backend selection
+
+=cut
+
+sub ACCEPT_CONTEXT {
+    my ($self, $c) = @_;
+    
+    # Try to get connection info from HybridDB
+    my $connection_info;
+    try {
+        my $hybrid_db = $c->model('HybridDB');
+        my $backend_type = $hybrid_db->get_backend_type($c);
+        
+        if ($backend_type eq 'sqlite_offline') {
+            # Use SQLite connection
+            $connection_info = $hybrid_db->get_sqlite_connection_info($c);
+            $c->log->debug("DBForager: Using SQLite backend");
+        } else {
+            # For Forager, we need to find a backend that has the forager database
+            my $available_backends = $hybrid_db->get_available_backends();
+            my $forager_backend = undef;
+            
+            # Look for a backend with 'forager' in the name or database
+            foreach my $backend_name (sort { $available_backends->{$a}->{config}->{priority} <=> $available_backends->{$b}->{config}->{priority} } keys %$available_backends) {
+                my $backend = $available_backends->{$backend_name};
+                if ($backend->{available} && $backend->{type} eq 'mysql') {
+                    if ($backend_name =~ /forager/ || $backend->{config}->{database} =~ /forager/) {
+                        $forager_backend = $backend_name;
+                        last;
+                    }
+                }
+            }
+            
+            if ($forager_backend) {
+                # Switch to forager backend temporarily to get connection info
+                my $original_backend = $hybrid_db->get_backend_type($c);
+                $hybrid_db->switch_backend($c, $forager_backend);
+                $connection_info = $hybrid_db->get_connection_info($c);
+                # Switch back to original backend
+                $hybrid_db->switch_backend($c, $original_backend);
+                $c->log->debug("DBForager: Using MySQL forager backend: $forager_backend");
+            } else {
+                # Use current backend connection
+                $connection_info = $hybrid_db->get_connection_info($c);
+                $c->log->debug("DBForager: Using current MySQL backend: $backend_type");
+            }
+        }
+    } catch {
+        # Fallback to legacy shanta_forager configuration
+        my $fallback_config = $config->{shanta_forager};
+        if ($fallback_config) {
+            $connection_info = {
+                dsn => "dbi:mysql:database=$fallback_config->{database};host=$fallback_config->{host};port=$fallback_config->{port}",
+                user => $fallback_config->{username},
+                password => $fallback_config->{password},
+                mysql_enable_utf8 => 1,
+                on_connect_do => ["SET NAMES 'utf8'", "SET CHARACTER SET 'utf8'"],
+                quote_char => '`',
+            };
+            $c->log->warn("DBForager: Using fallback configuration: $_");
+        } else {
+            $c->log->error("DBForager: No valid configuration found: $_");
+            # Use default connection info from config
+            return $self;
+        }
+    };
+    
+    # Create a new instance with the dynamic connection info if we got one
+    if ($connection_info) {
+        my $new_config = { %{$self->config} };
+        $new_config->{connect_info} = $connection_info;
+        
+        my $new_instance = $self->new($new_config);
+        return $new_instance;
+    }
+    
+    return $self;
+}
+
 sub list_tables {
     my $self = shift;
 

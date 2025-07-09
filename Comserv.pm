@@ -56,6 +56,37 @@ sub setup {
     $self->next::method(@_);
     $logging->log_with_details($self, __FILE__, __LINE__, "Template paths: " . join(", ", @{$self->config->{'View::TT'}->{INCLUDE_PATH}}));
     $logging->log_with_details($self, __FILE__, __LINE__, "Initializing Comserv application");
+    
+    # Perform automatic database synchronization on startup
+    eval {
+        my $hybrid_db = $self->model('HybridDB');
+        if ($hybrid_db) {
+            $logging->log_with_details($self, __FILE__, __LINE__, "Starting automatic database synchronization");
+            my $sync_result = $hybrid_db->auto_sync_on_startup($self);
+            
+            if ($sync_result->{skipped}) {
+                $logging->log_with_details($self, __FILE__, __LINE__, "Auto-sync skipped: " . $sync_result->{reason});
+            } elsif ($sync_result->{error}) {
+                $logging->log_with_details($self, __FILE__, __LINE__, "Auto-sync failed: " . $sync_result->{error});
+            } elsif ($sync_result->{auto_sync}) {
+                my $tables_created = $sync_result->{tables_created} || 0;
+                my $records_synced = $sync_result->{records_synced} || 0;
+                $logging->log_with_details($self, __FILE__, __LINE__, 
+                    "Auto-sync completed: $tables_created tables created, $records_synced records synced");
+                
+                if ($sync_result->{missing_tables}) {
+                    $logging->log_with_details($self, __FILE__, __LINE__, 
+                        "Synced missing tables: " . join(', ', @{$sync_result->{missing_tables}}));
+                }
+            }
+        } else {
+            $logging->log_with_details($self, __FILE__, __LINE__, "HybridDB model not available for auto-sync");
+        }
+    };
+    if ($@) {
+        $logging->log_with_details($self, __FILE__, __LINE__, "Auto-sync initialization failed: $@");
+        # Don't die on auto-sync failure, just log and continue
+    }
 }
 
 my $log_file_path = __PACKAGE__->path_to('logs', 'application.log')->stringify;

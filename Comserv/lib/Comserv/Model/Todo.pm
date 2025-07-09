@@ -47,12 +47,9 @@ sub get_top_todos {
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
 
-    # Get a DBIx::Class::ResultSet object for the 'Todo' table
-    my $rs = $schema->resultset('Todo');
-
     # Fetch the top 10 todos for the given site, ordered by priority and start_date
     # Add a condition to only fetch todos where status is not 3
-    my @todos = $rs->search(
+    my @todos = $schema->safe_search($c, 'Todo',
         { sitename => $SiteName, status => { '!=' => 3 } },
         { order_by => { -asc => ['priority', 'start_date'] }, rows => 10 }
     );
@@ -77,11 +74,8 @@ sub get_todos_for_date {
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
 
-    # Get a DBIx::Class::ResultSet object for the 'Todo' table
-    my $rs = $schema->resultset('Todo');
-
     # Fetch todos whose start date is on or before the given date and status is not 3
-    my @todos = $rs->search(
+    my @todos = $schema->safe_search($c, 'Todo',
         { start_date => { '<=' => $date }, status => { '!=' => 3 }, sitename => $SiteName },
         { order_by => { -asc => ['priority', 'start_date'] } }
     );
@@ -94,12 +88,9 @@ sub fetch_todo_record {
     my ($self, $c, $record_id) = @_;
     my $schema = $c->model('DBEncy');
 
-    # Get a DBIx::Class::ResultSet object for the 'Todo' table
-    my $rs = $schema->resultset('Todo');
-
-    # Fetch the todo record based on $record_id
-    my $todo_record = $rs->find($record_id);
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, "Fetched todo record");
+    # Use safe_find to fetch the todo record - this will sync missing tables from production
+    my $todo_record = $schema->safe_find($c, 'Todo', $record_id);
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, "Fetched todo record using safe_find");
     return $todo_record;
 }
 

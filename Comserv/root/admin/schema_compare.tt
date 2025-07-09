@@ -33,6 +33,20 @@
                 <div class="stat-label">Connected</div>
             </div>
         </div>
+        <div class="stat-card backends">
+            <div class="stat-icon"><i class="fas fa-server"></i></div>
+            <div class="stat-content">
+                <div class="stat-number">[% database_comparison.summary.total_backends %]</div>
+                <div class="stat-label">Total Backends</div>
+            </div>
+        </div>
+        <div class="stat-card available">
+            <div class="stat-icon"><i class="fas fa-plug"></i></div>
+            <div class="stat-content">
+                <div class="stat-number">[% database_comparison.summary.available_backends %]</div>
+                <div class="stat-label">Available</div>
+            </div>
+        </div>
         <div class="stat-card tables">
             <div class="stat-icon"><i class="fas fa-table"></i></div>
             <div class="stat-content">
@@ -220,6 +234,202 @@
             </div>
         </div>
     </div>
+
+    <!-- Multi-Backend Database Sections -->
+    [% IF database_comparison.backends.keys.size > 0 %]
+        <div class="multi-backend-section">
+            <h2><i class="fas fa-server"></i> Multi-Backend Schema Comparison</h2>
+            <p class="section-intro">Compare table schemas across all available database backends to ensure consistency.</p>
+            
+            [% FOREACH backend_name IN database_comparison.backends.keys.sort %]
+                [% backend = database_comparison.backends.$backend_name %]
+                <div class="schema-section backend-section">
+                    <button class="section-toggle" onclick="toggleSection(this)">
+                        <span>
+                            <i class="fas fa-[% backend.type == 'mysql' ? 'database' : 'file-alt' %]"></i> 
+                            [% backend.display_name %]
+                            [% IF backend.available %]
+                                <span class="status-badge connected">Connected</span>
+                            [% ELSE %]
+                                <span class="status-badge disconnected">Disconnected</span>
+                            [% END %]
+                            <span class="backend-type">[% backend.type.upper %]</span>
+                            <span class="table-count">[% backend.table_count %] tables</span>
+                            [% IF backend.priority < 999 %]
+                                <span class="priority-badge">Priority: [% backend.priority %]</span>
+                            [% END %]
+                        </span>
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                    <div class="section-content">
+                        [% IF backend.available AND backend.table_comparisons.size > 0 %]
+                            <!-- Group tables by result file availability -->
+                            [% tables_with_results = [] %]
+                            [% tables_without_results = [] %]
+                            [% FOREACH table_comparison IN backend.table_comparisons %]
+                                [% IF table_comparison.has_result_file %]
+                                    [% tables_with_results.push(table_comparison) %]
+                                [% ELSE %]
+                                    [% tables_without_results.push(table_comparison) %]
+                                [% END %]
+                            [% END %]
+                            
+                            [% IF tables_with_results.size > 0 %]
+                            <div class="table-group">
+                                <div class="table-group-header" onclick="toggleTableGroup(this)">
+                                    <span>
+                                        <i class="fas fa-check-circle"></i> Tables with Result Files
+                                        <span class="group-count">[% tables_with_results.size %]</span>
+                                    </span>
+                                    <i class="fas fa-chevron-right group-toggle-icon"></i>
+                                </div>
+                                <div class="table-group-content">
+                                    <div class="table-comparison-grid">
+                                        [% FOREACH table_comparison IN tables_with_results %]
+                                            <div class="table-comparison-card" onclick="toggleTableDetails(this)">
+                                                <div class="table-card-header">
+                                                    <h4>
+                                                        <i class="fas fa-table"></i> [% table_comparison.table_name %]
+                                                        <span class="backend-indicator">[% backend.type.upper %]</span>
+                                                    </h4>
+                                                    <div class="table-status">
+                                                        [% field_count = table_comparison.fields.keys.size %]
+                                                        [% differences_count = 0 %]
+                                                        [% FOREACH field_name IN table_comparison.fields.keys %]
+                                                            [% field = table_comparison.fields.$field_name %]
+                                                            [% IF field.differences.size > 0 %]
+                                                                [% differences_count = differences_count + 1 %]
+                                                            [% END %]
+                                                        [% END %]
+                                                        
+                                                        [% IF differences_count == 0 %]
+                                                            <span class="status-ok"><i class="fas fa-check"></i> Synchronized</span>
+                                                        [% ELSE %]
+                                                            <span class="status-warning"><i class="fas fa-exclamation-triangle"></i> [% differences_count %] differences</span>
+                                                        [% END %]
+                                                        <span class="field-count">[% field_count %] fields</span>
+                                                    </div>
+                                                    <i class="fas fa-chevron-down toggle-icon"></i>
+                                                </div>
+                                                
+                                                <div class="table-details">
+                                                    <div class="result-file-info">
+                                                        <strong>Result File:</strong> [% table_comparison.result_file_path.replace('^.*/', '') %]
+                                                    </div>
+                                                    
+                                                    <div class="field-comparison-table">
+                                                        <table>
+                                                            <thead>
+                                                                <tr>
+                                                                    <th>Field Name</th>
+                                                                    <th>Database ([% backend.type.upper %])</th>
+                                                                    <th>Result File</th>
+                                                                    <th>Status</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                [% FOREACH field_name IN table_comparison.fields.keys.sort %]
+                                                                    [% field = table_comparison.fields.$field_name %]
+                                                                    <tr class="[% field.differences.size > 0 ? 'field-different' : 'field-same' %]">
+                                                                        <td class="field-name">[% field_name %]</td>
+                                                                        <td class="table-data">
+                                                                            [% IF field.table %]
+                                                                                <div class="field-type">[% field.table.data_type %][% IF field.table.size %]([% field.table.size %])[% END %]</div>
+                                                                                <div class="field-attrs">
+                                                                                    [% IF field.table.is_nullable %]<span class="attr nullable">NULL</span>[% ELSE %]<span class="attr not-null">NOT NULL</span>[% END %]
+                                                                                    [% IF field.table.is_auto_increment %]<span class="attr auto-inc">AUTO_INCREMENT</span>[% END %]
+                                                                                    [% IF field.table.default_value %]<span class="attr default">DEFAULT: [% field.table.default_value %]</span>[% END %]
+                                                                                </div>
+                                                                            [% ELSE %]
+                                                                                <span class="missing">Missing in database</span>
+                                                                            [% END %]
+                                                                        </td>
+                                                                        <td class="result-data">
+                                                                            [% IF field.result %]
+                                                                                <div class="field-type">[% field.result.data_type %][% IF field.result.size %]([% field.result.size %])[% END %]</div>
+                                                                                <div class="field-attrs">
+                                                                                    [% IF field.result.is_nullable %]<span class="attr nullable">NULL</span>[% ELSE %]<span class="attr not-null">NOT NULL</span>[% END %]
+                                                                                    [% IF field.result.is_auto_increment %]<span class="attr auto-inc">AUTO_INCREMENT</span>[% END %]
+                                                                                    [% IF field.result.default_value %]<span class="attr default">DEFAULT: [% field.result.default_value %]</span>[% END %]
+                                                                                </div>
+                                                                            [% ELSE %]
+                                                                                <span class="missing">Missing in Result file</span>
+                                                                            [% END %]
+                                                                        </td>
+                                                                        <td class="status-cell">
+                                                                            [% IF field.differences.size > 0 %]
+                                                                                <span class="status-different">⚠ Different</span>
+                                                                                <div class="differences-list">
+                                                                                    [% FOREACH diff IN field.differences %]
+                                                                                        <div class="difference-item">
+                                                                                            <strong>[% diff.attribute %]:</strong> 
+                                                                                            DB: [% diff.table_value || 'null' %] → 
+                                                                                            Result: [% diff.result_value || 'null' %]
+                                                                                        </div>
+                                                                                    [% END %]
+                                                                                </div>
+                                                                            [% ELSE %]
+                                                                                <span class="status-same">✓ Match</span>
+                                                                            [% END %]
+                                                                        </td>
+                                                                    </tr>
+                                                                [% END %]
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        [% END %]
+                                    </div>
+                                </div>
+                            </div>
+                            [% END %]
+                            
+                            [% IF tables_without_results.size > 0 %]
+                            <div class="table-group">
+                                <div class="table-group-header" onclick="toggleTableGroup(this)">
+                                    <span>
+                                        <i class="fas fa-exclamation-triangle"></i> Tables without Result Files
+                                        <span class="group-count">[% tables_without_results.size %]</span>
+                                    </span>
+                                    <i class="fas fa-chevron-right group-toggle-icon"></i>
+                                </div>
+                                <div class="table-group-content">
+                                    <div class="table-comparison-grid">
+                                        [% FOREACH table_comparison IN tables_without_results %]
+                                            <div class="table-comparison-card missing-result">
+                                                <div class="table-card-header">
+                                                    <h4>
+                                                        <i class="fas fa-table"></i> [% table_comparison.table_name %]
+                                                        <span class="backend-indicator">[% backend.type.upper %]</span>
+                                                    </h4>
+                                                    <div class="table-status">
+                                                        <span class="status-missing"><i class="fas fa-times"></i> No Result File</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        [% END %]
+                                    </div>
+                                </div>
+                            </div>
+                            [% END %]
+                            
+                        [% ELSIF backend.available %]
+                            <div class="no-tables-message">
+                                <i class="fas fa-info-circle"></i>
+                                <p>No tables found in this backend.</p>
+                            </div>
+                        [% ELSE %]
+                            <div class="backend-error-message">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <p><strong>Backend Unavailable:</strong> [% backend.error || 'Connection failed' %]</p>
+                            </div>
+                        [% END %]
+                    </div>
+                </div>
+            [% END %]
+        </div>
+    [% END %]
 
     <!-- Database Sections -->
     [% IF database_comparison.ency.connection_status == 'connected' OR database_comparison.forager.connection_status == 'connected' %]

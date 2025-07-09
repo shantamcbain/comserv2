@@ -332,7 +332,7 @@ sub fetch_projects_with_subprojects :Private {
     # Fetch top-level projects (those without a parent)
     my @top_projects;
     eval {
-        @top_projects = $schema->resultset('Project')->search(
+        @top_projects = $schema->safe_search($c, 'Project',
             {
                 'sitename' => $SiteName,
                 -or => [
@@ -377,7 +377,7 @@ sub fetch_projects_with_subprojects :Private {
         # Fetch first-level sub-projects
         my @level1_subprojects;
         eval {
-            @level1_subprojects = $schema->resultset('Project')->search(
+            @level1_subprojects = $schema->safe_search($c, 'Project',
                 { parent_id => $project->id },
                 { order_by => { -asc => 'name' } }
             )->all;

@@ -2255,7 +2255,12 @@ sub get_result_file_field_definitions {
 sub get_database_comparison {
     my ($self, $c) = @_;
     
+    # Get available backends from HybridDB
+    my $hybrid_db = $c->model('HybridDB');
+    my $available_backends = $hybrid_db->get_available_backends() || {};
+    
     my $comparison = {
+        backends => {},
         ency => {
             name => 'ency',
             display_name => 'Encyclopedia Database',
@@ -2280,9 +2285,63 @@ sub get_database_comparison {
             total_tables => 0,
             tables_with_results => 0,
             tables_without_results => 0,
-            results_without_tables => 0
+            results_without_tables => 0,
+            total_backends => scalar(keys %$available_backends),
+            available_backends => scalar(grep { $available_backends->{$_}->{available} } keys %$available_backends)
         }
     };
+    
+    # Add backend-specific schema comparison
+    foreach my $backend_name (sort keys %$available_backends) {
+        my $backend_info = $available_backends->{$backend_name};
+        
+        $comparison->{backends}->{$backend_name} = {
+            name => $backend_name,
+            display_name => $backend_info->{config}->{description} || $backend_name,
+            type => $backend_info->{type},
+            available => $backend_info->{available},
+            priority => $backend_info->{config}->{priority} || 999,
+            connection_status => $backend_info->{available} ? 'connected' : 'disconnected',
+            tables => [],
+            table_count => 0,
+            table_comparisons => [],
+            error => undef
+        };
+        
+        # If backend is available, get its schema information
+        if ($backend_info->{available}) {
+            try {
+                my $backend_tables = $self->get_backend_database_tables($c, $backend_name, $backend_info);
+                $comparison->{backends}->{$backend_name}->{tables} = $backend_tables;
+                $comparison->{backends}->{$backend_name}->{table_count} = scalar(@$backend_tables);
+                
+                # Build result file mapping for this backend
+                my $result_table_mapping = $self->build_result_table_mapping($c, 'ency');
+                
+                # Compare each table with its result file
+                foreach my $table_name (@$backend_tables) {
+                    my $table_comparison = $self->compare_backend_table_with_result_file($c, $table_name, $backend_name, $backend_info, $result_table_mapping);
+                    push @{$comparison->{backends}->{$backend_name}->{table_comparisons}}, $table_comparison;
+                    
+                    if ($table_comparison->{has_result_file}) {
+                        $comparison->{summary}->{tables_with_results}++;
+                    } else {
+                        $comparison->{summary}->{tables_without_results}++;
+                    }
+                }
+                
+                $comparison->{summary}->{total_tables} += scalar(@$backend_tables);
+                
+            } catch {
+                my $error = $_;
+                $comparison->{backends}->{$backend_name}->{error} = $error;
+                $comparison->{backends}->{$backend_name}->{connection_status} = 'error';
+                
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_database_comparison', 
+                    "Error getting schema for backend '$backend_name': $error");
+            };
+        }
+    }
     
     # Get Ency database tables and compare with result files
     try {
@@ -7037,6 +7096,14 @@ sub database_mode :Path('database_mode') :Args {
             $c->forward('Controller::DatabaseMode', 'test_connection', \@args);
         } elsif ($action eq 'status') {
             $c->forward('Controller::DatabaseMode', 'status', \@args);
+        } elsif ($action eq 'sync_to_production') {
+            $c->forward('Controller::DatabaseMode', 'sync_to_production', \@args);
+        } elsif ($action eq 'sync_from_production') {
+            $c->forward('Controller::Admin', 'sync_from_production', \@args);
+        } elsif ($action eq 'refresh_backends') {
+            $c->forward('Controller::DatabaseMode', 'refresh_backends', \@args);
+        } elsif ($action eq 'debug_backends') {
+            $c->forward('Controller::DatabaseMode', 'debug_backends', \@args);
         } else {
             # Unknown sub-route, forward to index with all args
             $c->forward('Controller::DatabaseMode', 'index', [$action, @args]);
@@ -7045,6 +7112,352 @@ sub database_mode :Path('database_mode') :Args {
         # No args, forward to index
         $c->forward('Controller::DatabaseMode', 'index', \@args);
     }
+}
+
+# Manual database synchronization from production
+sub sync_from_production :Path('sync_from_production') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Check admin permissions
+    unless ($c->check_user_roles('admin') || $c->check_user_roles('developer')) {
+        $c->response->redirect($c->uri_for('/access_denied'));
+        return;
+    }
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_from_production',
+        "Manual sync from production requested by user: " . ($c->user ? $c->user->username : 'unknown'));
+    
+    try {
+        my $hybrid_db = $c->model('HybridDB');
+        unless ($hybrid_db) {
+            die "HybridDB model not available";
+        }
+        
+        # Get sync options from request parameters
+        my $dry_run = $c->request->params->{dry_run} ? 1 : 0;
+        my $force_overwrite = $c->request->params->{force_overwrite} ? 1 : 0;
+        my $tables_param = $c->request->params->{tables} || '';
+        my @tables = $tables_param ? split(/,/, $tables_param) : ();
+        
+        # Clean up table names
+        @tables = map { s/^\s+|\s+$//g; $_ } @tables;
+        @tables = grep { $_ ne '' } @tables;
+        
+        my $sync_result = $hybrid_db->sync_from_production($c, {
+            dry_run => $dry_run,
+            force_overwrite => $force_overwrite,
+            tables => \@tables,
+        });
+        
+        # Prepare result message
+        my $message = '';
+        if ($dry_run) {
+            $message = "DRY RUN: Would sync " . $sync_result->{tables_synced} . " tables, " .
+                      "create " . $sync_result->{tables_created} . " new tables, " .
+                      "update " . $sync_result->{tables_updated} . " existing tables, " .
+                      "sync " . $sync_result->{records_synced} . " records";
+        } else {
+            $message = "Sync completed: " . $sync_result->{tables_synced} . " tables processed, " .
+                      $sync_result->{tables_created} . " tables created, " .
+                      $sync_result->{tables_updated} . " tables updated, " .
+                      $sync_result->{records_synced} . " records synced";
+        }
+        
+        if (@{$sync_result->{errors}}) {
+            $message .= ". Errors: " . join('; ', @{$sync_result->{errors}});
+        }
+        
+        $c->stash(
+            sync_result => $sync_result,
+            message => $message,
+            success => (@{$sync_result->{errors}} == 0),
+        );
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_from_production',
+            "Sync completed: " . $message);
+        
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'sync_from_production',
+            "Sync failed: $error");
+        
+        $c->stash(
+            error => $error,
+            message => "Sync failed: $error",
+            success => 0,
+        );
+    };
+    
+    # If this is an AJAX request, return JSON
+    if ($c->request->header('X-Requested-With') eq 'XMLHttpRequest') {
+        $c->response->content_type('application/json');
+        $c->response->body(JSON::encode_json({
+            success => $c->stash->{success},
+            message => $c->stash->{message},
+            sync_result => $c->stash->{sync_result},
+        }));
+        return;
+    }
+    
+    # Otherwise render template
+    $c->stash(template => 'admin/sync_from_production.tt');
+}
+
+# Get database tables for a specific backend
+sub get_backend_database_tables {
+    my ($self, $c, $backend_name, $backend_info) = @_;
+    
+    my @tables = ();
+    
+    try {
+        if ($backend_info->{type} eq 'mysql') {
+            # Create direct connection to this backend
+            my $config = $backend_info->{config};
+            my $host = $config->{host};
+            
+            # Apply localhost override if configured
+            if ($config->{localhost_override} && $host ne 'localhost') {
+                $host = 'localhost';
+            }
+            
+            my $dsn = "dbi:mysql:database=$config->{database};host=$host;port=$config->{port}";
+            my $dbh = DBI->connect(
+                $dsn,
+                $config->{username},
+                $config->{password},
+                {
+                    RaiseError => 1,
+                    PrintError => 0,
+                    mysql_enable_utf8 => 1,
+                }
+            );
+            
+            if ($dbh) {
+                my $sth = $dbh->prepare("SHOW TABLES");
+                $sth->execute();
+                
+                while (my ($table) = $sth->fetchrow_array()) {
+                    push @tables, $table;
+                }
+                
+                $dbh->disconnect();
+                
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_backend_database_tables',
+                    "Found " . scalar(@tables) . " tables in backend '$backend_name': " . join(', ', @tables));
+            }
+            
+        } elsif ($backend_info->{type} eq 'sqlite') {
+            # For SQLite, get tables from the database file
+            my $db_path = $backend_info->{config}->{database_path};
+            
+            if (-f $db_path) {
+                my $dbh = DBI->connect("dbi:SQLite:dbname=$db_path", "", "", {
+                    RaiseError => 1,
+                    PrintError => 0,
+                });
+                
+                if ($dbh) {
+                    my $sth = $dbh->prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
+                    $sth->execute();
+                    
+                    while (my ($table) = $sth->fetchrow_array()) {
+                        push @tables, $table;
+                    }
+                    
+                    $dbh->disconnect();
+                    
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_backend_database_tables',
+                        "Found " . scalar(@tables) . " tables in SQLite backend '$backend_name': " . join(', ', @tables));
+                }
+            } else {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_backend_database_tables',
+                    "SQLite database file not found: $db_path");
+            }
+        }
+        
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_backend_database_tables', 
+            "Error getting tables for backend '$backend_name': $error");
+        die $error;
+    };
+    
+    return \@tables;
+}
+
+# Compare a backend table with its Result file
+sub compare_backend_table_with_result_file {
+    my ($self, $c, $table_name, $backend_name, $backend_info, $result_table_mapping) = @_;
+    
+    # Get table schema from the backend
+    my $table_schema = { columns => {} };
+    eval {
+        $table_schema = $self->get_backend_table_schema($c, $table_name, $backend_name, $backend_info);
+    };
+    if ($@) {
+        warn "Failed to get table schema for $table_name ($backend_name): $@";
+        $table_schema = { columns => {} };
+    }
+    
+    # Check if this table has a corresponding result file using the mapping
+    my $table_key = lc($table_name);
+    my $result_info = $result_table_mapping->{$table_key};
+    my $result_schema = { columns => {} };
+    
+    if ($result_info && -f $result_info->{result_path}) {
+        eval {
+            $result_schema = $self->parse_result_file_schema($c, $result_info->{result_path});
+        };
+        if ($@) {
+            warn "Failed to parse Result file $result_info->{result_path}: $@";
+            $result_schema = { columns => {} };
+        }
+    }
+    
+    # Create field comparison
+    my $comparison = {
+        table_name => $table_name,
+        database => $backend_name,
+        backend_type => $backend_info->{type},
+        has_result_file => ($result_info && -f $result_info->{result_path}) ? 1 : 0,
+        result_file_path => $result_info ? $result_info->{result_path} : undef,
+        fields => {}
+    };
+    
+    # Get all unique field names from both sources
+    my %all_fields = ();
+    if ($table_schema && $table_schema->{columns}) {
+        %all_fields = (%all_fields, map { $_ => 1 } keys %{$table_schema->{columns}});
+    }
+    if ($result_schema && $result_schema->{columns}) {
+        %all_fields = (%all_fields, map { $_ => 1 } keys %{$result_schema->{columns}});
+    }
+    
+    # Compare each field
+    foreach my $field_name (sort keys %all_fields) {
+        my $table_field = $table_schema->{columns}->{$field_name};
+        my $result_field = $result_schema->{columns}->{$field_name};
+        
+        $comparison->{fields}->{$field_name} = {
+            table => $table_field,
+            result => $result_field,
+            differences => $self->compare_field_attributes($table_field, $result_field, $c, $field_name)
+        };
+    }
+    
+    return $comparison;
+}
+
+# Get table schema from a specific backend
+sub get_backend_table_schema {
+    my ($self, $c, $table_name, $backend_name, $backend_info) = @_;
+    
+    my $schema_info = {
+        columns => {},
+        primary_keys => [],
+        unique_constraints => [],
+        foreign_keys => [],
+        indexes => []
+    };
+    
+    try {
+        if ($backend_info->{type} eq 'mysql') {
+            # Create direct connection to this backend
+            my $config = $backend_info->{config};
+            my $host = $config->{host};
+            
+            # Apply localhost override if configured
+            if ($config->{localhost_override} && $host ne 'localhost') {
+                $host = 'localhost';
+            }
+            
+            my $dsn = "dbi:mysql:database=$config->{database};host=$host;port=$config->{port}";
+            my $dbh = DBI->connect(
+                $dsn,
+                $config->{username},
+                $config->{password},
+                {
+                    RaiseError => 1,
+                    PrintError => 0,
+                    mysql_enable_utf8 => 1,
+                }
+            );
+            
+            if ($dbh) {
+                # Get column information
+                my $sth = $dbh->prepare("DESCRIBE `$table_name`");
+                $sth->execute();
+                
+                while (my $row = $sth->fetchrow_hashref()) {
+                    my $column_name = $row->{Field};
+                    
+                    # Parse MySQL column type
+                    my ($data_type, $size) = $self->parse_mysql_column_type($row->{Type});
+                    
+                    $schema_info->{columns}->{$column_name} = {
+                        data_type => $data_type,
+                        size => $size,
+                        is_nullable => ($row->{Null} eq 'YES' ? 1 : 0),
+                        default_value => $row->{Default},
+                        is_auto_increment => ($row->{Extra} =~ /auto_increment/i ? 1 : 0),
+                        extra => $row->{Extra}
+                    };
+                    
+                    # Check for primary key
+                    if ($row->{Key} eq 'PRI') {
+                        push @{$schema_info->{primary_keys}}, $column_name;
+                    }
+                }
+                
+                $dbh->disconnect();
+            }
+            
+        } elsif ($backend_info->{type} eq 'sqlite') {
+            # For SQLite, get schema information
+            my $db_path = $backend_info->{config}->{database_path};
+            
+            if (-f $db_path) {
+                my $dbh = DBI->connect("dbi:SQLite:dbname=$db_path", "", "", {
+                    RaiseError => 1,
+                    PrintError => 0,
+                });
+                
+                if ($dbh) {
+                    # Get column information from SQLite
+                    my $sth = $dbh->prepare("PRAGMA table_info(`$table_name`)");
+                    $sth->execute();
+                    
+                    while (my $row = $sth->fetchrow_hashref()) {
+                        my $column_name = $row->{name};
+                        
+                        $schema_info->{columns}->{$column_name} = {
+                            data_type => $row->{type},
+                            size => undef,  # SQLite doesn't enforce size
+                            is_nullable => ($row->{notnull} ? 0 : 1),
+                            default_value => $row->{dflt_value},
+                            is_auto_increment => 0,  # Will be detected separately
+                            extra => ''
+                        };
+                        
+                        # Check for primary key
+                        if ($row->{pk}) {
+                            push @{$schema_info->{primary_keys}}, $column_name;
+                        }
+                    }
+                    
+                    $dbh->disconnect();
+                }
+            }
+        }
+        
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_backend_table_schema', 
+            "Error getting schema for table '$table_name' in backend '$backend_name': $error");
+        die $error;
+    };
+    
+    return $schema_info;
 }
 
 __PACKAGE__->meta->make_immutable;

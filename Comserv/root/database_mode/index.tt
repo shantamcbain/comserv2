@@ -33,14 +33,20 @@
                     <div class="status-grid">
                         <div class="status-item">
                             <strong>Active Backend:</strong>
-                            <span class="badge [% IF status.current_backend == 'mysql' %]badge-success[% ELSE %]badge-info[% END %]">
-                                [% status.current_backend | upper %]
+                            <span class="badge badge-primary">
+                                [% status.current_backend | html %]
                             </span>
                         </div>
                         <div class="status-item">
-                            <strong>MySQL Available:</strong>
-                            <span class="badge [% IF status.mysql_available %]badge-success[% ELSE %]badge-danger[% END %]">
-                                [% IF status.mysql_available %]Yes[% ELSE %]No[% END %]
+                            <strong>Total Backends:</strong>
+                            <span class="badge badge-info">
+                                [% status.total_backends || 0 %]
+                            </span>
+                        </div>
+                        <div class="status-item">
+                            <strong>Available:</strong>
+                            <span class="badge badge-success">
+                                [% status.available_count || 0 %]
                             </span>
                         </div>
                         <div class="status-item">
@@ -67,88 +73,122 @@
                 <button type="button" class="btn btn-secondary" onclick="refreshStatus()">
                     <i class="fas fa-sync-alt"></i> Refresh Status
                 </button>
-            </div>
-        </div>
-
-        <!-- MySQL Backend Card -->
-        <div class="feature-card">
-            <div class="feature-header">
-                <h3><i class="fas fa-server"></i> MySQL Backend</h3>
-                [% IF status && status.mysql_available %]
-                    <span class="badge badge-success">Available</span>
-                [% ELSE %]
-                    <span class="badge badge-danger">Unavailable</span>
-                [% END %]
-            </div>
-            <div class="feature-content">
-                <div class="backend-info">
-                    <h4>Advantages:</h4>
-                    <ul>
-                        <li>Full feature compatibility</li>
-                        <li>Same schema as production</li>
-                        <li>Better performance for large datasets</li>
-                        <li>Easier synchronization</li>
-                    </ul>
-                    
-                    <h4>Requirements:</h4>
-                    <ul>
-                        <li>Local MySQL server running</li>
-                        <li>Database configuration accessible</li>
-                        <li>Network connectivity to MySQL</li>
-                    </ul>
-                </div>
-            </div>
-            <div class="feature-actions">
-                [% IF status && status.mysql_available %]
-                    <button type="button" class="btn btn-primary" onclick="switchBackend('mysql')"
-                            [% IF status.current_backend == 'mysql' %]disabled[% END %]>
-                        <i class="fas fa-exchange-alt"></i>
-                        [% IF status.current_backend == 'mysql' %]Currently Active[% ELSE %]Switch to MySQL[% END %]
-                    </button>
-                [% ELSE %]
-                    <button type="button" class="btn btn-secondary" disabled>
-                        <i class="fas fa-times"></i> MySQL Not Available
-                    </button>
-                [% END %]
-                <button type="button" class="btn btn-info" onclick="testConnection('mysql')">
-                    <i class="fas fa-plug"></i> Test Connection
+                <button type="button" class="btn btn-warning" onclick="refreshBackends()">
+                    <i class="fas fa-search"></i> Refresh Detection
+                </button>
+                <button type="button" class="btn btn-info" onclick="debugBackends()">
+                    <i class="fas fa-bug"></i> Debug Backends
                 </button>
             </div>
         </div>
 
-        <!-- SQLite Backend Card -->
+        <!-- Available Backends -->
+        [% IF status && status.available_backends %]
+            [% FOREACH backend_name IN status.available_backends.keys.sort %]
+                [% backend = status.available_backends.$backend_name %]
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <h3>
+                            [% IF backend.type == 'mysql' %]
+                                <i class="fas fa-server"></i>
+                            [% ELSE %]
+                                <i class="fas fa-cube"></i>
+                            [% END %]
+                            [% backend.config.description || backend_name %]
+                        </h3>
+                        [% IF backend.available %]
+                            <span class="badge badge-success">Available</span>
+                        [% ELSE %]
+                            <span class="badge badge-danger">Unavailable</span>
+                        [% END %]
+                        [% IF status.current_backend == backend_name %]
+                            <span class="badge badge-primary">Active</span>
+                        [% END %]
+                    </div>
+                    <div class="feature-content">
+                        <div class="backend-info">
+                            [% IF backend.type == 'mysql' %]
+                                <div class="backend-details">
+                                    <strong>Host:</strong> [% backend.config.host %]<br>
+                                    <strong>Port:</strong> [% backend.config.port %]<br>
+                                    <strong>Database:</strong> [% backend.config.database %]<br>
+                                    <strong>Priority:</strong> [% backend.config.priority || 'N/A' %]
+                                    [% IF backend.config.localhost_override %]
+                                        <br><strong>Localhost Override:</strong> Enabled
+                                    [% END %]
+                                </div>
+                            [% ELSE %]
+                                <div class="backend-details">
+                                    <strong>Type:</strong> SQLite Database<br>
+                                    <strong>Path:</strong> [% backend.config.database_path %]<br>
+                                    <strong>Features:</strong> Offline capable, No server required
+                                </div>
+                            [% END %]
+                        </div>
+                    </div>
+                    <div class="feature-actions">
+                        [% IF backend.available %]
+                            <button type="button" class="btn btn-primary" onclick="switchBackend('[% backend_name %]')"
+                                    [% IF status.current_backend == backend_name %]disabled[% END %]>
+                                <i class="fas fa-exchange-alt"></i>
+                                [% IF status.current_backend == backend_name %]Currently Active[% ELSE %]Switch to This Backend[% END %]
+                            </button>
+                        [% ELSE %]
+                            <button type="button" class="btn btn-secondary" disabled>
+                                <i class="fas fa-times"></i> Not Available
+                            </button>
+                        [% END %]
+                        <button type="button" class="btn btn-info" onclick="testConnection('[% backend_name %]')">
+                            <i class="fas fa-plug"></i> Test Connection
+                        </button>
+                    </div>
+                </div>
+            [% END %]
+        [% ELSE %]
+            <div class="feature-card">
+                <div class="feature-header">
+                    <h3><i class="fas fa-exclamation-triangle"></i> No Backends Available</h3>
+                </div>
+                <div class="feature-content">
+                    <div class="alert alert-warning">
+                        No database backends are currently configured or available.
+                    </div>
+                </div>
+            </div>
+        [% END %]
+
+        <!-- Database Synchronization Card -->
         <div class="feature-card">
             <div class="feature-header">
-                <h3><i class="fas fa-cube"></i> SQLite Backend</h3>
-                <span class="badge badge-info">Always Available</span>
+                <h3><i class="fas fa-sync-alt"></i> Database Synchronization</h3>
             </div>
             <div class="feature-content">
-                <div class="backend-info">
-                    <h4>Advantages:</h4>
-                    <ul>
-                        <li>No server required</li>
-                        <li>Lightweight and portable</li>
-                        <li>File-based storage</li>
-                        <li>Works offline</li>
-                    </ul>
+                <div class="sync-info">
+                    <h4>Production Sync:</h4>
+                    <p>Keep your development database in sync with the production server. This will copy all tables and data from your current backend to the production server.</p>
                     
-                    <h4>Limitations:</h4>
-                    <ul>
-                        <li>Schema mapping required</li>
-                        <li>Limited concurrent access</li>
-                        <li>Different SQL dialect</li>
-                        <li>Synchronization complexity</li>
-                    </ul>
+                    <div class="alert alert-warning">
+                        <strong>Warning:</strong> This operation will overwrite data on the production server. Use dry run first to preview changes.
+                    </div>
+                    
+                    <div class="sync-options">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="dryRunCheck" checked>
+                            <label class="form-check-label" for="dryRunCheck">
+                                Dry Run (Preview only - no actual changes)
+                            </label>
+                        </div>
+                        <div class="form-group mt-2">
+                            <label for="tablesToSync">Tables to sync (leave empty for all tables):</label>
+                            <input type="text" class="form-control" id="tablesToSync" placeholder="table1,table2,table3">
+                            <small class="form-text text-muted">Comma-separated list of table names</small>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="feature-actions">
-                <button type="button" class="btn btn-primary" onclick="switchBackend('sqlite')"
-                        [% IF status && status.current_backend == 'sqlite' %]disabled[% END %]>
-                    <i class="fas fa-exchange-alt"></i>
-                    [% IF status && status.current_backend == 'sqlite' %]Currently Active[% ELSE %]Switch to SQLite[% END %]
-                </button>
-                <button type="button" class="btn btn-info" onclick="testConnection('sqlite')">
-                    <i class="fas fa-plug"></i> Test Connection
+                <button type="button" class="btn btn-warning" onclick="syncToProduction()">
+                    <i class="fas fa-sync-alt"></i> Sync to Production
                 </button>
             </div>
         </div>
@@ -216,7 +256,7 @@ function showMessage(message, type = 'info') {
     }, 5000);
 }
 
-function switchBackend(backendType) {
+function switchBackend(backendName) {
     const button = event.target;
     const originalText = button.innerHTML;
     
@@ -224,7 +264,7 @@ function switchBackend(backendType) {
     button.disabled = true;
     button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Switching...';
     
-    fetch(`/admin/database_mode/switch_backend/${backendType}`, {
+    fetch(`/admin/database_mode/switch_backend/${backendName}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -251,7 +291,7 @@ function switchBackend(backendType) {
     });
 }
 
-function testConnection(backendType) {
+function testConnection(backendName) {
     const button = event.target;
     const originalText = button.innerHTML;
     
@@ -259,7 +299,7 @@ function testConnection(backendType) {
     button.disabled = true;
     button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
     
-    fetch(`/admin/database_mode/test_connection/${backendType}`, {
+    fetch(`/admin/database_mode/test_connection/${backendName}`, {
         method: 'GET',
         headers: {
             'Content-Type': 'application/json',
@@ -319,6 +359,167 @@ function refreshStatus() {
         button.innerHTML = originalText;
     });
 }
+
+function refreshBackends() {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    // Show loading state
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Detecting...';
+    
+    fetch('/admin/database_mode/refresh_backends', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage(`Backend detection refreshed - Found ${data.available_count} of ${data.total_backends} backends available`, 'success');
+            // Reload page to update backend display
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            showMessage(data.error, 'error');
+        }
+        
+        button.disabled = false;
+        button.innerHTML = originalText;
+    })
+    .catch(error => {
+        showMessage('Network error: ' + error.message, 'error');
+        button.disabled = false;
+        button.innerHTML = originalText;
+    });
+}
+
+function debugBackends() {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    // Show loading state
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+    
+    fetch('/admin/database_mode/debug_backends', {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Display debug information in a modal or alert
+            const debugInfo = data.debug_info;
+            let message = `=== Backend Debug Information ===\n\n`;
+            message += `Current Backend: ${debugInfo.current_backend}\n`;
+            message += `Total Backends: ${debugInfo.total_backends}\n`;
+            message += `Available Backends: ${debugInfo.available_count}\n\n`;
+            
+            message += `=== Backend Details ===\n`;
+            Object.keys(debugInfo.backends).forEach(backendName => {
+                const backend = debugInfo.backends[backendName];
+                message += `\n${backendName}:\n`;
+                message += `  Type: ${backend.type}\n`;
+                message += `  Available: ${backend.available ? 'Yes' : 'No'}\n`;
+                message += `  Description: ${backend.description}\n`;
+                
+                if (backend.type === 'mysql') {
+                    message += `  Host: ${backend.config.host}\n`;
+                    message += `  Port: ${backend.config.port}\n`;
+                    message += `  Database: ${backend.config.database}\n`;
+                    message += `  Priority: ${backend.config.priority || 'N/A'}\n`;
+                    message += `  Localhost Override: ${backend.config.localhost_override ? 'Yes' : 'No'}\n`;
+                } else if (backend.type === 'sqlite') {
+                    message += `  Database Path: ${backend.config.database_path}\n`;
+                }
+            });
+            
+            // Show in alert for now (could be enhanced with a proper modal)
+            alert(message);
+            showMessage('Debug information retrieved successfully', 'success');
+        } else {
+            showMessage(data.error, 'error');
+        }
+        
+        button.disabled = false;
+        button.innerHTML = originalText;
+    })
+    .catch(error => {
+        showMessage('Network error: ' + error.message, 'error');
+        button.disabled = false;
+        button.innerHTML = originalText;
+    });
+}
+
+function syncToProduction() {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    // Get form values
+    const dryRun = document.getElementById('dryRunCheck').checked;
+    const tables = document.getElementById('tablesToSync').value.trim();
+    
+    // Confirm action if not dry run
+    if (!dryRun) {
+        const confirmMessage = 'This will overwrite data on the production server. Are you sure you want to continue?';
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+    }
+    
+    // Show loading state
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (dryRun ? 'Running Preview...' : 'Syncing...');
+    
+    // Prepare form data
+    const formData = new FormData();
+    formData.append('dry_run', dryRun ? '1' : '0');
+    if (tables) {
+        formData.append('tables', tables);
+    }
+    
+    fetch('/admin/database_mode/sync_to_production', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const messageType = dryRun ? 'info' : 'success';
+            showMessage(data.message, messageType);
+            
+            // Show detailed results if available
+            if (data.sync_results) {
+                const results = data.sync_results;
+                let detailMessage = `Tables processed: ${results.tables_synced}, Records: ${results.records_synced}`;
+                
+                if (results.errors && results.errors.length > 0) {
+                    detailMessage += `\nErrors: ${results.errors.length}`;
+                    console.error('Sync errors:', results.errors);
+                }
+                
+                setTimeout(() => {
+                    showMessage(detailMessage, 'info');
+                }, 2000);
+            }
+        } else {
+            showMessage(data.error, 'error');
+        }
+        
+        button.disabled = false;
+        button.innerHTML = originalText;
+    })
+    .catch(error => {
+        showMessage('Network error: ' + error.message, 'error');
+        button.disabled = false;
+        button.innerHTML = originalText;
+    });
+}
 </script>
 
 <style>
@@ -363,6 +564,34 @@ function refreshStatus() {
 .feature-actions .btn {
     flex: 1;
     min-width: 120px;
+}
+
+.sync-options {
+    margin-top: 1rem;
+}
+
+.sync-options .form-check {
+    margin-bottom: 1rem;
+}
+
+.sync-options .form-group {
+    margin-bottom: 1rem;
+}
+
+.sync-options .form-control {
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+}
+
+.sync-options .form-control:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(var(--primary-color-rgb), 0.25);
+}
+
+.sync-options .form-check-input:checked {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
 }
 
 @media (max-width: 768px) {

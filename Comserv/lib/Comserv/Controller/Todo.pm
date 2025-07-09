@@ -57,12 +57,14 @@ sub begin :Private {
 sub index :Path(/todo) :Args(0) {
     my ( $self, $c ) = @_;
 
-    # Retrieve all of the todo records as todo model objects and store in the stash
-    $c->stash(todos => [$c->model('DB::Todo')->all]);
+    # Use safe_search to retrieve all todo records - this will sync missing tables from production
+    my $schema = $c->model('DBEncy');
+    my @todos = $schema->safe_search($c, 'Todo', {}, {});
+    $c->stash(todos => \@todos);
 
     # Set the TT template to use.
     $c->stash(template => 'todo/todo.tt');
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 'Fetched todos for the, todo page');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 'Fetched todos for the, todo page using safe_search');
     $c->forward($c->view('TT'));
 }
 sub auto :Private {
@@ -108,11 +110,34 @@ sub todo :Path('/todo') :Args(0) {
         }
     }
 
-    # Get a DBIx::Class::Schema object
+    # Get a DBIx::Class::Schema object with HybridDB backend integration
     my $schema = $c->model('DBEncy');
-
-    # Get a DBIx::Class::ResultSet object
-    my $rs = $schema->resultset('Todo');
+    
+    # Check user's backend preference and use appropriate schema
+    my $backend_preference = $schema->get_hybrid_backend_preference($c);
+    my $actual_backend = 'mysql';  # Default
+    
+    if ($backend_preference eq 'sqlite') {
+        my $sqlite_schema = $schema->get_sqlite_schema($c);
+        if ($sqlite_schema) {
+            $schema = $sqlite_schema;
+            $actual_backend = 'sqlite';
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'todo', 
+                "Using SQLite backend for database access");
+        } else {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'todo', 
+                "SQLite backend requested but unavailable, falling back to MySQL");
+        }
+    } else {
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'todo', 
+            "Using MySQL backend for database access");
+    }
+    
+    # Store backend info in stash for template display
+    $c->stash(
+        current_backend => $actual_backend,
+        backend_preference => $backend_preference,
+    );
 
     # Build the search conditions
     my $search_conditions = {
@@ -184,8 +209,10 @@ sub todo :Path('/todo') :Args(0) {
         ];
     }
 
-    # Fetch todos with the applied filters
-    my @todos = $rs->search(
+    # Fetch todos with the applied filters using safe search
+    my @todos = $schema->safe_search(
+        $c,
+        'Todo',
         $search_conditions,
         { 
             order_by => { -asc => ['me.priority', 'me.start_date'] },
@@ -231,14 +258,28 @@ sub details :Path('/todo/details') :Args {
     # Get the record_id from the request parameters
     my $record_id = $c->request->parameters->{record_id};
 
-    # Get a DBIx::Class::Schema object
+    # Get a DBIx::Class::Schema object with HybridDB backend integration
     my $schema = $c->model('DBEncy');
+    
+    # Check user's backend preference and use appropriate schema
+    my $backend_preference = $schema->get_hybrid_backend_preference($c);
+    if ($backend_preference eq 'sqlite') {
+        my $sqlite_schema = $schema->get_sqlite_schema($c);
+        if ($sqlite_schema) {
+            $schema = $sqlite_schema;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'details', 
+                "Using SQLite backend for database access");
+        } else {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'details', 
+                "SQLite backend requested but unavailable, falling back to MySQL");
+        }
+    } else {
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'details', 
+            "Using MySQL backend for database access");
+    }
 
-    # Get a DBIx::Class::ResultSet object
-    my $rs = $schema->resultset('Todo');
-
-    # Fetch the todo with the given record_id
-    my $todo = $rs->find($record_id);
+    # Fetch the todo with the given record_id using safe find
+    my $todo = $schema->safe_find($c, 'Todo', $record_id);
 
     # Check if the todo was found
     if (defined $todo) {
@@ -283,6 +324,21 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
     # Attempt to locate the current project based on project_id
     if ($project_id) {
         my $schema = $c->model('DBEncy');
+        
+        # Check user's backend preference and use appropriate schema
+        my $backend_preference = $schema->get_hybrid_backend_preference($c);
+        if ($backend_preference eq 'sqlite') {
+            my $sqlite_schema = $schema->get_sqlite_schema($c);
+            if ($sqlite_schema) {
+                $schema = $sqlite_schema;
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'addtodo', 
+                    "Using SQLite backend for database access");
+            } else {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'addtodo', 
+                    "SQLite backend requested but unavailable, falling back to MySQL");
+            }
+        }
+        
         $current_project = $schema->resultset('Project')->find($project_id);
         if ($current_project) {
             $self->logging->log_with_details(
@@ -299,6 +355,23 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
 
     # Fetch all users to populate the user drop-down
     my $schema = $c->model('DBEncy');
+    
+    # Check user's backend preference and use appropriate schema (if not already done)
+    unless ($project_id) {  # Only check if we haven't already done it above
+        my $backend_preference = $schema->get_hybrid_backend_preference($c);
+        if ($backend_preference eq 'sqlite') {
+            my $sqlite_schema = $schema->get_sqlite_schema($c);
+            if ($sqlite_schema) {
+                $schema = $sqlite_schema;
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'addtodo', 
+                    "Using SQLite backend for database access");
+            } else {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'addtodo', 
+                    "SQLite backend requested but unavailable, falling back to MySQL");
+            }
+        }
+    }
+    
     my @users = $schema->resultset('User')->search({}, { order_by => 'id' });
 
     # Log a message confirming users were fetched
@@ -362,8 +435,8 @@ sub edit :Path('/todo/edit') :Args(1) {
     # Initialize the schema to fetch data
     my $schema = $c->model('DBEncy');
 
-    # Fetch the todo item with the given record_id
-    my $todo = $schema->resultset('Todo')->find($record_id);
+    # Fetch the todo item with the given record_id using safe find
+    my $todo = $schema->safe_find($c, 'Todo', $record_id);
 
     if (!$todo) {
         $self->logging->log_with_details(
@@ -1002,7 +1075,7 @@ sub get_overdue_todos :Private {
     my $sitename = $c->session->{SiteName};
     my $today = DateTime->now->ymd;
     
-    my @overdue_todos = $schema->resultset('Todo')->search(
+    my @overdue_todos = $schema->safe_search($c, 'Todo', 
         {
             'me.sitename' => $sitename,
             'me.due_date' => { '<' => $today },
@@ -1149,12 +1222,12 @@ sub _parse_ai_prompt :Private {
     if ($prompt =~ /\b(?:project|for)\s+([A-Za-z0-9_\-]+)/i) {
         my $project_name = $1;
         my $schema = $c->model('DBEncy');
-        my $project = $schema->resultset('Project')->search({ 
+        my $project = $schema->safe_search($c, 'Project', { 
             -or => [
                 { name => { 'like', "%$project_name%" } },
                 { project_code => { 'like', "%$project_name%" } }
             ]
-        })->first;
+        }, {})->first;
         
         if ($project) {
             $todo_data->{project_id} = $project->id;
