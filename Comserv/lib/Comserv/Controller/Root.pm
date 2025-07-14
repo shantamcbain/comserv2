@@ -36,7 +36,8 @@ sub check_user_roles {
     
     # Get roles from session
     my $roles = $c->session->{roles};
-    $roles = "admin";
+    # Removed hardcoded admin role to allow offline mode visibility
+    # $roles = "admin";
     # Log the role check for debugging
     my $roles_debug = 'none';
     if (defined $roles) {
