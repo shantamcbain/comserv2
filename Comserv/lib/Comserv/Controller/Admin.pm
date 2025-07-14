@@ -7107,6 +7107,14 @@ sub database_mode :Path('database_mode') :Args {
             $c->forward('Controller::DatabaseMode', 'refresh_backends', \@args);
         } elsif ($action eq 'debug_backends') {
             $c->forward('Controller::DatabaseMode', 'debug_backends', \@args);
+        } elsif ($action eq 'add_backend') {
+            $c->forward('Controller::DatabaseMode', 'add_backend', \@args);
+        } elsif ($action eq 'update_backend' && @args) {
+            $c->forward('Controller::DatabaseMode', 'update_backend', \@args);
+        } elsif ($action eq 'delete_backend' && @args) {
+            $c->forward('Controller::DatabaseMode', 'delete_backend', \@args);
+        } elsif ($action eq 'get_backend' && @args) {
+            $c->forward('Controller::DatabaseMode', 'get_backend', \@args);
         } else {
             # Unknown sub-route, forward to index with all args
             $c->forward('Controller::DatabaseMode', 'index', [$action, @args]);

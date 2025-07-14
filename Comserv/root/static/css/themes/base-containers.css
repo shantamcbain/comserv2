@@ -2199,3 +2199,60 @@ mark {
         right: 10px;
     }
 }
+
+/* Database Mode Specific Styles */
+.status-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+}
+
+.status-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    background: var(--card-bg);
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+}
+
+.backend-info h4,
+.system-info h4,
+.backend-management-info h4 {
+    color: var(--primary-color);
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.backend-info ul {
+    margin-bottom: 1rem;
+}
+
+.sync-options {
+    margin-top: 1rem;
+}
+
+.sync-options .form-check {
+    margin-bottom: 1rem;
+}
+
+.sync-options .form-group {
+    margin-bottom: 1rem;
+}
+
+.sync-options .form-control {
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+}
+
+.sync-options .form-control:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(var(--primary-color-rgb), 0.25);
+}
+
+.sync-options .form-check-input:checked {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}

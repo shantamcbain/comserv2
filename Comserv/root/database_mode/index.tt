@@ -141,6 +141,12 @@
                         <button type="button" class="btn btn-info" onclick="testConnection('[% backend_name %]')">
                             <i class="fas fa-plug"></i> Test Connection
                         </button>
+                        <button type="button" class="btn btn-warning" onclick="editBackend('[% backend_name %]')">
+                            <i class="fas fa-edit"></i> Edit
+                        </button>
+                        <button type="button" class="btn btn-danger" onclick="deleteBackend('[% backend_name %]')">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
                     </div>
                 </div>
             [% END %]
@@ -189,6 +195,28 @@
             <div class="feature-actions">
                 <button type="button" class="btn btn-warning" onclick="syncToProduction()">
                     <i class="fas fa-sync-alt"></i> Sync to Production
+                </button>
+            </div>
+        </div>
+
+        <!-- Backend Management Card -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3><i class="fas fa-cogs"></i> Backend Management</h3>
+            </div>
+            <div class="feature-content">
+                <div class="backend-management-info">
+                    <h4>Configuration Management:</h4>
+                    <p>Add, edit, or remove database backend configurations. Changes are saved to the JSON configuration file with automatic backup.</p>
+                    
+                    <div class="alert alert-info">
+                        <strong>Note:</strong> Configuration changes require application restart to take full effect. Backend detection will be refreshed automatically.
+                    </div>
+                </div>
+            </div>
+            <div class="feature-actions">
+                <button type="button" class="btn btn-success" onclick="showAddBackendModal()">
+                    <i class="fas fa-plus"></i> Add New Backend
                 </button>
             </div>
         </div>
@@ -520,87 +548,252 @@ function syncToProduction() {
         button.innerHTML = originalText;
     });
 }
-</script>
 
-<style>
-.status-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 0.5rem;
+// Backend Management Functions
+function showAddBackendModal() {
+    document.getElementById('backendModalTitle').textContent = 'Add New Backend';
+    document.getElementById('backendForm').reset();
+    document.getElementById('backendModal').style.display = 'block';
+    document.getElementById('isEditMode').value = 'false';
+    document.getElementById('originalBackendName').value = '';
+    toggleBackendFields(); // Show appropriate fields based on default db_type
 }
 
-.status-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.5rem;
-    background: var(--card-bg);
-    border-radius: 4px;
-    border: 1px solid var(--border-color);
+function editBackend(backendName) {
+    document.getElementById('backendModalTitle').textContent = 'Edit Backend: ' + backendName;
+    document.getElementById('isEditMode').value = 'true';
+    document.getElementById('originalBackendName').value = backendName;
+    
+    // Fetch backend configuration
+    fetch(`/admin/database_mode/get_backend/${backendName}`, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const config = data.config;
+            
+            // Populate form fields
+            document.getElementById('backend_name').value = backendName;
+            document.getElementById('db_type').value = config.db_type;
+            document.getElementById('description').value = config.description || '';
+            document.getElementById('priority').value = config.priority || 999;
+            document.getElementById('localhost_override').checked = config.localhost_override || false;
+            
+            if (config.db_type === 'mysql') {
+                document.getElementById('host').value = config.host || '';
+                document.getElementById('port').value = config.port || 3306;
+                document.getElementById('username').value = config.username || '';
+                document.getElementById('password').value = config.password || '';
+                document.getElementById('database').value = config.database || '';
+            } else if (config.db_type === 'sqlite') {
+                document.getElementById('database_path').value = config.database_path || '';
+            }
+            
+            toggleBackendFields();
+            document.getElementById('backendModal').style.display = 'block';
+        } else {
+            showMessage('Failed to load backend configuration: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        showMessage('Network error: ' + error.message, 'error');
+    });
 }
 
-.backend-info h4 {
-    color: var(--primary-color);
-    margin-top: 1rem;
-    margin-bottom: 0.5rem;
-}
-
-.backend-info ul {
-    margin-bottom: 1rem;
-}
-
-.system-info h4 {
-    color: var(--primary-color);
-    margin-top: 1rem;
-    margin-bottom: 0.5rem;
-}
-
-.feature-actions {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-}
-
-.feature-actions .btn {
-    flex: 1;
-    min-width: 120px;
-}
-
-.sync-options {
-    margin-top: 1rem;
-}
-
-.sync-options .form-check {
-    margin-bottom: 1rem;
-}
-
-.sync-options .form-group {
-    margin-bottom: 1rem;
-}
-
-.sync-options .form-control {
-    background: var(--input-bg);
-    border: 1px solid var(--border-color);
-    color: var(--text-color);
-}
-
-.sync-options .form-control:focus {
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 0.2rem rgba(var(--primary-color-rgb), 0.25);
-}
-
-.sync-options .form-check-input:checked {
-    background-color: var(--primary-color);
-    border-color: var(--primary-color);
-}
-
-@media (max-width: 768px) {
-    .feature-actions {
-        flex-direction: column;
+function deleteBackend(backendName) {
+    if (!confirm(`Are you sure you want to delete backend '${backendName}'? This action cannot be undone.`)) {
+        return;
     }
     
-    .feature-actions .btn {
-        width: 100%;
+    fetch(`/admin/database_mode/delete_backend/${backendName}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage(data.message, 'success');
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            showMessage('Failed to delete backend: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        showMessage('Network error: ' + error.message, 'error');
+    });
+}
+
+function closeBackendModal() {
+    document.getElementById('backendModal').style.display = 'none';
+}
+
+function toggleBackendFields() {
+    const dbType = document.getElementById('db_type').value;
+    const mysqlFields = document.getElementById('mysqlFields');
+    const sqliteFields = document.getElementById('sqliteFields');
+    
+    if (dbType === 'mysql') {
+        mysqlFields.style.display = 'block';
+        sqliteFields.style.display = 'none';
+    } else if (dbType === 'sqlite') {
+        mysqlFields.style.display = 'none';
+        sqliteFields.style.display = 'block';
     }
 }
-</style>
+
+function saveBackend() {
+    const form = document.getElementById('backendForm');
+    const formData = new FormData(form);
+    const isEditMode = document.getElementById('isEditMode').value === 'true';
+    const originalName = document.getElementById('originalBackendName').value;
+    const backendName = formData.get('backend_name');
+    
+    if (!backendName) {
+        showMessage('Backend name is required', 'error');
+        return;
+    }
+    
+    const button = document.querySelector('#backendModal .btn-primary');
+    const originalText = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+    
+    const url = isEditMode ? 
+        `/admin/database_mode/update_backend/${originalName}` : 
+        '/admin/database_mode/add_backend';
+    
+    fetch(url, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage(data.message, 'success');
+            closeBackendModal();
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            showMessage('Failed to save backend: ' + data.error, 'error');
+        }
+        
+        button.disabled = false;
+        button.innerHTML = originalText;
+    })
+    .catch(error => {
+        showMessage('Network error: ' + error.message, 'error');
+        button.disabled = false;
+        button.innerHTML = originalText;
+    });
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const modal = document.getElementById('backendModal');
+    if (event.target === modal) {
+        closeBackendModal();
+    }
+}
+</script>
+
+<!-- Backend Configuration Modal -->
+<div id="backendModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="backendModalTitle">Add New Backend</h3>
+            <span class="close" onclick="closeBackendModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="backendForm">
+                <input type="hidden" id="isEditMode" name="isEditMode" value="false">
+                <input type="hidden" id="originalBackendName" name="originalBackendName" value="">
+                
+                <div class="form-group">
+                    <label for="backend_name">Backend Name:</label>
+                    <input type="text" id="backend_name" name="backend_name" class="form-control" required>
+                    <small class="form-text text-muted">Unique identifier for this backend configuration</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="db_type">Database Type:</label>
+                    <select id="db_type" name="db_type" class="form-control" onchange="toggleBackendFields()" required>
+                        <option value="mysql">MySQL</option>
+                        <option value="sqlite">SQLite</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="description">Description:</label>
+                    <input type="text" id="description" name="description" class="form-control">
+                    <small class="form-text text-muted">Optional description for this backend</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="priority">Priority:</label>
+                    <input type="number" id="priority" name="priority" class="form-control" value="999" min="1" max="999">
+                    <small class="form-text text-muted">Lower numbers have higher priority (1 = highest)</small>
+                </div>
+                
+                <div class="form-group">
+                    <div class="form-check">
+                        <input type="checkbox" id="localhost_override" name="localhost_override" class="form-check-input">
+                        <label for="localhost_override" class="form-check-label">
+                            Localhost Override (connect to localhost instead of configured host)
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- MySQL-specific fields -->
+                <div id="mysqlFields" style="display: block;">
+                    <div class="form-group">
+                        <label for="host">Host:</label>
+                        <input type="text" id="host" name="host" class="form-control">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="port">Port:</label>
+                        <input type="number" id="port" name="port" class="form-control" value="3306" min="1" max="65535">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="username">Username:</label>
+                        <input type="text" id="username" name="username" class="form-control">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password">Password:</label>
+                        <input type="password" id="password" name="password" class="form-control">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="database">Database:</label>
+                        <input type="text" id="database" name="database" class="form-control">
+                    </div>
+                </div>
+                
+                <!-- SQLite-specific fields -->
+                <div id="sqliteFields" style="display: none;">
+                    <div class="form-group">
+                        <label for="database_path">Database Path:</label>
+                        <input type="text" id="database_path" name="database_path" class="form-control">
+                        <small class="form-text text-muted">Path to SQLite database file</small>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeBackendModal()">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="saveBackend()">Save Backend</button>
+        </div>
+    </div>
+</div>
+

@@ -3251,6 +3251,218 @@ sub _safe_log {
     }
 }
 
+=head2 save_config
+
+Save the current configuration back to the JSON file
+
+=cut
+
+sub save_config {
+    my ($self, $c) = @_;
+    
+    try {
+        my $config_file = $self->_find_config_file($c);
+        unless ($config_file) {
+            die "Configuration file not found";
+        }
+        
+        # Create backup
+        my $backup_file = $config_file . '.backup.' . time();
+        require File::Copy;
+        File::Copy::copy($config_file, $backup_file) or die "Failed to create backup: $!";
+        
+        # Write updated configuration
+        open my $fh, '>', $config_file or die "Cannot write to $config_file: $!";
+        print $fh encode_json($self->{config});
+        close $fh;
+        
+        $c->log->info("HybridDB: Configuration saved to $config_file (backup: $backup_file)");
+        return { success => 1, backup_file => $backup_file };
+        
+    } catch {
+        my $error = $_;
+        $c->log->error("HybridDB: Failed to save configuration: $error");
+        return { success => 0, error => $error };
+    };
+}
+
+=head2 add_backend_config
+
+Add a new backend configuration
+
+=cut
+
+sub add_backend_config {
+    my ($self, $c, $backend_name, $config) = @_;
+    
+    return { success => 0, error => "Backend name is required" } unless $backend_name;
+    return { success => 0, error => "Configuration is required" } unless $config;
+    
+    # Check if backend already exists
+    if ($self->{config}->{$backend_name}) {
+        return { success => 0, error => "Backend '$backend_name' already exists" };
+    }
+    
+    # Validate required fields based on db_type
+    if ($config->{db_type} eq 'mysql') {
+        for my $field (qw/host port username password database/) {
+            unless (defined $config->{$field} && $config->{$field} ne '') {
+                return { success => 0, error => "Field '$field' is required for MySQL backends" };
+            }
+        }
+    } elsif ($config->{db_type} eq 'sqlite') {
+        unless (defined $config->{database_path} && $config->{database_path} ne '') {
+            return { success => 0, error => "Field 'database_path' is required for SQLite backends" };
+        }
+    } else {
+        return { success => 0, error => "Invalid db_type. Must be 'mysql' or 'sqlite'" };
+    }
+    
+    # Set defaults
+    $config->{priority} ||= 999;
+    $config->{localhost_override} = $config->{localhost_override} ? 1 : 0;
+    $config->{description} ||= "User-defined backend: $backend_name";
+    
+    # Add to configuration
+    $self->{config}->{$backend_name} = $config;
+    
+    # Save configuration
+    my $save_result = $self->save_config($c);
+    if ($save_result->{success}) {
+        # Re-detect backends to include the new one
+        $self->_detect_backends($c);
+        
+        $c->log->info("HybridDB: Added new backend '$backend_name'");
+        return { 
+            success => 1, 
+            message => "Backend '$backend_name' added successfully",
+            backup_file => $save_result->{backup_file}
+        };
+    } else {
+        return { success => 0, error => "Failed to save configuration: " . $save_result->{error} };
+    }
+}
+
+=head2 update_backend_config
+
+Update an existing backend configuration
+
+=cut
+
+sub update_backend_config {
+    my ($self, $c, $backend_name, $config) = @_;
+    
+    return { success => 0, error => "Backend name is required" } unless $backend_name;
+    return { success => 0, error => "Configuration is required" } unless $config;
+    
+    # Check if backend exists
+    unless ($self->{config}->{$backend_name}) {
+        return { success => 0, error => "Backend '$backend_name' does not exist" };
+    }
+    
+    # Validate required fields based on db_type
+    if ($config->{db_type} eq 'mysql') {
+        for my $field (qw/host port username password database/) {
+            unless (defined $config->{$field} && $config->{$field} ne '') {
+                return { success => 0, error => "Field '$field' is required for MySQL backends" };
+            }
+        }
+    } elsif ($config->{db_type} eq 'sqlite') {
+        unless (defined $config->{database_path} && $config->{database_path} ne '') {
+            return { success => 0, error => "Field 'database_path' is required for SQLite backends" };
+        }
+    } else {
+        return { success => 0, error => "Invalid db_type. Must be 'mysql' or 'sqlite'" };
+    }
+    
+    # Preserve existing values if not provided
+    my $existing_config = $self->{config}->{$backend_name};
+    $config->{priority} = defined $config->{priority} ? $config->{priority} : $existing_config->{priority};
+    $config->{localhost_override} = defined $config->{localhost_override} ? ($config->{localhost_override} ? 1 : 0) : $existing_config->{localhost_override};
+    $config->{description} = defined $config->{description} ? $config->{description} : $existing_config->{description};
+    
+    # Update configuration
+    $self->{config}->{$backend_name} = $config;
+    
+    # Save configuration
+    my $save_result = $self->save_config($c);
+    if ($save_result->{success}) {
+        # Re-detect backends to apply changes
+        $self->_detect_backends($c);
+        
+        $c->log->info("HybridDB: Updated backend '$backend_name'");
+        return { 
+            success => 1, 
+            message => "Backend '$backend_name' updated successfully",
+            backup_file => $save_result->{backup_file}
+        };
+    } else {
+        return { success => 0, error => "Failed to save configuration: " . $save_result->{error} };
+    }
+}
+
+=head2 delete_backend_config
+
+Delete a backend configuration
+
+=cut
+
+sub delete_backend_config {
+    my ($self, $c, $backend_name) = @_;
+    
+    return { success => 0, error => "Backend name is required" } unless $backend_name;
+    
+    # Check if backend exists
+    unless ($self->{config}->{$backend_name}) {
+        return { success => 0, error => "Backend '$backend_name' does not exist" };
+    }
+    
+    # Prevent deletion of currently active backend
+    if ($self->{backend_type} eq $backend_name) {
+        return { success => 0, error => "Cannot delete currently active backend '$backend_name'" };
+    }
+    
+    # Remove from configuration
+    delete $self->{config}->{$backend_name};
+    
+    # Save configuration
+    my $save_result = $self->save_config($c);
+    if ($save_result->{success}) {
+        # Re-detect backends to remove the deleted one
+        $self->_detect_backends($c);
+        
+        $c->log->info("HybridDB: Deleted backend '$backend_name'");
+        return { 
+            success => 1, 
+            message => "Backend '$backend_name' deleted successfully",
+            backup_file => $save_result->{backup_file}
+        };
+    } else {
+        return { success => 0, error => "Failed to save configuration: " . $save_result->{error} };
+    }
+}
+
+=head2 get_backend_config
+
+Get configuration for a specific backend
+
+=cut
+
+sub get_backend_config {
+    my ($self, $c, $backend_name) = @_;
+    
+    return { success => 0, error => "Backend name is required" } unless $backend_name;
+    
+    if ($self->{config}->{$backend_name}) {
+        return { 
+            success => 1, 
+            config => $self->{config}->{$backend_name}
+        };
+    } else {
+        return { success => 0, error => "Backend '$backend_name' not found" };
+    }
+}
+
 1;
 
 =head1 AUTHOR
