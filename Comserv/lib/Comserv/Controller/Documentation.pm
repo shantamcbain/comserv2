@@ -2763,7 +2763,7 @@ sub _extract_match_context {
     $context_length ||= 150;
     
     # Find the position of the first match
-    my $pos = index(lc($content), lc($query));
+    my $pos = CORE::index(lc($content), lc($query));
     return unless $pos >= 0;
     
     # Calculate start and end positions for context

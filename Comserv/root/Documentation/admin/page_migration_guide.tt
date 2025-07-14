@@ -1,0 +1,167 @@
+[% PageVersion = 'Documentation/admin/page_migration_guide.tt,v 1.01 2025/01/28 shanta Exp shanta' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Page Migration Tool Guide' %]
+
+<div class="documentation-content">
+
+<div class="markdown-content">
+
+# Page Migration Tool Guide
+
+## Overview
+
+The Page Migration Tool allows administrators to migrate pages from the Forager schema to the Ency schema (pages_content table). This tool provides a safe, controlled way to move page data between different database schemas.
+
+## Access
+
+- **URL**: `/admin/migrate_pages`
+- **Requirements**: Admin role required
+- **Location**: Admin Dashboard → Database Management → Migrate Pages (Forager → Ency)
+
+## Features
+
+### 1. Preview Migration
+- Shows all pages available for migration from the Forager schema
+- Identifies potential issues before migration
+- Displays field mapping information
+- Allows selective migration of pages
+
+### 2. Issue Detection
+The tool automatically detects:
+- Duplicate page codes (pages that already exist in the destination)
+- Missing required fields (sitename, menu, page_code)
+- Data validation issues
+
+### 3. Selective Migration
+- Choose which pages to migrate using checkboxes
+- Select all functionality for bulk operations
+- Pages with issues are automatically disabled from selection
+
+### 4. Migration Results
+- Detailed log of migration process
+- Count of migrated, skipped, and error pages
+- Error details for troubleshooting
+
+## Field Mapping
+
+The tool maps fields from Forager schema to Ency schema as follows:
+
+| Forager Field | Ency Field | Notes |
+|---------------|------------|-------|
+| record_id | id | New auto-increment ID assigned |
+| sitename | sitename | Direct mapping |
+| menu | menu | Direct mapping |
+| page_code | page_code | Direct mapping (must be unique) |
+| app_title | title | Falls back to page_code if empty |
+| body | body | Direct mapping |
+| description | description | Direct mapping |
+| keywords | keywords | Direct mapping |
+| link_order | link_order | Direct mapping, defaults to 0 |
+| status | status | Direct mapping, defaults to 'active' |
+| username_of_poster | created_by | Falls back to last_mod_by or 'migrated' |
+| last_mod_date | created_at, updated_at | Used for both timestamps |
+| - | roles | Defaults to 'public' |
+
+## Usage Instructions
+
+### Step 1: Access the Tool
+1. Log in as an administrator
+2. Go to Admin Dashboard
+3. Click "Migrate Pages (Forager → Ency)" under Database Management
+
+### Step 2: Preview Migration
+1. Click "Preview Migration" button
+2. Review the list of pages to be migrated
+3. Check for any issues highlighted in red/yellow
+4. Note the total count and issues count
+
+### Step 3: Select Pages
+1. Use checkboxes to select pages for migration
+2. Use "Select All" to choose all available pages
+3. Pages with issues cannot be selected (they appear disabled)
+
+### Step 4: Perform Migration
+1. Click "Migrate Selected Pages" button
+2. Confirm the migration when prompted
+3. Review the migration results
+
+### Step 5: Verify Results
+1. Check the migration log for details
+2. Verify migrated pages in the Ency schema
+3. Address any errors if they occurred
+
+## Safety Features
+
+- **Preview Mode**: Always preview before migrating
+- **Duplicate Detection**: Prevents overwriting existing pages
+- **Issue Identification**: Highlights problems before migration
+- **Selective Migration**: Choose exactly which pages to migrate
+- **Detailed Logging**: Complete audit trail of migration process
+- **Error Handling**: Graceful handling of migration errors
+
+## Troubleshooting
+
+### Common Issues
+
+1. **"Page code already exists"**
+   - The destination already has a page with this page_code
+   - Either skip this page or manually resolve the conflict
+
+2. **"Missing required field"**
+   - Source page is missing sitename, menu, or page_code
+   - Update the source data before migration
+
+3. **Database connection errors**
+   - Check that both Forager and Ency databases are accessible
+   - Verify database configuration
+
+### Error Recovery
+
+- Migration is performed page by page
+- If one page fails, others continue to process
+- Failed pages are logged with specific error messages
+- Re-run migration to retry failed pages after fixing issues
+
+## Best Practices
+
+1. **Always Preview First**: Use the preview feature to understand what will be migrated
+2. **Start Small**: Test with a few pages before bulk migration
+3. **Backup Data**: Ensure you have backups before migration
+4. **Resolve Issues**: Fix any identified issues before migration
+5. **Verify Results**: Check migrated data in the destination schema
+6. **Document Changes**: Keep records of what was migrated and when
+
+## Technical Details
+
+### Database Models Used
+- **Source**: `DBForager` model, `Page` resultset
+- **Destination**: `DBEncy` model, `Page` resultset
+
+### Controller Methods
+- `migrate_pages`: Main migration interface
+- `_preview_page_migration`: Preview functionality
+- `_perform_page_migration`: Actual migration process
+- `_map_forager_to_ency_page`: Field mapping logic
+
+### Templates
+- `admin/migrate_pages.tt`: Migration interface template
+
+## Support
+
+For issues or questions about the Page Migration Tool:
+1. Check the application logs for detailed error messages
+2. Review this documentation
+3. Contact the system administrator
+4. Check the Catalyst application debug output if available
+
+---
+
+*Last updated: January 2025*  
+*Version: 1.01*
+
+</div>
+
+</div>

@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html>
-[% PageVersion = 'layout.tt,v 0.04 2025/01/27 shanta Exp shanta ' %]
+[% PageVersion = 'layout.tt,v 0.05 2025/01/28 shanta Exp shanta' %]
 [% # Setup includes with error handling %]
 [% TRY %]
     [% INCLUDE 'setup/DefaultDBI.tt' %]

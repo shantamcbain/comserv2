@@ -1106,7 +1106,7 @@ sub convert :Path('/workshop/convert') :Args(0) {
         # Use our Perl module to convert the PDF
         require Comserv::Util::PDFConverter;
         my $converter = Comserv::Util::PDFConverter->new();
-        my $result = $converter->convert_pdf_to_web(
+        my $conversion_result = $converter->convert_pdf_to_web(
             pdf_path => $pdf_path,
             output_dir => $output_dir,
             base_name => $base_name,
@@ -1115,9 +1115,9 @@ sub convert :Path('/workshop/convert') :Args(0) {
             dpi => 200
         );
         
-        if ($result->{status} ne 'success') {
+        if ($conversion_result->{status} ne 'success') {
             $c->stash(
-                error_msg => "Failed to convert PDF: " . $result->{message},
+                error_msg => "Failed to convert PDF: " . $conversion_result->{message},
                 template => 'WorkShops/error.tt'
             );
             return;

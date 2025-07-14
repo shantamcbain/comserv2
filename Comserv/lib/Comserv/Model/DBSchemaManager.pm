@@ -63,7 +63,7 @@ if ($@ || !defined $config_file) {
     }
     
     $config_file = "$app_root/db_config.json";
-    warn "Using FindBin fallback for config file: $config_file";
+    # Debug: Using FindBin fallback for config file: $config_file
 }
 
 # Load the configuration file

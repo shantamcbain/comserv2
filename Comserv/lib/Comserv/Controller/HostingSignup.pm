@@ -139,7 +139,7 @@ sub process_signup :Path('process') :Args(0) {
             roles => 'normal', # Default role for new users
         };
         
-        my $user = $c->model('User')->create_user($user_data);
+        my $user = $c->model('User')->create_user($c, $user_data);
         
         # Check if user creation was successful
         if (!ref $user) {

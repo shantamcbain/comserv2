@@ -77,8 +77,8 @@ package Comserv::Model::User;
                 }
 
                 sub create_user {
-                    my ($self, $user_data) = @_;
-                    my $schema = Comserv::Model::DBEncy->new->schema;
+                    my ($self, $c, $user_data) = @_;
+                    my $schema = $c->model('DBEncy')->schema;
                     my $existing_user = $schema->resultset('User')->find({ username => $user_data->{username} });
                     return "Username already exists" if $existing_user;
                     my $new_user = $schema->resultset('User')->create({
@@ -89,8 +89,8 @@ package Comserv::Model::User;
                 }
                 
                 sub delete_user {
-                    my ($self, $user_id) = @_;
-                    my $schema = Comserv::Model::DBEncy->new->schema;
+                    my ($self, $c, $user_id) = @_;
+                    my $schema = $c->model('DBEncy')->schema;
                     my $user = $schema->resultset('User')->find($user_id);
                     
                     return "User not found" unless $user;

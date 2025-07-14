@@ -1,6 +1,6 @@
 [% META title = 'Restart Starman Server' %]
 <!-- File: /home/shanta/PycharmProjects/comserv2/Comserv/root/admin/restart_starman.tt -->
-[% PageVersion = 'admin/restart_starman.tt,v 0.02 2025/01/15 shanta Exp shanta ' %]
+[% PageVersion = 'admin/restart_starman.tt,v 0.03 2025/01/28 shanta Exp shanta' %]
 
 <!-- Include admin-specific CSS -->
 <link rel="stylesheet" type="text/css" href="[% c.uri_for('/static/css/themes/admin.css') %]">

@@ -2,6 +2,7 @@ package Comserv::Model::DBEncy;
 
 use strict;
 use base 'Catalyst::Model::DBIC::Schema';
+use warnings FATAL => 'all';
 use Sys::Hostname;
 use Socket;
 use JSON;

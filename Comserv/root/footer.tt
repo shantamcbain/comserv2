@@ -1,4 +1,4 @@
-[% PageVersion	= 'footer.tt,v 0.03 2024/08/31 shanta Exp shanta '	%]
+[% PageVersion = 'footer.tt,v 0.04 2025/01/28 shanta Exp shanta' %]
 [% IF c.session.debug_mode == 1 %]
  <br>[%	PageVersion %] </br>
  <br><a href="/reset_session">Reset Session</a></br>

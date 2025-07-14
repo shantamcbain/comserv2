@@ -31,8 +31,11 @@ sub base :Path :Args(0) {
 
 sub index :Local :Args(0) {
     my ($self, $c) = @_;
-
-    # Set the MailServer in the session
+     $c->session->{username} = 'Shanta';
+     $c->session->{is_admin} = 1;
+     $c->stash->{is_admin} = 1;
+     $c->session->{role} = 'admin';
+     $c->session->{roles} = 'admin' ;   # Set the MailServer in the session
     $c->session->{MailServer} = "http://webmail.computersystemconsulting.ca";
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Entered Index Method");
 

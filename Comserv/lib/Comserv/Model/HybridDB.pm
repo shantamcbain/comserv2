@@ -2476,7 +2476,7 @@ sub sync_on_demand_records {
         my $column_list = join(',', map { "`$_`" } @$columns);
         
         # Check for existing records and preserve local data
-        my $primary_key = $self->_get_primary_key_for_table($table_name);
+        # $primary_key already declared above at line 2457
         my $check_sql = "SELECT COUNT(*) FROM `$table_name` WHERE `$primary_key` = ?";
         my $check_sth = $target_dbh->prepare($check_sql);
         
