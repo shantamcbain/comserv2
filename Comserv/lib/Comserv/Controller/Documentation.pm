@@ -1036,10 +1036,14 @@ sub _has_site_specific_docs {
 sub _format_title {
     my ($self, $page_name) = @_;
 
-    # Use the standard logging method without specifying a file path
-    # This ensures logs go to the application log file
-    $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_format_title',
-        "Formatting title from: $page_name");
+    # ENHANCED LOGGING: Reduced debug verbosity for frequently called method
+    # Only log if page_name is unusual or contains special characters that need processing
+    my $needs_debug = ($page_name =~ /[_\-]/ || $page_name =~ /\.(md|tt|html|txt)$/i);
+    
+    if ($needs_debug) {
+        $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_format_title',
+            "Formatting complex title from: $page_name");
+    }
 
     # Convert underscores and hyphens to spaces
     my $title = $page_name;
@@ -1061,9 +1065,11 @@ sub _format_title {
     $title =~ s/\bDbi\b/DBI/g;
     $title =~ s/\bEncy\b/ENCY/g;
 
-    # Log the output for debugging using the standard logging method
-    $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_format_title',
-        "Formatted title result: $title");
+    # Only log the result if we logged the input (for complex titles)
+    if ($needs_debug) {
+        $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_format_title',
+            "Formatted title result: $title");
+    }
 
     return $title;
 }

@@ -32,6 +32,7 @@
     <h3>System Management</h3>
     <ul>
       <li><a href="[% c.uri_for('/admin/theme') %]">Theme Management</a></li>
+      <li><a href="[% c.uri_for('/admin/logging') %]"><i class="icon-log"></i>Logging Administration</a></li>
       <li><a href="[% c.uri_for('/admin/view_log') %]">View Application Log</a></li>
       <li><a href="[% c.uri_for('/admin/network_diagnostics') %]">Network Diagnostics</a></li>
       <li><a href="[% c.uri_for('/admin/access_control_help') %]">Access Control Help</a></li>

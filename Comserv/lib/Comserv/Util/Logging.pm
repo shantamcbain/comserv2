@@ -20,6 +20,7 @@ use File::Path qw(make_path);
 use File::Spec;
 use Fcntl qw(:flock O_WRONLY O_APPEND O_CREAT);
 use POSIX qw(strftime); # For timestamp formatting
+use JSON qw(encode_json decode_json); # For structured error logging
 
 my $LOG_FH; # Global file handle for logging
 my $LOG_FILE; # Global log file path
@@ -27,6 +28,22 @@ my $LOG_FILE; # Global log file path
 my $MAX_LOG_SIZE = 100 * 1024; # 100 KB max size for easier AI analysis
 my $ROTATION_THRESHOLD = 80 * 1024; # Rotate at 80 KB to prevent exceeding max size
 my $MAX_LOG_FILES = 20; # Maximum number of archived log files to keep
+
+# PHASE 2: Enhanced Error Reporting - Error tracking storage
+my $ERROR_STORAGE = {}; # In-memory error storage for current session
+my $MAX_STORED_ERRORS = 100; # Maximum number of errors to store in memory
+my $ERROR_LOG_FILE; # Separate error log file
+
+# PHASE 3: Application-level log filtering (separate from browser debug_mode)
+# This controls what actually gets written to application.log
+my $APPLICATION_LOG_LEVEL = 'WARN'; # Default: Only WARN, ERROR, CRITICAL to application.log
+my %LOG_LEVELS = (
+    'DEBUG' => 1,
+    'INFO'  => 2, 
+    'WARN'  => 3,
+    'ERROR' => 4,
+    'CRITICAL' => 5
+);
 
 # Internal subroutine to print log messages to STDERR and the log file
 sub _print_log {
@@ -45,11 +62,7 @@ sub rotate_log {
     return unless defined $LOG_FILE && -e $LOG_FILE;
 
     my $file_size = -s $LOG_FILE;
-    _print_log("Current log file size: $file_size bytes, max size: $MAX_LOG_SIZE bytes");
     return if $file_size < $MAX_LOG_SIZE;
-
-    # Log that we're rotating the file
-    _print_log("Log file size ($file_size bytes) exceeds maximum size ($MAX_LOG_SIZE bytes). Rotating log file.");
 
     # Generate timestamped filename
     my $timestamp = strftime("%Y%m%d_%H%M%S", localtime);
@@ -64,7 +77,6 @@ sub rotate_log {
 
     # For very large files, we'll split them into chunks
     if ($file_size > $MAX_LOG_SIZE * 2) {
-        _print_log("Log file is very large ($file_size bytes). Splitting into chunks of $MAX_LOG_SIZE bytes.");
         $archived_log = _split_large_log($LOG_FILE, $archive_dir, $filename, $timestamp, $MAX_LOG_SIZE);
     } else {
         # For smaller files, just move the whole file
@@ -77,8 +89,6 @@ sub rotate_log {
 
     # Clean up old log files if we have too many
     _cleanup_old_logs($archive_dir, $filename);
-
-    _print_log("Log rotated: $archived_log");
 }
 
 # Helper function to clean up old log files
@@ -185,6 +195,27 @@ sub new {
     return bless {}, $class;
 }
 
+# PHASE 3: Application log level management (separate from browser debug_mode)
+sub set_application_log_level {
+    my ($class, $level) = @_;
+    $level = uc($level || 'WARN');
+    if (exists $LOG_LEVELS{$level}) {
+        $APPLICATION_LOG_LEVEL = $level;
+        return 1;
+    }
+    return 0;
+}
+
+sub get_application_log_level {
+    my ($class) = @_;
+    return $APPLICATION_LOG_LEVEL;
+}
+
+sub get_available_log_levels {
+    my ($class) = @_;
+    return sort { $LOG_LEVELS{$a} <=> $LOG_LEVELS{$b} } keys %LOG_LEVELS;
+}
+
 # Singleton-like instance method
 sub instance {
     my ($class) = @_;
@@ -197,23 +228,68 @@ sub log_with_details {
     $message //= 'No message provided';
     $level   //= 'INFO';
 
+    # Convert level to uppercase for consistency
+    $level = uc($level);
+
+    # PHASE 3: Application-level log filtering - Check if this level should be logged to file
+    # This is separate from browser debug_mode and controls what goes to application.log
+    if (exists $LOG_LEVELS{$level} && exists $LOG_LEVELS{$APPLICATION_LOG_LEVEL}) {
+        # Only log if the message level is >= the application log level
+        # This filtering applies to file logging, not browser debug display
+        my $should_log_to_file = $LOG_LEVELS{$level} >= $LOG_LEVELS{$APPLICATION_LOG_LEVEL};
+        
+        # If this message shouldn't be logged to file, we still add it to browser debug display
+        # but skip the file logging part
+        if (!$should_log_to_file) {
+            # Add to debug_errors in stash for browser display if debug_mode is enabled
+            if ($c && ref($c) && ref($c->stash) eq 'HASH') {
+                my $debug_mode = 0;
+                eval {
+                    $debug_mode = $c->session->{debug_mode} || 0;
+                };
+                
+                # Only add to browser debug display if debug_mode is enabled
+                if ($debug_mode) {
+                    my $debug_errors = $c->stash->{debug_errors} ||= [];
+                    my $timestamp = _get_timestamp();
+                    my $log_message = sprintf("[%s] [%s] [%s:%d] %s - %s", $timestamp, $level, $file, $line || 0, ($subroutine // 'unknown'), $message);
+                    push @$debug_errors, $log_message;
+                }
+            }
+            return; # Skip file logging but allow browser display
+        }
+    }
+
     # Format the log message with a timestamp
     my $timestamp = _get_timestamp();
 
     # Make sure $line is numeric, default to 0 if not
     $line = 0 unless defined $line && $line =~ /^\d+$/;
 
-    my $log_message = sprintf("[%s] [%s:%d] %s - %s", $timestamp, $file, $line, ($subroutine // 'unknown'), $message);
+    my $log_message = sprintf("[%s] [%s] [%s:%d] %s - %s", $timestamp, $level, $file, $line, ($subroutine // 'unknown'), $message);
+
+    # PHASE 2: Enhanced Error Reporting - Track errors separately for dashboard
+    if ($level eq 'ERROR' || $level eq 'CRITICAL' || $level eq 'WARN') {
+        _track_error($c, $level, $file, $line, $subroutine, $message, $timestamp);
+    }
 
     # Log to file - this is our primary logging mechanism
     # (rotation is now handled in log_to_file)
     log_to_file($log_message, undef, $level);
 
-    # Add to debug_errors in stash if Catalyst context is available
-    # But avoid calling $c->log methods to prevent recursion
+    # Add to debug_errors in stash for browser display if debug_mode is enabled
+    # This is separate from file logging and controlled by browser debug_mode
     if ($c && ref($c) && ref($c->stash) eq 'HASH') {
-        my $debug_errors = $c->stash->{debug_errors} ||= [];
-        push @$debug_errors, $log_message;
+        my $debug_mode = 0;
+        eval {
+            $debug_mode = $c->session->{debug_mode} || 0;
+        };
+        
+        # Only add to browser debug display if debug_mode is enabled
+        if ($debug_mode) {
+            my $debug_errors = $c->stash->{debug_errors} ||= [];
+            push @$debug_errors, $log_message;
+        }
     }
 
     return $log_message;
@@ -226,9 +302,10 @@ sub log_error {
 
     # Format the error message with a timestamp
     my $timestamp = _get_timestamp();
-    my $log_message = sprintf("[%s] [ERROR] - %s:%d - %s", $timestamp, $file, $line, $error_message);
+    my $log_message = sprintf("[%s] [ERROR] [%s:%d] unknown - %s", $timestamp, $file, $line, $error_message);
 
     # Log to file - this is our primary logging mechanism
+    # ERROR messages are ALWAYS logged regardless of debug_mode
     log_to_file($log_message, undef, 'ERROR');
 
     # Add to debug_errors in stash if Catalyst context is available
@@ -241,10 +318,229 @@ sub log_error {
     return $log_message;
 }
 
+# Convenience methods for different log levels
+# These methods provide a cleaner interface for logging at specific levels
+
+sub log_debug {
+    my ($self, $c, $file, $line, $subroutine, $message) = @_;
+    return $self->log_with_details($c, 'DEBUG', $file, $line, $subroutine, $message);
+}
+
+sub log_info {
+    my ($self, $c, $file, $line, $subroutine, $message) = @_;
+    return $self->log_with_details($c, 'INFO', $file, $line, $subroutine, $message);
+}
+
+sub log_warn {
+    my ($self, $c, $file, $line, $subroutine, $message) = @_;
+    return $self->log_with_details($c, 'WARN', $file, $line, $subroutine, $message);
+}
+
+sub log_error_with_details {
+    my ($self, $c, $file, $line, $subroutine, $message) = @_;
+    return $self->log_with_details($c, 'ERROR', $file, $line, $subroutine, $message);
+}
+
+# PHASE 2: Enhanced Error Reporting - New critical error logging method
+sub log_critical {
+    my ($self, $c, $file, $line, $subroutine, $message) = @_;
+    return $self->log_with_details($c, 'CRITICAL', $file, $line, $subroutine, $message);
+}
+
+# PHASE 2: Enhanced Error Reporting - Track errors separately from regular logging
+sub _track_error {
+    my ($c, $level, $file, $line, $subroutine, $message, $timestamp) = @_;
+    
+    # Create error entry with JSON-safe values
+    my $error_entry = {
+        timestamp => "$timestamp",
+        level => "$level",
+        file => "$file",
+        line => int($line || 0),
+        subroutine => defined($subroutine) ? "$subroutine" : 'unknown',
+        message => defined($message) ? "$message" : 'No message',
+        session_id => $c && $c->can('sessionid') ? "${\$c->sessionid}" : 'unknown',
+        user_id => $c && $c->can('session') ? "${\$c->session->{user_id} || 'anonymous'}" : 'unknown',
+        site_name => $c && $c->can('session') ? "${\$c->session->{SiteName} || 'default'}" : 'unknown',
+        request_uri => $c && $c->can('request') && $c->request->uri ? "${\$c->request->uri}" : 'unknown',
+    };
+    
+    # Store in memory (with size limit)
+    my $error_id = time() . '_' . int(rand(10000));
+    $ERROR_STORAGE->{$error_id} = $error_entry;
+    
+    # Maintain storage size limit
+    if (keys %$ERROR_STORAGE > $MAX_STORED_ERRORS) {
+        # Remove oldest entries
+        my @sorted_keys = sort keys %$ERROR_STORAGE;
+        my $to_remove = keys(%$ERROR_STORAGE) - $MAX_STORED_ERRORS;
+        for my $i (0 .. $to_remove - 1) {
+            delete $ERROR_STORAGE->{$sorted_keys[$i]};
+        }
+    }
+    
+    # Log to separate error file
+    _log_to_error_file($error_entry);
+    
+    # Check if this is a critical error that needs admin notification
+    if ($level eq 'CRITICAL') {
+        _notify_admin_of_critical_error($c, $error_entry);
+    }
+}
+
+# PHASE 2: Enhanced Error Reporting - Log errors to separate error file
+sub _log_to_error_file {
+    my ($error_entry) = @_;
+    
+    # Initialize error log file if not done yet
+    unless ($ERROR_LOG_FILE) {
+        my $base_dir = $ENV{'COMSERV_LOG_DIR'} // File::Spec->catdir($FindBin::Bin, '..');
+        my $log_dir = File::Spec->catdir($base_dir, "logs");
+        $ERROR_LOG_FILE = File::Spec->catfile($log_dir, "errors.log");
+        
+        # Create log directory if it doesn't exist
+        unless (-d $log_dir) {
+            eval { make_path($log_dir) };
+            return if $@; # Silently fail if we can't create directory
+        }
+    }
+    
+    # Format error entry as JSON for structured logging
+    my $error_json;
+    eval {
+        $error_json = encode_json($error_entry);
+    };
+    if ($@) {
+        # If JSON encoding fails, create a simple fallback entry
+        $error_json = encode_json({
+            timestamp => $error_entry->{timestamp},
+            level => $error_entry->{level},
+            message => $error_entry->{message},
+            file => $error_entry->{file},
+            line => $error_entry->{line},
+            subroutine => $error_entry->{subroutine},
+            encoding_error => "Original entry failed JSON encoding: $@"
+        });
+    }
+    
+    # Write to error log file
+    if (open my $error_fh, '>>', $ERROR_LOG_FILE) {
+        flock($error_fh, LOCK_EX);
+        print $error_fh "$error_json\n";
+        flock($error_fh, LOCK_UN);
+        close $error_fh;
+    }
+}
+
+# PHASE 2: Enhanced Error Reporting - Admin notification for critical errors
+sub _notify_admin_of_critical_error {
+    my ($c, $error_entry) = @_;
+    
+    # Store critical error notification in session for admin dashboard
+    if ($c && $c->can('session')) {
+        my $critical_errors = $c->session->{critical_errors} ||= [];
+        
+        # Add to critical errors list (with limit)
+        push @$critical_errors, $error_entry;
+        
+        # Keep only last 10 critical errors in session
+        if (@$critical_errors > 10) {
+            splice @$critical_errors, 0, @$critical_errors - 10;
+        }
+        
+        # Set flag for admin notification
+        $c->session->{has_critical_errors} = 1;
+    }
+}
+
+# PHASE 2: Enhanced Error Reporting - Get stored errors for dashboard
+sub get_stored_errors {
+    my ($self, $level_filter) = @_;
+    
+    my @errors;
+    for my $error_id (sort keys %$ERROR_STORAGE) {
+        my $error = $ERROR_STORAGE->{$error_id};
+        
+        # Apply level filter if specified
+        if ($level_filter) {
+            next unless $error->{level} eq uc($level_filter);
+        }
+        
+        push @errors, {
+            id => $error_id,
+            %$error
+        };
+    }
+    
+    # Sort by timestamp (newest first)
+    @errors = sort { $b->{timestamp} cmp $a->{timestamp} } @errors;
+    
+    return \@errors;
+}
+
+# PHASE 2: Enhanced Error Reporting - Get error summary statistics
+sub get_error_summary {
+    my ($self) = @_;
+    
+    my $summary = {
+        total_errors => 0,
+        critical_count => 0,
+        error_count => 0,
+        warn_count => 0,
+        recent_errors => [],
+    };
+    
+    for my $error_id (keys %$ERROR_STORAGE) {
+        my $error = $ERROR_STORAGE->{$error_id};
+        $summary->{total_errors}++;
+        
+        if ($error->{level} eq 'CRITICAL') {
+            $summary->{critical_count}++;
+        } elsif ($error->{level} eq 'ERROR') {
+            $summary->{error_count}++;
+        } elsif ($error->{level} eq 'WARN') {
+            $summary->{warn_count}++;
+        }
+    }
+    
+    # Get recent errors (last 5)
+    my $recent_errors = $self->get_stored_errors();
+    $summary->{recent_errors} = [ splice(@$recent_errors, 0, 5) ];
+    
+    return $summary;
+}
+
+# PHASE 2: Enhanced Error Reporting - Clear stored errors
+sub clear_stored_errors {
+    my ($self, $level_filter) = @_;
+    
+    if ($level_filter) {
+        # Clear only specific level
+        for my $error_id (keys %$ERROR_STORAGE) {
+            if ($ERROR_STORAGE->{$error_id}->{level} eq uc($level_filter)) {
+                delete $ERROR_STORAGE->{$error_id};
+            }
+        }
+    } else {
+        # Clear all stored errors
+        $ERROR_STORAGE = {};
+    }
+}
+
 # Log a message to a file (defaults to the global log file)
 sub log_to_file {
     my $self = shift if ref($_[0]); # Handle both instance and class method calls
     my ($message, $file_path, $level) = @_;
+    
+    $level //= 'INFO';
+    $level = uc($level);
+    
+    # PHASE 3: Application-level log filtering - Check if this level should be logged
+    # This is separate from browser debug_mode and controls what goes to application.log
+    if (exists $LOG_LEVELS{$level} && exists $LOG_LEVELS{$APPLICATION_LOG_LEVEL}) {
+        # Only log if the message level is >= the application log level
+        return if $LOG_LEVELS{$level} < $LOG_LEVELS{$APPLICATION_LOG_LEVEL};
+    }
     
     # CRITICAL FIX: Ensure we always use a proper log file path
     # If no file_path is provided or it's undefined, use the global log file
@@ -271,14 +567,12 @@ sub log_to_file {
             $file_path = File::Spec->catfile($log_dir, 'application.log');
         }
     }
-    
-    $level //= 'INFO';
 
     # Check file size before writing to ensure we don't exceed max size
     if (defined $LOG_FILE && $file_path eq $LOG_FILE && -e $file_path) {
         my $file_size = -s $file_path;
         if ($file_size >= $ROTATION_THRESHOLD) {
-            _print_log("Pre-emptive log rotation triggered: $file_size bytes >= $ROTATION_THRESHOLD bytes");
+            # Rotate log without verbose messaging to prevent feedback loop
             rotate_log();
         }
     }

@@ -536,6 +536,18 @@ offline_mode:
             </ul>
         </div>
         
+        <div class="alert alert-info">
+            <h4>⚠️ Performance Optimization - Future Improvement</h4>
+            <p><strong>Backend Detection Optimization (2025-07-15):</strong></p>
+            <ul>
+                <li><strong>Current Implementation:</strong> 5-minute cache for backend detection to reduce page load lag</li>
+                <li><strong>Future Improvement:</strong> Backend detection should only occur on application startup or when delay exceeds threshold</li>
+                <li><strong>Issue:</strong> Database connection testing on every request causes significant lag (5-second timeout per backend)</li>
+                <li><strong>Recommended Solution:</strong> Move to startup-only detection with fallback mechanism for connection failures</li>
+                <li><strong>Status:</strong> Temporary cache solution implemented - needs architectural improvement</li>
+            </ul>
+        </div>
+        
         <h3>Files to Monitor</h3>
         <ul class="file-list">
             <li><code>Comserv/lib/Comserv/Controller/Todo.pm</code> - Database lock issue resolved ✅</li>

@@ -567,7 +567,13 @@ sub setup_debug_mode {
     my ($self, $c) = @_;
 
     if (defined $c->req->params->{debug}) {
-        $c->session->{debug_mode} = $c->session->{debug_mode} ? 0 : 1;
+        # Set debug_mode based on the actual parameter value, not just toggle
+        my $debug_param = $c->req->params->{debug};
+        $c->session->{debug_mode} = ($debug_param eq '1') ? 1 : 0;
+        
+        # Log the debug mode change
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_debug_mode',
+            "Debug mode changed via URL parameter to: " . $c->session->{debug_mode});
     }
     $c->stash->{debug_mode} = $c->session->{debug_mode};
 }
@@ -1427,6 +1433,55 @@ sub default :Path {
     
     # Add the debug message to the array
     push @{$c->stash->{debug_msg}}, "Page not found: /$path";
+}
+
+# PHASE 2: Enhanced Error Reporting - Test route to demonstrate error reporting system
+sub test_error_reporting :Path('/test_error_reporting') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Check admin permissions
+    my $roles = $c->session->{roles};
+    if (!defined $roles || ref $roles ne 'ARRAY' || !grep { $_ eq 'admin' } @$roles) {
+        $c->response->status(403);
+        $c->response->body('Access denied. Admin role required.');
+        return;
+    }
+    
+    # Generate test errors to demonstrate the enhanced error reporting system
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'test_error_reporting',
+        "Starting error reporting system test");
+    
+    # Test different error levels
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'test_error_reporting',
+        "Test warning message - This is a sample warning to demonstrate warning level logging");
+    
+    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'test_error_reporting',
+        "Test error message - This is a sample error to demonstrate error level logging and tracking");
+    
+    $self->logging->log_critical($c, __FILE__, __LINE__, 'test_error_reporting',
+        "Test critical error - This is a sample critical error that should trigger admin notifications");
+    
+    # Generate a few more errors for testing
+    for my $i (1..3) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'test_error_reporting',
+            "Test error #$i - Multiple error testing for dashboard display");
+    }
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'test_error_reporting',
+        "Error reporting system test completed");
+    
+    # Return JSON response
+    $c->response->content_type('application/json');
+    $c->response->body(encode_json({
+        success => 1,
+        message => "Error reporting test completed. Check /admin/logging to see the results.",
+        errors_generated => {
+            critical => 1,
+            error => 4,
+            warning => 1,
+            info => 2
+        }
+    }));
 }
 
 __PACKAGE__->meta->make_immutable;

@@ -35,7 +35,12 @@ use constant {
     MYSQL_DETECTION_TIMEOUT => 5,
     SQLITE_DB_PATH => 'data/comserv_offline.db',
     CONFIG_FILE => 'db_config.json',
+    BACKEND_CACHE_TTL => 300,  # Cache backend detection for 5 minutes
 };
+
+# Class-level cache for backend detection results
+our $BACKEND_CACHE = {};
+our $CACHE_TIMESTAMP = 0;
 
 =head1 METHODS
 
@@ -61,8 +66,8 @@ sub new {
     # Load database configuration
     $self->_load_config($c);
     
-    # Detect available backends
-    $self->_detect_backends($c);
+    # Detect available backends (with caching to improve performance)
+    $self->_detect_backends_cached($c);
     
     return $self;
 }
@@ -156,6 +161,60 @@ sub _find_config_file {
     }
     
     return $config_file;
+}
+
+=head2 _detect_backends_cached
+
+Cached version of backend detection to improve performance.
+Only performs actual detection if cache is expired or empty.
+
+=cut
+
+sub _detect_backends_cached {
+    my ($self, $c) = @_;
+    
+    my $current_time = time();
+    
+    # Check if cache is still valid
+    if ($CACHE_TIMESTAMP && 
+        ($current_time - $CACHE_TIMESTAMP) < BACKEND_CACHE_TTL && 
+        %$BACKEND_CACHE) {
+        
+        # Use cached results
+        $self->{available_backends} = $BACKEND_CACHE;
+        my $default_backend = $self->_get_default_backend();
+        $self->{backend_type} = $default_backend;
+        
+        $self->_safe_log($c, 'debug', "HybridDB: Using cached backend detection results (age: " . 
+                         ($current_time - $CACHE_TIMESTAMP) . "s)");
+        return;
+    }
+    
+    # Cache is expired or empty, perform fresh detection
+    $self->_safe_log($c, 'info', "HybridDB: Cache expired or empty, performing fresh backend detection");
+    $self->_detect_backends($c);
+    
+    # Update cache
+    $BACKEND_CACHE = $self->{available_backends};
+    $CACHE_TIMESTAMP = $current_time;
+    
+    $self->_safe_log($c, 'info', "HybridDB: Backend detection cache updated");
+}
+
+=head2 _invalidate_backend_cache
+
+Invalidate the backend detection cache to force fresh detection on next request.
+This should be called when database configuration changes.
+
+=cut
+
+sub _invalidate_backend_cache {
+    my ($self, $c) = @_;
+    
+    $BACKEND_CACHE = {};
+    $CACHE_TIMESTAMP = 0;
+    
+    $self->_safe_log($c, 'info', "HybridDB: Backend detection cache invalidated");
 }
 
 =head2 _detect_backends
