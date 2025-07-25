@@ -1,0 +1,105 @@
+[% META title = 'ShamanBotanicals Controller Documentation' %]
+[% PageVersion = 'shamanbotanicals/documentation.tt,v 0.01 2025/01/27 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="documentation-content">
+
+<h1>ShamanBotanicals Controller Documentation2025-01-27<br>
+<strong>Last Updated:</strong> 2025-01-27<br>
+<strong>Controller:</strong> Comserv::Controller::ShamanBotanicals<br>
+<strong>Namespace:</strong> shamanbotanicals</p>
+
+<h2>Overview</h2>
+
+<p>The ShamanBotanicals controller manages the internal administration interface for the Shaman Botanicals natural health products website. This controller provides access to product management, documentation, and administrative functions.</p>
+
+<h2>Access Control</h2>
+
+<h3>Permitted Users</h3>
+<ul>
+<li><strong>SB Admin:</strong> Users with site designation 'SB'</li>
+<li><strong>CSC Admin:</strong> Users with group 'admin' or 'csc_admin'</li>
+</ul>
+
+<h3>Authentication</h3>
+<ul>
+<li>All routes require user authentication</li>
+<li>Unauthorized users are redirected to <code>/login</code></li>
+<li>Access is validated in the <code>auto</code> method</li>
+</ul>
+
+<h2>Routes and Methods</h2>
+
+<h3>Base Routes</h3>
+
+<h4><code>/shamanbotanicals</code> (index)</h4>
+<ul>
+<li><strong>Method:</strong> <code>index</code></li>
+<li><strong>Template:</strong> <code>shamanbotanicals/index.tt</code></li>
+<li><strong>Purpose:</strong> Main landing page with product categories</li>
+<li><strong>Access:</strong> SB Admin or CSC Admin</li>
+</ul>
+
+<h4><code>/ShamanBotanicals</code> (direct_index)</h4>
+<ul>
+<li><strong>Method:</strong> <code>direct_index</code></li>
+<li><strong>Purpose:</strong> Mixed case URL support</li>
+<li><strong>Forwards to:</strong> <code>index</code> method</li>
+</ul>
+
+<h3>Product Management</h3>
+
+<h4><code>/shamanbotanicals/products/{product_id}</code></h4>
+<ul>
+<li><strong>Method:</strong> <code>products</code></li>
+<li><strong>Template:</strong> <code>shamanbotanicals/products/{product_id}.tt</code></li>
+<li><strong>Purpose:</strong> Display individual product pages</li>
+<li><strong>Error Handling:</strong> 404 if template not found</li>
+<li><strong>Helper Method:</strong> <code>_
+</ul>
+
+<h3>Documentation</h3>
+
+<h4><code>/shamanbotanicals/documentation</code></h4>
+<ul>
+<li><strong>Method:</strong> <code>documentation</code></li>
+<li><strong>Template:</strong> <code>shamanbotanicals/documentation.tt</code></li>
+<li><strong>Purpose:</strong> Controller documentation (this page)</li>
+<li><strong>Access:</strong> SB Admin or CSC Admin only</li>
+</ul>
+
+<h2>Directory Structure</h2>
+
+<pre>
+/root/shamanbotanicals/
+├── index.tt                    # Main landing page
+├── documentation.tt            # Controller documentation
+└── products/                   # Product template directory
+    ├── tinctures.tt           # Herbal tinctures
+    ├── dried-herbs.tt         # Dried herbs
+    ├── essential-oils.tt      # Essential oils
+    └── supplies.tt            # Botanical supplies
+</pre>
+
+<h2>Configuration</h2>
+
+<h3>Session Variables</h3>
+<ul>
+<li><code>current_site</code>: Set to "ShamanBotanicals" in base method</li>
+<li>Access control based on <code>group</code> and <code>site</code> session variables</li>
+</ul>
+
+<h3>External Integration</h3>
+<ul>
+<li><strong>Live Site:</strong> https://shamanbotanicals.ca</li>
+<li><strong>Cloudflare Zone ID:</strong> 93ee6bc562b976ca2bf133833a4eadd7</li>
+</ul>
+
+<h2>Version History</h2>
+<ul>
+<li><strong>v0.01 (2025-01-27):</strong> Initial controller creation with basic product management</li>
+</ul>
+
+</div>

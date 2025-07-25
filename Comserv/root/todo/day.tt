@@ -13,7 +13,7 @@
     <a href="/todo/day" class="btn btn-secondary active">Day View</a>
     <a href="/todo/week" class="btn btn-secondary">Week View</a>
     <a href="/todo/month" class="btn btn-secondary">Month View</a>
-    <a href="/todo/addtodo" class="btn btn-success" style="margin-left: auto;">Add New Todo</a>
+    <a href="/todo/addtodo" class="button button-success">Add New Todo</a>
 </div>
 
 <div class="day-navigation">
@@ -24,7 +24,7 @@
 
 <!-- Debug Information -->
 [% IF c.session.debug_mode %]
-<div style="background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 4px;">
+<div class="debug-info">
     <strong>Debug Info:</strong> 
     Total todos: [% todos.size %], 
     Unscheduled: [% unscheduled_todos.size %], 

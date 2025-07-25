@@ -291,10 +291,38 @@ When user 'shanta' logs in, sync their specific data subset:
 
 ---
 
-**Document Version**: 0.01  
+## 🤖 AI Development Guidelines - Database Configuration
+
+### Workstation Configuration Priority
+For mobile workstations that travel between networks, database configuration must prioritize network-agnostic addresses:
+
+#### Configuration Priority Order
+1. **Primary**: ZeroTier production server (172.30.161.222) - works from any network
+2. **Secondary**: Local network production server (192.168.1.198) - home/office only  
+3. **Tertiary**: localhost MySQL (development)
+4. **Fallback**: SQLite (offline mode)
+
+#### Mobile Workstation Requirements
+- **ZeroTier Addresses**: Use 172.30.161.222 for production_server entries in db_config.json
+- **Network Reality**: Each workstation has different network perspective - configure accordingly
+- **Avoid Local Addresses**: Don't use 192.168.1.198 for mobile workstations as it's only available on specific networks
+
+#### Database Standards for AI Development
+- **Table Aliases**: Use table aliases in all queries to avoid ambiguity (e.g., 'me.column_name')
+- **Error Handling**: Implement proper error handling with eval blocks and try/catch
+- **Parameterized Queries**: Use parameterized queries to prevent SQL injection
+- **Logging**: Use application logging standards for database operations
+
+#### Log File Locations
+- Primary: `/home/shanta/PycharmProjects/comserv2/Comserv/logs/application.log`
+- Secondary: `/home/shanta/PycharmProjects/comserv2/logs/application.log`
+
+---
+
+**Document Version**: 0.02  
 **Last Updated**: 2025-01-28  
 **Author**: Shanta  
-**Status**: Active Development
+**Status**: Active Development - Updated with AI Guidelines
 
 </div>
 </div>

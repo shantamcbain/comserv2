@@ -411,3 +411,50 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+
+<!-- AI Development Guidelines Integration -->
+<section class="doc-section">
+    <h2 class="section-toggle">AI Development Guidelines - Theme Compliance</h2>
+    <div class="section-content">
+        <div class="alert alert-info">
+            <i class="fas fa-robot"></i>
+            <div>
+                <h3>For AI Assistants</h3>
+                <p>These guidelines are specifically for AI assistants working on this codebase.</p>
+            </div>
+        </div>
+        
+        <div class="guideline-section">
+            <h3>PageVersion Header Requirements</h3>
+            <p>All .tt files must include this exact format:</p>
+            <pre><code>[% META title = 'Page Title Here' %]
+[% PageVersion = 'relative/path/filename.tt,v 0.01 YYYY/MM/DD author Exp author ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]</code></pre>
+        </div>
+        
+        <div class="guideline-section">
+            <h3>Directory Structure Notes</h3>
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                <div>
+                    <h4>Directory Consolidation in Progress</h4>
+                    <p>We are normalizing to single <code>Documentation</code> directory (capitalized) to reduce confusion. 
+                    Some legacy references may exist to lowercase <code>documentation</code> - these should be updated to use the capitalized version.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="guideline-section">
+            <h3>File Management Rules</h3>
+            <ul>
+                <li><strong>Use Existing Files First:</strong> Always search for and update existing files before creating new ones</li>
+                <li><strong>No Duplicate Directories:</strong> Use established directory structure - don't create new directories</li>
+                <li><strong>Template Toolkit Only:</strong> Use ONLY .tt files for application documentation - NO .md files</li>
+                <li><strong>Theme Compliance:</strong> NO page-specific CSS - use theme system only</li>
+            </ul>
+        </div>
+    </div>
+</section>
+</div>

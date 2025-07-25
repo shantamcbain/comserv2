@@ -92,6 +92,16 @@
         </div>
     </header>
     
+    <!-- Directory Normalization Notice -->
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i>
+        <div>
+            <h3>Directory Structure Update</h3>
+            <p>We are normalizing to a single <code>Documentation</code> directory (capitalized) to reduce confusion. 
+            Legacy references to lowercase <code>documentation</code> directories are being updated to use this standardized structure.</p>
+        </div>
+    </div>
+    
     <!-- Search Box Section -->
     <div class="section">
         <div class="section-header collapsible-header" onclick="toggleSection('search-section')">

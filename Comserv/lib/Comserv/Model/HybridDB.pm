@@ -42,6 +42,11 @@ use constant {
 our $BACKEND_CACHE = {};
 our $CACHE_TIMESTAMP = 0;
 
+# Connection pool for persistent database connections
+our $CONNECTION_POOL = {};
+our $CONNECTION_TIMESTAMPS = {};
+use constant CONNECTION_POOL_TTL => 1800; # 30 minutes
+
 =head1 METHODS
 
 =head2 new
@@ -282,6 +287,13 @@ sub _test_mysql_backend {
     
     return 0 unless $config && $config->{db_type} eq 'mysql';
     
+    # Check connection pool first
+    my $pooled_connection = $self->_get_pooled_connection($backend_name);
+    if ($pooled_connection) {
+        $self->_safe_log($c, 'debug', "HybridDB: Using pooled connection for backend '$backend_name'");
+        return 1;
+    }
+    
     # Apply localhost override if configured
     my $host = $config->{host};
     if ($config->{localhost_override} && $host ne 'localhost') {
@@ -316,10 +328,12 @@ sub _test_mysql_backend {
             $sth->execute();
             my ($result) = $sth->fetchrow_array();
             $sth->finish();
-            $dbh->disconnect();
+            
+            # Store successful connection in pool for reuse
+            $self->_store_pooled_connection($backend_name, $dbh);
             
             alarm(0);
-            $self->_safe_log($c, 'info', "HybridDB: MySQL backend '$backend_name' connection successful (result: $result)");
+            $self->_safe_log($c, 'info', "HybridDB: MySQL backend '$backend_name' connection successful (result: $result) - stored in pool");
             return 1;
         }
         
@@ -362,6 +376,62 @@ sub _get_default_backend {
     
     # Return best MySQL backend or fallback to SQLite
     return $best_mysql || 'sqlite_offline';
+}
+
+=head2 _get_pooled_connection
+
+Check if a valid pooled connection exists for the given backend
+
+=cut
+
+sub _get_pooled_connection {
+    my ($self, $backend_name) = @_;
+    
+    return undef unless $backend_name;
+    
+    # Check if connection exists and is still valid
+    if (exists $CONNECTION_POOL->{$backend_name} && 
+        exists $CONNECTION_TIMESTAMPS->{$backend_name}) {
+        
+        my $age = time() - $CONNECTION_TIMESTAMPS->{$backend_name};
+        
+        if ($age < CONNECTION_POOL_TTL) {
+            # Connection is still valid, test it quickly
+            my $dbh = $CONNECTION_POOL->{$backend_name};
+            
+            try {
+                # Quick ping test
+                if ($dbh && $dbh->ping()) {
+                    return $dbh;
+                }
+            } catch {
+                # Connection failed, remove from pool
+                delete $CONNECTION_POOL->{$backend_name};
+                delete $CONNECTION_TIMESTAMPS->{$backend_name};
+            };
+        } else {
+            # Connection expired, remove from pool
+            delete $CONNECTION_POOL->{$backend_name};
+            delete $CONNECTION_TIMESTAMPS->{$backend_name};
+        }
+    }
+    
+    return undef;
+}
+
+=head2 _store_pooled_connection
+
+Store a successful connection in the pool for reuse
+
+=cut
+
+sub _store_pooled_connection {
+    my ($self, $backend_name, $dbh) = @_;
+    
+    return unless $backend_name && $dbh;
+    
+    $CONNECTION_POOL->{$backend_name} = $dbh;
+    $CONNECTION_TIMESTAMPS->{$backend_name} = time();
 }
 
 =head2 _detect_mysql
@@ -446,6 +516,42 @@ sub get_backend_type {
     }
     
     return $self->{backend_type} || 'unknown';
+}
+
+=head2 get_backend_for_data_type
+
+Get the best available backend for a specific data type and privacy level
+Supports multiple simultaneous active backends based on data routing requirements
+
+=cut
+
+sub get_backend_for_data_type {
+    my ($self, $c, $data_type, $privacy_level) = @_;
+    
+    $data_type ||= 'ency';  # Default to ency data
+    $privacy_level ||= 'shared';  # Default to shared data
+    
+    # Simple routing logic based on data type and privacy
+    if ($privacy_level eq 'private') {
+        # Private data should go to local backends first
+        foreach my $backend_name (sort { $self->{available_backends}->{$a}->{config}->{priority} <=> $self->{available_backends}->{$b}->{config}->{priority} } keys %{$self->{available_backends}}) {
+            my $backend = $self->{available_backends}->{$backend_name};
+            if ($backend->{available} && $backend->{config}->{host} eq 'localhost') {
+                return $backend_name;
+            }
+        }
+    } elsif ($privacy_level eq 'shared' || $privacy_level eq 'production') {
+        # Shared/production data should go to production backends first
+        foreach my $backend_name (sort { $self->{available_backends}->{$a}->{config}->{priority} <=> $self->{available_backends}->{$b}->{config}->{priority} } keys %{$self->{available_backends}}) {
+            my $backend = $self->{available_backends}->{$backend_name};
+            if ($backend->{available} && $backend->{config}->{host} ne 'localhost') {
+                return $backend_name;
+            }
+        }
+    }
+    
+    # Fallback to default backend
+    return $self->{backend_type} || 'sqlite_offline';
 }
 
 =head2 is_mysql_available

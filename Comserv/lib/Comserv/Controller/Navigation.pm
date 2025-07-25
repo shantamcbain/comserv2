@@ -5,6 +5,25 @@ use Data::Dumper;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
+# Class-level cache for navigation data
+has '_navigation_cache' => (
+    is => 'rw',
+    isa => 'HashRef',
+    default => sub { {} }
+);
+
+has '_tables_checked' => (
+    is => 'rw',
+    isa => 'Bool',
+    default => 0
+);
+
+has '_cache_timestamp' => (
+    is => 'rw',
+    isa => 'Int',
+    default => 0
+);
+
 =head1 NAME
 
 Comserv::Controller::Navigation - Catalyst Controller for navigation components
@@ -729,14 +748,32 @@ sub edit_link :Path('/navigation/edit_link') :Args(1) {
     $c->stash->{template} = 'navigation/edit_link.tt';
 }
 
-# Method to populate navigation data in the stash
+# Method to populate navigation data in the stash with caching
 sub populate_navigation_data {
     my ($self, $c) = @_;
     
     # Use eval to catch any errors
     eval {
         my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
-        $c->log->debug("Populating navigation data for site: $site_name");
+        my $username = $c->session->{username} || '';
+        
+        # Create cache key based on site and user
+        my $cache_key = "${site_name}_${username}";
+        my $current_time = time();
+        my $cache_ttl = 300; # 5 minutes cache
+        
+        # Check if we have valid cached data
+        if ($self->_navigation_cache->{$cache_key} && 
+            ($current_time - $self->_cache_timestamp) < $cache_ttl) {
+            
+            # Use cached data
+            my $cached_data = $self->_navigation_cache->{$cache_key};
+            $c->stash->{$_} = $cached_data->{$_} for keys %$cached_data;
+            $c->log->debug("Using cached navigation data for site: $site_name");
+            return;
+        }
+        
+        $c->log->debug("Populating fresh navigation data for site: $site_name");
         
         # Set is_admin flag based on user roles
         my $is_admin = 0;
@@ -755,8 +792,59 @@ sub populate_navigation_data {
         
         # Set the is_admin flag in stash for use in templates
         $c->stash->{is_admin} = $is_admin;
-        $c->log->debug("Set is_admin flag to: " . ($is_admin ? 'true' : 'false'));
         
+        # Only check tables once per application lifecycle
+        if (!$self->_tables_checked) {
+            $self->_ensure_navigation_tables_exist($c);
+            $self->_tables_checked(1);
+        }
+        
+        # Prepare data structure for caching
+        my $nav_data = {
+            is_admin => $is_admin
+        };
+        
+        # Populate member links
+        $nav_data->{member_links} = $self->get_internal_links($c, 'Member_links', $site_name);
+        $nav_data->{member_pages} = $self->get_pages($c, 'member', $site_name);
+        
+        # Populate main links
+        $nav_data->{main_links} = $self->get_internal_links($c, 'Main_links', $site_name);
+        $nav_data->{main_pages} = $self->get_pages($c, 'Main', $site_name);
+        
+        # Populate hosted links
+        $nav_data->{hosted_links} = $self->get_internal_links($c, 'Hosted_link', $site_name);
+        
+        # Populate admin links and pages only for admin users
+        if ($is_admin) {
+            $nav_data->{admin_pages} = $self->get_admin_pages($c, $site_name);
+            $nav_data->{admin_links} = $self->get_admin_links($c, $site_name);
+        }
+        
+        # Populate private links for logged-in users
+        if ($c->user_exists && $username) {
+            $nav_data->{private_links} = $self->get_private_links($c, $username, $site_name);
+        }
+        
+        # Cache the data
+        $self->_navigation_cache->{$cache_key} = $nav_data;
+        $self->_cache_timestamp($current_time);
+        
+        # Set stash data
+        $c->stash->{$_} = $nav_data->{$_} for keys %$nav_data;
+        
+        $c->log->debug("Navigation data populated and cached successfully");
+    };
+    if ($@) {
+        $c->log->error("Error populating navigation data: $@");
+    }
+}
+
+# Separate method for table existence checking (called only once)
+sub _ensure_navigation_tables_exist {
+    my ($self, $c) = @_;
+    
+    eval {
         # Ensure tables exist before querying them
         my $db_model = $c->model('DBEncy');
         my $schema = $db_model->schema;
@@ -822,34 +910,18 @@ sub populate_navigation_data {
                 }
             }
         }
-        
-        # Populate member links
-        $c->stash->{member_links} = $self->get_internal_links($c, 'Member_links', $site_name);
-        $c->stash->{member_pages} = $self->get_pages($c, 'member', $site_name);
-        
-        # Populate main links
-        $c->stash->{main_links} = $self->get_internal_links($c, 'Main_links', $site_name);
-        $c->stash->{main_pages} = $self->get_pages($c, 'Main', $site_name);
-        
-        # Populate hosted links
-        $c->stash->{hosted_links} = $self->get_internal_links($c, 'Hosted_link', $site_name);
-        
-        # Populate admin links and pages only for admin users
-        if ($is_admin) {
-            $c->stash->{admin_pages} = $self->get_admin_pages($c, $site_name);
-            $c->stash->{admin_links} = $self->get_admin_links($c, $site_name);
-        }
-        
-        # Populate private links for logged-in users
-        if ($c->user_exists && $c->session->{username}) {
-            $c->stash->{private_links} = $self->get_private_links($c, $c->session->{username}, $site_name);
-        }
-        
-        $c->log->debug("Navigation data populated successfully");
     };
     if ($@) {
-        $c->log->error("Error populating navigation data: $@");
+        $c->log->error("Error ensuring navigation tables exist: $@");
     }
+}
+
+# Method to clear navigation cache (useful for admin operations)
+sub clear_navigation_cache {
+    my ($self, $c) = @_;
+    $self->_navigation_cache({});
+    $self->_cache_timestamp(0);
+    $c->log->debug("Navigation cache cleared");
 }
 
 # Auto method to populate navigation data for all requests

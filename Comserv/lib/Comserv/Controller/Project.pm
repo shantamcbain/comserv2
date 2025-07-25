@@ -332,7 +332,7 @@ sub fetch_projects_with_subprojects :Private {
     # Fetch top-level projects (those without a parent)
     my @top_projects;
     eval {
-        @top_projects = $schema->safe_search($c, 'Project',
+        my $resultset = $schema->safe_search($c, 'Project',
             {
                 'sitename' => $SiteName,
                 -or => [
@@ -343,7 +343,8 @@ sub fetch_projects_with_subprojects :Private {
             {
                 order_by => { -asc => 'name' }
             }
-        )->all;
+        );
+        @top_projects = $resultset ? $resultset->all : ();
     };
 
     if ($@) {
