@@ -146,14 +146,166 @@ Documentation CSS integrates with the universal theme system:
 - Server-side content filtering
 - Enhanced error handling with detailed logging
 
-## Development Guidelines
+## Documentation Strategy & Standards
 
-### Adding New Documentation
-1. **Choose appropriate directory** based on target audience
-2. **Create .tt file** with proper PageVersion header
-3. **Follow naming conventions** (lowercase, underscores)
-4. **Test role-based access** with different user types
-5. **Verify CSS styling** loads correctly
+### Core Documentation Principles
+
+#### File Format Requirements - MANDATORY
+- **ONLY .tt files** for application documentation - NO .md files allowed
+- **.md files** are exclusively for AI development guidelines and are NOT tracked by Git
+- **All user-facing documentation** must be Template Toolkit (.tt) format
+- **Consistent PageVersion headers** required in all .tt files
+
+#### Directory Structure Standards
+```
+/Documentation/
+├── roles/
+│   ├── normal/        # End-user guides (normal, editor, admin, developer)
+│   ├── admin/         # Administrator documentation (admin, developer)
+│   └── developer/     # Technical documentation (developer only)
+├── sites/
+│   └── {site_name}/   # Site-specific documentation (filtered by site)
+├── modules/           # System module docs (admin, developer)
+├── controllers/       # Controller documentation (admin, developer)
+├── models/           # Model documentation (admin, developer)
+├── changelog/        # System changes (admin, developer)
+├── tutorials/        # Step-by-step guides (all roles)
+├── proxmox/          # Proxmox documentation (admin only)
+├── workshops/        # Training materials (admin, developer)
+├── general/          # General system documentation (all roles)
+└── [root files]     # Core documentation (all roles)
+```
+
+#### Naming Conventions - CRITICAL
+- **Descriptive filenames** using lowercase with underscores
+- **Consistent patterns** within each directory
+- **Avoid duplication** - search existing files before creating new ones
+- **Version tracking** in PageVersion headers
+
+### Role-Based Documentation Organization
+
+#### Access Control Matrix
+| Role | Normal | Admin | Developer | Tutorials | Site-Specific |
+|------|--------|-------|-----------|-----------|---------------|
+| normal | ✓ | ✗ | ✗ | ✓ | ✓ (own site) |
+| editor | ✓ | ✓ (limited) | ✗ | ✓ | ✓ (own site) |
+| admin | ✓ | ✓ | ✗ | ✓ | ✓ (all sites) |
+| developer | ✓ | ✓ | ✓ | ✓ | ✓ (all sites) |
+
+#### Content Classification
+- **User Guides** (`/roles/normal/`) - End-user functionality
+- **Admin Guides** (`/roles/admin/`) - System administration
+- **Developer Guides** (`/roles/developer/`) - Technical implementation
+- **Site-Specific** (`/sites/{name}/`) - Site customizations
+- **System Modules** (`/modules/`) - Module documentation
+- **Tutorials** (`/tutorials/`) - Step-by-step instructions
+
+### File Creation Protocol - MANDATORY
+
+#### Before Creating ANY Documentation File
+1. **Search existing files** using file search tools
+2. **Check directory structure** for similar content
+3. **Identify target audience** and appropriate directory
+4. **Verify naming conventions** in target directory
+5. **Update existing files** rather than creating duplicates
+
+#### Template File Standards
+```tt
+[% PageVersion = 'Comserv/root/Documentation/path/filename.tt,v 1.0 YYYY/MM/DD author Exp author ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Descriptive Page Title' %]
+
+<div class="documentation-content">
+<div class="markdown-content">
+
+# Main Title
+
+## Content sections...
+
+</div>
+</div>
+```
+
+#### Version Control Integration
+- **PageVersion headers** must reflect actual file paths
+- **Update version numbers** when making significant changes
+- **Include author information** and dates
+- **Maintain version history** in documentation
+
+### Zencoder Integration Standards
+
+#### AI Development Guidelines (.md files)
+- **Location**: `/.zencoder/rules/` directory
+- **Purpose**: AI behavior and development standards
+- **Git Status**: NOT tracked by Git (.gitignore)
+- **Format**: Markdown (.md) for AI consumption only
+
+#### Documentation Rules for AI
+- **ALWAYS search existing .tt files** before creating new ones
+- **Update existing documentation** rather than duplicating
+- **Follow role-based directory structure**
+- **Maintain consistent naming conventions**
+- **Use Template Toolkit format** for all user documentation
+
+### Content Duplication Prevention
+
+#### Search-First Protocol
+1. **File search** by name pattern
+2. **Content search** for similar topics
+3. **Directory review** for existing structure
+4. **User consultation** if multiple similar files exist
+5. **Consolidation** of duplicate content
+
+#### Consolidation Guidelines
+- **Merge similar content** into single authoritative files
+- **Maintain cross-references** between related topics
+- **Update navigation** to reflect consolidated structure
+- **Archive obsolete files** with proper documentation
+
+### Site-Specific Documentation
+
+#### Organization Strategy
+```
+/sites/
+├── apis/              # APIS-specific documentation
+├── csc/               # CSC-specific documentation
+├── usbm/              # USBM-specific documentation
+├── ve7tit/            # VE7TIT-specific documentation
+└── [other_sites]/     # Additional site documentation
+```
+
+#### Content Guidelines
+- **Site-specific features** and customizations
+- **Local configuration** details
+- **Site-specific workflows** and procedures
+- **Contact information** and support details
+
+### Development Guidelines
+
+#### Adding New Documentation
+1. **Identify target audience** and appropriate role directory
+2. **Search existing files** for similar content
+3. **Choose descriptive filename** following conventions
+4. **Create .tt file** with proper PageVersion header
+5. **Test role-based access** with different user types
+6. **Verify CSS styling** loads correctly
+7. **Update navigation** if needed
+
+#### Content Standards
+- **Clear, concise writing** appropriate for target audience
+- **Code examples** with proper syntax highlighting
+- **Screenshots** where helpful for user understanding
+- **Cross-references** to related documentation
+- **Regular updates** to maintain accuracy
+
+#### Quality Assurance
+- **Peer review** for technical accuracy
+- **User testing** with target audience
+- **Regular audits** for outdated content
+- **Feedback collection** and incorporation
 
 ### CSS Development
 - **Use existing theme variables** from theme system

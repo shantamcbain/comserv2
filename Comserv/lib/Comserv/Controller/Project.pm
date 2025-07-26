@@ -1,4 +1,4 @@
-package Comserv::Controller::Project;
+ypackage Comserv::Controller::Project;
 use Moose;
 use namespace::autoclean;
 use DateTime;
@@ -317,34 +317,16 @@ sub fetch_projects_with_subprojects :Private {
         'Fetching parent projects with sub-projects'
     );
 
-    # Get the schema and SiteName
-    my $schema = $c->model('DBEncy');
-    my $SiteName = $c->session->{SiteName} || '';
-
-    # Check if SiteName is defined
-    if (!$SiteName) {
-        $self->logging->log_with_details(
-            $c, 'warn', __FILE__, __LINE__, 'fetch_projects_with_subprojects',
-            'SiteName is not defined in session, using empty string'
-        );
-    }
-
-    # Fetch top-level projects (those without a parent)
+    # Get database schema
+    my $schema = $c->model('DBEncy')->schema;
+    
+    # Fetch top-level projects (where parent_id is NULL)
     my @top_projects;
     eval {
-        my $resultset = $schema->safe_search($c, 'Project',
-            {
-                'sitename' => $SiteName,
-                -or => [
-                    'parent_id' => undef,
-                    'parent_id' => ''
-                ]
-            },
-            {
-                order_by => { -asc => 'name' }
-            }
-        );
-        @top_projects = $resultset ? $resultset->all : ();
+        @top_projects = $schema->resultset('Project')->search(
+            { parent_id => undef },
+            { order_by => { -asc => 'name' } }
+        )->all;
     };
 
     if ($@) {
@@ -366,84 +348,14 @@ sub fetch_projects_with_subprojects :Private {
             name => $project->name,
             description => $project->description || '',
             parent_id => $project->parent_id,
-            status => $project->status || 1, # Default to 'New' status
+            status => $project->status || 1,
             start_date => $project->start_date,
             end_date => $project->end_date,
             developer_name => $project->developer_name || '',
             client_name => $project->client_name || '',
-            priority => 2, # Default to medium priority since field doesn't exist
+            priority => 2,
             sub_projects => []
         };
-
-        # Fetch first-level sub-projects
-        my @level1_subprojects;
-        eval {
-            @level1_subprojects = $schema->safe_search($c, 'Project',
-                { parent_id => $project->id },
-                { order_by => { -asc => 'name' } }
-            )->all;
-        };
-
-        if ($@) {
-            $self->logging->log_with_details(
-                $c, 'error', __FILE__, __LINE__, 'fetch_projects_with_subprojects',
-                "Error fetching level 1 sub-projects for project ID " . $project->id . ": $@"
-            );
-            next;
-        }
-
-        # Process first-level sub-projects
-        foreach my $subproject1 (@level1_subprojects) {
-            my $subproject1_hash = {
-                id => $subproject1->id,
-                name => $subproject1->name,
-                description => $subproject1->description || '',
-                parent_id => $subproject1->parent_id,
-                status => $subproject1->status || 1, # Default to 'New' status
-                start_date => $subproject1->start_date,
-                end_date => $subproject1->end_date,
-                developer_name => $subproject1->developer_name || '',
-                client_name => $subproject1->client_name || '',
-                priority => 2, # Default to medium priority since field doesn't exist
-                sub_projects => []
-            };
-
-            # Fetch second-level sub-projects
-            my @level2_subprojects;
-            eval {
-                @level2_subprojects = $schema->resultset('Project')->search(
-                    { parent_id => $subproject1->id },
-                    { order_by => { -asc => 'name' } }
-                )->all;
-            };
-
-            if ($@) {
-                $self->logging->log_with_details(
-                    $c, 'error', __FILE__, __LINE__, 'fetch_projects_with_subprojects',
-                    "Error fetching level 2 sub-projects for project ID " . $subproject1->id . ": $@"
-                );
-                next;
-            }
-
-            # Process second-level sub-projects
-            foreach my $subproject2 (@level2_subprojects) {
-                push @{$subproject1_hash->{sub_projects}}, {
-                    id => $subproject2->id,
-                    name => $subproject2->name,
-                    description => $subproject2->description || '',
-                    parent_id => $subproject2->parent_id,
-                    status => $subproject2->status || 1, # Default to 'New' status
-                    start_date => $subproject2->start_date,
-                    end_date => $subproject2->end_date,
-                    developer_name => $subproject2->developer_name || '',
-                    client_name => $subproject2->client_name || '',
-                    priority => 2, # Default to medium priority since field doesn't exist
-                    sub_projects => [] # Empty array, we don't go deeper
-                };
-            }
-
-            push @{$project_hash->{sub_projects}}, $subproject1_hash;
-        }
 
         push @projects, $project_hash;
     }

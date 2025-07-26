@@ -1,4 +1,4 @@
-package Comserv::Controller::ShamanBotanicals;
+package Comserv::Controller::SB;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
