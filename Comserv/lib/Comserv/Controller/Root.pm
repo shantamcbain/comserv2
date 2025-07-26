@@ -337,120 +337,303 @@ sub track_application_start {
     return;
 }
 
+# Add class attributes for startup-only caching and database connection management
+has '_site_cache' => (
+    is => 'rw',
+    isa => 'HashRef',
+    default => sub { {} }
+);
+
+has '_theme_cache' => (
+    is => 'rw',
+    isa => 'HashRef',
+    default => sub { {} }
+);
+
+has '_system_info_cache' => (
+    is => 'rw',
+    isa => 'HashRef',
+    default => sub { {} }
+);
+
+has '_cache_timestamp' => (
+    is => 'rw',
+    isa => 'Int',
+    default => 0
+);
+
+has '_db_connections_tested' => (
+    is => 'rw',
+    isa => 'Bool',
+    default => 0
+);
+
+has '_startup_complete' => (
+    is => 'rw',
+    isa => 'Bool',
+    default => 0
+);
+
+# Production logging flag - set to 0 to disable detailed logging once issues are fixed
+my $ENABLE_DETAILED_LOGGING = $ENV{CATALYST_DEBUG} || 0;
+
 sub auto :Private {
     my ($self, $c) = @_;
     
-    # Temporarily add back the uri_no_port function to prevent template errors
-    # This will be removed once all templates are updated
+    # Minimal setup for every request
     $c->stash->{uri_no_port} = sub {
         my $path = shift;
         my $uri = $c->uri_for($path, @_);
         return $uri;
     };
     
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Starting auto action with temporary uri_no_port helper");
-
-    # Track application start
-    $c->stash->{forwarder} = $c->req->path; # Store current path as potential redirect target
-    $self->track_application_start($c);
-
-    # Log the request path
+    $c->stash->{forwarder} = $c->req->path;
     my $path = $c->req->path;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Request path: '$path'");
-
-    # Generate theme CSS files if they don't exist
-    # We only need to do this once per application start
-    if (!$self->_theme_css_generated) {
-        $c->model('ThemeConfig')->generate_all_theme_css($c);
-        $self->_theme_css_generated(1);
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Generated all theme CSS files");
+    
+    # One-time startup operations
+    if (!$self->_startup_complete) {
+        eval {
+            $self->_perform_startup_operations($c);
+            $self->_startup_complete(1);
+        };
+        if ($@) {
+            # CRITICAL ERROR - Log to production and inform admin
+            $c->log->error("CRITICAL STARTUP ERROR: $@ - Run with CATALYST_DEBUG=1 for details");
+            # Still try to continue with minimal functionality
+        }
     }
-
-    # Get server information
-    my $system_info = Comserv::Util::SystemInfo::get_system_info();
-    $c->stash->{server_hostname} = $system_info->{hostname};
-    $c->stash->{server_ip} = $system_info->{ip};
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', 
-        "Server info - Hostname: $system_info->{hostname}, IP: $system_info->{ip}");
-
-    # Perform general setup tasks
+    
+    # Fast path for cached site/theme data
+    my $domain = $c->req->uri->host;
+    $domain =~ s/:.*//;
+    
+    # Use cached site data or set defaults
+    if (exists $self->_site_cache->{$domain}) {
+        my $cached = $self->_site_cache->{$domain};
+        $c->stash->{$_} = $cached->{$_} for keys %$cached;
+        $c->session->{SiteName} = $cached->{SiteName};
+        $c->session->{ControllerName} = $cached->{ControllerName};
+    } else {
+        # Only do expensive site setup if not cached
+        eval {
+            $self->_setup_site_cached($c, $domain);
+        };
+        if ($@) {
+            $c->log->error("Site setup error for $domain: $@ - Run with CATALYST_DEBUG=1 for details");
+            $self->_set_default_site_values($c);
+        }
+    }
+    
+    # Setup debug mode (lightweight)
     $self->setup_debug_mode($c);
     
-    # Test database connections if in debug mode
-    if ($c->session->{debug_mode}) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Testing database connections in debug mode");
-        
-        # Add database connection status to debug messages
-        my $debug_msg = $c->stash->{debug_msg} ||= [];
-        push @$debug_msg, "Database connection check initiated. See logs for details.";
-        
-        # Test connections using the test_connection methods we added
-        eval {
-            if ($c->model('DBEncy')->test_connection($c)) {
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "DBEncy connection successful");
-            }
-        };
-        if ($@) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto', "DBEncy connection error: $@");
+    # Root path handling
+    if ($path eq '/' || $path eq '') {
+        my $ControllerName = $c->session->{ControllerName} || 'Root';
+        if ($ControllerName ne 'Root') {
+            # Quick controller existence check
+            eval {
+                my $controller = $c->controller($ControllerName);
+                unless ($controller) {
+                    $c->session->{ControllerName} = 'Root';
+                    $c->stash->{ControllerName} = 'Root';
+                }
+            };
         }
-        
+        $self->index($c);
+    }
+    
+    return 1;
+}
+
+# Startup-only operations - called once per application start
+sub _perform_startup_operations {
+    my ($self, $c) = @_;
+    
+    if ($ENABLE_DETAILED_LOGGING) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_perform_startup_operations', 
+            "Performing one-time startup operations");
+    }
+    
+    # Track application start
+    $self->track_application_start($c);
+    
+    # Generate theme CSS files (startup only)
+    if (!$self->_theme_css_generated) {
         eval {
-            if ($c->model('DBForager')->test_connection($c)) {
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "DBForager connection successful");
-            }
+            $c->model('ThemeConfig')->generate_all_theme_css($c);
+            $self->_theme_css_generated(1);
         };
         if ($@) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto', "DBForager connection error: $@");
+            $c->log->error("Theme CSS generation failed: $@");
         }
     }
     
-    $self->setup_site($c);
-    $self->set_theme($c);
-    
-    # Try to populate navigation data if the controller is available
-    # This is done in a way that doesn't require explicit loading of the Navigation controller
+    # Cache system information (startup only)
     eval {
-        # Check if the Navigation controller exists by trying to load it
+        my $system_info = Comserv::Util::SystemInfo::get_system_info();
+        $self->_system_info_cache->{info} = $system_info;
+        if ($ENABLE_DETAILED_LOGGING) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_perform_startup_operations',
+                "Cached system info - Hostname: $system_info->{hostname}, IP: $system_info->{ip}");
+        }
+    };
+    if ($@) {
+        $c->log->error("System info caching failed: $@");
+    }
+    
+    # Test database connections (startup only)
+    if (!$self->_db_connections_tested) {
+        $self->_test_database_connections($c);
+        $self->_db_connections_tested(1);
+    }
+    
+    # Load navigation data (startup only)
+    eval {
         require Comserv::Controller::Navigation;
-        
-        # If we get here, the controller exists, so try to use it
         my $navigation = $c->controller('Navigation');
         if ($navigation) {
             $navigation->populate_navigation_data($c);
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Navigation data populated");
+            $self->_system_info_cache->{navigation_loaded} = 1;
         }
     };
-    # Don't log errors here - if the controller isn't available, that's fine
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Completed general setup tasks");
-
-    # Call the index action only for the root path
-    if ($path eq '/' || $path eq '') {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Calling index action for root path");
-
-        # Check if we have a ControllerName in the session that might cause issues
-        my $ControllerName = $c->session->{ControllerName} || '';
-        if ($ControllerName && $ControllerName ne 'Root') {
-            # Verify the controller exists before proceeding
-            my $controller_exists = 0;
-            eval {
-                my $controller = $c->controller($ControllerName);
-                $controller_exists = 1 if $controller;
-            };
-
-            if (!$controller_exists) {
-                $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'auto',
-                    "Controller '$ControllerName' not found or not loaded. Setting ControllerName to 'Root'.");
-                $c->session->{ControllerName} = 'Root';
-                $c->stash->{ControllerName} = 'Root';
-            }
-        }
-
-        $self->index($c);
+    if ($@) {
+        $c->log->warn("Navigation controller not available: $@") if $ENABLE_DETAILED_LOGGING;
     }
+    
+    if ($ENABLE_DETAILED_LOGGING) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_perform_startup_operations',
+            "Startup operations completed successfully");
+    }
+}
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Completed auto action");
-    return 1; # Allow the request to proceed
+# Database connection testing - startup only unless different databases per user/site
+sub _test_database_connections {
+    my ($self, $c) = @_;
+    
+    # Test primary database connections
+    my $db_status = {
+        ency_ok => 0,
+        forager_ok => 0,
+        errors => []
+    };
+    
+    # Test DBEncy
+    eval {
+        if ($c->model('DBEncy')->test_connection($c)) {
+            $db_status->{ency_ok} = 1;
+        }
+    };
+    if ($@) {
+        push @{$db_status->{errors}}, "DBEncy: $@";
+        $c->log->error("Database connection failed - DBEncy: $@");
+    }
+    
+    # Test DBForager
+    eval {
+        if ($c->model('DBForager')->test_connection($c)) {
+            $db_status->{forager_ok} = 1;
+        }
+    };
+    if ($@) {
+        push @{$db_status->{errors}}, "DBForager: $@";
+        $c->log->error("Database connection failed - DBForager: $@");
+    }
+    
+    # Cache database status
+    $self->_system_info_cache->{db_status} = $db_status;
+    
+    # Log summary
+    if (@{$db_status->{errors}}) {
+        $c->log->error("Database connection issues detected - Run with CATALYST_DEBUG=1 for details");
+    } elsif ($ENABLE_DETAILED_LOGGING) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_test_database_connections',
+            "All database connections tested successfully");
+    }
+}
+
+# Cached site setup - only called if not already cached
+sub _setup_site_cached {
+    my ($self, $c, $domain) = @_;
+    
+    if ($ENABLE_DETAILED_LOGGING) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_setup_site_cached',
+            "Setting up site for domain: $domain");
+    }
+    
+    # Development bypass for localhost
+    if ($domain eq 'localhost' && ($ENV{CATALYST_DEBUG} || $ENV{CATALYST_ENV} eq 'development')) {
+        $self->_set_development_defaults($c);
+        return;
+    }
+    
+    # Perform site setup
+    $self->setup_site($c);
+    $self->set_theme($c);
+    
+    # Cache the results
+    $self->_site_cache->{$domain} = {
+        SiteName => $c->stash->{SiteName},
+        ControllerName => $c->stash->{ControllerName},
+        HostName => $c->stash->{HostName},
+        ScriptDisplayName => $c->stash->{ScriptDisplayName},
+        css_view_name => $c->stash->{css_view_name},
+        mail_to_admin => $c->stash->{mail_to_admin},
+        mail_replyto => $c->stash->{mail_replyto},
+        theme_name => $c->stash->{theme_name},
+        available_themes => $c->stash->{available_themes},
+    };
+    
+    # Set cache timestamp
+    $self->_cache_timestamp(time());
+    
+    if ($ENABLE_DETAILED_LOGGING) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_setup_site_cached',
+            "Cached site setup for domain: $domain, SiteName: " . $c->stash->{SiteName});
+    }
+}
+
+# Set development defaults
+sub _set_development_defaults {
+    my ($self, $c) = @_;
+    
+    my $defaults = {
+        SiteName => 'CSC',
+        ControllerName => 'CSC',
+        HostName => 'http://localhost:3000',
+        ScriptDisplayName => 'CSC Development',
+        css_view_name => '/static/css/default.css',
+        mail_to_admin => 'admin@localhost',
+        mail_replyto => 'noreply@localhost',
+        theme_name => 'csc',
+        available_themes => ['csc', 'default'],
+    };
+    
+    $c->stash->{$_} = $defaults->{$_} for keys %$defaults;
+    $c->session->{SiteName} = $defaults->{SiteName};
+    $c->session->{ControllerName} = $defaults->{ControllerName};
+    
+    # Cache for localhost
+    $self->_site_cache->{localhost} = $defaults;
+    $self->_cache_timestamp(time());
+}
+
+# Set minimal default values for error conditions
+sub _set_default_site_values {
+    my ($self, $c) = @_;
+    
+    $c->stash->{SiteName} = 'CSC';
+    $c->stash->{ControllerName} = 'Root';
+    $c->stash->{HostName} = 'http://' . $c->req->uri->host;
+    $c->stash->{ScriptDisplayName} = 'Site';
+    $c->stash->{css_view_name} = '/static/css/default.css';
+    $c->stash->{mail_to_admin} = 'admin@computersystemconsulting.ca';
+    $c->stash->{mail_replyto} = 'helpdesk@computersystemconsulting.ca';
+    $c->stash->{theme_name} = 'default';
+    $c->stash->{available_themes} = ['default'];
+    
+    $c->session->{SiteName} = 'CSC';
+    $c->session->{ControllerName} = 'Root';
 }
 
 sub setup_debug_mode {
@@ -906,6 +1089,28 @@ sub site_setup {
     my $mail_to_admin = $site->mail_to_admin || 'admin@computersystemconsulting.ca';
     my $mail_replyto = $site->mail_replyto || 'helpdesk.computersystemconsulting.ca';
     my $site_name = $site->name || $SiteName;
+
+    # Set ControllerName based on the site's home_view - this was missing!
+    my $home_view = $site->home_view || $site->name || 'Root';
+    
+    # Verify the controller exists before setting it
+    my $controller_exists = 0;
+    eval {
+        my $controller = $c->controller($home_view);
+        $controller_exists = 1 if $controller;
+    };
+
+    if ($controller_exists) {
+        $c->stash->{ControllerName} = $home_view;
+        $c->session->{ControllerName} = $home_view;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "ControllerName set to: $home_view");
+    } else {
+        # If controller doesn't exist, fall back to Root
+        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'site_setup',
+            "Controller '$home_view' not found or not loaded. Falling back to 'Root'.");
+        $c->stash->{ControllerName} = 'Root';
+        $c->session->{ControllerName} = 'Root';
+    }
 
     # If site has a document_root_url, use it for HostName
     if ($site->document_root_url && $site->document_root_url ne '') {

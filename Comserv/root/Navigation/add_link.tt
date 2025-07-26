@@ -1,0 +1,208 @@
+[% META title = 'Add Menu Link' %]
+[% PageVersion = 'Navigation/add_link.tt,v 0.01 2025/01/28 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <header class="page-header">
+        <h1><i class="icon-plus"></i> Add Menu Link</h1>
+        <p class="page-description">Add a new link to the navigation menu system.</p>
+    </header>
+
+    [% IF c.flash.error_msg %]
+        <div class="alert alert-danger">
+            <i class="icon-exclamation-triangle"></i> [% c.flash.error_msg %]
+        </div>
+    [% END %]
+
+    [% IF c.flash.success_msg %]
+        <div class="alert alert-success">
+            <i class="icon-check"></i> [% c.flash.success_msg %]
+        </div>
+    [% END %]
+
+    <div class="form-container">
+        <form method="POST" action="[% c.uri_for('/navigation/add_link') %]" class="menu-link-form">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="category" class="form-label">
+                        <i class="icon-folder"></i> Menu Category *
+                    </label>
+                    <select id="category" name="category" class="form-control" required>
+                        <option value="">Select a category...</option>
+                        <option value="Admin_links" [% IF c.req.param('category') == 'Admin_links' %]selected[% END %]>Admin Links</option>
+                        <option value="Main_links" [% IF c.req.param('category') == 'Main_links' %]selected[% END %]>Main Links</option>
+                        <option value="Member_links" [% IF c.req.param('category') == 'Member_links' %]selected[% END %]>Member Links</option>
+                        <option value="Global_links" [% IF c.req.param('category') == 'Global_links' %]selected[% END %]>Global Links</option>
+                        <option value="Hosted_links" [% IF c.req.param('category') == 'Hosted_links' %]selected[% END %]>Hosted Links</option>
+                        <option value="Weather_links" [% IF c.req.param('category') == 'Weather_links' %]selected[% END %]>Weather Links</option>
+                        <option value="IT_links" [% IF c.req.param('category') == 'IT_links' %]selected[% END %]>IT Links</option>
+                        <option value="HelpDesk_links" [% IF c.req.param('category') == 'HelpDesk_links' %]selected[% END %]>HelpDesk Links</option>
+                        <option value="Coop_links" [% IF c.req.param('category') == 'Coop_links' %]selected[% END %]>Coop Links</option>
+                        <option value="Login_links" [% IF c.req.param('category') == 'Login_links' %]selected[% END %]>Login Links</option>
+                        <option value="Footer_links" [% IF c.req.param('category') == 'Footer_links' %]selected[% END %]>Footer Links</option>
+                        <option value="Private_links" [% IF c.req.param('category') == 'Private_links' %]selected[% END %]>Private Links</option>
+                    </select>
+                    <small class="form-help">Choose which menu section this link will appear in</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="sitename" class="form-label">
+                        <i class="icon-globe"></i> Site
+                    </label>
+                    <select id="sitename" name="sitename" class="form-control">
+                        <option value="All" [% IF c.req.param('sitename') == 'All' OR !c.req.param('sitename') %]selected[% END %]>All Sites</option>
+                        <option value="[% c.session.SiteName %]" [% IF c.req.param('sitename') == c.session.SiteName %]selected[% END %]>[% c.session.SiteName %] (Current Site)</option>
+                        <option value="BMaster" [% IF c.req.param('sitename') == 'BMaster' %]selected[% END %]>BMaster</option>
+                        <option value="CSC" [% IF c.req.param('sitename') == 'CSC' %]selected[% END %]>CSC</option>
+                        <option value="Monashee" [% IF c.req.param('sitename') == 'Monashee' %]selected[% END %]>Monashee</option>
+                        <option value="Forager" [% IF c.req.param('sitename') == 'Forager' %]selected[% END %]>Forager</option>
+                        <option value="Shanta" [% IF c.req.param('sitename') == 'Shanta' %]selected[% END %]>Shanta</option>
+                        <option value="SunFire" [% IF c.req.param('sitename') == 'SunFire' %]selected[% END %]>SunFire</option>
+                        <option value="USBM" [% IF c.req.param('sitename') == 'USBM' %]selected[% END %]>USBM</option>
+                        <option value="WB" [% IF c.req.param('sitename') == 'WB' %]selected[% END %]>WeaverBeck</option>
+                    </select>
+                    <small class="form-help">Choose which site(s) this link should appear on</small>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="name" class="form-label">
+                    <i class="icon-tag"></i> Link Name *
+                </label>
+                <input type="text" 
+                       id="name" 
+                       name="name" 
+                       class="form-control" 
+                       value="[% c.req.param('name') %]"
+                       placeholder="Enter the display name for the link"
+                       required
+                       maxlength="100">
+                <small class="form-help">This is the text that will appear in the menu</small>
+            </div>
+
+            <div class="form-group">
+                <label for="view_name" class="form-label">
+                    <i class="icon-eye"></i> View Name
+                </label>
+                <input type="text" 
+                       id="view_name" 
+                       name="view_name" 
+                       class="form-control" 
+                       value="[% c.req.param('view_name') %]"
+                       placeholder="Optional: Alternative display name"
+                       maxlength="100">
+                <small class="form-help">Optional: Alternative name for display (defaults to Link Name)</small>
+            </div>
+
+            <div class="form-group">
+                <label for="url" class="form-label">
+                    <i class="icon-link"></i> URL *
+                </label>
+                <input type="text" 
+                       id="url" 
+                       name="url" 
+                       class="form-control" 
+                       value="[% c.req.param('url') %]"
+                       placeholder="https://example.com or /internal/path"
+                       required
+                       maxlength="255">
+                <small class="form-help">The web address or internal path for this link</small>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="target" class="form-label">
+                        <i class="icon-external-link"></i> Open Link In
+                    </label>
+                    <select id="target" name="target" class="form-control">
+                        <option value="_self" [% IF c.req.param('target') == '_self' OR !c.req.param('target') %]selected[% END %]>Same Window/Tab</option>
+                        <option value="_blank" [% IF c.req.param('target') == '_blank' %]selected[% END %]>New Window/Tab</option>
+                    </select>
+                    <small class="form-help">Choose how the link should open when clicked</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="page_code" class="form-label">
+                        <i class="icon-code"></i> Page Code
+                    </label>
+                    <input type="text" 
+                           id="page_code" 
+                           name="page_code" 
+                           class="form-control" 
+                           value="[% c.req.param('page_code') %]"
+                           placeholder="Optional: Internal page code"
+                           maxlength="50">
+                    <small class="form-help">Optional: Internal page identifier for legacy systems</small>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="description" class="form-label">
+                    <i class="icon-info-circle"></i> Description
+                </label>
+                <textarea id="description" 
+                          name="description" 
+                          class="form-control" 
+                          rows="3"
+                          placeholder="Optional: Brief description or notes about this link">[% c.req.param('description') %]</textarea>
+                <small class="form-help">Optional: Additional information about this link</small>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" 
+                        style="background-color: [% theme_vars.item('primary-color') || '#007bff' %]; 
+                               color: [% theme_vars.item('text-color') || '#ffffff' %]; 
+                               border: 1px solid [% theme_vars.item('border-color') || '#007bff' %]; 
+                               padding: 8px 16px; 
+                               border-radius: 4px; 
+                               cursor: pointer; 
+                               margin-right: 8px;">
+                    <i class="icon-plus"></i> Add Menu Link
+                </button>
+                <a href="[% c.uri_for('/navigation/manage_links') %]" 
+                   style="background-color: [% theme_vars.item('secondary-color') || '#6c757d' %]; 
+                          color: [% theme_vars.item('text-color') || '#ffffff' %]; 
+                          border: 1px solid [% theme_vars.item('border-color') || '#6c757d' %]; 
+                          padding: 8px 16px; 
+                          text-decoration: none; 
+                          border-radius: 4px; 
+                          display: inline-block;">
+                    <i class="icon-arrow-left"></i> Back to Manage Links
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <div class="help-section">
+        <h3><i class="icon-question-circle"></i> Adding Menu Links</h3>
+        <div class="help-content">
+            <h4>Categories Explained:</h4>
+            <ul>
+                <li><strong>Admin Links:</strong> Visible only to administrators</li>
+                <li><strong>Main Links:</strong> Primary navigation for all users</li>
+                <li><strong>Member Links:</strong> Links for registered members</li>
+                <li><strong>Global Links:</strong> Site-wide resources and tools</li>
+                <li><strong>Hosted Links:</strong> Links related to hosted services</li>
+                <li><strong>Weather Links:</strong> Weather-related tools and information</li>
+                <li><strong>IT Links:</strong> Technical resources and IT tools</li>
+                <li><strong>HelpDesk Links:</strong> Support and assistance links</li>
+                <li><strong>Coop Links:</strong> Cooperative-specific resources (site-specific)</li>
+                <li><strong>Login Links:</strong> Authentication-related links</li>
+                <li><strong>Footer Links:</strong> Links that appear in the page footer</li>
+                <li><strong>Private Links:</strong> User-specific personal links</li>
+            </ul>
+            
+            <h4>Site Selection:</h4>
+            <p>Choose "All Sites" to make the link appear on every site, or select a specific site to limit visibility.</p>
+            
+            <h4>URL Guidelines:</h4>
+            <ul>
+                <li>External links: Use full URLs (https://example.com)</li>
+                <li>Internal links: Use relative paths (/page/path)</li>
+                <li>Always test your links after adding them</li>
+            </ul>
+        </div>
+    </div>
+</div>

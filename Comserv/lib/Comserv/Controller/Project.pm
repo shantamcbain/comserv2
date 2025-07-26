@@ -1,4 +1,4 @@
-ypackage Comserv::Controller::Project;
+package Comserv::Controller::Project;
 use Moose;
 use namespace::autoclean;
 use DateTime;

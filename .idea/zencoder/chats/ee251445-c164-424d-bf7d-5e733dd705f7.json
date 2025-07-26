@@ -1,0 +1,45 @@
+{
+    "checksum": "edc1e8b4d740c3073f23c20c86202f55ae40d65021201d2abcb3d2d1bc6ee0ec",
+    "data": {
+    "id": "ee251445-c164-424d-bf7d-5e733dd705f7",
+    "createdAt": 1752131080348,
+    "updatedAt": 1752131080469,
+    "title": "Please have a look at the new DBency, and the O...",
+    "messages": [
+        {
+            "id": "8ce117bd-44d3-4b6c-9851-a13aa11e6267",
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "Please have a look at the new DBency, and the Offline mode and see how we should modify our local db_config.json to work with the new setup."
+                }
+            ],
+            "context": {
+                "codebaseEnabled": true
+            },
+            "createdAt": 1752131080463,
+            "isInternal": false,
+            "rawContent": {
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Please have a look at the new DBency, and the Offline mode and see how we should modify our local db_config.json to work with the new setup. "
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ],
+    "isAgent": true,
+    "isCustomAgent": false,
+    "isUnitTestsAgent": false,
+    "isE2EAgent": false,
+    "autoApply": false
+}
+}

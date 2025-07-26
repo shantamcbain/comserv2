@@ -1,0 +1,762 @@
+{
+    "checksum": "abc1645bc4f742e2a231f3d73544500b50b7c8bc62556aceb2bc103357b64755",
+    "data": {
+    "id": "47346343-cfc3-421d-94d9-7aab234a7199",
+    "createdAt": 1753526966617,
+    "updatedAt": 1753528422002,
+    "title": "Comserv Project Documentation Update",
+    "messages": [
+        {
+            "id": "2856178e-b4ec-4546-986e-a2a4e27cc53b",
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "Continue working on Comserv project documentation updates. Read development-guidelines.md and ai-behavior-enforcement.md first."
+                },
+                {
+                    "type": "text",
+                    "text": "Current context: Fixed compilation errors in Project.pm and SB.pm controllers. Project.pm now has working database queries instead of empty arrays. Both controllers pass syntax validation. Created new Project controller documentation but need to update the existing main Projects.tt file."
+                },
+                {
+                    "type": "text",
+                    "text": "Files being worked on:"
+                },
+                {
+                    "type": "text",
+                    "text": "- /home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Projects.tt (EXISTS - needs updating with system overview)"
+                },
+                {
+                    "type": "text",
+                    "text": "- /home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/controllers/SB.tt (needs creation)"
+                },
+                {
+                    "type": "text",
+                    "text": "- /home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Project.pm (functional, documented)"
+                },
+                {
+                    "type": "text",
+                    "text": "- /home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/SB.pm (functional, needs documentation)"
+                },
+                {
+                    "type": "text",
+                    "text": "Next steps needed:"
+                },
+                {
+                    "type": "text",
+                    "text": "1. PRIORITY: Update existing /Documentation/Projects.tt file (don't create new) with comprehensive project system overview"
+                },
+                {
+                    "type": "text",
+                    "text": "2. Create SB controller documentation at /Documentation/controllers/SB.tt"
+                },
+                {
+                    "type": "text",
+                    "text": "3. Test project listing at /project/project URL in browser"
+                },
+                {
+                    "type": "text",
+                    "text": "4. Check for application logs and database connectivity issues"
+                },
+                {
+                    "type": "text",
+                    "text": "5. Verify sub-project functionality works"
+                },
+                {
+                    "type": "text",
+                    "text": "Key findings perl -Ilib -c"
+                },
+                {
+                    "type": "text",
+                    "text": "- Project.pm fetch_projects_with_subprojects method now queries database properly"
+                },
+                {
+                    "type": "text",
+                    "text": "- SB.pm was renamed from Comserv::Controller::ShamanBotanicals to Comserv::Controller::SB"
+                },
+                {
+                    "type": "text",
+                    "text": "- Server starts but project listing may have template/database issues"
+                },
+                {
+                    "type": "text",
+                    "text": "- Missing application logs suggest logging directory issues"
+                }
+            ],
+            "context": {
+                "currentFile": {
+                    "path": "Comserv/lib/Comserv/Controller/Project.pm",
+                    "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Project.pm",
+                    "sources": [
+                        "opened_tab"
+                    ],
+                    "content": "package Comserv::Controller::Project;\nuse Moose;\nuse namespace::autoclean;\nuse DateTime;\nuse Data::Dumper;\nuse Comserv::Util::Logging;\nuse Comserv::Controller::Site;\nBEGIN { extends 'Catalyst::Controller'; }\nhas 'logging' => (\n    is => 'ro',\n    default => sub { Comserv::Util::Logging->instance }\n);\nsub index :Path :Args(0) {\n    my ( $self, $c ) = @_;\n    $self->logging->log_with_details('info', __FILE__, __LINE__, 'index', 'Starting index action');\n    $c->res->redirect($c->uri_for($self->action_for('project')));\n}\n\nsub add_project :Path('addproject') :Args(0) {\n    my ( $self, $c ) = @_;\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_project', 'Starting add_project action' );\n\n    # Store the previous URL for redirect after form submission\n    $c->session->{previous_url} = $c->req->referer;\n\n    # Get parent_id from query parameters if it exists (for sub-projects)\n    my $parent_id = $c->request->query_parameters->{parent_id};\n\n    # Use the fetch_projects_with_subprojects method to get the projects\n    my $projects = $self->fetch_projects_with_subprojects($c);\n\n    # Use the fetch_available_sites method from Site controller to get the sites\n    my $site_controller = $c->controller('Site');\n    my $sites = $site_controller->fetch_available_sites($c);\n\n    # If this is a sub-project, get the parent project details\n    my $parent_project;\n    if ($parent_id) {\n        my $schema = $c->model('DBEncy');\n        $parent_project = $schema->resultset('Project')->find($parent_id);\n        if ($parent_project) {\n            # Pre-fill form data with parent project details\n            $c->stash->{form_data} = {\n                sitename => $parent_project->sitename,\n                parent_id => $parent_id,  # This will be used to pre-select in the dropdown\n                selected_parent => $parent_id,  # Additional field for template to identify selected parent\n                # Inherit other relevant fields from parent\n                project_code => $parent_project->project_code,\n                client_name => $parent_project->client_name,\n                developer_name => $parent_project->developer_name,\n            };\n\n            # Log the parent project details for debugging\n            $self->logging->log_with_details(\n                $c, 'debug', __FILE__, __LINE__, 'add_project',\n                \"Setting up sub-project for parent ID: $parent_id, Name: \" . $parent_project->name\n            );\n        } else {\n            $self->logging->log_with_details(\n                $c, 'warn', __FILE__, __LINE__, 'add_project',\n                \"Parent project not found for ID: $parent_id\"\n            );\n        }\n    }\n\n    # Set up the stash for the template\n    $c->stash(\n        sites => $sites,\n        projects => $projects,\n        parent_project => $parent_project,\n        template => 'todo/add_project.tt'\n    );\n\n    $c->forward($c->view('TT'));\n}\n\n\nsub  create_project :Local :Args(0) {\n    my ($self, $c) = @_;\n\n    my $form_data = $c->request->body_parameters;\n    my $schema = $c->model('DBEncy');\n    my $project_rs = $schema->resultset('Project');\n    my $date_time_posted = DateTime->now;\n\n    # Get username safely - check both user_exists AND that user object is defined\n    my $username = '';\n    if ($c->user_exists && $c->user) {\n        $username = $c->user->username;\n    } elsif ($c->session->{username}) {\n        $username = $c->session->{username};\n    } else {\n        $username = 'anonymous';\n    }\n\n    # Handle parent_id properly\n    my $parent_id = $form_data->{parent_id};\n    if (ref $parent_id eq 'ARRAY') {\n        $parent_id = $parent_id->[0];\n    }\n    if (!$parent_id || $parent_id eq '') {\n        $parent_id = undef;\n    }\n\n    # Get group_of_poster safely\n    my $group_of_poster = 'general';  # Default value\n    if ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && defined $c->session->{roles}->[0]) {\n        $group_of_poster = $c->session->{roles}->[0];\n    } else {\n        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_project',\n            \"No roles found in session, using default group 'general'\");\n    }\n\n    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_project',\n        \"Parent ID: \" . (defined $parent_id ? $parent_id : 'undef') . \", Group of poster: $group_of_poster\");\n\n    my $project = eval {\n        $project_rs->create({\n            sitename => $c->session->{SiteName},\n            name => $form_data->{name},\n            description => $form_data->{description},\n            start_date => $form_data->{start_date},\n            end_date => $form_data->{end_date},\n            status => $form_data->{status},\n            project_code => $form_data->{project_code},\n            project_size => $form_data->{project_size},\n            estimated_man_hours => $form_data->{estimated_man_hours},\n            developer_name => $form_data->{developer_name},\n            client_name => $form_data->{client_name},\n            comments => $form_data->{comments},\n            username_of_poster => $username,\n            parent_id => $parent_id,\n            group_of_poster => $group_of_poster,\n            date_time_posted => $date_time_posted->ymd . ' ' . $date_time_posted->hms,\n            record_id => 0  # Set to 0 instead of undef\n        });\n    };\n\n    if ($@) {\n        my $error_msg = $@;\n        $error_msg =~ s/\\s+at\\s+.*//s;\n\n        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_project',\n            \"Database error creating project: $error_msg\");\n\n        my $site_controller = $c->controller('Site');\n        my $sites = $site_controller->fetch_available_sites($c);\n        my $projects = $self->fetch_projects_with_subprojects($c);\n\n        $c->stash(\n            form_data => $form_data,\n            sites => $sites,\n            projects => $projects,\n            error_message => \"Failed to create project: $error_msg\",\n            template => 'todo/add_project.tt'\n        );\n\n        $c->forward($c->view('TT'));\n        return;\n    }\n\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_project',\n        \"Project created with ID: \" . $project->id);\n\n    $c->flash->{success_message} = 'Project added successfully';\n    $c->res->redirect($c->uri_for($self->action_for('project')));\n}\n\n\nsub project :Path('project') :Args(0) {\n    my ( $self, $c ) = @_;\n    \n    # Log the start of the project action\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'project', 'Starting project action');\n    \n    # Get filter parameters from query string\n    my $role_filter = $c->request->query_parameters->{role} || '';\n    my $project_filter = $c->request->query_parameters->{project_id} || '';\n    my $priority_filter = $c->request->query_parameters->{priority} || '';\n    \n    # Log the filter parameters\n    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'project', \n        \"Filter parameters - Role: $role_filter, Project: $project_filter, Priority: $priority_filter\");\n\n    # Use the existing method to fetch projects with sub-projects\n    my $projects = $self->fetch_projects_with_subprojects($c);\n    \n    # Enhance project data with additional fields needed for filtering\n    $projects = $self->enhance_project_data($c, $projects);\n\n    # Add the projects and filter info to the stash\n    $c->stash(\n        projects => $projects,\n        role_filter => $role_filter,\n        project_filter => $project_filter,\n        priority_filter => $priority_filter,\n        template => 'todo/project.tt', # Use the original template\n        template_timestamp => time(), # Add a timestamp to force template reload\n        success_message => 'Project priority display has been updated. All projects without a priority are now shown as Medium priority.',\n        additional_css => ['/static/css/components/project-cards.css?v=' . time()], # Add timestamp to force CSS reload\n        use_fluid_container => 1, # Use fluid container for better card layout\n        debug_mode => 1 # Enable debug mode to see template version\n    );\n    \n    # Log that we're using the project cards CSS\n    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'project', \n        \"Loading bootstrap cards CSS and project cards CSS with timestamp: \" . time());\n\n    # Log completion of the project action\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'project', 'Completed project action');\n\n    $c->forward($c->view('TT'));\n}\n\nsub details :Path('details') :Args(0) {\n    my ( $self, $c ) = @_;\n\n    # Logging: Start of the details action\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'details', 'Starting details action.');\n\n    # Retrieve project_id from body or query parameters\n    my $project_id = $c->request->body_parameters->{project_id} || $c->request->query_parameters->{project_id};\n\n    if (!$project_id) {\n        # Logging: Parameter missing\n        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'details', 'Missing parent_id or project_id parameter in request.');\n\n        # Check if this was meant to be a sub-project creation\n        my $parent_id = $c->request->query_parameters->{parent_id};\n        if ($parent_id) {\n            # Redirect back to add project form with parent_id\n            $c->response->redirect($c->uri_for($self->action_for('add_project'), { parent_id => $parent_id }));\n            return;\n        }\n\n        $c->stash(\n            error_msg => 'Project ID is required to view project details. Please select a project from the list.',\n            template => 'todo/projectdetails.tt'\n        );\n        $c->forward($c->view('TT'));\n        return;\n    }\n\n    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'details', \"Received project_id: $project_id.\");\n\n    # Get the DB schema and project model\n    my $schema = $c->model('DBEncy');\n    my $project_model = $c->model('Project');\n\n    # Log the project_id we're looking for\n    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'details',\n        \"Looking for project with ID: $project_id\");\n\n    # Fetch project by ID\n    my $project;\n    eval {\n        $project = $schema->resultset('Project')->find($project_id);\n    };\n    if ($@ || !$project) {\n        # Logging: Error fetching project or project not found\n        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'details', \"Failed to fetch project for ID: $project_id. Error: $@\");\n        $c->stash(\n            error_msg => \"Project with ID $project_id not found.\",\n            template => 'todo/projectdetails.tt'\n        );\n        $c->forward($c->view('TT'));\n        return;\n    }\n\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'details', \"Successfully fetched project for ID: $project_id.\");\n\n    # Fetch todos associated with the project\n    my @todos;\n    eval {\n        @todos = $schema->resultset('Todo')->search(\n            { project_id => $project_id },\n            { order_by => { -asc => 'start_date' } }\n        );\n    };\n    if ($@) {\n        # Logging: Error fetching todos\n        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'details', \"Error fetching todos for project ID: $project_id. Error: $@\");\n        $c->stash(\n            error_msg => \"Failed to fetch todos for project with ID $project_id.\",\n            template => 'todo/projectdetails.tt'\n        );\n        $c->forward($c->view('TT'));\n        return;\n    }\n\n    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'details', \"Fetched \" . scalar(@todos) . \" todos for project ID: $project_id.\");\n\n    # Fetch sub-projects and their todos recursively\n    my $project_tree = $self->build_project_tree($c, $project);\n\n    # Add the project tree (including sub-projects and todos) to the stash\n    $c->stash(\n        project => $project_tree,\n        todos => \\@todos,\n        template => 'todo/projectdetails.tt'\n    );\n\n    # Logging: End of details action\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'details', \"Finished details action for project ID: $project_id.\");\n\n    $c->forward($c->view('TT'));\n}\n\n# This enhance_project_data implementation has been moved to line 482\n# See the implementation there\n\nsub fetch_projects_with_subprojects :Private {\n    my ($self, $c) = @_;\n    # Log the start of the project-fetching subroutine\n    $self->logging->log_with_details(\n        $c, 'info', __FILE__, __LINE__, 'fetch_projects_with_subprojects',\n        'Fetching parent projects with sub-projects'\n    );\n\n    # Get database schema\n    my $schema = $c->model('DBEncy')->schema;\n    \n    # Fetch top-level projects (where parent_id is NULL)\n    my @top_projects;\n    eval {\n        @top_projects = $schema->resultset('Project')->search(\n            { parent_id => undef },\n            { order_by => { -asc => 'name' } }\n        )->all;\n    };\n\n    if ($@) {\n        $self->logging->log_with_details(\n            $c, 'error', __FILE__, __LINE__, 'fetch_projects_with_subprojects',\n            \"Error fetching top-level projects: $@\"\n        );\n        return [];\n    }\n\n    # Create an array to hold our project structure\n    my @projects = ();\n\n    # Process each top-level project\n    foreach my $project (@top_projects) {\n        # Create a hashref for this project\n        my $project_hash = {\n            id => $project->id,\n            name => $project->name,\n            description => $project->description || '',\n            parent_id => $project->parent_id,\n            status => $project->status || 1,\n            start_date => $project->start_date,\n            end_date => $project->end_date,\n            developer_name => $project->developer_name || '',\n            client_name => $project->client_name || '',\n            priority => 2,\n            sub_projects => []\n        };\n\n        push @projects, $project_hash;\n    }\n\n    # Log the successful preparation of the project data structure\n    $self->logging->log_with_details(\n        $c, 'info', __FILE__, __LINE__, 'fetch_projects_with_subprojects',\n        'Successfully prepared project data structure with ' . scalar(@projects) . ' top-level projects'\n    );\n\n    return \\@projects;\n}\n\n# Enhance project data with additional fields needed for filtering\nsub enhance_project_data :Private {\n    my ($self, $c, $projects) = @_;\n    \n    # Log the start of the enhance_project_data method\n    $self->logging->log_with_details(\n        $c, 'info', __FILE__, __LINE__, 'enhance_project_data',\n        'Enhancing project data for filtering'\n    );\n    \n    # Process each project to ensure it has all required fields\n    foreach my $project (@$projects) {\n        # Set default values for any missing fields\n        $project->{priority} = $project->{priority} || 2; # Default to medium priority\n        $project->{status} = $project->{status} || 1; # Default to new status\n        $project->{developer_name} = $project->{developer_name} || '';\n        $project->{client_name} = $project->{client_name} || '';\n        \n        # Process sub-projects recursively\n        if ($project->{sub_projects} && @{$project->{sub_projects}}) {\n            $self->enhance_project_data($c, $project->{sub_projects});\n        }\n    }\n    \n    # Log completion of the enhance_project_data method\n    $self->logging->log_with_details(\n        $c, 'info', __FILE__, __LINE__, 'enhance_project_data',\n        'Completed enhancing project data for filtering'\n    );\n    \n    return $projects;\n}\n\n# This build_project_tree implementation has been moved to line 672\n# See the implementation there\n\nsub editproject :Path('editproject') :Args(0) {\n    my ( $self, $c ) = @_;\n\n    # Log the start of the editproject action\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'editproject', 'Starting editproject action');\n\n    # Get project_id from either body parameters (POST) or query parameters (GET)\n    my $project_id = $c->request->body_parameters->{project_id} || $c->request->query_parameters->{project_id};\n\n    # Log the project_id\n    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'editproject',\n        \"Project ID: \" . (defined $project_id ? $project_id : 'undefined'));\n\n    # Validate project_id\n    if (!defined $project_id || $project_id eq '') {\n        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'editproject', 'Missing project_id parameter');\n        $c->stash(\n            error_msg => \"Project ID is required to edit a project.\",\n            template => 'todo/error.tt'\n        );\n        $c->forward($c->view('TT'));\n        return;\n    }\n\n    # Handle the case where project_id is an array reference (from multi-select)\n    if (ref $project_id eq 'ARRAY') {\n        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'editproject',\n            \"Project ID is an array reference, using first element\");\n        $project_id = $project_id->[0];\n    }\n\n    # Get the project from the database\n    my $project_model = $c->model('Project');\n    my $schema = $c->model('DBEncy');\n    my $project;\n\n    eval {\n        $project = $project_model->get_project($schema, $project_id);\n    };\n\n    if ($@ || !$project) {\n        my $error_msg = $@ || \"Project not found\";\n        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'editproject',\n            \"Error finding project with ID $project_id: $error_msg\");\n        $c->stash(\n            error_msg => \"Project with ID $project_id not found. Please check the application.log for more Details.\",\n            template => 'todo/error.tt'\n        );\n        $c->forward($c->view('TT'));\n        return;\n    }\n\n    # Log that we found the project\n    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'editproject',\n        \"Found project with ID $project_id: \" . $project->name);\n\n    # Use the fetch_available_sites method from the Site controller to get the sites\n    my $site_controller = $c->controller('Site');\n    my $sites = $site_controller->fetch_available_sites($c);\n\n    # Use the fetch_projects_with_subprojects method to get the projects\n    my $projects = $self->fetch_projects_with_subprojects($c);\n\n    # Stash everything for the template\n    $c->stash(\n        projects => $projects,\n        project => $project,\n        sites => $sites,\n        template => 'todo/editproject.tt'\n    );\n\n    # Log the end of the editproject action\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'editproject',\n        \"Ending editproject action for project ID $project_id\");\n\n    $c->forward($c->view('TT'));\n}\n\nsub build_project_tree :Private {\n    my ($self, $c, $project, $depth) = @_;\n\n    # Set default depth or increment current depth\n    $depth = defined($depth) ? $depth + 1 : 0;\n\n    # Maximum recursion depth - adjust as needed\n    my $max_depth = 3;\n\n    # Get the schema\n    my $schema = $c->model('DBEncy');\n\n    # Log the start of building the project tree\n    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'build_project_tree',\n        \"Building project tree for project ID: \" . $project->id . \" at depth $depth\");\n\n    # Create the base project hash with essential attributes only\n    my $project_hash = {\n        id => $project->id,\n        name => $project->name,\n        description => $project->description,\n        start_date => $project->start_date,\n        end_date => $project->end_date,\n        status => $project->status,\n        project_code => $project->project_code,\n        project_size => $project->project_size,\n        estimated_man_hours => $project->estimated_man_hours,\n        developer_name => $project->developer_name,\n        client_name => $project->client_name,\n        comments => $project->comments,\n        sitename => $project->sitename,\n        parent_id => $project->parent_id,\n        username_of_poster => $project->username_of_poster,\n        group_of_poster => $project->group_of_poster,\n        date_time_posted => $project->date_time_posted,\n        record_id => $project->record_id\n    };\n\n    # Fetch todos for this project\n    my @todos = ();\n    eval {\n        @todos = $schema->resultset('Todo')->search(\n            { project_id => $project->id },\n            { order_by => { -asc => 'start_date' } }\n        )->all;\n    };\n\n    if ($@) {\n        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'build_project_tree',\n            \"Error fetching todos for project ID: \" . $project->id . \": $@\");\n    } else {\n        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'build_project_tree',\n            \"Fetched \" . scalar(@todos) . \" todos for project ID: \" . $project->id);\n    }\n\n    # Create an array of todo hashrefs with only the needed attributes\n    my @todo_hashrefs = ();\n    foreach my $todo (@todos) {\n        push @todo_hashrefs, {\n            id => $todo->id,\n            record_id => $todo->record_id,\n            subject => $todo->subject,\n            description => $todo->description,\n            start_date => $todo->start_date,\n            due_date => $todo->due_date,\n            status => $todo->status,\n            priority => $todo->priority\n        };\n    }\n    $project_hash->{todos} = \\@todo_hashrefs;\n\n    # Only fetch sub-projects if we haven't reached the maximum depth\n    if ($depth < $max_depth) {\n        # Fetch sub-projects\n        my @sub_projects = ();\n        eval {\n            @sub_projects = $schema->resultset('Project')->search(\n                { parent_id => $project->id },\n                { order_by => { -asc => 'name' } }\n            )->all;\n        };\n\n        if ($@) {\n            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'build_project_tree',\n                \"Error fetching sub-projects for project ID: \" . $project->id . \": $@\");\n        } else {\n            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'build_project_tree',\n                \"Fetched \" . scalar(@sub_projects) . \" sub-projects for project ID: \" . $project->id);\n        }\n\n        # If there are sub-projects, process them iteratively\n        if (@sub_projects) {\n            my @sub_project_hashrefs = ();\n            foreach my $sub_project (@sub_projects) {\n                # Recursively build the sub-project tree, but only if we're not too deep\n                if ($depth + 1 < $max_depth) {\n                    push @sub_project_hashrefs, $self->build_project_tree($c, $sub_project, $depth);\n                } else {\n                    # Just add basic info for the sub-project\n                    push @sub_project_hashrefs, {\n                        id => $sub_project->id,\n                        name => $sub_project->name,\n                        description => $sub_project->description,\n                        parent_id => $sub_project->parent_id,\n                        has_more_sub_projects => ($schema->resultset('Project')->search({ parent_id => $sub_project->id })->count > 0) ? 1 : 0\n                    };\n                }\n            }\n            $project_hash->{sub_projects} = \\@sub_project_hashrefs;\n        } else {\n            $project_hash->{sub_projects} = [];\n        }\n    } else {\n        # Log that we've reached the maximum depth\n        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'build_project_tree',\n            \"Reached maximum depth ($max_depth) for project ID: \" . $project->id);\n\n        # Add a flag to indicate there might be more sub-projects\n        my $has_more = 0;\n        eval {\n            $has_more = $schema->resultset('Project')->search({ parent_id => $project->id })->count > 0 ? 1 : 0;\n        };\n\n        if ($@) {\n            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'build_project_tree',\n                \"Error checking for more sub-projects for project ID: \" . $project->id . \": $@\");\n        }\n\n        $project_hash->{has_more_sub_projects} = $has_more;\n        $project_hash->{sub_projects} = [];\n    }\n\n    return $project_hash;\n}\n\nsub update_project :Local :Args(0)  {\n    my ( $self, $c ) = @_;\n\n    # Log the start of the update_project action\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_project', 'Starting update_project action');\n\n    my $form_data = $c->request->body_parameters;\n    my $project_id = $form_data->{project_id};\n\n    # Handle the case where project_id is an array reference (from multi-select)\n    if (ref $project_id eq 'ARRAY') {\n        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'update_project',\n            \"Project ID is an array reference, using first element\");\n        $project_id = $project_id->[0];\n    }\n\n    # Validate project_id\n    if (!$project_id) {\n        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_project', 'Missing project_id parameter');\n        $c->response->status(400);\n        $c->response->body('Project ID is required');\n        return;\n    }\n\n    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'update_project', \"Updating project with ID: $project_id\");\n\n    my $schema = $c->model('DBEncy');\n    my $project_rs = $schema->resultset('Project');\n\n    # Find the project with error handling\n    my $project;\n    eval {\n        $project = $project_rs->find($project_id);\n    };\n\n    if ($@ || !$project) {\n        my $error_msg = $@ || \"Project not found\";\n        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_project', \"Error finding project: $error_msg\");\n        $c->response->status(404);\n        $c->response->body(\"Project with ID $project_id not found\");\n        return;\n    }\n\n    # Handle parent_id properly\n    my $parent_id = $form_data->{parent_id};\n    if (ref $parent_id eq 'ARRAY') {\n        $parent_id = $parent_id->[0];\n    }\n    if (!$parent_id || $parent_id eq '') {\n        $parent_id = undef;\n    }\n\n    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'update_project',\n        \"Parent ID: \" . (defined $parent_id ? $parent_id : 'undef'));\n\n    # Update the project with error handling\n    eval {\n        $project->update({\n            sitename => $form_data->{sitename},\n            name => $form_data->{name},\n            description => $form_data->{description},\n            start_date => $form_data->{start_date},\n            end_date => $form_data->{end_date},\n            status => $form_data->{status},\n            project_code => $form_data->{project_code},\n            project_size => $form_data->{project_size},\n            estimated_man_hours => $form_data->{estimated_man_hours},\n            developer_name => $form_data->{developer_name},\n            client_name => $form_data->{client_name},\n            comments => $form_data->{comments},\n            parent_id => $parent_id,\n        });\n    };\n\n    if ($@) {\n        my $error_msg = $@;\n        $error_msg =~ s/\\s+at\\s+.*//s; # Clean up the error message\n\n        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_project', \"Error updating project: $error_msg\");\n        $c->response->status(500);\n        $c->response->body(\"Failed to update project: $error_msg\");\n        return;\n    }\n\n    # Log successful update\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_project',\n        \"Successfully updated project with ID: $project_id, Name: \" . $project->name .\n        \", Parent ID: \" . (defined $parent_id ? $parent_id : 'None'));\n\n    # Set success message\n    $c->flash->{success_message} = 'Project \"' . $project->name . '\" updated successfully';\n\n    # Redirect to the project details page\n    $c->res->redirect($c->uri_for($self->action_for('details'), { project_id => $project_id }));\n}\n__PACKAGE__->meta->make_immutable;\n1;\n",
+                    "language": "perl5"
+                },
+                "codebaseEnabled": true
+            },
+            "createdAt": 1753526966627,
+            "isInternal": false,
+            "rawContent": {
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Continue working on Comserv project documentation updates. Read development-guidelines.md and ai-behavior-enforcement.md first."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Current context: Fixed compilation errors in Project.pm and SB.pm controllers. Project.pm now has working database queries instead of empty arrays. Both controllers pass syntax validation. Created new Project controller documentation but need to update the existing main Projects.tt file."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Files being worked on:"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "- /home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Projects.tt (EXISTS - needs updating with system overview)"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "- /home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/controllers/SB.tt (needs creation)"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "- /home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Project.pm (functional, documented)"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "- /home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/SB.pm (functional, needs documentation)"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Next steps needed:"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "1. PRIORITY: Update existing /Documentation/Projects.tt file (don't create new) with comprehensive project system overview"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "2. Create SB controller documentation at /Documentation/controllers/SB.tt"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "3. Test project listing at /project/project URL in browser"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "4. Check for application logs and database connectivity issues"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "5. Verify sub-project functionality works"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Key findings perl -Ilib -c"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "- Project.pm fetch_projects_with_subprojects method now queries database properly"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "- SB.pm was renamed from Comserv::Controller::ShamanBotanicals to Comserv::Controller::SB"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "- Server starts but project listing may have template/database issues"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "- Missing application logs suggest logging directory issues"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph"
+                    }
+                ]
+            },
+            "autoAppliedRules": [
+                {
+                    "name": "User AI Instruction",
+                    "description": "User AI Instruction",
+                    "uri": "zen-rules://user/custom",
+                    "content": "read AI_DEVELOPMENT_GUIDELINES\nall code must be varifed by user"
+                },
+                {
+                    "name": "Repository Information Overview",
+                    "description": "Repository Information Overview",
+                    "uri": "zen-rules://repo/repo",
+                    "content": "\n\n# Comserv Project Information\n\n## Summary\nComserv is a comprehensive web-based system for managing business operations, projects, and documentation. It's built using the Catalyst Perl web framework and provides features for project management, theme customization, and user authentication.\n\n## Structure\n- `Comserv/`: Main application directory containing the core application code\n  - `lib/`: Application code and models\n  - `docs/`: Documentation files\n  - `root/`: Static assets and templates\n  - `script/`: Utility scripts for server management and database operations\n  - `t/`: Test files\n- `app/`: Additional application components\n- `data/`: Data files including pricing information\n- `proxmox/`: Proxmox VE integration components\n\n## Language & Runtime\n**Language**: Perl\n**Version**: 5.x (compatible with Perl 5.40.0)\n**Framework**: Catalyst 5.90130\n**Build System**: Module::Install\n**Package Manager**: CPAN\n\n## Dependencies\n**Main Dependencies**:\n- Catalyst::Runtime (5.90130)\n- Moose\n- DBIx::Class\n- Template (Template Toolkit)\n- JSON/JSON::MaybeXS\n- Log::Log4perl\n- DateTime\n- File::Slurp\n\n**Development Dependencies**:\n- Test::More (0.88+)\n- Test::Pod\n- Test::Pod::Coverage\n- Test::WWW::Mechanize::Catalyst\n- Catalyst::Devel\n\n## Build & Installation\n```bash\ncd Comserv\nperl Makefile.PL\nmake\nmake test\nmake install\n```\n\n## Database\n**Type**: MySQL\n**Setup**: \n```bash\nmysql -u root -p < database_initialization_script.sql\n```\n**Schema Management**: DBIx::Class::Schema::Loader\n\n## Testing\n**Framework**: Test::More\n**Test Location**: Comserv/t/\n**Run Command**:\n```bash\ncd Comserv\nprove -l t/\n```\n\n## Server Execution\n**Development Server**:\n```bash\ncd Comserv\nscript/comserv_server.pl\n```\n**Production Deployment**:\n```bash\ncd Comserv\nscript/comserv_fastcgi.pl\n# or\nstarman --port 5000 --workers 5 comserv.psgi\n```\n\n## Authentication & Authorization\n- Session-based authentication\n- Role-based access control\n- Multiple authentication realms\n- Support for user groups and site-specific permissions\n\n## Features\n- Project management system\n- Theme customization system\n- Email integration\n- PDF generation\n- Proxmox VE integration\n- Multi-site support"
+                },
+                {
+                    "name": "Database Development Standards and Best Practices",
+                    "description": "Database Development Standards and Best Practices",
+                    "uri": "zen-rules://repo/database-standards",
+                    "content": "\n\n# Database Development Standards\n\n## Query Standards\n- **Table Aliases:** Use table aliases in all queries to avoid ambiguity (e.g., 'me.column_name')\n- **Error Handling:** Implement proper error handling with eval blocks and try/catch\n- **Parameterized Queries:** Use parameterized queries to prevent SQL injection\n\n## Schema Management\n- **Naming Conventions:** Follow naming conventions for tables, columns, and relationships\n- **Documentation:** Document schema changes and rationale for future reference\n- **Performance:** Regularly optimize database performance and indexes\n- **Version Control:** Use Git to track schema changes with proper tagging\n- **Backup Protocol:** Always backup database before making schema changes\n\n## Model Standards (DBIx::Class)\n- **Result Classes:** Located in `/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema/Ency/Result/`\n- **Relationships:** Define proper relationships between tables\n- **Validation:** Implement data validation in model classes\n\n## Configuration Priority\n- **Primary:** ZeroTier production server (172.30.161.222) - works from any network\n- **Secondary:** Local network production server (192.168.1.198) - home/office only\n- **Tertiary:** localhost MySQL (development)\n- **Fallback:** SQLite (offline mode)\n\n## Security Protocols\n- **Input Validation:** Validate all user inputs before database operations\n- **Access Controls:** Implement proper access controls based on user roles\n- **Regular Reviews:** Regularly review and update security protocols"
+                },
+                {
+                    "name": "AI Behavior Enforcement Rules for Zencoder",
+                    "description": "AI Behavior Enforcement Rules for Zencoder",
+                    "uri": "zen-rules://repo/ai-behavior-enforcement",
+                    "content": "\n\n# AI Behavior Enforcement Rules\n\n## MANDATORY PROMPT TRACKING\n**CURRENT PROMPT:** This is prompt #[X] of 4 maximum allowed prompts.\n\n### Prompt Counter Protocol\n- **Start Each Response:** Begin every response with current prompt count\n- **Track Internally:** Keep running count throughout conversation\n- **Warn at Prompt 3:** Alert user that next prompt will trigger handoff\n- **Stop at Prompt 4:** Refuse to continue, provide handoff documentation\n\n## MANDATORY APPROVAL WORKFLOW\n\n### Before ANY Code Changes\n1. **STOP:** Do not modify any files without explicit user approval\n2. **PRESENT:** Show exactly what will be changed using the standard format\n3. **WAIT:** Wait for explicit approval (\"yes\", \"approved\", \"apply changes\")\n4. **CONFIRM:** Acknowledge approval before proceeding\n5. **EXECUTE:** Apply changes only after confirmation\n\n### Standard Change Presentation\n```\n🔄 PROPOSED CHANGE TO: [filename]\n📝 CHANGE TYPE: [Addition/Modification/Deletion]\n📋 DESCRIPTION: [what this accomplishes]\n\n❌ CURRENT CODE:\n[existing code or \"N/A\"]\n\n✅ NEW CODE:\n[proposed code or \"DELETED\"]\n\n💡 REASON: [why needed]\n\n⚠️  APPROVAL REQUIRED: Please confirm with \"approved\" or \"yes\"\n🔄 REVERT: Changes can be undone if needed\n```\n\n## VIOLATION CONSEQUENCES\n- **Prompt Limit Exceeded:** Immediate session termination with handoff\n- **Unapproved Changes:** Acknowledge violation and request approval retroactively\n- **Missing Counter:** Add prompt counter to current response\n\n## HANDOFF TEMPLATE (Use on 4th Prompt)\n```\n🚨 PROMPT LIMIT REACHED - HANDOFF REQUIRED\n\n📊 SESSION SUMMARY:\n- Prompts Used: 4/4\n- Files Modified: [list]\n- Tasks Completed: [list]\n- Tasks Remaining: [list]\n\n🔄 HANDOFF PROMPT FOR NEXT AI:\n\"Continue working on [project/task]. Read development-guidelines.md and ai-behavior-enforcement.md first. \nCurrent context: [brief context]\nFiles being worked on: [list]\nNext steps needed: [specific actions]\"\n\n📚 REQUIRED READING FOR NEXT AI:\n- .zencoder/rules/development-guidelines.md\n- .zencoder/rules/ai-behavior-enforcement.md\n- [any other relevant docs]\n\n✅ DOCUMENTATION UPDATED: [what was recorded]\n```\n\n## EMERGENCY PROTOCOLS\n- **User Says \"Stop\":** Immediately cease all activities\n- **User Says \"Revert\":** Provide instructions for undoing changes\n- **User Says \"Handoff\":** Immediately provide handoff documentation"
+                },
+                {
+                    "name": "Template Toolkit Standards and Requirements",
+                    "description": "Template Toolkit Standards and Requirements",
+                    "uri": "zen-rules://repo/template-standards",
+                    "content": "\n\n# Template Toolkit (.tt) Standards\n\n## Required PageVersion Header Format\nAll .tt files must include this exact format:\n```\n[% META title = 'Page Title Here' %]\n[% PageVersion = 'relative/path/filename.tt,v 0.01 YYYY/MM/DD author Exp author ' %]\n[% IF c.session.debug_mode == 1 %]\n    [% PageVersion %]\n[% END %]\n```\n\n## Template Standards\n- **Theme Compliance:** Use theme system variables for styling - NO page-specific CSS\n- **Debug Mode:** Include debug mode blocks for development visibility\n- **Responsive Design:** Implement mobile-first responsive design patterns\n- **HTML Structure:** Use proper semantic HTML structure\n- **Template Toolkit:** Follow Template Toolkit best practices\n\n## Navigation Integration\nWhen working with navigation templates:\n- **Main Navigation:** Include via `/Navigation/navigation.tt`\n- **Admin Menu:** Use `/Navigation/admintopmenu.tt` for admin-only sections\n- **Dropdown Menus:** Reference existing dropdown templates in `/Navigation/` directory\n\n## Documentation File Rules - CRITICAL\n- **File Format:** ONLY `.tt` files for application documentation - NO `.md` files\n- **EXISTING FILES FIRST:** ALWAYS search for and use existing files before creating new ones\n- **Naming Consistency:** Use same file names across AI sessions to prevent content loss\n- **Content Priority:** Always improve existing files rather than creating new ones\n- **Role-Based Access:** Respect existing Documentation/index.tt role-based structure\n- **Directory Consolidation:** Use established directory structure - don't create new directories\n\n## File Creation Protocol\n1. **Search First:** Use file search tools to find existing similar files\n2. **Check Directory:** Look at existing directory structure in target location\n3. **Ask User:** If multiple similar files exist, ask which should be updated\n4. **Update Existing:** Improve existing files rather than creating duplicates"
+                },
+                {
+                    "name": "Debugging and Troubleshooting Protocols",
+                    "description": "Debugging and Troubleshooting Protocols",
+                    "uri": "zen-rules://repo/debugging-protocols",
+                    "content": "\n\n# Debugging Protocols\n\n## Log Analysis Priority\n1. **Application Logs:** Check `/home/shanta/PycharmProjects/comserv2/Comserv/logs/application.log` first\n2. **Error Logs:** Look for recent errors and stack traces\n3. **Debug Mode:** Enable debug mode in session for detailed output\n\n## Common Debugging Steps\n1. **Reproduce Issue:** Ensure issue is reproducible\n2. **Check Recent Changes:** Review recent code modifications\n3. **Verify Dependencies:** Ensure all required modules are installed\n4. **Database Connectivity:** Test database connections\n5. **Permission Issues:** Check file and directory permissions\n\n## Testing Protocol\n- **Unit Tests:** Run relevant unit tests first\n- **Integration Tests:** Test full workflow\n- **Browser Testing:** Always test in actual browser environment\n- **Log Monitoring:** Monitor logs during testing\n\n## Performance Issues\n- **Database Queries:** Check for slow queries\n- **Memory Usage:** Monitor memory consumption\n- **Template Rendering:** Check template compilation times\n- **Network Latency:** Consider network-related delays"
+                }
+            ]
+        },
+        {
+            "id": "2b1c1cc8-d220-4e6c-9d48-e47016a5d599",
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "**CURRENT PROMPT:** This is prompt #1pts.\n\nI'll start by reading the development guidelines and enforcement rules, then work on updating the existing Projects.tt documentation file as requested."
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01XqhPoiiSXrh15TjAVj3Azw",
+                    "statusText": "Viewed file",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": ".zencoder/rules/development-guidelines.md",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/.zencoder/rules/development-guidelines.md"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01Niu2JB9JSESxWVPT7Fuza6",
+                    "statusText": "Viewed file",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": ".zencoder/rules/ai-behavior-enforcement.md",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/.zencoder/rules/ai-behavior-enforcement.md"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "text",
+                    "text": "Now let me check the existing Projects.tt file to understand its current state:"
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01HmacW5jDKm8KSKaAJdpYCu",
+                    "statusText": "Viewed file",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": "Comserv/root/Documentation/Projects.tt",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Projects.tt"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "text",
+                    "text": "Let me see the rest of the file:"
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_018LmcpW4vywi8EovMQQ9C4G",
+                    "statusText": "Viewed file",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": "Comserv/root/Documentation/Projects.tt",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Projects.tt"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "text",
+                    "text": "Now let me check the current Project.pm controller to understand what needs to be documented:"
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_011oZQqfhAZTszTZ78WP3GBG",
+                    "statusText": "Viewed file",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": "Comserv/lib/Comserv/Controller/Project.pm",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Project.pm"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "text",
+                    "text": "Let me check the enhance_project_data method that was mentioned in the code:"
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01R2T1dudB7tRjErSL8UrStR",
+                    "title": "Fulltext search",
+                    "statusText": "Done",
+                    "status": "SUCCESS",
+                    "isHidden": false
+                },
+                {
+                    "type": "text",
+                    "text": "Let me check the enhance_project_data method:"
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01XsxFbJM3g5JjoQwB6hfGWK",
+                    "statusText": "Viewed file",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": "Comserv/lib/Comserv/Controller/Project.pm",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Project.pm"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "text",
+                    "text": "Now let me check the application logs to understand any current issues:"
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01N3SrTPwRcH18vfzDj2B6HM",
+                    "statusText": "Viewed folder",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": "Comserv/logs",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/logs"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01WAzLVuNuW1wXfeUbdDx99t",
+                    "statusText": "Viewed folder",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": "logs",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/logs"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "text",
+                    "text": "Let me check if there are any log files in the project:"
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01BL6TCsKjyR86xSANmu7iJw",
+                    "title": "File search",
+                    "statusText": "Done",
+                    "status": "SUCCESS",
+                    "isHidden": false
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01QPTP5mU3e1qDyqjR2YrHWo",
+                    "title": "File search",
+                    "statusText": "Done",
+                    "status": "SUCCESS",
+                    "isHidden": false
+                },
+                {
+                    "type": "text",
+                    "text": "Now let me check the SB controller to understand what needs to be documented:"
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01FXFn89fS4wTnWWEonyxCz2",
+                    "statusText": "Viewed file",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": "Comserv/lib/Comserv/Controller/SB.pm",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/SB.pm"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "text",
+                    "text": "Let me see more of the SB controller:"
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01S7CEWTP5Ykuf3iJ9EkMZVn",
+                    "statusText": "Viewed file",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": "Comserv/lib/Comserv/Controller/SB.pm",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/SB.pm"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "text",
+                    "text": "Now I have a good understanding of both controllers. Let me prepare the updates to the Projects.tt documentation file. Based on the handoff context and my analysis, I need to update the existing Projects.tt file with comprehensive system overview information, particularly focusing on the recent fixes and current functionality.\n\n🔄 **PROPOSED CHANGE TO:** /home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Projects.tt\n📝 **CHANGE TYPE:** Modification\n📋 **DESCRIPTION:** Update the existing Projects.tt documentation with comprehensive system overview, recent fixes, database connectivity information, and current functionality status\n\n❌ **CURRENT CODE:**\n```\n[% META title = 'Projects Documentation' %]Version = 'Documentation/Projects.tt,v 0.06 2025/08/25 Shanta Exp shanta ' %]\n[% IF debug == 1 %]\n    [% PageVersion %]\n[% END %]\n\n    <h1 id=\"projects-top\">Projects System Documentation</h1>\n```\n\n✅ **NEW CODE:**\n```\n[% META title = 'Projects System Documentation' %]\n    [% PageVersion = 'Documentation/Projects.tt,v 0.07 2025/01/27 AI Exp AI ' %]\n[% IF c.session.debug_mode == 1 %]\n    [% PageVersion %]\n[% END %]\n\n    <h1 id=\"projects-top\">Projects System Documentation</h1>\n    \n    <div class=\"alert alert-info\">\n        <strong>System Status:</strong> Project controller has been updated with working database queries and proper error handling. \n        All compilation errors have been resolved. Last updated: January 27, 2025.\n    </div>\n```\n\n💡 **REASON:** Update version number, fix debug mode check to use proper session variable, and add system status information to reflect recent fixes\n\n⚠️  **APPROVAL REQUIRED:** Please confirm with \"approved\" or \"yes\"\n🔄 **REVERT:** Changes can be undone if needed"
+                }
+            ],
+            "context": {
+                "author": "Coding Agent",
+                "operationId": "208b2883-f98d-44ec-9bb8-c94176a53806"
+            },
+            "createdAt": 1753526968144,
+            "isInternal": false
+        },
+        {
+            "id": "365ca3f3-f85d-4970-920b-0b9c325efcf9",
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "yes"
+                }
+            ],
+            "context": {
+                "currentFile": {
+                    "path": "Comserv/lib/Comserv/Controller/Project.pm",
+                    "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Project.pm",
+                    "sources": [
+                        "opened_tab"
+                    ],
+                    "content": "ypackage Comserv::Controller::Project;\nuse Moose;\nuse namespace::autoclean;\nuse DateTime;\nuse Data::Dumper;\nuse Comserv::Util::Logging;\nuse Comserv::Controller::Site;\nBEGIN { extends 'Catalyst::Controller'; }\nhas 'logging' => (\n    is => 'ro',\n    default => sub { Comserv::Util::Logging->instance }\n);\nsub index :Path :Args(0) {\n    my ( $self, $c ) = @_;\n    $self->logging->log_with_details('info', __FILE__, __LINE__, 'index', 'Starting index action');\n    $c->res->redirect($c->uri_for($self->action_for('project')));\n}\n\nsub add_project :Path('addproject') :Args(0) {\n    my ( $self, $c ) = @_;\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_project', 'Starting add_project action' );\n\n    # Store the previous URL for redirect after form submission\n    $c->session->{previous_url} = $c->req->referer;\n\n    # Get parent_id from query parameters if it exists (for sub-projects)\n    my $parent_id = $c->request->query_parameters->{parent_id};\n\n    # Use the fetch_projects_with_subprojects method to get the projects\n    my $projects = $self->fetch_projects_with_subprojects($c);\n\n    # Use the fetch_available_sites method from Site controller to get the sites\n    my $site_controller = $c->controller('Site');\n    my $sites = $site_controller->fetch_available_sites($c);\n\n    # If this is a sub-project, get the parent project details\n    my $parent_project;\n    if ($parent_id) {\n        my $schema = $c->model('DBEncy');\n        $parent_project = $schema->resultset('Project')->find($parent_id);\n        if ($parent_project) {\n            # Pre-fill form data with parent project details\n            $c->stash->{form_data} = {\n                sitename => $parent_project->sitename,\n                parent_id => $parent_id,  # This will be used to pre-select in the dropdown\n                selected_parent => $parent_id,  # Additional field for template to identify selected parent\n                # Inherit other relevant fields from parent\n                project_code => $parent_project->project_code,\n                client_name => $parent_project->client_name,\n                developer_name => $parent_project->developer_name,\n            };\n\n            # Log the parent project details for debugging\n            $self->logging->log_with_details(\n                $c, 'debug', __FILE__, __LINE__, 'add_project',\n                \"Setting up sub-project for parent ID: $parent_id, Name: \" . $parent_project->name\n            );\n        } else {\n            $self->logging->log_with_details(\n                $c, 'warn', __FILE__, __LINE__, 'add_project',\n                \"Parent project not found for ID: $parent_id\"\n            );\n        }\n    }\n\n    # Set up the stash for the template\n    $c->stash(\n        sites => $sites,\n        projects => $projects,\n        parent_project => $parent_project,\n        template => 'todo/add_project.tt'\n    );\n\n    $c->forward($c->view('TT'));\n}\n\n\nsub  create_project :Local :Args(0) {\n    my ($self, $c) = @_;\n\n    my $form_data = $c->request->body_parameters;\n    my $schema = $c->model('DBEncy');\n    my $project_rs = $schema->resultset('Project');\n    my $date_time_posted = DateTime->now;\n\n    # Get username safely - check both user_exists AND that user object is defined\n    my $username = '';\n    if ($c->user_exists && $c->user) {\n        $username = $c->user->username;\n    } elsif ($c->session->{username}) {\n        $username = $c->session->{username};\n    } else {\n        $username = 'anonymous';\n    }\n\n    # Handle parent_id properly\n    my $parent_id = $form_data->{parent_id};\n    if (ref $parent_id eq 'ARRAY') {\n        $parent_id = $parent_id->[0];\n    }\n    if (!$parent_id || $parent_id eq '') {\n        $parent_id = undef;\n    }\n\n    # Get group_of_poster safely\n    my $group_of_poster = 'general';  # Default value\n    if ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && defined $c->session->{roles}->[0]) {\n        $group_of_poster = $c->session->{roles}->[0];\n    } else {\n        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_project',\n            \"No roles found in session, using default group 'general'\");\n    }\n\n    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_project',\n        \"Parent ID: \" . (defined $parent_id ? $parent_id : 'undef') . \", Group of poster: $group_of_poster\");\n\n    my $project = eval {\n        $project_rs->create({\n            sitename => $c->session->{SiteName},\n            name => $form_data->{name},\n            description => $form_data->{description},\n            start_date => $form_data->{start_date},\n            end_date => $form_data->{end_date},\n            status => $form_data->{status},\n            project_code => $form_data->{project_code},\n            project_size => $form_data->{project_size},\n            estimated_man_hours => $form_data->{estimated_man_hours},\n            developer_name => $form_data->{developer_name},\n            client_name => $form_data->{client_name},\n            comments => $form_data->{comments},\n            username_of_poster => $username,\n            parent_id => $parent_id,\n            group_of_poster => $group_of_poster,\n            date_time_posted => $date_time_posted->ymd . ' ' . $date_time_posted->hms,\n            record_id => 0  # Set to 0 instead of undef\n        });\n    };\n\n    if ($@) {\n        my $error_msg = $@;\n        $error_msg =~ s/\\s+at\\s+.*//s;\n\n        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_project',\n            \"Database error creating project: $error_msg\");\n\n        my $site_controller = $c->controller('Site');\n        my $sites = $site_controller->fetch_available_sites($c);\n        my $projects = $self->fetch_projects_with_subprojects($c);\n\n        $c->stash(\n            form_data => $form_data,\n            sites => $sites,\n            projects => $projects,\n            error_message => \"Failed to create project: $error_msg\",\n            template => 'todo/add_project.tt'\n        );\n\n        $c->forward($c->view('TT'));\n        return;\n    }\n\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_project',\n        \"Project created with ID: \" . $project->id);\n\n    $c->flash->{success_message} = 'Project added successfully';\n    $c->res->redirect($c->uri_for($self->action_for('project')));\n}\n\n\nsub project :Path('project') :Args(0) {\n    my ( $self, $c ) = @_;\n    \n    # Log the start of the project action\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'project', 'Starting project action');\n    \n    # Get filter parameters from query string\n    my $role_filter = $c->request->query_parameters->{role} || '';\n    my $project_filter = $c->request->query_parameters->{project_id} || '';\n    my $priority_filter = $c->request->query_parameters->{priority} || '';\n    \n    # Log the filter parameters\n    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'project', \n        \"Filter parameters - Role: $role_filter, Project: $project_filter, Priority: $priority_filter\");\n\n    # Use the existing method to fetch projects with sub-projects\n    my $projects = $self->fetch_projects_with_subprojects($c);\n    \n    # Enhance project data with additional fields needed for filtering\n    $projects = $self->enhance_project_data($c, $projects);\n\n    # Add the projects and filter info to the stash\n    $c->stash(\n        projects => $projects,\n        role_filter => $role_filter,\n        project_filter => $project_filter,\n        priority_filter => $priority_filter,\n        template => 'todo/project.tt', # Use the original template\n        template_timestamp => time(), # Add a timestamp to force template reload\n        success_message => 'Project priority display has been updated. All projects without a priority are now shown as Medium priority.',\n        additional_css => ['/static/css/components/project-cards.css?v=' . time()], # Add timestamp to force CSS reload\n        use_fluid_container => 1, # Use fluid container for better card layout\n        debug_mode => 1 # Enable debug mode to see template version\n    );\n    \n    # Log that we're using the project cards CSS\n    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'project', \n        \"Loading bootstrap cards CSS and project cards CSS with timestamp: \" . time());\n\n    # Log completion of the project action\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'project', 'Completed project action');\n\n    $c->forward($c->view('TT'));\n}\n\nsub details :Path('details') :Args(0) {\n    my ( $self, $c ) = @_;\n\n    # Logging: Start of the details action\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'details', 'Starting details action.');\n\n    # Retrieve project_id from body or query parameters\n    my $project_id = $c->request->body_parameters->{project_id} || $c->request->query_parameters->{project_id};\n\n    if (!$project_id) {\n        # Logging: Parameter missing\n        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'details', 'Missing parent_id or project_id parameter in request.');\n\n        # Check if this was meant to be a sub-project creation\n        my $parent_id = $c->request->query_parameters->{parent_id};\n        if ($parent_id) {\n            # Redirect back to add project form with parent_id\n            $c->response->redirect($c->uri_for($self->action_for('add_project'), { parent_id => $parent_id }));\n            return;\n        }\n\n        $c->stash(\n            error_msg => 'Project ID is required to view project details. Please select a project from the list.',\n            template => 'todo/projectdetails.tt'\n        );\n        $c->forward($c->view('TT'));\n        return;\n    }\n\n    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'details', \"Received project_id: $project_id.\");\n\n    # Get the DB schema and project model\n    my $schema = $c->model('DBEncy');\n    my $project_model = $c->model('Project');\n\n    # Log the project_id we're looking for\n    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'details',\n        \"Looking for project with ID: $project_id\");\n\n    # Fetch project by ID\n    my $project;\n    eval {\n        $project = $schema->resultset('Project')->find($project_id);\n    };\n    if ($@ || !$project) {\n        # Logging: Error fetching project or project not found\n        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'details', \"Failed to fetch project for ID: $project_id. Error: $@\");\n        $c->stash(\n            error_msg => \"Project with ID $project_id not found.\",\n            template => 'todo/projectdetails.tt'\n        );\n        $c->forward($c->view('TT'));\n        return;\n    }\n\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'details', \"Successfully fetched project for ID: $project_id.\");\n\n    # Fetch todos associated with the project\n    my @todos;\n    eval {\n        @todos = $schema->resultset('Todo')->search(\n            { project_id => $project_id },\n            { order_by => { -asc => 'start_date' } }\n        );\n    };\n    if ($@) {\n        # Logging: Error fetching todos\n        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'details', \"Error fetching todos for project ID: $project_id. Error: $@\");\n        $c->stash(\n            error_msg => \"Failed to fetch todos for project with ID $project_id.\",\n            template => 'todo/projectdetails.tt'\n        );\n        $c->forward($c->view('TT'));\n        return;\n    }\n\n    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'details', \"Fetched \" . scalar(@todos) . \" todos for project ID: $project_id.\");\n\n    # Fetch sub-projects and their todos recursively\n    my $project_tree = $self->build_project_tree($c, $project);\n\n    # Add the project tree (including sub-projects and todos) to the stash\n    $c->stash(\n        project => $project_tree,\n        todos => \\@todos,\n        template => 'todo/projectdetails.tt'\n    );\n\n    # Logging: End of details action\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'details', \"Finished details action for project ID: $project_id.\");\n\n    $c->forward($c->view('TT'));\n}\n\n# This enhance_project_data implementation has been moved to line 482\n# See the implementation there\n\nsub fetch_projects_with_subprojects :Private {\n    my ($self, $c) = @_;\n    # Log the start of the project-fetching subroutine\n    $self->logging->log_with_details(\n        $c, 'info', __FILE__, __LINE__, 'fetch_projects_with_subprojects',\n        'Fetching parent projects with sub-projects'\n    );\n\n    # Get database schema\n    my $schema = $c->model('DBEncy')->schema;\n    \n    # Fetch top-level projects (where parent_id is NULL)\n    my @top_projects;\n    eval {\n        @top_projects = $schema->resultset('Project')->search(\n            { parent_id => undef },\n            { order_by => { -asc => 'name' } }\n        )->all;\n    };\n\n    if ($@) {\n        $self->logging->log_with_details(\n            $c, 'error', __FILE__, __LINE__, 'fetch_projects_with_subprojects',\n            \"Error fetching top-level projects: $@\"\n        );\n        return [];\n    }\n\n    # Create an array to hold our project structure\n    my @projects = ();\n\n    # Process each top-level project\n    foreach my $project (@top_projects) {\n        # Create a hashref for this project\n        my $project_hash = {\n            id => $project->id,\n            name => $project->name,\n            description => $project->description || '',\n            parent_id => $project->parent_id,\n            status => $project->status || 1,\n            start_date => $project->start_date,\n            end_date => $project->end_date,\n            developer_name => $project->developer_name || '',\n            client_name => $project->client_name || '',\n            priority => 2,\n            sub_projects => []\n        };\n\n        push @projects, $project_hash;\n    }\n\n    # Log the successful preparation of the project data structure\n    $self->logging->log_with_details(\n        $c, 'info', __FILE__, __LINE__, 'fetch_projects_with_subprojects',\n        'Successfully prepared project data structure with ' . scalar(@projects) . ' top-level projects'\n    );\n\n    return \\@projects;\n}\n\n# Enhance project data with additional fields needed for filtering\nsub enhance_project_data :Private {\n    my ($self, $c, $projects) = @_;\n    \n    # Log the start of the enhance_project_data method\n    $self->logging->log_with_details(\n        $c, 'info', __FILE__, __LINE__, 'enhance_project_data',\n        'Enhancing project data for filtering'\n    );\n    \n    # Process each project to ensure it has all required fields\n    foreach my $project (@$projects) {\n        # Set default values for any missing fields\n        $project->{priority} = $project->{priority} || 2; # Default to medium priority\n        $project->{status} = $project->{status} || 1; # Default to new status\n        $project->{developer_name} = $project->{developer_name} || '';\n        $project->{client_name} = $project->{client_name} || '';\n        \n        # Process sub-projects recursively\n        if ($project->{sub_projects} && @{$project->{sub_projects}}) {\n            $self->enhance_project_data($c, $project->{sub_projects});\n        }\n    }\n    \n    # Log completion of the enhance_project_data method\n    $self->logging->log_with_details(\n        $c, 'info', __FILE__, __LINE__, 'enhance_project_data',\n        'Completed enhancing project data for filtering'\n    );\n    \n    return $projects;\n}\n\n# This build_project_tree implementation has been moved to line 672\n# See the implementation there\n\nsub editproject :Path('editproject') :Args(0) {\n    my ( $self, $c ) = @_;\n\n    # Log the start of the editproject action\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'editproject', 'Starting editproject action');\n\n    # Get project_id from either body parameters (POST) or query parameters (GET)\n    my $project_id = $c->request->body_parameters->{project_id} || $c->request->query_parameters->{project_id};\n\n    # Log the project_id\n    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'editproject',\n        \"Project ID: \" . (defined $project_id ? $project_id : 'undefined'));\n\n    # Validate project_id\n    if (!defined $project_id || $project_id eq '') {\n        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'editproject', 'Missing project_id parameter');\n        $c->stash(\n            error_msg => \"Project ID is required to edit a project.\",\n            template => 'todo/error.tt'\n        );\n        $c->forward($c->view('TT'));\n        return;\n    }\n\n    # Handle the case where project_id is an array reference (from multi-select)\n    if (ref $project_id eq 'ARRAY') {\n        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'editproject',\n            \"Project ID is an array reference, using first element\");\n        $project_id = $project_id->[0];\n    }\n\n    # Get the project from the database\n    my $project_model = $c->model('Project');\n    my $schema = $c->model('DBEncy');\n    my $project;\n\n    eval {\n        $project = $project_model->get_project($schema, $project_id);\n    };\n\n    if ($@ || !$project) {\n        my $error_msg = $@ || \"Project not found\";\n        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'editproject',\n            \"Error finding project with ID $project_id: $error_msg\");\n        $c->stash(\n            error_msg => \"Project with ID $project_id not found. Please check the application.log for more Details.\",\n            template => 'todo/error.tt'\n        );\n        $c->forward($c->view('TT'));\n        return;\n    }\n\n    # Log that we found the project\n    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'editproject',\n        \"Found project with ID $project_id: \" . $project->name);\n\n    # Use the fetch_available_sites method from the Site controller to get the sites\n    my $site_controller = $c->controller('Site');\n    my $sites = $site_controller->fetch_available_sites($c);\n\n    # Use the fetch_projects_with_subprojects method to get the projects\n    my $projects = $self->fetch_projects_with_subprojects($c);\n\n    # Stash everything for the template\n    $c->stash(\n        projects => $projects,\n        project => $project,\n        sites => $sites,\n        template => 'todo/editproject.tt'\n    );\n\n    # Log the end of the editproject action\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'editproject',\n        \"Ending editproject action for project ID $project_id\");\n\n    $c->forward($c->view('TT'));\n}\n\nsub build_project_tree :Private {\n    my ($self, $c, $project, $depth) = @_;\n\n    # Set default depth or increment current depth\n    $depth = defined($depth) ? $depth + 1 : 0;\n\n    # Maximum recursion depth - adjust as needed\n    my $max_depth = 3;\n\n    # Get the schema\n    my $schema = $c->model('DBEncy');\n\n    # Log the start of building the project tree\n    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'build_project_tree',\n        \"Building project tree for project ID: \" . $project->id . \" at depth $depth\");\n\n    # Create the base project hash with essential attributes only\n    my $project_hash = {\n        id => $project->id,\n        name => $project->name,\n        description => $project->description,\n        start_date => $project->start_date,\n        end_date => $project->end_date,\n        status => $project->status,\n        project_code => $project->project_code,\n        project_size => $project->project_size,\n        estimated_man_hours => $project->estimated_man_hours,\n        developer_name => $project->developer_name,\n        client_name => $project->client_name,\n        comments => $project->comments,\n        sitename => $project->sitename,\n        parent_id => $project->parent_id,\n        username_of_poster => $project->username_of_poster,\n        group_of_poster => $project->group_of_poster,\n        date_time_posted => $project->date_time_posted,\n        record_id => $project->record_id\n    };\n\n    # Fetch todos for this project\n    my @todos = ();\n    eval {\n        @todos = $schema->resultset('Todo')->search(\n            { project_id => $project->id },\n            { order_by => { -asc => 'start_date' } }\n        )->all;\n    };\n\n    if ($@) {\n        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'build_project_tree',\n            \"Error fetching todos for project ID: \" . $project->id . \": $@\");\n    } else {\n        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'build_project_tree',\n            \"Fetched \" . scalar(@todos) . \" todos for project ID: \" . $project->id);\n    }\n\n    # Create an array of todo hashrefs with only the needed attributes\n    my @todo_hashrefs = ();\n    foreach my $todo (@todos) {\n        push @todo_hashrefs, {\n            id => $todo->id,\n            record_id => $todo->record_id,\n            subject => $todo->subject,\n            description => $todo->description,\n            start_date => $todo->start_date,\n            due_date => $todo->due_date,\n            status => $todo->status,\n            priority => $todo->priority\n        };\n    }\n    $project_hash->{todos} = \\@todo_hashrefs;\n\n    # Only fetch sub-projects if we haven't reached the maximum depth\n    if ($depth < $max_depth) {\n        # Fetch sub-projects\n        my @sub_projects = ();\n        eval {\n            @sub_projects = $schema->resultset('Project')->search(\n                { parent_id => $project->id },\n                { order_by => { -asc => 'name' } }\n            )->all;\n        };\n\n        if ($@) {\n            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'build_project_tree',\n                \"Error fetching sub-projects for project ID: \" . $project->id . \": $@\");\n        } else {\n            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'build_project_tree',\n                \"Fetched \" . scalar(@sub_projects) . \" sub-projects for project ID: \" . $project->id);\n        }\n\n        # If there are sub-projects, process them iteratively\n        if (@sub_projects) {\n            my @sub_project_hashrefs = ();\n            foreach my $sub_project (@sub_projects) {\n                # Recursively build the sub-project tree, but only if we're not too deep\n                if ($depth + 1 < $max_depth) {\n                    push @sub_project_hashrefs, $self->build_project_tree($c, $sub_project, $depth);\n                } else {\n                    # Just add basic info for the sub-project\n                    push @sub_project_hashrefs, {\n                        id => $sub_project->id,\n                        name => $sub_project->name,\n                        description => $sub_project->description,\n                        parent_id => $sub_project->parent_id,\n                        has_more_sub_projects => ($schema->resultset('Project')->search({ parent_id => $sub_project->id })->count > 0) ? 1 : 0\n                    };\n                }\n            }\n            $project_hash->{sub_projects} = \\@sub_project_hashrefs;\n        } else {\n            $project_hash->{sub_projects} = [];\n        }\n    } else {\n        # Log that we've reached the maximum depth\n        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'build_project_tree',\n            \"Reached maximum depth ($max_depth) for project ID: \" . $project->id);\n\n        # Add a flag to indicate there might be more sub-projects\n        my $has_more = 0;\n        eval {\n            $has_more = $schema->resultset('Project')->search({ parent_id => $project->id })->count > 0 ? 1 : 0;\n        };\n\n        if ($@) {\n            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'build_project_tree',\n                \"Error checking for more sub-projects for project ID: \" . $project->id . \": $@\");\n        }\n\n        $project_hash->{has_more_sub_projects} = $has_more;\n        $project_hash->{sub_projects} = [];\n    }\n\n    return $project_hash;\n}\n\nsub update_project :Local :Args(0)  {\n    my ( $self, $c ) = @_;\n\n    # Log the start of the update_project action\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_project', 'Starting update_project action');\n\n    my $form_data = $c->request->body_parameters;\n    my $project_id = $form_data->{project_id};\n\n    # Handle the case where project_id is an array reference (from multi-select)\n    if (ref $project_id eq 'ARRAY') {\n        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'update_project',\n            \"Project ID is an array reference, using first element\");\n        $project_id = $project_id->[0];\n    }\n\n    # Validate project_id\n    if (!$project_id) {\n        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_project', 'Missing project_id parameter');\n        $c->response->status(400);\n        $c->response->body('Project ID is required');\n        return;\n    }\n\n    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'update_project', \"Updating project with ID: $project_id\");\n\n    my $schema = $c->model('DBEncy');\n    my $project_rs = $schema->resultset('Project');\n\n    # Find the project with error handling\n    my $project;\n    eval {\n        $project = $project_rs->find($project_id);\n    };\n\n    if ($@ || !$project) {\n        my $error_msg = $@ || \"Project not found\";\n        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_project', \"Error finding project: $error_msg\");\n        $c->response->status(404);\n        $c->response->body(\"Project with ID $project_id not found\");\n        return;\n    }\n\n    # Handle parent_id properly\n    my $parent_id = $form_data->{parent_id};\n    if (ref $parent_id eq 'ARRAY') {\n        $parent_id = $parent_id->[0];\n    }\n    if (!$parent_id || $parent_id eq '') {\n        $parent_id = undef;\n    }\n\n    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'update_project',\n        \"Parent ID: \" . (defined $parent_id ? $parent_id : 'undef'));\n\n    # Update the project with error handling\n    eval {\n        $project->update({\n            sitename => $form_data->{sitename},\n            name => $form_data->{name},\n            description => $form_data->{description},\n            start_date => $form_data->{start_date},\n            end_date => $form_data->{end_date},\n            status => $form_data->{status},\n            project_code => $form_data->{project_code},\n            project_size => $form_data->{project_size},\n            estimated_man_hours => $form_data->{estimated_man_hours},\n            developer_name => $form_data->{developer_name},\n            client_name => $form_data->{client_name},\n            comments => $form_data->{comments},\n            parent_id => $parent_id,\n        });\n    };\n\n    if ($@) {\n        my $error_msg = $@;\n        $error_msg =~ s/\\s+at\\s+.*//s; # Clean up the error message\n\n        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_project', \"Error updating project: $error_msg\");\n        $c->response->status(500);\n        $c->response->body(\"Failed to update project: $error_msg\");\n        return;\n    }\n\n    # Log successful update\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_project',\n        \"Successfully updated project with ID: $project_id, Name: \" . $project->name .\n        \", Parent ID: \" . (defined $parent_id ? $parent_id : 'None'));\n\n    # Set success message\n    $c->flash->{success_message} = 'Project \"' . $project->name . '\" updated successfully';\n\n    # Redirect to the project details page\n    $c->res->redirect($c->uri_for($self->action_for('details'), { project_id => $project_id }));\n}\n__PACKAGE__->meta->make_immutable;\n1;\n",
+                    "language": "perl5"
+                },
+                "codebaseEnabled": true
+            },
+            "createdAt": 1753528306380,
+            "isInternal": false,
+            "rawContent": {
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "yes"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "autoAppliedRules": [
+                {
+                    "name": "User AI Instruction",
+                    "description": "User AI Instruction",
+                    "uri": "zen-rules://user/custom",
+                    "content": "read AI_DEVELOPMENT_GUIDELINES\nall code must be varifed by user"
+                },
+                {
+                    "name": "Repository Information Overview",
+                    "description": "Repository Information Overview",
+                    "uri": "zen-rules://repo/repo",
+                    "content": "\n\n# Comserv Project Information\n\n## Summary\nComserv is a comprehensive web-based system for managing business operations, projects, and documentation. It's built using the Catalyst Perl web framework and provides features for project management, theme customization, and user authentication.\n\n## Structure\n- `Comserv/`: Main application directory containing the core application code\n  - `lib/`: Application code and models\n  - `docs/`: Documentation files\n  - `root/`: Static assets and templates\n  - `script/`: Utility scripts for server management and database operations\n  - `t/`: Test files\n- `app/`: Additional application components\n- `data/`: Data files including pricing information\n- `proxmox/`: Proxmox VE integration components\n\n## Language & Runtime\n**Language**: Perl\n**Version**: 5.x (compatible with Perl 5.40.0)\n**Framework**: Catalyst 5.90130\n**Build System**: Module::Install\n**Package Manager**: CPAN\n\n## Dependencies\n**Main Dependencies**:\n- Catalyst::Runtime (5.90130)\n- Moose\n- DBIx::Class\n- Template (Template Toolkit)\n- JSON/JSON::MaybeXS\n- Log::Log4perl\n- DateTime\n- File::Slurp\n\n**Development Dependencies**:\n- Test::More (0.88+)\n- Test::Pod\n- Test::Pod::Coverage\n- Test::WWW::Mechanize::Catalyst\n- Catalyst::Devel\n\n## Build & Installation\n```bash\ncd Comserv\nperl Makefile.PL\nmake\nmake test\nmake install\n```\n\n## Database\n**Type**: MySQL\n**Setup**: \n```bash\nmysql -u root -p < database_initialization_script.sql\n```\n**Schema Management**: DBIx::Class::Schema::Loader\n\n## Testing\n**Framework**: Test::More\n**Test Location**: Comserv/t/\n**Run Command**:\n```bash\ncd Comserv\nprove -l t/\n```\n\n## Server Execution\n**Development Server**:\n```bash\ncd Comserv\nscript/comserv_server.pl\n```\n**Production Deployment**:\n```bash\ncd Comserv\nscript/comserv_fastcgi.pl\n# or\nstarman --port 5000 --workers 5 comserv.psgi\n```\n\n## Authentication & Authorization\n- Session-based authentication\n- Role-based access control\n- Multiple authentication realms\n- Support for user groups and site-specific permissions\n\n## Features\n- Project management system\n- Theme customization system\n- Email integration\n- PDF generation\n- Proxmox VE integration\n- Multi-site support"
+                },
+                {
+                    "name": "Database Development Standards and Best Practices",
+                    "description": "Database Development Standards and Best Practices",
+                    "uri": "zen-rules://repo/database-standards",
+                    "content": "\n\n# Database Development Standards\n\n## Query Standards\n- **Table Aliases:** Use table aliases in all queries to avoid ambiguity (e.g., 'me.column_name')\n- **Error Handling:** Implement proper error handling with eval blocks and try/catch\n- **Parameterized Queries:** Use parameterized queries to prevent SQL injection\n\n## Schema Management\n- **Naming Conventions:** Follow naming conventions for tables, columns, and relationships\n- **Documentation:** Document schema changes and rationale for future reference\n- **Performance:** Regularly optimize database performance and indexes\n- **Version Control:** Use Git to track schema changes with proper tagging\n- **Backup Protocol:** Always backup database before making schema changes\n\n## Model Standards (DBIx::Class)\n- **Result Classes:** Located in `/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema/Ency/Result/`\n- **Relationships:** Define proper relationships between tables\n- **Validation:** Implement data validation in model classes\n\n## Configuration Priority\n- **Primary:** ZeroTier production server (172.30.161.222) - works from any network\n- **Secondary:** Local network production server (192.168.1.198) - home/office only\n- **Tertiary:** localhost MySQL (development)\n- **Fallback:** SQLite (offline mode)\n\n## Security Protocols\n- **Input Validation:** Validate all user inputs before database operations\n- **Access Controls:** Implement proper access controls based on user roles\n- **Regular Reviews:** Regularly review and update security protocols"
+                },
+                {
+                    "name": "AI Behavior Enforcement Rules for Zencoder",
+                    "description": "AI Behavior Enforcement Rules for Zencoder",
+                    "uri": "zen-rules://repo/ai-behavior-enforcement",
+                    "content": "\n\n# AI Behavior Enforcement Rules\n\n## MANDATORY PROMPT TRACKING\n**CURRENT PROMPT:** This is prompt #[X] of 4 maximum allowed prompts.\n\n### Prompt Counter Protocol\n- **Start Each Response:** Begin every response with current prompt count\n- **Track Internally:** Keep running count throughout conversation\n- **Warn at Prompt 3:** Alert user that next prompt will trigger handoff\n- **Stop at Prompt 4:** Refuse to continue, provide handoff documentation\n\n## MANDATORY APPROVAL WORKFLOW\n\n### Before ANY Code Changes\n1. **STOP:** Do not modify any files without explicit user approval\n2. **PRESENT:** Show exactly what will be changed using the standard format\n3. **WAIT:** Wait for explicit approval (\"yes\", \"approved\", \"apply changes\")\n4. **CONFIRM:** Acknowledge approval before proceeding\n5. **EXECUTE:** Apply changes only after confirmation\n\n### Standard Change Presentation\n```\n🔄 PROPOSED CHANGE TO: [filename]\n📝 CHANGE TYPE: [Addition/Modification/Deletion]\n📋 DESCRIPTION: [what this accomplishes]\n\n❌ CURRENT CODE:\n[existing code or \"N/A\"]\n\n✅ NEW CODE:\n[proposed code or \"DELETED\"]\n\n💡 REASON: [why needed]\n\n⚠️  APPROVAL REQUIRED: Please confirm with \"approved\" or \"yes\"\n🔄 REVERT: Changes can be undone if needed\n```\n\n## VIOLATION CONSEQUENCES\n- **Prompt Limit Exceeded:** Immediate session termination with handoff\n- **Unapproved Changes:** Acknowledge violation and request approval retroactively\n- **Missing Counter:** Add prompt counter to current response\n\n## HANDOFF TEMPLATE (Use on 4th Prompt)\n```\n🚨 PROMPT LIMIT REACHED - HANDOFF REQUIRED\n\n📊 SESSION SUMMARY:\n- Prompts Used: 4/4\n- Files Modified: [list]\n- Tasks Completed: [list]\n- Tasks Remaining: [list]\n\n🔄 HANDOFF PROMPT FOR NEXT AI:\n\"Continue working on [project/task]. Read development-guidelines.md and ai-behavior-enforcement.md first. \nCurrent context: [brief context]\nFiles being worked on: [list]\nNext steps needed: [specific actions]\"\n\n📚 REQUIRED READING FOR NEXT AI:\n- .zencoder/rules/development-guidelines.md\n- .zencoder/rules/ai-behavior-enforcement.md\n- [any other relevant docs]\n\n✅ DOCUMENTATION UPDATED: [what was recorded]\n```\n\n## EMERGENCY PROTOCOLS\n- **User Says \"Stop\":** Immediately cease all activities\n- **User Says \"Revert\":** Provide instructions for undoing changes\n- **User Says \"Handoff\":** Immediately provide handoff documentation"
+                },
+                {
+                    "name": "Template Toolkit Standards and Requirements",
+                    "description": "Template Toolkit Standards and Requirements",
+                    "uri": "zen-rules://repo/template-standards",
+                    "content": "\n\n# Template Toolkit (.tt) Standards\n\n## Required PageVersion Header Format\nAll .tt files must include this exact format:\n```\n[% META title = 'Page Title Here' %]\n[% PageVersion = 'relative/path/filename.tt,v 0.01 YYYY/MM/DD author Exp author ' %]\n[% IF c.session.debug_mode == 1 %]\n    [% PageVersion %]\n[% END %]\n```\n\n## Template Standards\n- **Theme Compliance:** Use theme system variables for styling - NO page-specific CSS\n- **Debug Mode:** Include debug mode blocks for development visibility\n- **Responsive Design:** Implement mobile-first responsive design patterns\n- **HTML Structure:** Use proper semantic HTML structure\n- **Template Toolkit:** Follow Template Toolkit best practices\n\n## Navigation Integration\nWhen working with navigation templates:\n- **Main Navigation:** Include via `/Navigation/navigation.tt`\n- **Admin Menu:** Use `/Navigation/admintopmenu.tt` for admin-only sections\n- **Dropdown Menus:** Reference existing dropdown templates in `/Navigation/` directory\n\n## Documentation File Rules - CRITICAL\n- **File Format:** ONLY `.tt` files for application documentation - NO `.md` files\n- **EXISTING FILES FIRST:** ALWAYS search for and use existing files before creating new ones\n- **Naming Consistency:** Use same file names across AI sessions to prevent content loss\n- **Content Priority:** Always improve existing files rather than creating new ones\n- **Role-Based Access:** Respect existing Documentation/index.tt role-based structure\n- **Directory Consolidation:** Use established directory structure - don't create new directories\n\n## File Creation Protocol\n1. **Search First:** Use file search tools to find existing similar files\n2. **Check Directory:** Look at existing directory structure in target location\n3. **Ask User:** If multiple similar files exist, ask which should be updated\n4. **Update Existing:** Improve existing files rather than creating duplicates"
+                },
+                {
+                    "name": "Debugging and Troubleshooting Protocols",
+                    "description": "Debugging and Troubleshooting Protocols",
+                    "uri": "zen-rules://repo/debugging-protocols",
+                    "content": "\n\n# Debugging Protocols\n\n## Log Analysis Priority\n1. **Application Logs:** Check `/home/shanta/PycharmProjects/comserv2/Comserv/logs/application.log` first\n2. **Error Logs:** Look for recent errors and stack traces\n3. **Debug Mode:** Enable debug mode in session for detailed output\n\n## Common Debugging Steps\n1. **Reproduce Issue:** Ensure issue is reproducible\n2. **Check Recent Changes:** Review recent code modifications\n3. **Verify Dependencies:** Ensure all required modules are installed\n4. **Database Connectivity:** Test database connections\n5. **Permission Issues:** Check file and directory permissions\n\n## Testing Protocol\n- **Unit Tests:** Run relevant unit tests first\n- **Integration Tests:** Test full workflow\n- **Browser Testing:** Always test in actual browser environment\n- **Log Monitoring:** Monitor logs during testing\n\n## Performance Issues\n- **Database Queries:** Check for slow queries\n- **Memory Usage:** Monitor memory consumption\n- **Template Rendering:** Check template compilation times\n- **Network Latency:** Consider network-related delays"
+                }
+            ]
+        },
+        {
+            "id": "7bbd2661-8150-44fa-bb27-2b9f7118f7e8",
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "**CURRENT PROMPT:** This is prompt #2 of 4 maximum allowed prompts.\n\nThank you for the approval! I'll now apply the first change and then present the comprehensive update to the Projects.tt documentation."
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01QNFNgCyFgRdHukAatdGHmm",
+                    "statusText": "Change generated",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": "Comserv/root/Documentation/Projects.tt",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Projects.tt"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "codeHunk",
+                    "lineBasedDiff": "--- /home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Projects.tt\n+++ /home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Projects.tt\n@@ -1,10 +1,15 @@\n-[% META title = 'Projects Documentation' %]\n-    [% PageVersion = 'Documentation/Projects.tt,v 0.06 2025/08/25 Shanta Exp shanta ' %]\n-[% IF debug == 1 %]\n+[% META title = 'Projects System Documentation' %]\n+    [% PageVersion = 'Documentation/Projects.tt,v 0.07 2025/01/27 AI Exp AI ' %]\n+[% IF c.session.debug_mode == 1 %]\n     [% PageVersion %]\n [% END %]\n \n     <h1 id=\"projects-top\">Projects System Documentation</h1>\n+    \n+    <div class=\"alert alert-info\">\n+        <strong>System Status:</strong> Project controller has been updated with working database queries and proper error handling. \n+        All compilation errors have been resolved. Last updated: January 27, 2025.\n+    </div>\n \n     <nav>\n         <a href=\"#projects-overview\">Projects Overview</a> |",
+                    "refToolCallId": "toolu_01QNFNgCyFgRdHukAatdGHmm"
+                },
+                {
+                    "type": "text",
+                    "text": "Now I'll add comprehensive system overview information to better document the current state and recent fixes:\n\n🔄 **PROPOSED CHANGE TO:** /home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Projects.tt\n📝 **CHANGE TYPE:** Addition\n📋 **DESCRIPTION:** Add comprehensive system overview section with database connectivity, recent fixes, and current functionality status\n\n❌ **CURRENT CODE:**\n```\n    <h2 id=\"projects-overview\">Projects Overview</h2>\n    <p>The Projects system manages hierarchical project structures with support for parent-child relationships. Each project can have multiple sub-projects, and the system maintains data integrity through proper handling of user permissions and data validation.</p>\n```\n\n✅ **NEW CODE:**\n```\n    <h2 id=\"projects-overview\">Projects Overview</h2>\n    <p>The Projects system manages hierarchical project structures with support for parent-child relationships. Each project can have multiple sub-projects, and the system maintains data integrity through proper handling of user permissions and data validation.</p>\n    \n    <h3>Recent System Updates (January 2025)</h3>\n    <div class=\"alert alert-success\">\n        <h4>Fixed Issues:</h4>\n        <ul>\n            <li><strong>Database Connectivity:</strong> Project controller now properly queries the database instead of returning empty arrays</li>\n            <li><strong>Compilation Errors:</strong> All syntax errors in Project.pm have been resolved</li>\n            <li><strong>Method Implementation:</strong> <code>fetch_projects_with_subprojects</code> method now includes working database queries</li>\n            <li><strong>Error Handling:</strong> Improved error handling with proper eval blocks and logging</li>\n            <li><strong>Data Enhancement:</strong> <code>enhance_project_data</code> method properly sets default values for missing fields</li>\n        </ul>\n    </div>\n    \n    <h3>Current System Status</h3>\n    <div class=\"alert alert-warning\">\n        <h4>Known Issues:</h4>\n        <ul>\n            <li><strong>Application Logs:</strong> Log directory may notycharmProjects/comserv exist - check <code>/home/shanta/P2/Comserv/logs/application.log</code></li>\n            <li><strong>Template Testing:</strong> Project listing at <code>/project/project</code> URL needs browser testing</li>\n            <li><strong>Sub-Project Functionality:</strong> Hierarchical project display requires verification</li>\n        </ul>\n    </div>\n    \n    <h3>Database Configuration</h3>\n    <p>The system uses the following database priority order:</p>\n    <ol>\n        <li><strong>Primary:</strong> ZeroTier production server (172.30.161.222) - accessible from any network</li>\n        <li><strong>Secondary:</strong> Local network production server (192.168.1.198) - home/office only</li>\n        <li><strong>Development:</strong> localhost MySQL</li>\n        <li><strong>Fallback:</strong> SQLite (offline mode)</li>\n    </ol>\n    \n    <h3>Key Controller Methods</h3>\n    <ul>\n        <li><strong>fetch_projects_with_subprojects:</strong> Retrieves hierarchical project data from database</li>\n        <li><strong>enhance_project_data:</strong> Adds default values and processes sub-projects recursively</li>\n        <li><strong>build_project_tree:</strong> Creates detailed project structure with todos</li>\n        <li><strong>create_project:</strong> Handles project creation with proper validation</li>\n        <li><strong>project:</strong> Main listing page with filtering capabilities</li>\n        <li><strong>details:</strong> Detailed project view with sub-projects and todos</li>\n    </ul>\n```\n\n💡 **REASON:** Provide comprehensive documentation of recent fixes, current system status, and key functionality to help with debugging and maintenance\n\n⚠️  **APPROVAL REQUIRED:** Please confirm with \"approved\" or \"yes\"\n🔄 **REVERT:** Changes can be undone if needed"
+                },
+                {
+                    "type": "codePatch",
+                    "diffs": [
+                        {
+                            "path": "Comserv/root/Documentation/Projects.tt",
+                            "patch": "@@ -19,16 +19,23 @@\n rojects \n+System \n Document\n@@ -101,55 +101,62 @@\n  0.0\n-6\n+7\n  2025/0\n-8/25 Shanta Exp shanta ' %25%5D%0A%5B%25 IF debug\n+1/27 AI Exp AI ' %25%5D%0A%5B%25 IF c.session.debug_mode\n  == \n@@ -253,16 +253,284 @@\n ion%3C/h1%3E\n+%0A    %0A    %3Cdiv class=%22alert alert-info%22%3E%0A        %3Cstrong%3ESystem Status:%3C/strong%3E Project controller has been updated with working database queries and proper error handling. %0A        All compilation errors have been resolved. Last updated: January 27, 2025.%0A    %3C/div%3E\n %0A%0A    %3Cn\n",
+                            "isNew": false,
+                            "isApplied": true
+                        }
+                    ]
+                }
+            ],
+            "context": {
+                "author": "Coding Agent",
+                "operationId": "e3d0bd58-b27a-42b0-be66-47c6b4522fe6"
+            },
+            "createdAt": 1753528308979,
+            "isInternal": false
+        },
+        {
+            "id": "a1850552-7ca1-4083-9a6a-c4c1a08f926c",
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "Ok time for the commit."
+                }
+            ],
+            "context": {
+                "currentFile": {
+                    "path": "Comserv/root/Documentation/Projects.tt",
+                    "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Projects.tt",
+                    "sources": [
+                        "opened_tab"
+                    ],
+                    "content": "[% META title = 'Projects System Documentation' %]\n    [% PageVersion = 'Documentation/Projects.tt,v 0.07 2025/01/27 AI Exp AI ' %]\n[% IF c.session.debug_mode == 1 %]\n    [% PageVersion %]\n[% END %]\n\n    <h1 id=\"projects-top\">Projects System Documentation</h1>\n    \n    <div class=\"alert alert-info\">\n        <strong>System Status:</strong> Project controller has been updated with working database queries and proper error handling. \n        All compilation errors have been resolved. Last updated: January 27, 2025.\n    </div>\n\n    <nav>\n        <a href=\"#projects-overview\">Projects Overview</a> |\n        <a href=\"#projects-controller\">Projects Controller</a> |\n        <a href=\"#projects-model\">Projects Model</a> |\n        <a href=\"#projects-templates\">Projects Templates</a> |\n        <a href=\"#projects-ui\">Projects UI Components</a> |\n        <a href=\"#projects-filtering\">Projects Filtering</a> |\n        <a href=\"#projects-workflow\">Projects Workflow</a> |\n        <a href=\"#projects-usage\">Projects Usage</a> |\n        <a href=\"#projects-troubleshooting\">Troubleshooting</a>\n    </nav>\n\n    <h2 id=\"projects-overview\">Projects Overview</h2>\n    <p>The Projects system manages hierarchical project structures with support for parent-child relationships. Each project can have multiple sub-projects, and the system maintains data integrity through proper handling of user permissions and data validation.</p>\n\n    <h2 id=\"projects-controller\">Projects Controller</h2>\n    <p>Key features in <code>Comserv::Controller::Project</code>:</p>\n    <ul>\n        <li><strong>Project Creation:</strong> Handles form submissions with proper validation for:\n            <ul>\n                <li>Parent-child relationships (parent_id)</li>\n                <li>User authentication and username tracking</li>\n                <li>Required fields and data type validation</li>\n            </ul>\n        </li>\n        <li><strong>Project Hierarchy:</strong> Manages up to 4 levels of sub-projects</li>\n        <li><strong>Project Listing:</strong> Displays projects in a card-based layout, sorted by name</li>\n        <li><strong>Error Handling:</strong> Provides detailed error messages and logging</li>\n        <li><strong>UI Configuration:</strong> Sets up the UI with:\n            <ul>\n                <li>CSS loading with cache-busting timestamps</li>\n                <li>Fluid container layout for better card display</li>\n                <li>Debug mode for troubleshooting</li>\n                <li>Template timestamp for forced reloading</li>\n            </ul>\n        </li>\n    </ul>\n    \n    <h3>Controller Code Example</h3>\n    <pre><code># Add the projects and filter info to the stash\n$c->stash(\n    projects => $projects,\n    role_filter => $role_filter,\n    project_filter => $project_filter,\n    priority_filter => $priority_filter,\n    template => 'todo/project.tt',\n    template_timestamp => time(), # Add a timestamp to force template reload\n    additional_css => ['/static/css/components/project-cards.css?v=' . time()], # Add timestamp to force CSS reload\n    use_fluid_container => 1, # Use fluid container for better card layout\n    debug_mode => 1 # Enable debug mode to see template version\n);</code></pre>\n\n    <h2 id=\"projects-model\">Projects Model</h2>\n    <p>The database schema includes these key fields:</p>\n    <ul>\n        <li>id (Primary Key)</li>\n        <li>name (Project name)</li>\n        <li>parent_id (Optional, for sub-projects)</li>\n        <li>sitename (Associated site)</li>\n        <li>status (Project status)</li>\n        <li>username_of_poster (Creator/owner)</li>\n        <li>Various metadata fields (dates, descriptions, etc.)</li>\n    </ul>\n\n    <h2 id=\"projects-templates\">Projects Templates</h2>\n    <p>Current template structure:</p>\n    <ul>\n        <li><strong>todo/project.tt:</strong> Main project listing with vertical card-based layout\n            <ul>\n                <li>Displays projects as collapsible vertical cards</li>\n                <li>Includes filter panel for project and priority filtering</li>\n                <li>Includes inline critical CSS to ensure proper rendering</li>\n                <li>Uses recursive macros to display hierarchical project structure</li>\n                <li>Implements JavaScript for collapsible functionality</li>\n            </ul>\n        </li>\n        <li><strong>todo/add_project.tt:</strong> Project creation form</li>\n        <li><strong>todo/editproject.tt:</strong> Project editing interface</li>\n        <li><strong>todo/projectdetails.tt:</strong> Detailed project view</li>\n        <li><strong>todo/project_list.tt:</strong> Reusable component for project selection dropdowns</li>\n    </ul>\n    \n    <p>The template system uses Template Toolkit with the following features:</p>\n    <ul>\n        <li>Version tracking in PageVersion variable</li>\n        <li>Debug mode support for troubleshooting</li>\n        <li>Responsive design principles</li>\n        <li>Role-based access control for admin functions</li>\n        <li>Helper macros for complex UI components</li>\n    </ul>\n\n    <h2 id=\"projects-ui\">Projects UI Components</h2>\n    <p>The Projects system uses a vertical card-based UI for displaying projects:</p>\n    \n    <h3>Card Layout</h3>\n    <ul>\n        <li><strong>Card Header:</strong> Contains project name, priority badge, and collapse toggle</li>\n        <li><strong>Card Body:</strong> Displays project description, status badge, key details, and sub-projects</li>\n        <li><strong>Action Buttons:</strong> Details and Edit buttons within the card body</li>\n        <li><strong>Sub-Projects Container:</strong> Visually distinct area for sub-projects with left border and indentation</li>\n    </ul>\n    \n    <h3>CSS Implementation</h3>\n    <p>The card layout is implemented using a combination of:</p>\n    <ul>\n        <li><strong>External CSS:</strong> <code>/static/css/components/project-cards.css</code> - Contains all card styling</li>\n        <li><strong>Inline Critical CSS:</strong> Embedded in the template to ensure proper rendering even if external CSS fails to load</li>\n        <li><strong>Bootstrap-Compatible Classes:</strong> Uses standard Bootstrap class names for compatibility</li>\n        <li><strong>Custom Classes:</strong> Additional classes for collapsible cards and sub-project containers</li>\n    </ul>\n    \n    <h3>Responsive Design</h3>\n    <ul>\n        <li>Vertical card layout that adapts to all screen sizes</li>\n        <li>Collapsible cards to save vertical space</li>\n        <li>Filter panel that adapts to mobile screens</li>\n        <li>Fluid container for better use of screen space</li>\n    </ul>\n    \n    <h3>Visual Indicators</h3>\n    <ul>\n        <li><strong>Priority Badges:</strong> Color-coded badges for High (red), Medium (yellow), Low (blue)</li>\n        <li><strong>Status Badges:</strong> New (blue), In Progress (primary), Completed (green)</li>\n        <li><strong>Icons:</strong> Font Awesome icons for improved visual cues</li>\n        <li><strong>Collapse Indicators:</strong> Chevron icons that rotate to indicate collapse state</li>\n        <li><strong>Sub-Project Indicators:</strong> Left border and indentation to show hierarchy</li>\n    </ul>\n    \n    <h2 id=\"projects-filtering\">Projects Filtering</h2>\n    <p>The Projects system includes a comprehensive filtering system:</p>\n    \n    <h3>Filter Panel</h3>\n    <ul>\n        <li><strong>Project Filter:</strong> Dropdown to select a specific project or sub-project</li>\n        <li><strong>Priority Filter:</strong> Dropdown to filter by priority level (High, Medium, Low)</li>\n        <li><strong>Apply Filters Button:</strong> Submits the filter form</li>\n        <li><strong>Clear Filters Button:</strong> Resets all filters</li>\n    </ul>\n    \n    <h3>Filtering Logic</h3>\n    <ul>\n        <li><strong>Project Filtering:</strong> When a project is selected, only that project and its sub-projects are displayed</li>\n        <li><strong>Sub-Project Filtering:</strong> When a sub-project is selected, its parent project is displayed with only the selected sub-project</li>\n        <li><strong>Priority Filtering:</strong> Only projects with the selected priority are displayed</li>\n        <li><strong>Combined Filtering:</strong> Project and priority filters can be used together</li>\n        <li><strong>Hierarchical Awareness:</strong> Parent projects remain visible when their sub-projects match the filter</li>\n    </ul>\n    \n    <h3>Implementation Details</h3>\n    <ul>\n        <li><strong>Template Macros:</strong> Helper macros determine if a project should be displayed based on filter criteria</li>\n        <li><strong>JavaScript:</strong> Auto-expands relevant projects when filtering</li>\n        <li><strong>Controller Support:</strong> The controller passes filter parameters to the template</li>\n        <li><strong>Query Parameters:</strong> Filters are maintained in the URL for bookmarking and sharing</li>\n    </ul>\n    \n    <h3>Code Example: Filter Panel</h3>\n    <pre><code>&lt;div class=\"filter-panel mb-4\"&gt;\n    &lt;form id=\"projectFilterForm\" class=\"form-inline\" method=\"GET\" action=\"/project/project\"&gt;\n        &lt;div class=\"form-group mb-2\"&gt;\n            &lt;label for=\"project_filter\" class=\"mr-2\"&gt;Project:&lt;/label&gt;\n            &lt;select id=\"project_filter\" name=\"project_id\" class=\"form-control\"&gt;\n                &lt;option value=\"\"&gt;All Projects&lt;/option&gt;\n                [% FOREACH project IN projects.sort('name') %]\n                    &lt;option value=\"[% project.id %]\" [% IF project_filter == project.id %]selected[% END %]&gt;\n                        [% project.name %]\n                    &lt;/option&gt;\n                    [% FOREACH subproject IN project.sub_projects.sort('name') %]\n                        &lt;option value=\"[% subproject.id %]\" [% IF project_filter == subproject.id %]selected[% END %]&gt;\n                            &amp;nbsp;&amp;nbsp;└─ [% subproject.name %]\n                        &lt;/option&gt;\n                    [% END %]\n                [% END %]\n            &lt;/select&gt;\n        &lt;/div&gt;\n        \n        &lt;div class=\"form-group mb-2 ml-3\"&gt;\n            &lt;label for=\"priority_filter\" class=\"mr-2\"&gt;Priority:&lt;/label&gt;\n            &lt;select id=\"priority_filter\" name=\"priority\" class=\"form-control\"&gt;\n                &lt;option value=\"\"&gt;All Priorities&lt;/option&gt;\n                &lt;option value=\"1\" [% IF priority_filter == '1' %]selected[% END %]&gt;High&lt;/option&gt;\n                &lt;option value=\"2\" [% IF priority_filter == '2' %]selected[% END %]&gt;Medium&lt;/option&gt;\n                &lt;option value=\"3\" [% IF priority_filter == '3' %]selected[% END %]&gt;Low&lt;/option&gt;\n            &lt;/select&gt;\n        &lt;/div&gt;\n        \n        &lt;button type=\"submit\" class=\"btn btn-primary mb-2 ml-3\"&gt;Apply Filters&lt;/button&gt;\n        &lt;button type=\"button\" id=\"clearFilters\" class=\"btn btn-outline-secondary mb-2 ml-2\"&gt;Clear Filters&lt;/button&gt;\n    &lt;/form&gt;\n&lt;/div&gt;</code></pre>\n\n    <h2 id=\"projects-workflow\">Projects Workflow</h2>\n    <ol>\n        <li><strong>Project Creation:</strong>\n            <ul>\n                <li>User fills out project form</li>\n                <li>System validates input and handles parent-child relationships</li>\n                <li>Project is created with proper user and site association</li>\n            </ul>\n        </li>\n        <li><strong>Project Management:</strong>\n            <ul>\n                <li>Projects can be viewed in hierarchical list</li>\n                <li>Admin users can edit project details</li>\n                <li>Sub-projects are managed within parent context</li>\n            </ul>\n        </li>\n    </ol>\n\n    <h2 id=\"projects-usage\">System Requirements and Limitations</h2>\n    <ul>\n        <li>User must be authenticated for project creation</li>\n        <li>Admin privileges required for editing projects</li>\n        <li>Maximum of 4 levels in project hierarchy</li>\n        <li>Project names must be unique within a site</li>\n        <li>Browser must support CSS Flexbox for optimal card layout</li>\n        <li>Font Awesome 5.x is required for icons</li>\n    </ul>\n\n    <h2 id=\"projects-troubleshooting\">Troubleshooting</h2>\n    \n    <h3>CSS Display Issues</h3>\n    <p>If projects are not displaying correctly as cards:</p>\n    <ol>\n        <li>Verify that the CSS file is being loaded correctly (check browser developer tools)</li>\n        <li>Ensure the template is using the correct CSS classes</li>\n        <li>Check that the inline critical CSS is present in the template</li>\n        <li>Verify that the controller is setting <code>use_fluid_container => 1</code></li>\n        <li>Check for JavaScript errors that might be affecting the layout</li>\n    </ol>\n    \n    <h3>Collapsible Card Issues</h3>\n    <p>If the collapsible functionality is not working:</p>\n    <ol>\n        <li>Check browser console for JavaScript errors</li>\n        <li>Verify that the <code>toggleCollapse</code> function is defined in the template</li>\n        <li>Ensure that card IDs are unique and properly referenced in the onclick handlers</li>\n        <li>Check that the collapse icon is properly styled and transitions are working</li>\n    </ol>\n    \n    <h3>Filtering Issues</h3>\n    <p>If filtering is not working correctly:</p>\n    <ol>\n        <li>Verify that the filter form is submitting to the correct URL</li>\n        <li>Check that the controller is correctly passing filter parameters to the template</li>\n        <li>Ensure that the <code>is_parent_of_filtered_project</code> macro is correctly implemented</li>\n        <li>Check the browser's network tab to confirm filter parameters are being sent</li>\n        <li>Verify that the NEXT statements in the template are correctly evaluating filter conditions</li>\n    </ol>\n    \n    <h3>Debug Mode</h3>\n    <p>Enable debug mode in the controller to see additional information:</p>\n    <pre><code>$c->stash(debug_mode => 1);</code></pre>\n    <p>This will display template version and CSS file information at the top of the page.</p>\n    \n    <h3>Common Issues</h3>\n    <ul>\n        <li><strong>Cards not collapsing/expanding:</strong> JavaScript errors or missing event handlers</li>\n        <li><strong>Filters not working:</strong> Form submission issues or incorrect template logic</li>\n        <li><strong>Sub-projects not displaying:</strong> Check the recursive macro implementation</li>\n        <li><strong>Parent projects not showing when filtering by sub-project:</strong> Issue with the <code>is_parent_of_filtered_project</code> macro</li>\n        <li><strong>Missing badges or icons:</strong> Font Awesome not loading correctly</li>\n        <li><strong>Auto-expand not working when filtering:</strong> JavaScript initialization issue</li>\n    </ul>\n    \n    <h3>Logging</h3>\n    <p>The Project controller logs important events to the application log:</p>\n    <pre><code>$self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'project', 'message');</code></pre>\n    <p>Check <code>logs/application.log</code> for debugging information, especially filter parameters and project data structure.</p>\n    \n    <h3>JavaScript Debugging</h3>\n    <p>For JavaScript-related issues, add console logging to the script:</p>\n    <pre><code>console.log('Filter parameters:', {\n    project: document.getElementById('project_filter').value,\n    priority: document.getElementById('priority_filter').value\n});</code></pre>\n    <p>This can help identify issues with the collapsible functionality and filter handling.</p>\n\n    <p><a href=\"#projects-top\">Back to top</a></p>",
+                    "language": "plain text"
+                },
+                "codebaseEnabled": true
+            },
+            "createdAt": 1753528408418,
+            "isInternal": false,
+            "rawContent": {
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Ok time for the commit."
+                            }
+                        ]
+                    }
+                ]
+            },
+            "autoAppliedRules": [
+                {
+                    "name": "User AI Instruction",
+                    "description": "User AI Instruction",
+                    "uri": "zen-rules://user/custom",
+                    "content": "read AI_DEVELOPMENT_GUIDELINES\nall code must be varifed by user"
+                },
+                {
+                    "name": "Repository Information Overview",
+                    "description": "Repository Information Overview",
+                    "uri": "zen-rules://repo/repo",
+                    "content": "\n\n# Comserv Project Information\n\n## Summary\nComserv is a comprehensive web-based system for managing business operations, projects, and documentation. It's built using the Catalyst Perl web framework and provides features for project management, theme customization, and user authentication.\n\n## Structure\n- `Comserv/`: Main application directory containing the core application code\n  - `lib/`: Application code and models\n  - `docs/`: Documentation files\n  - `root/`: Static assets and templates\n  - `script/`: Utility scripts for server management and database operations\n  - `t/`: Test files\n- `app/`: Additional application components\n- `data/`: Data files including pricing information\n- `proxmox/`: Proxmox VE integration components\n\n## Language & Runtime\n**Language**: Perl\n**Version**: 5.x (compatible with Perl 5.40.0)\n**Framework**: Catalyst 5.90130\n**Build System**: Module::Install\n**Package Manager**: CPAN\n\n## Dependencies\n**Main Dependencies**:\n- Catalyst::Runtime (5.90130)\n- Moose\n- DBIx::Class\n- Template (Template Toolkit)\n- JSON/JSON::MaybeXS\n- Log::Log4perl\n- DateTime\n- File::Slurp\n\n**Development Dependencies**:\n- Test::More (0.88+)\n- Test::Pod\n- Test::Pod::Coverage\n- Test::WWW::Mechanize::Catalyst\n- Catalyst::Devel\n\n## Build & Installation\n```bash\ncd Comserv\nperl Makefile.PL\nmake\nmake test\nmake install\n```\n\n## Database\n**Type**: MySQL\n**Setup**: \n```bash\nmysql -u root -p < database_initialization_script.sql\n```\n**Schema Management**: DBIx::Class::Schema::Loader\n\n## Testing\n**Framework**: Test::More\n**Test Location**: Comserv/t/\n**Run Command**:\n```bash\ncd Comserv\nprove -l t/\n```\n\n## Server Execution\n**Development Server**:\n```bash\ncd Comserv\nscript/comserv_server.pl\n```\n**Production Deployment**:\n```bash\ncd Comserv\nscript/comserv_fastcgi.pl\n# or\nstarman --port 5000 --workers 5 comserv.psgi\n```\n\n## Authentication & Authorization\n- Session-based authentication\n- Role-based access control\n- Multiple authentication realms\n- Support for user groups and site-specific permissions\n\n## Features\n- Project management system\n- Theme customization system\n- Email integration\n- PDF generation\n- Proxmox VE integration\n- Multi-site support"
+                },
+                {
+                    "name": "Database Development Standards and Best Practices",
+                    "description": "Database Development Standards and Best Practices",
+                    "uri": "zen-rules://repo/database-standards",
+                    "content": "\n\n# Database Development Standards\n\n## Query Standards\n- **Table Aliases:** Use table aliases in all queries to avoid ambiguity (e.g., 'me.column_name')\n- **Error Handling:** Implement proper error handling with eval blocks and try/catch\n- **Parameterized Queries:** Use parameterized queries to prevent SQL injection\n\n## Schema Management\n- **Naming Conventions:** Follow naming conventions for tables, columns, and relationships\n- **Documentation:** Document schema changes and rationale for future reference\n- **Performance:** Regularly optimize database performance and indexes\n- **Version Control:** Use Git to track schema changes with proper tagging\n- **Backup Protocol:** Always backup database before making schema changes\n\n## Model Standards (DBIx::Class)\n- **Result Classes:** Located in `/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema/Ency/Result/`\n- **Relationships:** Define proper relationships between tables\n- **Validation:** Implement data validation in model classes\n\n## Configuration Priority\n- **Primary:** ZeroTier production server (172.30.161.222) - works from any network\n- **Secondary:** Local network production server (192.168.1.198) - home/office only\n- **Tertiary:** localhost MySQL (development)\n- **Fallback:** SQLite (offline mode)\n\n## Security Protocols\n- **Input Validation:** Validate all user inputs before database operations\n- **Access Controls:** Implement proper access controls based on user roles\n- **Regular Reviews:** Regularly review and update security protocols"
+                },
+                {
+                    "name": "AI Behavior Enforcement Rules for Zencoder",
+                    "description": "AI Behavior Enforcement Rules for Zencoder",
+                    "uri": "zen-rules://repo/ai-behavior-enforcement",
+                    "content": "\n\n# AI Behavior Enforcement Rules\n\n## MANDATORY PROMPT TRACKING\n**CURRENT PROMPT:** This is prompt #[X] of 4 maximum allowed prompts.\n\n### Prompt Counter Protocol\n- **Start Each Response:** Begin every response with current prompt count\n- **Track Internally:** Keep running count throughout conversation\n- **Warn at Prompt 3:** Alert user that next prompt will trigger handoff\n- **Stop at Prompt 4:** Refuse to continue, provide handoff documentation\n\n## MANDATORY APPROVAL WORKFLOW\n\n### Before ANY Code Changes\n1. **STOP:** Do not modify any files without explicit user approval\n2. **PRESENT:** Show exactly what will be changed using the standard format\n3. **WAIT:** Wait for explicit approval (\"yes\", \"approved\", \"apply changes\")\n4. **CONFIRM:** Acknowledge approval before proceeding\n5. **EXECUTE:** Apply changes only after confirmation\n\n### Standard Change Presentation\n```\n🔄 PROPOSED CHANGE TO: [filename]\n📝 CHANGE TYPE: [Addition/Modification/Deletion]\n📋 DESCRIPTION: [what this accomplishes]\n\n❌ CURRENT CODE:\n[existing code or \"N/A\"]\n\n✅ NEW CODE:\n[proposed code or \"DELETED\"]\n\n💡 REASON: [why needed]\n\n⚠️  APPROVAL REQUIRED: Please confirm with \"approved\" or \"yes\"\n🔄 REVERT: Changes can be undone if needed\n```\n\n## VIOLATION CONSEQUENCES\n- **Prompt Limit Exceeded:** Immediate session termination with handoff\n- **Unapproved Changes:** Acknowledge violation and request approval retroactively\n- **Missing Counter:** Add prompt counter to current response\n\n## HANDOFF TEMPLATE (Use on 4th Prompt)\n```\n🚨 PROMPT LIMIT REACHED - HANDOFF REQUIRED\n\n📊 SESSION SUMMARY:\n- Prompts Used: 4/4\n- Files Modified: [list]\n- Tasks Completed: [list]\n- Tasks Remaining: [list]\n\n🔄 HANDOFF PROMPT FOR NEXT AI:\n\"Continue working on [project/task]. Read development-guidelines.md and ai-behavior-enforcement.md first. \nCurrent context: [brief context]\nFiles being worked on: [list]\nNext steps needed: [specific actions]\"\n\n📚 REQUIRED READING FOR NEXT AI:\n- .zencoder/rules/development-guidelines.md\n- .zencoder/rules/ai-behavior-enforcement.md\n- [any other relevant docs]\n\n✅ DOCUMENTATION UPDATED: [what was recorded]\n```\n\n## EMERGENCY PROTOCOLS\n- **User Says \"Stop\":** Immediately cease all activities\n- **User Says \"Revert\":** Provide instructions for undoing changes\n- **User Says \"Handoff\":** Immediately provide handoff documentation"
+                },
+                {
+                    "name": "Template Toolkit Standards and Requirements",
+                    "description": "Template Toolkit Standards and Requirements",
+                    "uri": "zen-rules://repo/template-standards",
+                    "content": "\n\n# Template Toolkit (.tt) Standards\n\n## Required PageVersion Header Format\nAll .tt files must include this exact format:\n```\n[% META title = 'Page Title Here' %]\n[% PageVersion = 'relative/path/filename.tt,v 0.01 YYYY/MM/DD author Exp author ' %]\n[% IF c.session.debug_mode == 1 %]\n    [% PageVersion %]\n[% END %]\n```\n\n## Template Standards\n- **Theme Compliance:** Use theme system variables for styling - NO page-specific CSS\n- **Debug Mode:** Include debug mode blocks for development visibility\n- **Responsive Design:** Implement mobile-first responsive design patterns\n- **HTML Structure:** Use proper semantic HTML structure\n- **Template Toolkit:** Follow Template Toolkit best practices\n\n## Navigation Integration\nWhen working with navigation templates:\n- **Main Navigation:** Include via `/Navigation/navigation.tt`\n- **Admin Menu:** Use `/Navigation/admintopmenu.tt` for admin-only sections\n- **Dropdown Menus:** Reference existing dropdown templates in `/Navigation/` directory\n\n## Documentation File Rules - CRITICAL\n- **File Format:** ONLY `.tt` files for application documentation - NO `.md` files\n- **EXISTING FILES FIRST:** ALWAYS search for and use existing files before creating new ones\n- **Naming Consistency:** Use same file names across AI sessions to prevent content loss\n- **Content Priority:** Always improve existing files rather than creating new ones\n- **Role-Based Access:** Respect existing Documentation/index.tt role-based structure\n- **Directory Consolidation:** Use established directory structure - don't create new directories\n\n## File Creation Protocol\n1. **Search First:** Use file search tools to find existing similar files\n2. **Check Directory:** Look at existing directory structure in target location\n3. **Ask User:** If multiple similar files exist, ask which should be updated\n4. **Update Existing:** Improve existing files rather than creating duplicates"
+                }
+            ]
+        },
+        {
+            "id": "d02d3df6-cd42-4167-97a5-82294275be4d",
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "**CURRENT PROMPT:** This is prompt #3 of 4 maximum allowed prompts.\n\n⚠️ **WARNING:** This is prompt #3 of 4. The next prompt will trigger automatic handoff.\n\nI understand you want to commit the changes. However, I notice that I had proposed a second change to add comprehensive system overview information to the Projects.tt file that wasn't approved yet. Let me apply the first approved change and then prepare for commit.\n\nThe first change has already been applied successfully. Let me create a proper git commit message for the work completed:\n\n**Git Commit Message:**\n```\ndocs: Update Projects.tt documentation with system status and recent fixes\n\n- Updated PageVersion to 0.07 with current date (2025/01/27)\n- Fixed debug mode check to use c.session.debug_mode instead of debug\n- Added system status alert showing recent controller fixes\n- Updated title to match content (Projects System Documentation)\n\nChanges reflect recent fixes to Project.pm controller:\n- Database queries now working instead of returning empty arrays\n- All compilation errors resolved\n- Proper error handling implemented\n\nFile: /home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Projects.tt\n```\n\n**Current Session Summary:**\n- **Files Modified:** `/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Projects.tt`\n- **Tasks Completed:** \n  - Updated Projects.tt header with correct version and debug mode\n  - Added system status information about recent fixes\n- **Tasks Remaining:**\n  - Create SB controller documentation at `/Documentation/controllers/SB.tt`\n  - Add comprehensive system overview section to Projects.tt\n  - Test project listing functionality in browser\n  - Verify database connectivity and logging\n\nWould you like me to proceed with the commit using this message, or would you prefer to modify it?"
+                }
+            ],
+            "context": {
+                "author": "Coding Agent",
+                "operationId": "5fdba38a-5a1b-4321-8328-a251fceef8ce"
+            },
+            "createdAt": 1753528409889,
+            "isInternal": false
+        }
+    ],
+    "isAgent": true,
+    "isNameGenerated": true,
+    "isCustomAgent": false,
+    "isUnitTestsAgent": false,
+    "isE2EAgent": false,
+    "isQnaAgent": false,
+    "isRepoInfoAgent": false,
+    "autoApply": false
+}
+}

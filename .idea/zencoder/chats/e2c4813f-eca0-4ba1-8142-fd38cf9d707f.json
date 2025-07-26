@@ -1,0 +1,537 @@
+{
+    "checksum": "e36393ceb894fff4c2836150fff6406c617ac7729f3b8ab3e02b71c3dae8c6bc",
+    "data": {
+    "id": "e2c4813f-eca0-4ba1-8142-fd38cf9d707f",
+    "createdAt": 1753464998818,
+    "updatedAt": 1753464998924,
+    "title": "Fetching http://www.cpan.org/authors/id/M/MV/MV...",
+    "messages": [
+        {
+            "id": "cb83bdaa-4d0d-4d19-8fd5-f82d6bd7df8d",
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "Fetching http://www.cpan.org/authors/id/M/MV/MVERB/GDTextUtil-0.86.tar.gz ... OK"
+                },
+                {
+                    "type": "text",
+                    "text": "Configuring GDTextUtil-0.86 ... OK"
+                },
+                {
+                    "type": "text",
+                    "text": "==> Found dependencies: GD"
+                },
+                {
+                    "type": "text",
+                    "text": "--> Working on GD"
+                },
+                {
+                    "type": "text",
+                    "text": "Fetching http://www.cpan.org/authors/id/R/RU/RURBAN/GD-2.83.tar.gz ... OK"
+                },
+                {
+                    "type": "text",
+                    "text": "Configuring GD-2.83 ... N/A"
+                },
+                {
+                    "type": "text",
+                    "text": "! Configure failed for GD-2.83. See /home/shanta/.cpanm/work/1753464956.5279/build.log for details."
+                },
+                {
+                    "type": "text",
+                    "text": "! Installing the dependencies failed: Module 'GD' is not installed"
+                },
+                {
+                    "type": "text",
+                    "text": "! Bailing out the installation for GDTextUtil-0.86."
+                },
+                {
+                    "type": "text",
+                    "text": "Failed to install GD::Text. Some functionality may be limited."
+                },
+                {
+                    "type": "text",
+                    "text": "Base directory: /home/shanta/PycharmProjects/comserv2/Comserv/script/.."
+                },
+                {
+                    "type": "text",
+                    "text": "Log directory: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs"
+                },
+                {
+                    "type": "text",
+                    "text": "Log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log"
+                },
+                {
+                    "type": "text",
+                    "text": "Log directory exists: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs"
+                },
+                {
+                    "type": "text",
+                    "text": "Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log"
+                },
+                {
+                    "type": "text",
+                    "text": "Wrote test log entry to file"
+                },
+                {
+                    "type": "text",
+                    "text": "Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log"
+                },
+                {
+                    "type": "text",
+                    "text": "Use of uninitialized value $_ in bitwise or (|) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/Catalyst/Log.pm line 84."
+                },
+                {
+                    "type": "text",
+                    "text": "Use of uninitialized value $_ in bitwise or (|) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/Catalyst/Log.pm line 84."
+                },
+                {
+                    "type": "text",
+                    "text": "Warning: Email modules temporarily disabled for development"
+                },
+                {
+                    "type": "text",
+                    "text": "Email functionality may not work correctly."
+                },
+                {
+                    "type": "text",
+                    "text": "Found config file at: /home/shanta/PycharmProjects/comserv2/Comserv/script/../db_config.json at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/DBEncy.pm line 51."
+                },
+                {
+                    "type": "text",
+                    "text": "DBEncy Configuration:"
+                },
+                {
+                    "type": "text",
+                    "text": "Host: 172.30.161.222"
+                },
+                {
+                    "type": "text",
+                    "text": "Database: ency"
+                },
+                {
+                    "type": "text",
+                    "text": "Username: shanta_forager"
+                },
+                {
+                    "type": "text",
+                    "text": "DBForager Configuration:"
+                },
+                {
+                    "type": "text",
+                    "text": "Host: 172.30.161.222"
+                },
+                {
+                    "type": "text",
+                    "text": "Database: shanta_forager"
+                },
+                {
+                    "type": "text",
+                    "text": "Username: shanta_forager"
+                },
+                {
+                    "type": "text",
+                    "text": "require Comserv::Controller::SB was successful but the package is not defined. at /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/Catalyst/Utils.pm line 316."
+                },
+                {
+                    "type": "text",
+                    "text": "Global symbol \"@top_projects\" requires explicit package name (did you forget to declare \"my @top_projects\"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 341."
+                },
+                {
+                    "type": "text",
+                    "text": "Global symbol \"$schema\" requires explicit package name (did you forget to declare \"my $schema\"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 360."
+                },
+                {
+                    "type": "text",
+                    "text": "Global symbol \"$schema\" requires explicit package name (did you forget to declare \"my $schema\"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 393."
+                },
+                {
+                    "type": "text",
+                    "text": "Compilation failed in require at /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/Catalyst/Utils.pm line 310."
+                },
+                {
+                    "type": "text",
+                    "text": "Compilation failed in require at /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/Catalyst/Utils.pm line 310."
+                }
+            ],
+            "context": {
+                "codebaseEnabled": true
+            },
+            "createdAt": 1753464998923,
+            "isInternal": false,
+            "rawContent": {
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Fetching http://www.cpan.org/authors/id/M/MV/MVERB/GDTextUtil-0.86.tar.gz ... OK"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Configuring GDTextUtil-0.86 ... OK"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "==> Found dependencies: GD"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "--> Working on GD"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Fetching http://www.cpan.org/authors/id/R/RU/RURBAN/GD-2.83.tar.gz ... OK"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Configuring GD-2.83 ... N/A"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "! Configure failed for GD-2.83. See /home/shanta/.cpanm/work/1753464956.5279/build.log for details."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "! Installing the dependencies failed: Module 'GD' is not installed"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "! Bailing out the installation for GDTextUtil-0.86."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Failed to install GD::Text. Some functionality may be limited."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Base directory: /home/shanta/PycharmProjects/comserv2/Comserv/script/.."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Log directory: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Log directory exists: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Wrote test log entry to file"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Use of uninitialized value $_ in bitwise or (|) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/Catalyst/Log.pm line 84."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Use of uninitialized value $_ in bitwise or (|) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/Catalyst/Log.pm line 84."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Warning: Email modules temporarily disabled for development"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Email functionality may not work correctly."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Found config file at: /home/shanta/PycharmProjects/comserv2/Comserv/script/../db_config.json at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/DBEncy.pm line 51."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "DBEncy Configuration:"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Host: 172.30.161.222"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Database: ency"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Username: shanta_forager"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "DBForager Configuration:"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Host: 172.30.161.222"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Database: shanta_forager"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Username: shanta_forager"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "require Comserv::Controller::SB was successful but the package is not defined. at /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/Catalyst/Utils.pm line 316."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Global symbol \"@top_projects\" requires explicit package name (did you forget to declare \"my @top_projects\"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 341."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Global symbol \"$schema\" requires explicit package name (did you forget to declare \"my $schema\"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 360."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Global symbol \"$schema\" requires explicit package name (did you forget to declare \"my $schema\"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 393."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Compilation failed in require at /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/Catalyst/Utils.pm line 310."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Compilation failed in require at /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/Catalyst/Utils.pm line 310."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph"
+                    }
+                ]
+            },
+            "autoAppliedRules": [
+                {
+                    "name": "User AI Instruction",
+                    "description": "User AI Instruction",
+                    "uri": "zen-rules://user/custom",
+                    "content": "read AI_DEVELOPMENT_GUIDELINES\nall code must be varifed by user"
+                },
+                {
+                    "name": "Repository Information Overview",
+                    "description": "Repository Information Overview",
+                    "uri": "zen-rules://repo/repo",
+                    "content": "\n\n# Comserv Project Information\n\n## Summary\nComserv is a comprehensive web-based system for managing business operations, projects, and documentation. It's built using the Catalyst Perl web framework and provides features for project management, theme customization, and user authentication.\n\n## Structure\n- `Comserv/`: Main application directory containing the core application code\n  - `lib/`: Application code and models\n  - `docs/`: Documentation files\n  - `root/`: Static assets and templates\n  - `script/`: Utility scripts for server management and database operations\n  - `t/`: Test files\n- `app/`: Additional application components\n- `data/`: Data files including pricing information\n- `proxmox/`: Proxmox VE integration components\n\n## Language & Runtime\n**Language**: Perl\n**Version**: 5.x (compatible with Perl 5.40.0)\n**Framework**: Catalyst 5.90130\n**Build System**: Module::Install\n**Package Manager**: CPAN\n\n## Dependencies\n**Main Dependencies**:\n- Catalyst::Runtime (5.90130)\n- Moose\n- DBIx::Class\n- Template (Template Toolkit)\n- JSON/JSON::MaybeXS\n- Log::Log4perl\n- DateTime\n- File::Slurp\n\n**Development Dependencies**:\n- Test::More (0.88+)\n- Test::Pod\n- Test::Pod::Coverage\n- Test::WWW::Mechanize::Catalyst\n- Catalyst::Devel\n\n## Build & Installation\n```bash\ncd Comserv\nperl Makefile.PL\nmake\nmake test\nmake install\n```\n\n## Database\n**Type**: MySQL\n**Setup**: \n```bash\nmysql -u root -p < database_initialization_script.sql\n```\n**Schema Management**: DBIx::Class::Schema::Loader\n\n## Testing\n**Framework**: Test::More\n**Test Location**: Comserv/t/\n**Run Command**:\n```bash\ncd Comserv\nprove -l t/\n```\n\n## Server Execution\n**Development Server**:\n```bash\ncd Comserv\nscript/comserv_server.pl\n```\n**Production Deployment**:\n```bash\ncd Comserv\nscript/comserv_fastcgi.pl\n# or\nstarman --port 5000 --workers 5 comserv.psgi\n```\n\n## Authentication & Authorization\n- Session-based authentication\n- Role-based access control\n- Multiple authentication realms\n- Support for user groups and site-specific permissions\n\n## Features\n- Project management system\n- Theme customization system\n- Email integration\n- PDF generation\n- Proxmox VE integration\n- Multi-site support"
+                },
+                {
+                    "name": "Database Development Standards and Best Practices",
+                    "description": "Database Development Standards and Best Practices",
+                    "uri": "zen-rules://repo/database-standards",
+                    "content": "\n\n# Database Development Standards\n\n## Query Standards\n- **Table Aliases:** Use table aliases in all queries to avoid ambiguity (e.g., 'me.column_name')\n- **Error Handling:** Implement proper error handling with eval blocks and try/catch\n- **Parameterized Queries:** Use parameterized queries to prevent SQL injection\n\n## Schema Management\n- **Naming Conventions:** Follow naming conventions for tables, columns, and relationships\n- **Documentation:** Document schema changes and rationale for future reference\n- **Performance:** Regularly optimize database performance and indexes\n- **Version Control:** Use Git to track schema changes with proper tagging\n- **Backup Protocol:** Always backup database before making schema changes\n\n## Model Standards (DBIx::Class)\n- **Result Classes:** Located in `/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema/Ency/Result/`\n- **Relationships:** Define proper relationships between tables\n- **Validation:** Implement data validation in model classes\n\n## Configuration Priority\n- **Primary:** ZeroTier production server (172.30.161.222) - works from any network\n- **Secondary:** Local network production server (192.168.1.198) - home/office only\n- **Tertiary:** localhost MySQL (development)\n- **Fallback:** SQLite (offline mode)\n\n## Security Protocols\n- **Input Validation:** Validate all user inputs before database operations\n- **Access Controls:** Implement proper access controls based on user roles\n- **Regular Reviews:** Regularly review and update security protocols"
+                },
+                {
+                    "name": "AI Behavior Enforcement Rules for Zencoder",
+                    "description": "AI Behavior Enforcement Rules for Zencoder",
+                    "uri": "zen-rules://repo/ai-behavior-enforcement",
+                    "content": "\n\n# AI Behavior Enforcement Rules\n\n## MANDATORY PROMPT TRACKING\n**CURRENT PROMPT:** This is prompt #[X] of 4 maximum allowed prompts.\n\n### Prompt Counter Protocol\n- **Start Each Response:** Begin every response with current prompt count\n- **Track Internally:** Keep running count throughout conversation\n- **Warn at Prompt 3:** Alert user that next prompt will trigger handoff\n- **Stop at Prompt 4:** Refuse to continue, provide handoff documentation\n\n## MANDATORY APPROVAL WORKFLOW\n\n### Before ANY Code Changes\n1. **STOP:** Do not modify any files without explicit user approval\n2. **PRESENT:** Show exactly what will be changed using the standard format\n3. **WAIT:** Wait for explicit approval (\"yes\", \"approved\", \"apply changes\")\n4. **CONFIRM:** Acknowledge approval before proceeding\n5. **EXECUTE:** Apply changes only after confirmation\n\n### Standard Change Presentation\n```\n🔄 PROPOSED CHANGE TO: [filename]\n📝 CHANGE TYPE: [Addition/Modification/Deletion]\n📋 DESCRIPTION: [what this accomplishes]\n\n❌ CURRENT CODE:\n[existing code or \"N/A\"]\n\n✅ NEW CODE:\n[proposed code or \"DELETED\"]\n\n💡 REASON: [why needed]\n\n⚠️  APPROVAL REQUIRED: Please confirm with \"approved\" or \"yes\"\n🔄 REVERT: Changes can be undone if needed\n```\n\n## VIOLATION CONSEQUENCES\n- **Prompt Limit Exceeded:** Immediate session termination with handoff\n- **Unapproved Changes:** Acknowledge violation and request approval retroactively\n- **Missing Counter:** Add prompt counter to current response\n\n## HANDOFF TEMPLATE (Use on 4th Prompt)\n```\n🚨 PROMPT LIMIT REACHED - HANDOFF REQUIRED\n\n📊 SESSION SUMMARY:\n- Prompts Used: 4/4\n- Files Modified: [list]\n- Tasks Completed: [list]\n- Tasks Remaining: [list]\n\n🔄 HANDOFF PROMPT FOR NEXT AI:\n\"Continue working on [project/task]. Read development-guidelines.md and ai-behavior-enforcement.md first. \nCurrent context: [brief context]\nFiles being worked on: [list]\nNext steps needed: [specific actions]\"\n\n📚 REQUIRED READING FOR NEXT AI:\n- .zencoder/rules/development-guidelines.md\n- .zencoder/rules/ai-behavior-enforcement.md\n- [any other relevant docs]\n\n✅ DOCUMENTATION UPDATED: [what was recorded]\n```\n\n## EMERGENCY PROTOCOLS\n- **User Says \"Stop\":** Immediately cease all activities\n- **User Says \"Revert\":** Provide instructions for undoing changes\n- **User Says \"Handoff\":** Immediately provide handoff documentation"
+                },
+                {
+                    "name": "Template Toolkit Standards and Requirements",
+                    "description": "Template Toolkit Standards and Requirements",
+                    "uri": "zen-rules://repo/template-standards",
+                    "content": "\n\n# Template Toolkit (.tt) Standards\n\n## Required PageVersion Header Format\nAll .tt files must include this exact format:\n```\n[% META title = 'Page Title Here' %]\n[% PageVersion = 'relative/path/filename.tt,v 0.01 YYYY/MM/DD author Exp author ' %]\n[% IF c.session.debug_mode == 1 %]\n    [% PageVersion %]\n[% END %]\n```\n\n## Template Standards\n- **Theme Compliance:** Use theme system variables for styling - NO page-specific CSS\n- **Debug Mode:** Include debug mode blocks for development visibility\n- **Responsive Design:** Implement mobile-first responsive design patterns\n- **HTML Structure:** Use proper semantic HTML structure\n- **Template Toolkit:** Follow Template Toolkit best practices\n\n## Navigation Integration\nWhen working with navigation templates:\n- **Main Navigation:** Include via `/Navigation/navigation.tt`\n- **Admin Menu:** Use `/Navigation/admintopmenu.tt` for admin-only sections\n- **Dropdown Menus:** Reference existing dropdown templates in `/Navigation/` directory\n\n## Documentation File Rules - CRITICAL\n- **File Format:** ONLY `.tt` files for application documentation - NO `.md` files\n- **EXISTING FILES FIRST:** ALWAYS search for and use existing files before creating new ones\n- **Naming Consistency:** Use same file names across AI sessions to prevent content loss\n- **Content Priority:** Always improve existing files rather than creating new ones\n- **Role-Based Access:** Respect existing Documentation/index.tt role-based structure\n- **Directory Consolidation:** Use established directory structure - don't create new directories\n\n## File Creation Protocol\n1. **Search First:** Use file search tools to find existing similar files\n2. **Check Directory:** Look at existing directory structure in target location\n3. **Ask User:** If multiple similar files exist, ask which should be updated\n4. **Update Existing:** Improve existing files rather than creating duplicates"
+                }
+            ]
+        }
+    ],
+    "isAgent": true,
+    "isCustomAgent": false,
+    "isUnitTestsAgent": false,
+    "isE2EAgent": false,
+    "isQnaAgent": false,
+    "isRepoInfoAgent": false,
+    "autoApply": false
+}
+}

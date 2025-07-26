@@ -381,6 +381,78 @@
     <li>Test with different user roles and site contexts</li>
 </ul>
 
+<h2>Multi-Role Session Caching System (COMPLETED - 2025-01-28)</h2>
+
+<h3>Implementation Status</h3>
+<p><strong>Status:</strong> ✅ COMPLETED</p>
+<p><strong>Performance Improvement:</strong> Significant reduction in database queries per request</p>
+<p><strong>Cache Duration:</strong> 1 hour per session with automatic invalidation</p>
+
+<h3>Key Features Implemented</h3>
+<ul>
+    <li><strong>Multi-Role Support:</strong> Handles users with multiple roles and user groups</li>
+    <li><strong>Session-Based Caching:</strong> Unique cache keys per user/role/site combination</li>
+    <li><strong>Automatic Cache Management:</strong> 1-hour TTL with manual invalidation methods</li>
+    <li><strong>Role-Specific Menus:</strong> Dynamic menu generation based on user roles</li>
+    <li><strong>Debug Support:</strong> Comprehensive debug information in debug mode</li>
+</ul>
+
+<h3>New Controller Methods</h3>
+<ul>
+    <li><code>get_user_roles()</code> - Extracts and normalizes user roles from session</li>
+    <li><code>create_cache_key()</code> - Generates unique cache keys for user/role/site combinations</li>
+    <li><code>build_navigation_cache()</code> - Main caching method with TTL management</li>
+    <li><code>build_role_based_navigation()</code> - Builds navigation structure for multiple roles</li>
+    <li><code>get_navigation()</code> - Convenient method to get cached navigation data</li>
+    <li><code>invalidate_navigation_cache()</code> - Manual cache invalidation for updates</li>
+</ul>
+
+<h3>Template Integration</h3>
+<p>The main navigation template (<code>Navigation/navigation.tt</code>) has been updated to:</p>
+<ul>
+    <li>Use the new <code>get_navigation()</code> method for improved performance</li>
+    <li>Support role-specific menus (Manager, Editor) dynamically</li>
+    <li>Include debug information for cache monitoring</li>
+    <li>Maintain backward compatibility with existing dropdown templates</li>
+</ul>
+
+<h3>Performance Benefits</h3>
+<ul>
+    <li><strong>Database Query Reduction:</strong> Navigation queries cached for 1 hour per session</li>
+    <li><strong>Multi-Role Efficiency:</strong> Single cache entry handles all user roles</li>
+    <li><strong>Site-Specific Optimization:</strong> Separate caches per site prevent cross-contamination</li>
+    <li><strong>Memory Efficient:</strong> Session-based storage with automatic cleanup</li>
+</ul>
+
+<h3>Usage Examples</h3>
+<pre>
+# In templates - get cached navigation
+[% cached_nav = c.controller('Navigation').get_navigation(c) %]
+
+# Check user roles
+[% user_roles = c.controller('Navigation').get_user_roles(c) %]
+
+# Access role-specific menus
+[% IF cached_nav.admin_menu.defined %]
+    [% FOREACH link IN cached_nav.admin_menu %]
+        &lt;a href="[% link.url %]"&gt;[% link.name %]&lt;/a&gt;
+    [% END %]
+[% END %]
+
+# Debug cache information
+[% IF c.session.debug_mode == 1 %]
+    Cache Key: [% c.controller('Navigation').create_cache_key(c) %]
+[% END %]
+</pre>
+
+<h3>Future Enhancements</h3>
+<ul>
+    <li>Cache warming for better initial performance</li>
+    <li>Additional role-specific menu categories as needed</li>
+    <li>Cache statistics and monitoring</li>
+    <li>Distributed caching for multi-server deployments</li>
+</ul>
+
 <h2>Related Documentation</h2>
 <ul>
     <li><a href="../changelog/2025-07-07-navigation-system-consolidation.tt">Navigation System Consolidation Changelog</a></li>

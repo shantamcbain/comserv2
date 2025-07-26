@@ -1,0 +1,142 @@
+[% META title = 'Manage Menu Links' %]
+[% PageVersion = 'Navigation/manage_links.tt,v 0.01 2025/01/28 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <header class="page-header">
+        <h1><i class="icon-cogs"></i> Manage Menu Links</h1>
+        <p class="page-description">Manage all navigation menu links across the system.</p>
+    </header>
+
+    [% IF c.flash.error_msg %]
+        <div class="alert alert-danger">
+            <i class="icon-exclamation-triangle"></i> [% c.flash.error_msg %]
+        </div>
+    [% END %]
+
+    [% IF c.flash.success_msg %]
+        <div class="alert alert-success">
+            <i class="icon-check"></i> [% c.flash.success_msg %]
+        </div>
+    [% END %]
+
+    <div class="action-bar">
+        <a href="[% c.uri_for('/navigation/add_link') %]" 
+           style="background-color: [% theme_vars.item('primary-color') || '#007bff' %]; 
+                  color: [% theme_vars.item('text-color') || '#ffffff' %]; 
+                  border: 1px solid [% theme_vars.item('border-color') || '#007bff' %]; 
+                  padding: 8px 16px; 
+                  text-decoration: none; 
+                  border-radius: 4px; 
+                  display: inline-block;">
+            <i class="icon-plus"></i> Add New Link
+        </a>
+    </div>
+
+    [% IF links_by_category.keys.size > 0 %]
+        [% FOREACH category IN links_by_category.keys.sort %]
+            <div class="category-section">
+                <h2 class="category-header">
+                    <i class="icon-folder-open"></i> [% category.replace('_', ' ') | ucfirst %]
+                </h2>
+                
+                <div class="links-table-container">
+                    <table class="table table-striped links-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>URL</th>
+                                <th>Site</th>
+                                <th>Target</th>
+                                <th>Order</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            [% FOREACH link IN links_by_category.$category %]
+                                <tr>
+                                    <td class="link-name">
+                                        <strong>[% link.name | html %]</strong>
+                                        [% IF link.description %]
+                                            <br><small class="text-muted">[% link.description | html %]</small>
+                                        [% END %]
+                                    </td>
+                                    <td class="link-url">
+                                        <code>[% link.url | html %]</code>
+                                    </td>
+                                    <td class="link-site">
+                                        <span class="badge [% IF link.sitename == 'All' %]badge-info[% ELSE %]badge-secondary[% END %]">
+                                            [% link.sitename | html %]
+                                        </span>
+                                    </td>
+                                    <td class="link-target">
+                                        [% link.target | html %]
+                                    </td>
+                                    <td class="link-order">
+                                        [% link.link_order %]
+                                    </td>
+                                    <td class="link-status">
+                                        [% IF link.status == 1 %]
+                                            <span class="badge badge-success">Active</span>
+                                        [% ELSE %]
+                                            <span class="badge badge-danger">Inactive</span>
+                                        [% END %]
+                                    </td>
+                                    <td class="link-actions">
+                                        <div class="btn-group">
+                                            <a href="[% c.uri_for('/navigation/edit_link', link.id) %]" 
+                                               style="background-color: [% theme_vars.item('secondary-color') || '#6c757d' %]; 
+                                                      color: [% theme_vars.item('text-color') || '#ffffff' %]; 
+                                                      border: 1px solid [% theme_vars.item('border-color') || '#6c757d' %]; 
+                                                      padding: 4px 8px; 
+                                                      text-decoration: none; 
+                                                      border-radius: 3px; 
+                                                      display: inline-block; 
+                                                      margin-right: 4px;"
+                                               title="Edit Link">
+                                                <i class="icon-edit"></i>
+                                            </a>
+                                            <a href="[% c.uri_for('/navigation/delete_link', link.id) %]" 
+                                               style="background-color: [% theme_vars.item('warning-color') || '#dc3545' %]; 
+                                                      color: #ffffff; 
+                                                      border: 1px solid [% theme_vars.item('warning-color') || '#dc3545' %]; 
+                                                      padding: 4px 8px; 
+                                                      text-decoration: none; 
+                                                      border-radius: 3px; 
+                                                      display: inline-block;"
+                                               title="Delete Link"
+                                               onclick="return confirm('Are you sure you want to delete this link?');">
+                                                <i class="icon-trash"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            [% END %]
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        [% END %]
+    [% ELSE %]
+        <div class="empty-state">
+            <div class="empty-state-icon">
+                <i class="icon-link"></i>
+            </div>
+            <h3>No Menu Links Found</h3>
+            <p>There are currently no menu links configured for your site.</p>
+            <a href="[% c.uri_for('/navigation/add_link') %]" 
+               style="background-color: [% theme_vars.item('primary-color') || '#007bff' %]; 
+                      color: [% theme_vars.item('text-color') || '#ffffff' %]; 
+                      border: 1px solid [% theme_vars.item('border-color') || '#007bff' %]; 
+                      padding: 8px 16px; 
+                      text-decoration: none; 
+                      border-radius: 4px; 
+                      display: inline-block;">
+                <i class="icon-plus"></i> Add Your First Link
+            </a>
+        </div>
+    [% END %]
+</div>
