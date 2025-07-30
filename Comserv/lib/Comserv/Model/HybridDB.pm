@@ -42,9 +42,10 @@ use constant {
 our $BACKEND_CACHE = {};
 our $CACHE_TIMESTAMP = 0;
 
-# Class-level connection cache to reduce connection overhead
-our $CONNECTION_CACHE = {};
-our $CONNECTION_CACHE_TTL = 600; # 10 minutes
+# Connection pool for persistent database connections
+our $CONNECTION_POOL = {};
+our $CONNECTION_TIMESTAMPS = {};
+use constant CONNECTION_POOL_TTL => 1800; # 30 minutes
 
 =head1 METHODS
 
@@ -286,6 +287,13 @@ sub _test_mysql_backend {
     
     return 0 unless $config && $config->{db_type} eq 'mysql';
     
+    # Check connection pool first
+    my $pooled_connection = $self->_get_pooled_connection($backend_name);
+    if ($pooled_connection) {
+        $self->_safe_log($c, 'debug', "HybridDB: Using pooled connection for backend '$backend_name'");
+        return 1;
+    }
+    
     # Apply localhost override if configured
     my $host = $config->{host};
     if ($config->{localhost_override} && $host ne 'localhost') {
@@ -320,10 +328,12 @@ sub _test_mysql_backend {
             $sth->execute();
             my ($result) = $sth->fetchrow_array();
             $sth->finish();
-            $dbh->disconnect();
+            
+            # Store successful connection in pool for reuse
+            $self->_store_pooled_connection($backend_name, $dbh);
             
             alarm(0);
-            $self->_safe_log($c, 'info', "HybridDB: MySQL backend '$backend_name' connection successful (result: $result)");
+            $self->_safe_log($c, 'info', "HybridDB: MySQL backend '$backend_name' connection successful (result: $result) - stored in pool");
             return 1;
         }
         
@@ -366,6 +376,62 @@ sub _get_default_backend {
     
     # Return best MySQL backend or fallback to SQLite
     return $best_mysql || 'sqlite_offline';
+}
+
+=head2 _get_pooled_connection
+
+Check if a valid pooled connection exists for the given backend
+
+=cut
+
+sub _get_pooled_connection {
+    my ($self, $backend_name) = @_;
+    
+    return undef unless $backend_name;
+    
+    # Check if connection exists and is still valid
+    if (exists $CONNECTION_POOL->{$backend_name} && 
+        exists $CONNECTION_TIMESTAMPS->{$backend_name}) {
+        
+        my $age = time() - $CONNECTION_TIMESTAMPS->{$backend_name};
+        
+        if ($age < CONNECTION_POOL_TTL) {
+            # Connection is still valid, test it quickly
+            my $dbh = $CONNECTION_POOL->{$backend_name};
+            
+            try {
+                # Quick ping test
+                if ($dbh && $dbh->ping()) {
+                    return $dbh;
+                }
+            } catch {
+                # Connection failed, remove from pool
+                delete $CONNECTION_POOL->{$backend_name};
+                delete $CONNECTION_TIMESTAMPS->{$backend_name};
+            };
+        } else {
+            # Connection expired, remove from pool
+            delete $CONNECTION_POOL->{$backend_name};
+            delete $CONNECTION_TIMESTAMPS->{$backend_name};
+        }
+    }
+    
+    return undef;
+}
+
+=head2 _store_pooled_connection
+
+Store a successful connection in the pool for reuse
+
+=cut
+
+sub _store_pooled_connection {
+    my ($self, $backend_name, $dbh) = @_;
+    
+    return unless $backend_name && $dbh;
+    
+    $CONNECTION_POOL->{$backend_name} = $dbh;
+    $CONNECTION_TIMESTAMPS->{$backend_name} = time();
 }
 
 =head2 _detect_mysql
@@ -452,6 +518,42 @@ sub get_backend_type {
     return $self->{backend_type} || 'unknown';
 }
 
+=head2 get_backend_for_data_type
+
+Get the best available backend for a specific data type and privacy level
+Supports multiple simultaneous active backends based on data routing requirements
+
+=cut
+
+sub get_backend_for_data_type {
+    my ($self, $c, $data_type, $privacy_level) = @_;
+    
+    $data_type ||= 'ency';  # Default to ency data
+    $privacy_level ||= 'shared';  # Default to shared data
+    
+    # Simple routing logic based on data type and privacy
+    if ($privacy_level eq 'private') {
+        # Private data should go to local backends first
+        foreach my $backend_name (sort { $self->{available_backends}->{$a}->{config}->{priority} <=> $self->{available_backends}->{$b}->{config}->{priority} } keys %{$self->{available_backends}}) {
+            my $backend = $self->{available_backends}->{$backend_name};
+            if ($backend->{available} && $backend->{config}->{host} eq 'localhost') {
+                return $backend_name;
+            }
+        }
+    } elsif ($privacy_level eq 'shared' || $privacy_level eq 'production') {
+        # Shared/production data should go to production backends first
+        foreach my $backend_name (sort { $self->{available_backends}->{$a}->{config}->{priority} <=> $self->{available_backends}->{$b}->{config}->{priority} } keys %{$self->{available_backends}}) {
+            my $backend = $self->{available_backends}->{$backend_name};
+            if ($backend->{available} && $backend->{config}->{host} ne 'localhost') {
+                return $backend_name;
+            }
+        }
+    }
+    
+    # Fallback to default backend
+    return $self->{backend_type} || 'sqlite_offline';
+}
+
 =head2 is_mysql_available
 
 Check if MySQL backend is available
@@ -479,31 +581,13 @@ sub get_connection_info {
         die "Unknown backend: $backend_name";
     }
     
-    # PERFORMANCE FIX: Cache connection info to reduce repeated calculations and logging
-    my $cache_key = "${backend_name}_connection_info";
-    my $cached_info = $CONNECTION_CACHE->{$cache_key};
-    my $cache_time = $CONNECTION_CACHE->{"${cache_key}_time"} || 0;
-    
-    if ($cached_info && (time() - $cache_time) < $CONNECTION_CACHE_TTL) {
-        # Use cached connection info (no logging to reduce noise)
-        return $cached_info;
-    }
-    
-    # Generate fresh connection info
-    my $connection_info;
     if ($backend_info->{type} eq 'mysql') {
-        $connection_info = $self->_get_mysql_connection_info_for_backend($c, $backend_name, $backend_info->{config});
+        return $self->_get_mysql_connection_info_for_backend($c, $backend_name, $backend_info->{config});
     } elsif ($backend_info->{type} eq 'sqlite') {
-        $connection_info = $self->_get_sqlite_connection_info($c);
+        return $self->_get_sqlite_connection_info($c);
     } else {
         die "Unknown backend type: " . $backend_info->{type};
     }
-    
-    # Cache the connection info
-    $CONNECTION_CACHE->{$cache_key} = $connection_info;
-    $CONNECTION_CACHE->{"${cache_key}_time"} = time();
-    
-    return $connection_info;
 }
 
 =head2 _get_mysql_connection_info_for_backend
@@ -523,10 +607,7 @@ sub _get_mysql_connection_info_for_backend {
     }
     
     my $dsn = "dbi:mysql:database=$config->{database};host=$host;port=$config->{port}";
-    # PERFORMANCE FIX: Only log DSN when debug mode is enabled to reduce log noise
-    if ($c->debug) {
-        $c->log->info("HybridDB: Final connection DSN for backend '$backend_name': $dsn");
-    }
+    $c->log->info("HybridDB: Final connection DSN for backend '$backend_name': $dsn");
     
     return {
         dsn => $dsn,

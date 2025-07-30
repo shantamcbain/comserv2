@@ -1,140 +1,390 @@
-[% PageVersion = 'Comserv/root/Documentation/general/navigation_system.tt,v 1.1 2025/07/07 shanta Exp shanta ' %]
+[% META title = 'Navigation System Documentation' %]
+[% PageVersion = 'Documentation/general/navigation_system.tt,v 1.0 2025/01/28 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
-[% META title = 'Navigation System Documentation' %]
+<div class="documentation-content">
 
-<div class="apiary-container">
-    <div class="feature-header">
-        <h1>Navigation System Documentation</h1>
-        <p class="feature-description">Complete guide to the Comserv navigation system architecture and implementation</p>
-    </div>
+<h1>Navigation System Documentation</h1>
 
-    <section id="overview">
-        <h2>System Overview</h2>
-        <div class="architecture-section">
-            <p>The Comserv navigation system uses a modular approach with individual dropdown menu templates that are included in the main navigation template. This allows for easy maintenance and role-based menu visibility.</p>
-            
-            <h3>Navigation Order</h3>
-            <p>The navigation menus appear in the following order:</p>
-            <ol>
-                <li><strong>Main</strong> - Primary navigation and home links</li>
-                <li><strong>Login</strong> - User authentication and account management</li>
-                <li><strong>Global</strong> - Site-wide features and tools</li>
-                <li><strong>Hosted</strong> - Hosted services and domains</li>
-                <li><strong>Member</strong> - Member-specific features</li>
-                <li><strong>Weather</strong> - Weather information and forecasts</li>
-                <li><strong>IT</strong> - IT tools and system management</li>
-                <li><strong>Admin</strong> - Administrative functions (admin users only)</li>
-                <li><strong>HelpDesk</strong> - Support and help resources</li>
-                <li><strong>Apiary</strong> - Beekeeping management (BMaster site only)</li>
-                <li><strong>Coop</strong> - Cooperative features</li>
-            </ol>
-        </div>
-    </section>
+<div class="doc-meta">
+    <p><strong>Date Created:</strong> 2025-01-28</p>
+    <p><strong>Last Updated:</strong> 2025-01-28</p>
+    <p><strong>Purpose:</strong> Complete reference for all navigation system files and architecture</p>
+</div>
 
-    <section id="architecture">
-        <h2>Technical Architecture</h2>
-        
-        <div class="architecture-section">
-            <h3>File Structure</h3>
-            <div class="template-list">
-                <ul>
-                    <li><strong>Main Navigation:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/root/Navigation/navigation.tt</code></li>
-                    <li><strong>Layout Integration:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/root/layout.tt</code> → <code>pagetop.tt</code> → <code>Navigation/navigation.tt</code></li>
-                </ul>
-            </div>
-            
-            <h3>Individual Menu Templates</h3>
-            <div class="template-list">
-                <ul>
-                    <li><strong>Main Menu:</strong> <code>Navigation/TopDropListMain.tt</code></li>
-                    <li><strong>Login Menu:</strong> <code>Navigation/TopDropListLogin.tt</code></li>
-                    <li><strong>Global Menu:</strong> <code>Navigation/TopDropListGlobal.tt</code></li>
-                    <li><strong>Hosted Menu:</strong> <code>Navigation/TopDropListHosted.tt</code></li>
-                    <li><strong>Member Menu:</strong> <code>Navigation/TopDropListMember.tt</code></li>
-                    <li><strong>Weather Menu:</strong> <code>Navigation/TopDropListWeather.tt</code></li>
-                    <li><strong>IT Menu:</strong> <code>Navigation/TopDropListIT.tt</code></li>
-                    <li><strong>Admin Menu:</strong> <code>Navigation/admintopmenu.tt</code></li>
-                    <li><strong>HelpDesk Menu:</strong> <code>Navigation/TopDropListHelpDesk.tt</code></li>
-                    <li><strong>Coop Menu:</strong> <code>Navigation/TopDropListCoop.tt</code></li>
-                </ul>
-            </div>
-        </div>
-    </section>
+<h2>Overview</h2>
+<p>The Comserv navigation system provides dynamic, role-based, and site-specific navigation menus throughout the application. It consists of a centralized controller, database models, template files, and supporting CSS/JavaScript files that work together to create a comprehensive navigation experience.</p>
 
-    <section id="role-based-access">
-        <h2>Role-Based Access Control</h2>
-        
-        <div class="architecture-section">
-            <h3>Admin Menu Visibility</h3>
-            <p>The Admin menu is only visible to users with admin role:</p>
-            <pre><code>[% IF c.session.roles.grep('admin').size %]
-    [% INCLUDE 'Navigation/admintopmenu.tt' %]
-[% END %]</code></pre>
-            
-            <h3>Site-Specific Menus</h3>
-            <p>The Apiary menu is only visible on the BMaster site:</p>
-            <pre><code>[% IF c.session.SiteName == 'BMaster' %]
-    <!-- Apiary Menu Content -->
-[% END %]</code></pre>
-        </div>
-    </section>
+<h2>System Architecture</h2>
 
-    <section id="menu-management">
-        <h2>Menu Management System</h2>
-        
-        <div class="architecture-section">
-            <h3>Dynamic Menu Links</h3>
-            <p>The system supports dynamic menu links managed through the Navigation controller:</p>
-            <ul>
-                <li><strong>Add Link:</strong> <code>/navigation/add_link?menu=&lt;menu_type&gt;</code></li>
-                <li><strong>Edit Link:</strong> <code>/navigation/edit_link/{link_id}</code></li>
-                <li><strong>Manage Links:</strong> <code>/navigation/manage_links</code></li>
-                <li><strong>Private Links:</strong> <code>/navigation/manage_private_links</code></li>
-            </ul>
-            
-            <h3>Database Integration</h3>
-            <p>Menu links are stored in database tables and dynamically loaded:</p>
-            <ul>
-                <li><strong>internal_links_tb</strong> - Internal navigation links</li>
-                <li><strong>Page_tb</strong> - Page-based navigation items</li>
-            </ul>
-        </div>
-    </section>
+<h3>Template Inclusion Hierarchy</h3>
+<pre>layout.tt → pagetop.tt → Navigation/navigation.tt → Individual TopDropList*.tt files</pre>
 
-    <section id="css-styling">
-        <h2>CSS Styling</h2>
-        
-        <div class="architecture-section">
-            <h3>Navigation Classes</h3>
-            <p>The navigation system uses the following CSS classes:</p>
-            <ul>
-                <li><code>.main-navigation</code> - Main navigation container</li>
-                <li><code>.horizontal-menu</code> - Horizontal menu list</li>
-                <li><code>.horizontal-dropdown</code> - Dropdown menu items</li>
-                <li><code>.dropbtn</code> - Dropdown button styling</li>
-                <li><code>.dropdown-content</code> - Dropdown content container</li>
-            </ul>
-            
-            <h3>Theme Integration</h3>
-            <p>Navigation styling is integrated with the theme system and uses CSS variables for consistent theming across different sites.</p>
-        </div>
-    </section>
+<h3>Menu Order Specification</h3>
+<ol>
+    <li><strong>Main</strong> - TopDropListMain.tt</li>
+    <li><strong>Login</strong> - TopDropListLogin.tt</li>
+    <li><strong>Global</strong> - TopDropListGlobal.tt</li>
+    <li><strong>Hosted</strong> - TopDropListHosted.tt</li>
+    <li><strong>Member</strong> - TopDropListMember.tt</li>
+    <li><strong>Weather</strong> - TopDropListWeather.tt</li>
+    <li><strong>IT</strong> - TopDropListIT.tt</li>
+    <li><strong>Admin</strong> - admintopmenu.tt (admin users only)</li>
+    <li><strong>HelpDesk</strong> - TopDropListHelpDesk.tt</li>
+    <li><strong>Apiary</strong> - Inline template (BMaster site only)</li>
+    <li><strong>Coop</strong> - TopDropListCoop.tt</li>
+</ol>
 
-    <section id="recent-updates">
-        <h2>Recent Updates</h2>
-        
-        <div class="architecture-section">
-            <h3>2025-07-07: Navigation System Consolidation</h3>
-            <ul>
-                <li>✅ <strong>Directory Consolidation:</strong> Merged duplicate navigation directories back to single Navigation/ directory</li>
-                <li>✅ <strong>Template Restoration:</strong> Restored proper navigation.tt with correct menu includes</li>
-                <li>✅ <strong>Menu Order Fix:</strong> Corrected navigation order to: Main, Login, Global, Hosted, Member, Weather, IT, Admin, HelpDesk</li>
-                <li>✅ <strong>Role-Based Access:</strong> Maintained proper admin-only and site-specific menu visibility</li>
-                <li>✅ <strong>Documentation Update:</strong> Updated all file path references to use correct Navigation/ directory</li>
-            </ul>
-        </div>
-    </section>
+<h2>Complete File Inventory</h2>
+
+<h3>Controllers</h3>
+
+<h4>Primary Navigation Controller</h4>
+<p><strong>File:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Navigation.pm</code></p>
+<p><strong>Purpose:</strong> Handles all navigation database queries, menu link management, private links, and admin functions</p>
+
+<p><strong>Key Methods:</strong></p>
+<ul>
+    <li><code>get_internal_links()</code> - Retrieves internal navigation links by category and site</li>
+    <li><code>get_pages()</code> - Retrieves page navigation entries by menu and site</li>
+    <li><code>get_admin_pages()</code> - Retrieves admin-specific page entries</li>
+    <li><code>get_admin_links()</code> - Retrieves admin-specific navigation links</li>
+    <li><code>get_private_links()</code> - Retrieves user-specific private navigation links</li>
+    <li><code>populate_navigation_data()</code> - Populates all navigation data in stash for templates</li>
+    <li><code>auto()</code> - Automatically runs on all requests to populate navigation data</li>
+</ul>
+
+<p><strong>Routes:</strong></p>
+<ul>
+    <li><code>/navigation/add_private_link</code> - Add new private navigation link</li>
+    <li><code>/navigation/manage_private_links</code> - Manage user's private navigation links</li>
+    <li><code>/navigation/add_link</code> - Admin: Add new navigation link</li>
+    <li><code>/navigation/manage_links</code> - Admin: Manage all navigation links</li>
+    <li><code>/navigation/edit_link/{id}</code> - Admin: Edit existing navigation link</li>
+    <li><code>/navigation/delete_link/{id}</code> - Admin: Delete navigation link</li>
+</ul>
+
+<h3>Database Models</h3>
+
+<h4>Internal Links Model</h4>
+<p><strong>File:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema/Ency/Result/InternalLinksTb.pm</code></p>
+<p><strong>Purpose:</strong> Manages internal_links_tb table for navigation links storage</p>
+<p><strong>Database Table:</strong> <code>internal_links_tb</code></p>
+
+<p><strong>Fields:</strong></p>
+<ul>
+    <li><code>id</code> - Primary key (integer, auto-increment)</li>
+    <li><code>category</code> - Link category (varchar 50) - Main_links, Member_links, Admin_links, Private_links, etc.</li>
+    <li><code>sitename</code> - Site name (varchar 50) - Site-specific or 'All'</li>
+    <li><code>name</code> - Display name (varchar 100)</li>
+    <li><code>url</code> - Link URL (varchar 255)</li>
+    <li><code>target</code> - Link target (varchar 20) - Default: '_self'</li>
+    <li><code>description</code> - Description/notes (text) - Also used for username in private links</li>
+    <li><code>link_order</code> - Display order (integer) - Default: 0</li>
+    <li><code>status</code> - Active status (integer) - Default: 1</li>
+    <li><code>created_at</code> - Creation timestamp (datetime)</li>
+    <li><code>updated_at</code> - Update timestamp (datetime)</li>
+</ul>
+
+<h4>Page Model</h4>
+<p><strong>File:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema/Ency/Result/PageTb.pm</code></p>
+<p><strong>Purpose:</strong> Manages page_tb table for page navigation entries</p>
+<p><strong>Database Table:</strong> <code>page_tb</code></p>
+
+<p><strong>Fields:</strong></p>
+<ul>
+    <li><code>id</code> - Primary key (integer, auto-increment)</li>
+    <li><code>menu</code> - Menu type (varchar 50) - Main, member, Admin, etc.</li>
+    <li><code>sitename</code> - Site name (varchar 50) - Site-specific or 'All'</li>
+    <li><code>name</code> - Display name (varchar 100)</li>
+    <li><code>url</code> - Page URL (varchar 255)</li>
+    <li><code>target</code> - Link target (varchar 20) - Default: '_self'</li>
+    <li><code>description</code> - Description/notes (text)</li>
+    <li><code>link_order</code> - Display order (integer) - Default: 0</li>
+    <li><code>status</code> - Active status (integer) - Default: 1 (inactive), 2 (active)</li>
+    <li><code>created_at</code> - Creation timestamp (datetime)</li>
+    <li><code>updated_at</code> - Update timestamp (datetime)</li>
+</ul>
+
+<h3>Template Files</h3>
+
+<h4>Core Navigation Templates</h4>
+
+<p><strong>Main Navigation Template</strong></p>
+<ul>
+    <li><strong>File:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/root/Navigation/navigation.tt</code></li>
+    <li><strong>Purpose:</strong> Central navigation template included by pagetop.tt, orchestrates all menu dropdowns</li>
+    <li><strong>Function:</strong> Includes all individual dropdown menu templates in proper order</li>
+</ul>
+
+<p><strong>Admin Top Menu</strong></p>
+<ul>
+    <li><strong>File:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/root/Navigation/admintopmenu.tt</code></li>
+    <li><strong>Purpose:</strong> Admin-only navigation menu with project and documentation sections</li>
+    <li><strong>Access:</strong> Only visible to users with admin role</li>
+</ul>
+
+<h4>Dropdown Menu Templates</h4>
+
+<p><strong>Main Menu</strong></p>
+<ul>
+    <li><strong>File:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/root/Navigation/TopDropListMain.tt</code></li>
+    <li><strong>Purpose:</strong> Main menu dropdown with primary site navigation</li>
+</ul>
+
+<p><strong>Login Menu</strong></p>
+<ul>
+    <li><strong>File:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/root/Navigation/TopDropListLogin.tt</code></li>
+    <li><strong>Purpose:</strong> Login menu dropdown with authentication-related links</li>
+</ul>
+
+<p><strong>Global Menu</strong></p>
+<ul>
+    <li><strong>File:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/root/Navigation/TopDropListGlobal.tt</code></li>
+    <li><strong>Purpose:</strong> Global menu dropdown with site-wide resources</li>
+    <li><strong>Note:</strong> There's also a duplicate file <code>TopDropLisGlobal.tt</code> that should be cleaned up</li>
+</ul>
+
+<p><strong>Hosted Services Menu</strong></p>
+<ul>
+    <li><strong>File:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/root/Navigation/TopDropListHosted.tt</code></li>
+    <li><strong>Purpose:</strong> Hosted services menu with hosting-related links</li>
+</ul>
+
+<p><strong>Member Menu</strong></p>
+<ul>
+    <li><strong>File:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/root/Navigation/TopDropListMember.tt</code></li>
+    <li><strong>Purpose:</strong> Member menu dropdown with member-specific resources</li>
+</ul>
+
+<p><strong>Weather Menu</strong></p>
+<ul>
+    <li><strong>File:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/root/Navigation/TopDropListWeather.tt</code></li>
+    <li><strong>Purpose:</strong> Weather menu dropdown with weather-related tools and information</li>
+</ul>
+
+<p><strong>IT Menu</strong></p>
+<ul>
+    <li><strong>File:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/root/Navigation/TopDropListIT.tt</code></li>
+    <li><strong>Purpose:</strong> IT menu dropdown with technical resources and tools</li>
+</ul>
+
+<p><strong>Help Desk Menu</strong></p>
+<ul>
+    <li><strong>File:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/root/Navigation/TopDropListHelpDesk.tt</code></li>
+    <li><strong>Purpose:</strong> Help desk menu with support and assistance links</li>
+</ul>
+
+<p><strong>Cooperative Menu</strong></p>
+<ul>
+    <li><strong>File:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/root/Navigation/TopDropListCoop.tt</code></li>
+    <li><strong>Purpose:</strong> Cooperative menu with cooperative-specific resources</li>
+</ul>
+
+<h4>Management Templates</h4>
+
+<p><strong>Link Editing Interface</strong></p>
+<ul>
+    <li><strong>File:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/root/Navigation/edit_link.tt</code></li>
+    <li><strong>Purpose:</strong> Admin interface for editing existing navigation links</li>
+    <li><strong>Access:</strong> Admin users only</li>
+</ul>
+
+<p><strong>Delete Confirmation</strong></p>
+<ul>
+    <li><strong>File:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/root/Navigation/confirm_delete.tt</code></li>
+    <li><strong>Purpose:</strong> Confirmation dialog for deleting navigation links</li>
+</ul>
+
+<p><strong>Modification Confirmation</strong></p>
+<ul>
+    <li><strong>File:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/root/Navigation/confirm_modification.tt</code></li>
+    <li><strong>Purpose:</strong> Confirmation dialog for modifying navigation links</li>
+</ul>
+
+<h3>Missing Template Files (Need Creation)</h3>
+
+<p>The following routes exist in the Navigation controller but lack corresponding template files:</p>
+
+<p><strong>Private Links Management</strong></p>
+<ul>
+    <li><strong>Route:</strong> <code>/navigation/manage_private_links</code></li>
+    <li><strong>Template:</strong> Missing - needs creation</li>
+    <li><strong>Purpose:</strong> Should provide interface for users to manage their private navigation links</li>
+    <li><strong>Access:</strong> Logged-in users only</li>
+</ul>
+
+<p><strong>Private Links Add</strong></p>
+<ul>
+    <li><strong>Route:</strong> <code>/navigation/add_private_link</code></li>
+    <li><strong>Template:</strong> Missing - needs creation</li>
+    <li><strong>Purpose:</strong> Should provide form for users to add new private navigation links</li>
+    <li><strong>Access:</strong> Logged-in users only</li>
+</ul>
+
+<p><strong>Links Management</strong></p>
+<ul>
+    <li><strong>Route:</strong> <code>/navigation/manage_links</code></li>
+    <li><strong>Template:</strong> Missing - needs creation</li>
+    <li><strong>Purpose:</strong> Should provide admin interface for managing all navigation links</li>
+    <li><strong>Access:</strong> Admin users only</li>
+</ul>
+
+<p><strong>Links Add</strong></p>
+<ul>
+    <li><strong>Route:</strong> <code>/navigation/add_link</code></li>
+    <li><strong>Template:</strong> Missing - needs creation</li>
+    <li><strong>Purpose:</strong> Should provide admin form for adding new navigation links</li>
+    <li><strong>Access:</strong> Admin users only</li>
+</ul>
+
+<h3>CSS and JavaScript Files</h3>
+
+<h4>CSS Files</h4>
+
+<p><strong>Navigation Component CSS</strong></p>
+<ul>
+    <li><strong>File:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/root/static/css/components/navigation.css</code></li>
+    <li><strong>Purpose:</strong> Navigation-specific styling and layout</li>
+</ul>
+
+<p><strong>General Menu CSS</strong></p>
+<ul>
+    <li><strong>File:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/root/static/css/menu.css</code></li>
+    <li><strong>Purpose:</strong> General menu styling and appearance</li>
+</ul>
+
+<p><strong>Menu Theme CSS</strong></p>
+<ul>
+    <li><strong>File:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/root/static/css/menu-theme.css</code></li>
+    <li><strong>Purpose:</strong> Theme-specific menu styling and colors</li>
+</ul>
+
+<h4>JavaScript Files</h4>
+
+<p><strong>Menu Interaction</strong></p>
+<ul>
+    <li><strong>File:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/root/static/js/menu.js</code></li>
+    <li><strong>Purpose:</strong> Menu interaction functionality and event handling</li>
+</ul>
+
+<p><strong>Menu Positioning</strong></p>
+<ul>
+    <li><strong>File:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/root/static/js/menu-position.js</code></li>
+    <li><strong>Purpose:</strong> Menu positioning logic and dropdown alignment</li>
+</ul>
+
+<p><strong>Sub-menu Functionality</strong></p>
+<ul>
+    <li><strong>File:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/root/static/js/sub-menu.js</code></li>
+    <li><strong>Purpose:</strong> Sub-menu functionality and nested menu handling</li>
+</ul>
+
+<h2>Key Features</h2>
+
+<h3>Role-Based Access Control</h3>
+<ul>
+    <li>Admin menus only visible to users with admin role</li>
+    <li>Private links specific to individual users</li>
+    <li>Site-specific navigation based on current site context</li>
+</ul>
+
+<h3>Site-Specific Navigation</h3>
+<ul>
+    <li>Different menu items can be configured per site</li>
+    <li>'All' site designation for universal menu items</li>
+    <li>Site name detection from session data</li>
+</ul>
+
+<h3>Dynamic Link Management</h3>
+<ul>
+    <li>Admin interface for adding, editing, and deleting navigation links</li>
+    <li>User interface for managing private navigation links</li>
+    <li>Database-driven menu content with fallback to direct SQL queries</li>
+</ul>
+
+<h3>Automatic System Management</h3>
+<ul>
+    <li>Automatic database table creation if missing</li>
+    <li>Graceful degradation when database is unavailable</li>
+    <li>Error handling and logging throughout the system</li>
+</ul>
+
+<h2>Database Schema</h2>
+
+<h3>Link Categories</h3>
+<ul>
+    <li><code>Main_links</code> - Main menu navigation items</li>
+    <li><code>Member_links</code> - Member-specific navigation items</li>
+    <li><code>Admin_links</code> - Admin-only navigation items</li>
+    <li><code>Private_links</code> - User-specific private navigation items</li>
+    <li><code>Hosted_link</code> - Hosted services navigation items</li>
+</ul>
+
+<h3>Menu Types</h3>
+<ul>
+    <li><code>Main</code> - Main page navigation</li>
+    <li><code>member</code> - Member page navigation</li>
+    <li><code>Admin</code> - Admin page navigation</li>
+</ul>
+
+<h3>Status Values</h3>
+<ul>
+    <li><code>1</code> - Active (for internal_links_tb)</li>
+    <li><code>2</code> - Active (for page_tb)</li>
+    <li><code>0</code> or other - Inactive</li>
+</ul>
+
+<h2>Development Guidelines</h2>
+
+<h3>Adding New Navigation Items</h3>
+<ol>
+    <li>Use the admin interface at <code>/navigation/add_link</code> (when template is created)</li>
+    <li>Or add directly to database via Navigation controller methods</li>
+    <li>Specify appropriate category, site name, and display order</li>
+    <li>Test visibility based on user roles and site context</li>
+</ol>
+
+<h3>Modifying Navigation Templates</h3>
+<ol>
+    <li>Always test navigation functionality after template changes</li>
+    <li>Maintain proper menu order as specified in architecture</li>
+    <li>Respect role-based access controls in template logic</li>
+    <li>Use theme system for styling, avoid inline CSS</li>
+</ol>
+
+<h3>Database Modifications</h3>
+<ol>
+    <li>All database interaction should be through Catalyst controllers</li>
+    <li>Use DBIx::Class methods with fallback to direct SQL if needed</li>
+    <li>Maintain proper error handling and logging</li>
+    <li>Test with both existing and missing database tables</li>
+</ol>
+
+<h2>Troubleshooting</h2>
+
+<h3>Common Issues</h3>
+<ul>
+    <li><strong>Missing Templates:</strong> Check that all route templates exist in Navigation directory</li>
+    <li><strong>Menu Not Appearing:</strong> Verify user roles and site-specific permissions</li>
+    <li><strong>Database Errors:</strong> Check that navigation tables exist and are accessible</li>
+    <li><strong>Styling Issues:</strong> Verify CSS files are loaded and theme system is working</li>
+</ul>
+
+<h3>Debugging</h3>
+<ul>
+    <li>Enable debug mode to see PageVersion information</li>
+    <li>Check application logs for navigation-related errors</li>
+    <li>Verify session data for user roles and site information</li>
+    <li>Test with different user roles and site contexts</li>
+</ul>
+
+<h2>Related Documentation</h2>
+<ul>
+    <li><a href="../changelog/2025-07-07-navigation-system-consolidation.tt">Navigation System Consolidation Changelog</a></li>
+    <li><a href="../changelog/2025-01-17-menu-links-implementation.tt">Menu Links Implementation Changelog</a></li>
+</ul>
+
 </div>

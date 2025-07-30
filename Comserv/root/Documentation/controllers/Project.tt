@@ -1,0 +1,159 @@
+[% META title = 'Project Controller Documentation' %]
+[% PageVersion = 'Documentation/controllers/Project.tt,v 0.01 2025/01/26 AI Exp AI ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>Project Controller Documentation</h1>
+            <p class="lead">Complete documentation for the Comserv::Controller::Project module</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <h2>Overview</h2>
+            <p>The Project controller manages project-related functionality in the Comserv application, including project listing, creation, editing, and hierarchical sub-project management.</p>
+
+            <h2>Recent Fixes (January 2025)</h2>
+            <div class="alert alert-success">
+                <h4>Compilation Issues Resolved</h4>
+                <ul>
+                    <li><strong>Database Query Restoration:</strong> Replaced temporary empty array returns with actual database queries in <code>fetch_projects_with_subprojects</code> method</li>
+                    <li><strong>Syntax Validation:</strong> All compilation errors have been fixed - both Project.pm and SB.pm now pass syntax checks</li>
+                    <li><strong>Logging Integration:</strong> Proper logging implementation using <code>Comserv::Util::Logging</code></li>
+                </ul>
+            </div>
+
+            <h2>Controller Actions</h2>
+            
+            <h3>index :Path :Args(0)</h3>
+            <p>Default action that redirects to the main project listing page.</p>
+            <pre><code>URL: /project
+Redirects to: /project/project</code></pre>
+
+            <h3>project :Path('project') :Args(0)</h3>
+            <p>Main project listing page with filtering capabilities.</p>
+            <ul>
+                <li><strong>Template:</strong> <code>todo/project.tt</code></li>
+                <li><strong>Features:</strong> Role-based filtering, project filtering, priority filtering</li>
+                <li><strong>CSS:</strong> Uses Bootstrap cards layout with <code>project-cards.css</code></li>
+            </ul>
+
+            <h3>add_project :Path('addproject') :Args(0)</h3>
+            <p>Form for creating new projects and sub-projects.</p>
+            <ul>
+                <li><strong>Template:</strong> <code>todo/add_project.tt</code></li>
+                <li><strong>Features:</strong> Parent project inheritance, site selection, form pre-filling</li>
+                <li><strong>Sub-projects:</strong> Supports <code>parent_id</code> parameter for creating sub-projects</li>
+            </ul>
+
+            <h3>create_project :Local :Args(0)</h3>
+            <p>Processes project creation form submissions.</p>
+            <ul>
+                <li><strong>Database:</strong> Creates records in Project table</li>
+                <li><strong>Error Handling:</strong> Comprehensive error logging and user feedback</li>
+                <li><strong>Validation:</strong> Handles parent_id arrays and user authentication</li>
+            </ul>
+
+            <h3>details :Path('details') :Args(0)</h3>
+            <p>Displays detailed project information including associated todos and sub-projects.</p>
+            <ul>
+                <li><strong>Template:</strong> <code>todo/projectdetails.tt</code></li>
+                <li><strong>Features:</strong> Project tree building, todo listing, recursive sub-project display</li>
+            </ul>
+
+            <h2>Private Methods</h2>
+
+            <h3>fetch_projects_with_subprojects</h3>
+            <p><strong>Status:</strong> ✅ Recently Fixed</p>
+            <p>Fetches top-level projects from the database and prepares them for display.</p>
+            <ul>
+                <li><strong>Query:</strong> <code>SELECT * FROM Project WHERE parent_id IS NULL ORDER BY name ASC</code></li>
+                <li><strong>Returns:</strong> Array reference of project hashrefs</li>
+                <li><strong>Error Handling:</strong> Returns empty array on database errors</li>
+            </ul>
+
+            <h3>enhance_project_data</h3>
+            <p>Adds default values and processes project data for filtering and display.</p>
+            <ul>
+                <li><strong>Default Priority:</strong> Medium (2)</li>
+                <li><strong>Default Status:</strong> New (1)</li>
+                <li><strong>Recursive:</strong> Processes sub-projects</li>
+            </ul>
+
+            <h3>build_project_tree</h3>
+            <p>Recursively builds project hierarchy including sub-projects and associated todos.</p>
+
+            <h2>Database Schema</h2>
+            <p>The Project controller works with the following database tables:</p>
+            <ul>
+                <li><strong>Project:</strong> Main project information</li>
+                <li><strong>Todo:</strong> Tasks associated with projects</li>
+                <li><strong>Site:</strong> Site information for project assignment</li>
+            </ul>
+
+            <h2>Templates</h2>
+            <ul>
+                <li><code>todo/project.tt</code> - Main project listing with Bootstrap cards</li>
+                <li><code>todo/add_project.tt</code> - Project creation form</li>
+                <li><code>todo/projectdetails.tt</code> - Detailed project view</li>
+            </ul>
+
+            <h2>Dependencies</h2>
+            <ul>
+                <li><code>Moose</code> - Object system</li>
+                <li><code>DateTime</code> - Date/time handling</li>
+                <li><code>Comserv::Util::Logging</code> - Application logging</li>
+                <li><code>Comserv::Controller::Site</code> - Site management integration</li>
+            </ul>
+        </div>
+
+        <div class="col-md-4">
+            <div class="panel panel-info">
+                <div class="panel-heading">
+                    <h3 class="panel-title">Quick Reference</h3>
+                </div>
+                <div class="panel-body">
+                    <h4>URLs</h4>
+                    <ul>
+                        <li><code>/project</code> - Project listing</li>
+                        <li><code>/project/addproject</code> - Add project</li>
+                        <li><code>/project/details?project_id=X</code> - Project details</li>
+                    </ul>
+
+                    <h4>Recent Changes</h4>
+                    <ul>
+                        <li>✅ Database queries restored</li>
+                        <li>✅ Compilation errors fixed</li>
+                        <li>✅ Logging properly implemented</li>
+                    </ul>
+
+                    <h4>Testing Status</h4>
+                    <ul>
+                        <li>✅ Syntax validation passed</li>
+                        <li>⚠️ Browser testing needed</li>
+                        <li>⚠️ Database connection verification needed</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="panel panel-warning">
+                <div class="panel-heading">
+                    <h3 class="panel-title">Next Steps</h3>
+                </div>
+                <div class="panel-body">
+                    <ol>
+                        <li>Test project listing in browser</li>
+                        <li>Verify database connectivity</li>
+                        <li>Check application logs for errors</li>
+                        <li>Test sub-project functionality</li>
+                        <li>Validate form submissions</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

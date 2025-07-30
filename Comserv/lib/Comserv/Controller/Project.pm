@@ -343,7 +343,7 @@ sub fetch_projects_with_subprojects :Private {
             {
                 order_by => { -asc => 'name' }
             }
-        );
+        )->all;
     };
 
     if ($@) {

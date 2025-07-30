@@ -325,126 +325,16 @@ sub fetch_and_set {
 
 sub track_application_start {
     my ($self, $c) = @_;
-
+    
     # Only track once per application start
     return if $self->_application_start_tracked;
     $self->_application_start_tracked(1);
 
-    # Get the current date
-    my $current_date = DateTime->now->ymd; # Format: YYYY-MM-DD
-
-    # Path to the JSON file
-    my $json_file = $c->path_to('root', 'Documentation', 'completed_items.json');
-
-    # Check if the file exists
-    if (-e $json_file) {
-        # Read the JSON file
-        open my $fh, '<:encoding(UTF-8)', $json_file or do {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'track_application_start', "Cannot open $json_file for reading: $!");
-            return;
-        };
-        my $json_content = do { local $/; <$fh> };
-        close $fh;
-
-        # Parse the JSON content
-        my $data;
-        eval {
-            $data = decode_json($json_content);
-        };
-        if ($@) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'track_application_start', "Error parsing JSON: $@");
-            return;
-        }
-
-        # Check if we already have any application start entry
-        my $entry_exists = 0;
-        my $latest_start_date = '';
-
-        foreach my $item (@{$data->{completed_items}}) {
-            if ($item->{item} =~ /^Application started/) {
-                # Keep track of the latest application start date
-                if ($item->{date_created} gt $latest_start_date) {
-                    $latest_start_date = $item->{date_created};
-                }
-
-                # If we already have an entry for today, mark it as existing
-                if ($item->{date_created} eq $current_date) {
-                    $entry_exists = 1;
-                }
-            }
-        }
-
-        # If we have a previous application start entry but not for today,
-        # update that entry instead of creating a new one
-        if (!$entry_exists && $latest_start_date ne '') {
-            for my $i (0 .. $#{$data->{completed_items}}) {
-                my $item = $data->{completed_items}[$i];
-                if ($item->{item} =~ /^Application started/ && $item->{date_created} eq $latest_start_date) {
-                    # Update the existing entry with today's date
-                    $data->{completed_items}[$i]->{item} = "Application started on $current_date";
-                    $data->{completed_items}[$i]->{date_created} = $current_date;
-                    $data->{completed_items}[$i]->{date_completed} = $current_date;
-                    $entry_exists = 1; # Mark as existing so we don't create a new one
-
-                    # Write the updated data back to the file
-                    open my $fh, '>:encoding(UTF-8)', $json_file or do {
-                        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'track_application_start', "Cannot open $json_file for writing: $!");
-                        return;
-                    };
-
-                    eval {
-                        print $fh encode_json($data);
-                    };
-                    if ($@) {
-                        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'track_application_start', "Error encoding JSON: $@");
-                        close $fh;
-                        return;
-                    }
-
-                    close $fh;
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'track_application_start', "Updated application start entry to $current_date");
-                    last;
-                }
-            }
-        }
-
-        # If no entry exists for today, add one
-        if (!$entry_exists) {
-            # Create a new entry
-            my $new_entry = {
-                item => "Application started on $current_date",
-                status => "completed",
-                date_created => $current_date,
-                date_completed => $current_date,
-                commit => "system" # Indicate this is a system-generated entry
-            };
-
-            # Add the new entry to the data
-            push @{$data->{completed_items}}, $new_entry;
-
-            # Write the updated data back to the file
-            open my $fh, '>:encoding(UTF-8)', $json_file or do {
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'track_application_start', "Cannot open $json_file for writing: $!");
-                return;
-            };
-
-            eval {
-                print $fh encode_json($data);
-            };
-            if ($@) {
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'track_application_start', "Error encoding JSON: $@");
-                close $fh;
-                return;
-            }
-
-            close $fh;
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'track_application_start', "Added application start entry for $current_date");
-        } else {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'track_application_start', "Application start entry for $current_date already exists");
-        }
-    } else {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'track_application_start', "JSON file $json_file does not exist");
-    }
+    # Log application start without JSON file manipulation
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'track_application_start', 
+        "Application started at " . DateTime->now->ymd);
+    
+    return;
 }
 
 sub auto :Private {

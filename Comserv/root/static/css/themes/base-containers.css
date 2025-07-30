@@ -418,6 +418,26 @@ body[class*="theme-"] a.btn-warning:hover,
     transform: translateY(-2px);
 }
 
+body[class*="theme-"] .btn-danger,
+body[class*="theme-"] a.btn-danger,
+.btn-danger,
+a.btn-danger,
+.feature-actions .btn-danger,
+.apiary-container .btn-danger {
+    background: #dc3545 !important;
+    color: white !important;
+}
+
+.btn-danger:hover,
+a.btn-danger:hover,
+body[class*="theme-"] a.btn-danger:hover,
+.feature-actions .btn-danger:hover,
+.apiary-container .btn-danger:hover {
+    background: #c82333 !important;
+    color: white !important;
+    transform: translateY(-2px);
+}
+
 .btn-outline {
     background: transparent;
     color: var(--primary-color);
@@ -432,6 +452,42 @@ body[class*="theme-"] a.btn-warning:hover,
 .btn-sm {
     padding: 8px 16px;
     font-size: 0.9rem;
+}
+
+/* Text Color Classes - Theme Compliant */
+body[class*="theme-"] .text-primary,
+.text-primary {
+    color: var(--primary-color) !important;
+}
+
+body[class*="theme-"] .text-secondary,
+.text-secondary {
+    color: var(--secondary-color) !important;
+}
+
+body[class*="theme-"] .text-success,
+.text-success {
+    color: var(--success-color) !important;
+}
+
+body[class*="theme-"] .text-info,
+.text-info {
+    color: var(--link-color) !important;
+}
+
+body[class*="theme-"] .text-warning,
+.text-warning {
+    color: var(--warning-color) !important;
+}
+
+body[class*="theme-"] .text-danger,
+.text-danger {
+    color: #dc3545 !important;
+}
+
+body[class*="theme-"] .text-muted,
+.text-muted {
+    color: var(--muted-text, #6c757d) !important;
 }
 
 /* Todo-specific button overrides for theme compliance */
