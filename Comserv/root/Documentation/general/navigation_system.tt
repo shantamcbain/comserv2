@@ -1,0 +1,140 @@
+[% PageVersion = 'Comserv/root/Documentation/general/navigation_system.tt,v 1.1 2025/07/07 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Navigation System Documentation' %]
+
+<div class="apiary-container">
+    <div class="feature-header">
+        <h1>Navigation System Documentation</h1>
+        <p class="feature-description">Complete guide to the Comserv navigation system architecture and implementation</p>
+    </div>
+
+    <section id="overview">
+        <h2>System Overview</h2>
+        <div class="architecture-section">
+            <p>The Comserv navigation system uses a modular approach with individual dropdown menu templates that are included in the main navigation template. This allows for easy maintenance and role-based menu visibility.</p>
+            
+            <h3>Navigation Order</h3>
+            <p>The navigation menus appear in the following order:</p>
+            <ol>
+                <li><strong>Main</strong> - Primary navigation and home links</li>
+                <li><strong>Login</strong> - User authentication and account management</li>
+                <li><strong>Global</strong> - Site-wide features and tools</li>
+                <li><strong>Hosted</strong> - Hosted services and domains</li>
+                <li><strong>Member</strong> - Member-specific features</li>
+                <li><strong>Weather</strong> - Weather information and forecasts</li>
+                <li><strong>IT</strong> - IT tools and system management</li>
+                <li><strong>Admin</strong> - Administrative functions (admin users only)</li>
+                <li><strong>HelpDesk</strong> - Support and help resources</li>
+                <li><strong>Apiary</strong> - Beekeeping management (BMaster site only)</li>
+                <li><strong>Coop</strong> - Cooperative features</li>
+            </ol>
+        </div>
+    </section>
+
+    <section id="architecture">
+        <h2>Technical Architecture</h2>
+        
+        <div class="architecture-section">
+            <h3>File Structure</h3>
+            <div class="template-list">
+                <ul>
+                    <li><strong>Main Navigation:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/root/Navigation/navigation.tt</code></li>
+                    <li><strong>Layout Integration:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/root/layout.tt</code> → <code>pagetop.tt</code> → <code>Navigation/navigation.tt</code></li>
+                </ul>
+            </div>
+            
+            <h3>Individual Menu Templates</h3>
+            <div class="template-list">
+                <ul>
+                    <li><strong>Main Menu:</strong> <code>Navigation/TopDropListMain.tt</code></li>
+                    <li><strong>Login Menu:</strong> <code>Navigation/TopDropListLogin.tt</code></li>
+                    <li><strong>Global Menu:</strong> <code>Navigation/TopDropListGlobal.tt</code></li>
+                    <li><strong>Hosted Menu:</strong> <code>Navigation/TopDropListHosted.tt</code></li>
+                    <li><strong>Member Menu:</strong> <code>Navigation/TopDropListMember.tt</code></li>
+                    <li><strong>Weather Menu:</strong> <code>Navigation/TopDropListWeather.tt</code></li>
+                    <li><strong>IT Menu:</strong> <code>Navigation/TopDropListIT.tt</code></li>
+                    <li><strong>Admin Menu:</strong> <code>Navigation/admintopmenu.tt</code></li>
+                    <li><strong>HelpDesk Menu:</strong> <code>Navigation/TopDropListHelpDesk.tt</code></li>
+                    <li><strong>Coop Menu:</strong> <code>Navigation/TopDropListCoop.tt</code></li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <section id="role-based-access">
+        <h2>Role-Based Access Control</h2>
+        
+        <div class="architecture-section">
+            <h3>Admin Menu Visibility</h3>
+            <p>The Admin menu is only visible to users with admin role:</p>
+            <pre><code>[% IF c.session.roles.grep('admin').size %]
+    [% INCLUDE 'Navigation/admintopmenu.tt' %]
+[% END %]</code></pre>
+            
+            <h3>Site-Specific Menus</h3>
+            <p>The Apiary menu is only visible on the BMaster site:</p>
+            <pre><code>[% IF c.session.SiteName == 'BMaster' %]
+    <!-- Apiary Menu Content -->
+[% END %]</code></pre>
+        </div>
+    </section>
+
+    <section id="menu-management">
+        <h2>Menu Management System</h2>
+        
+        <div class="architecture-section">
+            <h3>Dynamic Menu Links</h3>
+            <p>The system supports dynamic menu links managed through the Navigation controller:</p>
+            <ul>
+                <li><strong>Add Link:</strong> <code>/navigation/add_link?menu=&lt;menu_type&gt;</code></li>
+                <li><strong>Edit Link:</strong> <code>/navigation/edit_link/{link_id}</code></li>
+                <li><strong>Manage Links:</strong> <code>/navigation/manage_links</code></li>
+                <li><strong>Private Links:</strong> <code>/navigation/manage_private_links</code></li>
+            </ul>
+            
+            <h3>Database Integration</h3>
+            <p>Menu links are stored in database tables and dynamically loaded:</p>
+            <ul>
+                <li><strong>internal_links_tb</strong> - Internal navigation links</li>
+                <li><strong>Page_tb</strong> - Page-based navigation items</li>
+            </ul>
+        </div>
+    </section>
+
+    <section id="css-styling">
+        <h2>CSS Styling</h2>
+        
+        <div class="architecture-section">
+            <h3>Navigation Classes</h3>
+            <p>The navigation system uses the following CSS classes:</p>
+            <ul>
+                <li><code>.main-navigation</code> - Main navigation container</li>
+                <li><code>.horizontal-menu</code> - Horizontal menu list</li>
+                <li><code>.horizontal-dropdown</code> - Dropdown menu items</li>
+                <li><code>.dropbtn</code> - Dropdown button styling</li>
+                <li><code>.dropdown-content</code> - Dropdown content container</li>
+            </ul>
+            
+            <h3>Theme Integration</h3>
+            <p>Navigation styling is integrated with the theme system and uses CSS variables for consistent theming across different sites.</p>
+        </div>
+    </section>
+
+    <section id="recent-updates">
+        <h2>Recent Updates</h2>
+        
+        <div class="architecture-section">
+            <h3>2025-07-07: Navigation System Consolidation</h3>
+            <ul>
+                <li>✅ <strong>Directory Consolidation:</strong> Merged duplicate navigation directories back to single Navigation/ directory</li>
+                <li>✅ <strong>Template Restoration:</strong> Restored proper navigation.tt with correct menu includes</li>
+                <li>✅ <strong>Menu Order Fix:</strong> Corrected navigation order to: Main, Login, Global, Hosted, Member, Weather, IT, Admin, HelpDesk</li>
+                <li>✅ <strong>Role-Based Access:</strong> Maintained proper admin-only and site-specific menu visibility</li>
+                <li>✅ <strong>Documentation Update:</strong> Updated all file path references to use correct Navigation/ directory</li>
+            </ul>
+        </div>
+    </section>
+</div>
