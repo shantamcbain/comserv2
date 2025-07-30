@@ -114,6 +114,12 @@ Dynamic connection setup based on HybridDB backend selection
 sub ACCEPT_CONTEXT {
     my ($self, $c) = @_;
     
+    # PERFORMANCE FIX: Cache the model instance in the request context to avoid repeated ACCEPT_CONTEXT calls
+    my $cached_instance = $c->stash->{_dbency_instance};
+    if ($cached_instance) {
+        return $cached_instance;
+    }
+    
     # Try to get connection info from HybridDB
     my $connection_info;
     try {
@@ -123,11 +129,11 @@ sub ACCEPT_CONTEXT {
         if ($backend_type eq 'sqlite_offline') {
             # Use SQLite connection
             $connection_info = $hybrid_db->get_sqlite_connection_info($c);
-            $c->log->debug("DBEncy: Using SQLite backend");
+            $c->log->debug("DBEncy: Using SQLite backend") if $c->debug;
         } else {
             # Use MySQL connection from selected backend
             $connection_info = $hybrid_db->get_connection_info($c);
-            $c->log->debug("DBEncy: Using MySQL backend: $backend_type");
+            $c->log->debug("DBEncy: Using MySQL backend: $backend_type") if $c->debug;
         }
     } catch {
         # Fallback to legacy shanta_ency configuration
@@ -155,6 +161,10 @@ sub ACCEPT_CONTEXT {
         $new_config->{connect_info} = $connection_info;
         
         my $new_instance = $self->new($new_config);
+        
+        # Cache the instance in the request context
+        $c->stash->{_dbency_instance} = $new_instance;
+        
         return $new_instance;
     }
     
@@ -802,6 +812,31 @@ sub safe_find {
     }
     
     return $result;
+}
+
+=head2 test_connection
+
+Test database connection
+
+=cut
+
+sub test_connection {
+    my ($self, $c) = @_;
+    
+    eval {
+        # Try a simple query to test the connection
+        my $dbh = $self->storage->dbh;
+        $dbh->do('SELECT 1');
+    };
+    
+    if ($@) {
+        if ($c && $c->can('log')) {
+            $c->log->error("DBEncy connection test failed: $@");
+        }
+        return 0;
+    }
+    
+    return 1;
 }
 
 1;

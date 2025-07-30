@@ -42,6 +42,10 @@ use constant {
 our $BACKEND_CACHE = {};
 our $CACHE_TIMESTAMP = 0;
 
+# Class-level connection cache to reduce connection overhead
+our $CONNECTION_CACHE = {};
+our $CONNECTION_CACHE_TTL = 600; # 10 minutes
+
 =head1 METHODS
 
 =head2 new
@@ -475,13 +479,31 @@ sub get_connection_info {
         die "Unknown backend: $backend_name";
     }
     
+    # PERFORMANCE FIX: Cache connection info to reduce repeated calculations and logging
+    my $cache_key = "${backend_name}_connection_info";
+    my $cached_info = $CONNECTION_CACHE->{$cache_key};
+    my $cache_time = $CONNECTION_CACHE->{"${cache_key}_time"} || 0;
+    
+    if ($cached_info && (time() - $cache_time) < $CONNECTION_CACHE_TTL) {
+        # Use cached connection info (no logging to reduce noise)
+        return $cached_info;
+    }
+    
+    # Generate fresh connection info
+    my $connection_info;
     if ($backend_info->{type} eq 'mysql') {
-        return $self->_get_mysql_connection_info_for_backend($c, $backend_name, $backend_info->{config});
+        $connection_info = $self->_get_mysql_connection_info_for_backend($c, $backend_name, $backend_info->{config});
     } elsif ($backend_info->{type} eq 'sqlite') {
-        return $self->_get_sqlite_connection_info($c);
+        $connection_info = $self->_get_sqlite_connection_info($c);
     } else {
         die "Unknown backend type: " . $backend_info->{type};
     }
+    
+    # Cache the connection info
+    $CONNECTION_CACHE->{$cache_key} = $connection_info;
+    $CONNECTION_CACHE->{"${cache_key}_time"} = time();
+    
+    return $connection_info;
 }
 
 =head2 _get_mysql_connection_info_for_backend
@@ -501,7 +523,10 @@ sub _get_mysql_connection_info_for_backend {
     }
     
     my $dsn = "dbi:mysql:database=$config->{database};host=$host;port=$config->{port}";
-    $c->log->info("HybridDB: Final connection DSN for backend '$backend_name': $dsn");
+    # PERFORMANCE FIX: Only log DSN when debug mode is enabled to reduce log noise
+    if ($c->debug) {
+        $c->log->info("HybridDB: Final connection DSN for backend '$backend_name': $dsn");
+    }
     
     return {
         dsn => $dsn,

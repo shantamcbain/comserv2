@@ -112,6 +112,49 @@ The Todo model provides methods for interacting with todo data:
 - **Form Pre-population** - Current data properly displayed in edit forms
 - **Project Dropdowns** - Easy project selection in edit mode with hierarchical display
 
+## Critical Database Schema Fix (2025-07-30)
+
+### Project ID Null Constraint Issue
+- **Problem**: Todo creation failing with "Column 'project_id' cannot be null" error
+- **Root Cause**: Todo table requires project_id (NOT NULL) but code was passing undef when no project selected
+- **Schema Mismatch**: Projects table uses 'id' as primary key, but code was referencing 'project_id'
+
+### Solution Implemented
+- **Default Project Logic** - System now automatically finds or creates a default project when none selected
+- **Schema Alignment** - Fixed references to use projects.id instead of non-existent project_id column
+- **Error Prevention** - Added validation to ensure project_id is never null before database insertion
+
+### Key Lessons for Future Development
+- **Always verify column names** against actual database schema files before writing queries
+- **Check NOT NULL constraints** in schema definitions when handling optional form fields
+- **Use application logs** to identify exact SQL errors and parameter values
+- **Test with empty/null form submissions** to catch constraint violations early
+
+## Critical Time Field Fix (2025-07-30)
+
+### Time Field Empty String Issue
+- **Problem**: Todo modification failing with "Incorrect time value: '' for column time_of_day" error
+- **Root Cause**: Form submissions sending empty strings to MySQL time columns instead of NULL values
+- **Database Behavior**: MySQL time columns reject empty strings but accept NULL for nullable fields
+
+### Solution Implemented
+- **Empty String to NULL Conversion** - Added validation to convert empty time_of_day strings to undef
+- **Proper Form Field Handling** - Enhanced modify action to process time fields before database update
+- **Error Prevention** - Added defensive coding to handle nullable time field submissions
+
+### Technical Details
+- **File Modified**: `/Comserv/lib/Comserv/Controller/Todo.pm` - modify action
+- **Fix Applied**: `if (defined $time_of_day && $time_of_day eq '') { $time_of_day = undef; }`
+- **Database Impact**: Prevents "Incorrect time value" MySQL errors on todo updates
+
+### Key Lessons for Time Field Handling
+- **Always convert empty strings to NULL** for nullable time/date fields in MySQL
+- **Check application logs** for exact SQL parameter values when debugging database errors
+- **Test form submissions with empty optional fields** to catch MySQL constraint issues
+- **Use undef instead of empty strings** for nullable database columns in DBIx::Class
+
+**Related Changelog**: [See /Documentation/changelog/2025-07-30-todo-time-field-fix.tt]
+
 ## Usage Guidelines
 
 ### For All Users

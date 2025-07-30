@@ -6,12 +6,14 @@ extends 'Catalyst::Model';
 
 has 'ency_schema' => (
     is => 'ro',
-    required => 1,
+    lazy => 1,
+    builder => '_build_ency_schema',
 );
 
 has 'forager_schema' => (
     is => 'ro',
-    required => 1,
+    lazy => 1,
+    builder => '_build_forager_schema',
 );
 
 has 'logging' => (
@@ -21,10 +23,27 @@ has 'logging' => (
 
 sub COMPONENT {
     my ($class, $app, $args) = @_;
+    return $class->new($args);
+}
 
-    my $ency_schema = $app->model('DBEncy');
-    my $forager_schema = $app->model('DBForager');
-    return $class->new({ %$args, ency_schema => $ency_schema, forager_schema => $forager_schema });
+sub _build_ency_schema {
+    return undef;
+}
+
+sub _build_forager_schema {
+    return undef;
+}
+
+sub ACCEPT_CONTEXT {
+    my ($self, $c) = @_;
+    
+    my $ency_schema = $c->model('DBEncy');
+    my $forager_schema = $c->model('DBForager');
+    
+    return $self->new(
+        ency_schema => $ency_schema,
+        forager_schema => $forager_schema
+    );
 }
 
 # Method to add a new herb to the forager database

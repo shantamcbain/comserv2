@@ -1,4 +1,4 @@
-[% PageVersion = 'Documentation/TODO_SYSTEM_DOCUMENTATION.tt,v 0.02 2025/01/28 shanta Exp shanta' %]
+[% PageVersion = 'Documentation/TODO_SYSTEM_DOCUMENTATION.tt,v 0.03 2025/07/30 shanta Exp shanta' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -192,6 +192,23 @@ $c->stash(
 3. **Optimize Queries**: Consider performance impact of complex filters
 
 ## 🐛 Troubleshooting
+
+### Critical Time Field Fix (2025-07-30)
+
+**Issue**: Todo modification failing with "Incorrect time value: '' for column time_of_day" error  
+**Root Cause**: Form submissions sending empty strings to MySQL time columns  
+**Solution**: Convert empty time_of_day strings to undef (NULL) for database compatibility  
+**Status**: ✅ **RESOLVED**
+
+**Technical Details**:
+- **Error Location**: `/todo/modify/{id}` endpoints
+- **Database Behavior**: MySQL time columns reject empty strings but accept NULL values
+- **Fix Implementation**: Added validation in `Todo.pm` modify action to convert empty strings to undef
+- **Additional Improvements**: Enhanced integer field validation and error handling
+
+**Related Documentation**:
+- **Detailed Fix Information**: [Todo Time Field Fix Changelog](/Documentation/changelog/2025-07-30-todo-time-field-fix)
+- **Main Changelog Entry**: [Project Changelog](/CHANGELOG.tt) - "Todo Time Field Fix (2025-07-30)"
 
 ### Common Issues
 

@@ -582,6 +582,58 @@ sub modify :Path('/todo/modify') :Args(1) {
         "Updating todo item with record ID: $record_id."
     );
 
+    # Handle project_id properly - ensure it's a valid integer or find/create default project
+    my $project_id = $form_data->{project_id};
+    
+    # Convert empty string to undef, then handle undef case
+    if (!defined $project_id || $project_id eq '' || $project_id eq '0') {
+        # Try to get existing project_id from todo record
+        $project_id = $todo->project_id;
+        
+        # If still no valid project_id, find or create a default project
+        if (!defined $project_id || $project_id eq '' || $project_id eq '0') {
+            my $default_project = $schema->resultset('Project')->find_or_create({
+                sitename => $c->session->{SiteName},
+                project_name => 'Default Project',
+                project_code => 'DEFAULT',
+                description => 'Default project for todos without specific project assignment',
+                status => 'active',
+                created_by => $c->session->{username} || 'system',
+                created_date => DateTime->now->ymd,
+            });
+            $project_id = $default_project->id;
+            
+            $self->logging->log_with_details(
+                $c, 'info', __FILE__, __LINE__, 'modify.default_project',
+                "Using default project (ID: $project_id) for todo record $record_id"
+            );
+        }
+    }
+    
+    # Ensure user_id is valid integer
+    my $user_id = $form_data->{user_id};
+    if (!defined $user_id || $user_id eq '' || $user_id eq '0') {
+        $user_id = $todo->user_id || 1;  # Use existing or default to 1
+    }
+    
+    # Ensure estimated_man_hours is valid integer
+    my $estimated_hours = $form_data->{estimated_man_hours};
+    if (!defined $estimated_hours || $estimated_hours eq '') {
+        $estimated_hours = $todo->estimated_man_hours || 0;
+    }
+    
+    # Ensure priority is valid integer
+    my $priority = $form_data->{priority};
+    if (!defined $priority || $priority eq '') {
+        $priority = $todo->priority || 1;
+    }
+    
+    # Handle time_of_day field - convert empty string to undef for nullable time field
+    my $time_of_day = $form_data->{time_of_day};
+    if (defined $time_of_day && $time_of_day eq '') {
+        $time_of_day = undef;  # Convert empty string to NULL for database
+    }
+
     # Attempt to update the todo record
     eval {
         $todo->update({
@@ -591,7 +643,7 @@ sub modify :Path('/todo/modify') :Args(1) {
             due_date             => $form_data->{due_date} || DateTime->now->add(days => 7)->ymd,
             subject              => $form_data->{subject},
             description          => $form_data->{description},
-            estimated_man_hours  => $form_data->{estimated_man_hours},
+            estimated_man_hours  => $estimated_hours,
             comments             => $form_data->{comments},
             accumulative_time    => $accumulative_time,
             reporter             => $form_data->{reporter},
@@ -600,14 +652,14 @@ sub modify :Path('/todo/modify') :Args(1) {
             developer            => $form_data->{developer},
             username_of_poster   => $c->session->{username},
             status               => $form_data->{status},
-            priority             => $form_data->{priority},
+            priority             => $priority,
             share                => $form_data->{share} || 0,
             last_mod_by          => $c->session->{username} || 'system',
             last_mod_date        => DateTime->now->ymd,
-            user_id              => $form_data->{user_id} || 1,
-            project_id           => $form_data->{project_id} || $todo->project_id,
+            user_id              => $user_id,
+            project_id           => $project_id,
             date_time_posted     => $form_data->{date_time_posted},
-            time_of_day          => $form_data->{time_of_day},
+            time_of_day          => $time_of_day,
         });
     };
     if ($@) {
@@ -698,6 +750,37 @@ sub create :Local {
 
     # If manual_project_id is not empty, use it as the project ID
     my $selected_project_id = $manual_project_id ? $manual_project_id : $project_id;
+
+    # Ensure project_id is never null - find or create a default project
+    if (!$selected_project_id) {
+        # Try to find a default project or use the first available project
+        my $default_project = $schema->resultset('Project')->search(
+            { sitename => $sitename },
+            { order_by => 'id', rows => 1 }
+        )->first;
+        
+        if ($default_project) {
+            $selected_project_id = $default_project->id;
+            $self->logging->log_with_details(
+                $c, 'info', __FILE__, __LINE__, 'create.default_project',
+                "No project selected, using default project_id: $selected_project_id"
+            );
+        } else {
+            # Create a default project if none exists
+            $default_project = $schema->resultset('Project')->create({
+                project_name => 'Default Project',
+                project_code => 'DEFAULT',
+                sitename => $sitename,
+                description => 'Auto-created default project for todos',
+                status => 'active'
+            });
+            $selected_project_id = $default_project->id;
+            $self->logging->log_with_details(
+                $c, 'info', __FILE__, __LINE__, 'create.created_default_project',
+                "Created default project with project_id: $selected_project_id"
+            );
+        }
+    }
 
     # Fetch the project_code using the selected_project_id
     my $project_code;

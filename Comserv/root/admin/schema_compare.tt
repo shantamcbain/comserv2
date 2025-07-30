@@ -204,7 +204,7 @@
         <ol>
             <li>Each database is compared with its corresponding Result files</li>
             <li>Click on table comparison cards to view detailed field comparisons between database and Result file</li>
-            <li>Fields with differences are highlighted with ⚠ warning icons</li>
+            <li>Fields with differences are highlighted with <i class="fas fa-exclamation-triangle"></i> warning icons</li>
             <li>Use "To Result" buttons to sync table values to result files</li>
             <li>Use "To Table" buttons to sync result values to database tables (caution: modifies database)</li>
             <li>Use "Create" buttons for missing Result files or tables</li>
@@ -223,7 +223,7 @@
                 </div>
                 <div style="display: flex; align-items: center; gap: 5px;">
                     <div style="width: 20px; height: 15px; background: #ffecb3; border-radius: 2px; position: relative;">
-                        <span style="position: absolute; left: 2px; top: -2px; font-size: 10px;">⚠</span>
+                        <i class="fas fa-exclamation-triangle" style="position: absolute; left: 2px; top: 1px; font-size: 10px; color: #ff9800;"></i>
                     </div>
                     <span>Different Values</span>
                 </div>
@@ -235,14 +235,23 @@
         </div>
     </div>
 
-    <!-- Multi-Backend Database Sections -->
-    [% IF database_comparison.backends.keys.size > 0 %]
+    <!-- Multi-Backend Database Sections (only show if different from main databases) -->
+    [% unique_backends = [] %]
+    [% FOREACH backend_name IN database_comparison.backends.keys.sort %]
+        [% backend = database_comparison.backends.$backend_name %]
+        [% IF backend.available AND backend.name != 'ency' AND backend.name != 'forager' %]
+            [% unique_backends.push(backend_name) %]
+        [% END %]
+    [% END %]
+    
+    [% IF unique_backends.size > 0 %]
         <div class="multi-backend-section">
-            <h2><i class="fas fa-server"></i> Multi-Backend Schema Comparison</h2>
-            <p class="section-intro">Compare table schemas across all available database backends to ensure consistency.</p>
+            <h2><i class="fas fa-server"></i> Additional Database Backends</h2>
+            <p class="section-intro">Additional database connections beyond the main ency/forager databases.</p>
             
-            [% FOREACH backend_name IN database_comparison.backends.keys.sort %]
+            [% FOREACH backend_name IN unique_backends %]
                 [% backend = database_comparison.backends.$backend_name %]
+                [% IF backend.available AND backend.name != 'ency' AND backend.name != 'forager' %]
                 <div class="schema-section backend-section">
                     <button class="section-toggle" onclick="toggleSection(this)">
                         <span>
@@ -296,14 +305,14 @@
                                                         [% field_count = table_comparison.fields.keys.size %]
                                                         [% differences_count = 0 %]
                                                         [% FOREACH field_name IN table_comparison.fields.keys %]
-                                                            [% field = table_comparison.fields.$field_name %]
-                                                            [% IF field.differences.size > 0 %]
+                                                            [% field_data = table_comparison.fields.$field_name %]
+                                                            [% IF field_data.differences.size > 0 %]
                                                                 [% differences_count = differences_count + 1 %]
                                                             [% END %]
                                                         [% END %]
                                                         
                                                         [% IF differences_count == 0 %]
-                                                            <span class="status-ok"><i class="fas fa-check"></i> Synchronized</span>
+                                                            <span class="status-ok"><i class="fas fa-check-circle"></i> Synchronized</span>
                                                         [% ELSE %]
                                                             <span class="status-warning"><i class="fas fa-exclamation-triangle"></i> [% differences_count %] differences</span>
                                                         [% END %]
@@ -313,69 +322,166 @@
                                                 </div>
                                                 
                                                 <div class="table-details">
-                                                    <div class="result-file-info">
-                                                        <strong>Result File:</strong> [% table_comparison.result_file_path.replace('^.*/', '') %]
-                                                    </div>
-                                                    
                                                     <div class="field-comparison-table">
-                                                        <table>
-                                                            <thead>
-                                                                <tr>
-                                                                    <th>Field Name</th>
-                                                                    <th>Database ([% backend.type.upper %])</th>
-                                                                    <th>Result File</th>
-                                                                    <th>Status</th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                [% FOREACH field_name IN table_comparison.fields.keys.sort %]
-                                                                    [% field = table_comparison.fields.$field_name %]
-                                                                    <tr class="[% field.differences.size > 0 ? 'field-different' : 'field-same' %]">
-                                                                        <td class="field-name">[% field_name %]</td>
-                                                                        <td class="table-data">
-                                                                            [% IF field.table %]
-                                                                                <div class="field-type">[% field.table.data_type %][% IF field.table.size %]([% field.table.size %])[% END %]</div>
-                                                                                <div class="field-attrs">
-                                                                                    [% IF field.table.is_nullable %]<span class="attr nullable">NULL</span>[% ELSE %]<span class="attr not-null">NOT NULL</span>[% END %]
-                                                                                    [% IF field.table.is_auto_increment %]<span class="attr auto-inc">AUTO_INCREMENT</span>[% END %]
-                                                                                    [% IF field.table.default_value %]<span class="attr default">DEFAULT: [% field.table.default_value %]</span>[% END %]
-                                                                                </div>
-                                                                            [% ELSE %]
-                                                                                <span class="missing">Missing in database</span>
-                                                                            [% END %]
-                                                                        </td>
-                                                                        <td class="result-data">
-                                                                            [% IF field.result %]
-                                                                                <div class="field-type">[% field.result.data_type %][% IF field.result.size %]([% field.result.size %])[% END %]</div>
-                                                                                <div class="field-attrs">
-                                                                                    [% IF field.result.is_nullable %]<span class="attr nullable">NULL</span>[% ELSE %]<span class="attr not-null">NOT NULL</span>[% END %]
-                                                                                    [% IF field.result.is_auto_increment %]<span class="attr auto-inc">AUTO_INCREMENT</span>[% END %]
-                                                                                    [% IF field.result.default_value %]<span class="attr default">DEFAULT: [% field.result.default_value %]</span>[% END %]
-                                                                                </div>
-                                                                            [% ELSE %]
-                                                                                <span class="missing">Missing in Result file</span>
-                                                                            [% END %]
-                                                                        </td>
-                                                                        <td class="status-cell">
-                                                                            [% IF field.differences.size > 0 %]
-                                                                                <span class="status-different">⚠ Different</span>
-                                                                                <div class="differences-list">
-                                                                                    [% FOREACH diff IN field.differences %]
-                                                                                        <div class="difference-item">
-                                                                                            <strong>[% diff.attribute %]:</strong> 
-                                                                                            DB: [% diff.table_value || 'null' %] → 
-                                                                                            Result: [% diff.result_value || 'null' %]
-                                                                                        </div>
-                                                                                    [% END %]
-                                                                                </div>
-                                                                            [% ELSE %]
-                                                                                <span class="status-same">✓ Match</span>
-                                                                            [% END %]
-                                                                        </td>
+                                                        [% IF table_comparison.has_result_file %]
+                                                            <div class="result-file-info">
+                                                                <strong>Result File:</strong> [% table_comparison.result_file_path.replace('^.*/', '') %]
+                                                            </div>
+                                                            
+                                                            [% # Get field list from the fields hash %]
+                                                            [% all_fields = table_comparison.fields || {} %]
+                                                            
+                                                            <table class="field-comparison-table">
+                                                                <thead>
+                                                                    <tr>
+                                                                        <th class="source-column">Source</th>
+                                                                        <th class="field-name-column">Field Name</th>
+                                                                        <th class="data-type-column">Data Type</th>
+                                                                        <th class="size-column">Size</th>
+                                                                        <th class="nullable-column">Nullable</th>
+                                                                        <th class="auto-increment-column">Auto Inc</th>
+                                                                        <th class="default-column">Default</th>
+                                                                        <th class="status-column">Status</th>
+                                                                        <th class="actions-column">Actions</th>
                                                                     </tr>
-                                                                [% END %]
-                                                            </tbody>
-                                                        </table>
+                                                                </thead>
+                                                                <tbody>
+                                                                    [% FOREACH field_name IN all_fields.keys.sort %]
+                                                                        [% field_data = all_fields.$field_name %]
+                                                                        [% db_field = field_data.table %]
+                                                                        [% result_field = field_data.result %]
+                                                                        [% field_has_differences = field_data.differences.size > 0 ? 1 : 0 %]
+                                                                        [% field_differences = field_data.differences || [] %]
+                                                                        
+                                                                        [% # Field header row (spans all columns) %]
+                                                                        <tr class="field-header-row">
+                                                                            <td colspan="9" class="field-header">
+                                                                                <strong>[% field_name %]</strong>
+                                                                                [% IF !db_field %]
+                                                                                    <span class="missing-indicator">(Missing in Table)</span>
+                                                                                [% ELSIF !result_field %]
+                                                                                    <span class="missing-indicator">(Missing in Result)</span>
+                                                                                [% END %]
+                                                                            </td>
+                                                                        </tr>
+                                                                        
+                                                                        [% # Table row %]
+                                                                        [% IF db_field %]
+                                                                            [% # Check for differences %]
+                                                                            [% data_type_diff = result_field AND (db_field.data_type != result_field.data_type) %]
+                                                                            [% size_diff = result_field AND (db_field.size != result_field.size) %]
+                                                                            [% nullable_diff = result_field AND (db_field.is_nullable != result_field.is_nullable) %]
+                                                                            [% auto_inc_diff = result_field AND (db_field.is_auto_increment != result_field.is_auto_increment) %]
+                                                                            [% default_diff = result_field AND (db_field.default_value != result_field.default_value) %]
+                                                                            [% has_differences = !result_field OR data_type_diff OR size_diff OR nullable_diff OR auto_inc_diff OR default_diff %]
+                                                                            
+                                                                            <tr class="table-row[% has_differences ? ' has-differences' : '' %]">
+                                                                                <td class="source-column"><strong>Table</strong></td>
+                                                                                <td class="field-name-column">[% field_name %]</td>
+                                                                                <td class="data-type-column[% data_type_diff ? ' field-different' : '' %]">[% db_field.data_type || '' %]</td>
+                                                                                <td class="size-column[% size_diff ? ' field-different' : '' %]">[% db_field.size || '' %]</td>
+                                                                                <td class="nullable-column[% nullable_diff ? ' field-different' : '' %]">[% db_field.is_nullable ? 'YES' : 'NO' %]</td>
+                                                                                <td class="auto-increment-column[% auto_inc_diff ? ' field-different' : '' %]">[% db_field.is_auto_increment ? 'YES' : 'NO' %]</td>
+                                                                                <td class="default-column[% default_diff ? ' field-different' : '' %]">[% db_field.default_value || '' %]</td>
+                                                                                <td class="status-column">
+                                                                                    [% IF !result_field %]
+                                                                                        <span class="status-missing"><i class="fas fa-exclamation-triangle"></i> Missing in Result</span>
+                                                                                    [% ELSIF has_differences %]
+                                                                                        <span class="status-different"><i class="fas fa-exclamation-circle"></i> Different</span>
+                                                                                    [% ELSE %]
+                                                                                        <span class="status-same"><i class="fas fa-check-circle"></i> Match</span>
+                                                                                    [% END %]
+                                                                                </td>
+                                                                                <td class="actions-column">
+                                                                                    [% IF !result_field %]
+                                                                                        <button class="add-to-result-btn" onclick="addFieldToResult('[% table_comparison.table_name | html %]', '[% backend.name %]', '[% field_name | html %]');" title="Add field to result file">
+                                                                                            <i class="fas fa-plus"></i> Add to Result
+                                                                                        </button>
+                                                                                    [% ELSIF has_differences %]
+                                                                                        <button class="sync-to-result-btn" onclick="syncFieldToResult('[% table_comparison.table_name | html %]', '[% backend.name %]', '[% field_name | html %]');" title="Sync database field to result file">
+                                                                                            <i class="fas fa-arrow-right"></i> To Result
+                                                                                        </button>
+                                                                                    [% END %]
+                                                                                </td>
+                                                                            </tr>
+                                                                        [% END %]
+                                                                        
+                                                                        [% # Result row %]
+                                                                        [% IF result_field %]
+                                                                            [% # Check for differences %]
+                                                                            [% data_type_diff = db_field AND (result_field.data_type != db_field.data_type) %]
+                                                                            [% size_diff = db_field AND (result_field.size != db_field.size) %]
+                                                                            [% nullable_diff = db_field AND (result_field.is_nullable != db_field.is_nullable) %]
+                                                                            [% auto_inc_diff = db_field AND (result_field.is_auto_increment != db_field.is_auto_increment) %]
+                                                                            [% default_diff = db_field AND (result_field.default_value != db_field.default_value) %]
+                                                                            [% has_differences = !db_field OR data_type_diff OR size_diff OR nullable_diff OR auto_inc_diff OR default_diff %]
+                                                                            
+                                                                            <tr class="result-row[% has_differences ? ' has-differences' : '' %]">
+                                                                                <td class="source-column"><strong>Result</strong></td>
+                                                                                <td class="field-name-column">[% field_name %]</td>
+                                                                                <td class="data-type-column[% data_type_diff ? ' field-different' : '' %]">[% result_field.data_type || '' %]</td>
+                                                                                <td class="size-column[% size_diff ? ' field-different' : '' %]">[% result_field.size || '' %]</td>
+                                                                                <td class="nullable-column[% nullable_diff ? ' field-different' : '' %]">[% result_field.is_nullable ? 'YES' : 'NO' %]</td>
+                                                                                <td class="auto-increment-column[% auto_inc_diff ? ' field-different' : '' %]">[% result_field.is_auto_increment ? 'YES' : 'NO' %]</td>
+                                                                                <td class="default-column[% default_diff ? ' field-different' : '' %]">[% result_field.default_value || '' %]</td>
+                                                                                <td class="status-column">
+                                                                                    [% IF !db_field %]
+                                                                                        <span class="status-missing"><i class="fas fa-exclamation-triangle"></i> Missing in Table</span>
+                                                                                    [% ELSIF has_differences %]
+                                                                                        <span class="status-different"><i class="fas fa-exclamation-circle"></i> Different</span>
+                                                                                    [% ELSE %]
+                                                                                        <span class="status-same"><i class="fas fa-check-circle"></i> Match</span>
+                                                                                    [% END %]
+                                                                                </td>
+                                                                                <td class="actions-column">
+                                                                                    [% IF !db_field %]
+                                                                                        <button class="add-to-table-btn" onclick="addFieldToTable('[% table_comparison.table_name | html %]', '[% backend.name %]', '[% field_name | html %]');" title="Add field to database table">
+                                                                                            <i class="fas fa-plus"></i> Add to Table
+                                                                                        </button>
+                                                                                    [% ELSIF has_differences %]
+                                                                                        <button class="sync-to-table-btn" onclick="syncFieldToTable('[% table_comparison.table_name | html %]', '[% backend.name %]', '[% field_name | html %]');" title="Sync result field to database table">
+                                                                                            <i class="fas fa-arrow-left"></i> To Table
+                                                                                        </button>
+                                                                                    [% END %]
+                                                                                </td>
+                                                                            </tr>
+                                                                        [% END %]
+                                                                        
+                                                                        [% # Spacer row %]
+                                                                        <tr class="field-spacer">
+                                                                            <td colspan="9"></td>
+                                                                        </tr>
+                                                                    [% END %]
+                                                                    [% # Debug: Show if no fields were found %]
+                                                                    [% IF all_fields.keys.size == 0 %]
+                                                                        <tr>
+                                                                            <td colspan="9" class="no-fields-message">
+                                                                                <em>No fields found. Debug: Fields hash size = [% all_fields.keys.size || 0 %], Has result file = [% table_comparison.has_result_file ? 'YES' : 'NO' %]</em>
+                                                                            </td>
+                                                                        </tr>
+                                                                    [% END %]
+                                                                </tbody>
+                                                            </table>
+                                                            
+                                                            [% IF differences_count > 0 %]
+                                                                <div class="bulk-sync-actions">
+                                                                    <button class="sync-all-to-result-btn" onclick="syncAllToResult('[% table_comparison.table_name | html %]', '[% backend.name %]');">
+                                                                        <i class="fas fa-arrow-right"></i> Sync All to Result
+                                                                    </button>
+                                                                    <button class="sync-all-to-table-btn" onclick="syncAllToTable('[% table_comparison.table_name | html %]', '[% backend.name %]');">
+                                                                        <i class="fas fa-arrow-left"></i> Sync All to Table
+                                                                    </button>
+                                                                </div>
+                                                            [% END %]
+                                                            
+                                                        [% ELSE %]
+                                                            <div class="no-result-file">
+                                                                <p><i class="fas fa-exclamation-triangle"></i> No Result file found for this table.</p>
+                                                                <button class="create-result-btn" onclick="createResultFromTable('[% table_comparison.table_name | html %]', '[% backend.name %]');">
+                                                                    <i class="fas fa-plus"></i> Create Result File
+                                                                </button>
+                                                            </div>
+                                                        [% END %]
                                                     </div>
                                                 </div>
                                             </div>
@@ -427,6 +533,7 @@
                         [% END %]
                     </div>
                 </div>
+                [% END %]
             [% END %]
         </div>
     [% END %]
@@ -446,62 +553,52 @@
                 <i class="fas fa-chevron-right"></i>
             </button>
             <div class="section-content">
-                <!-- Group 1: Tables with Result files -->
-                [% tables_with_results = [] %]
-                [% tables_without_results = [] %]
-                [% FOREACH table_comparison IN database_comparison.ency.table_comparisons %]
-                    [% IF table_comparison.has_result_file %]
-                        [% tables_with_results.push(table_comparison) %]
-                    [% ELSE %]
-                        [% tables_without_results.push(table_comparison) %]
-                    [% END %]
-                [% END %]
-                
-                [% IF tables_with_results.size > 0 %]
+                <!-- All Tables -->
                 <div class="table-group">
                     <div class="table-group-header" onclick="toggleTableGroup(this)">
                         <span>
-                            <i class="fas fa-check-circle"></i> Tables with Result Files
-                            <span class="group-count">[% tables_with_results.size %]</span>
+                            <i class="fas fa-table"></i> All Tables
+                            <span class="group-count">[% database_comparison.ency.table_comparisons.size %]</span>
                         </span>
                         <i class="fas fa-chevron-right group-toggle-icon"></i>
                     </div>
                     <div class="table-group-content">
-                    [% FOREACH table_comparison IN tables_with_results %]
-                        <div class="feature-card table-comparison-card" data-table="[% table_comparison.table_name | html %]" data-database="ency">
-                            <div class="feature-header" onclick="toggleTableComparison(this)">
-                                <h4>
-                                    <i class="feature-icon fas fa-table"></i>
-                                    [% table_comparison.table_name | html %]
+                    [% FOREACH table_comparison IN database_comparison.ency.table_comparisons %]
+                        <div class="table-comparison-card" data-table="[% table_comparison.table_name | html %]" data-database="ency">
+                            <div class="table-comparison-header" onclick="toggleTableComparison(this)">
+                                <div class="table-comparison-title">
+                                    <i class="fas fa-table"></i>
+                                    <h4>[% table_comparison.table_name | html %]</h4>
                                     [% IF table_comparison.sync_status == 'synchronized' %]
                                         <span class="difference-indicator same" title="Synchronized"></span>
                                     [% ELSE %]
                                         <span class="difference-indicator different" title="Needs sync"></span>
                                     [% END %]
+                                </div>
+                                <div class="table-comparison-actions">
+                                    [% IF table_comparison.sync_status == 'needs_sync' %]
+                                        <button class="update-table-btn" onclick="updateTableSchema('[% table_comparison.table_name | html %]', 'ency'); event.stopPropagation();" title="Update table to match result file">
+                                            <i class="fas fa-database"></i> Update Table
+                                        </button>
+                                        <button class="update-result-btn" onclick="updateResultFile('[% table_comparison.table_name | html %]', 'ency'); event.stopPropagation();" title="Update result file to match table">
+                                            <i class="fas fa-file-code"></i> Update Result
+                                        </button>
+                                    [% END %]
                                     <i class="fas fa-chevron-right expand-icon"></i>
-                                </h4>
+                                </div>
                             </div>
-                            <div class="feature-content field-comparison-content">
+                            <div class="field-comparison-content">
                                 <div class="loading-indicator">
                                     <i class="fas fa-spinner fa-spin"></i>
                                     <span>Loading field comparison...</span>
                                 </div>
                             </div>
-                            <div class="feature-actions">
-                                [% IF table_comparison.sync_status == 'needs_sync' %]
-                                    <button class="btn btn-success" onclick="syncTable('[% table_comparison.table_name | html %]', 'ency'); event.stopPropagation();">
-                                        <i class="fas fa-sync"></i> Sync
-                                    </button>
-                                [% END %]
-                            </div>
                         </div>
                     [% END %]
                     </div>
                 </div>
-                [% END %]
                 
                 <!-- Group 2: Result files without Tables -->
-                [% IF database_comparison.ency.results_without_tables.size > 0 %]
                 <div class="table-group">
                     <div class="table-group-header" onclick="toggleTableGroup(this)">
                         <span>
@@ -511,7 +608,8 @@
                         <i class="fas fa-chevron-right group-toggle-icon"></i>
                     </div>
                     <div class="table-group-content">
-                    [% FOREACH result_file IN database_comparison.ency.results_without_tables %]
+                    [% IF database_comparison.ency.results_without_tables.size > 0 %]
+                        [% FOREACH result_file IN database_comparison.ency.results_without_tables %]
                         <div class="table-comparison-card" data-result="[% result_file.result_name | html %]" data-database="ency">
                             <div class="table-comparison-header" onclick="toggleResultComparison(this)">
                                 <div class="table-comparison-title">
@@ -533,13 +631,17 @@
                                 </div>
                             </div>
                         </div>
+                        [% END %]
+                    [% ELSE %]
+                        <div class="empty-message">
+                            <i class="fas fa-info-circle"></i>
+                            <p>No result files found without corresponding database tables.</p>
+                        </div>
                     [% END %]
                     </div>
                 </div>
-                [% END %]
                 
                 <!-- Group 3: Tables without Result files -->
-                [% IF tables_without_results.size > 0 %]
                 <div class="table-group">
                     <div class="table-group-header" onclick="toggleTableGroup(this)">
                         <span>
@@ -549,7 +651,8 @@
                         <i class="fas fa-chevron-right group-toggle-icon"></i>
                     </div>
                     <div class="table-group-content">
-                    [% FOREACH table_comparison IN tables_without_results %]
+                    [% IF tables_without_results.size > 0 %]
+                        [% FOREACH table_comparison IN tables_without_results %]
                         <div class="table-comparison-card" data-table="[% table_comparison.table_name | html %]" data-database="ency">
                             <div class="table-comparison-header" onclick="toggleTableComparison(this)">
                                 <div class="table-comparison-title">
@@ -571,10 +674,15 @@
                                 </div>
                             </div>
                         </div>
+                        [% END %]
+                    [% ELSE %]
+                        <div class="empty-message">
+                            <i class="fas fa-info-circle"></i>
+                            <p>All database tables have corresponding result files.</p>
+                        </div>
                     [% END %]
                     </div>
                 </div>
-                [% END %]
             </div>
         </div>
         [% END %]
@@ -591,28 +699,17 @@
                 <i class="fas fa-chevron-right"></i>
             </button>
             <div class="section-content">
-                <!-- Group 1: Tables with Result files -->
-                [% tables_with_results = [] %]
-                [% tables_without_results = [] %]
-                [% FOREACH table_comparison IN database_comparison.forager.table_comparisons %]
-                    [% IF table_comparison.has_result_file %]
-                        [% tables_with_results.push(table_comparison) %]
-                    [% ELSE %]
-                        [% tables_without_results.push(table_comparison) %]
-                    [% END %]
-                [% END %]
-                
-                [% IF tables_with_results.size > 0 %]
+                <!-- All Tables -->
                 <div class="table-group">
                     <div class="table-group-header" onclick="toggleTableGroup(this)">
                         <span>
-                            <i class="fas fa-check-circle"></i> Tables with Result Files
-                            <span class="group-count">[% tables_with_results.size %]</span>
+                            <i class="fas fa-table"></i> All Tables
+                            <span class="group-count">[% database_comparison.forager.table_comparisons.size %]</span>
                         </span>
                         <i class="fas fa-chevron-right group-toggle-icon"></i>
                     </div>
                     <div class="table-group-content">
-                    [% FOREACH table_comparison IN tables_with_results %]
+                    [% FOREACH table_comparison IN database_comparison.forager.table_comparisons %]
                         <div class="table-comparison-card" data-table="[% table_comparison.table_name | html %]" data-database="forager">
                             <div class="table-comparison-header" onclick="toggleTableComparison(this)">
                                 <div class="table-comparison-title">
@@ -626,8 +723,11 @@
                                 </div>
                                 <div class="table-comparison-actions">
                                     [% IF table_comparison.sync_status == 'needs_sync' %]
-                                        <button class="sync-btn" onclick="syncTable('[% table_comparison.table_name | html %]', 'forager'); event.stopPropagation();">
-                                            <i class="fas fa-sync"></i> Sync
+                                        <button class="update-table-btn" onclick="updateTableSchema('[% table_comparison.table_name | html %]', 'forager'); event.stopPropagation();" title="Update table to match result file">
+                                            <i class="fas fa-database"></i> Update Table
+                                        </button>
+                                        <button class="update-result-btn" onclick="updateResultFile('[% table_comparison.table_name | html %]', 'forager'); event.stopPropagation();" title="Update result file to match table">
+                                            <i class="fas fa-file-code"></i> Update Result
                                         </button>
                                     [% END %]
                                     <i class="fas fa-chevron-right expand-icon"></i>
@@ -643,10 +743,8 @@
                     [% END %]
                     </div>
                 </div>
-                [% END %]
                 
                 <!-- Group 2: Result files without Tables -->
-                [% IF database_comparison.forager.results_without_tables.size > 0 %]
                 <div class="table-group">
                     <div class="table-group-header" onclick="toggleTableGroup(this)">
                         <span>
@@ -656,7 +754,8 @@
                         <i class="fas fa-chevron-right group-toggle-icon"></i>
                     </div>
                     <div class="table-group-content">
-                    [% FOREACH result_file IN database_comparison.forager.results_without_tables %]
+                    [% IF database_comparison.forager.results_without_tables.size > 0 %]
+                        [% FOREACH result_file IN database_comparison.forager.results_without_tables %]
                         <div class="table-comparison-card" data-result="[% result_file.result_name | html %]" data-database="forager">
                             <div class="table-comparison-header" onclick="toggleResultComparison(this)">
                                 <div class="table-comparison-title">
@@ -678,13 +777,17 @@
                                 </div>
                             </div>
                         </div>
+                        [% END %]
+                    [% ELSE %]
+                        <div class="empty-message">
+                            <i class="fas fa-info-circle"></i>
+                            <p>No result files found without corresponding database tables.</p>
+                        </div>
                     [% END %]
                     </div>
                 </div>
-                [% END %]
                 
                 <!-- Group 3: Tables without Result files -->
-                [% IF tables_without_results.size > 0 %]
                 <div class="table-group">
                     <div class="table-group-header" onclick="toggleTableGroup(this)">
                         <span>
@@ -694,7 +797,8 @@
                         <i class="fas fa-chevron-right group-toggle-icon"></i>
                     </div>
                     <div class="table-group-content">
-                    [% FOREACH table_comparison IN tables_without_results %]
+                    [% IF tables_without_results.size > 0 %]
+                        [% FOREACH table_comparison IN tables_without_results %]
                         <div class="table-comparison-card" data-table="[% table_comparison.table_name | html %]" data-database="forager">
                             <div class="table-comparison-header" onclick="toggleTableComparison(this)">
                                 <div class="table-comparison-title">
@@ -716,10 +820,15 @@
                                 </div>
                             </div>
                         </div>
+                        [% END %]
+                    [% ELSE %]
+                        <div class="empty-message">
+                            <i class="fas fa-info-circle"></i>
+                            <p>All database tables have corresponding result files.</p>
+                        </div>
                     [% END %]
                     </div>
                 </div>
-                [% END %]
             </div>
         </div>
         [% END %]
@@ -1071,6 +1180,7 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
         html += '<th class="nullable-column">Nullable</th>';
         html += '<th class="auto-increment-column">Auto Inc</th>';
         html += '<th class="default-column">Default</th>';
+        html += '<th class="status-column">Status</th>';
         html += '<th class="actions-column">Actions</th>';
         html += '</tr>';
         html += '</thead>';
@@ -1084,7 +1194,7 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
             
             // Field header row (spans all columns)
             html += '<tr class="field-header-row">';
-            html += '<td colspan="8" class="field-header">';
+            html += '<td colspan="9" class="field-header">';
             html += '<strong>' + fieldName + '</strong>';
             if (tableMissing) {
                 html += ' <span class="missing-indicator">(Missing in Table)</span>';
@@ -1120,6 +1230,15 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
                 html += '<td class="nullable-column' + (nullableDiff ? ' field-different' : '') + '">' + formatFieldValue(tableField.is_nullable) + '</td>';
                 html += '<td class="auto-increment-column' + (autoIncDiff ? ' field-different' : '') + '">' + formatFieldValue(tableField.is_auto_increment) + '</td>';
                 html += '<td class="default-column' + (defaultDiff ? ' field-different' : '') + '">' + formatFieldValue(tableField.default_value) + '</td>';
+                html += '<td class="status-column">';
+                if (resultMissing) {
+                    html += '<span class="status-missing"><i class="fas fa-exclamation-triangle"></i> Missing in Result</span>';
+                } else if (hasDifferences) {
+                    html += '<span class="status-different"><i class="fas fa-exclamation-circle"></i> Different</span>';
+                } else {
+                    html += '<span class="status-match"><i class="fas fa-check-circle"></i> Match</span>';
+                }
+                html += '</td>';
                 html += '<td class="actions-column">';
                 // Add sync to result button if there are differences and result exists
                 if (hasDifferences) {
@@ -1132,6 +1251,7 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
                 html += '<tr class="table-row missing-row">';
                 html += '<td class="source-column"><strong>Table</strong></td>';
                 html += '<td colspan="6" class="missing-field">Field not found in table</td>';
+                html += '<td class="status-column"><span class="status-missing"><i class="fas fa-exclamation-triangle"></i> Missing</span></td>';
                 html += '<td class="actions-column">';
                 if (!resultMissing) {
                     html += '<button class="create-field-btn" onclick="createFieldInTable(\'' + tableName + '\', \'' + database + '\', \'' + fieldName + '\');">';
@@ -1167,6 +1287,15 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
                 html += '<td class="nullable-column' + (nullableDiff ? ' field-different' : '') + '">' + formatFieldValue(resultField.is_nullable) + '</td>';
                 html += '<td class="auto-increment-column' + (autoIncDiff ? ' field-different' : '') + '">' + formatFieldValue(resultField.is_auto_increment) + '</td>';
                 html += '<td class="default-column' + (defaultDiff ? ' field-different' : '') + '">' + formatFieldValue(resultField.default_value) + '</td>';
+                html += '<td class="status-column">';
+                if (tableMissing) {
+                    html += '<span class="status-missing"><i class="fas fa-exclamation-triangle"></i> Missing in Table</span>';
+                } else if (hasDifferences) {
+                    html += '<span class="status-different"><i class="fas fa-exclamation-circle"></i> Different</span>';
+                } else {
+                    html += '<span class="status-match"><i class="fas fa-check-circle"></i> Match</span>';
+                }
+                html += '</td>';
                 html += '<td class="actions-column">';
                 // Add sync to table button if there are differences
                 if (hasDifferences) {
@@ -1179,6 +1308,7 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
                 html += '<tr class="result-row missing-row">';
                 html += '<td class="source-column"><strong>Result</strong></td>';
                 html += '<td colspan="6" class="missing-field">Field not found in result file</td>';
+                html += '<td class="status-column"><span class="status-missing"><i class="fas fa-exclamation-triangle"></i> Missing</span></td>';
                 html += '<td class="actions-column">';
                 if (!tableMissing) {
                     html += '<button class="create-field-btn" onclick="createFieldInResult(\'' + tableName + '\', \'' + database + '\', \'' + fieldName + '\');">';
@@ -1189,7 +1319,7 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
             }
             
             // Add spacing row between fields
-            html += '<tr class="field-spacer"><td colspan="8"></td></tr>';
+            html += '<tr class="field-spacer"><td colspan="9"></td></tr>';
         }
         
         html += '</tbody>';
@@ -1616,6 +1746,264 @@ function syncResultToTable(tableName, database, fieldName) {
     });
 }
 
+// Sync individual field to result
+function syncFieldToResult(tableName, database, fieldName) {
+    if (!confirm('Are you sure you want to sync database field "' + fieldName + '" to the result file?')) {
+        return;
+    }
+    
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    button.disabled = true;
+    
+    fetch('[% c.uri_for("/admin/sync_field_to_result") %]', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            table_name: tableName,
+            field_name: fieldName,
+            database: database
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        
+        if (data.success) {
+            alert('Field synchronized successfully to result file!');
+            location.reload(); // Refresh the page to show updated comparison
+        } else {
+            if (data.error_type === 'result_file_not_found') {
+                const createFile = confirm('Result file not found for this table.\n\n' + data.suggestion + '\n\nWould you like to create the result file now?');
+                if (createFile) {
+                    createResultFromTable(data.table_name, data.database);
+                }
+            } else {
+                alert('Error synchronizing field: ' + (data.error || 'Unknown error'));
+            }
+        }
+    })
+    .catch(error => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        alert('Failed to synchronize field. Please try again.');
+    });
+}
+
+// Sync individual field to table
+function syncFieldToTable(tableName, database, fieldName) {
+    if (!confirm('Are you sure you want to sync result field "' + fieldName + '" to the database table? This will modify the database schema.')) {
+        return;
+    }
+    
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    button.disabled = true;
+    
+    fetch('[% c.uri_for("/admin/sync_field_to_table") %]', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            table_name: tableName,
+            field_name: fieldName,
+            database: database
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        
+        if (data.success) {
+            alert('Field synchronized successfully to database table!');
+            location.reload(); // Refresh the page to show updated comparison
+        } else {
+            if (data.error_type === 'result_file_not_found') {
+                const createFile = confirm('Result file not found for this table.\n\n' + data.suggestion + '\n\nWould you like to create the result file now?');
+                if (createFile) {
+                    createResultFromTable(data.table_name, data.database);
+                }
+            } else {
+                alert('Error synchronizing field: ' + (data.error || 'Unknown error'));
+            }
+        }
+    })
+    .catch(error => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        alert('Failed to synchronize field. Please try again.');
+    });
+}
+
+// Add field to result file
+function addFieldToResult(tableName, database, fieldName) {
+    if (!confirm('Are you sure you want to add field "' + fieldName + '" to the result file?')) {
+        return;
+    }
+    
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    button.disabled = true;
+    
+    fetch('[% c.uri_for("/admin/add_field_to_result") %]', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            table_name: tableName,
+            field_name: fieldName,
+            database: database
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        
+        if (data.success) {
+            alert('Field added successfully to result file!');
+            location.reload(); // Refresh the page to show updated comparison
+        } else {
+            alert('Error adding field: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        alert('Failed to add field. Please try again.');
+    });
+}
+
+// Add field to database table
+function addFieldToTable(tableName, database, fieldName) {
+    if (!confirm('Are you sure you want to add field "' + fieldName + '" to the database table? This will modify the database schema.')) {
+        return;
+    }
+    
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    button.disabled = true;
+    
+    fetch('[% c.uri_for("/admin/add_field_to_table") %]', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            table_name: tableName,
+            field_name: fieldName,
+            database: database
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        
+        if (data.success) {
+            alert('Field added successfully to database table!');
+            location.reload(); // Refresh the page to show updated comparison
+        } else {
+            alert('Error adding field: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        alert('Failed to add field. Please try again.');
+    });
+}
+
+// Sync all fields to result
+function syncAllToResult(tableName, database) {
+    if (!confirm('Are you sure you want to sync all different fields from the database table to the result file?')) {
+        return;
+    }
+    
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing...';
+    button.disabled = true;
+    
+    fetch('[% c.uri_for("/admin/sync_all_to_result") %]', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            table_name: tableName,
+            database: database
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        
+        if (data.success) {
+            alert('All fields synchronized successfully to result file!');
+            location.reload(); // Refresh the page to show updated comparison
+        } else {
+            alert('Error synchronizing fields: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        alert('Failed to synchronize fields. Please try again.');
+    });
+}
+
+// Sync all fields to table
+function syncAllToTable(tableName, database) {
+    if (!confirm('Are you sure you want to sync all different fields from the result file to the database table? This will modify the database schema.')) {
+        return;
+    }
+    
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing...';
+    button.disabled = true;
+    
+    fetch('[% c.uri_for("/admin/sync_all_to_table") %]', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            table_name: tableName,
+            database: database
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        
+        if (data.success) {
+            alert('All fields synchronized successfully to database table!');
+            location.reload(); // Refresh the page to show updated comparison
+        } else {
+            alert('Error synchronizing fields: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        alert('Failed to synchronize fields. Please try again.');
+    });
+}
+
 // Parse data type to extract base type and size
 function parseDataType(dataType) {
     if (!dataType) return { baseType: 'N/A', size: null };
@@ -1884,5 +2272,201 @@ function createFieldInTable(tableName, database, fieldName) {
         button.disabled = false;
         alert('Failed to add field to table. Please try again.');
     });
+}
+
+// Update table schema to match result file
+function updateTableSchema(tableName, database) {
+    if (!confirm('Are you sure you want to update table "' + tableName + '" to match its result file? This will modify the database schema.')) {
+        return;
+    }
+    
+    // Show loading state
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
+    button.disabled = true;
+    
+    fetch('[% c.uri_for("/admin/update_table_schema") %]', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'table_name=' + encodeURIComponent(tableName) + '&database_name=' + encodeURIComponent(database)
+    })
+    .then(response => response.json())
+    .then(data => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        
+        if (data.success) {
+            let message = 'Table schema update prepared successfully!\n\n';
+            message += 'Generated ' + data.alter_statements.length + ' ALTER statements:\n\n';
+            data.alter_statements.forEach((stmt, index) => {
+                message += (index + 1) + '. ' + stmt + '\n';
+            });
+            message += '\nWould you like to execute these statements?';
+            
+            if (confirm(message)) {
+                executeAlterStatements(tableName, database, data.alter_statements);
+            }
+        } else {
+            alert('Error preparing table update: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        alert('Failed to prepare table update. Please try again.');
+    });
+}
+
+// Update result file to match table schema
+function updateResultFile(tableName, database) {
+    if (!confirm('Are you sure you want to update the result file for "' + tableName + '" to match the table schema?')) {
+        return;
+    }
+    
+    // Show loading state
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
+    button.disabled = true;
+    
+    fetch('[% c.uri_for("/admin/update_result_file") %]', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'table_name=' + encodeURIComponent(tableName) + '&database_name=' + encodeURIComponent(database)
+    })
+    .then(response => response.json())
+    .then(data => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        
+        if (data.success) {
+            // Show the generated result file content in a modal or new window
+            const newWindow = window.open('', '_blank', 'width=800,height=600,scrollbars=yes');
+            newWindow.document.write('<html><head><title>Generated Result File: ' + tableName + '</title></head><body>');
+            newWindow.document.write('<h2>Generated Result File Content</h2>');
+            newWindow.document.write('<p><strong>Table:</strong> ' + tableName + ' (' + database + ')</p>');
+            newWindow.document.write('<pre style="background: #f5f5f5; padding: 10px; border: 1px solid #ddd; overflow: auto;">' + 
+                                   data.result_file_content.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>');
+            newWindow.document.write('<p><em>Copy this content to your result file manually.</em></p>');
+            newWindow.document.write('</body></html>');
+            newWindow.document.close();
+            
+            alert('Result file content generated successfully! Check the new window for the content.');
+        } else {
+            alert('Error generating result file: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        alert('Failed to generate result file. Please try again.');
+    });
+}
+
+// Show detailed field comparison
+function showFieldDetails(tableName, database) {
+    // Toggle the field comparison content
+    const card = document.querySelector('.table-comparison-card[data-table="' + tableName + '"][data-database="' + database + '"]') ||
+                 document.querySelector('.feature-card[data-table="' + tableName + '"][data-database="' + database + '"]');
+    
+    if (card) {
+        const header = card.querySelector('.feature-header') || card.querySelector('.table-comparison-header');
+        if (header) {
+            toggleTableComparison(header);
+        }
+    }
+}
+
+// Execute ALTER statements (helper function)
+function executeAlterStatements(tableName, database, statements) {
+    // This would need a separate endpoint to actually execute the statements
+    // For now, just show them to the user
+    let message = 'Execute these ALTER statements manually in your database:\n\n';
+    statements.forEach((stmt, index) => {
+        message += (index + 1) + '. ' + stmt + ';\n';
+    });
+    
+    // Create a modal or new window to show the statements
+    const newWindow = window.open('', '_blank', 'width=800,height=400,scrollbars=yes');
+    newWindow.document.write('<html><head><title>ALTER Statements for ' + tableName + '</title></head><body>');
+    newWindow.document.write('<h2>ALTER Statements for Table: ' + tableName + '</h2>');
+    newWindow.document.write('<p><strong>Database:</strong> ' + database + '</p>');
+    newWindow.document.write('<p><strong>Instructions:</strong> Execute these statements in your MySQL client:</p>');
+    newWindow.document.write('<pre style="background: #f5f5f5; padding: 10px; border: 1px solid #ddd; overflow: auto;">');
+    statements.forEach((stmt, index) => {
+        newWindow.document.write((index + 1) + '. ' + stmt + ';\n');
+    });
+    newWindow.document.write('</pre>');
+    newWindow.document.write('<p><em>After executing these statements, refresh the schema comparison page.</em></p>');
+    newWindow.document.write('</body></html>');
+    newWindow.document.close();
+}
+
+// Build HTML for detailed field comparison display
+function buildFieldComparisonHTML(fields, tableName, database, resultFilePath) {
+    let html = '<div class="field-comparison-display">';
+    html += '<div class="comparison-header">';
+    html += '<h5>Field Comparison: ' + tableName + ' (' + database + ')</h5>';
+    if (resultFilePath) {
+        html += '<p class="result-file-path"><i class="fas fa-file-code"></i> ' + resultFilePath + '</p>';
+    }
+    html += '</div>';
+    
+    if (!fields || Object.keys(fields).length === 0) {
+        html += '<div class="no-fields"><i class="fas fa-info-circle"></i> No fields found for comparison.</div>';
+        html += '</div>';
+        return html;
+    }
+    
+    html += '<div class="fields-container">';
+    
+    // Sort fields by name
+    const sortedFields = Object.keys(fields).sort();
+    
+    for (const fieldName of sortedFields) {
+        const field = fields[fieldName];
+        const hasDifferences = field.differences && field.differences.length > 0;
+        
+        html += '<div class="field-comparison-item ' + (hasDifferences ? 'has-differences' : 'synchronized') + '">';
+        html += '<div class="field-header">';
+        html += '<h6><i class="fas fa-columns"></i> ' + fieldName;
+        
+        if (hasDifferences) {
+            html += ' <span class="difference-count">(' + field.differences.length + ' difference' + (field.differences.length > 1 ? 's' : '') + ')</span>';
+        } else {
+            html += ' <span class="synchronized-badge"><i class="fas fa-check"></i> Synchronized</span>';
+        }
+        
+        html += '</h6>';
+        html += '</div>';
+        
+        if (hasDifferences) {
+            html += '<div class="field-differences">';
+            
+            for (const diff of field.differences) {
+                html += '<div class="difference-item">';
+                html += '<div class="difference-attribute"><strong>' + formatPropertyName(diff.attribute) + '</strong></div>';
+                html += '<div class="difference-values">';
+                html += '<div class="table-value">Table: <code>' + diff.table_value + '</code></div>';
+                html += '<div class="result-value">Result: <code>' + diff.result_value + '</code></div>';
+                html += '</div>';
+                html += '</div>';
+            }
+            
+            html += '</div>';
+        }
+        
+        html += '</div>';
+    }
+    
+    html += '</div>';
+    html += '</div>';
+    
+    return html;
 }
 </script>

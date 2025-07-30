@@ -1763,8 +1763,10 @@ sub schema_compare :Path('/admin/schema_compare') :Args(0) {
         return;
     }
     
-    # Get database comparison data
-    my $database_comparison = $self->get_database_comparison($c);
+    # Get database comparison data with caching (only caches when this page is accessed)
+    require Comserv::Util::DatabaseSchemaCache;
+    my $cache = Comserv::Util::DatabaseSchemaCache->instance();
+    my $database_comparison = $cache->get_schema_comparison_with_cache($c);
     
     # Add access control schema status
     my $access_control_status = $self->check_access_control_schema($c);
@@ -1792,6 +1794,267 @@ sub schema_compare :Path('/admin/schema_compare') :Args(0) {
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare', 
         "Completed schema_compare action");
+}
+
+# Refresh database schema cache (admin endpoint)
+sub schema_cache_refresh :Path('/admin/schema_cache_refresh') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_cache_refresh', 
+        "Manual schema cache refresh requested");
+    
+    # Check if the user has admin role
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $c->flash->{error_msg} = "You need to be an administrator to refresh the cache.";
+        $c->response->redirect($c->uri_for('/admin/schema_compare'));
+        return;
+    }
+    
+    # Refresh the schema cache
+    require Comserv::Util::DatabaseSchemaCache;
+    my $cache = Comserv::Util::DatabaseSchemaCache->instance();
+    $cache->refresh_schema_cache($c);
+    
+    $c->flash->{success_msg} = "Database schema cache has been refreshed successfully.";
+    $c->response->redirect($c->uri_for('/admin/schema_compare'));
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_cache_refresh', 
+        "Schema cache refresh completed");
+}
+
+# Get active database information (API endpoint)
+sub get_active_database :Path('/admin/get_active_database') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Check if the user has admin role
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $c->response->status(403);
+        $c->response->body('Access denied');
+        return;
+    }
+    
+    # Get active database from cache
+    require Comserv::Util::DatabaseSchemaCache;
+    my $cache = Comserv::Util::DatabaseSchemaCache->instance();
+    my $active_database = $cache->get_active_database($c);
+    my $cache_status = $cache->get_cache_status();
+    
+    # Return JSON response
+    $c->response->content_type('application/json');
+    $c->response->body($c->model('JSON')->encode({
+        active_database => $active_database,
+        cache_status => $cache_status
+    }));
+}
+
+# Update table schema to match result file
+sub update_table_schema :Path('/admin/update_table_schema') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Check if the user has admin role
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $c->response->status(403);
+        $c->response->body('Access denied');
+        return;
+    }
+    
+    my $table_name = $c->req->param('table_name');
+    my $database_name = $c->req->param('database_name');
+    
+    unless ($table_name && $database_name) {
+        $c->response->status(400);
+        $c->response->body('Missing required parameters');
+        return;
+    }
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_table_schema', 
+        "Updating table schema: $table_name in database: $database_name");
+    
+    try {
+        # Get the result file schema
+        my $result_table_mapping = $self->build_result_table_mapping($c, $database_name);
+        my $table_comparison = $self->compare_table_with_result_file_v2($c, $table_name, $database_name, $result_table_mapping);
+        
+        if (!$table_comparison->{has_result_file}) {
+            $c->response->status(400);
+            $c->response->body('No result file found for this table');
+            return;
+        }
+        
+        # Generate ALTER TABLE statements
+        my @alter_statements = ();
+        
+        foreach my $field_name (keys %{$table_comparison->{fields}}) {
+            my $field = $table_comparison->{fields}->{$field_name};
+            
+            if ($field->{differences} && @{$field->{differences}} > 0) {
+                # Field needs updating
+                my $result_type = $field->{result_type} || 'varchar(255)';
+                push @alter_statements, "ALTER TABLE `$table_name` MODIFY COLUMN `$field_name` $result_type";
+            }
+        }
+        
+        # Add missing fields
+        foreach my $field_name (keys %{$table_comparison->{missing_in_table}}) {
+            my $field_info = $table_comparison->{missing_in_table}->{$field_name};
+            my $field_type = $field_info->{data_type} || 'varchar(255)';
+            push @alter_statements, "ALTER TABLE `$table_name` ADD COLUMN `$field_name` $field_type";
+        }
+        
+        $c->response->content_type('application/json');
+        $c->response->body($c->model('JSON')->encode({
+            success => 1,
+            table_name => $table_name,
+            database_name => $database_name,
+            alter_statements => \@alter_statements,
+            message => "Generated " . scalar(@alter_statements) . " ALTER statements"
+        }));
+        
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_table_schema', 
+            "Error updating table schema: $error");
+        
+        $c->response->status(500);
+        $c->response->body("Error: $error");
+    };
+}
+
+# Update result file to match table schema
+sub update_result_file :Path('/admin/update_result_file') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Check if the user has admin role
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $c->response->status(403);
+        $c->response->body('Access denied');
+        return;
+    }
+    
+    my $table_name = $c->req->param('table_name');
+    my $database_name = $c->req->param('database_name');
+    
+    unless ($table_name && $database_name) {
+        $c->response->status(400);
+        $c->response->body('Missing required parameters');
+        return;
+    }
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_result_file', 
+        "Updating result file for table: $table_name in database: $database_name");
+    
+    try {
+        # Get table schema from database
+        my $table_schema = $self->get_table_schema($c, $table_name, $database_name);
+        
+        if (!$table_schema || !@{$table_schema}) {
+            $c->response->status(400);
+            $c->response->body('Table not found in database');
+            return;
+        }
+        
+        # Generate result file content
+        my $result_file_content = $self->generate_result_file_content($c, $table_name, $table_schema, $database_name);
+        
+        $c->response->content_type('application/json');
+        $c->response->body($c->model('JSON')->encode({
+            success => 1,
+            table_name => $table_name,
+            database_name => $database_name,
+            result_file_content => $result_file_content,
+            message => "Generated result file content for $table_name"
+        }));
+        
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_result_file', 
+            "Error updating result file: $error");
+        
+        $c->response->status(500);
+        $c->response->body("Error: $error");
+    };
+}
+
+# Generate result file content from table schema
+sub generate_result_file_content {
+    my ($self, $c, $table_name, $table_schema, $database_name) = @_;
+    
+    my $class_name = ucfirst($table_name);
+    my $namespace = ucfirst($database_name);
+    
+    my $content = qq{package Comserv::Model::Schema::${namespace}::Result::${class_name};
+
+use strict;
+use warnings;
+use base 'DBIx::Class::Core';
+
+__PACKAGE__->table('$table_name');
+
+__PACKAGE__->add_columns(
+};
+
+    foreach my $field (@{$table_schema}) {
+        my $field_name = $field->{Field};
+        my $data_type = $self->normalize_mysql_type_for_result_file($field->{Type});
+        my $is_nullable = $field->{Null} eq 'YES' ? 1 : 0;
+        my $default = $field->{Default};
+        my $is_auto_increment = $field->{Extra} =~ /auto_increment/i ? 1 : 0;
+        
+        $content .= qq{    $field_name => {
+        data_type => '$data_type',};
+        
+        if ($is_nullable) {
+            $content .= qq{
+        is_nullable => 1,};
+        }
+        
+        if (defined $default && $default ne '') {
+            $content .= qq{
+        default_value => '$default',};
+        }
+        
+        if ($is_auto_increment) {
+            $content .= qq{
+        is_auto_increment => 1,};
+        }
+        
+        $content .= qq{
+    },
+};
+    }
+    
+    $content .= qq{);
+
+__PACKAGE__->set_primary_key('id') if grep { \$_->{Field} eq 'id' } \@{\$table_schema};
+
+1;
+};
+
+    return $content;
+}
+
+# Normalize MySQL data types for result files
+sub normalize_mysql_type_for_result_file {
+    my ($self, $mysql_type) = @_;
+    
+    # Convert MySQL types to DBIx::Class types
+    if ($mysql_type =~ /^int/i) {
+        return 'integer';
+    } elsif ($mysql_type =~ /^varchar\((\d+)\)/i) {
+        return "varchar($1)";
+    } elsif ($mysql_type =~ /^text/i) {
+        return 'text';
+    } elsif ($mysql_type =~ /^datetime/i) {
+        return 'datetime';
+    } elsif ($mysql_type =~ /^timestamp/i) {
+        return 'timestamp';
+    } elsif ($mysql_type =~ /^enum/i) {
+        return 'enum';
+    } elsif ($mysql_type =~ /^decimal/i) {
+        return 'decimal';
+    } else {
+        return 'varchar(255)'; # Default fallback
+    }
 }
 
 # Check access control schema status
@@ -2697,6 +2960,8 @@ sub build_result_table_mapping {
         # Extract actual table name from Result file
         my $table_name = $self->extract_table_name_from_result_file($result_file->{path});
         
+
+        
         if ($table_name) {
             $mapping{lc($table_name)} = {
                 result_name => $result_file->{name},
@@ -2764,6 +3029,13 @@ sub compare_table_with_result_file_v2 {
             $comparison->{database_schema}, 
             $comparison->{result_file_schema}
         );
+        
+        # Debug logging for differences
+        if (scalar(@{$comparison->{differences}}) > 0) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'compare_table_with_result_file_v2', 
+                "Found " . scalar(@{$comparison->{differences}}) . " differences for table $table_name: " . 
+                join(", ", map { $_->{description} } @{$comparison->{differences}}));
+        }
         
         # Determine sync status
         if (scalar(@{$comparison->{differences}}) == 0) {
@@ -4717,6 +4989,21 @@ sub sync_table_to_result :Path('/admin/sync_table_to_result') :Args(0) {
         # Get table field info
         my $table_field_info = $self->get_table_field_info($c, $table_name, $field_name, $database);
         
+        # Check if field is missing from database
+        if ($table_field_info->{field_missing}) {
+            $c->stash(json => {
+                success => 0,
+                error => $table_field_info->{error},
+                error_type => 'field_missing_in_database',
+                suggestion => "Field exists in result file but not in database. Use 'Sync to Table' to create the field in database.",
+                table_name => $table_name,
+                field_name => $field_name,
+                database => $database
+            });
+            $c->forward('View::JSON');
+            return;
+        }
+        
         # Update result file with table values
         my $result = $self->update_result_field_from_table($c, $table_name, $field_name, $database, $table_field_info);
         
@@ -4824,6 +5111,187 @@ sub sync_result_to_table :Path('/admin/sync_result_to_table') :Args(0) {
     $c->forward('View::JSON');
 }
 
+# AJAX endpoint to sync field to result (alias for sync_table_to_result)
+sub sync_field_to_result :Path('/admin/sync_field_to_result') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_field_to_result',
+        "Starting sync_field_to_result action (alias for sync_table_to_result)");
+    
+    # Check if the user has admin role
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $c->response->status(403);
+        $c->stash(json => { success => 0, error => 'Access denied' });
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Parse JSON request
+    my $json_data;
+    try {
+        my $body = $c->req->body;
+        if ($body) {
+            local $/;
+            my $json_text = <$body>;
+            $json_data = decode_json($json_text);
+        } else {
+            die "No request body provided";
+        }
+    } catch {
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => "Invalid JSON request: $_" });
+        $c->forward('View::JSON');
+        return;
+    };
+    
+    my $table_name = $json_data->{table_name};
+    my $field_name = $json_data->{field_name};
+    my $database = $json_data->{database};
+    
+    unless ($table_name && $field_name && $database) {
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => 'Missing required parameters: table_name, field_name, database' });
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    try {
+        # Get table field info
+        my $table_field_info = $self->get_table_field_info($c, $table_name, $field_name, $database);
+        
+        # Check if field is missing from database
+        if ($table_field_info->{field_missing}) {
+            $c->stash(json => {
+                success => 0,
+                error => $table_field_info->{error},
+                error_type => 'field_missing_in_database',
+                suggestion => "Field exists in result file but not in database. Use 'Sync to Table' to create the field in database.",
+                table_name => $table_name,
+                field_name => $field_name,
+                database => $database
+            });
+            $c->forward('View::JSON');
+            return;
+        }
+        
+        # Update result file with table values
+        my $result = $self->update_result_field_from_table($c, $table_name, $field_name, $database, $table_field_info);
+        
+        $c->stash(json => {
+            success => 1,
+            message => "Successfully synced table field '$field_name' to result file",
+            field_info => $table_field_info
+        });
+        
+    } catch {
+        my $error = "$_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'sync_field_to_result', $error);
+        
+        # Check if this is a "result file not found" error
+        if ($error =~ /Result file not found for table/) {
+            $c->response->status(404);
+            $c->stash(json => { 
+                success => 0, 
+                error => $error,
+                error_type => 'result_file_not_found',
+                table_name => $table_name,
+                database => $database,
+                suggestion => "Create a result file for this table first using the 'Create Result File' button"
+            });
+        } else {
+            $c->response->status(500);
+            $c->stash(json => { success => 0, error => "Error syncing field to result: $error" });
+        }
+    };
+    
+    $c->forward('View::JSON');
+}
+
+# AJAX endpoint to sync field to table (alias for sync_result_to_table)
+sub sync_field_to_table :Path('/admin/sync_field_to_table') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_field_to_table',
+        "Starting sync_field_to_table action (alias for sync_result_to_table)");
+    
+    # Check if the user has admin role
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $c->response->status(403);
+        $c->stash(json => { success => 0, error => 'Access denied' });
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Parse JSON request
+    my $json_data;
+    try {
+        my $body = $c->req->body;
+        if ($body) {
+            local $/;
+            my $json_text = <$body>;
+            $json_data = decode_json($json_text);
+        } else {
+            die "No request body provided";
+        }
+    } catch {
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => "Invalid JSON request: $_" });
+        $c->forward('View::JSON');
+        return;
+    };
+    
+    my $table_name = $json_data->{table_name};
+    my $field_name = $json_data->{field_name};
+    my $database = $json_data->{database};
+    
+    unless ($table_name && $field_name && $database) {
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => 'Missing required parameters: table_name, field_name, database' });
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    try {
+        # Get result field info
+        my $result_field_info = $self->get_result_field_info($c, $table_name, $field_name, $database);
+        
+        # Update table with result values
+        my $result = $self->update_table_field_from_result($c, $table_name, $field_name, $database, $result_field_info);
+        
+        if ($result->{success}) {
+            $c->stash(json => {
+                success => 1,
+                message => "Successfully synced result field '$field_name' to table",
+                field_info => $result_field_info
+            });
+        } else {
+            die $result->{error} || "Unknown error updating table field";
+        }
+        
+    } catch {
+        my $error = "$_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'sync_field_to_table', $error);
+        
+        # Check if this is a "result file not found" error
+        if ($error =~ /Result file not found for table/) {
+            $c->response->status(404);
+            $c->stash(json => { 
+                success => 0, 
+                error => $error,
+                error_type => 'result_file_not_found',
+                table_name => $table_name,
+                database => $database,
+                suggestion => "Create a result file for this table first using the 'Create Result File' button"
+            });
+        } else {
+            $c->response->status(500);
+            $c->stash(json => { success => 0, error => "Error syncing field to table: $error" });
+        }
+    };
+    
+    $c->forward('View::JSON');
+}
+
 # Debug endpoint to test field comparison
 sub debug_field_comparison :Path('/admin/debug_field_comparison') :Args(0) {
     my ($self, $c) = @_;
@@ -4880,10 +5348,20 @@ sub get_table_field_info {
     my $column_info = $sth->fetchrow_hashref;
     
     if (!$column_info) {
-        die "Field '$field_name' not found in table '$table_name'";
+        # Return a special marker for missing fields instead of dying
+        return {
+            field_missing => 1,
+            error => "Field '$field_name' not found in table '$table_name'",
+            data_type => undef,
+            size => undef,
+            is_nullable => undef,
+            is_auto_increment => undef,
+            default_value => undef
+        };
     }
     
     return {
+        field_missing => 0,
         data_type => $column_info->{TYPE_NAME} || $column_info->{DATA_TYPE},
         size => $column_info->{COLUMN_SIZE},
         is_nullable => $column_info->{NULLABLE} ? 1 : 0,
@@ -5003,8 +5481,9 @@ sub get_result_field_info {
         # Add debug information if debug mode is enabled
         if ($c->session->{debug_mode}) {
             my $debug_info = "\nDEBUG INFO (get_result_field_info):\n";
+            $debug_info .= "Database: '$database'\n";
             $debug_info .= "Table key searched: '$table_key'\n";
-            $debug_info .= "Available tables: " . join(', ', keys %$result_table_mapping) . "\n";
+            $debug_info .= "Available tables: " . join(', ', sort keys %$result_table_mapping) . "\n";
             $debug_info .= "Result file path: " . ($result_file_path || 'undefined') . "\n";
             if ($result_file_path) {
                 $debug_info .= "File exists: " . (-f $result_file_path ? 'YES' : 'NO') . "\n";
@@ -5223,7 +5702,7 @@ sub update_table_field_from_result {
     # 2. Execute it against the database
     # 3. Handle any constraints or dependencies
     
-    return 1;
+    return { success => 1, message => "Table field sync simulated (not implemented)" };
 }
 
 # AJAX endpoint to create a Result file from a database table

@@ -457,3 +457,30 @@ sub delete_herb {
     
     return (1, "Herb deleted successfully");
 }
+
+=head2 test_connection
+
+Test database connection
+
+=cut
+
+sub test_connection {
+    my ($self, $c) = @_;
+    
+    eval {
+        # Try a simple query to test the connection
+        my $dbh = $self->storage->dbh;
+        $dbh->do('SELECT 1');
+    };
+    
+    if ($@) {
+        if ($c && $c->can('log')) {
+            $c->log->error("DBForager connection test failed: $@");
+        }
+        return 0;
+    }
+    
+    return 1;
+}
+
+1;

@@ -27,8 +27,11 @@ sub get_internal_links {
     
     # Use eval to catch any database errors
     eval {
+        # PERFORMANCE FIX: Use cached database model to avoid repeated ACCEPT_CONTEXT calls
+        my $db_model = $c->stash->{_cached_db_model} || $c->model('DBEncy');
+        
         # Try to use the DBIx::Class API first
-        my $rs = $c->model('DBEncy')->resultset('InternalLinksTb')->search({
+        my $rs = $db_model->resultset('InternalLinksTb')->search({
             category => $category,
             sitename => [ $site_name, 'All' ]
         }, {
@@ -41,8 +44,8 @@ sub get_internal_links {
         
         # If no results and we might need to fall back to direct SQL
         if (!@results) {
-            # Get the database handle from the DBEncy model
-            my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+            # Get the database handle from the cached model
+            my $dbh = $db_model->schema->storage->dbh;
             
             # Prepare and execute the query
             my $query = "SELECT * FROM internal_links_tb WHERE category = ? AND (sitename = ? OR sitename = 'All') ORDER BY link_order";
@@ -77,8 +80,11 @@ sub get_pages {
     
     # Use eval to catch any database errors
     eval {
+        # PERFORMANCE FIX: Use cached database model to avoid repeated ACCEPT_CONTEXT calls
+        my $db_model = $c->stash->{_cached_db_model} || $c->model('DBEncy');
+        
         # Try to use the DBIx::Class API first
-        my $rs = $c->model('DBEncy')->resultset('PageTb')->search({
+        my $rs = $db_model->resultset('PageTb')->search({
             menu => $menu,
             status => $status,
             sitename => [ $site_name, 'All' ]
@@ -92,8 +98,8 @@ sub get_pages {
         
         # If no results and we might need to fall back to direct SQL
         if (!@results) {
-            # Get the database handle from the DBEncy model
-            my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+            # Get the database handle from the cached model
+            my $dbh = $db_model->schema->storage->dbh;
             
             # Prepare and execute the query
             my $query = "SELECT * FROM page_tb WHERE menu = ? AND status = ? AND (sitename = ? OR sitename = 'All') ORDER BY link_order";
@@ -126,8 +132,11 @@ sub get_admin_pages {
     
     # Use eval to catch any database errors
     eval {
+        # PERFORMANCE FIX: Use cached database model to avoid repeated ACCEPT_CONTEXT calls
+        my $db_model = $c->stash->{_cached_db_model} || $c->model('DBEncy');
+        
         # Try to use the DBIx::Class API first
-        my $rs = $c->model('DBEncy')->resultset('PageTb')->search({
+        my $rs = $db_model->resultset('PageTb')->search({
             menu => 'Admin',
             status => 2,
             sitename => [ $site_name, 'All' ]
@@ -141,8 +150,8 @@ sub get_admin_pages {
         
         # If no results and we might need to fall back to direct SQL
         if (!@results) {
-            # Get the database handle from the DBEncy model
-            my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+            # Get the database handle from the cached model
+            my $dbh = $db_model->schema->storage->dbh;
             
             # Prepare and execute the query
             my $query = "SELECT * FROM page_tb WHERE (menu = 'Admin' AND status = 2) AND (sitename = ? OR sitename = 'All') ORDER BY link_order";
@@ -175,8 +184,11 @@ sub get_admin_links {
     
     # Use eval to catch any database errors
     eval {
+        # PERFORMANCE FIX: Use cached database model to avoid repeated ACCEPT_CONTEXT calls
+        my $db_model = $c->stash->{_cached_db_model} || $c->model('DBEncy');
+        
         # Try to use the DBIx::Class API first
-        my $rs = $c->model('DBEncy')->resultset('InternalLinksTb')->search({
+        my $rs = $db_model->resultset('InternalLinksTb')->search({
             category => 'Admin_links',
             sitename => [ $site_name, 'All' ]
         }, {
@@ -189,8 +201,8 @@ sub get_admin_links {
         
         # If no results and we might need to fall back to direct SQL
         if (!@results) {
-            # Get the database handle from the DBEncy model
-            my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+            # Get the database handle from the cached model
+            my $dbh = $db_model->schema->storage->dbh;
             
             # Prepare and execute the query
             my $query = "SELECT * FROM internal_links_tb WHERE category = 'Admin_links' AND (sitename = ? OR sitename = 'All') ORDER BY link_order";
@@ -223,8 +235,11 @@ sub get_private_links {
     
     # Use eval to catch any database errors
     eval {
+        # PERFORMANCE FIX: Use cached database model to avoid repeated ACCEPT_CONTEXT calls
+        my $db_model = $c->stash->{_cached_db_model} || $c->model('DBEncy');
+        
         # Try to use the DBIx::Class API first
-        my $rs = $c->model('DBEncy')->resultset('InternalLinksTb')->search({
+        my $rs = $db_model->resultset('InternalLinksTb')->search({
             category => 'Private_links',
             description => $username,  # Using description field to store username
             sitename => [ $site_name, 'All' ]
@@ -238,7 +253,7 @@ sub get_private_links {
         
         # If no results and we might need to fall back to direct SQL
         if (!@results) {
-            # Get the database handle from the DBEncy model
+            # Get the database handle from the cached model
             my $dbh = $c->model('DBEncy')->schema->storage->dbh;
             
             # Prepare and execute the query
@@ -757,92 +772,136 @@ sub populate_navigation_data {
         $c->stash->{is_admin} = $is_admin;
         $c->log->debug("Set is_admin flag to: " . ($is_admin ? 'true' : 'false'));
         
-        # Ensure tables exist before querying them
-        my $db_model = $c->model('DBEncy');
+        # PERFORMANCE FIX: Cache the database model instance to avoid repeated ACCEPT_CONTEXT calls
+        my $db_model = $c->stash->{_cached_db_model};
+        if (!$db_model) {
+            $db_model = $c->model('DBEncy');
+            $c->stash->{_cached_db_model} = $db_model;
+        }
         my $schema = $db_model->schema;
         
-        # Check if tables exist in the database
-        my $dbh = $schema->storage->dbh;
-        my $tables = $db_model->list_tables();
-        my $internal_links_exists = grep { $_ eq 'internal_links_tb' } @$tables;
-        my $page_tb_exists = grep { $_ eq 'page_tb' } @$tables;
-        
-        # If tables don't exist, try to create them
-        if (!$internal_links_exists || !$page_tb_exists) {
-            $c->log->debug("Navigation tables don't exist. Attempting to create them.");
+        # PERFORMANCE FIX: Cache table existence check to avoid repeated queries
+        my $tables_checked = $c->stash->{_tables_checked};
+        if (!$tables_checked) {
+            # Check if tables exist in the database
+            my $dbh = $schema->storage->dbh;
+            my $tables = $db_model->list_tables();
+            my $internal_links_exists = grep { $_ eq 'internal_links_tb' } @$tables;
+            my $page_tb_exists = grep { $_ eq 'page_tb' } @$tables;
             
-            # Create tables if they don't exist
-            $db_model->create_table_from_result('InternalLinksTb', $schema, $c);
-            $db_model->create_table_from_result('PageTb', $schema, $c);
-            
-            # Check if tables were created successfully
-            $tables = $db_model->list_tables();
-            $internal_links_exists = grep { $_ eq 'internal_links_tb' } @$tables;
-            $page_tb_exists = grep { $_ eq 'page_tb' } @$tables;
-            
-            # If tables still don't exist, try to create them using SQL files
+            # If tables don't exist, try to create them
             if (!$internal_links_exists || !$page_tb_exists) {
-                $c->log->debug("Creating tables from SQL files.");
+                $c->log->debug("Navigation tables don't exist. Attempting to create them.");
                 
-                # Try to execute SQL files
-                if (!$internal_links_exists) {
-                    my $sql_file = $c->path_to('sql', 'internal_links_tb.sql')->stringify;
-                    if (-e $sql_file) {
-                        my $sql = do { local (@ARGV, $/) = $sql_file; <> };
-                        my @statements = split /;/, $sql;
-                        foreach my $statement (@statements) {
-                            $statement =~ s/^\s+|\s+$//g;  # Trim whitespace
-                            next unless $statement;  # Skip empty statements
-                            eval { $dbh->do($statement); };
-                            if ($@) {
-                                $c->log->error("Error executing SQL: $@");
+                # Create tables if they don't exist
+                $db_model->create_table_from_result('InternalLinksTb', $schema, $c);
+                $db_model->create_table_from_result('PageTb', $schema, $c);
+                
+                # Check if tables were created successfully
+                $tables = $db_model->list_tables();
+                $internal_links_exists = grep { $_ eq 'internal_links_tb' } @$tables;
+                $page_tb_exists = grep { $_ eq 'page_tb' } @$tables;
+                
+                # If tables still don't exist, try to create them using SQL files
+                if (!$internal_links_exists || !$page_tb_exists) {
+                    $c->log->debug("Creating tables from SQL files.");
+                    
+                    # Try to execute SQL files
+                    if (!$internal_links_exists) {
+                        my $sql_file = $c->path_to('sql', 'internal_links_tb.sql')->stringify;
+                        if (-e $sql_file) {
+                            my $sql = do { local (@ARGV, $/) = $sql_file; <> };
+                            my @statements = split /;/, $sql;
+                            foreach my $statement (@statements) {
+                                $statement =~ s/^\s+|\s+$//g;  # Trim whitespace
+                                next unless $statement;  # Skip empty statements
+                                eval { $dbh->do($statement); };
+                                if ($@) {
+                                    $c->log->error("Error executing SQL: $@");
+                                }
                             }
+                        } else {
+                            $c->log->error("SQL file not found: $sql_file");
                         }
-                    } else {
-                        $c->log->error("SQL file not found: $sql_file");
                     }
-                }
-                
-                if (!$page_tb_exists) {
-                    my $sql_file = $c->path_to('sql', 'page_tb.sql')->stringify;
-                    if (-e $sql_file) {
-                        my $sql = do { local (@ARGV, $/) = $sql_file; <> };
-                        my @statements = split /;/, $sql;
-                        foreach my $statement (@statements) {
-                            $statement =~ s/^\s+|\s+$//g;  # Trim whitespace
-                            next unless $statement;  # Skip empty statements
-                            eval { $dbh->do($statement); };
-                            if ($@) {
-                                $c->log->error("Error executing SQL: $@");
+                    
+                    if (!$page_tb_exists) {
+                        my $sql_file = $c->path_to('sql', 'page_tb.sql')->stringify;
+                        if (-e $sql_file) {
+                            my $sql = do { local (@ARGV, $/) = $sql_file; <> };
+                            my @statements = split /;/, $sql;
+                            foreach my $statement (@statements) {
+                                $statement =~ s/^\s+|\s+$//g;  # Trim whitespace
+                                next unless $statement;  # Skip empty statements
+                                eval { $dbh->do($statement); };
+                                if ($@) {
+                                    $c->log->error("Error executing SQL: $@");
+                                }
                             }
+                        } else {
+                            $c->log->error("SQL file not found: $sql_file");
                         }
-                    } else {
-                        $c->log->error("SQL file not found: $sql_file");
                     }
                 }
             }
+            
+            # Mark tables as checked to avoid repeating this expensive operation
+            $c->stash->{_tables_checked} = 1;
         }
         
-        # Populate member links
-        $c->stash->{member_links} = $self->get_internal_links($c, 'Member_links', $site_name);
-        $c->stash->{member_pages} = $self->get_pages($c, 'member', $site_name);
+        # PERFORMANCE FIX: Cache navigation data in session to avoid repeated database queries
+        my $nav_cache_key = "nav_cache_${site_name}_" . ($c->session->{username} || 'guest') . "_" . ($is_admin ? 'admin' : 'user');
+        my $nav_cache_time = $c->session->{"${nav_cache_key}_time"} || 0;
+        my $cache_ttl = 300; # 5 minutes cache
         
-        # Populate main links
-        $c->stash->{main_links} = $self->get_internal_links($c, 'Main_links', $site_name);
-        $c->stash->{main_pages} = $self->get_pages($c, 'Main', $site_name);
-        
-        # Populate hosted links
-        $c->stash->{hosted_links} = $self->get_internal_links($c, 'Hosted_link', $site_name);
-        
-        # Populate admin links and pages only for admin users
-        if ($is_admin) {
-            $c->stash->{admin_pages} = $self->get_admin_pages($c, $site_name);
-            $c->stash->{admin_links} = $self->get_admin_links($c, $site_name);
-        }
-        
-        # Populate private links for logged-in users
-        if ($c->user_exists && $c->session->{username}) {
-            $c->stash->{private_links} = $self->get_private_links($c, $c->session->{username}, $site_name);
+        if (time() - $nav_cache_time < $cache_ttl && $c->session->{$nav_cache_key}) {
+            # Use cached navigation data
+            my $cached_nav = $c->session->{$nav_cache_key};
+            $c->stash->{member_links} = $cached_nav->{member_links};
+            $c->stash->{member_pages} = $cached_nav->{member_pages};
+            $c->stash->{main_links} = $cached_nav->{main_links};
+            $c->stash->{main_pages} = $cached_nav->{main_pages};
+            $c->stash->{hosted_links} = $cached_nav->{hosted_links};
+            $c->stash->{admin_pages} = $cached_nav->{admin_pages} if $is_admin;
+            $c->stash->{admin_links} = $cached_nav->{admin_links} if $is_admin;
+            $c->stash->{private_links} = $cached_nav->{private_links};
+            
+            $c->log->debug("Using cached navigation data (age: " . (time() - $nav_cache_time) . "s)");
+        } else {
+            # Fetch fresh navigation data
+            $c->stash->{member_links} = $self->get_internal_links($c, 'Member_links', $site_name);
+            $c->stash->{member_pages} = $self->get_pages($c, 'member', $site_name);
+            
+            $c->stash->{main_links} = $self->get_internal_links($c, 'Main_links', $site_name);
+            $c->stash->{main_pages} = $self->get_pages($c, 'Main', $site_name);
+            
+            $c->stash->{hosted_links} = $self->get_internal_links($c, 'Hosted_link', $site_name);
+            
+            # Populate admin links and pages only for admin users
+            if ($is_admin) {
+                $c->stash->{admin_pages} = $self->get_admin_pages($c, $site_name);
+                $c->stash->{admin_links} = $self->get_admin_links($c, $site_name);
+            }
+            
+            # Populate private links for logged-in users
+            if ($c->user_exists && $c->session->{username}) {
+                $c->stash->{private_links} = $self->get_private_links($c, $c->session->{username}, $site_name);
+            }
+            
+            # Cache the navigation data
+            $c->session->{$nav_cache_key} = {
+                member_links => $c->stash->{member_links},
+                member_pages => $c->stash->{member_pages},
+                main_links => $c->stash->{main_links},
+                main_pages => $c->stash->{main_pages},
+                hosted_links => $c->stash->{hosted_links},
+                admin_pages => $c->stash->{admin_pages},
+                admin_links => $c->stash->{admin_links},
+                private_links => $c->stash->{private_links},
+            };
+            $c->session->{"${nav_cache_key}_time"} = time();
+            
+            $c->log->debug("Cached fresh navigation data");
         }
         
         $c->log->debug("Navigation data populated successfully");

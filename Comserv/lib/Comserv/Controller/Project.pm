@@ -343,7 +343,7 @@ sub fetch_projects_with_subprojects :Private {
             {
                 order_by => { -asc => 'name' }
             }
-        )->all;
+        );
     };
 
     if ($@) {
@@ -380,7 +380,7 @@ sub fetch_projects_with_subprojects :Private {
             @level1_subprojects = $schema->safe_search($c, 'Project',
                 { parent_id => $project->id },
                 { order_by => { -asc => 'name' } }
-            )->all;
+            );
         };
 
         if ($@) {
