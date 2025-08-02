@@ -1,0 +1,161 @@
+[% META title = 'JSON Handling Guidelines' %]
+[% PageVersion = 'Documentation/developer/json_handling_guidelines.tt,v 0.01 2025/07/26 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="documentation-content">
+    <h1>JSON Handling Guidelines</h1>
+    
+    <div class="alert alert-danger">
+        <h4>⚠️ CRITICAL WARNING</h4>
+        <p>Improper JSON handling can break existing functionality. Always follow these guidelines when working with JSON data in the Comserv application.</p>
+    </div>
+
+    <h2>Common JSON Parsing Issues</h2>
+    
+    <h3>1. Schema Comparison System Failure (July 2025)</h3>
+    <div class="alert alert-warning">
+        <h4>Root Cause</h4>
+        <p>JSON configuration management changes introduced JSON serialization without proper deserialization in the data flow chain, causing the error:</p>
+        <code>Can't use string ("{"success":1,"databases":{"DBEnc"...) as a HASH ref while "strict refs" in use</code>
+        
+        <h4>Solution Applied</h4>
+        <p>Added proper JSON parsing validation in <code>get_database_comparison</code> method in Admin.pm:</p>
+        <pre><code># CRITICAL FIX: Ensure backend_info is a hash reference, not a JSON string
+if (!ref($backend_info)) {
+    # If it's a JSON string, decode it
+    try {
+        $backend_info = decode_json($backend_info);
+    } catch {
+        # Log error and skip problematic backend
+        next;
+    };
+}</code></pre>
+    </div>
+
+    <h2>JSON Handling Best Practices</h2>
+
+    <h3>1. Always Validate Data Types</h3>
+    <ul>
+        <li>Use <code>ref()</code> to check if data is already a reference</li>
+        <li>Use <code>ref($data) eq 'HASH'</code> to ensure hash reference</li>
+        <li>Use <code>ref($data) eq 'ARRAY'</code> to ensure array reference</li>
+    </ul>
+
+    <h3>2. Proper JSON Decoding Pattern</h3>
+    <pre><code>use JSON qw(decode_json encode_json);
+use Try::Tiny;
+
+# Safe JSON decoding with validation
+my $data;
+if (!ref($input_data)) {
+    try {
+        $data = decode_json($input_data);
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'method_name',
+            "JSON decode error: $_");
+        return; # or handle error appropriately
+    };
+} else {
+    $data = $input_data; # Already a reference
+}
+
+# Validate the decoded data
+unless (ref($data) eq 'HASH') {
+    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'method_name',
+        "Expected hash reference, got: " . ref($data));
+    return;
+}</code></pre>
+
+    <h3>3. Web Endpoint vs Internal Method Distinction</h3>
+    <div class="alert alert-info">
+        <h4>Critical Rule</h4>
+        <p>Methods that serve as web endpoints (return JSON via <code>$c->response->body()</code>) should NOT be called internally by other methods that expect hash references.</p>
+        
+        <h4>Solution Patterns</h4>
+        <ul>
+            <li><strong>Separate Logic:</strong> Extract business logic into private methods that return hash references</li>
+            <li><strong>Dual Methods:</strong> Create both internal (returns hash) and web endpoint (returns JSON) versions</li>
+            <li><strong>Conditional Return:</strong> Check context and return appropriate format</li>
+        </ul>
+    </div>
+
+    <h3>4. Configuration Management</h3>
+    <ul>
+        <li>Always validate JSON configuration files after loading</li>
+        <li>Use consistent error handling for malformed JSON</li>
+        <li>Log detailed error messages for debugging</li>
+        <li>Provide fallback mechanisms for critical configurations</li>
+    </ul>
+
+    <h2>Testing JSON Handling</h2>
+
+    <h3>Unit Test Requirements</h3>
+    <ul>
+        <li>Test with valid JSON strings</li>
+        <li>Test with malformed JSON</li>
+        <li>Test with already-decoded hash references</li>
+        <li>Test with unexpected data types</li>
+    </ul>
+
+    <h3>Integration Testing</h3>
+    <ul>
+        <li>Test full data flow from configuration loading to usage</li>
+        <li>Monitor application logs during testing</li>
+        <li>Test schema comparison functionality after JSON changes</li>
+    </ul>
+
+    <h2>Debugging JSON Issues</h2>
+
+    <h3>Log Analysis</h3>
+    <ol>
+        <li>Check <code>/home/shanta/PycharmProjects/comserv2/Comserv/logs/application.log</code></li>
+        <li>Look for "Can't use string" errors</li>
+        <li>Trace the data flow from source to error point</li>
+        <li>Enable debug mode for detailed output</li>
+    </ol>
+
+    <h3>Common Error Patterns</h3>
+    <ul>
+        <li><code>Can't use string (...) as a HASH ref</code> - JSON string treated as hash</li>
+        <li><code>Can't use string (...) as an ARRAY ref</code> - JSON string treated as array</li>
+        <li><code>malformed JSON string</code> - Invalid JSON syntax</li>
+    </ul>
+
+    <h2>Prevention Checklist</h2>
+
+    <div class="alert alert-success">
+        <h4>Before Making JSON-Related Changes</h4>
+        <ul>
+            <li>✅ Identify all code paths that use the data</li>
+            <li>✅ Ensure proper encoding/decoding at boundaries</li>
+            <li>✅ Add validation for data types</li>
+            <li>✅ Test schema comparison functionality</li>
+            <li>✅ Monitor logs during testing</li>
+            <li>✅ Update documentation with changes</li>
+        </ul>
+    </div>
+
+    <h2>Related Files</h2>
+    <ul>
+        <li><code>Comserv/lib/Comserv/Controller/Admin.pm</code> - Schema comparison methods</li>
+        <li><code>Comserv/lib/Comserv/Model/HybridDB.pm</code> - Backend configuration management</li>
+        <li><code>Comserv/lib/Comserv/Controller/DatabaseMode.pm</code> - Database mode configuration</li>
+        <li><code>Comserv/config/db_config.json</code> - Database configuration file</li>
+    </ul>
+
+    <h2>Emergency Recovery</h2>
+    <p>If JSON parsing issues break critical functionality:</p>
+    <ol>
+        <li>Check recent commits for JSON-related changes</li>
+        <li>Revert problematic commits if necessary</li>
+        <li>Apply proper JSON parsing fixes</li>
+        <li>Test thoroughly before deployment</li>
+    </ol>
+
+    <div class="alert alert-info">
+        <h4>Document History</h4>
+        <p>Created: July 26, 2025 - Response to schema comparison system failure caused by JSON configuration management changes (commits ba2054c, 50fb88e)</p>
+    </div>
+</div>

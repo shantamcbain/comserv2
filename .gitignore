@@ -5137,3 +5137,8 @@ logs/*
 local/*
 root/static/config/*
 *.log
+.zencoder.
+.zencoder/
+.zencoder*
+.zen-rules/
+.idea/
