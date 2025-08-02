@@ -2298,6 +2298,26 @@ sub get_database_comparison {
     foreach my $backend_name (sort keys %$available_backends) {
         my $backend_info = $available_backends->{$backend_name};
         
+        # CRITICAL FIX: Ensure backend_info is a hash reference, not a JSON string
+        if (!ref($backend_info)) {
+            # If it's a JSON string, decode it
+            try {
+                $backend_info = decode_json($backend_info);
+            } catch {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_database_comparison',
+                    "Error decoding JSON for backend '$backend_name': $_");
+                # Skip this backend if JSON parsing fails
+                next;
+            };
+        }
+        
+        # Ensure backend_info is still a hash reference after potential JSON decoding
+        unless (ref($backend_info) eq 'HASH') {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_database_comparison',
+                "Backend info for '$backend_name' is not a hash reference: " . ref($backend_info));
+            next;
+        }
+        
         $comparison->{backends}->{$backend_name} = {
             name => $backend_name,
             display_name => $backend_info->{config}->{description} || $backend_name,

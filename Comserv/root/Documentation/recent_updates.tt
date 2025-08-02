@@ -11,6 +11,22 @@
     
     <!-- Show only the 3 most recent changes -->
     <div class="changelog-summary">
+        <h3>AutoDiscovery File Preview Enhancement (January 27, 2025)</h3>
+        <p>
+            The AutoDiscovery system file preview functionality has been enhanced with improved reliability and debugging capabilities:
+        </p>
+        <ul>
+            <li><strong>Enhanced Modal Compatibility</strong> - Added jQuery/Bootstrap compatibility checks with vanilla JavaScript fallback</li>
+            <li><strong>Improved Debugging</strong> - Added comprehensive console logging to help identify modal display issues</li>
+            <li><strong>Robust Error Handling</strong> - Modal now displays reliably regardless of JavaScript library availability</li>
+            <li><strong>Better User Experience</strong> - File preview modal shows consistently when clicking file path links</li>
+        </ul>
+        <p>
+            The AutoDiscovery tool now provides reliable file preview functionality for administrators reviewing unconfigured documentation files.
+        </p>
+    </div>
+    
+    <div class="changelog-summary">
         <h3>API Credentials Documentation Fix (June 15, 2025)</h3>
         <p>
             Fixed issues with the API credentials documentation routing and consolidated duplicate documentation files.

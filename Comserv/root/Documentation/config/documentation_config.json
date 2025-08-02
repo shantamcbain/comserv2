@@ -1,214 +1,477 @@
 {
-  "categories": {
-    "user_guides": {
-      "title": "User Guides",
-      "description": "Documentation for end users of the system",
-      "icon": "fas fa-users",
-      "roles": ["normal", "editor", "admin", "developer"],
-      "site_specific": false,
-      "display_order": 1
-    },
-    "admin_guides": {
-      "title": "Administrator Guides",
-      "description": "Documentation for system administrators",
-      "icon": "fas fa-shield-alt",
-      "roles": ["admin", "developer"],
-      "site_specific": false,
-      "display_order": 2
-    },
-    "developer_guides": {
-      "title": "Developer Documentation",
-      "description": "Documentation for developers",
-      "icon": "fas fa-code",
-      "roles": ["developer"],
-      "site_specific": false,
-      "display_order": 3
-    },
-    "tutorials": {
-      "title": "Tutorials",
-      "description": "Step-by-step guides for common tasks",
-      "icon": "fas fa-graduation-cap",
-      "roles": ["normal", "editor", "admin", "developer"],
-      "site_specific": false,
-      "display_order": 4
-    },
-    "site_specific": {
-      "title": "Site-Specific Documentation",
-      "description": "Documentation specific to this site",
-      "icon": "fas fa-building",
-      "roles": ["normal", "editor", "admin", "developer"],
-      "site_specific": true,
-      "display_order": 5
-    },
-    "modules": {
-      "title": "Module Documentation",
-      "description": "Documentation for specific system modules",
-      "icon": "fas fa-puzzle-piece",
-      "roles": ["admin", "developer"],
-      "site_specific": false,
-      "display_order": 6
-    }
-  },
-  "pages": [
-    {
-      "id": "user_guide",
-      "title": "User Guide",
-      "description": "Complete guide for using the system",
-      "path": "Documentation/roles/normal/user_guide.tt",
-      "categories": ["user_guides"],
-      "roles": ["normal", "editor", "admin", "developer"],
-      "site": "all",
-      "format": "template"
-    },
-    {
-      "id": "getting_started",
-      "title": "Getting Started",
-      "description": "Quick start guide for new users",
-      "path": "Documentation/roles/normal/getting_started.tt",
-      "categories": ["user_guides", "tutorials"],
-      "roles": ["normal", "editor", "admin", "developer"],
-      "site": "all",
-      "format": "template"
-    },
-    {
-      "id": "account_management",
-      "title": "Account Management",
-      "description": "How to manage your account settings",
-      "path": "Documentation/roles/normal/account_management.tt",
-      "categories": ["user_guides"],
-      "roles": ["normal", "editor", "admin", "developer"],
-      "site": "all",
-      "format": "template"
-    },
-    {
-      "id": "admin_guide",
-      "title": "Administrator Guide",
-      "description": "Complete guide for system administrators",
-      "path": "Documentation/roles/admin/admin_guide.tt",
-      "categories": ["admin_guides"],
-      "roles": ["admin", "developer"],
-      "site": "all",
-      "format": "template"
-    },
-    {
-      "id": "installation",
-      "title": "Installation Guide",
-      "description": "How to install and configure the system",
-      "path": "Documentation/roles/admin/installation.tt",
-      "categories": ["admin_guides"],
-      "roles": ["admin", "developer"],
-      "site": "all",
-      "format": "template"
-    },
-    {
-      "id": "api_reference",
-      "title": "API Reference",
-      "description": "Complete API documentation for developers",
-      "path": "Documentation/roles/developer/api_reference.tt",
-      "categories": ["developer_guides"],
-      "roles": ["developer"],
-      "site": "all",
-      "format": "template"
-    },
-    {
-      "id": "database_schema",
-      "title": "Database Schema",
-      "description": "Database structure and relationships",
-      "path": "Documentation/roles/developer/database_schema.tt",
-      "categories": ["developer_guides"],
-      "roles": ["developer"],
-      "site": "all",
-      "format": "template"
-    },
-    {
-      "id": "login_authentication",
-      "title": "Login and Authentication",
-      "description": "How to log in and manage authentication",
-      "path": "Documentation/tutorials/login_authentication.tt",
-      "categories": ["tutorials"],
-      "roles": ["normal", "editor", "admin", "developer"],
-      "site": "all",
-      "format": "template"
-    },
-    {
-      "id": "mcoop_user_guide",
-      "title": "MCOOP User Guide",
-      "description": "User guide specific to MCOOP site",
-      "path": "Documentation/sites/mcoop/mcoop_user_guide.tt",
-      "categories": ["user_guides", "site_specific"],
-      "roles": ["normal", "editor", "admin", "developer"],
-      "site": "MCOOP",
-      "format": "template"
-    },
-    {
-      "id": "mcoop_getting_started",
-      "title": "Getting Started with MCOOP",
-      "description": "Quick start guide for MCOOP users",
-      "path": "Documentation/tutorials/mcoop_getting_started.tt",
-      "categories": ["tutorials", "site_specific"],
-      "roles": ["normal", "editor", "admin", "developer"],
-      "site": "MCOOP",
-      "format": "template"
-    },
-    {
-      "id": "documentation_system",
-      "title": "Documentation System",
-      "description": "How the documentation system works",
-      "path": "Documentation/documentation_system.tt",
-      "categories": ["developer_guides", "modules"],
-      "roles": ["developer"],
-      "site": "all",
-      "format": "template"
-    },
-    {
-      "id": "user_module",
-      "title": "User Module",
-      "description": "Documentation for the User module",
-      "path": "Documentation/modules/user_module.tt",
-      "categories": ["modules"],
-      "roles": ["admin", "developer"],
-      "site": "all",
-      "format": "template"
-    },
-    {
-      "id": "todo_system",
-      "title": "Todo System Overview",
-      "description": "Complete Todo system documentation",
-      "path": "Documentation/Todo.tt",
-      "categories": ["modules"],
-      "roles": ["admin", "developer"],
-      "site": "all",
-      "format": "template"
-    },
-    {
-      "id": "todo_user_guide",
-      "title": "Todo User Guide",
-      "description": "How to use the Todo system effectively",
-      "path": "Documentation/roles/normal/todo_user_guide.tt",
-      "categories": ["user_guides", "tutorials"],
-      "roles": ["normal", "editor", "admin", "developer"],
-      "site": "all",
-      "format": "template"
-    },
-    {
-      "id": "todo_admin_guide",
-      "title": "Todo Administrator Guide",
-      "description": "Administrative guide for Todo system management",
-      "path": "Documentation/roles/admin/todo_admin_guide.tt",
-      "categories": ["admin_guides"],
-      "roles": ["admin", "developer"],
-      "site": "all",
-      "format": "template"
-    },
-    {
-      "id": "todo_developer_guide",
-      "title": "Todo Developer Guide",
-      "description": "Technical documentation for Todo system development",
-      "path": "Documentation/roles/developer/todo_developer_guide.tt",
-      "categories": ["developer_guides", "modules"],
-      "roles": ["developer"],
-      "site": "all",
-      "format": "template"
-    }
-  ]
+   "pages" : [
+      {
+         "site" : "all",
+         "roles" : [
+            "normal",
+            "editor",
+            "admin",
+            "developer"
+         ],
+         "title" : "User Guide",
+         "format" : "template",
+         "categories" : [
+            "user_guides"
+         ],
+         "description" : "Complete guide for using the system",
+         "path" : "Documentation/roles/normal/user_guide.tt",
+         "id" : "user_guide"
+      },
+      {
+         "site" : "all",
+         "format" : "template",
+         "categories" : [
+            "user_guides",
+            "tutorials"
+         ],
+         "description" : "Quick start guide for new users",
+         "id" : "getting_started",
+         "path" : "Documentation/roles/normal/getting_started.tt",
+         "title" : "Getting Started",
+         "roles" : [
+            "normal",
+            "editor",
+            "admin",
+            "developer"
+         ]
+      },
+      {
+         "title" : "Account Management",
+         "roles" : [
+            "normal",
+            "editor",
+            "admin",
+            "developer"
+         ],
+         "description" : "How to manage your account settings",
+         "id" : "account_management",
+         "path" : "Documentation/roles/normal/account_management.tt",
+         "format" : "template",
+         "categories" : [
+            "user_guides"
+         ],
+         "site" : "all"
+      },
+      {
+         "title" : "Administrator Guide",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "id" : "admin_guide",
+         "path" : "Documentation/roles/admin/admin_guide.tt",
+         "description" : "Complete guide for system administrators",
+         "categories" : [
+            "admin_guides"
+         ],
+         "format" : "template",
+         "site" : "all"
+      },
+      {
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "title" : "Installation Guide",
+         "format" : "template",
+         "categories" : [
+            "admin_guides"
+         ],
+         "description" : "How to install and configure the system",
+         "path" : "Documentation/roles/admin/installation.tt",
+         "id" : "installation",
+         "site" : "all"
+      },
+      {
+         "site" : "all",
+         "format" : "template",
+         "categories" : [
+            "developer_guides"
+         ],
+         "description" : "Complete API documentation for developers",
+         "id" : "api_reference",
+         "path" : "Documentation/roles/developer/api_reference.tt",
+         "title" : "API Reference",
+         "roles" : [
+            "developer"
+         ]
+      },
+      {
+         "site" : "all",
+         "id" : "database_schema",
+         "path" : "Documentation/roles/developer/database_schema.tt",
+         "description" : "Database structure and relationships",
+         "categories" : [
+            "developer_guides"
+         ],
+         "format" : "template",
+         "roles" : [
+            "developer"
+         ],
+         "title" : "Database Schema"
+      },
+      {
+         "id" : "login_authentication",
+         "path" : "Documentation/tutorials/login_authentication.tt",
+         "description" : "How to log in and manage authentication",
+         "categories" : [
+            "tutorials"
+         ],
+         "format" : "template",
+         "title" : "Login and Authentication",
+         "roles" : [
+            "normal",
+            "editor",
+            "admin",
+            "developer"
+         ],
+         "site" : "all"
+      },
+      {
+         "site" : "MCOOP",
+         "roles" : [
+            "normal",
+            "editor",
+            "admin",
+            "developer"
+         ],
+         "title" : "MCOOP User Guide",
+         "path" : "Documentation/sites/mcoop/mcoop_user_guide.tt",
+         "id" : "mcoop_user_guide",
+         "description" : "User guide specific to MCOOP site",
+         "categories" : [
+            "user_guides",
+            "site_specific"
+         ],
+         "format" : "template"
+      },
+      {
+         "description" : "Quick start guide for MCOOP users",
+         "path" : "Documentation/tutorials/mcoop_getting_started.tt",
+         "id" : "mcoop_getting_started",
+         "format" : "template",
+         "categories" : [
+            "tutorials",
+            "site_specific"
+         ],
+         "roles" : [
+            "normal",
+            "editor",
+            "admin",
+            "developer"
+         ],
+         "title" : "Getting Started with MCOOP",
+         "site" : "MCOOP"
+      },
+      {
+         "site" : "all",
+         "categories" : [
+            "developer_guides",
+            "modules"
+         ],
+         "format" : "template",
+         "id" : "documentation_system",
+         "path" : "Documentation/documentation_system.tt",
+         "description" : "How the documentation system works",
+         "title" : "Documentation System",
+         "roles" : [
+            "developer"
+         ]
+      },
+      {
+         "site" : "all",
+         "description" : "Documentation for the User module",
+         "path" : "Documentation/modules/user_module.tt",
+         "id" : "user_module",
+         "format" : "template",
+         "categories" : [
+            "modules"
+         ],
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "title" : "User Module"
+      },
+      {
+         "format" : "template",
+         "categories" : [
+            "modules"
+         ],
+         "description" : "Complete Todo system documentation",
+         "path" : "Documentation/Todo.tt",
+         "id" : "todo_system",
+         "site" : "all",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "title" : "Todo System Overview"
+      },
+      {
+         "title" : "Todo User Guide",
+         "roles" : [
+            "normal",
+            "editor",
+            "admin",
+            "developer"
+         ],
+         "description" : "How to use the Todo system effectively",
+         "path" : "Documentation/roles/normal/todo_user_guide.tt",
+         "id" : "todo_user_guide",
+         "format" : "template",
+         "categories" : [
+            "user_guides",
+            "tutorials"
+         ],
+         "site" : "all"
+      },
+      {
+         "site" : "all",
+         "title" : "Todo Administrator Guide",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "categories" : [
+            "admin_guides"
+         ],
+         "format" : "template",
+         "id" : "todo_admin_guide",
+         "path" : "Documentation/roles/admin/todo_admin_guide.tt",
+         "description" : "Administrative guide for Todo system management"
+      },
+      {
+         "roles" : [
+            "developer",
+            "admin"
+         ],
+         "title" : "Inventory and Accounting System Implementation Guideline",
+         "site" : "all",
+         "id" : "inventory_accounting_system_guideline",
+         "path" : "Documentation/developer/inventory-accounting-system-guideline.tt",
+         "description" : "Guide development team to implement hybrid inventory/accounting system with LedgerSMB + Catalyst integration",
+         "categories" : [
+            "developer_guides"
+         ],
+         "format" : "template"
+      },
+      {
+         "title" : "Todo Developer Guide",
+         "roles" : [
+            "developer"
+         ],
+         "categories" : [
+            "developer_guides",
+            "modules"
+         ],
+         "format" : "template",
+         "path" : "Documentation/roles/developer/todo_developer_guide.tt",
+         "id" : "todo_developer_guide",
+         "description" : "Technical documentation for Todo system development",
+         "site" : "all"
+      },
+      {
+         "site" : "all",
+         "path" : "Documentation/DBIDocument.tt",
+         "id" : "dbidocument",
+         "description" : "Documentation for DBIDocument",
+         "categories" : [
+            "user_guides"
+         ],
+         "format" : "template",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "title" : "DBIDocument"
+      },
+      {
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "title" : "RestartStarman",
+         "format" : "template",
+         "categories" : [
+            "user_guides"
+         ],
+         "description" : "Documentation for RestartStarman",
+         "id" : "restartstarman",
+         "path" : "Documentation/RestartStarman.tt",
+         "site" : "all"
+      },
+      {
+         "categories" : [
+            "user_guides"
+         ],
+         "format" : "template",
+         "id" : "markdown_viewer",
+         "path" : "Documentation/markdown_viewer.tt",
+         "description" : "Documentation for Markdown Viewer",
+         "site" : "all",
+         "title" : "Markdown Viewer",
+         "roles" : [
+            "developer"
+         ]
+      },
+      {
+         "format" : "template",
+         "categories" : [
+            "user_guides"
+         ],
+         "description" : "Documentation for DocumentManagement",
+         "id" : "documentmanagement",
+         "path" : "Documentation/DocumentManagement.tt",
+         "title" : "DocumentManagement",
+         "roles" : [
+            "editor",
+            "admin"
+         ],
+         "site" : "all"
+      },
+      {
+         "site" : "all",
+         "path" : "Documentation/documentation_workflow.tt",
+         "id" : "documentation_workflow",
+         "description" : "Documentation for Documentation Workflow",
+         "categories" : [
+            "user_guides"
+         ],
+         "format" : "template",
+         "roles" : [
+            "editor",
+            "admin",
+            "developer"
+         ],
+         "title" : "Documentation Workflow"
+      },
+      {
+         "format" : "template",
+         "categories" : [
+            "user_guides"
+         ],
+         "description" : "Documentation for Overview",
+         "id" : "overview",
+         "path" : "Documentation/Overview.tt",
+         "roles" : [
+            "normal"
+         ],
+         "title" : "Overview",
+         "site" : "all"
+      }
+   ],
+   "categories" : {
+      "modules" : {
+         "description" : "Documentation for specific system modules",
+         "display_order" : "6",
+         "pages" : [
+            "documentation_system",
+            "todo_developer_guide",
+            "todo_system",
+            "user_module"
+         ],
+         "title" : "Module Documentation",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "icon" : "fas fa-puzzle-piece",
+         "site_specific" : false
+      },
+      "admin_guides" : {
+         "icon" : "fas fa-shield-alt",
+         "description" : "Documentation for system administrators",
+         "display_order" : "2",
+         "pages" : [
+            "admin_guide",
+            "installation",
+            "todo_admin_guide"
+         ],
+         "site_specific" : false,
+         "title" : "Administrator Guides",
+         "roles" : [
+            "admin",
+            "developer"
+         ]
+      },
+      "user_guides" : {
+         "display_order" : "1",
+         "description" : "Documentation for end users of the system",
+         "icon" : "fas fa-users",
+         "title" : "User Guides",
+         "roles" : [
+            "normal",
+            "editor",
+            "admin",
+            "developer"
+         ],
+         "site_specific" : false,
+         "pages" : [
+            "account_management",
+            "dbidocument",
+            "documentation_workflow",
+            "documentmanagement",
+            "getting_started",
+            "markdown_viewer",
+            "mcoop_user_guide",
+            "restartstarman",
+            "todo_user_guide",
+            "user_guide"
+         ]
+      },
+      "developer_guides" : {
+         "site_specific" : false,
+         "icon" : "fas fa-code",
+         "pages" : [
+            "api_reference",
+            "database_schema",
+            "documentation_system",
+            "inventory_accounting_system_guideline",
+            "todo_developer_guide"
+         ],
+         "title" : "Developer Documentation",
+         "roles" : [
+            "developer"
+         ],
+         "description" : "Documentation for developers",
+         "display_order" : "3"
+      },
+      "site_specific" : {
+         "site_specific" : true,
+         "pages" : [
+            "mcoop_getting_started",
+            "mcoop_user_guide"
+         ],
+         "title" : "Site-Specific Documentation",
+         "roles" : [
+            "normal",
+            "editor",
+            "admin",
+            "developer"
+         ],
+         "icon" : "fas fa-building",
+         "display_order" : "5",
+         "description" : "Documentation specific to this site"
+      },
+      "tutorials" : {
+         "icon" : "fas fa-graduation-cap",
+         "description" : "Step-by-step guides for common tasks",
+         "display_order" : "4",
+         "pages" : [
+            "getting_started",
+            "mcoop_getting_started",
+            "login_authentication",
+            "todo_user_guide"
+         ],
+         "site_specific" : false,
+         "roles" : [
+            "normal",
+            "editor",
+            "admin",
+            "developer"
+         ],
+         "title" : "Tutorials"
+      }
+   }
 }

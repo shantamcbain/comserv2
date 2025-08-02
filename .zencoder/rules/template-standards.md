@@ -42,3 +42,12 @@ When working with navigation templates:
 2. **Check Directory:** Look at existing directory structure in target location
 3. **Ask User:** If multiple similar files exist, ask which should be updated
 4. **Update Existing:** Improve existing files rather than creating duplicates
+
+## Documentation Configuration Management - CRITICAL
+When adding new documentation files (.tt):
+- **ALWAYS update:** `/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/config/documentation_config.json`
+- **NEVER update:** `/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/documentation_config.json` (legacy file)
+- **Required fields:** id, title, description, path, categories, roles, site, format
+- **Format:** "template" for .tt files, "markdown" for .md files
+- **Categories:** Use existing categories: user_guides, admin_guides, developer_guides, tutorials, modules, controllers, models, changelog, proxmox, documentation, templates
+- **Roles:** ["developer", "admin"] for technical docs, ["normal", "editor", "admin", "developer"] for user docs

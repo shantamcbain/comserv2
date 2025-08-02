@@ -148,6 +148,13 @@
                         <li><a href="[% c.uri_for('/Documentation/view/architecture') %]">System Architecture</a></li>
                     </ul>
                 </div>
+                <div class="admin-card">
+                    <h4><i class="fas fa-cogs"></i>Documentation Management</h4>
+                    <ul>
+                        <li><a href="[% c.uri_for('/Documentation/AutoDiscovery') %]"><i class="fas fa-search"></i> Auto-Discovery Tool</a></li>
+                        <li><span class="text-muted">Scan for unconfigured documentation files</span></li>
+                    </ul>
+                </div>
             </div>
         </div>
     </div>
