@@ -1,7 +1,12 @@
-[% PageVersion = 'Navigation/navigation.tt,v 0.01 2025/07/07 shanta Exp shanta ' %]
+[% META title = 'Main Navigation Menu' %]
+[% PageVersion = 'Navigation/navigation.tt,v 1.1 2025/01/28 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     <!-- [% PageVersion %] -->
+    <!-- Using cached navigation system for improved performance -->
 [% END %]
+
+[%# Get cached navigation data using the new caching system %]
+[% cached_nav = c.controller('Navigation').get_navigation(c) %]
 
 <!-- Main Navigation Menu -->
 <nav class="main-navigation">
@@ -28,7 +33,8 @@
         [% INCLUDE 'Navigation/TopDropListIT.tt' %]
         
         <!-- Admin Menu (only for admin users) -->
-        [% IF c.session.roles.grep('admin').size %]
+        [% user_roles = c.controller('Navigation').get_user_roles(c) %]
+        [% IF user_roles.grep('admin').size || cached_nav.admin_menu.defined %]
             [% INCLUDE 'Navigation/admintopmenu.tt' %]
         [% END %]
         
@@ -47,7 +53,50 @@
             </li>
         [% END %]
         
+        <!-- Manager Menu (role-specific) -->
+        [% IF user_roles.grep('manager').size || cached_nav.manager_menu.defined %]
+            <li class="horizontal-dropdown">
+                <a href="#" class="dropbtn"><i class="icon-manager"></i>Manager</a>
+                <div class="dropdown-content">
+                    [% IF cached_nav.manager_menu.defined %]
+                        [% FOREACH link IN cached_nav.manager_menu %]
+                            <a href="[% link.url %]" target="[% link.target %]" title="[% link.name %]">
+                                <i class="icon-link"></i> [% link.name %]
+                            </a>
+                        [% END %]
+                    [% END %]
+                </div>
+            </li>
+        [% END %]
+        
+        <!-- Editor Menu (role-specific) -->
+        [% IF user_roles.grep('editor').size || cached_nav.editor_menu.defined %]
+            <li class="horizontal-dropdown">
+                <a href="#" class="dropbtn"><i class="icon-editor"></i>Editor</a>
+                <div class="dropdown-content">
+                    [% IF cached_nav.editor_menu.defined %]
+                        [% FOREACH link IN cached_nav.editor_menu %]
+                            <a href="[% link.url %]" target="[% link.target %]" title="[% link.name %]">
+                                <i class="icon-link"></i> [% link.name %]
+                            </a>
+                        [% END %]
+                    [% END %]
+                </div>
+            </li>
+        [% END %]
+        
         <!-- Coop Menu -->
         [% INCLUDE 'Navigation/TopDropListCoop.tt' %]
     </ul>
 </nav>
+
+[%# Debug information for cached navigation (only in debug mode) %]
+[% IF c.session.debug_mode == 1 %]
+    <!-- Navigation Cache Debug Info -->
+    <!-- User Roles: [% user_roles.join(', ') %] -->
+    <!-- Cache Key: [% c.controller('Navigation').create_cache_key(c) %] -->
+    <!-- Admin Menu Items: [% cached_nav.admin_menu.size || 0 %] -->
+    <!-- Manager Menu Items: [% cached_nav.manager_menu.size || 0 %] -->
+    <!-- Editor Menu Items: [% cached_nav.editor_menu.size || 0 %] -->
+    <!-- Private Links: [% cached_nav.private_links.size || 0 %] -->
+[% END %]

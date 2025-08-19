@@ -1,0 +1,67 @@
+{
+    "checksum": "4ba292e9c93386e95507627a54e6fae1e7b936530054a9c843862d66e9d15046",
+    "data": {
+    "id": "a4f4f7fa-4cd1-4cee-a49d-ca9b2e21f07b",
+    "createdAt": 1752132184934,
+    "updatedAt": 1752132833686,
+    "title": "please rewrite db_config.json to be complient t...",
+    "messages": [
+        {
+            "id": "d690b4bb-6a57-4f66-916d-7cbb947eb4a9",
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "please rewrite db_config.json to be complient to the new format created by the new offline mode"
+                }
+            ],
+            "context": {
+                "currentFile": {
+                    "path": "Comserv/db_config.json",
+                    "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/db_config.json",
+                    "sources": [
+                        "opened_tab"
+                    ],
+                    "content": "{\n    \"shanta_ency\": {\n\n        \"host\": \"localhost\",\n        \"port\": 3306,\n        \"username\": \"shanta_forager\",\n            \"password\": \"UA=nPF8*m+T#\",\n        \"database\": \"ency\"\n    },\n    \"shanta_forager\": {\n        \"host\": \"localhost\",\n        \"port\": 3306,\n        \"username\": \"shanta_forager\",\n        \"password\": \"UA=nPF8*m+T#\",\n        \"database\": \"shanta_forager\"\n    }\n}\n",
+                    "language": "json"
+                },
+                "codebaseEnabled": true
+            },
+            "createdAt": 1752132184954,
+            "isInternal": false,
+            "rawContent": {
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "please rewrite db_config.json to be complient to the new format created by the new offline mode"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "b4d9c5a4-af14-4bf2-a2d8-f23fa136a46f",
+            "role": "system",
+            "content": [
+                {
+                    "type": "errorText",
+                    "text": "Could not establish websocket connection. Please try again later.",
+                    "allowRegenerate": true
+                }
+            ],
+            "createdAt": 1752132833686,
+            "isInternal": false
+        }
+    ],
+    "isAgent": true,
+    "isCustomAgent": false,
+    "isUnitTestsAgent": false,
+    "isE2EAgent": false,
+    "autoApply": false
+}
+}

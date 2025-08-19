@@ -1,0 +1,652 @@
+{
+    "checksum": "c9ec9275b00a7384e445880a07b83c01a419755b82e8fe51e33d223e3229b643",
+    "data": {
+    "id": "b2a77340-3fbc-41d5-80f7-ae058bdc35a8",
+    "createdAt": 1753298477784,
+    "updatedAt": 1753299327416,
+    "title": "Code Change Error Resolution",
+    "messages": [
+        {
+            "id": "142bba36-af19-4d3b-ac60-00e72ddbe2b2",
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "you are not returning the code in a format that will apply the chages to the code on the workstaion in +- format so I can see just were in the code change is in the  code and compare it on the left window us what code is being replace if i apply the code though the apply button it changes the code on the hardrive."
+                },
+                {
+                    "type": "text",
+                    "text": "your last code change created this error which crashed the application"
+                },
+                {
+                    "type": "text",
+                    "text": "dules temporarily disabled for development"
+                },
+                {
+                    "type": "text",
+                    "text": "Email functionality may not work correctly."
+                },
+                {
+                    "type": "text",
+                    "text": "Found config file at: /home/shanta/PycharmProjects/comserv2/Comserv/script/../db_config.json at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/DBEncy.pm line 51."
+                },
+                {
+                    "type": "text",
+                    "text": "DBEncy Configuration:"
+                },
+                {
+                    "type": "text",
+                    "text": "Host: 172.30.161.222"
+                },
+                {
+                    "type": "text",
+                    "text": "Database: ency"
+                },
+                {
+                    "type": "text",
+                    "text": "Username: shanta_forager"
+                },
+                {
+                    "type": "text",
+                    "text": "DBForager Configuration:"
+                },
+                {
+                    "type": "text",
+                    "text": "Host: 172.30.161.222"
+                },
+                {
+                    "type": "text",
+                    "text": "Database: shanta_forager"
+                },
+                {
+                    "type": "text",
+                    "text": "Username: shanta_forager"
+                },
+                {
+                    "type": "text",
+                    "text": "Can't locate object method \"__\" via package \"PACKAGE__\" (perhaps you forgot to load \"PACKAGE__\"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/SB.pm line 126."
+                },
+                {
+                    "type": "text",
+                    "text": "Compilation failed in require at /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/Catalyst/Utils.pm line 310."
+                },
+                {
+                    "type": "text",
+                    "text": "Compilation failed in require at /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/Catalyst/Utils.pm line 310."
+                },
+                {
+                    "type": "text",
+                    "text": "^[[1;2A^[[1;2A"
+                }
+            ],
+            "context": {
+                "currentFile": {
+                    "path": "Comserv/lib/Comserv/Controller/SB.pm",
+                    "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/SB.pm",
+                    "sources": [
+                        "opened_tab"
+                    ],
+                    "content": "package Comserv::Controller::ShamanBotanicals;\nuse Moose;\nuse namespace::autoclean;\nuse Comserv::Util::Logging;\n\nBEGIN { extends 'Catalyst::Controller'; }\n\n# Set the namespace for this controller\n__PACKAGE__->config(namespace => 'shamanbotanicals');\n\nhas 'logging' => (\n    is => 'ro',\n    default => sub { Comserv::Util::Logging->instance }\n);\n\nsub auto :Private {\n    my ($self, $c) = @_;\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', \"ShamanBotanicals controller auto method called\");\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', \"Request path: \" . $c->req->uri->path);\n\n    # Check access permissions - SB admin or CSC admin\n    if ($c->user_exists) {\n        my $group = $c->session->{group} || '';\n        my $site = $c->session->{site} || '';\n\n        unless ($group eq 'admin' || $site eq 'SB' || $group eq 'csc_admin') {\n            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',\n                \"Access denied - user group: $group, site: $site\");\n            $c->response->redirect('/login');\n            return 0;\n        }\n    } else {\n        $c->response->redirect('/login');\n        return 0;\n    }\n\n    return 1; # Allow the request to proceed\n}\n\n# Root path for this controller\nsub base :Chained('/') :PathPart('shamanbotanicals') :CaptureArgs(0) {\n    my ($self, $c) = @_;\n    $c->session->{current_site} = \"ShamanBotanicals\";\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'base', \"Base chained method called\");\n}\n\n# Default index page\nsub index :Chained('base') :PathPart('') :Args(0) {\n    my ($self, $c) = @_;\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', \"Index method called\");\n    $c->stash(template => 'shamanbotanicals/index.tt');\n    $c->forward($c->view('TT'));\n}\n\n# Direct access to index for mixed case URL\nsub direct_index :Path('/ShamanBotanicals') :Args(0) {\n    my ($self, $c) = @_;\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'direct_index', \"Direct index method called for mixed case URL\");\n    $c->forward('index');\n}\n\n# Handle product pages\nsub products :Chained('base') :PathPart('products') :Args(1) {\n    my ($self, $c, $product_id) = @_;\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'products', \"Products method called for ID: $product_id\");\n\n    # Normalize the product ID to match template naming\n    my $template_name = $product_id;\n\n    # Check if template exists, otherwise show error\n    if (-e $c->path_to('root', 'shamanbotanicals', 'products', \"$template_name.tt\")) {\n        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'products', \"Template found: shamanbotanicals/products/$template_name.tt\");\n        $c->stash(template => \"shamanbotanicals/products/$template_name.tt\");\n    } else {\n        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'products', \"Template not found: shamanbotanicals/products/$template_name.tt\");\n        $c->stash(\n            template => 'error.tt',\n            error_msg => \"The product page for '$product_id' could not be found. Return to <a href='/shamanbotanicals'>Product List</a>\",\n            status => '404',\n            product_id => $product_id,\n            available_products => $self->_get_available_products($c)\n        );\n        $c->response->status(404);\n    }\n    $c->forward($c->view('TT'));\n}\n\n# Documentation page - accessible by SB admin or CSC admin\nsub documentation :Chained('base') :PathPart('documentation') :Args(0) {\n    my ($self, $c) = @_;\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'documentation', \"Documentation method called\");\n    $c->stash(template => 'shamanbotanicals/documentation.tt');\n    $c->forward($c->view('TT'));\n}\n\n# Catch-all for any other paths\nsub default :Private {\n    my ($self, $c) = @_;\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'default', \"Default method called, forwarding to index\");\n    $c->forward('index');\n}\n\n# Helper method to get available product templates\nsub _get_available_products {\n    my ($self, $c) = @_;\n\n    my @product_files = ();\n    my $products_dir = $c->path_to('root', 'shamanbotanicals', 'products');\n\n    if (-d $products_dir && opendir(my $dh, $products_dir)) {\n        while (my $file = readdir($dh)) {\n            next if $file =~ /^\\./ || $file eq 'index.tt';\n            if ($file =~ /(.+)\\.tt$/) {\n                push @product_files, $1;\n            }\n        }\n        closedir($dh);\n    }\n\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_get_available_products',\n        \"Found \" . scalar(@product_files) . \" product templates\");\n\n    return \\@product_files;\n}\n\n__  PACKAGE__->meta->make_immutable;\n\n1;\n",
+                    "language": "perl5"
+                },
+                "codebaseEnabled": true
+            },
+            "createdAt": 1753298477829,
+            "isInternal": false,
+            "rawContent": {
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "you are not returning the code in a format that will apply the chages to the code on the workstaion in +- format so I can see just were in the code change is in the  code and compare it on the left window us what code is being replace if i apply the code though the apply button it changes the code on the hardrive."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "your last code change created this error which crashed the application"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "dules temporarily disabled for development"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Email functionality may not work correctly."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Found config file at: /home/shanta/PycharmProjects/comserv2/Comserv/script/../db_config.json at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/DBEncy.pm line 51."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "DBEncy Configuration:"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Host: 172.30.161.222"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Database: ency"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Username: shanta_forager"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "DBForager Configuration:"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Host: 172.30.161.222"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Database: shanta_forager"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Username: shanta_forager"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Can't locate object method \"__\" via package \"PACKAGE__\" (perhaps you forgot to load \"PACKAGE__\"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/SB.pm line 126."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Compilation failed in require at /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/Catalyst/Utils.pm line 310."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Compilation failed in require at /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/Catalyst/Utils.pm line 310."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "^[[1;2A^[[1;2A"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph"
+                    }
+                ]
+            },
+            "autoAppliedRules": [
+                {
+                    "name": "User AI Instruction",
+                    "description": "User AI Instruction",
+                    "uri": "zen-rules://user/custom",
+                    "content": "read AI_DEVELOPMENT_GUIDELINES\nall code must be varifed by user"
+                },
+                {
+                    "name": "Repository Information Overview",
+                    "description": "Repository Information Overview",
+                    "uri": "zen-rules://repo/repo",
+                    "content": "\n\n# Comserv Project Information\n\n## Summary\nComserv is a comprehensive web-based system for managing business operations, projects, and documentation. It's built using the Catalyst Perl web framework and provides features for project management, theme customization, and user authentication.\n\n## Structure\n- `Comserv/`: Main application directory containing the core application code\n  - `lib/`: Application code and models\n  - `docs/`: Documentation files\n  - `root/`: Static assets and templates\n  - `script/`: Utility scripts for server management and database operations\n  - `t/`: Test files\n- `app/`: Additional application components\n- `data/`: Data files including pricing information\n- `proxmox/`: Proxmox VE integration components\n\n## Language & Runtime\n**Language**: Perl\n**Version**: 5.x (compatible with Perl 5.40.0)\n**Framework**: Catalyst 5.90130\n**Build System**: Module::Install\n**Package Manager**: CPAN\n\n## Dependencies\n**Main Dependencies**:\n- Catalyst::Runtime (5.90130)\n- Moose\n- DBIx::Class\n- Template (Template Toolkit)\n- JSON/JSON::MaybeXS\n- Log::Log4perl\n- DateTime\n- File::Slurp\n\n**Development Dependencies**:\n- Test::More (0.88+)\n- Test::Pod\n- Test::Pod::Coverage\n- Test::WWW::Mechanize::Catalyst\n- Catalyst::Devel\n\n## Build & Installation\n```bash\ncd Comserv\nperl Makefile.PL\nmake\nmake test\nmake install\n```\n\n## Database\n**Type**: MySQL\n**Setup**: \n```bash\nmysql -u root -p < database_initialization_script.sql\n```\n**Schema Management**: DBIx::Class::Schema::Loader\n\n## Testing\n**Framework**: Test::More\n**Test Location**: Comserv/t/\n**Run Command**:\n```bash\ncd Comserv\nprove -l t/\n```\n\n## Server Execution\n**Development Server**:\n```bash\ncd Comserv\nscript/comserv_server.pl\n```\n**Production Deployment**:\n```bash\ncd Comserv\nscript/comserv_fastcgi.pl\n# or\nstarman --port 5000 --workers 5 comserv.psgi\n```\n\n## Authentication & Authorization\n- Session-based authentication\n- Role-based access control\n- Multiple authentication realms\n- Support for user groups and site-specific permissions\n\n## Features\n- Project management system\n- Theme customization system\n- Email integration\n- PDF generation\n- Proxmox VE integration\n- Multi-site support"
+                },
+                {
+                    "name": "Database Development Standards and Best Practices",
+                    "description": "Database Development Standards and Best Practices",
+                    "uri": "zen-rules://repo/database-standards",
+                    "content": "\n\n# Database Development Standards\n\n## Query Standards\n- **Table Aliases:** Use table aliases in all queries to avoid ambiguity (e.g., 'me.column_name')\n- **Error Handling:** Implement proper error handling with eval blocks and try/catch\n- **Parameterized Queries:** Use parameterized queries to prevent SQL injection\n\n## Schema Management\n- **Naming Conventions:** Follow naming conventions for tables, columns, and relationships\n- **Documentation:** Document schema changes and rationale for future reference\n- **Performance:** Regularly optimize database performance and indexes\n- **Version Control:** Use Git to track schema changes with proper tagging\n- **Backup Protocol:** Always backup database before making schema changes\n\n## Model Standards (DBIx::Class)\n- **Result Classes:** Located in `/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema/Ency/Result/`\n- **Relationships:** Define proper relationships between tables\n- **Validation:** Implement data validation in model classes\n\n## Configuration Priority\n- **Primary:** ZeroTier production server (172.30.161.222) - works from any network\n- **Secondary:** Local network production server (192.168.1.198) - home/office only\n- **Tertiary:** localhost MySQL (development)\n- **Fallback:** SQLite (offline mode)\n\n## Security Protocols\n- **Input Validation:** Validate all user inputs before database operations\n- **Access Controls:** Implement proper access controls based on user roles\n- **Regular Reviews:** Regularly review and update security protocols"
+                },
+                {
+                    "name": "AI Behavior Enforcement Rules for Zencoder",
+                    "description": "AI Behavior Enforcement Rules for Zencoder",
+                    "uri": "zen-rules://repo/ai-behavior-enforcement",
+                    "content": "\n\n# AI Behavior Enforcement Rules\n\n## MANDATORY PROMPT TRACKING\n**CURRENT PROMPT:** This is prompt #[X] of 4 maximum allowed prompts.\n\n### Prompt Counter Protocol\n- **Start Each Response:** Begin every response with current prompt count\n- **Track Internally:** Keep running count throughout conversation\n- **Warn at Prompt 3:** Alert user that next prompt will trigger handoff\n- **Stop at Prompt 4:** Refuse to continue, provide handoff documentation\n\n## MANDATORY APPROVAL WORKFLOW\n\n### Before ANY Code Changes\n1. **STOP:** Do not modify any files without explicit user approval\n2. **PRESENT:** Show exactly what will be changed using the standard format\n3. **WAIT:** Wait for explicit approval (\"yes\", \"approved\", \"apply changes\")\n4. **CONFIRM:** Acknowledge approval before proceeding\n5. **EXECUTE:** Apply changes only after confirmation\n\n### Standard Change Presentation\n```\n🔄 PROPOSED CHANGE TO: [filename]\n📝 CHANGE TYPE: [Addition/Modification/Deletion]\n📋 DESCRIPTION: [what this accomplishes]\n\n❌ CURRENT CODE:\n[existing code or \"N/A\"]\n\n✅ NEW CODE:\n[proposed code or \"DELETED\"]\n\n💡 REASON: [why needed]\n\n⚠️  APPROVAL REQUIRED: Please confirm with \"approved\" or \"yes\"\n🔄 REVERT: Changes can be undone if needed\n```\n\n## VIOLATION CONSEQUENCES\n- **Prompt Limit Exceeded:** Immediate session termination with handoff\n- **Unapproved Changes:** Acknowledge violation and request approval retroactively\n- **Missing Counter:** Add prompt counter to current response\n\n## HANDOFF TEMPLATE (Use on 4th Prompt)\n```\n🚨 PROMPT LIMIT REACHED - HANDOFF REQUIRED\n\n📊 SESSION SUMMARY:\n- Prompts Used: 4/4\n- Files Modified: [list]\n- Tasks Completed: [list]\n- Tasks Remaining: [list]\n\n🔄 HANDOFF PROMPT FOR NEXT AI:\n\"Continue working on [project/task]. Read development-guidelines.md and ai-behavior-enforcement.md first. \nCurrent context: [brief context]\nFiles being worked on: [list]\nNext steps needed: [specific actions]\"\n\n📚 REQUIRED READING FOR NEXT AI:\n- .zencoder/rules/development-guidelines.md\n- .zencoder/rules/ai-behavior-enforcement.md\n- [any other relevant docs]\n\n✅ DOCUMENTATION UPDATED: [what was recorded]\n```\n\n## EMERGENCY PROTOCOLS\n- **User Says \"Stop\":** Immediately cease all activities\n- **User Says \"Revert\":** Provide instructions for undoing changes\n- **User Says \"Handoff\":** Immediately provide handoff documentation"
+                },
+                {
+                    "name": "Template Toolkit Standards and Requirements",
+                    "description": "Template Toolkit Standards and Requirements",
+                    "uri": "zen-rules://repo/template-standards",
+                    "content": "\n\n# Template Toolkit (.tt) Standards\n\n## Required PageVersion Header Format\nAll .tt files must include this exact format:\n```\n[% META title = 'Page Title Here' %]\n[% PageVersion = 'relative/path/filename.tt,v 0.01 YYYY/MM/DD author Exp author ' %]\n[% IF c.session.debug_mode == 1 %]\n    [% PageVersion %]\n[% END %]\n```\n\n## Template Standards\n- **Theme Compliance:** Use theme system variables for styling - NO page-specific CSS\n- **Debug Mode:** Include debug mode blocks for development visibility\n- **Responsive Design:** Implement mobile-first responsive design patterns\n- **HTML Structure:** Use proper semantic HTML structure\n- **Template Toolkit:** Follow Template Toolkit best practices\n\n## Navigation Integration\nWhen working with navigation templates:\n- **Main Navigation:** Include via `/Navigation/navigation.tt`\n- **Admin Menu:** Use `/Navigation/admintopmenu.tt` for admin-only sections\n- **Dropdown Menus:** Reference existing dropdown templates in `/Navigation/` directory\n\n## Documentation File Rules - CRITICAL\n- **File Format:** ONLY `.tt` files for application documentation - NO `.md` files\n- **EXISTING FILES FIRST:** ALWAYS search for and use existing files before creating new ones\n- **Naming Consistency:** Use same file names across AI sessions to prevent content loss\n- **Content Priority:** Always improve existing files rather than creating new ones\n- **Role-Based Access:** Respect existing Documentation/index.tt role-based structure\n- **Directory Consolidation:** Use established directory structure - don't create new directories\n\n## File Creation Protocol\n1. **Search First:** Use file search tools to find existing similar files\n2. **Check Directory:** Look at existing directory structure in target location\n3. **Ask User:** If multiple similar files exist, ask which should be updated\n4. **Update Existing:** Improve existing files rather than creating duplicates"
+                },
+                {
+                    "name": "Debugging and Troubleshooting Protocols",
+                    "description": "Debugging and Troubleshooting Protocols",
+                    "uri": "zen-rules://repo/debugging-protocols",
+                    "content": "\n\n# Debugging Protocols\n\n## Log Analysis Priority\n1. **Application Logs:** Check `/home/shanta/PycharmProjects/comserv2/Comserv/logs/application.log` first\n2. **Error Logs:** Look for recent errors and stack traces\n3. **Debug Mode:** Enable debug mode in session for detailed output\n\n## Common Debugging Steps\n1. **Reproduce Issue:** Ensure issue is reproducible\n2. **Check Recent Changes:** Review recent code modifications\n3. **Verify Dependencies:** Ensure all required modules are installed\n4. **Database Connectivity:** Test database connections\n5. **Permission Issues:** Check file and directory permissions\n\n## Testing Protocol\n- **Unit Tests:** Run relevant unit tests first\n- **Integration Tests:** Test full workflow\n- **Browser Testing:** Always test in actual browser environment\n- **Log Monitoring:** Monitor logs during testing\n\n## Performance Issues\n- **Database Queries:** Check for slow queries\n- **Memory Usage:** Monitor memory consumption\n- **Template Rendering:** Check template compilation times\n- **Network Latency:** Consider network-related delays"
+                }
+            ]
+        },
+        {
+            "id": "2b17ec46-ac0d-4b0b-a858-27dde22995f4",
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "**CURRENT PROMPT:** This is prompt #1 of 4 maximum allowed prompts.\n\nI can see the issue! There's a syntax error on line 126 in the SB.pm file. Looking at the current file, I can see the problem:\n\n```perl\n__  PACKAGE__->meta->make_immutable;\n```\n\nThere's an extra space between the underscores, making it `__  PACKAGE__` instead of `__PACKAGE__`. This is causing Perl to look for a method `__` on a package called `PACKAGE__`, which doesn't exist.\n\n🔄 **PROPOSED CHANGE TO:** /home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/SB.pm\n📝 **CHANGE TYPE:** Modification\n📋 **DESCRIPTION:** Fix syntax error in __PACKAGE__ declaration\n\n❌ **CURRENT CODE:**\n```perl\n__  PACKAGE__->meta->make_immutable;\n```\n\n✅ **NEW CODE:**\n```perl\n__PACKAGE__->meta->make_immutable;\n```\n\n💡 **REASON:** The extra space between underscores is causing a compilation error. `__PACKAGE__` is a Perl special literal that should not have spaces.\n\n⚠️  **APPROVAL REQUIRED:** Please confirm with \"approved\" or \"yes\"\n🔄 **REVERT:** Changes can be undone if needed\n\nThis single character fix should resolve the compilation error and allow your application to start properly."
+                }
+            ],
+            "context": {
+                "author": "Coding Agent",
+                "operationId": "7b4a207a-9427-420d-9949-d1e9e2a999ea"
+            },
+            "createdAt": 1753298479549,
+            "isInternal": false
+        },
+        {
+            "id": "82d69546-aeb9-4b79-84b5-6f49b89beca4",
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "yes but this is not the format asked for. it is not in +- firnate and i cant see in the code were the problem is being addressed"
+                }
+            ],
+            "context": {
+                "currentFile": {
+                    "path": "Comserv/lib/Comserv/Controller/SB.pm",
+                    "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/SB.pm",
+                    "sources": [
+                        "opened_tab"
+                    ],
+                    "content": "package Comserv::Controller::ShamanBotanicals;\nuse Moose;\nuse namespace::autoclean;\nuse Comserv::Util::Logging;\n\nBEGIN { extends 'Catalyst::Controller'; }\n\n# Set the namespace for this controller\n__PACKAGE__->config(namespace => 'shamanbotanicals');\n\nhas 'logging' => (\n    is => 'ro',\n    default => sub { Comserv::Util::Logging->instance }\n);\n\nsub auto :Private {\n    my ($self, $c) = @_;\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', \"ShamanBotanicals controller auto method called\");\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', \"Request path: \" . $c->req->uri->path);\n\n    # Check access permissions - SB admin or CSC admin\n    if ($c->user_exists) {\n        my $group = $c->session->{group} || '';\n        my $site = $c->session->{site} || '';\n\n        unless ($group eq 'admin' || $site eq 'SB' || $group eq 'csc_admin') {\n            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',\n                \"Access denied - user group: $group, site: $site\");\n            $c->response->redirect('/login');\n            return 0;\n        }\n    } else {\n        $c->response->redirect('/login');\n        return 0;\n    }\n\n    return 1; # Allow the request to proceed\n}\n\n# Root path for this controller\nsub base :Chained('/') :PathPart('shamanbotanicals') :CaptureArgs(0) {\n    my ($self, $c) = @_;\n    $c->session->{current_site} = \"ShamanBotanicals\";\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'base', \"Base chained method called\");\n}\n\n# Default index page\nsub index :Chained('base') :PathPart('') :Args(0) {\n    my ($self, $c) = @_;\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', \"Index method called\");\n    $c->stash(template => 'shamanbotanicals/index.tt');\n    $c->forward($c->view('TT'));\n}\n\n# Direct access to index for mixed case URL\nsub direct_index :Path('/ShamanBotanicals') :Args(0) {\n    my ($self, $c) = @_;\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'direct_index', \"Direct index method called for mixed case URL\");\n    $c->forward('index');\n}\n\n# Handle product pages\nsub products :Chained('base') :PathPart('products') :Args(1) {\n    my ($self, $c, $product_id) = @_;\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'products', \"Products method called for ID: $product_id\");\n\n    # Normalize the product ID to match template naming\n    my $template_name = $product_id;\n\n    # Check if template exists, otherwise show error\n    if (-e $c->path_to('root', 'shamanbotanicals', 'products', \"$template_name.tt\")) {\n        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'products', \"Template found: shamanbotanicals/products/$template_name.tt\");\n        $c->stash(template => \"shamanbotanicals/products/$template_name.tt\");\n    } else {\n        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'products', \"Template not found: shamanbotanicals/products/$template_name.tt\");\n        $c->stash(\n            template => 'error.tt',\n            error_msg => \"The product page for '$product_id' could not be found. Return to <a href='/shamanbotanicals'>Product List</a>\",\n            status => '404',\n            product_id => $product_id,\n            available_products => $self->_get_available_products($c)\n        );\n        $c->response->status(404);\n    }\n    $c->forward($c->view('TT'));\n}\n\n# Documentation page - accessible by SB admin or CSC admin\nsub documentation :Chained('base') :PathPart('documentation') :Args(0) {\n    my ($self, $c) = @_;\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'documentation', \"Documentation method called\");\n    $c->stash(template => 'shamanbotanicals/documentation.tt');\n    $c->forward($c->view('TT'));\n}\n\n# Catch-all for any other paths\nsub default :Private {\n    my ($self, $c) = @_;\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'default', \"Default method called, forwarding to index\");\n    $c->forward('index');\n}\n\n# Helper method to get available product templates\nsub _get_available_products {\n    my ($self, $c) = @_;\n\n    my @product_files = ();\n    my $products_dir = $c->path_to('root', 'shamanbotanicals', 'products');\n\n    if (-d $products_dir && opendir(my $dh, $products_dir)) {\n        while (my $file = readdir($dh)) {\n            next if $file =~ /^\\./ || $file eq 'index.tt';\n            if ($file =~ /(.+)\\.tt$/) {\n                push @product_files, $1;\n            }\n        }\n        closedir($dh);\n    }\n\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_get_available_products',\n        \"Found \" . scalar(@product_files) . \" product templates\");\n\n    return \\@product_files;\n}\n\n__  PACKAGE__->meta->make_immutable;\n\n1;\n",
+                    "language": "perl5"
+                },
+                "codebaseEnabled": true
+            },
+            "createdAt": 1753298604997,
+            "isInternal": false,
+            "rawContent": {
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "yes but this is not the format asked for. it is not in +- firnate and i cant see in the code were the problem is being addressed"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "autoAppliedRules": [
+                {
+                    "name": "User AI Instruction",
+                    "description": "User AI Instruction",
+                    "uri": "zen-rules://user/custom",
+                    "content": "read AI_DEVELOPMENT_GUIDELINES\nall code must be varifed by user"
+                },
+                {
+                    "name": "Repository Information Overview",
+                    "description": "Repository Information Overview",
+                    "uri": "zen-rules://repo/repo",
+                    "content": "\n\n# Comserv Project Information\n\n## Summary\nComserv is a comprehensive web-based system for managing business operations, projects, and documentation. It's built using the Catalyst Perl web framework and provides features for project management, theme customization, and user authentication.\n\n## Structure\n- `Comserv/`: Main application directory containing the core application code\n  - `lib/`: Application code and models\n  - `docs/`: Documentation files\n  - `root/`: Static assets and templates\n  - `script/`: Utility scripts for server management and database operations\n  - `t/`: Test files\n- `app/`: Additional application components\n- `data/`: Data files including pricing information\n- `proxmox/`: Proxmox VE integration components\n\n## Language & Runtime\n**Language**: Perl\n**Version**: 5.x (compatible with Perl 5.40.0)\n**Framework**: Catalyst 5.90130\n**Build System**: Module::Install\n**Package Manager**: CPAN\n\n## Dependencies\n**Main Dependencies**:\n- Catalyst::Runtime (5.90130)\n- Moose\n- DBIx::Class\n- Template (Template Toolkit)\n- JSON/JSON::MaybeXS\n- Log::Log4perl\n- DateTime\n- File::Slurp\n\n**Development Dependencies**:\n- Test::More (0.88+)\n- Test::Pod\n- Test::Pod::Coverage\n- Test::WWW::Mechanize::Catalyst\n- Catalyst::Devel\n\n## Build & Installation\n```bash\ncd Comserv\nperl Makefile.PL\nmake\nmake test\nmake install\n```\n\n## Database\n**Type**: MySQL\n**Setup**: \n```bash\nmysql -u root -p < database_initialization_script.sql\n```\n**Schema Management**: DBIx::Class::Schema::Loader\n\n## Testing\n**Framework**: Test::More\n**Test Location**: Comserv/t/\n**Run Command**:\n```bash\ncd Comserv\nprove -l t/\n```\n\n## Server Execution\n**Development Server**:\n```bash\ncd Comserv\nscript/comserv_server.pl\n```\n**Production Deployment**:\n```bash\ncd Comserv\nscript/comserv_fastcgi.pl\n# or\nstarman --port 5000 --workers 5 comserv.psgi\n```\n\n## Authentication & Authorization\n- Session-based authentication\n- Role-based access control\n- Multiple authentication realms\n- Support for user groups and site-specific permissions\n\n## Features\n- Project management system\n- Theme customization system\n- Email integration\n- PDF generation\n- Proxmox VE integration\n- Multi-site support"
+                },
+                {
+                    "name": "Database Development Standards and Best Practices",
+                    "description": "Database Development Standards and Best Practices",
+                    "uri": "zen-rules://repo/database-standards",
+                    "content": "\n\n# Database Development Standards\n\n## Query Standards\n- **Table Aliases:** Use table aliases in all queries to avoid ambiguity (e.g., 'me.column_name')\n- **Error Handling:** Implement proper error handling with eval blocks and try/catch\n- **Parameterized Queries:** Use parameterized queries to prevent SQL injection\n\n## Schema Management\n- **Naming Conventions:** Follow naming conventions for tables, columns, and relationships\n- **Documentation:** Document schema changes and rationale for future reference\n- **Performance:** Regularly optimize database performance and indexes\n- **Version Control:** Use Git to track schema changes with proper tagging\n- **Backup Protocol:** Always backup database before making schema changes\n\n## Model Standards (DBIx::Class)\n- **Result Classes:** Located in `/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema/Ency/Result/`\n- **Relationships:** Define proper relationships between tables\n- **Validation:** Implement data validation in model classes\n\n## Configuration Priority\n- **Primary:** ZeroTier production server (172.30.161.222) - works from any network\n- **Secondary:** Local network production server (192.168.1.198) - home/office only\n- **Tertiary:** localhost MySQL (development)\n- **Fallback:** SQLite (offline mode)\n\n## Security Protocols\n- **Input Validation:** Validate all user inputs before database operations\n- **Access Controls:** Implement proper access controls based on user roles\n- **Regular Reviews:** Regularly review and update security protocols"
+                },
+                {
+                    "name": "AI Behavior Enforcement Rules for Zencoder",
+                    "description": "AI Behavior Enforcement Rules for Zencoder",
+                    "uri": "zen-rules://repo/ai-behavior-enforcement",
+                    "content": "\n\n# AI Behavior Enforcement Rules\n\n## MANDATORY PROMPT TRACKING\n**CURRENT PROMPT:** This is prompt #[X] of 4 maximum allowed prompts.\n\n### Prompt Counter Protocol\n- **Start Each Response:** Begin every response with current prompt count\n- **Track Internally:** Keep running count throughout conversation\n- **Warn at Prompt 3:** Alert user that next prompt will trigger handoff\n- **Stop at Prompt 4:** Refuse to continue, provide handoff documentation\n\n## MANDATORY APPROVAL WORKFLOW\n\n### Before ANY Code Changes\n1. **STOP:** Do not modify any files without explicit user approval\n2. **PRESENT:** Show exactly what will be changed using the standard format\n3. **WAIT:** Wait for explicit approval (\"yes\", \"approved\", \"apply changes\")\n4. **CONFIRM:** Acknowledge approval before proceeding\n5. **EXECUTE:** Apply changes only after confirmation\n\n### Standard Change Presentation\n```\n🔄 PROPOSED CHANGE TO: [filename]\n📝 CHANGE TYPE: [Addition/Modification/Deletion]\n📋 DESCRIPTION: [what this accomplishes]\n\n❌ CURRENT CODE:\n[existing code or \"N/A\"]\n\n✅ NEW CODE:\n[proposed code or \"DELETED\"]\n\n💡 REASON: [why needed]\n\n⚠️  APPROVAL REQUIRED: Please confirm with \"approved\" or \"yes\"\n🔄 REVERT: Changes can be undone if needed\n```\n\n## VIOLATION CONSEQUENCES\n- **Prompt Limit Exceeded:** Immediate session termination with handoff\n- **Unapproved Changes:** Acknowledge violation and request approval retroactively\n- **Missing Counter:** Add prompt counter to current response\n\n## HANDOFF TEMPLATE (Use on 4th Prompt)\n```\n🚨 PROMPT LIMIT REACHED - HANDOFF REQUIRED\n\n📊 SESSION SUMMARY:\n- Prompts Used: 4/4\n- Files Modified: [list]\n- Tasks Completed: [list]\n- Tasks Remaining: [list]\n\n🔄 HANDOFF PROMPT FOR NEXT AI:\n\"Continue working on [project/task]. Read development-guidelines.md and ai-behavior-enforcement.md first. \nCurrent context: [brief context]\nFiles being worked on: [list]\nNext steps needed: [specific actions]\"\n\n📚 REQUIRED READING FOR NEXT AI:\n- .zencoder/rules/development-guidelines.md\n- .zencoder/rules/ai-behavior-enforcement.md\n- [any other relevant docs]\n\n✅ DOCUMENTATION UPDATED: [what was recorded]\n```\n\n## EMERGENCY PROTOCOLS\n- **User Says \"Stop\":** Immediately cease all activities\n- **User Says \"Revert\":** Provide instructions for undoing changes\n- **User Says \"Handoff\":** Immediately provide handoff documentation"
+                },
+                {
+                    "name": "Template Toolkit Standards and Requirements",
+                    "description": "Template Toolkit Standards and Requirements",
+                    "uri": "zen-rules://repo/template-standards",
+                    "content": "\n\n# Template Toolkit (.tt) Standards\n\n## Required PageVersion Header Format\nAll .tt files must include this exact format:\n```\n[% META title = 'Page Title Here' %]\n[% PageVersion = 'relative/path/filename.tt,v 0.01 YYYY/MM/DD author Exp author ' %]\n[% IF c.session.debug_mode == 1 %]\n    [% PageVersion %]\n[% END %]\n```\n\n## Template Standards\n- **Theme Compliance:** Use theme system variables for styling - NO page-specific CSS\n- **Debug Mode:** Include debug mode blocks for development visibility\n- **Responsive Design:** Implement mobile-first responsive design patterns\n- **HTML Structure:** Use proper semantic HTML structure\n- **Template Toolkit:** Follow Template Toolkit best practices\n\n## Navigation Integration\nWhen working with navigation templates:\n- **Main Navigation:** Include via `/Navigation/navigation.tt`\n- **Admin Menu:** Use `/Navigation/admintopmenu.tt` for admin-only sections\n- **Dropdown Menus:** Reference existing dropdown templates in `/Navigation/` directory\n\n## Documentation File Rules - CRITICAL\n- **File Format:** ONLY `.tt` files for application documentation - NO `.md` files\n- **EXISTING FILES FIRST:** ALWAYS search for and use existing files before creating new ones\n- **Naming Consistency:** Use same file names across AI sessions to prevent content loss\n- **Content Priority:** Always improve existing files rather than creating new ones\n- **Role-Based Access:** Respect existing Documentation/index.tt role-based structure\n- **Directory Consolidation:** Use established directory structure - don't create new directories\n\n## File Creation Protocol\n1. **Search First:** Use file search tools to find existing similar files\n2. **Check Directory:** Look at existing directory structure in target location\n3. **Ask User:** If multiple similar files exist, ask which should be updated\n4. **Update Existing:** Improve existing files rather than creating duplicates"
+                },
+                {
+                    "name": "Debugging and Troubleshooting Protocols",
+                    "description": "Debugging and Troubleshooting Protocols",
+                    "uri": "zen-rules://repo/debugging-protocols",
+                    "content": "\n\n# Debugging Protocols\n\n## Log Analysis Priority\n1. **Application Logs:** Check `/home/shanta/PycharmProjects/comserv2/Comserv/logs/application.log` first\n2. **Error Logs:** Look for recent errors and stack traces\n3. **Debug Mode:** Enable debug mode in session for detailed output\n\n## Common Debugging Steps\n1. **Reproduce Issue:** Ensure issue is reproducible\n2. **Check Recent Changes:** Review recent code modifications\n3. **Verify Dependencies:** Ensure all required modules are installed\n4. **Database Connectivity:** Test database connections\n5. **Permission Issues:** Check file and directory permissions\n\n## Testing Protocol\n- **Unit Tests:** Run relevant unit tests first\n- **Integration Tests:** Test full workflow\n- **Browser Testing:** Always test in actual browser environment\n- **Log Monitoring:** Monitor logs during testing\n\n## Performance Issues\n- **Database Queries:** Check for slow queries\n- **Memory Usage:** Monitor memory consumption\n- **Template Rendering:** Check template compilation times\n- **Network Latency:** Consider network-related delays"
+                }
+            ]
+        },
+        {
+            "id": "5f2a7849-254c-4335-8dc5-da6c1d4f2d11",
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "**CURRENT PROMPT:** This is prompt #2 of 4 maximum allowed prompts.\n\nYou're absolutely right! I apologize for not using the proper diff format. Let me show you the exact change in the +/- format so you can see exactly where the problem is in the code:"
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_011bQyfor44RmzzetED6GoVr",
+                    "statusText": "Viewed file",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": "Comserv/lib/Comserv/Controller/SB.pm",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/SB.pm"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "text",
+                    "text": "🔄 **PROPOSED CHANGE TO:** /home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/SB.pm\n📝 **CHANGE TYPE:** Modification  \n📋 **DESCRIPTION:** Fix syntax error on line 126 by removing extra space in __PACKAGE__\n\n**DIFF FORMAT:**\n```diff\n   124\t}\n   125\t\n-  126\t__  PACKAGE__->meta->make_immutable;\n+  126\t__PACKAGE__->meta->make_immutable;\n   127\t\n   128\t1;\n```\n\n**THE PROBLEM:** Line 126 has `__  PACKAGE__` (with extra space) instead of `__PACKAGE__` (no space). This is causing Perl to look for a method `__` on package `PACKAGE__` which doesn't exist.\n\n**THE FIX:** Remove the extra space between the underscores.\n\n⚠️  **APPROVAL REQUIRED:** Please confirm with \"approved\" or \"yes\""
+                }
+            ],
+            "context": {
+                "author": "Coding Agent",
+                "operationId": "d626b863-76c2-4d22-a617-c4fd0fd798ca"
+            },
+            "createdAt": 1753298608476,
+            "isInternal": false
+        },
+        {
+            "id": "7b520c68-ea47-40c4-b4ce-8f985c177a65",
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "yes"
+                }
+            ],
+            "context": {
+                "currentFile": {
+                    "path": "Comserv/lib/Comserv/Controller/SB.pm",
+                    "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/SB.pm",
+                    "sources": [
+                        "opened_tab"
+                    ],
+                    "content": "package Comserv::Controller::ShamanBotanicals;\nuse Moose;\nuse namespace::autoclean;\nuse Comserv::Util::Logging;\n\nBEGIN { extends 'Catalyst::Controller'; }\n\n# Set the namespace for this controller\n__PACKAGE__->config(namespace => 'shamanbotanicals');\n\nhas 'logging' => (\n    is => 'ro',\n    default => sub { Comserv::Util::Logging->instance }\n);\n\nsub auto :Private {\n    my ($self, $c) = @_;\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', \"ShamanBotanicals controller auto method called\");\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', \"Request path: \" . $c->req->uri->path);\n\n    # Check access permissions - SB admin or CSC admin\n    if ($c->user_exists) {\n        my $group = $c->session->{group} || '';\n        my $site = $c->session->{site} || '';\n\n        unless ($group eq 'admin' || $site eq 'SB' || $group eq 'csc_admin') {\n            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',\n                \"Access denied - user group: $group, site: $site\");\n            $c->response->redirect('/login');\n            return 0;\n        }\n    } else {\n        $c->response->redirect('/login');\n        return 0;\n    }\n\n    return 1; # Allow the request to proceed\n}\n\n# Root path for this controller\nsub base :Chained('/') :PathPart('shamanbotanicals') :CaptureArgs(0) {\n    my ($self, $c) = @_;\n    $c->session->{current_site} = \"ShamanBotanicals\";\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'base', \"Base chained method called\");\n}\n\n# Default index page\nsub index :Chained('base') :PathPart('') :Args(0) {\n    my ($self, $c) = @_;\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', \"Index method called\");\n    $c->stash(template => 'shamanbotanicals/index.tt');\n    $c->forward($c->view('TT'));\n}\n\n# Direct access to index for mixed case URL\nsub direct_index :Path('/ShamanBotanicals') :Args(0) {\n    my ($self, $c) = @_;\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'direct_index', \"Direct index method called for mixed case URL\");\n    $c->forward('index');\n}\n\n# Handle product pages\nsub products :Chained('base') :PathPart('products') :Args(1) {\n    my ($self, $c, $product_id) = @_;\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'products', \"Products method called for ID: $product_id\");\n\n    # Normalize the product ID to match template naming\n    my $template_name = $product_id;\n\n    # Check if template exists, otherwise show error\n    if (-e $c->path_to('root', 'shamanbotanicals', 'products', \"$template_name.tt\")) {\n        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'products', \"Template found: shamanbotanicals/products/$template_name.tt\");\n        $c->stash(template => \"shamanbotanicals/products/$template_name.tt\");\n    } else {\n        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'products', \"Template not found: shamanbotanicals/products/$template_name.tt\");\n        $c->stash(\n            template => 'error.tt',\n            error_msg => \"The product page for '$product_id' could not be found. Return to <a href='/shamanbotanicals'>Product List</a>\",\n            status => '404',\n            product_id => $product_id,\n            available_products => $self->_get_available_products($c)\n        );\n        $c->response->status(404);\n    }\n    $c->forward($c->view('TT'));\n}\n\n# Documentation page - accessible by SB admin or CSC admin\nsub documentation :Chained('base') :PathPart('documentation') :Args(0) {\n    my ($self, $c) = @_;\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'documentation', \"Documentation method called\");\n    $c->stash(template => 'shamanbotanicals/documentation.tt');\n    $c->forward($c->view('TT'));\n}\n\n# Catch-all for any other paths\nsub default :Private {\n    my ($self, $c) = @_;\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'default', \"Default method called, forwarding to index\");\n    $c->forward('index');\n}\n\n# Helper method to get available product templates\nsub _get_available_products {\n    my ($self, $c) = @_;\n\n    my @product_files = ();\n    my $products_dir = $c->path_to('root', 'shamanbotanicals', 'products');\n\n    if (-d $products_dir && opendir(my $dh, $products_dir)) {\n        while (my $file = readdir($dh)) {\n            next if $file =~ /^\\./ || $file eq 'index.tt';\n            if ($file =~ /(.+)\\.tt$/) {\n                push @product_files, $1;\n            }\n        }\n        closedir($dh);\n    }\n\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_get_available_products',\n        \"Found \" . scalar(@product_files) . \" product templates\");\n\n    return \\@product_files;\n}\n\n__  PACKAGE__->meta->make_immutable;\n\n1;\n",
+                    "language": "perl5"
+                },
+                "codebaseEnabled": true
+            },
+            "createdAt": 1753298634375,
+            "isInternal": false,
+            "rawContent": {
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "yes"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "autoAppliedRules": [
+                {
+                    "name": "User AI Instruction",
+                    "description": "User AI Instruction",
+                    "uri": "zen-rules://user/custom",
+                    "content": "read AI_DEVELOPMENT_GUIDELINES\nall code must be varifed by user"
+                },
+                {
+                    "name": "Repository Information Overview",
+                    "description": "Repository Information Overview",
+                    "uri": "zen-rules://repo/repo",
+                    "content": "\n\n# Comserv Project Information\n\n## Summary\nComserv is a comprehensive web-based system for managing business operations, projects, and documentation. It's built using the Catalyst Perl web framework and provides features for project management, theme customization, and user authentication.\n\n## Structure\n- `Comserv/`: Main application directory containing the core application code\n  - `lib/`: Application code and models\n  - `docs/`: Documentation files\n  - `root/`: Static assets and templates\n  - `script/`: Utility scripts for server management and database operations\n  - `t/`: Test files\n- `app/`: Additional application components\n- `data/`: Data files including pricing information\n- `proxmox/`: Proxmox VE integration components\n\n## Language & Runtime\n**Language**: Perl\n**Version**: 5.x (compatible with Perl 5.40.0)\n**Framework**: Catalyst 5.90130\n**Build System**: Module::Install\n**Package Manager**: CPAN\n\n## Dependencies\n**Main Dependencies**:\n- Catalyst::Runtime (5.90130)\n- Moose\n- DBIx::Class\n- Template (Template Toolkit)\n- JSON/JSON::MaybeXS\n- Log::Log4perl\n- DateTime\n- File::Slurp\n\n**Development Dependencies**:\n- Test::More (0.88+)\n- Test::Pod\n- Test::Pod::Coverage\n- Test::WWW::Mechanize::Catalyst\n- Catalyst::Devel\n\n## Build & Installation\n```bash\ncd Comserv\nperl Makefile.PL\nmake\nmake test\nmake install\n```\n\n## Database\n**Type**: MySQL\n**Setup**: \n```bash\nmysql -u root -p < database_initialization_script.sql\n```\n**Schema Management**: DBIx::Class::Schema::Loader\n\n## Testing\n**Framework**: Test::More\n**Test Location**: Comserv/t/\n**Run Command**:\n```bash\ncd Comserv\nprove -l t/\n```\n\n## Server Execution\n**Development Server**:\n```bash\ncd Comserv\nscript/comserv_server.pl\n```\n**Production Deployment**:\n```bash\ncd Comserv\nscript/comserv_fastcgi.pl\n# or\nstarman --port 5000 --workers 5 comserv.psgi\n```\n\n## Authentication & Authorization\n- Session-based authentication\n- Role-based access control\n- Multiple authentication realms\n- Support for user groups and site-specific permissions\n\n## Features\n- Project management system\n- Theme customization system\n- Email integration\n- PDF generation\n- Proxmox VE integration\n- Multi-site support"
+                },
+                {
+                    "name": "Database Development Standards and Best Practices",
+                    "description": "Database Development Standards and Best Practices",
+                    "uri": "zen-rules://repo/database-standards",
+                    "content": "\n\n# Database Development Standards\n\n## Query Standards\n- **Table Aliases:** Use table aliases in all queries to avoid ambiguity (e.g., 'me.column_name')\n- **Error Handling:** Implement proper error handling with eval blocks and try/catch\n- **Parameterized Queries:** Use parameterized queries to prevent SQL injection\n\n## Schema Management\n- **Naming Conventions:** Follow naming conventions for tables, columns, and relationships\n- **Documentation:** Document schema changes and rationale for future reference\n- **Performance:** Regularly optimize database performance and indexes\n- **Version Control:** Use Git to track schema changes with proper tagging\n- **Backup Protocol:** Always backup database before making schema changes\n\n## Model Standards (DBIx::Class)\n- **Result Classes:** Located in `/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema/Ency/Result/`\n- **Relationships:** Define proper relationships between tables\n- **Validation:** Implement data validation in model classes\n\n## Configuration Priority\n- **Primary:** ZeroTier production server (172.30.161.222) - works from any network\n- **Secondary:** Local network production server (192.168.1.198) - home/office only\n- **Tertiary:** localhost MySQL (development)\n- **Fallback:** SQLite (offline mode)\n\n## Security Protocols\n- **Input Validation:** Validate all user inputs before database operations\n- **Access Controls:** Implement proper access controls based on user roles\n- **Regular Reviews:** Regularly review and update security protocols"
+                },
+                {
+                    "name": "AI Behavior Enforcement Rules for Zencoder",
+                    "description": "AI Behavior Enforcement Rules for Zencoder",
+                    "uri": "zen-rules://repo/ai-behavior-enforcement",
+                    "content": "\n\n# AI Behavior Enforcement Rules\n\n## MANDATORY PROMPT TRACKING\n**CURRENT PROMPT:** This is prompt #[X] of 4 maximum allowed prompts.\n\n### Prompt Counter Protocol\n- **Start Each Response:** Begin every response with current prompt count\n- **Track Internally:** Keep running count throughout conversation\n- **Warn at Prompt 3:** Alert user that next prompt will trigger handoff\n- **Stop at Prompt 4:** Refuse to continue, provide handoff documentation\n\n## MANDATORY APPROVAL WORKFLOW\n\n### Before ANY Code Changes\n1. **STOP:** Do not modify any files without explicit user approval\n2. **PRESENT:** Show exactly what will be changed using the standard format\n3. **WAIT:** Wait for explicit approval (\"yes\", \"approved\", \"apply changes\")\n4. **CONFIRM:** Acknowledge approval before proceeding\n5. **EXECUTE:** Apply changes only after confirmation\n\n### Standard Change Presentation\n```\n🔄 PROPOSED CHANGE TO: [filename]\n📝 CHANGE TYPE: [Addition/Modification/Deletion]\n📋 DESCRIPTION: [what this accomplishes]\n\n❌ CURRENT CODE:\n[existing code or \"N/A\"]\n\n✅ NEW CODE:\n[proposed code or \"DELETED\"]\n\n💡 REASON: [why needed]\n\n⚠️  APPROVAL REQUIRED: Please confirm with \"approved\" or \"yes\"\n🔄 REVERT: Changes can be undone if needed\n```\n\n## VIOLATION CONSEQUENCES\n- **Prompt Limit Exceeded:** Immediate session termination with handoff\n- **Unapproved Changes:** Acknowledge violation and request approval retroactively\n- **Missing Counter:** Add prompt counter to current response\n\n## HANDOFF TEMPLATE (Use on 4th Prompt)\n```\n🚨 PROMPT LIMIT REACHED - HANDOFF REQUIRED\n\n📊 SESSION SUMMARY:\n- Prompts Used: 4/4\n- Files Modified: [list]\n- Tasks Completed: [list]\n- Tasks Remaining: [list]\n\n🔄 HANDOFF PROMPT FOR NEXT AI:\n\"Continue working on [project/task]. Read development-guidelines.md and ai-behavior-enforcement.md first. \nCurrent context: [brief context]\nFiles being worked on: [list]\nNext steps needed: [specific actions]\"\n\n📚 REQUIRED READING FOR NEXT AI:\n- .zencoder/rules/development-guidelines.md\n- .zencoder/rules/ai-behavior-enforcement.md\n- [any other relevant docs]\n\n✅ DOCUMENTATION UPDATED: [what was recorded]\n```\n\n## EMERGENCY PROTOCOLS\n- **User Says \"Stop\":** Immediately cease all activities\n- **User Says \"Revert\":** Provide instructions for undoing changes\n- **User Says \"Handoff\":** Immediately provide handoff documentation"
+                },
+                {
+                    "name": "Template Toolkit Standards and Requirements",
+                    "description": "Template Toolkit Standards and Requirements",
+                    "uri": "zen-rules://repo/template-standards",
+                    "content": "\n\n# Template Toolkit (.tt) Standards\n\n## Required PageVersion Header Format\nAll .tt files must include this exact format:\n```\n[% META title = 'Page Title Here' %]\n[% PageVersion = 'relative/path/filename.tt,v 0.01 YYYY/MM/DD author Exp author ' %]\n[% IF c.session.debug_mode == 1 %]\n    [% PageVersion %]\n[% END %]\n```\n\n## Template Standards\n- **Theme Compliance:** Use theme system variables for styling - NO page-specific CSS\n- **Debug Mode:** Include debug mode blocks for development visibility\n- **Responsive Design:** Implement mobile-first responsive design patterns\n- **HTML Structure:** Use proper semantic HTML structure\n- **Template Toolkit:** Follow Template Toolkit best practices\n\n## Navigation Integration\nWhen working with navigation templates:\n- **Main Navigation:** Include via `/Navigation/navigation.tt`\n- **Admin Menu:** Use `/Navigation/admintopmenu.tt` for admin-only sections\n- **Dropdown Menus:** Reference existing dropdown templates in `/Navigation/` directory\n\n## Documentation File Rules - CRITICAL\n- **File Format:** ONLY `.tt` files for application documentation - NO `.md` files\n- **EXISTING FILES FIRST:** ALWAYS search for and use existing files before creating new ones\n- **Naming Consistency:** Use same file names across AI sessions to prevent content loss\n- **Content Priority:** Always improve existing files rather than creating new ones\n- **Role-Based Access:** Respect existing Documentation/index.tt role-based structure\n- **Directory Consolidation:** Use established directory structure - don't create new directories\n\n## File Creation Protocol\n1. **Search First:** Use file search tools to find existing similar files\n2. **Check Directory:** Look at existing directory structure in target location\n3. **Ask User:** If multiple similar files exist, ask which should be updated\n4. **Update Existing:** Improve existing files rather than creating duplicates"
+                },
+                {
+                    "name": "Debugging and Troubleshooting Protocols",
+                    "description": "Debugging and Troubleshooting Protocols",
+                    "uri": "zen-rules://repo/debugging-protocols",
+                    "content": "\n\n# Debugging Protocols\n\n## Log Analysis Priority\n1. **Application Logs:** Check `/home/shanta/PycharmProjects/comserv2/Comserv/logs/application.log` first\n2. **Error Logs:** Look for recent errors and stack traces\n3. **Debug Mode:** Enable debug mode in session for detailed output\n\n## Common Debugging Steps\n1. **Reproduce Issue:** Ensure issue is reproducible\n2. **Check Recent Changes:** Review recent code modifications\n3. **Verify Dependencies:** Ensure all required modules are installed\n4. **Database Connectivity:** Test database connections\n5. **Permission Issues:** Check file and directory permissions\n\n## Testing Protocol\n- **Unit Tests:** Run relevant unit tests first\n- **Integration Tests:** Test full workflow\n- **Browser Testing:** Always test in actual browser environment\n- **Log Monitoring:** Monitor logs during testing\n\n## Performance Issues\n- **Database Queries:** Check for slow queries\n- **Memory Usage:** Monitor memory consumption\n- **Template Rendering:** Check template compilation times\n- **Network Latency:** Consider network-related delays"
+                }
+            ]
+        },
+        {
+            "id": "fffde4cb-ddc5-45f7-8548-8ad88965d6c9",
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "**CURRENT PROMPT:** This is prompt #3 of 4 maximum allowed prompts.\n\n⚠️ **WARNING:** This is prompt 3 of 4. The next prompt will trigger a handoff to another AI assistant.\n\n✅ **APPROVAL CONFIRMED** - Proceeding with the fix now."
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01KumjfNUcPspRi612XH7Sgn",
+                    "statusText": "Change generated",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": "Comserv/lib/Comserv/Controller/SB.pm",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/SB.pm"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "codeHunk",
+                    "lineBasedDiff": "--- /home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/SB.pm\n+++ /home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/SB.pm\n@@ -123,6 +123,6 @@\n     return \\@product_files;\n }\n \n-__  PACKAGE__->meta->make_immutable;\n+__PACKAGE__->meta->make_immutable;\n \n 1;",
+                    "refToolCallId": "toolu_01KumjfNUcPspRi612XH7Sgn"
+                },
+                {
+                    "type": "text",
+                    "text": "✅ **CHANGE APPLIED SUCCESSFULLY**\n\nThe syntax error has been fixed! The extra space in `__  PACKAGE__` has been removed, making it the correct `__PACKAGE__` on line 126.\n\n**What was fixed:**\n- Line 126: Removed the extra space between underscores in the `__PACKAGE__` declaration\n- This should resolve the compilation error: `Can't locate object method \"__\" via package \"PACKAGE__\"`\n\nYour application should now start without the compilation error. You can test by running:\n```bash\ncd /home/shanta/PycharmProjects/comserv2/Comserv\nscript/comserv_server.pl\n```\n\nThe fix is complete and your ShamanBotanicals controller should now compile properly."
+                },
+                {
+                    "type": "codePatch",
+                    "diffs": [
+                        {
+                            "path": "Comserv/lib/Comserv/Controller/SB.pm",
+                            "patch": "@@ -4734,18 +4734,16 @@\n s;%0A%7D%0A%0A__\n-  \n PACKAGE_\n",
+                            "isNew": false,
+                            "isApplied": true
+                        }
+                    ]
+                }
+            ],
+            "context": {
+                "author": "Coding Agent",
+                "operationId": "a83b4013-c7f3-4431-96f1-1cc0404edb20"
+            },
+            "createdAt": 1753298636738,
+            "isInternal": false
+        },
+        {
+            "id": "30f5446c-0d54-4c75-85ec-6d20aac09eff",
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "Thankyou this fix the problem with the changes at the end that allowed me to see and aprove the changes. ahving to aprove the changes in the chat will wast the prompts. Please update the guidelines and the zencoder files (if nessesary to learn from this)"
+                }
+            ],
+            "context": {
+                "currentFile": {
+                    "path": "Comserv/lib/Comserv/Controller/SB.pm",
+                    "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/SB.pm",
+                    "sources": [
+                        "opened_tab"
+                    ],
+                    "content": "package Comserv::Controller::ShamanBotanicals;\nuse Moose;\nuse namespace::autoclean;\nuse Comserv::Util::Logging;\n\nBEGIN { extends 'Catalyst::Controller'; }\n\n# Set the namespace for this controller\n__PACKAGE__->config(namespace => 'shamanbotanicals');\n\nhas 'logging' => (\n    is => 'ro',\n    default => sub { Comserv::Util::Logging->instance }\n);\n\nsub auto :Private {\n    my ($self, $c) = @_;\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', \"ShamanBotanicals controller auto method called\");\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', \"Request path: \" . $c->req->uri->path);\n\n    # Check access permissions - SB admin or CSC admin\n    if ($c->user_exists) {\n        my $group = $c->session->{group} || '';\n        my $site = $c->session->{site} || '';\n\n        unless ($group eq 'admin' || $site eq 'SB' || $group eq 'csc_admin') {\n            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',\n                \"Access denied - user group: $group, site: $site\");\n            $c->response->redirect('/login');\n            return 0;\n        }\n    } else {\n        $c->response->redirect('/login');\n        return 0;\n    }\n\n    return 1; # Allow the request to proceed\n}\n\n# Root path for this controller\nsub base :Chained('/') :PathPart('shamanbotanicals') :CaptureArgs(0) {\n    my ($self, $c) = @_;\n    $c->session->{current_site} = \"ShamanBotanicals\";\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'base', \"Base chained method called\");\n}\n\n# Default index page\nsub index :Chained('base') :PathPart('') :Args(0) {\n    my ($self, $c) = @_;\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', \"Index method called\");\n    $c->stash(template => 'shamanbotanicals/index.tt');\n    $c->forward($c->view('TT'));\n}\n\n# Direct access to index for mixed case URL\nsub direct_index :Path('/ShamanBotanicals') :Args(0) {\n    my ($self, $c) = @_;\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'direct_index', \"Direct index method called for mixed case URL\");\n    $c->forward('index');\n}\n\n# Handle product pages\nsub products :Chained('base') :PathPart('products') :Args(1) {\n    my ($self, $c, $product_id) = @_;\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'products', \"Products method called for ID: $product_id\");\n\n    # Normalize the product ID to match template naming\n    my $template_name = $product_id;\n\n    # Check if template exists, otherwise show error\n    if (-e $c->path_to('root', 'shamanbotanicals', 'products', \"$template_name.tt\")) {\n        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'products', \"Template found: shamanbotanicals/products/$template_name.tt\");\n        $c->stash(template => \"shamanbotanicals/products/$template_name.tt\");\n    } else {\n        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'products', \"Template not found: shamanbotanicals/products/$template_name.tt\");\n        $c->stash(\n            template => 'error.tt',\n            error_msg => \"The product page for '$product_id' could not be found. Return to <a href='/shamanbotanicals'>Product List</a>\",\n            status => '404',\n            product_id => $product_id,\n            available_products => $self->_get_available_products($c)\n        );\n        $c->response->status(404);\n    }\n    $c->forward($c->view('TT'));\n}\n\n# Documentation page - accessible by SB admin or CSC admin\nsub documentation :Chained('base') :PathPart('documentation') :Args(0) {\n    my ($self, $c) = @_;\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'documentation', \"Documentation method called\");\n    $c->stash(template => 'shamanbotanicals/documentation.tt');\n    $c->forward($c->view('TT'));\n}\n\n# Catch-all for any other paths\nsub default :Private {\n    my ($self, $c) = @_;\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'default', \"Default method called, forwarding to index\");\n    $c->forward('index');\n}\n\n# Helper method to get available product templates\nsub _get_available_products {\n    my ($self, $c) = @_;\n\n    my @product_files = ();\n    my $products_dir = $c->path_to('root', 'shamanbotanicals', 'products');\n\n    if (-d $products_dir && opendir(my $dh, $products_dir)) {\n        while (my $file = readdir($dh)) {\n            next if $file =~ /^\\./ || $file eq 'index.tt';\n            if ($file =~ /(.+)\\.tt$/) {\n                push @product_files, $1;\n            }\n        }\n        closedir($dh);\n    }\n\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_get_available_products',\n        \"Found \" . scalar(@product_files) . \" product templates\");\n\n    return \\@product_files;\n}\n\n__PACKAGE__->meta->make_immutable;\n\n1;\n",
+                    "language": "perl5"
+                },
+                "codebaseEnabled": true
+            },
+            "createdAt": 1753299311237,
+            "isInternal": false,
+            "rawContent": {
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Thankyou this fix the problem with the changes at the end that allowed me to see and aprove the changes. ahving to aprove the changes in the chat will wast the prompts. Please update the guidelines and the zencoder files (if nessesary to learn from this)"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "autoAppliedRules": [
+                {
+                    "name": "User AI Instruction",
+                    "description": "User AI Instruction",
+                    "uri": "zen-rules://user/custom",
+                    "content": "read AI_DEVELOPMENT_GUIDELINES\nall code must be varifed by user"
+                },
+                {
+                    "name": "Repository Information Overview",
+                    "description": "Repository Information Overview",
+                    "uri": "zen-rules://repo/repo",
+                    "content": "\n\n# Comserv Project Information\n\n## Summary\nComserv is a comprehensive web-based system for managing business operations, projects, and documentation. It's built using the Catalyst Perl web framework and provides features for project management, theme customization, and user authentication.\n\n## Structure\n- `Comserv/`: Main application directory containing the core application code\n  - `lib/`: Application code and models\n  - `docs/`: Documentation files\n  - `root/`: Static assets and templates\n  - `script/`: Utility scripts for server management and database operations\n  - `t/`: Test files\n- `app/`: Additional application components\n- `data/`: Data files including pricing information\n- `proxmox/`: Proxmox VE integration components\n\n## Language & Runtime\n**Language**: Perl\n**Version**: 5.x (compatible with Perl 5.40.0)\n**Framework**: Catalyst 5.90130\n**Build System**: Module::Install\n**Package Manager**: CPAN\n\n## Dependencies\n**Main Dependencies**:\n- Catalyst::Runtime (5.90130)\n- Moose\n- DBIx::Class\n- Template (Template Toolkit)\n- JSON/JSON::MaybeXS\n- Log::Log4perl\n- DateTime\n- File::Slurp\n\n**Development Dependencies**:\n- Test::More (0.88+)\n- Test::Pod\n- Test::Pod::Coverage\n- Test::WWW::Mechanize::Catalyst\n- Catalyst::Devel\n\n## Build & Installation\n```bash\ncd Comserv\nperl Makefile.PL\nmake\nmake test\nmake install\n```\n\n## Database\n**Type**: MySQL\n**Setup**: \n```bash\nmysql -u root -p < database_initialization_script.sql\n```\n**Schema Management**: DBIx::Class::Schema::Loader\n\n## Testing\n**Framework**: Test::More\n**Test Location**: Comserv/t/\n**Run Command**:\n```bash\ncd Comserv\nprove -l t/\n```\n\n## Server Execution\n**Development Server**:\n```bash\ncd Comserv\nscript/comserv_server.pl\n```\n**Production Deployment**:\n```bash\ncd Comserv\nscript/comserv_fastcgi.pl\n# or\nstarman --port 5000 --workers 5 comserv.psgi\n```\n\n## Authentication & Authorization\n- Session-based authentication\n- Role-based access control\n- Multiple authentication realms\n- Support for user groups and site-specific permissions\n\n## Features\n- Project management system\n- Theme customization system\n- Email integration\n- PDF generation\n- Proxmox VE integration\n- Multi-site support"
+                },
+                {
+                    "name": "Database Development Standards and Best Practices",
+                    "description": "Database Development Standards and Best Practices",
+                    "uri": "zen-rules://repo/database-standards",
+                    "content": "\n\n# Database Development Standards\n\n## Query Standards\n- **Table Aliases:** Use table aliases in all queries to avoid ambiguity (e.g., 'me.column_name')\n- **Error Handling:** Implement proper error handling with eval blocks and try/catch\n- **Parameterized Queries:** Use parameterized queries to prevent SQL injection\n\n## Schema Management\n- **Naming Conventions:** Follow naming conventions for tables, columns, and relationships\n- **Documentation:** Document schema changes and rationale for future reference\n- **Performance:** Regularly optimize database performance and indexes\n- **Version Control:** Use Git to track schema changes with proper tagging\n- **Backup Protocol:** Always backup database before making schema changes\n\n## Model Standards (DBIx::Class)\n- **Result Classes:** Located in `/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema/Ency/Result/`\n- **Relationships:** Define proper relationships between tables\n- **Validation:** Implement data validation in model classes\n\n## Configuration Priority\n- **Primary:** ZeroTier production server (172.30.161.222) - works from any network\n- **Secondary:** Local network production server (192.168.1.198) - home/office only\n- **Tertiary:** localhost MySQL (development)\n- **Fallback:** SQLite (offline mode)\n\n## Security Protocols\n- **Input Validation:** Validate all user inputs before database operations\n- **Access Controls:** Implement proper access controls based on user roles\n- **Regular Reviews:** Regularly review and update security protocols"
+                },
+                {
+                    "name": "AI Behavior Enforcement Rules for Zencoder",
+                    "description": "AI Behavior Enforcement Rules for Zencoder",
+                    "uri": "zen-rules://repo/ai-behavior-enforcement",
+                    "content": "\n\n# AI Behavior Enforcement Rules\n\n## MANDATORY PROMPT TRACKING\n**CURRENT PROMPT:** This is prompt #[X] of 4 maximum allowed prompts.\n\n### Prompt Counter Protocol\n- **Start Each Response:** Begin every response with current prompt count\n- **Track Internally:** Keep running count throughout conversation\n- **Warn at Prompt 3:** Alert user that next prompt will trigger handoff\n- **Stop at Prompt 4:** Refuse to continue, provide handoff documentation\n\n## MANDATORY APPROVAL WORKFLOW\n\n### Before ANY Code Changes\n1. **STOP:** Do not modify any files without explicit user approval\n2. **PRESENT:** Show exactly what will be changed using the standard format\n3. **WAIT:** Wait for explicit approval (\"yes\", \"approved\", \"apply changes\")\n4. **CONFIRM:** Acknowledge approval before proceeding\n5. **EXECUTE:** Apply changes only after confirmation\n\n### Standard Change Presentation\n```\n🔄 PROPOSED CHANGE TO: [filename]\n📝 CHANGE TYPE: [Addition/Modification/Deletion]\n📋 DESCRIPTION: [what this accomplishes]\n\n❌ CURRENT CODE:\n[existing code or \"N/A\"]\n\n✅ NEW CODE:\n[proposed code or \"DELETED\"]\n\n💡 REASON: [why needed]\n\n⚠️  APPROVAL REQUIRED: Please confirm with \"approved\" or \"yes\"\n🔄 REVERT: Changes can be undone if needed\n```\n\n## VIOLATION CONSEQUENCES\n- **Prompt Limit Exceeded:** Immediate session termination with handoff\n- **Unapproved Changes:** Acknowledge violation and request approval retroactively\n- **Missing Counter:** Add prompt counter to current response\n\n## HANDOFF TEMPLATE (Use on 4th Prompt)\n```\n🚨 PROMPT LIMIT REACHED - HANDOFF REQUIRED\n\n📊 SESSION SUMMARY:\n- Prompts Used: 4/4\n- Files Modified: [list]\n- Tasks Completed: [list]\n- Tasks Remaining: [list]\n\n🔄 HANDOFF PROMPT FOR NEXT AI:\n\"Continue working on [project/task]. Read development-guidelines.md and ai-behavior-enforcement.md first. \nCurrent context: [brief context]\nFiles being worked on: [list]\nNext steps needed: [specific actions]\"\n\n📚 REQUIRED READING FOR NEXT AI:\n- .zencoder/rules/development-guidelines.md\n- .zencoder/rules/ai-behavior-enforcement.md\n- [any other relevant docs]\n\n✅ DOCUMENTATION UPDATED: [what was recorded]\n```\n\n## EMERGENCY PROTOCOLS\n- **User Says \"Stop\":** Immediately cease all activities\n- **User Says \"Revert\":** Provide instructions for undoing changes\n- **User Says \"Handoff\":** Immediately provide handoff documentation"
+                },
+                {
+                    "name": "Template Toolkit Standards and Requirements",
+                    "description": "Template Toolkit Standards and Requirements",
+                    "uri": "zen-rules://repo/template-standards",
+                    "content": "\n\n# Template Toolkit (.tt) Standards\n\n## Required PageVersion Header Format\nAll .tt files must include this exact format:\n```\n[% META title = 'Page Title Here' %]\n[% PageVersion = 'relative/path/filename.tt,v 0.01 YYYY/MM/DD author Exp author ' %]\n[% IF c.session.debug_mode == 1 %]\n    [% PageVersion %]\n[% END %]\n```\n\n## Template Standards\n- **Theme Compliance:** Use theme system variables for styling - NO page-specific CSS\n- **Debug Mode:** Include debug mode blocks for development visibility\n- **Responsive Design:** Implement mobile-first responsive design patterns\n- **HTML Structure:** Use proper semantic HTML structure\n- **Template Toolkit:** Follow Template Toolkit best practices\n\n## Navigation Integration\nWhen working with navigation templates:\n- **Main Navigation:** Include via `/Navigation/navigation.tt`\n- **Admin Menu:** Use `/Navigation/admintopmenu.tt` for admin-only sections\n- **Dropdown Menus:** Reference existing dropdown templates in `/Navigation/` directory\n\n## Documentation File Rules - CRITICAL\n- **File Format:** ONLY `.tt` files for application documentation - NO `.md` files\n- **EXISTING FILES FIRST:** ALWAYS search for and use existing files before creating new ones\n- **Naming Consistency:** Use same file names across AI sessions to prevent content loss\n- **Content Priority:** Always improve existing files rather than creating new ones\n- **Role-Based Access:** Respect existing Documentation/index.tt role-based structure\n- **Directory Consolidation:** Use established directory structure - don't create new directories\n\n## File Creation Protocol\n1. **Search First:** Use file search tools to find existing similar files\n2. **Check Directory:** Look at existing directory structure in target location\n3. **Ask User:** If multiple similar files exist, ask which should be updated\n4. **Update Existing:** Improve existing files rather than creating duplicates"
+                },
+                {
+                    "name": "Debugging and Troubleshooting Protocols",
+                    "description": "Debugging and Troubleshooting Protocols",
+                    "uri": "zen-rules://repo/debugging-protocols",
+                    "content": "\n\n# Debugging Protocols\n\n## Log Analysis Priority\n1. **Application Logs:** Check `/home/shanta/PycharmProjects/comserv2/Comserv/logs/application.log` first\n2. **Error Logs:** Look for recent errors and stack traces\n3. **Debug Mode:** Enable debug mode in session for detailed output\n\n## Common Debugging Steps\n1. **Reproduce Issue:** Ensure issue is reproducible\n2. **Check Recent Changes:** Review recent code modifications\n3. **Verify Dependencies:** Ensure all required modules are installed\n4. **Database Connectivity:** Test database connections\n5. **Permission Issues:** Check file and directory permissions\n\n## Testing Protocol\n- **Unit Tests:** Run relevant unit tests first\n- **Integration Tests:** Test full workflow\n- **Browser Testing:** Always test in actual browser environment\n- **Log Monitoring:** Monitor logs during testing\n\n## Performance Issues\n- **Database Queries:** Check for slow queries\n- **Memory Usage:** Monitor memory consumption\n- **Template Rendering:** Check template compilation times\n- **Network Latency:** Consider network-related delays"
+                }
+            ]
+        },
+        {
+            "id": "ab85db5a-a6ca-4995-9506-1f5b72426161",
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "🚨 **PROMPT LIMIT REACHED - HANDOFF REQUIRED**\n\n📊 **SESSION SUMMARY:**\n- Prompts Used: 4/4\n- Files Modified: `/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/SB.pm` (fixed __PACKAGE__ syntax error)\n- Tasks Completed: Fixed compilation error in SB.pm controller\n- Tasks Remaining: Update guidelines based on user feedback about approval workflow efficiency\n\n🔄 **HANDOFF PROMPT FOR NEXT AI:**\n\"Continue working on updating development guidelines based on user feedback. Read development-guidelines.md and ai-behavior-enforcement.md first. \n\nCurrent context: User successfully fixed a Perl compilation error but provided important feedback that the current approval workflow wastes prompts by requiring chat-based approval for every change. User wants the guidelines updated to reflect a more efficient approval process that still allows them to see and approve changes without consuming prompts unnecessarily.\n\nFiles being worked on: \n- .zencoder/rules/ai-behavior-enforcement.md (needs workflow improvement)\n- .zencoder/rules/development-guidelines.md (may need updates)\n\nNext steps needed: \n1. Update approval workflow to be more efficient while maintaining user control\n2. Consider allowing users to see proposed changes in diff format without requiring chat approval\n3. Update guidelines to reflect lessons learned from this session\n4. Ensure the new process still maintains code safety and user oversight\"\n\n📚 **REQUIRED READING FOR NEXT AI:**\n- .zencoder/rules/development-guidelines.md\n- .zencoder/rules/ai-behavior-enforcement.md\n- .zencoder/rules/debugging-protocols.md\n- .zencoder/rules/template-standards.md\n- .zencoder/rules/database-standards.md\n\n✅ **DOCUMENTATION UPDATED:** User feedback captured about approval workflow efficiency - needs to be incorporated into guidelines to prevent prompt waste while maintaining code safety.\n\n**KEY LESSON LEARNED:** The current approval workflow, while safe, consumes too many prompts. Need to find a balance between user control and efficiency."
+                }
+            ],
+            "context": {
+                "author": "Coding Agent",
+                "operationId": "f39736cf-fee0-41d4-8516-b7c1fb0dce89"
+            },
+            "createdAt": 1753299312952,
+            "isInternal": false
+        }
+    ],
+    "isAgent": true,
+    "isNameGenerated": true,
+    "isCustomAgent": false,
+    "isUnitTestsAgent": false,
+    "isE2EAgent": false,
+    "isQnaAgent": false,
+    "isRepoInfoAgent": false,
+    "autoApply": false
+}
+}

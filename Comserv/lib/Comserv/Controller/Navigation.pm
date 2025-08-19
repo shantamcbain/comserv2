@@ -12,6 +12,179 @@ has '_navigation_cache' => (
     default => sub { {} }
 );
 
+# Helper method to get user roles (returns array of all roles)
+sub get_user_roles {
+    my ($self, $c) = @_;
+    
+    return ['guest'] unless $c->user_exists;
+    
+    my @user_roles = ();
+    
+    # Get roles from session
+    my $roles = $c->session->{roles};
+    if (ref($roles) eq 'ARRAY') {
+        @user_roles = @$roles;
+    } elsif (defined $roles && !ref($roles)) {
+        @user_roles = split(/[,\s]+/, $roles);
+    }
+    
+    # Get user groups as additional roles
+    my $user_groups = $c->session->{user_groups};
+    if (ref($user_groups) eq 'ARRAY') {
+        push @user_roles, @$user_groups;
+    } elsif (defined $user_groups && !ref($user_groups)) {
+        push @user_roles, split(/[,\s]+/, $user_groups);
+    }
+    
+    # Clean up roles (lowercase, remove duplicates)
+    my %seen;
+    @user_roles = grep { !$seen{lc($_)}++ } map { lc($_) } @user_roles;
+    
+    # Ensure we have at least 'member' if user exists but no specific roles
+    push @user_roles, 'member' unless @user_roles;
+    
+    return \@user_roles;
+}
+
+# Helper method to create cache key from multiple roles
+sub create_cache_key {
+    my ($self, $c) = @_;
+    
+    my $roles = $self->get_user_roles($c);
+    my $site_name = $c->session->{SiteName} || 'All';
+    my $username = $c->session->{username} || 'guest';
+    
+    # Sort roles for consistent cache key
+    my $roles_str = join('_', sort @$roles);
+    
+    return "${roles_str}_${site_name}_${username}";
+}
+
+# Method to build complete navigation menu for user roles and store in session
+sub build_navigation_cache {
+    my ($self, $c) = @_;
+    
+    my $cache_key = $self->create_cache_key($c);
+    
+    # Check if we already have cached navigation for this session
+    if ($c->session->{navigation_cache} && 
+        $c->session->{navigation_cache_key} eq $cache_key &&
+        $c->session->{navigation_cache_time} && 
+        (time() - $c->session->{navigation_cache_time}) < 3600) { # 1 hour cache
+        
+        $c->log->debug("Using cached navigation for: $cache_key");
+        return $c->session->{navigation_cache};
+    }
+    
+    $c->log->debug("Building navigation cache for: $cache_key");
+    
+    my $user_roles = $self->get_user_roles($c);
+    my $site_name = $c->session->{SiteName} || 'All';
+    my $username = $c->session->{username} || 'guest';
+    
+    my $navigation = $self->build_role_based_navigation($c, $user_roles, $site_name, $username);
+    
+    # Store in session
+    $c->session->{navigation_cache} = $navigation;
+    $c->session->{navigation_cache_key} = $cache_key;
+    $c->session->{navigation_cache_time} = time();
+    
+    return $navigation;
+}
+
+# Build navigation based on multiple user roles
+sub build_role_based_navigation {
+    my ($self, $c, $user_roles, $site_name, $username) = @_;
+    
+    my $page_url = $c->req->path || '';
+    
+    my $navigation = {
+        # Always include main menu
+        main_menu => $self->get_pages($c, 'Main', $site_name),
+        top_menu => $self->get_internal_links($c, 'Top_menu', $site_name),
+        footer_menu => $self->get_internal_links($c, 'Footer_menu', $site_name),
+    };
+    
+    # Add custom menu items for main menu (gradual integration)
+    my $custom_main_items = $self->get_custom_menu_items($c, 'main', $user_roles, $site_name, $page_url);
+    if (@$custom_main_items) {
+        $navigation->{custom_main_menu} = $self->build_custom_dropdown_structure($c, $custom_main_items);
+    }
+    
+    # Add role-specific navigation
+    foreach my $role (@$user_roles) {
+        if ($role eq 'admin') {
+            $navigation->{admin_menu} = $self->get_admin_pages($c, $site_name);
+            $navigation->{admin_links} = $self->get_admin_links($c, $site_name);
+            
+            # Add custom admin menu items
+            my $custom_admin_items = $self->get_custom_menu_items($c, 'admin', $user_roles, $site_name, $page_url);
+            if (@$custom_admin_items) {
+                $navigation->{custom_admin_menu} = $self->build_custom_dropdown_structure($c, $custom_admin_items);
+            }
+        }
+        
+        # Add other role-specific menus as needed
+        if ($role eq 'manager') {
+            $navigation->{manager_menu} = $self->get_internal_links($c, 'Manager_menu', $site_name);
+            
+            # Add custom manager menu items
+            my $custom_manager_items = $self->get_custom_menu_items($c, 'manager', $user_roles, $site_name, $page_url);
+            if (@$custom_manager_items) {
+                $navigation->{custom_manager_menu} = $self->build_custom_dropdown_structure($c, $custom_manager_items);
+            }
+        }
+        
+        if ($role eq 'editor') {
+            $navigation->{editor_menu} = $self->get_internal_links($c, 'Editor_menu', $site_name);
+            
+            # Add custom editor menu items
+            my $custom_editor_items = $self->get_custom_menu_items($c, 'editor', $user_roles, $site_name, $page_url);
+            if (@$custom_editor_items) {
+                $navigation->{custom_editor_menu} = $self->build_custom_dropdown_structure($c, $custom_editor_items);
+            }
+        }
+        
+        # Add more roles as your system requires
+    }
+    
+    # Add private links for logged-in users (not guests)
+    if ($username ne 'guest') {
+        $navigation->{private_links} = $self->get_private_links($c, $username, $site_name);
+    }
+    
+    # Add menu visibility information
+    $navigation->{menu_visibility} = {
+        main => $self->is_menu_visible($c, 'main', $user_roles, $site_name, $page_url),
+        admin => $self->is_menu_visible($c, 'admin', $user_roles, $site_name, $page_url),
+        manager => $self->is_menu_visible($c, 'manager', $user_roles, $site_name, $page_url),
+        editor => $self->is_menu_visible($c, 'editor', $user_roles, $site_name, $page_url),
+        member => $self->is_menu_visible($c, 'member', $user_roles, $site_name, $page_url),
+        global => $self->is_menu_visible($c, 'global', $user_roles, $site_name, $page_url),
+        hosted => $self->is_menu_visible($c, 'hosted', $user_roles, $site_name, $page_url),
+    };
+    
+    return $navigation;
+}
+
+# Method to invalidate navigation cache (call when navigation changes)
+sub invalidate_navigation_cache {
+    my ($self, $c) = @_;
+    
+    delete $c->session->{navigation_cache};
+    delete $c->session->{navigation_cache_key};
+    delete $c->session->{navigation_cache_time};
+    
+    $c->log->debug("Navigation cache invalidated");
+}
+
+# Convenient method to get cached navigation
+sub get_navigation {
+    my ($self, $c) = @_;
+    
+    return $self->build_navigation_cache($c);
+}
+
 has '_tables_checked' => (
     is => 'rw',
     isa => 'Bool',
@@ -301,7 +474,7 @@ sub add_private_link :Path('/navigation/add_private_link') :Args(0) {
         # Validate required fields
         unless ($name && $url) {
             $c->flash->{error_msg} = "Name and URL are required fields.";
-            $c->stash->{template} = 'navigation/add_private_link.tt';
+            $c->stash->{template} = 'Navigation/add_private_link.tt';
             return;
         }
         
@@ -346,7 +519,7 @@ sub add_private_link :Path('/navigation/add_private_link') :Args(0) {
     }
     
     # Show the add form
-    $c->stash->{template} = 'navigation/add_private_link.tt';
+    $c->stash->{template} = 'Navigation/add_private_link.tt';
 }
 
 # Method to manage private links
@@ -365,7 +538,7 @@ sub manage_private_links :Path('/navigation/manage_private_links') :Args(0) {
     
     # Get user's private links
     $c->stash->{private_links} = $self->get_private_links($c, $username, $site_name);
-    $c->stash->{template} = 'navigation/manage_private_links.tt';
+    $c->stash->{template} = 'Navigation/manage_private_links.tt';
 }
 
 # Method to edit a private link
@@ -406,7 +579,7 @@ sub edit_private_link :Path('/navigation/edit_private_link') :Args(1) {
         unless ($name && $url) {
             $c->flash->{error_msg} = "Name and URL are required fields.";
             $c->stash->{link} = { $link->get_columns };
-            $c->stash->{template} = 'navigation/edit_private_link.tt';
+            $c->stash->{template} = 'Navigation/edit_private_link.tt';
             return;
         }
         
@@ -431,7 +604,7 @@ sub edit_private_link :Path('/navigation/edit_private_link') :Args(1) {
     
     # Show the edit form
     $c->stash->{link} = { $link->get_columns };
-    $c->stash->{template} = 'navigation/edit_private_link.tt';
+    $c->stash->{template} = 'Navigation/edit_private_link.tt';
 }
 
 # Method to delete a private link
@@ -496,7 +669,7 @@ sub add_link :Path('/navigation/add_link') :Args(0) {
         unless ($category && $name && $url) {
             $c->flash->{error_msg} = "Category, Name and URL are required fields.";
             $c->stash->{menu_type} = $menu_type;
-            $c->stash->{template} = 'navigation/add_link.tt';
+            $c->stash->{template} = 'Navigation/add_link.tt';
             return;
         }
         
@@ -507,7 +680,7 @@ sub add_link :Path('/navigation/add_link') :Args(0) {
             if ($site_name ne $current_site && $site_name ne 'All') {
                 $c->flash->{error_msg} = "You can only add links for your current site ($current_site).";
                 $c->stash->{menu_type} = $menu_type;
-                $c->stash->{template} = 'navigation/add_link.tt';
+                $c->stash->{template} = 'Navigation/add_link.tt';
                 return;
             }
             # Force site_name to current site for non-privileged sites
@@ -557,7 +730,7 @@ sub add_link :Path('/navigation/add_link') :Args(0) {
     
     # Show the add form
     $c->stash->{menu_type} = $menu_type;
-    $c->stash->{template} = 'navigation/add_link.tt';
+    $c->stash->{template} = 'Navigation/add_link.tt';
 }
 
 # Admin method to manage all menu links
@@ -603,7 +776,7 @@ sub manage_links :Path('/navigation/manage_links') :Args(0) {
     }
     
     $c->stash->{links_by_category} = \%links_by_category;
-    $c->stash->{template} = 'navigation/manage_links.tt';
+    $c->stash->{template} = 'Navigation/manage_links.tt';
 }
 
 # Admin method to delete any menu link
@@ -702,7 +875,7 @@ sub edit_link :Path('/navigation/edit_link') :Args(1) {
         unless ($category && $name && $url) {
             $c->flash->{error_msg} = "Category, Name and URL are required fields.";
             $c->stash->{link} = { $link->get_columns };
-            $c->stash->{template} = 'navigation/edit_link.tt';
+            $c->stash->{template} = 'Navigation/edit_link.tt';
             return;
         }
         
@@ -712,7 +885,7 @@ sub edit_link :Path('/navigation/edit_link') :Args(1) {
             if ($site_name ne $current_site && $site_name ne 'All') {
                 $c->flash->{error_msg} = "You can only update links for your current site ($current_site).";
                 $c->stash->{link} = { $link->get_columns };
-                $c->stash->{template} = 'navigation/edit_link.tt';
+                $c->stash->{template} = 'Navigation/edit_link.tt';
                 return;
             }
             # Force site_name to current site for non-privileged sites
@@ -745,7 +918,7 @@ sub edit_link :Path('/navigation/edit_link') :Args(1) {
     
     # Show the edit form
     $c->stash->{link} = { $link->get_columns };
-    $c->stash->{template} = 'navigation/edit_link.tt';
+    $c->stash->{template} = 'Navigation/edit_link.tt';
 }
 
 # Method to populate navigation data in the stash with caching
@@ -937,6 +1110,168 @@ sub auto :Private {
     }
     
     return 1; # Allow the request to proceed
+}
+
+# Method to check if a menu should be visible based on menu_visibility table
+sub is_menu_visible {
+    my ($self, $c, $menu_name, $user_roles, $site_name, $page_url) = @_;
+    
+    $c->log->debug("Checking menu visibility for: $menu_name, site: $site_name");
+    
+    # Default to visible if no rules found
+    my $is_visible = 1;
+    
+    eval {
+        # Get visibility rules for this menu, ordered by priority (lower = higher priority)
+        my $rs = $c->model('DBEncy')->resultset('MenuVisibility')->search({
+            menu_name => $menu_name,
+            site_name => [ $site_name, 'All' ]
+        }, {
+            order_by => { -asc => 'priority' }
+        });
+        
+        while (my $rule = $rs->next) {
+            # Check if this rule applies to current context
+            my $rule_applies = 1;
+            
+            # Check role match
+            if (defined $rule->role_name && $rule->role_name ne '') {
+                my $role_matches = 0;
+                foreach my $user_role (@$user_roles) {
+                    if (lc($user_role) eq lc($rule->role_name)) {
+                        $role_matches = 1;
+                        last;
+                    }
+                }
+                $rule_applies = 0 unless $role_matches;
+            }
+            
+            # Check page pattern match
+            if (defined $rule->page_pattern && $rule->page_pattern ne '' && defined $page_url) {
+                my $pattern = $rule->page_pattern;
+                # Simple pattern matching - can be enhanced later
+                if ($pattern =~ /\*/) {
+                    # Wildcard pattern
+                    $pattern =~ s/\*/.*?/g;
+                    $rule_applies = 0 unless $page_url =~ /$pattern/i;
+                } else {
+                    # Exact match
+                    $rule_applies = 0 unless lc($page_url) eq lc($pattern);
+                }
+            }
+            
+            # Apply the rule if it matches
+            if ($rule_applies) {
+                $is_visible = $rule->is_visible;
+                $c->log->debug("Menu visibility rule applied: $menu_name = " . ($is_visible ? 'visible' : 'hidden'));
+                last; # First matching rule wins (due to priority ordering)
+            }
+        }
+    };
+    if ($@) {
+        $c->log->error("Error checking menu visibility: $@");
+        # Default to visible on error
+        $is_visible = 1;
+    }
+    
+    return $is_visible;
+}
+
+# Method to get custom menu items for a specific parent menu
+sub get_custom_menu_items {
+    my ($self, $c, $parent_menu, $user_roles, $site_name, $page_url) = @_;
+    
+    $c->log->debug("Getting custom menu items for parent: $parent_menu, site: $site_name");
+    
+    my @results;
+    
+    eval {
+        # Get active custom menu items for this parent menu
+        my $rs = $c->model('DBEncy')->resultset('CustomMenu')->search({
+            parent_menu => $parent_menu,
+            site_name => [ $site_name, 'All' ],
+            is_active => 1
+        }, {
+            order_by => { -asc => 'sort_order' }
+        });
+        
+        while (my $item = $rs->next) {
+            # Check role requirements
+            my $role_ok = 1;
+            if (defined $item->required_role && $item->required_role ne '') {
+                $role_ok = 0;
+                foreach my $user_role (@$user_roles) {
+                    if (lc($user_role) eq lc($item->required_role)) {
+                        $role_ok = 1;
+                        last;
+                    }
+                }
+            }
+            
+            # Check page pattern
+            my $page_ok = 1;
+            if (defined $item->page_pattern && $item->page_pattern ne '' && defined $page_url) {
+                my $pattern = $item->page_pattern;
+                if ($pattern =~ /\*/) {
+                    # Wildcard pattern
+                    $pattern =~ s/\*/.*?/g;
+                    $page_ok = ($page_url =~ /$pattern/i) ? 1 : 0;
+                } else {
+                    # Exact match
+                    $page_ok = (lc($page_url) eq lc($pattern)) ? 1 : 0;
+                }
+            }
+            
+            # Add item if it passes all checks
+            if ($role_ok && $page_ok) {
+                push @results, {
+                    id => $item->id,
+                    title => $item->title,
+                    url => $item->url,
+                    icon_class => $item->icon_class || 'icon-link',
+                    target => $item->target || '_self',
+                    is_dropdown => $item->is_dropdown,
+                    dropdown_parent_id => $item->dropdown_parent_id,
+                    menu_group => $item->menu_group,
+                    sort_order => $item->sort_order,
+                    description => $item->description
+                };
+            }
+        }
+        
+        $c->log->debug("Found " . scalar(@results) . " custom menu items for parent: $parent_menu");
+    };
+    if ($@) {
+        $c->log->error("Error getting custom menu items: $@");
+    }
+    
+    return \@results;
+}
+
+# Method to build dropdown structure from flat custom menu items
+sub build_custom_dropdown_structure {
+    my ($self, $c, $menu_items) = @_;
+    
+    my @top_level = ();
+    my %children_by_parent = ();
+    
+    # Separate top-level items from dropdown children
+    foreach my $item (@$menu_items) {
+        if ($item->{dropdown_parent_id}) {
+            push @{$children_by_parent{$item->{dropdown_parent_id}}}, $item;
+        } else {
+            push @top_level, $item;
+        }
+    }
+    
+    # Attach children to their parents
+    foreach my $parent (@top_level) {
+        if ($parent->{is_dropdown} && $children_by_parent{$parent->{id}}) {
+            $parent->{children} = $children_by_parent{$parent->{id}};
+        }
+    }
+    
+    return \@top_level;
 }
 
 __PACKAGE__->meta->make_immutable;

@@ -1,0 +1,45 @@
+{
+    "checksum": "af19ebc73bd207899846d12ffe1e8710e7b1f20b7eb5dcfccd0f7fff5dfac6bd",
+    "data": {
+    "id": "1964b4a9-389b-4287-a0ca-82c30ca4cae4",
+    "createdAt": 1752781278142,
+    "updatedAt": 1752781971561,
+    "title": "We have not solved the problem of the buttons i...",
+    "messages": [
+        {
+            "id": "2d54df25-f855-4af7-b51a-3819b3866d4f",
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "We have not solved the problem of the buttons in forms are not complient with the theme of the website. background colour clash with the other colours of the theme backgrounds . the link colour is the same as the button background there for cannot be seen.  Is this a theme problem or attempting to fix ai putting css in each file there for creating a maintinance night mare."
+                }
+            ],
+            "context": {
+                "codebaseEnabled": true
+            },
+            "createdAt": 1752781971561,
+            "isInternal": false,
+            "rawContent": {
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "We have not solved the problem of the buttons in forms are not complient with the theme of the website. background colour clash with the other colours of the theme backgrounds . the link colour is the same as the button background there for cannot be seen.  Is this a theme problem or attempting to fix ai putting css in each file there for creating a maintinance night mare."
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ],
+    "isAgent": true,
+    "isCustomAgent": false,
+    "isUnitTestsAgent": false,
+    "isE2EAgent": false,
+    "autoApply": false
+}
+}

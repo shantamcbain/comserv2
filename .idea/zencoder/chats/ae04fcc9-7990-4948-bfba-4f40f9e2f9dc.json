@@ -1,0 +1,248 @@
+{
+    "checksum": "fd3721bc6f8dea3980f89b2a407e10d98f2ffa22ffcdedc905120a9b7c8aecbe",
+    "data": {
+    "id": "ae04fcc9-7990-4948-bfba-4f40f9e2f9dc",
+    "createdAt": 1749808315136,
+    "updatedAt": 1749808333572,
+    "title": "DBEncy Configuration: Host: 172.30.161.222 (sho...",
+    "messages": [
+        {
+            "id": "00d92030-c5ae-4bff-be5d-25330bc69cfa",
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "DBEncy Configuration:"
+                },
+                {
+                    "type": "text",
+                    "text": "Host: 172.30.161.222 (should be localhost)"
+                },
+                {
+                    "type": "text",
+                    "text": "Database: ency"
+                },
+                {
+                    "type": "text",
+                    "text": "Username: shanta_forager"
+                },
+                {
+                    "type": "text",
+                    "text": "Using FindBin fallback for config file: /home/shanta/PycharmProjects/comserv2/Comserv/db_config.json at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/DBForager.pm line 49."
+                },
+                {
+                    "type": "text",
+                    "text": "DBForager Configuration:"
+                },
+                {
+                    "type": "text",
+                    "text": "Host: 172.30.161.222"
+                },
+                {
+                    "type": "text",
+                    "text": "Database: shanta_forager"
+                },
+                {
+                    "type": "text",
+                    "text": "Username: shanta_forager"
+                },
+                {
+                    "type": "text",
+                    "text": "Using FindBin fallback for config file: /home/shanta/PycharmProjects/comserv2/Comserv/db_config.json at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/DBSchemaManager.pm line 66."
+                },
+                {
+                    "type": "text",
+                    "text": "While trying to resolve method call Comserv::View::AutoCRUD::JSON->isa() can not locate package \"Catalyst::View::JSON\" yet it is mentioned in @Comserv::View::AutoCRUD::JSON::ISA (perhaps you forgot to load \"Catalyst::View::JSON\"?) at /usr/local/lib/x86_64-linux-gnu/perl/5.34.0/Class/MOP/Class.pm line 957."
+                },
+                {
+                    "type": "text",
+                    "text": "Can't locate object method \"config\" via package \"Comserv::View::AutoCRUD::JSON\" at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/View/AutoCRUD/JSON.pm line 7."
+                },
+                {
+                    "type": "text",
+                    "text": "Compilation failed in require at /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/Catalyst/Utils.pm line 310."
+                },
+                {
+                    "type": "text",
+                    "text": "Compilation failed in require at /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/Catalyst/Utils.pm line 310."
+                },
+                {
+                    "type": "text",
+                    "text": "This is the location of our mysql datebace why are we being told that it should be local host"
+                }
+            ],
+            "context": {
+                "currentFile": {
+                    "path": "Comserv/db_config.json",
+                    "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/db_config.json",
+                    "sources": [
+                        "opened_tab"
+                    ],
+                    "content": "{\n    \"shanta_ency\": {\n\n        \"host\": \"172.30.161.222\",\n        \"port\": 3306,\n        \"username\": \"shanta_forager\",\n            \"password\": \"UA=nPF8*m+T#\",\n        \"database\": \"ency\"\n    },\n    \"shanta_forager\": {\n        \"host\": \"172.30.161.222\",\n        \"port\": 3306,\n        \"username\": \"shanta_forager\",\n        \"password\": \"UA=nPF8*m+T#\",\n        \"database\": \"shanta_forager\"\n    }\n}",
+                    "language": "json"
+                },
+                "codebaseEnabled": true
+            },
+            "createdAt": 1749808315140,
+            "isInternal": false,
+            "rawContent": {
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "DBEncy Configuration:"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Host: 172.30.161.222 (should be localhost)"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Database: ency"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Username: shanta_forager"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Using FindBin fallback for config file: /home/shanta/PycharmProjects/comserv2/Comserv/db_config.json at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/DBForager.pm line 49."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "DBForager Configuration:"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Host: 172.30.161.222"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Database: shanta_forager"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Username: shanta_forager"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Using FindBin fallback for config file: /home/shanta/PycharmProjects/comserv2/Comserv/db_config.json at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/DBSchemaManager.pm line 66."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "While trying to resolve method call Comserv::View::AutoCRUD::JSON->isa() can not locate package \"Catalyst::View::JSON\" yet it is mentioned in @Comserv::View::AutoCRUD::JSON::ISA (perhaps you forgot to load \"Catalyst::View::JSON\"?) at /usr/local/lib/x86_64-linux-gnu/perl/5.34.0/Class/MOP/Class.pm line 957."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Can't locate object method \"config\" via package \"Comserv::View::AutoCRUD::JSON\" at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/View/AutoCRUD/JSON.pm line 7."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Compilation failed in require at /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/Catalyst/Utils.pm line 310."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Compilation failed in require at /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/Catalyst/Utils.pm line 310."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "This is the location of our mysql datebace why are we being told that it should be local host"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "0e1dafd7-f7d4-408a-9182-3aa35117e3ad",
+            "role": "system",
+            "content": [
+                {
+                    "type": "errorText",
+                    "text": "Could not establish websocket connection. Please try again later.",
+                    "allowRegenerate": true
+                }
+            ],
+            "createdAt": 1749808333572,
+            "isInternal": false
+        }
+    ],
+    "isAgent": true,
+    "isCustomAgent": false,
+    "isUnitTestsAgent": false,
+    "autoApply": false
+}
+}

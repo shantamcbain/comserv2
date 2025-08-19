@@ -1,0 +1,891 @@
+{
+    "checksum": "084bd209409653d785c44564801556c76350e23146a9ebe2c39164edf38f919b",
+    "data": {
+    "id": "430c3388-76b8-4679-bfcd-14dae68c8f07",
+    "createdAt": 1753528564474,
+    "updatedAt": 1753532578084,
+    "title": "Projects Documentation Update",
+    "messages": [
+        {
+            "id": "da569ef9-c16b-40cd-a1a6-da413dcd1901",
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "docs: Update Projects.tt documentation with system status and recent fixes"
+                },
+                {
+                    "type": "text",
+                    "text": "- Updated PageVersion to 0.07 with current date (2025/01/27)"
+                },
+                {
+                    "type": "text",
+                    "text": "- Fixed debug mode check to use c.session.debug_mode instead of debug"
+                },
+                {
+                    "type": "text",
+                    "text": "- Added system status alert showing recent controller fixes"
+                },
+                {
+                    "type": "text",
+                    "text": "- Updated title to match content (Projects System Documentation)"
+                },
+                {
+                    "type": "text",
+                    "text": "Changes reflect recent fixes to Project.pm controller:"
+                },
+                {
+                    "type": "text",
+                    "text": "- Database queries now working instead of returning empty arrays"
+                },
+                {
+                    "type": "text",
+                    "text": "- All compilation errors resolved"
+                },
+                {
+                    "type": "text",
+                    "text": "- Proper error handling implemented"
+                },
+                {
+                    "type": "text",
+                    "text": "File: /home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Projects.tt"
+                }
+            ],
+            "context": {
+                "currentFile": {
+                    "path": "Comserv/root/Documentation/Projects.tt",
+                    "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Projects.tt",
+                    "sources": [
+                        "opened_tab"
+                    ],
+                    "content": "[% META title = 'Projects System Documentation' %]\n    [% PageVersion = 'Documentation/Projects.tt,v 0.07 2025/01/27 AI Exp AI ' %]\n[% IF c.session.debug_mode == 1 %]\n    [% PageVersion %]\n[% END %]\n\n    <h1 id=\"projects-top\">Projects System Documentation</h1>\n    \n    <div class=\"alert alert-info\">\n        <strong>System Status:</strong> Project controller has been updated with working database queries and proper error handling. \n        All compilation errors have been resolved. Last updated: January 27, 2025.\n    </div>\n\n    <nav>\n        <a href=\"#projects-overview\">Projects Overview</a> |\n        <a href=\"#projects-controller\">Projects Controller</a> |\n        <a href=\"#projects-model\">Projects Model</a> |\n        <a href=\"#projects-templates\">Projects Templates</a> |\n        <a href=\"#projects-ui\">Projects UI Components</a> |\n        <a href=\"#projects-filtering\">Projects Filtering</a> |\n        <a href=\"#projects-workflow\">Projects Workflow</a> |\n        <a href=\"#projects-usage\">Projects Usage</a> |\n        <a href=\"#projects-troubleshooting\">Troubleshooting</a>\n    </nav>\n\n    <h2 id=\"projects-overview\">Projects Overview</h2>\n    <p>The Projects system manages hierarchical project structures with support for parent-child relationships. Each project can have multiple sub-projects, and the system maintains data integrity through proper handling of user permissions and data validation.</p>\n\n    <h2 id=\"projects-controller\">Projects Controller</h2>\n    <p>Key features in <code>Comserv::Controller::Project</code>:</p>\n    <ul>\n        <li><strong>Project Creation:</strong> Handles form submissions with proper validation for:\n            <ul>\n                <li>Parent-child relationships (parent_id)</li>\n                <li>User authentication and username tracking</li>\n                <li>Required fields and data type validation</li>\n            </ul>\n        </li>\n        <li><strong>Project Hierarchy:</strong> Manages up to 4 levels of sub-projects</li>\n        <li><strong>Project Listing:</strong> Displays projects in a card-based layout, sorted by name</li>\n        <li><strong>Error Handling:</strong> Provides detailed error messages and logging</li>\n        <li><strong>UI Configuration:</strong> Sets up the UI with:\n            <ul>\n                <li>CSS loading with cache-busting timestamps</li>\n                <li>Fluid container layout for better card display</li>\n                <li>Debug mode for troubleshooting</li>\n                <li>Template timestamp for forced reloading</li>\n            </ul>\n        </li>\n    </ul>\n    \n    <h3>Controller Code Example</h3>\n    <pre><code># Add the projects and filter info to the stash\n$c->stash(\n    projects => $projects,\n    role_filter => $role_filter,\n    project_filter => $project_filter,\n    priority_filter => $priority_filter,\n    template => 'todo/project.tt',\n    template_timestamp => time(), # Add a timestamp to force template reload\n    additional_css => ['/static/css/components/project-cards.css?v=' . time()], # Add timestamp to force CSS reload\n    use_fluid_container => 1, # Use fluid container for better card layout\n    debug_mode => 1 # Enable debug mode to see template version\n);</code></pre>\n\n    <h2 id=\"projects-model\">Projects Model</h2>\n    <p>The database schema includes these key fields:</p>\n    <ul>\n        <li>id (Primary Key)</li>\n        <li>name (Project name)</li>\n        <li>parent_id (Optional, for sub-projects)</li>\n        <li>sitename (Associated site)</li>\n        <li>status (Project status)</li>\n        <li>username_of_poster (Creator/owner)</li>\n        <li>Various metadata fields (dates, descriptions, etc.)</li>\n    </ul>\n\n    <h2 id=\"projects-templates\">Projects Templates</h2>\n    <p>Current template structure:</p>\n    <ul>\n        <li><strong>todo/project.tt:</strong> Main project listing with vertical card-based layout\n            <ul>\n                <li>Displays projects as collapsible vertical cards</li>\n                <li>Includes filter panel for project and priority filtering</li>\n                <li>Includes inline critical CSS to ensure proper rendering</li>\n                <li>Uses recursive macros to display hierarchical project structure</li>\n                <li>Implements JavaScript for collapsible functionality</li>\n            </ul>\n        </li>\n        <li><strong>todo/add_project.tt:</strong> Project creation form</li>\n        <li><strong>todo/editproject.tt:</strong> Project editing interface</li>\n        <li><strong>todo/projectdetails.tt:</strong> Detailed project view</li>\n        <li><strong>todo/project_list.tt:</strong> Reusable component for project selection dropdowns</li>\n    </ul>\n    \n    <p>The template system uses Template Toolkit with the following features:</p>\n    <ul>\n        <li>Version tracking in PageVersion variable</li>\n        <li>Debug mode support for troubleshooting</li>\n        <li>Responsive design principles</li>\n        <li>Role-based access control for admin functions</li>\n        <li>Helper macros for complex UI components</li>\n    </ul>\n\n    <h2 id=\"projects-ui\">Projects UI Components</h2>\n    <p>The Projects system uses a vertical card-based UI for displaying projects:</p>\n    \n    <h3>Card Layout</h3>\n    <ul>\n        <li><strong>Card Header:</strong> Contains project name, priority badge, and collapse toggle</li>\n        <li><strong>Card Body:</strong> Displays project description, status badge, key details, and sub-projects</li>\n        <li><strong>Action Buttons:</strong> Details and Edit buttons within the card body</li>\n        <li><strong>Sub-Projects Container:</strong> Visually distinct area for sub-projects with left border and indentation</li>\n    </ul>\n    \n    <h3>CSS Implementation</h3>\n    <p>The card layout is implemented using a combination of:</p>\n    <ul>\n        <li><strong>External CSS:</strong> <code>/static/css/components/project-cards.css</code> - Contains all card styling</li>\n        <li><strong>Inline Critical CSS:</strong> Embedded in the template to ensure proper rendering even if external CSS fails to load</li>\n        <li><strong>Bootstrap-Compatible Classes:</strong> Uses standard Bootstrap class names for compatibility</li>\n        <li><strong>Custom Classes:</strong> Additional classes for collapsible cards and sub-project containers</li>\n    </ul>\n    \n    <h3>Responsive Design</h3>\n    <ul>\n        <li>Vertical card layout that adapts to all screen sizes</li>\n        <li>Collapsible cards to save vertical space</li>\n        <li>Filter panel that adapts to mobile screens</li>\n        <li>Fluid container for better use of screen space</li>\n    </ul>\n    \n    <h3>Visual Indicators</h3>\n    <ul>\n        <li><strong>Priority Badges:</strong> Color-coded badges for High (red), Medium (yellow), Low (blue)</li>\n        <li><strong>Status Badges:</strong> New (blue), In Progress (primary), Completed (green)</li>\n        <li><strong>Icons:</strong> Font Awesome icons for improved visual cues</li>\n        <li><strong>Collapse Indicators:</strong> Chevron icons that rotate to indicate collapse state</li>\n        <li><strong>Sub-Project Indicators:</strong> Left border and indentation to show hierarchy</li>\n    </ul>\n    \n    <h2 id=\"projects-filtering\">Projects Filtering</h2>\n    <p>The Projects system includes a comprehensive filtering system:</p>\n    \n    <h3>Filter Panel</h3>\n    <ul>\n        <li><strong>Project Filter:</strong> Dropdown to select a specific project or sub-project</li>\n        <li><strong>Priority Filter:</strong> Dropdown to filter by priority level (High, Medium, Low)</li>\n        <li><strong>Apply Filters Button:</strong> Submits the filter form</li>\n        <li><strong>Clear Filters Button:</strong> Resets all filters</li>\n    </ul>\n    \n    <h3>Filtering Logic</h3>\n    <ul>\n        <li><strong>Project Filtering:</strong> When a project is selected, only that project and its sub-projects are displayed</li>\n        <li><strong>Sub-Project Filtering:</strong> When a sub-project is selected, its parent project is displayed with only the selected sub-project</li>\n        <li><strong>Priority Filtering:</strong> Only projects with the selected priority are displayed</li>\n        <li><strong>Combined Filtering:</strong> Project and priority filters can be used together</li>\n        <li><strong>Hierarchical Awareness:</strong> Parent projects remain visible when their sub-projects match the filter</li>\n    </ul>\n    \n    <h3>Implementation Details</h3>\n    <ul>\n        <li><strong>Template Macros:</strong> Helper macros determine if a project should be displayed based on filter criteria</li>\n        <li><strong>JavaScript:</strong> Auto-expands relevant projects when filtering</li>\n        <li><strong>Controller Support:</strong> The controller passes filter parameters to the template</li>\n        <li><strong>Query Parameters:</strong> Filters are maintained in the URL for bookmarking and sharing</li>\n    </ul>\n    \n    <h3>Code Example: Filter Panel</h3>\n    <pre><code>&lt;div class=\"filter-panel mb-4\"&gt;\n    &lt;form id=\"projectFilterForm\" class=\"form-inline\" method=\"GET\" action=\"/project/project\"&gt;\n        &lt;div class=\"form-group mb-2\"&gt;\n            &lt;label for=\"project_filter\" class=\"mr-2\"&gt;Project:&lt;/label&gt;\n            &lt;select id=\"project_filter\" name=\"project_id\" class=\"form-control\"&gt;\n                &lt;option value=\"\"&gt;All Projects&lt;/option&gt;\n                [% FOREACH project IN projects.sort('name') %]\n                    &lt;option value=\"[% project.id %]\" [% IF project_filter == project.id %]selected[% END %]&gt;\n                        [% project.name %]\n                    &lt;/option&gt;\n                    [% FOREACH subproject IN project.sub_projects.sort('name') %]\n                        &lt;option value=\"[% subproject.id %]\" [% IF project_filter == subproject.id %]selected[% END %]&gt;\n                            &amp;nbsp;&amp;nbsp;└─ [% subproject.name %]\n                        &lt;/option&gt;\n                    [% END %]\n                [% END %]\n            &lt;/select&gt;\n        &lt;/div&gt;\n        \n        &lt;div class=\"form-group mb-2 ml-3\"&gt;\n            &lt;label for=\"priority_filter\" class=\"mr-2\"&gt;Priority:&lt;/label&gt;\n            &lt;select id=\"priority_filter\" name=\"priority\" class=\"form-control\"&gt;\n                &lt;option value=\"\"&gt;All Priorities&lt;/option&gt;\n                &lt;option value=\"1\" [% IF priority_filter == '1' %]selected[% END %]&gt;High&lt;/option&gt;\n                &lt;option value=\"2\" [% IF priority_filter == '2' %]selected[% END %]&gt;Medium&lt;/option&gt;\n                &lt;option value=\"3\" [% IF priority_filter == '3' %]selected[% END %]&gt;Low&lt;/option&gt;\n            &lt;/select&gt;\n        &lt;/div&gt;\n        \n        &lt;button type=\"submit\" class=\"btn btn-primary mb-2 ml-3\"&gt;Apply Filters&lt;/button&gt;\n        &lt;button type=\"button\" id=\"clearFilters\" class=\"btn btn-outline-secondary mb-2 ml-2\"&gt;Clear Filters&lt;/button&gt;\n    &lt;/form&gt;\n&lt;/div&gt;</code></pre>\n\n    <h2 id=\"projects-workflow\">Projects Workflow</h2>\n    <ol>\n        <li><strong>Project Creation:</strong>\n            <ul>\n                <li>User fills out project form</li>\n                <li>System validates input and handles parent-child relationships</li>\n                <li>Project is created with proper user and site association</li>\n            </ul>\n        </li>\n        <li><strong>Project Management:</strong>\n            <ul>\n                <li>Projects can be viewed in hierarchical list</li>\n                <li>Admin users can edit project details</li>\n                <li>Sub-projects are managed within parent context</li>\n            </ul>\n        </li>\n    </ol>\n\n    <h2 id=\"projects-usage\">System Requirements and Limitations</h2>\n    <ul>\n        <li>User must be authenticated for project creation</li>\n        <li>Admin privileges required for editing projects</li>\n        <li>Maximum of 4 levels in project hierarchy</li>\n        <li>Project names must be unique within a site</li>\n        <li>Browser must support CSS Flexbox for optimal card layout</li>\n        <li>Font Awesome 5.x is required for icons</li>\n    </ul>\n\n    <h2 id=\"projects-troubleshooting\">Troubleshooting</h2>\n    \n    <h3>CSS Display Issues</h3>\n    <p>If projects are not displaying correctly as cards:</p>\n    <ol>\n        <li>Verify that the CSS file is being loaded correctly (check browser developer tools)</li>\n        <li>Ensure the template is using the correct CSS classes</li>\n        <li>Check that the inline critical CSS is present in the template</li>\n        <li>Verify that the controller is setting <code>use_fluid_container => 1</code></li>\n        <li>Check for JavaScript errors that might be affecting the layout</li>\n    </ol>\n    \n    <h3>Collapsible Card Issues</h3>\n    <p>If the collapsible functionality is not working:</p>\n    <ol>\n        <li>Check browser console for JavaScript errors</li>\n        <li>Verify that the <code>toggleCollapse</code> function is defined in the template</li>\n        <li>Ensure that card IDs are unique and properly referenced in the onclick handlers</li>\n        <li>Check that the collapse icon is properly styled and transitions are working</li>\n    </ol>\n    \n    <h3>Filtering Issues</h3>\n    <p>If filtering is not working correctly:</p>\n    <ol>\n        <li>Verify that the filter form is submitting to the correct URL</li>\n        <li>Check that the controller is correctly passing filter parameters to the template</li>\n        <li>Ensure that the <code>is_parent_of_filtered_project</code> macro is correctly implemented</li>\n        <li>Check the browser's network tab to confirm filter parameters are being sent</li>\n        <li>Verify that the NEXT statements in the template are correctly evaluating filter conditions</li>\n    </ol>\n    \n    <h3>Debug Mode</h3>\n    <p>Enable debug mode in the controller to see additional information:</p>\n    <pre><code>$c->stash(debug_mode => 1);</code></pre>\n    <p>This will display template version and CSS file information at the top of the page.</p>\n    \n    <h3>Common Issues</h3>\n    <ul>\n        <li><strong>Cards not collapsing/expanding:</strong> JavaScript errors or missing event handlers</li>\n        <li><strong>Filters not working:</strong> Form submission issues or incorrect template logic</li>\n        <li><strong>Sub-projects not displaying:</strong> Check the recursive macro implementation</li>\n        <li><strong>Parent projects not showing when filtering by sub-project:</strong> Issue with the <code>is_parent_of_filtered_project</code> macro</li>\n        <li><strong>Missing badges or icons:</strong> Font Awesome not loading correctly</li>\n        <li><strong>Auto-expand not working when filtering:</strong> JavaScript initialization issue</li>\n    </ul>\n    \n    <h3>Logging</h3>\n    <p>The Project controller logs important events to the application log:</p>\n    <pre><code>$self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'project', 'message');</code></pre>\n    <p>Check <code>logs/application.log</code> for debugging information, especially filter parameters and project data structure.</p>\n    \n    <h3>JavaScript Debugging</h3>\n    <p>For JavaScript-related issues, add console logging to the script:</p>\n    <pre><code>console.log('Filter parameters:', {\n    project: document.getElementById('project_filter').value,\n    priority: document.getElementById('priority_filter').value\n});</code></pre>\n    <p>This can help identify issues with the collapsible functionality and filter handling.</p>\n\n    <p><a href=\"#projects-top\">Back to top</a></p>",
+                    "language": "plain text"
+                },
+                "codebaseEnabled": true
+            },
+            "createdAt": 1753528564481,
+            "isInternal": false,
+            "rawContent": {
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "docs: Update Projects.tt documentation with system status and recent fixes"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "- Updated PageVersion to 0.07 with current date (2025/01/27)"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "- Fixed debug mode check to use c.session.debug_mode instead of debug"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "- Added system status alert showing recent controller fixes"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "- Updated title to match content (Projects System Documentation)"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Changes reflect recent fixes to Project.pm controller:"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "- Database queries now working instead of returning empty arrays"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "- All compilation errors resolved"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "- Proper error handling implemented"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "File: /home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Projects.tt"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph"
+                    }
+                ]
+            },
+            "autoAppliedRules": [
+                {
+                    "name": "User AI Instruction",
+                    "description": "User AI Instruction",
+                    "uri": "zen-rules://user/custom",
+                    "content": "read AI_DEVELOPMENT_GUIDELINES\nall code must be varifed by user"
+                },
+                {
+                    "name": "Repository Information Overview",
+                    "description": "Repository Information Overview",
+                    "uri": "zen-rules://repo/repo",
+                    "content": "\n\n# Comserv Project Information\n\n## Summary\nComserv is a comprehensive web-based system for managing business operations, projects, and documentation. It's built using the Catalyst Perl web framework and provides features for project management, theme customization, and user authentication.\n\n## Structure\n- `Comserv/`: Main application directory containing the core application code\n  - `lib/`: Application code and models\n  - `docs/`: Documentation files\n  - `root/`: Static assets and templates\n  - `script/`: Utility scripts for server management and database operations\n  - `t/`: Test files\n- `app/`: Additional application components\n- `data/`: Data files including pricing information\n- `proxmox/`: Proxmox VE integration components\n\n## Language & Runtime\n**Language**: Perl\n**Version**: 5.x (compatible with Perl 5.40.0)\n**Framework**: Catalyst 5.90130\n**Build System**: Module::Install\n**Package Manager**: CPAN\n\n## Dependencies\n**Main Dependencies**:\n- Catalyst::Runtime (5.90130)\n- Moose\n- DBIx::Class\n- Template (Template Toolkit)\n- JSON/JSON::MaybeXS\n- Log::Log4perl\n- DateTime\n- File::Slurp\n\n**Development Dependencies**:\n- Test::More (0.88+)\n- Test::Pod\n- Test::Pod::Coverage\n- Test::WWW::Mechanize::Catalyst\n- Catalyst::Devel\n\n## Build & Installation\n```bash\ncd Comserv\nperl Makefile.PL\nmake\nmake test\nmake install\n```\n\n## Database\n**Type**: MySQL\n**Setup**: \n```bash\nmysql -u root -p < database_initialization_script.sql\n```\n**Schema Management**: DBIx::Class::Schema::Loader\n\n## Testing\n**Framework**: Test::More\n**Test Location**: Comserv/t/\n**Run Command**:\n```bash\ncd Comserv\nprove -l t/\n```\n\n## Server Execution\n**Development Server**:\n```bash\ncd Comserv\nscript/comserv_server.pl\n```\n**Production Deployment**:\n```bash\ncd Comserv\nscript/comserv_fastcgi.pl\n# or\nstarman --port 5000 --workers 5 comserv.psgi\n```\n\n## Authentication & Authorization\n- Session-based authentication\n- Role-based access control\n- Multiple authentication realms\n- Support for user groups and site-specific permissions\n\n## Features\n- Project management system\n- Theme customization system\n- Email integration\n- PDF generation\n- Proxmox VE integration\n- Multi-site support"
+                },
+                {
+                    "name": "Database Development Standards and Best Practices",
+                    "description": "Database Development Standards and Best Practices",
+                    "uri": "zen-rules://repo/database-standards",
+                    "content": "\n\n# Database Development Standards\n\n## Query Standards\n- **Table Aliases:** Use table aliases in all queries to avoid ambiguity (e.g., 'me.column_name')\n- **Error Handling:** Implement proper error handling with eval blocks and try/catch\n- **Parameterized Queries:** Use parameterized queries to prevent SQL injection\n\n## Schema Management\n- **Naming Conventions:** Follow naming conventions for tables, columns, and relationships\n- **Documentation:** Document schema changes and rationale for future reference\n- **Performance:** Regularly optimize database performance and indexes\n- **Version Control:** Use Git to track schema changes with proper tagging\n- **Backup Protocol:** Always backup database before making schema changes\n\n## Model Standards (DBIx::Class)\n- **Result Classes:** Located in `/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema/Ency/Result/`\n- **Relationships:** Define proper relationships between tables\n- **Validation:** Implement data validation in model classes\n\n## Configuration Priority\n- **Primary:** ZeroTier production server (172.30.161.222) - works from any network\n- **Secondary:** Local network production server (192.168.1.198) - home/office only\n- **Tertiary:** localhost MySQL (development)\n- **Fallback:** SQLite (offline mode)\n\n## Security Protocols\n- **Input Validation:** Validate all user inputs before database operations\n- **Access Controls:** Implement proper access controls based on user roles\n- **Regular Reviews:** Regularly review and update security protocols"
+                },
+                {
+                    "name": "AI Behavior Enforcement Rules for Zencoder",
+                    "description": "AI Behavior Enforcement Rules for Zencoder",
+                    "uri": "zen-rules://repo/ai-behavior-enforcement",
+                    "content": "\n\n# AI Behavior Enforcement Rules\n\n## MANDATORY PROMPT TRACKING\n**CURRENT PROMPT:** This is prompt #[X] of 4 maximum allowed prompts.\n\n### Prompt Counter Protocol\n- **Start Each Response:** Begin every response with current prompt count\n- **Track Internally:** Keep running count throughout conversation\n- **Warn at Prompt 3:** Alert user that next prompt will trigger handoff\n- **Stop at Prompt 4:** Refuse to continue, provide handoff documentation\n\n## MANDATORY APPROVAL WORKFLOW\n\n### Before ANY Code Changes\n1. **STOP:** Do not modify any files without explicit user approval\n2. **PRESENT:** Show exactly what will be changed using the standard format\n3. **WAIT:** Wait for explicit approval (\"yes\", \"approved\", \"apply changes\")\n4. **CONFIRM:** Acknowledge approval before proceeding\n5. **EXECUTE:** Apply changes only after confirmation\n\n### Standard Change Presentation\n```\n🔄 PROPOSED CHANGE TO: [filename]\n📝 CHANGE TYPE: [Addition/Modification/Deletion]\n📋 DESCRIPTION: [what this accomplishes]\n\n❌ CURRENT CODE:\n[existing code or \"N/A\"]\n\n✅ NEW CODE:\n[proposed code or \"DELETED\"]\n\n💡 REASON: [why needed]\n\n⚠️  APPROVAL REQUIRED: Please confirm with \"approved\" or \"yes\"\n🔄 REVERT: Changes can be undone if needed\n```\n\n## VIOLATION CONSEQUENCES\n- **Prompt Limit Exceeded:** Immediate session termination with handoff\n- **Unapproved Changes:** Acknowledge violation and request approval retroactively\n- **Missing Counter:** Add prompt counter to current response\n\n## HANDOFF TEMPLATE (Use on 4th Prompt)\n```\n🚨 PROMPT LIMIT REACHED - HANDOFF REQUIRED\n\n📊 SESSION SUMMARY:\n- Prompts Used: 4/4\n- Files Modified: [list]\n- Tasks Completed: [list]\n- Tasks Remaining: [list]\n\n🔄 HANDOFF PROMPT FOR NEXT AI:\n\"Continue working on [project/task]. Read development-guidelines.md and ai-behavior-enforcement.md first. \nCurrent context: [brief context]\nFiles being worked on: [list]\nNext steps needed: [specific actions]\"\n\n📚 REQUIRED READING FOR NEXT AI:\n- .zencoder/rules/development-guidelines.md\n- .zencoder/rules/ai-behavior-enforcement.md\n- [any other relevant docs]\n\n✅ DOCUMENTATION UPDATED: [what was recorded]\n```\n\n## EMERGENCY PROTOCOLS\n- **User Says \"Stop\":** Immediately cease all activities\n- **User Says \"Revert\":** Provide instructions for undoing changes\n- **User Says \"Handoff\":** Immediately provide handoff documentation"
+                },
+                {
+                    "name": "Template Toolkit Standards and Requirements",
+                    "description": "Template Toolkit Standards and Requirements",
+                    "uri": "zen-rules://repo/template-standards",
+                    "content": "\n\n# Template Toolkit (.tt) Standards\n\n## Required PageVersion Header Format\nAll .tt files must include this exact format:\n```\n[% META title = 'Page Title Here' %]\n[% PageVersion = 'relative/path/filename.tt,v 0.01 YYYY/MM/DD author Exp author ' %]\n[% IF c.session.debug_mode == 1 %]\n    [% PageVersion %]\n[% END %]\n```\n\n## Template Standards\n- **Theme Compliance:** Use theme system variables for styling - NO page-specific CSS\n- **Debug Mode:** Include debug mode blocks for development visibility\n- **Responsive Design:** Implement mobile-first responsive design patterns\n- **HTML Structure:** Use proper semantic HTML structure\n- **Template Toolkit:** Follow Template Toolkit best practices\n\n## Navigation Integration\nWhen working with navigation templates:\n- **Main Navigation:** Include via `/Navigation/navigation.tt`\n- **Admin Menu:** Use `/Navigation/admintopmenu.tt` for admin-only sections\n- **Dropdown Menus:** Reference existing dropdown templates in `/Navigation/` directory\n\n## Documentation File Rules - CRITICAL\n- **File Format:** ONLY `.tt` files for application documentation - NO `.md` files\n- **EXISTING FILES FIRST:** ALWAYS search for and use existing files before creating new ones\n- **Naming Consistency:** Use same file names across AI sessions to prevent content loss\n- **Content Priority:** Always improve existing files rather than creating new ones\n- **Role-Based Access:** Respect existing Documentation/index.tt role-based structure\n- **Directory Consolidation:** Use established directory structure - don't create new directories\n\n## File Creation Protocol\n1. **Search First:** Use file search tools to find existing similar files\n2. **Check Directory:** Look at existing directory structure in target location\n3. **Ask User:** If multiple similar files exist, ask which should be updated\n4. **Update Existing:** Improve existing files rather than creating duplicates"
+                }
+            ]
+        },
+        {
+            "id": "f60634e2-cf59-4bb9-8b17-09e2a85e0136",
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "**CURRENT PROMPT:** This is prompt #1 of 4 maximum allowed prompts.\n\nI can see you've provided documentation about the Projects system and some zen-rules for the repository. The current file `Projects.tt` appears to be comprehensive documentation for the Projects system.\n\nLooking at your message, it seems like you're documenting recent updates that have been made to the Projects system, specifically:\n\n1. Updated PageVersion to 0.07 with current date (2025/01/27)\n2. Fixed debug mode check to use `c.session.debug_mode` instead of `debug`\n3. Added system status alert showing recent controller fixes\n4. Updated title to match content\n\nThe documentation mentions that recent fixes to `Project.pm` controller include:\n- Database queries now working instead of returning empty arrays\n- All compilation errors resolved\n- Proper error handling implemented\n\nIs there something specific you'd like me to help you with regarding this documentation or the Projects system? For example:\n\n1. Do you need me to review or update any part of this documentation?\n2. Are you looking for help with the actual Project.pm controller code?\n3. Do you need assistance with any other aspect of the Projects system?\n4. Would you like me to search for and examine the actual controller file to verify the documentation matches the implementation?\n\nPlease let me know what specific task you'd like me to help you with."
+                }
+            ],
+            "context": {
+                "author": "Coding Agent",
+                "operationId": "a0f6e1b5-db72-4f05-a8ff-893db3edd851"
+            },
+            "createdAt": 1753528565904,
+            "isInternal": false
+        },
+        {
+            "id": "2d8a3326-9ab0-41b6-89d8-0ec43045c1fd",
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "figuring GD-2.83 ... N/A"
+                },
+                {
+                    "type": "text",
+                    "text": "! Configure failed for GD-2.83. See /home/shanta/.cpanm/work/1753532190.101980/build.log for details."
+                },
+                {
+                    "type": "text",
+                    "text": "! Installing the dependencies failed: Module 'GD' is not installed"
+                },
+                {
+                    "type": "text",
+                    "text": "! Bailing out the installation for GDTextUtil-0.86."
+                },
+                {
+                    "type": "text",
+                    "text": "Failed to install GD::Text. Some functionality may be limited."
+                },
+                {
+                    "type": "text",
+                    "text": "Base directory: /home/shanta/PycharmProjects/comserv2/Comserv/script/.."
+                },
+                {
+                    "type": "text",
+                    "text": "Log directory: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs"
+                },
+                {
+                    "type": "text",
+                    "text": "Log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log"
+                },
+                {
+                    "type": "text",
+                    "text": "Log directory exists: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs"
+                },
+                {
+                    "type": "text",
+                    "text": "Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log"
+                },
+                {
+                    "type": "text",
+                    "text": "Wrote test log entry to file"
+                },
+                {
+                    "type": "text",
+                    "text": "Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log"
+                },
+                {
+                    "type": "text",
+                    "text": "Use of uninitialized value $_ in bitwise or (|) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/Catalyst/Log.pm line 84."
+                },
+                {
+                    "type": "text",
+                    "text": "Use of uninitialized value $_ in bitwise or (|) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/Catalyst/Log.pm line 84."
+                },
+                {
+                    "type": "text",
+                    "text": "Warning: Email modules temporarily disabled for development"
+                },
+                {
+                    "type": "text",
+                    "text": "Email functionality may not work correctly."
+                },
+                {
+                    "type": "text",
+                    "text": "Found config file at: /home/shanta/PycharmProjects/comserv2/Comserv/script/../db_config.json at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/DBEncy.pm line 51."
+                },
+                {
+                    "type": "text",
+                    "text": "DBEncy Configuration:"
+                },
+                {
+                    "type": "text",
+                    "text": "Host: 172.30.161.222"
+                },
+                {
+                    "type": "text",
+                    "text": "Database: ency"
+                },
+                {
+                    "type": "text",
+                    "text": "Username: shanta_forager"
+                },
+                {
+                    "type": "text",
+                    "text": "DBForager Configuration:"
+                },
+                {
+                    "type": "text",
+                    "text": "Host: 172.30.161.222"
+                },
+                {
+                    "type": "text",
+                    "text": "Database: shanta_forager"
+                },
+                {
+                    "type": "text",
+                    "text": "Username: shanta_forager"
+                },
+                {
+                    "type": "text",
+                    "text": "Can't locate object method \"ypackage\" via package \"Comserv::Controller::Project\" (perhaps you forgot to load \"Comserv::Controller::Project\"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 1."
+                },
+                {
+                    "type": "text",
+                    "text": "Compilation failed in require at /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/Catalyst/Utils.pm line 310."
+                },
+                {
+                    "type": "text",
+                    "text": "Compilation failed in require at /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/Catalyst/Utils.pm line 310."
+                }
+            ],
+            "context": {
+                "currentFile": {
+                    "path": "Comserv/root/Documentation/Projects.tt",
+                    "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Projects.tt",
+                    "sources": [
+                        "opened_tab"
+                    ],
+                    "content": "[% META title = 'Projects System Documentation' %]\n    [% PageVersion = 'Documentation/Projects.tt,v 0.07 2025/01/27 AI Exp AI ' %]\n[% IF c.session.debug_mode == 1 %]\n    [% PageVersion %]\n[% END %]\n\n    <h1 id=\"projects-top\">Projects System Documentation</h1>\n    \n    <div class=\"alert alert-info\">\n        <strong>System Status:</strong> Project controller has been updated with working database queries and proper error handling. \n        All compilation errors have been resolved. Last updated: January 27, 2025.\n    </div>\n\n    <nav>\n        <a href=\"#projects-overview\">Projects Overview</a> |\n        <a href=\"#projects-controller\">Projects Controller</a> |\n        <a href=\"#projects-model\">Projects Model</a> |\n        <a href=\"#projects-templates\">Projects Templates</a> |\n        <a href=\"#projects-ui\">Projects UI Components</a> |\n        <a href=\"#projects-filtering\">Projects Filtering</a> |\n        <a href=\"#projects-workflow\">Projects Workflow</a> |\n        <a href=\"#projects-usage\">Projects Usage</a> |\n        <a href=\"#projects-troubleshooting\">Troubleshooting</a>\n    </nav>\n\n    <h2 id=\"projects-overview\">Projects Overview</h2>\n    <p>The Projects system manages hierarchical project structures with support for parent-child relationships. Each project can have multiple sub-projects, and the system maintains data integrity through proper handling of user permissions and data validation.</p>\n\n    <h2 id=\"projects-controller\">Projects Controller</h2>\n    <p>Key features in <code>Comserv::Controller::Project</code>:</p>\n    <ul>\n        <li><strong>Project Creation:</strong> Handles form submissions with proper validation for:\n            <ul>\n                <li>Parent-child relationships (parent_id)</li>\n                <li>User authentication and username tracking</li>\n                <li>Required fields and data type validation</li>\n            </ul>\n        </li>\n        <li><strong>Project Hierarchy:</strong> Manages up to 4 levels of sub-projects</li>\n        <li><strong>Project Listing:</strong> Displays projects in a card-based layout, sorted by name</li>\n        <li><strong>Error Handling:</strong> Provides detailed error messages and logging</li>\n        <li><strong>UI Configuration:</strong> Sets up the UI with:\n            <ul>\n                <li>CSS loading with cache-busting timestamps</li>\n                <li>Fluid container layout for better card display</li>\n                <li>Debug mode for troubleshooting</li>\n                <li>Template timestamp for forced reloading</li>\n            </ul>\n        </li>\n    </ul>\n    \n    <h3>Controller Code Example</h3>\n    <pre><code># Add the projects and filter info to the stash\n$c->stash(\n    projects => $projects,\n    role_filter => $role_filter,\n    project_filter => $project_filter,\n    priority_filter => $priority_filter,\n    template => 'todo/project.tt',\n    template_timestamp => time(), # Add a timestamp to force template reload\n    additional_css => ['/static/css/components/project-cards.css?v=' . time()], # Add timestamp to force CSS reload\n    use_fluid_container => 1, # Use fluid container for better card layout\n    debug_mode => 1 # Enable debug mode to see template version\n);</code></pre>\n\n    <h2 id=\"projects-model\">Projects Model</h2>\n    <p>The database schema includes these key fields:</p>\n    <ul>\n        <li>id (Primary Key)</li>\n        <li>name (Project name)</li>\n        <li>parent_id (Optional, for sub-projects)</li>\n        <li>sitename (Associated site)</li>\n        <li>status (Project status)</li>\n        <li>username_of_poster (Creator/owner)</li>\n        <li>Various metadata fields (dates, descriptions, etc.)</li>\n    </ul>\n\n    <h2 id=\"projects-templates\">Projects Templates</h2>\n    <p>Current template structure:</p>\n    <ul>\n        <li><strong>todo/project.tt:</strong> Main project listing with vertical card-based layout\n            <ul>\n                <li>Displays projects as collapsible vertical cards</li>\n                <li>Includes filter panel for project and priority filtering</li>\n                <li>Includes inline critical CSS to ensure proper rendering</li>\n                <li>Uses recursive macros to display hierarchical project structure</li>\n                <li>Implements JavaScript for collapsible functionality</li>\n            </ul>\n        </li>\n        <li><strong>todo/add_project.tt:</strong> Project creation form</li>\n        <li><strong>todo/editproject.tt:</strong> Project editing interface</li>\n        <li><strong>todo/projectdetails.tt:</strong> Detailed project view</li>\n        <li><strong>todo/project_list.tt:</strong> Reusable component for project selection dropdowns</li>\n    </ul>\n    \n    <p>The template system uses Template Toolkit with the following features:</p>\n    <ul>\n        <li>Version tracking in PageVersion variable</li>\n        <li>Debug mode support for troubleshooting</li>\n        <li>Responsive design principles</li>\n        <li>Role-based access control for admin functions</li>\n        <li>Helper macros for complex UI components</li>\n    </ul>\n\n    <h2 id=\"projects-ui\">Projects UI Components</h2>\n    <p>The Projects system uses a vertical card-based UI for displaying projects:</p>\n    \n    <h3>Card Layout</h3>\n    <ul>\n        <li><strong>Card Header:</strong> Contains project name, priority badge, and collapse toggle</li>\n        <li><strong>Card Body:</strong> Displays project description, status badge, key details, and sub-projects</li>\n        <li><strong>Action Buttons:</strong> Details and Edit buttons within the card body</li>\n        <li><strong>Sub-Projects Container:</strong> Visually distinct area for sub-projects with left border and indentation</li>\n    </ul>\n    \n    <h3>CSS Implementation</h3>\n    <p>The card layout is implemented using a combination of:</p>\n    <ul>\n        <li><strong>External CSS:</strong> <code>/static/css/components/project-cards.css</code> - Contains all card styling</li>\n        <li><strong>Inline Critical CSS:</strong> Embedded in the template to ensure proper rendering even if external CSS fails to load</li>\n        <li><strong>Bootstrap-Compatible Classes:</strong> Uses standard Bootstrap class names for compatibility</li>\n        <li><strong>Custom Classes:</strong> Additional classes for collapsible cards and sub-project containers</li>\n    </ul>\n    \n    <h3>Responsive Design</h3>\n    <ul>\n        <li>Vertical card layout that adapts to all screen sizes</li>\n        <li>Collapsible cards to save vertical space</li>\n        <li>Filter panel that adapts to mobile screens</li>\n        <li>Fluid container for better use of screen space</li>\n    </ul>\n    \n    <h3>Visual Indicators</h3>\n    <ul>\n        <li><strong>Priority Badges:</strong> Color-coded badges for High (red), Medium (yellow), Low (blue)</li>\n        <li><strong>Status Badges:</strong> New (blue), In Progress (primary), Completed (green)</li>\n        <li><strong>Icons:</strong> Font Awesome icons for improved visual cues</li>\n        <li><strong>Collapse Indicators:</strong> Chevron icons that rotate to indicate collapse state</li>\n        <li><strong>Sub-Project Indicators:</strong> Left border and indentation to show hierarchy</li>\n    </ul>\n    \n    <h2 id=\"projects-filtering\">Projects Filtering</h2>\n    <p>The Projects system includes a comprehensive filtering system:</p>\n    \n    <h3>Filter Panel</h3>\n    <ul>\n        <li><strong>Project Filter:</strong> Dropdown to select a specific project or sub-project</li>\n        <li><strong>Priority Filter:</strong> Dropdown to filter by priority level (High, Medium, Low)</li>\n        <li><strong>Apply Filters Button:</strong> Submits the filter form</li>\n        <li><strong>Clear Filters Button:</strong> Resets all filters</li>\n    </ul>\n    \n    <h3>Filtering Logic</h3>\n    <ul>\n        <li><strong>Project Filtering:</strong> When a project is selected, only that project and its sub-projects are displayed</li>\n        <li><strong>Sub-Project Filtering:</strong> When a sub-project is selected, its parent project is displayed with only the selected sub-project</li>\n        <li><strong>Priority Filtering:</strong> Only projects with the selected priority are displayed</li>\n        <li><strong>Combined Filtering:</strong> Project and priority filters can be used together</li>\n        <li><strong>Hierarchical Awareness:</strong> Parent projects remain visible when their sub-projects match the filter</li>\n    </ul>\n    \n    <h3>Implementation Details</h3>\n    <ul>\n        <li><strong>Template Macros:</strong> Helper macros determine if a project should be displayed based on filter criteria</li>\n        <li><strong>JavaScript:</strong> Auto-expands relevant projects when filtering</li>\n        <li><strong>Controller Support:</strong> The controller passes filter parameters to the template</li>\n        <li><strong>Query Parameters:</strong> Filters are maintained in the URL for bookmarking and sharing</li>\n    </ul>\n    \n    <h3>Code Example: Filter Panel</h3>\n    <pre><code>&lt;div class=\"filter-panel mb-4\"&gt;\n    &lt;form id=\"projectFilterForm\" class=\"form-inline\" method=\"GET\" action=\"/project/project\"&gt;\n        &lt;div class=\"form-group mb-2\"&gt;\n            &lt;label for=\"project_filter\" class=\"mr-2\"&gt;Project:&lt;/label&gt;\n            &lt;select id=\"project_filter\" name=\"project_id\" class=\"form-control\"&gt;\n                &lt;option value=\"\"&gt;All Projects&lt;/option&gt;\n                [% FOREACH project IN projects.sort('name') %]\n                    &lt;option value=\"[% project.id %]\" [% IF project_filter == project.id %]selected[% END %]&gt;\n                        [% project.name %]\n                    &lt;/option&gt;\n                    [% FOREACH subproject IN project.sub_projects.sort('name') %]\n                        &lt;option value=\"[% subproject.id %]\" [% IF project_filter == subproject.id %]selected[% END %]&gt;\n                            &amp;nbsp;&amp;nbsp;└─ [% subproject.name %]\n                        &lt;/option&gt;\n                    [% END %]\n                [% END %]\n            &lt;/select&gt;\n        &lt;/div&gt;\n        \n        &lt;div class=\"form-group mb-2 ml-3\"&gt;\n            &lt;label for=\"priority_filter\" class=\"mr-2\"&gt;Priority:&lt;/label&gt;\n            &lt;select id=\"priority_filter\" name=\"priority\" class=\"form-control\"&gt;\n                &lt;option value=\"\"&gt;All Priorities&lt;/option&gt;\n                &lt;option value=\"1\" [% IF priority_filter == '1' %]selected[% END %]&gt;High&lt;/option&gt;\n                &lt;option value=\"2\" [% IF priority_filter == '2' %]selected[% END %]&gt;Medium&lt;/option&gt;\n                &lt;option value=\"3\" [% IF priority_filter == '3' %]selected[% END %]&gt;Low&lt;/option&gt;\n            &lt;/select&gt;\n        &lt;/div&gt;\n        \n        &lt;button type=\"submit\" class=\"btn btn-primary mb-2 ml-3\"&gt;Apply Filters&lt;/button&gt;\n        &lt;button type=\"button\" id=\"clearFilters\" class=\"btn btn-outline-secondary mb-2 ml-2\"&gt;Clear Filters&lt;/button&gt;\n    &lt;/form&gt;\n&lt;/div&gt;</code></pre>\n\n    <h2 id=\"projects-workflow\">Projects Workflow</h2>\n    <ol>\n        <li><strong>Project Creation:</strong>\n            <ul>\n                <li>User fills out project form</li>\n                <li>System validates input and handles parent-child relationships</li>\n                <li>Project is created with proper user and site association</li>\n            </ul>\n        </li>\n        <li><strong>Project Management:</strong>\n            <ul>\n                <li>Projects can be viewed in hierarchical list</li>\n                <li>Admin users can edit project details</li>\n                <li>Sub-projects are managed within parent context</li>\n            </ul>\n        </li>\n    </ol>\n\n    <h2 id=\"projects-usage\">System Requirements and Limitations</h2>\n    <ul>\n        <li>User must be authenticated for project creation</li>\n        <li>Admin privileges required for editing projects</li>\n        <li>Maximum of 4 levels in project hierarchy</li>\n        <li>Project names must be unique within a site</li>\n        <li>Browser must support CSS Flexbox for optimal card layout</li>\n        <li>Font Awesome 5.x is required for icons</li>\n    </ul>\n\n    <h2 id=\"projects-troubleshooting\">Troubleshooting</h2>\n    \n    <h3>CSS Display Issues</h3>\n    <p>If projects are not displaying correctly as cards:</p>\n    <ol>\n        <li>Verify that the CSS file is being loaded correctly (check browser developer tools)</li>\n        <li>Ensure the template is using the correct CSS classes</li>\n        <li>Check that the inline critical CSS is present in the template</li>\n        <li>Verify that the controller is setting <code>use_fluid_container => 1</code></li>\n        <li>Check for JavaScript errors that might be affecting the layout</li>\n    </ol>\n    \n    <h3>Collapsible Card Issues</h3>\n    <p>If the collapsible functionality is not working:</p>\n    <ol>\n        <li>Check browser console for JavaScript errors</li>\n        <li>Verify that the <code>toggleCollapse</code> function is defined in the template</li>\n        <li>Ensure that card IDs are unique and properly referenced in the onclick handlers</li>\n        <li>Check that the collapse icon is properly styled and transitions are working</li>\n    </ol>\n    \n    <h3>Filtering Issues</h3>\n    <p>If filtering is not working correctly:</p>\n    <ol>\n        <li>Verify that the filter form is submitting to the correct URL</li>\n        <li>Check that the controller is correctly passing filter parameters to the template</li>\n        <li>Ensure that the <code>is_parent_of_filtered_project</code> macro is correctly implemented</li>\n        <li>Check the browser's network tab to confirm filter parameters are being sent</li>\n        <li>Verify that the NEXT statements in the template are correctly evaluating filter conditions</li>\n    </ol>\n    \n    <h3>Debug Mode</h3>\n    <p>Enable debug mode in the controller to see additional information:</p>\n    <pre><code>$c->stash(debug_mode => 1);</code></pre>\n    <p>This will display template version and CSS file information at the top of the page.</p>\n    \n    <h3>Common Issues</h3>\n    <ul>\n        <li><strong>Cards not collapsing/expanding:</strong> JavaScript errors or missing event handlers</li>\n        <li><strong>Filters not working:</strong> Form submission issues or incorrect template logic</li>\n        <li><strong>Sub-projects not displaying:</strong> Check the recursive macro implementation</li>\n        <li><strong>Parent projects not showing when filtering by sub-project:</strong> Issue with the <code>is_parent_of_filtered_project</code> macro</li>\n        <li><strong>Missing badges or icons:</strong> Font Awesome not loading correctly</li>\n        <li><strong>Auto-expand not working when filtering:</strong> JavaScript initialization issue</li>\n    </ul>\n    \n    <h3>Logging</h3>\n    <p>The Project controller logs important events to the application log:</p>\n    <pre><code>$self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'project', 'message');</code></pre>\n    <p>Check <code>logs/application.log</code> for debugging information, especially filter parameters and project data structure.</p>\n    \n    <h3>JavaScript Debugging</h3>\n    <p>For JavaScript-related issues, add console logging to the script:</p>\n    <pre><code>console.log('Filter parameters:', {\n    project: document.getElementById('project_filter').value,\n    priority: document.getElementById('priority_filter').value\n});</code></pre>\n    <p>This can help identify issues with the collapsible functionality and filter handling.</p>\n\n    <p><a href=\"#projects-top\">Back to top</a></p>",
+                    "language": "plain text"
+                },
+                "codebaseEnabled": true
+            },
+            "createdAt": 1753532225513,
+            "isInternal": false,
+            "rawContent": {
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "figuring GD-2.83 ... N/A"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "! Configure failed for GD-2.83. See /home/shanta/.cpanm/work/1753532190.101980/build.log for details."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "! Installing the dependencies failed: Module 'GD' is not installed"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "! Bailing out the installation for GDTextUtil-0.86."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Failed to install GD::Text. Some functionality may be limited."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Base directory: /home/shanta/PycharmProjects/comserv2/Comserv/script/.."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Log directory: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Log directory exists: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Wrote test log entry to file"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Use of uninitialized value $_ in bitwise or (|) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/Catalyst/Log.pm line 84."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Use of uninitialized value $_ in bitwise or (|) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/Catalyst/Log.pm line 84."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Warning: Email modules temporarily disabled for development"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Email functionality may not work correctly."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Found config file at: /home/shanta/PycharmProjects/comserv2/Comserv/script/../db_config.json at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/DBEncy.pm line 51."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "DBEncy Configuration:"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Host: 172.30.161.222"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Database: ency"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Username: shanta_forager"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "DBForager Configuration:"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Host: 172.30.161.222"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Database: shanta_forager"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Username: shanta_forager"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Can't locate object method \"ypackage\" via package \"Comserv::Controller::Project\" (perhaps you forgot to load \"Comserv::Controller::Project\"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 1."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Compilation failed in require at /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/Catalyst/Utils.pm line 310."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Compilation failed in require at /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/Catalyst/Utils.pm line 310."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph"
+                    }
+                ]
+            },
+            "autoAppliedRules": [
+                {
+                    "name": "User AI Instruction",
+                    "description": "User AI Instruction",
+                    "uri": "zen-rules://user/custom",
+                    "content": "read AI_DEVELOPMENT_GUIDELINES\nall code must be varifed by user"
+                },
+                {
+                    "name": "Repository Information Overview",
+                    "description": "Repository Information Overview",
+                    "uri": "zen-rules://repo/repo",
+                    "content": "\n\n# Comserv Project Information\n\n## Summary\nComserv is a comprehensive web-based system for managing business operations, projects, and documentation. It's built using the Catalyst Perl web framework and provides features for project management, theme customization, and user authentication.\n\n## Structure\n- `Comserv/`: Main application directory containing the core application code\n  - `lib/`: Application code and models\n  - `docs/`: Documentation files\n  - `root/`: Static assets and templates\n  - `script/`: Utility scripts for server management and database operations\n  - `t/`: Test files\n- `app/`: Additional application components\n- `data/`: Data files including pricing information\n- `proxmox/`: Proxmox VE integration components\n\n## Language & Runtime\n**Language**: Perl\n**Version**: 5.x (compatible with Perl 5.40.0)\n**Framework**: Catalyst 5.90130\n**Build System**: Module::Install\n**Package Manager**: CPAN\n\n## Dependencies\n**Main Dependencies**:\n- Catalyst::Runtime (5.90130)\n- Moose\n- DBIx::Class\n- Template (Template Toolkit)\n- JSON/JSON::MaybeXS\n- Log::Log4perl\n- DateTime\n- File::Slurp\n\n**Development Dependencies**:\n- Test::More (0.88+)\n- Test::Pod\n- Test::Pod::Coverage\n- Test::WWW::Mechanize::Catalyst\n- Catalyst::Devel\n\n## Build & Installation\n```bash\ncd Comserv\nperl Makefile.PL\nmake\nmake test\nmake install\n```\n\n## Database\n**Type**: MySQL\n**Setup**: \n```bash\nmysql -u root -p < database_initialization_script.sql\n```\n**Schema Management**: DBIx::Class::Schema::Loader\n\n## Testing\n**Framework**: Test::More\n**Test Location**: Comserv/t/\n**Run Command**:\n```bash\ncd Comserv\nprove -l t/\n```\n\n## Server Execution\n**Development Server**:\n```bash\ncd Comserv\nscript/comserv_server.pl\n```\n**Production Deployment**:\n```bash\ncd Comserv\nscript/comserv_fastcgi.pl\n# or\nstarman --port 5000 --workers 5 comserv.psgi\n```\n\n## Authentication & Authorization\n- Session-based authentication\n- Role-based access control\n- Multiple authentication realms\n- Support for user groups and site-specific permissions\n\n## Features\n- Project management system\n- Theme customization system\n- Email integration\n- PDF generation\n- Proxmox VE integration\n- Multi-site support"
+                },
+                {
+                    "name": "Database Development Standards and Best Practices",
+                    "description": "Database Development Standards and Best Practices",
+                    "uri": "zen-rules://repo/database-standards",
+                    "content": "\n\n# Database Development Standards\n\n## Query Standards\n- **Table Aliases:** Use table aliases in all queries to avoid ambiguity (e.g., 'me.column_name')\n- **Error Handling:** Implement proper error handling with eval blocks and try/catch\n- **Parameterized Queries:** Use parameterized queries to prevent SQL injection\n\n## Schema Management\n- **Naming Conventions:** Follow naming conventions for tables, columns, and relationships\n- **Documentation:** Document schema changes and rationale for future reference\n- **Performance:** Regularly optimize database performance and indexes\n- **Version Control:** Use Git to track schema changes with proper tagging\n- **Backup Protocol:** Always backup database before making schema changes\n\n## Model Standards (DBIx::Class)\n- **Result Classes:** Located in `/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema/Ency/Result/`\n- **Relationships:** Define proper relationships between tables\n- **Validation:** Implement data validation in model classes\n\n## Configuration Priority\n- **Primary:** ZeroTier production server (172.30.161.222) - works from any network\n- **Secondary:** Local network production server (192.168.1.198) - home/office only\n- **Tertiary:** localhost MySQL (development)\n- **Fallback:** SQLite (offline mode)\n\n## Security Protocols\n- **Input Validation:** Validate all user inputs before database operations\n- **Access Controls:** Implement proper access controls based on user roles\n- **Regular Reviews:** Regularly review and update security protocols"
+                },
+                {
+                    "name": "AI Behavior Enforcement Rules for Zencoder",
+                    "description": "AI Behavior Enforcement Rules for Zencoder",
+                    "uri": "zen-rules://repo/ai-behavior-enforcement",
+                    "content": "\n\n# AI Behavior Enforcement Rules\n\n## MANDATORY PROMPT TRACKING\n**CURRENT PROMPT:** This is prompt #[X] of 4 maximum allowed prompts.\n\n### Prompt Counter Protocol\n- **Start Each Response:** Begin every response with current prompt count\n- **Track Internally:** Keep running count throughout conversation\n- **Warn at Prompt 3:** Alert user that next prompt will trigger handoff\n- **Stop at Prompt 4:** Refuse to continue, provide handoff documentation\n\n## MANDATORY APPROVAL WORKFLOW\n\n### Before ANY Code Changes\n1. **STOP:** Do not modify any files without explicit user approval\n2. **PRESENT:** Show exactly what will be changed using the standard format\n3. **WAIT:** Wait for explicit approval (\"yes\", \"approved\", \"apply changes\")\n4. **CONFIRM:** Acknowledge approval before proceeding\n5. **EXECUTE:** Apply changes only after confirmation\n\n### Standard Change Presentation\n```\n🔄 PROPOSED CHANGE TO: [filename]\n📝 CHANGE TYPE: [Addition/Modification/Deletion]\n📋 DESCRIPTION: [what this accomplishes]\n\n❌ CURRENT CODE:\n[existing code or \"N/A\"]\n\n✅ NEW CODE:\n[proposed code or \"DELETED\"]\n\n💡 REASON: [why needed]\n\n⚠️  APPROVAL REQUIRED: Please confirm with \"approved\" or \"yes\"\n🔄 REVERT: Changes can be undone if needed\n```\n\n## VIOLATION CONSEQUENCES\n- **Prompt Limit Exceeded:** Immediate session termination with handoff\n- **Unapproved Changes:** Acknowledge violation and request approval retroactively\n- **Missing Counter:** Add prompt counter to current response\n\n## HANDOFF TEMPLATE (Use on 4th Prompt)\n```\n🚨 PROMPT LIMIT REACHED - HANDOFF REQUIRED\n\n📊 SESSION SUMMARY:\n- Prompts Used: 4/4\n- Files Modified: [list]\n- Tasks Completed: [list]\n- Tasks Remaining: [list]\n\n🔄 HANDOFF PROMPT FOR NEXT AI:\n\"Continue working on [project/task]. Read development-guidelines.md and ai-behavior-enforcement.md first. \nCurrent context: [brief context]\nFiles being worked on: [list]\nNext steps needed: [specific actions]\"\n\n📚 REQUIRED READING FOR NEXT AI:\n- .zencoder/rules/development-guidelines.md\n- .zencoder/rules/ai-behavior-enforcement.md\n- [any other relevant docs]\n\n✅ DOCUMENTATION UPDATED: [what was recorded]\n```\n\n## EMERGENCY PROTOCOLS\n- **User Says \"Stop\":** Immediately cease all activities\n- **User Says \"Revert\":** Provide instructions for undoing changes\n- **User Says \"Handoff\":** Immediately provide handoff documentation"
+                },
+                {
+                    "name": "Template Toolkit Standards and Requirements",
+                    "description": "Template Toolkit Standards and Requirements",
+                    "uri": "zen-rules://repo/template-standards",
+                    "content": "\n\n# Template Toolkit (.tt) Standards\n\n## Required PageVersion Header Format\nAll .tt files must include this exact format:\n```\n[% META title = 'Page Title Here' %]\n[% PageVersion = 'relative/path/filename.tt,v 0.01 YYYY/MM/DD author Exp author ' %]\n[% IF c.session.debug_mode == 1 %]\n    [% PageVersion %]\n[% END %]\n```\n\n## Template Standards\n- **Theme Compliance:** Use theme system variables for styling - NO page-specific CSS\n- **Debug Mode:** Include debug mode blocks for development visibility\n- **Responsive Design:** Implement mobile-first responsive design patterns\n- **HTML Structure:** Use proper semantic HTML structure\n- **Template Toolkit:** Follow Template Toolkit best practices\n\n## Navigation Integration\nWhen working with navigation templates:\n- **Main Navigation:** Include via `/Navigation/navigation.tt`\n- **Admin Menu:** Use `/Navigation/admintopmenu.tt` for admin-only sections\n- **Dropdown Menus:** Reference existing dropdown templates in `/Navigation/` directory\n\n## Documentation File Rules - CRITICAL\n- **File Format:** ONLY `.tt` files for application documentation - NO `.md` files\n- **EXISTING FILES FIRST:** ALWAYS search for and use existing files before creating new ones\n- **Naming Consistency:** Use same file names across AI sessions to prevent content loss\n- **Content Priority:** Always improve existing files rather than creating new ones\n- **Role-Based Access:** Respect existing Documentation/index.tt role-based structure\n- **Directory Consolidation:** Use established directory structure - don't create new directories\n\n## File Creation Protocol\n1. **Search First:** Use file search tools to find existing similar files\n2. **Check Directory:** Look at existing directory structure in target location\n3. **Ask User:** If multiple similar files exist, ask which should be updated\n4. **Update Existing:** Improve existing files rather than creating duplicates"
+                }
+            ]
+        },
+        {
+            "id": "18bbab72-f645-4c07-b4c5-cc7071381848",
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "**CURRENT PROMPT:** This is prompt #2 of 4 maximum allowed prompts.\n\nI can see there's a compilation error in the Project controller. The error message indicates:\n\n```\nCan't locate object method \"ypackage\" via package \"Comserv::Controller::Project\" (perhaps you forgot to load \"Comserv::Controller::Project\"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 1.\n```\n\nThis suggests there's a typo in the Project.pm file - \"ypackage\" instead of \"package\" on line 1. Let me examine the Project controller file to identify and fix this issue."
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01WRUJG6o6kwbRomNbLWfXJG",
+                    "statusText": "Viewed file",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": "Comserv/lib/Comserv/Controller/Project.pm",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Project.pm"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "text",
+                    "text": "Found the issue! There's a typo on line 1 - \"ypackage\" should be \"package\". Let me fix this:\n\n🔄 **PROPOSED CHANGE TO:** /home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Project.pm\n📝 **CHANGE TYPE:** Modification\n📋 **DESCRIPTION:**\n\n❌ **CURRENT CODE:**\n```perl\nypackage Comserv::Controller::Project;\n```\n\n✅ **NEW CODE:**\n```perl\npackage Comserv::Controller::Project;\n```\n\n💡 **REASON:** The \"ypackage\" typo is causing a compilation error that prevents the Project controller from loading. This needs to be \"package\" for proper Perl syntax.\n\n⚠️ **APPROVAL REQUIRED:** Please confirm with \"approved\" or \"yes\"\n🔄 **REVERT:** Changes can be undone if needed"
+                }
+            ],
+            "context": {
+                "author": "Coding Agent",
+                "operationId": "676bd959-d9ab-49a7-a75e-21b794566e7c"
+            },
+            "createdAt": 1753532227162,
+            "isInternal": false
+        },
+        {
+            "id": "a89de42b-812c-4cfa-8b71-c450fdcae0a7",
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "yes"
+                }
+            ],
+            "context": {
+                "currentFile": {
+                    "path": "Comserv/root/Documentation/Projects.tt",
+                    "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Projects.tt",
+                    "sources": [
+                        "opened_tab"
+                    ],
+                    "content": "[% META title = 'Projects System Documentation' %]\n    [% PageVersion = 'Documentation/Projects.tt,v 0.07 2025/01/27 AI Exp AI ' %]\n[% IF c.session.debug_mode == 1 %]\n    [% PageVersion %]\n[% END %]\n\n    <h1 id=\"projects-top\">Projects System Documentation</h1>\n    \n    <div class=\"alert alert-info\">\n        <strong>System Status:</strong> Project controller has been updated with working database queries and proper error handling. \n        All compilation errors have been resolved. Last updated: January 27, 2025.\n    </div>\n\n    <nav>\n        <a href=\"#projects-overview\">Projects Overview</a> |\n        <a href=\"#projects-controller\">Projects Controller</a> |\n        <a href=\"#projects-model\">Projects Model</a> |\n        <a href=\"#projects-templates\">Projects Templates</a> |\n        <a href=\"#projects-ui\">Projects UI Components</a> |\n        <a href=\"#projects-filtering\">Projects Filtering</a> |\n        <a href=\"#projects-workflow\">Projects Workflow</a> |\n        <a href=\"#projects-usage\">Projects Usage</a> |\n        <a href=\"#projects-troubleshooting\">Troubleshooting</a>\n    </nav>\n\n    <h2 id=\"projects-overview\">Projects Overview</h2>\n    <p>The Projects system manages hierarchical project structures with support for parent-child relationships. Each project can have multiple sub-projects, and the system maintains data integrity through proper handling of user permissions and data validation.</p>\n\n    <h2 id=\"projects-controller\">Projects Controller</h2>\n    <p>Key features in <code>Comserv::Controller::Project</code>:</p>\n    <ul>\n        <li><strong>Project Creation:</strong> Handles form submissions with proper validation for:\n            <ul>\n                <li>Parent-child relationships (parent_id)</li>\n                <li>User authentication and username tracking</li>\n                <li>Required fields and data type validation</li>\n            </ul>\n        </li>\n        <li><strong>Project Hierarchy:</strong> Manages up to 4 levels of sub-projects</li>\n        <li><strong>Project Listing:</strong> Displays projects in a card-based layout, sorted by name</li>\n        <li><strong>Error Handling:</strong> Provides detailed error messages and logging</li>\n        <li><strong>UI Configuration:</strong> Sets up the UI with:\n            <ul>\n                <li>CSS loading with cache-busting timestamps</li>\n                <li>Fluid container layout for better card display</li>\n                <li>Debug mode for troubleshooting</li>\n                <li>Template timestamp for forced reloading</li>\n            </ul>\n        </li>\n    </ul>\n    \n    <h3>Controller Code Example</h3>\n    <pre><code># Add the projects and filter info to the stash\n$c->stash(\n    projects => $projects,\n    role_filter => $role_filter,\n    project_filter => $project_filter,\n    priority_filter => $priority_filter,\n    template => 'todo/project.tt',\n    template_timestamp => time(), # Add a timestamp to force template reload\n    additional_css => ['/static/css/components/project-cards.css?v=' . time()], # Add timestamp to force CSS reload\n    use_fluid_container => 1, # Use fluid container for better card layout\n    debug_mode => 1 # Enable debug mode to see template version\n);</code></pre>\n\n    <h2 id=\"projects-model\">Projects Model</h2>\n    <p>The database schema includes these key fields:</p>\n    <ul>\n        <li>id (Primary Key)</li>\n        <li>name (Project name)</li>\n        <li>parent_id (Optional, for sub-projects)</li>\n        <li>sitename (Associated site)</li>\n        <li>status (Project status)</li>\n        <li>username_of_poster (Creator/owner)</li>\n        <li>Various metadata fields (dates, descriptions, etc.)</li>\n    </ul>\n\n    <h2 id=\"projects-templates\">Projects Templates</h2>\n    <p>Current template structure:</p>\n    <ul>\n        <li><strong>todo/project.tt:</strong> Main project listing with vertical card-based layout\n            <ul>\n                <li>Displays projects as collapsible vertical cards</li>\n                <li>Includes filter panel for project and priority filtering</li>\n                <li>Includes inline critical CSS to ensure proper rendering</li>\n                <li>Uses recursive macros to display hierarchical project structure</li>\n                <li>Implements JavaScript for collapsible functionality</li>\n            </ul>\n        </li>\n        <li><strong>todo/add_project.tt:</strong> Project creation form</li>\n        <li><strong>todo/editproject.tt:</strong> Project editing interface</li>\n        <li><strong>todo/projectdetails.tt:</strong> Detailed project view</li>\n        <li><strong>todo/project_list.tt:</strong> Reusable component for project selection dropdowns</li>\n    </ul>\n    \n    <p>The template system uses Template Toolkit with the following features:</p>\n    <ul>\n        <li>Version tracking in PageVersion variable</li>\n        <li>Debug mode support for troubleshooting</li>\n        <li>Responsive design principles</li>\n        <li>Role-based access control for admin functions</li>\n        <li>Helper macros for complex UI components</li>\n    </ul>\n\n    <h2 id=\"projects-ui\">Projects UI Components</h2>\n    <p>The Projects system uses a vertical card-based UI for displaying projects:</p>\n    \n    <h3>Card Layout</h3>\n    <ul>\n        <li><strong>Card Header:</strong> Contains project name, priority badge, and collapse toggle</li>\n        <li><strong>Card Body:</strong> Displays project description, status badge, key details, and sub-projects</li>\n        <li><strong>Action Buttons:</strong> Details and Edit buttons within the card body</li>\n        <li><strong>Sub-Projects Container:</strong> Visually distinct area for sub-projects with left border and indentation</li>\n    </ul>\n    \n    <h3>CSS Implementation</h3>\n    <p>The card layout is implemented using a combination of:</p>\n    <ul>\n        <li><strong>External CSS:</strong> <code>/static/css/components/project-cards.css</code> - Contains all card styling</li>\n        <li><strong>Inline Critical CSS:</strong> Embedded in the template to ensure proper rendering even if external CSS fails to load</li>\n        <li><strong>Bootstrap-Compatible Classes:</strong> Uses standard Bootstrap class names for compatibility</li>\n        <li><strong>Custom Classes:</strong> Additional classes for collapsible cards and sub-project containers</li>\n    </ul>\n    \n    <h3>Responsive Design</h3>\n    <ul>\n        <li>Vertical card layout that adapts to all screen sizes</li>\n        <li>Collapsible cards to save vertical space</li>\n        <li>Filter panel that adapts to mobile screens</li>\n        <li>Fluid container for better use of screen space</li>\n    </ul>\n    \n    <h3>Visual Indicators</h3>\n    <ul>\n        <li><strong>Priority Badges:</strong> Color-coded badges for High (red), Medium (yellow), Low (blue)</li>\n        <li><strong>Status Badges:</strong> New (blue), In Progress (primary), Completed (green)</li>\n        <li><strong>Icons:</strong> Font Awesome icons for improved visual cues</li>\n        <li><strong>Collapse Indicators:</strong> Chevron icons that rotate to indicate collapse state</li>\n        <li><strong>Sub-Project Indicators:</strong> Left border and indentation to show hierarchy</li>\n    </ul>\n    \n    <h2 id=\"projects-filtering\">Projects Filtering</h2>\n    <p>The Projects system includes a comprehensive filtering system:</p>\n    \n    <h3>Filter Panel</h3>\n    <ul>\n        <li><strong>Project Filter:</strong> Dropdown to select a specific project or sub-project</li>\n        <li><strong>Priority Filter:</strong> Dropdown to filter by priority level (High, Medium, Low)</li>\n        <li><strong>Apply Filters Button:</strong> Submits the filter form</li>\n        <li><strong>Clear Filters Button:</strong> Resets all filters</li>\n    </ul>\n    \n    <h3>Filtering Logic</h3>\n    <ul>\n        <li><strong>Project Filtering:</strong> When a project is selected, only that project and its sub-projects are displayed</li>\n        <li><strong>Sub-Project Filtering:</strong> When a sub-project is selected, its parent project is displayed with only the selected sub-project</li>\n        <li><strong>Priority Filtering:</strong> Only projects with the selected priority are displayed</li>\n        <li><strong>Combined Filtering:</strong> Project and priority filters can be used together</li>\n        <li><strong>Hierarchical Awareness:</strong> Parent projects remain visible when their sub-projects match the filter</li>\n    </ul>\n    \n    <h3>Implementation Details</h3>\n    <ul>\n        <li><strong>Template Macros:</strong> Helper macros determine if a project should be displayed based on filter criteria</li>\n        <li><strong>JavaScript:</strong> Auto-expands relevant projects when filtering</li>\n        <li><strong>Controller Support:</strong> The controller passes filter parameters to the template</li>\n        <li><strong>Query Parameters:</strong> Filters are maintained in the URL for bookmarking and sharing</li>\n    </ul>\n    \n    <h3>Code Example: Filter Panel</h3>\n    <pre><code>&lt;div class=\"filter-panel mb-4\"&gt;\n    &lt;form id=\"projectFilterForm\" class=\"form-inline\" method=\"GET\" action=\"/project/project\"&gt;\n        &lt;div class=\"form-group mb-2\"&gt;\n            &lt;label for=\"project_filter\" class=\"mr-2\"&gt;Project:&lt;/label&gt;\n            &lt;select id=\"project_filter\" name=\"project_id\" class=\"form-control\"&gt;\n                &lt;option value=\"\"&gt;All Projects&lt;/option&gt;\n                [% FOREACH project IN projects.sort('name') %]\n                    &lt;option value=\"[% project.id %]\" [% IF project_filter == project.id %]selected[% END %]&gt;\n                        [% project.name %]\n                    &lt;/option&gt;\n                    [% FOREACH subproject IN project.sub_projects.sort('name') %]\n                        &lt;option value=\"[% subproject.id %]\" [% IF project_filter == subproject.id %]selected[% END %]&gt;\n                            &amp;nbsp;&amp;nbsp;└─ [% subproject.name %]\n                        &lt;/option&gt;\n                    [% END %]\n                [% END %]\n            &lt;/select&gt;\n        &lt;/div&gt;\n        \n        &lt;div class=\"form-group mb-2 ml-3\"&gt;\n            &lt;label for=\"priority_filter\" class=\"mr-2\"&gt;Priority:&lt;/label&gt;\n            &lt;select id=\"priority_filter\" name=\"priority\" class=\"form-control\"&gt;\n                &lt;option value=\"\"&gt;All Priorities&lt;/option&gt;\n                &lt;option value=\"1\" [% IF priority_filter == '1' %]selected[% END %]&gt;High&lt;/option&gt;\n                &lt;option value=\"2\" [% IF priority_filter == '2' %]selected[% END %]&gt;Medium&lt;/option&gt;\n                &lt;option value=\"3\" [% IF priority_filter == '3' %]selected[% END %]&gt;Low&lt;/option&gt;\n            &lt;/select&gt;\n        &lt;/div&gt;\n        \n        &lt;button type=\"submit\" class=\"btn btn-primary mb-2 ml-3\"&gt;Apply Filters&lt;/button&gt;\n        &lt;button type=\"button\" id=\"clearFilters\" class=\"btn btn-outline-secondary mb-2 ml-2\"&gt;Clear Filters&lt;/button&gt;\n    &lt;/form&gt;\n&lt;/div&gt;</code></pre>\n\n    <h2 id=\"projects-workflow\">Projects Workflow</h2>\n    <ol>\n        <li><strong>Project Creation:</strong>\n            <ul>\n                <li>User fills out project form</li>\n                <li>System validates input and handles parent-child relationships</li>\n                <li>Project is created with proper user and site association</li>\n            </ul>\n        </li>\n        <li><strong>Project Management:</strong>\n            <ul>\n                <li>Projects can be viewed in hierarchical list</li>\n                <li>Admin users can edit project details</li>\n                <li>Sub-projects are managed within parent context</li>\n            </ul>\n        </li>\n    </ol>\n\n    <h2 id=\"projects-usage\">System Requirements and Limitations</h2>\n    <ul>\n        <li>User must be authenticated for project creation</li>\n        <li>Admin privileges required for editing projects</li>\n        <li>Maximum of 4 levels in project hierarchy</li>\n        <li>Project names must be unique within a site</li>\n        <li>Browser must support CSS Flexbox for optimal card layout</li>\n        <li>Font Awesome 5.x is required for icons</li>\n    </ul>\n\n    <h2 id=\"projects-troubleshooting\">Troubleshooting</h2>\n    \n    <h3>CSS Display Issues</h3>\n    <p>If projects are not displaying correctly as cards:</p>\n    <ol>\n        <li>Verify that the CSS file is being loaded correctly (check browser developer tools)</li>\n        <li>Ensure the template is using the correct CSS classes</li>\n        <li>Check that the inline critical CSS is present in the template</li>\n        <li>Verify that the controller is setting <code>use_fluid_container => 1</code></li>\n        <li>Check for JavaScript errors that might be affecting the layout</li>\n    </ol>\n    \n    <h3>Collapsible Card Issues</h3>\n    <p>If the collapsible functionality is not working:</p>\n    <ol>\n        <li>Check browser console for JavaScript errors</li>\n        <li>Verify that the <code>toggleCollapse</code> function is defined in the template</li>\n        <li>Ensure that card IDs are unique and properly referenced in the onclick handlers</li>\n        <li>Check that the collapse icon is properly styled and transitions are working</li>\n    </ol>\n    \n    <h3>Filtering Issues</h3>\n    <p>If filtering is not working correctly:</p>\n    <ol>\n        <li>Verify that the filter form is submitting to the correct URL</li>\n        <li>Check that the controller is correctly passing filter parameters to the template</li>\n        <li>Ensure that the <code>is_parent_of_filtered_project</code> macro is correctly implemented</li>\n        <li>Check the browser's network tab to confirm filter parameters are being sent</li>\n        <li>Verify that the NEXT statements in the template are correctly evaluating filter conditions</li>\n    </ol>\n    \n    <h3>Debug Mode</h3>\n    <p>Enable debug mode in the controller to see additional information:</p>\n    <pre><code>$c->stash(debug_mode => 1);</code></pre>\n    <p>This will display template version and CSS file information at the top of the page.</p>\n    \n    <h3>Common Issues</h3>\n    <ul>\n        <li><strong>Cards not collapsing/expanding:</strong> JavaScript errors or missing event handlers</li>\n        <li><strong>Filters not working:</strong> Form submission issues or incorrect template logic</li>\n        <li><strong>Sub-projects not displaying:</strong> Check the recursive macro implementation</li>\n        <li><strong>Parent projects not showing when filtering by sub-project:</strong> Issue with the <code>is_parent_of_filtered_project</code> macro</li>\n        <li><strong>Missing badges or icons:</strong> Font Awesome not loading correctly</li>\n        <li><strong>Auto-expand not working when filtering:</strong> JavaScript initialization issue</li>\n    </ul>\n    \n    <h3>Logging</h3>\n    <p>The Project controller logs important events to the application log:</p>\n    <pre><code>$self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'project', 'message');</code></pre>\n    <p>Check <code>logs/application.log</code> for debugging information, especially filter parameters and project data structure.</p>\n    \n    <h3>JavaScript Debugging</h3>\n    <p>For JavaScript-related issues, add console logging to the script:</p>\n    <pre><code>console.log('Filter parameters:', {\n    project: document.getElementById('project_filter').value,\n    priority: document.getElementById('priority_filter').value\n});</code></pre>\n    <p>This can help identify issues with the collapsible functionality and filter handling.</p>\n\n    <p><a href=\"#projects-top\">Back to top</a></p>",
+                    "language": "plain text"
+                },
+                "codebaseEnabled": true
+            },
+            "createdAt": 1753532265976,
+            "isInternal": false,
+            "rawContent": {
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "yes"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "autoAppliedRules": [
+                {
+                    "name": "User AI Instruction",
+                    "description": "User AI Instruction",
+                    "uri": "zen-rules://user/custom",
+                    "content": "read AI_DEVELOPMENT_GUIDELINES\nall code must be varifed by user"
+                },
+                {
+                    "name": "Repository Information Overview",
+                    "description": "Repository Information Overview",
+                    "uri": "zen-rules://repo/repo",
+                    "content": "\n\n# Comserv Project Information\n\n## Summary\nComserv is a comprehensive web-based system for managing business operations, projects, and documentation. It's built using the Catalyst Perl web framework and provides features for project management, theme customization, and user authentication.\n\n## Structure\n- `Comserv/`: Main application directory containing the core application code\n  - `lib/`: Application code and models\n  - `docs/`: Documentation files\n  - `root/`: Static assets and templates\n  - `script/`: Utility scripts for server management and database operations\n  - `t/`: Test files\n- `app/`: Additional application components\n- `data/`: Data files including pricing information\n- `proxmox/`: Proxmox VE integration components\n\n## Language & Runtime\n**Language**: Perl\n**Version**: 5.x (compatible with Perl 5.40.0)\n**Framework**: Catalyst 5.90130\n**Build System**: Module::Install\n**Package Manager**: CPAN\n\n## Dependencies\n**Main Dependencies**:\n- Catalyst::Runtime (5.90130)\n- Moose\n- DBIx::Class\n- Template (Template Toolkit)\n- JSON/JSON::MaybeXS\n- Log::Log4perl\n- DateTime\n- File::Slurp\n\n**Development Dependencies**:\n- Test::More (0.88+)\n- Test::Pod\n- Test::Pod::Coverage\n- Test::WWW::Mechanize::Catalyst\n- Catalyst::Devel\n\n## Build & Installation\n```bash\ncd Comserv\nperl Makefile.PL\nmake\nmake test\nmake install\n```\n\n## Database\n**Type**: MySQL\n**Setup**: \n```bash\nmysql -u root -p < database_initialization_script.sql\n```\n**Schema Management**: DBIx::Class::Schema::Loader\n\n## Testing\n**Framework**: Test::More\n**Test Location**: Comserv/t/\n**Run Command**:\n```bash\ncd Comserv\nprove -l t/\n```\n\n## Server Execution\n**Development Server**:\n```bash\ncd Comserv\nscript/comserv_server.pl\n```\n**Production Deployment**:\n```bash\ncd Comserv\nscript/comserv_fastcgi.pl\n# or\nstarman --port 5000 --workers 5 comserv.psgi\n```\n\n## Authentication & Authorization\n- Session-based authentication\n- Role-based access control\n- Multiple authentication realms\n- Support for user groups and site-specific permissions\n\n## Features\n- Project management system\n- Theme customization system\n- Email integration\n- PDF generation\n- Proxmox VE integration\n- Multi-site support"
+                },
+                {
+                    "name": "Database Development Standards and Best Practices",
+                    "description": "Database Development Standards and Best Practices",
+                    "uri": "zen-rules://repo/database-standards",
+                    "content": "\n\n# Database Development Standards\n\n## Query Standards\n- **Table Aliases:** Use table aliases in all queries to avoid ambiguity (e.g., 'me.column_name')\n- **Error Handling:** Implement proper error handling with eval blocks and try/catch\n- **Parameterized Queries:** Use parameterized queries to prevent SQL injection\n\n## Schema Management\n- **Naming Conventions:** Follow naming conventions for tables, columns, and relationships\n- **Documentation:** Document schema changes and rationale for future reference\n- **Performance:** Regularly optimize database performance and indexes\n- **Version Control:** Use Git to track schema changes with proper tagging\n- **Backup Protocol:** Always backup database before making schema changes\n\n## Model Standards (DBIx::Class)\n- **Result Classes:** Located in `/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema/Ency/Result/`\n- **Relationships:** Define proper relationships between tables\n- **Validation:** Implement data validation in model classes\n\n## Configuration Priority\n- **Primary:** ZeroTier production server (172.30.161.222) - works from any network\n- **Secondary:** Local network production server (192.168.1.198) - home/office only\n- **Tertiary:** localhost MySQL (development)\n- **Fallback:** SQLite (offline mode)\n\n## Security Protocols\n- **Input Validation:** Validate all user inputs before database operations\n- **Access Controls:** Implement proper access controls based on user roles\n- **Regular Reviews:** Regularly review and update security protocols"
+                },
+                {
+                    "name": "AI Behavior Enforcement Rules for Zencoder",
+                    "description": "AI Behavior Enforcement Rules for Zencoder",
+                    "uri": "zen-rules://repo/ai-behavior-enforcement",
+                    "content": "\n\n# AI Behavior Enforcement Rules\n\n## MANDATORY PROMPT TRACKING\n**CURRENT PROMPT:** This is prompt #[X] of 4 maximum allowed prompts.\n\n### Prompt Counter Protocol\n- **Start Each Response:** Begin every response with current prompt count\n- **Track Internally:** Keep running count throughout conversation\n- **Warn at Prompt 3:** Alert user that next prompt will trigger handoff\n- **Stop at Prompt 4:** Refuse to continue, provide handoff documentation\n\n## MANDATORY APPROVAL WORKFLOW\n\n### Before ANY Code Changes\n1. **STOP:** Do not modify any files without explicit user approval\n2. **PRESENT:** Show exactly what will be changed using the standard format\n3. **WAIT:** Wait for explicit approval (\"yes\", \"approved\", \"apply changes\")\n4. **CONFIRM:** Acknowledge approval before proceeding\n5. **EXECUTE:** Apply changes only after confirmation\n\n### Standard Change Presentation\n```\n🔄 PROPOSED CHANGE TO: [filename]\n📝 CHANGE TYPE: [Addition/Modification/Deletion]\n📋 DESCRIPTION: [what this accomplishes]\n\n❌ CURRENT CODE:\n[existing code or \"N/A\"]\n\n✅ NEW CODE:\n[proposed code or \"DELETED\"]\n\n💡 REASON: [why needed]\n\n⚠️  APPROVAL REQUIRED: Please confirm with \"approved\" or \"yes\"\n🔄 REVERT: Changes can be undone if needed\n```\n\n## VIOLATION CONSEQUENCES\n- **Prompt Limit Exceeded:** Immediate session termination with handoff\n- **Unapproved Changes:** Acknowledge violation and request approval retroactively\n- **Missing Counter:** Add prompt counter to current response\n\n## HANDOFF TEMPLATE (Use on 4th Prompt)\n```\n🚨 PROMPT LIMIT REACHED - HANDOFF REQUIRED\n\n📊 SESSION SUMMARY:\n- Prompts Used: 4/4\n- Files Modified: [list]\n- Tasks Completed: [list]\n- Tasks Remaining: [list]\n\n🔄 HANDOFF PROMPT FOR NEXT AI:\n\"Continue working on [project/task]. Read development-guidelines.md and ai-behavior-enforcement.md first. \nCurrent context: [brief context]\nFiles being worked on: [list]\nNext steps needed: [specific actions]\"\n\n📚 REQUIRED READING FOR NEXT AI:\n- .zencoder/rules/development-guidelines.md\n- .zencoder/rules/ai-behavior-enforcement.md\n- [any other relevant docs]\n\n✅ DOCUMENTATION UPDATED: [what was recorded]\n```\n\n## EMERGENCY PROTOCOLS\n- **User Says \"Stop\":** Immediately cease all activities\n- **User Says \"Revert\":** Provide instructions for undoing changes\n- **User Says \"Handoff\":** Immediately provide handoff documentation"
+                },
+                {
+                    "name": "Template Toolkit Standards and Requirements",
+                    "description": "Template Toolkit Standards and Requirements",
+                    "uri": "zen-rules://repo/template-standards",
+                    "content": "\n\n# Template Toolkit (.tt) Standards\n\n## Required PageVersion Header Format\nAll .tt files must include this exact format:\n```\n[% META title = 'Page Title Here' %]\n[% PageVersion = 'relative/path/filename.tt,v 0.01 YYYY/MM/DD author Exp author ' %]\n[% IF c.session.debug_mode == 1 %]\n    [% PageVersion %]\n[% END %]\n```\n\n## Template Standards\n- **Theme Compliance:** Use theme system variables for styling - NO page-specific CSS\n- **Debug Mode:** Include debug mode blocks for development visibility\n- **Responsive Design:** Implement mobile-first responsive design patterns\n- **HTML Structure:** Use proper semantic HTML structure\n- **Template Toolkit:** Follow Template Toolkit best practices\n\n## Navigation Integration\nWhen working with navigation templates:\n- **Main Navigation:** Include via `/Navigation/navigation.tt`\n- **Admin Menu:** Use `/Navigation/admintopmenu.tt` for admin-only sections\n- **Dropdown Menus:** Reference existing dropdown templates in `/Navigation/` directory\n\n## Documentation File Rules - CRITICAL\n- **File Format:** ONLY `.tt` files for application documentation - NO `.md` files\n- **EXISTING FILES FIRST:** ALWAYS search for and use existing files before creating new ones\n- **Naming Consistency:** Use same file names across AI sessions to prevent content loss\n- **Content Priority:** Always improve existing files rather than creating new ones\n- **Role-Based Access:** Respect existing Documentation/index.tt role-based structure\n- **Directory Consolidation:** Use established directory structure - don't create new directories\n\n## File Creation Protocol\n1. **Search First:** Use file search tools to find existing similar files\n2. **Check Directory:** Look at existing directory structure in target location\n3. **Ask User:** If multiple similar files exist, ask which should be updated\n4. **Update Existing:** Improve existing files rather than creating duplicates"
+                }
+            ]
+        },
+        {
+            "id": "085b6554-c471-4487-bad2-1551b52ded38",
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "**CURRENT PROMPT:** This is prompt #3 of 4 maximum allowed prompts.\n\n⚠️ **WARNING:** This is prompt 3 of 4. The next prompt will trigger a handoff to another AI assistant.\n\n✅ **APPROVAL CONFIRMED** - Applying the fix to Project.pm"
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01D59eMbczxiV3KhRLyZ6p4T",
+                    "statusText": "Change generated",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": "Comserv/lib/Comserv/Controller/Project.pm",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Project.pm"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "codeHunk",
+                    "lineBasedDiff": "--- /home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Project.pm\n+++ /home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Project.pm\n@@ -1,4 +1,4 @@\n-ypackage Comserv::Controller::Project;\n+package Comserv::Controller::Project;\n use Moose;\n use namespace::autoclean;\n use DateTime;",
+                    "refToolCallId": "toolu_01D59eMbczxiV3KhRLyZ6p4T"
+                },
+                {
+                    "type": "text",
+                    "text": "✅ **CHANGE APPLIED SUCCESSFULLY**\n\nThe typo has been fixed! The Project controller should now compile correctly. The error was caused by \"ypackage\" instead of \"package\" on line 1.\n\n**Summary of what was fixed:**\n- Fixed the package declaration typo in `/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Project.pm`\n- This should resolve the compilation error that was preventing the Project controller from loading\n- The Projects system should now work as documented in the Projects.tt documentation\n\nYou can now test the server startup again to verify that the compilation error is resolved. The Projects system should be functional with all the features documented in the Projects.tt file, including:\n- Project creation and management\n- Hierarchical project structures\n- Card-based UI layout\n- Filtering functionality\n- Proper error handling\n\nIs there anything else you need help with regarding the Projects system?"
+                },
+                {
+                    "type": "codePatch",
+                    "diffs": [
+                        {
+                            "path": "Comserv/lib/Comserv/Controller/Project.pm",
+                            "patch": "@@ -1,9 +1,8 @@\n-y\n package \n",
+                            "isNew": false,
+                            "isApplied": true
+                        }
+                    ]
+                }
+            ],
+            "context": {
+                "author": "Coding Agent",
+                "operationId": "0cefd6e8-1196-44b4-8574-c71ca9921b11"
+            },
+            "createdAt": 1753532267603,
+            "isInternal": false
+        },
+        {
+            "id": "b1170fcf-d385-4d89-85a7-f08ddc36ced3",
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "That fixed the problem of loading. we still need to shorten the time it takes to load a page.  once loged in things seem to be quicker."
+                }
+            ],
+            "context": {
+                "currentFile": {
+                    "path": "Comserv/root/Documentation/Projects.tt",
+                    "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Projects.tt",
+                    "sources": [
+                        "opened_tab"
+                    ],
+                    "content": "[% META title = 'Projects System Documentation' %]\n    [% PageVersion = 'Documentation/Projects.tt,v 0.07 2025/01/27 AI Exp AI ' %]\n[% IF c.session.debug_mode == 1 %]\n    [% PageVersion %]\n[% END %]\n\n    <h1 id=\"projects-top\">Projects System Documentation</h1>\n    \n    <div class=\"alert alert-info\">\n        <strong>System Status:</strong> Project controller has been updated with working database queries and proper error handling. \n        All compilation errors have been resolved. Last updated: January 27, 2025.\n    </div>\n\n    <nav>\n        <a href=\"#projects-overview\">Projects Overview</a> |\n        <a href=\"#projects-controller\">Projects Controller</a> |\n        <a href=\"#projects-model\">Projects Model</a> |\n        <a href=\"#projects-templates\">Projects Templates</a> |\n        <a href=\"#projects-ui\">Projects UI Components</a> |\n        <a href=\"#projects-filtering\">Projects Filtering</a> |\n        <a href=\"#projects-workflow\">Projects Workflow</a> |\n        <a href=\"#projects-usage\">Projects Usage</a> |\n        <a href=\"#projects-troubleshooting\">Troubleshooting</a>\n    </nav>\n\n    <h2 id=\"projects-overview\">Projects Overview</h2>\n    <p>The Projects system manages hierarchical project structures with support for parent-child relationships. Each project can have multiple sub-projects, and the system maintains data integrity through proper handling of user permissions and data validation.</p>\n\n    <h2 id=\"projects-controller\">Projects Controller</h2>\n    <p>Key features in <code>Comserv::Controller::Project</code>:</p>\n    <ul>\n        <li><strong>Project Creation:</strong> Handles form submissions with proper validation for:\n            <ul>\n                <li>Parent-child relationships (parent_id)</li>\n                <li>User authentication and username tracking</li>\n                <li>Required fields and data type validation</li>\n            </ul>\n        </li>\n        <li><strong>Project Hierarchy:</strong> Manages up to 4 levels of sub-projects</li>\n        <li><strong>Project Listing:</strong> Displays projects in a card-based layout, sorted by name</li>\n        <li><strong>Error Handling:</strong> Provides detailed error messages and logging</li>\n        <li><strong>UI Configuration:</strong> Sets up the UI with:\n            <ul>\n                <li>CSS loading with cache-busting timestamps</li>\n                <li>Fluid container layout for better card display</li>\n                <li>Debug mode for troubleshooting</li>\n                <li>Template timestamp for forced reloading</li>\n            </ul>\n        </li>\n    </ul>\n    \n    <h3>Controller Code Example</h3>\n    <pre><code># Add the projects and filter info to the stash\n$c->stash(\n    projects => $projects,\n    role_filter => $role_filter,\n    project_filter => $project_filter,\n    priority_filter => $priority_filter,\n    template => 'todo/project.tt',\n    template_timestamp => time(), # Add a timestamp to force template reload\n    additional_css => ['/static/css/components/project-cards.css?v=' . time()], # Add timestamp to force CSS reload\n    use_fluid_container => 1, # Use fluid container for better card layout\n    debug_mode => 1 # Enable debug mode to see template version\n);</code></pre>\n\n    <h2 id=\"projects-model\">Projects Model</h2>\n    <p>The database schema includes these key fields:</p>\n    <ul>\n        <li>id (Primary Key)</li>\n        <li>name (Project name)</li>\n        <li>parent_id (Optional, for sub-projects)</li>\n        <li>sitename (Associated site)</li>\n        <li>status (Project status)</li>\n        <li>username_of_poster (Creator/owner)</li>\n        <li>Various metadata fields (dates, descriptions, etc.)</li>\n    </ul>\n\n    <h2 id=\"projects-templates\">Projects Templates</h2>\n    <p>Current template structure:</p>\n    <ul>\n        <li><strong>todo/project.tt:</strong> Main project listing with vertical card-based layout\n            <ul>\n                <li>Displays projects as collapsible vertical cards</li>\n                <li>Includes filter panel for project and priority filtering</li>\n                <li>Includes inline critical CSS to ensure proper rendering</li>\n                <li>Uses recursive macros to display hierarchical project structure</li>\n                <li>Implements JavaScript for collapsible functionality</li>\n            </ul>\n        </li>\n        <li><strong>todo/add_project.tt:</strong> Project creation form</li>\n        <li><strong>todo/editproject.tt:</strong> Project editing interface</li>\n        <li><strong>todo/projectdetails.tt:</strong> Detailed project view</li>\n        <li><strong>todo/project_list.tt:</strong> Reusable component for project selection dropdowns</li>\n    </ul>\n    \n    <p>The template system uses Template Toolkit with the following features:</p>\n    <ul>\n        <li>Version tracking in PageVersion variable</li>\n        <li>Debug mode support for troubleshooting</li>\n        <li>Responsive design principles</li>\n        <li>Role-based access control for admin functions</li>\n        <li>Helper macros for complex UI components</li>\n    </ul>\n\n    <h2 id=\"projects-ui\">Projects UI Components</h2>\n    <p>The Projects system uses a vertical card-based UI for displaying projects:</p>\n    \n    <h3>Card Layout</h3>\n    <ul>\n        <li><strong>Card Header:</strong> Contains project name, priority badge, and collapse toggle</li>\n        <li><strong>Card Body:</strong> Displays project description, status badge, key details, and sub-projects</li>\n        <li><strong>Action Buttons:</strong> Details and Edit buttons within the card body</li>\n        <li><strong>Sub-Projects Container:</strong> Visually distinct area for sub-projects with left border and indentation</li>\n    </ul>\n    \n    <h3>CSS Implementation</h3>\n    <p>The card layout is implemented using a combination of:</p>\n    <ul>\n        <li><strong>External CSS:</strong> <code>/static/css/components/project-cards.css</code> - Contains all card styling</li>\n        <li><strong>Inline Critical CSS:</strong> Embedded in the template to ensure proper rendering even if external CSS fails to load</li>\n        <li><strong>Bootstrap-Compatible Classes:</strong> Uses standard Bootstrap class names for compatibility</li>\n        <li><strong>Custom Classes:</strong> Additional classes for collapsible cards and sub-project containers</li>\n    </ul>\n    \n    <h3>Responsive Design</h3>\n    <ul>\n        <li>Vertical card layout that adapts to all screen sizes</li>\n        <li>Collapsible cards to save vertical space</li>\n        <li>Filter panel that adapts to mobile screens</li>\n        <li>Fluid container for better use of screen space</li>\n    </ul>\n    \n    <h3>Visual Indicators</h3>\n    <ul>\n        <li><strong>Priority Badges:</strong> Color-coded badges for High (red), Medium (yellow), Low (blue)</li>\n        <li><strong>Status Badges:</strong> New (blue), In Progress (primary), Completed (green)</li>\n        <li><strong>Icons:</strong> Font Awesome icons for improved visual cues</li>\n        <li><strong>Collapse Indicators:</strong> Chevron icons that rotate to indicate collapse state</li>\n        <li><strong>Sub-Project Indicators:</strong> Left border and indentation to show hierarchy</li>\n    </ul>\n    \n    <h2 id=\"projects-filtering\">Projects Filtering</h2>\n    <p>The Projects system includes a comprehensive filtering system:</p>\n    \n    <h3>Filter Panel</h3>\n    <ul>\n        <li><strong>Project Filter:</strong> Dropdown to select a specific project or sub-project</li>\n        <li><strong>Priority Filter:</strong> Dropdown to filter by priority level (High, Medium, Low)</li>\n        <li><strong>Apply Filters Button:</strong> Submits the filter form</li>\n        <li><strong>Clear Filters Button:</strong> Resets all filters</li>\n    </ul>\n    \n    <h3>Filtering Logic</h3>\n    <ul>\n        <li><strong>Project Filtering:</strong> When a project is selected, only that project and its sub-projects are displayed</li>\n        <li><strong>Sub-Project Filtering:</strong> When a sub-project is selected, its parent project is displayed with only the selected sub-project</li>\n        <li><strong>Priority Filtering:</strong> Only projects with the selected priority are displayed</li>\n        <li><strong>Combined Filtering:</strong> Project and priority filters can be used together</li>\n        <li><strong>Hierarchical Awareness:</strong> Parent projects remain visible when their sub-projects match the filter</li>\n    </ul>\n    \n    <h3>Implementation Details</h3>\n    <ul>\n        <li><strong>Template Macros:</strong> Helper macros determine if a project should be displayed based on filter criteria</li>\n        <li><strong>JavaScript:</strong> Auto-expands relevant projects when filtering</li>\n        <li><strong>Controller Support:</strong> The controller passes filter parameters to the template</li>\n        <li><strong>Query Parameters:</strong> Filters are maintained in the URL for bookmarking and sharing</li>\n    </ul>\n    \n    <h3>Code Example: Filter Panel</h3>\n    <pre><code>&lt;div class=\"filter-panel mb-4\"&gt;\n    &lt;form id=\"projectFilterForm\" class=\"form-inline\" method=\"GET\" action=\"/project/project\"&gt;\n        &lt;div class=\"form-group mb-2\"&gt;\n            &lt;label for=\"project_filter\" class=\"mr-2\"&gt;Project:&lt;/label&gt;\n            &lt;select id=\"project_filter\" name=\"project_id\" class=\"form-control\"&gt;\n                &lt;option value=\"\"&gt;All Projects&lt;/option&gt;\n                [% FOREACH project IN projects.sort('name') %]\n                    &lt;option value=\"[% project.id %]\" [% IF project_filter == project.id %]selected[% END %]&gt;\n                        [% project.name %]\n                    &lt;/option&gt;\n                    [% FOREACH subproject IN project.sub_projects.sort('name') %]\n                        &lt;option value=\"[% subproject.id %]\" [% IF project_filter == subproject.id %]selected[% END %]&gt;\n                            &amp;nbsp;&amp;nbsp;└─ [% subproject.name %]\n                        &lt;/option&gt;\n                    [% END %]\n                [% END %]\n            &lt;/select&gt;\n        &lt;/div&gt;\n        \n        &lt;div class=\"form-group mb-2 ml-3\"&gt;\n            &lt;label for=\"priority_filter\" class=\"mr-2\"&gt;Priority:&lt;/label&gt;\n            &lt;select id=\"priority_filter\" name=\"priority\" class=\"form-control\"&gt;\n                &lt;option value=\"\"&gt;All Priorities&lt;/option&gt;\n                &lt;option value=\"1\" [% IF priority_filter == '1' %]selected[% END %]&gt;High&lt;/option&gt;\n                &lt;option value=\"2\" [% IF priority_filter == '2' %]selected[% END %]&gt;Medium&lt;/option&gt;\n                &lt;option value=\"3\" [% IF priority_filter == '3' %]selected[% END %]&gt;Low&lt;/option&gt;\n            &lt;/select&gt;\n        &lt;/div&gt;\n        \n        &lt;button type=\"submit\" class=\"btn btn-primary mb-2 ml-3\"&gt;Apply Filters&lt;/button&gt;\n        &lt;button type=\"button\" id=\"clearFilters\" class=\"btn btn-outline-secondary mb-2 ml-2\"&gt;Clear Filters&lt;/button&gt;\n    &lt;/form&gt;\n&lt;/div&gt;</code></pre>\n\n    <h2 id=\"projects-workflow\">Projects Workflow</h2>\n    <ol>\n        <li><strong>Project Creation:</strong>\n            <ul>\n                <li>User fills out project form</li>\n                <li>System validates input and handles parent-child relationships</li>\n                <li>Project is created with proper user and site association</li>\n            </ul>\n        </li>\n        <li><strong>Project Management:</strong>\n            <ul>\n                <li>Projects can be viewed in hierarchical list</li>\n                <li>Admin users can edit project details</li>\n                <li>Sub-projects are managed within parent context</li>\n            </ul>\n        </li>\n    </ol>\n\n    <h2 id=\"projects-usage\">System Requirements and Limitations</h2>\n    <ul>\n        <li>User must be authenticated for project creation</li>\n        <li>Admin privileges required for editing projects</li>\n        <li>Maximum of 4 levels in project hierarchy</li>\n        <li>Project names must be unique within a site</li>\n        <li>Browser must support CSS Flexbox for optimal card layout</li>\n        <li>Font Awesome 5.x is required for icons</li>\n    </ul>\n\n    <h2 id=\"projects-troubleshooting\">Troubleshooting</h2>\n    \n    <h3>CSS Display Issues</h3>\n    <p>If projects are not displaying correctly as cards:</p>\n    <ol>\n        <li>Verify that the CSS file is being loaded correctly (check browser developer tools)</li>\n        <li>Ensure the template is using the correct CSS classes</li>\n        <li>Check that the inline critical CSS is present in the template</li>\n        <li>Verify that the controller is setting <code>use_fluid_container => 1</code></li>\n        <li>Check for JavaScript errors that might be affecting the layout</li>\n    </ol>\n    \n    <h3>Collapsible Card Issues</h3>\n    <p>If the collapsible functionality is not working:</p>\n    <ol>\n        <li>Check browser console for JavaScript errors</li>\n        <li>Verify that the <code>toggleCollapse</code> function is defined in the template</li>\n        <li>Ensure that card IDs are unique and properly referenced in the onclick handlers</li>\n        <li>Check that the collapse icon is properly styled and transitions are working</li>\n    </ol>\n    \n    <h3>Filtering Issues</h3>\n    <p>If filtering is not working correctly:</p>\n    <ol>\n        <li>Verify that the filter form is submitting to the correct URL</li>\n        <li>Check that the controller is correctly passing filter parameters to the template</li>\n        <li>Ensure that the <code>is_parent_of_filtered_project</code> macro is correctly implemented</li>\n        <li>Check the browser's network tab to confirm filter parameters are being sent</li>\n        <li>Verify that the NEXT statements in the template are correctly evaluating filter conditions</li>\n    </ol>\n    \n    <h3>Debug Mode</h3>\n    <p>Enable debug mode in the controller to see additional information:</p>\n    <pre><code>$c->stash(debug_mode => 1);</code></pre>\n    <p>This will display template version and CSS file information at the top of the page.</p>\n    \n    <h3>Common Issues</h3>\n    <ul>\n        <li><strong>Cards not collapsing/expanding:</strong> JavaScript errors or missing event handlers</li>\n        <li><strong>Filters not working:</strong> Form submission issues or incorrect template logic</li>\n        <li><strong>Sub-projects not displaying:</strong> Check the recursive macro implementation</li>\n        <li><strong>Parent projects not showing when filtering by sub-project:</strong> Issue with the <code>is_parent_of_filtered_project</code> macro</li>\n        <li><strong>Missing badges or icons:</strong> Font Awesome not loading correctly</li>\n        <li><strong>Auto-expand not working when filtering:</strong> JavaScript initialization issue</li>\n    </ul>\n    \n    <h3>Logging</h3>\n    <p>The Project controller logs important events to the application log:</p>\n    <pre><code>$self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'project', 'message');</code></pre>\n    <p>Check <code>logs/application.log</code> for debugging information, especially filter parameters and project data structure.</p>\n    \n    <h3>JavaScript Debugging</h3>\n    <p>For JavaScript-related issues, add console logging to the script:</p>\n    <pre><code>console.log('Filter parameters:', {\n    project: document.getElementById('project_filter').value,\n    priority: document.getElementById('priority_filter').value\n});</code></pre>\n    <p>This can help identify issues with the collapsible functionality and filter handling.</p>\n\n    <p><a href=\"#projects-top\">Back to top</a></p>",
+                    "language": "plain text"
+                },
+                "codebaseEnabled": true
+            },
+            "createdAt": 1753532563449,
+            "isInternal": false,
+            "rawContent": {
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "That fixed the problem of loading. we still need to shorten the time it takes to load a page.  once loged in things seem to be quicker. "
+                            }
+                        ]
+                    }
+                ]
+            },
+            "autoAppliedRules": [
+                {
+                    "name": "User AI Instruction",
+                    "description": "User AI Instruction",
+                    "uri": "zen-rules://user/custom",
+                    "content": "read AI_DEVELOPMENT_GUIDELINES\nall code must be varifed by user"
+                },
+                {
+                    "name": "Repository Information Overview",
+                    "description": "Repository Information Overview",
+                    "uri": "zen-rules://repo/repo",
+                    "content": "\n\n# Comserv Project Information\n\n## Summary\nComserv is a comprehensive web-based system for managing business operations, projects, and documentation. It's built using the Catalyst Perl web framework and provides features for project management, theme customization, and user authentication.\n\n## Structure\n- `Comserv/`: Main application directory containing the core application code\n  - `lib/`: Application code and models\n  - `docs/`: Documentation files\n  - `root/`: Static assets and templates\n  - `script/`: Utility scripts for server management and database operations\n  - `t/`: Test files\n- `app/`: Additional application components\n- `data/`: Data files including pricing information\n- `proxmox/`: Proxmox VE integration components\n\n## Language & Runtime\n**Language**: Perl\n**Version**: 5.x (compatible with Perl 5.40.0)\n**Framework**: Catalyst 5.90130\n**Build System**: Module::Install\n**Package Manager**: CPAN\n\n## Dependencies\n**Main Dependencies**:\n- Catalyst::Runtime (5.90130)\n- Moose\n- DBIx::Class\n- Template (Template Toolkit)\n- JSON/JSON::MaybeXS\n- Log::Log4perl\n- DateTime\n- File::Slurp\n\n**Development Dependencies**:\n- Test::More (0.88+)\n- Test::Pod\n- Test::Pod::Coverage\n- Test::WWW::Mechanize::Catalyst\n- Catalyst::Devel\n\n## Build & Installation\n```bash\ncd Comserv\nperl Makefile.PL\nmake\nmake test\nmake install\n```\n\n## Database\n**Type**: MySQL\n**Setup**: \n```bash\nmysql -u root -p < database_initialization_script.sql\n```\n**Schema Management**: DBIx::Class::Schema::Loader\n\n## Testing\n**Framework**: Test::More\n**Test Location**: Comserv/t/\n**Run Command**:\n```bash\ncd Comserv\nprove -l t/\n```\n\n## Server Execution\n**Development Server**:\n```bash\ncd Comserv\nscript/comserv_server.pl\n```\n**Production Deployment**:\n```bash\ncd Comserv\nscript/comserv_fastcgi.pl\n# or\nstarman --port 5000 --workers 5 comserv.psgi\n```\n\n## Authentication & Authorization\n- Session-based authentication\n- Role-based access control\n- Multiple authentication realms\n- Support for user groups and site-specific permissions\n\n## Features\n- Project management system\n- Theme customization system\n- Email integration\n- PDF generation\n- Proxmox VE integration\n- Multi-site support"
+                },
+                {
+                    "name": "Database Development Standards and Best Practices",
+                    "description": "Database Development Standards and Best Practices",
+                    "uri": "zen-rules://repo/database-standards",
+                    "content": "\n\n# Database Development Standards\n\n## Query Standards\n- **Table Aliases:** Use table aliases in all queries to avoid ambiguity (e.g., 'me.column_name')\n- **Error Handling:** Implement proper error handling with eval blocks and try/catch\n- **Parameterized Queries:** Use parameterized queries to prevent SQL injection\n\n## Schema Management\n- **Naming Conventions:** Follow naming conventions for tables, columns, and relationships\n- **Documentation:** Document schema changes and rationale for future reference\n- **Performance:** Regularly optimize database performance and indexes\n- **Version Control:** Use Git to track schema changes with proper tagging\n- **Backup Protocol:** Always backup database before making schema changes\n\n## Model Standards (DBIx::Class)\n- **Result Classes:** Located in `/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema/Ency/Result/`\n- **Relationships:** Define proper relationships between tables\n- **Validation:** Implement data validation in model classes\n\n## Configuration Priority\n- **Primary:** ZeroTier production server (172.30.161.222) - works from any network\n- **Secondary:** Local network production server (192.168.1.198) - home/office only\n- **Tertiary:** localhost MySQL (development)\n- **Fallback:** SQLite (offline mode)\n\n## Security Protocols\n- **Input Validation:** Validate all user inputs before database operations\n- **Access Controls:** Implement proper access controls based on user roles\n- **Regular Reviews:** Regularly review and update security protocols"
+                },
+                {
+                    "name": "AI Behavior Enforcement Rules for Zencoder",
+                    "description": "AI Behavior Enforcement Rules for Zencoder",
+                    "uri": "zen-rules://repo/ai-behavior-enforcement",
+                    "content": "\n\n# AI Behavior Enforcement Rules\n\n## MANDATORY PROMPT TRACKING\n**CURRENT PROMPT:** This is prompt #[X] of 4 maximum allowed prompts.\n\n### Prompt Counter Protocol\n- **Start Each Response:** Begin every response with current prompt count\n- **Track Internally:** Keep running count throughout conversation\n- **Warn at Prompt 3:** Alert user that next prompt will trigger handoff\n- **Stop at Prompt 4:** Refuse to continue, provide handoff documentation\n\n## MANDATORY APPROVAL WORKFLOW\n\n### Before ANY Code Changes\n1. **STOP:** Do not modify any files without explicit user approval\n2. **PRESENT:** Show exactly what will be changed using the standard format\n3. **WAIT:** Wait for explicit approval (\"yes\", \"approved\", \"apply changes\")\n4. **CONFIRM:** Acknowledge approval before proceeding\n5. **EXECUTE:** Apply changes only after confirmation\n\n### Standard Change Presentation\n```\n🔄 PROPOSED CHANGE TO: [filename]\n📝 CHANGE TYPE: [Addition/Modification/Deletion]\n📋 DESCRIPTION: [what this accomplishes]\n\n❌ CURRENT CODE:\n[existing code or \"N/A\"]\n\n✅ NEW CODE:\n[proposed code or \"DELETED\"]\n\n💡 REASON: [why needed]\n\n⚠️  APPROVAL REQUIRED: Please confirm with \"approved\" or \"yes\"\n🔄 REVERT: Changes can be undone if needed\n```\n\n## VIOLATION CONSEQUENCES\n- **Prompt Limit Exceeded:** Immediate session termination with handoff\n- **Unapproved Changes:** Acknowledge violation and request approval retroactively\n- **Missing Counter:** Add prompt counter to current response\n\n## HANDOFF TEMPLATE (Use on 4th Prompt)\n```\n🚨 PROMPT LIMIT REACHED - HANDOFF REQUIRED\n\n📊 SESSION SUMMARY:\n- Prompts Used: 4/4\n- Files Modified: [list]\n- Tasks Completed: [list]\n- Tasks Remaining: [list]\n\n🔄 HANDOFF PROMPT FOR NEXT AI:\n\"Continue working on [project/task]. Read development-guidelines.md and ai-behavior-enforcement.md first. \nCurrent context: [brief context]\nFiles being worked on: [list]\nNext steps needed: [specific actions]\"\n\n📚 REQUIRED READING FOR NEXT AI:\n- .zencoder/rules/development-guidelines.md\n- .zencoder/rules/ai-behavior-enforcement.md\n- [any other relevant docs]\n\n✅ DOCUMENTATION UPDATED: [what was recorded]\n```\n\n## EMERGENCY PROTOCOLS\n- **User Says \"Stop\":** Immediately cease all activities\n- **User Says \"Revert\":** Provide instructions for undoing changes\n- **User Says \"Handoff\":** Immediately provide handoff documentation"
+                },
+                {
+                    "name": "Template Toolkit Standards and Requirements",
+                    "description": "Template Toolkit Standards and Requirements",
+                    "uri": "zen-rules://repo/template-standards",
+                    "content": "\n\n# Template Toolkit (.tt) Standards\n\n## Required PageVersion Header Format\nAll .tt files must include this exact format:\n```\n[% META title = 'Page Title Here' %]\n[% PageVersion = 'relative/path/filename.tt,v 0.01 YYYY/MM/DD author Exp author ' %]\n[% IF c.session.debug_mode == 1 %]\n    [% PageVersion %]\n[% END %]\n```\n\n## Template Standards\n- **Theme Compliance:** Use theme system variables for styling - NO page-specific CSS\n- **Debug Mode:** Include debug mode blocks for development visibility\n- **Responsive Design:** Implement mobile-first responsive design patterns\n- **HTML Structure:** Use proper semantic HTML structure\n- **Template Toolkit:** Follow Template Toolkit best practices\n\n## Navigation Integration\nWhen working with navigation templates:\n- **Main Navigation:** Include via `/Navigation/navigation.tt`\n- **Admin Menu:** Use `/Navigation/admintopmenu.tt` for admin-only sections\n- **Dropdown Menus:** Reference existing dropdown templates in `/Navigation/` directory\n\n## Documentation File Rules - CRITICAL\n- **File Format:** ONLY `.tt` files for application documentation - NO `.md` files\n- **EXISTING FILES FIRST:** ALWAYS search for and use existing files before creating new ones\n- **Naming Consistency:** Use same file names across AI sessions to prevent content loss\n- **Content Priority:** Always improve existing files rather than creating new ones\n- **Role-Based Access:** Respect existing Documentation/index.tt role-based structure\n- **Directory Consolidation:** Use established directory structure - don't create new directories\n\n## File Creation Protocol\n1. **Search First:** Use file search tools to find existing similar files\n2. **Check Directory:** Look at existing directory structure in target location\n3. **Ask User:** If multiple similar files exist, ask which should be updated\n4. **Update Existing:** Improve existing files rather than creating duplicates"
+                }
+            ]
+        },
+        {
+            "id": "cc144141-2c7b-4b01-927f-9eebd4627d9e",
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "🚨 **PROMPT LIMIT REACHED - HANDOFF REQUIRED**\n\n📊 **SESSION SUMMARY:**\n- Prompts Used: 4/4\n- Files Modified: `/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Project.pm` (fixed package declaration typo)\n- Tasks Completed: Fixed compilation error in Project controller that was preventing application startup\n- Tasks Remaining: Optimize page load performance, particularly for initial page loads before login\n\n🔄 **HANDOFF PROMPT FOR NEXT AI:**\n\"Continue working on Comserv application performance optimization. Read development-guidelines.md and ai-behavior-enforcement.md first. \n\nCurrent context: The Project controller compilation error has been fixed (ypackage -> package typo), and the application now loads successfully. However, initial page load times are slow before login, though performance improves after authentication.\n\nFiles being worked on: \n- Project controller is now functional\n- Need to investigate performance bottlenecks in initial page loads\n\nNext steps needed: \n1. Analyze application startup and initial page load performance\n2. Identify bottlenecks in pre-authentication page loading\n3. Optimize database connections, template loading, or other performance issues\n4. Consider caching strategies for improved performance\n5. Review authentication/session handling that might be causing the performance difference\n\nPerformance context: User reports that 'once logged in things seem to be quicker' - suggesting authentication state affects performance significantly.\"\n\n📚 **REQUIRED READING FOR NEXT AI:**\n- .zencoder/rules/development-guidelines.md  \n- .zencoder/rules/ai-behavior-enforcement.md\n- .zencoder/rules/template-standards.md\n- .zencoder/rules/database-standards.md\n- .zencoder/rules/repo.md\n\n✅ **DOCUMENTATION UPDATED:** Projects.tt documentation reflects the recent controller fixes and system status updates.\n\n**Key Technical Notes for Next AI:**\n- Application uses Catalyst framework with Template Toolkit\n- Database: MySQL with DBIx::Class ORM\n- Authentication affects performance significantly\n- GD module installation failed but application still functions\n- Log files available at `/home/shanta/PycharmProjects/comserv2/Comserv/logs/application.log`"
+                }
+            ],
+            "context": {
+                "author": "Coding Agent",
+                "operationId": "89538aba-f3f8-4230-954d-83c04c6ea907"
+            },
+            "createdAt": 1753532564875,
+            "isInternal": false
+        }
+    ],
+    "isAgent": true,
+    "isNameGenerated": true,
+    "isCustomAgent": false,
+    "isUnitTestsAgent": false,
+    "isE2EAgent": false,
+    "isQnaAgent": false,
+    "isRepoInfoAgent": false,
+    "autoApply": false
+}
+}

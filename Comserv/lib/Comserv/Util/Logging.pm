@@ -34,9 +34,17 @@ my $ERROR_STORAGE = {}; # In-memory error storage for current session
 my $MAX_STORED_ERRORS = 100; # Maximum number of errors to store in memory
 my $ERROR_LOG_FILE; # Separate error log file
 
-# PHASE 3: Application-level log filtering (separate from browser debug_mode)
+# PHASE 3: Application-level log filtering (integrated with CATALYST_DEBUG)
 # This controls what actually gets written to application.log
-my $APPLICATION_LOG_LEVEL = 'WARN'; # Default: Only WARN, ERROR, CRITICAL to application.log
+my $APPLICATION_LOG_LEVEL = do {
+    if ($ENV{CATALYST_DEBUG}) {
+        'DEBUG';  # Development: Show everything for debugging
+    } elsif ($ENV{CATALYST_ENV} && $ENV{CATALYST_ENV} eq 'production') {
+        'ERROR';  # Production: Only errors for admin review, nothing to users
+    } else {
+        'WARN';   # Default: Warnings and above
+    }
+};
 my %LOG_LEVELS = (
     'DEBUG' => 1,
     'INFO'  => 2, 

@@ -1,0 +1,275 @@
+{
+    "checksum": "4aec5bd23fb26f10a044c98c2a520ea5c5b7df19419ca67c4e850ad7b75142b0",
+    "data": {
+    "id": "2cc3f92e-5c6b-42f2-a1e8-a56bc6b35324",
+    "createdAt": 1751884312536,
+    "updatedAt": 1751905499012,
+    "title": "I what to setup the aplication to be able to wo...",
+    "messages": [
+        {
+            "id": "fb2567ae-57e1-4692-ab27-e81d7b55dbe7",
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "I what to setup the aplication to be able to work from multiplbe database setting. such as an ofline mode that will use the local mysql to function. then when not in ofline mode update the production db with the data entered. We need to create a AI_DEVELOPMENT_GUIDE to keep chats consitant from prompt to promt and chat to chat."
+                },
+                {
+                    "type": "text",
+                    "text": "key thinks to remember are"
+                },
+                {
+                    "type": "text",
+                    "text": "We have only 4 prompts from me before they system fails Keep track of the prompts."
+                },
+                {
+                    "type": "text",
+                    "text": "we have 3 promts from me then we must do the fallowing steps"
+                },
+                {
+                    "type": "text",
+                    "text": "Update the appropriate documentations for what we are working on. Avoid new documenttion use what we have"
+                },
+                {
+                    "type": "text",
+                    "text": "Update the c withe the current state of the project being work on state including a link to the documentation for review. "
+                },
+                {
+                    "type": "text",
+                    "text": "Write the prompt for the next chat stating our progerss and the next step."
+                },
+                {
+                    "type": "text",
+                    "text": "If I tell you that the task has been completed"
+                },
+                {
+                    "type": "text",
+                    "text": "update the docs for the task, "
+                },
+                {
+                    "type": "text",
+                    "text": "UPdate AI_DEVELOPMENT_GUIDE"
+                },
+                {
+                    "type": "text",
+                    "text": "Write a commit"
+                },
+                {
+                    "type": "text",
+                    "text": "Wait for the next prompt for the new task."
+                },
+                {
+                    "type": "text",
+                    "text": "Then update AI_DEVELOPMENT_GUIDE with the task "
+                },
+                {
+                    "type": "text",
+                    "text": "write the prompt for the next chat"
+                }
+            ],
+            "context": {
+                "codebaseEnabled": true
+            },
+            "createdAt": 1751893513263,
+            "isInternal": false,
+            "rawContent": {
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "I what to setup the aplication to be able to work from multiplbe database setting. such as an ofline mode that will use the local mysql to function. then when not in ofline mode update the production db with the data entered. We need to create a AI_DEVELOPMENT_GUIDE to keep chats consitant from prompt to promt and chat to chat."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "key thinks to remember are"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "We have only 4 prompts from me before they system fails Keep track of the prompts."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "we have 3 promts from me then we must do the fallowing steps"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Update the appropriate documentations for what we are working on. Avoid new documenttion use what we have"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Update the c withe the current state of the project being work on state including a link to the documentation for review. "
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Write the prompt for the next chat stating our progerss and the next step."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph"
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "If I tell you that the task has been completed"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "update the docs for the task, "
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "UPdate AI_DEVELOPMENT_GUIDE"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Write a commit"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Wait for the next prompt for the new task."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Then update AI_DEVELOPMENT_GUIDE with the task "
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "write the prompt for the next chat"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "cc45b458-70c0-4ee7-a003-136f5de8a8ba",
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "you got stalled"
+                }
+            ],
+            "context": {
+                "codebaseEnabled": true
+            },
+            "createdAt": 1751893766018,
+            "isInternal": false,
+            "rawContent": {
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "you got stalled "
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "85d0576b-d637-4880-b30e-e223687a1533",
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "your not getting past the first attempt"
+                }
+            ],
+            "context": {
+                "codebaseEnabled": true
+            },
+            "createdAt": 1751905499012,
+            "isInternal": false,
+            "rawContent": {
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "your not getting past the first attempt"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ],
+    "isAgent": true,
+    "isCustomAgent": false,
+    "isUnitTestsAgent": false,
+    "isE2EAgent": false,
+    "autoApply": false
+}
+}

@@ -1,0 +1,67 @@
+{
+    "checksum": "7c0171ccb15e255469f10966b6770b39b5a364622146af82ae1de0c1d0d3e24b",
+    "data": {
+    "id": "10f29860-6a50-497c-adf2-cf2f3dda08c9",
+    "createdAt": 1752156142587,
+    "updatedAt": 1752165853018,
+    "title": "we are working offline. Please look at the code...",
+    "messages": [
+        {
+            "id": "56744cea-2ea4-4a9b-ae21-8a6e16c0c94f",
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "we are working offline. Please look at the code and see why we are not access the local database"
+                }
+            ],
+            "context": {
+                "currentFile": {
+                    "path": "Comserv/db_config.json",
+                    "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/db_config.json",
+                    "sources": [
+                        "opened_tab"
+                    ],
+                    "content": "{\n  \"production_server\": {\n    \"db_type\": \"mysql\",\n    \"host\": \"192.168.1.198\",\n    \"port\": 3306,\n    \"username\": \"shanta_forager\",\n    \"password\": \"UA=nPF8*m+T#\",\n    \"database\": \"ency\",\n    \"description\": \"Production Server (192.168.1.198) - ENCY Database\",\n    \"priority\": 1,\n    \"localhost_override\": false\n  },\n  \"production_forager\": {\n    \"db_type\": \"mysql\",\n    \"host\": \"192.168.1.198\",\n    \"port\": 3306,\n    \"username\": \"shanta_forager\",\n    \"password\": \"UA=nPF8*m+T#\",\n    \"database\": \"shanta_forager\",\n    \"description\": \"Production Server (192.168.1.198) - Forager Database\",\n    \"priority\": 2,\n    \"localhost_override\": true\n  },\n  \"zerotier_server\": {\n    \"db_type\": \"mysql\",\n    \"host\": \"172.30.161.222\",\n    \"port\": 3306,\n    \"username\": \"shanta_forager\",\n    \"password\": \"UA=nPF8*m+T#\",\n    \"database\": \"ency\",\n    \"description\": \"ZeroTier Access (172.30.161.222) - ENCY Database\",\n    \"priority\": 3,\n    \"localhost_override\": false\n  },\n  \"zerotier_forager\": {\n    \"db_type\": \"mysql\",\n    \"host\": \"172.30.161.222\",\n    \"port\": 3306,\n    \"username\": \"shanta_forager\",\n    \"password\": \"UA=nPF8*m+T#\",\n    \"database\": \"shanta_forager\",\n    \"description\": \"ZeroTier Access (172.30.161.222) - Forager Database\",\n    \"priority\": 4,\n    \"localhost_override\": false\n  },\n  \"workstation_mysql\": {\n    \"db_type\": \"mysql\",\n    \"host\": \"localhost\",\n    \"port\": 3306,\n    \"username\": \"shanta_forager\",\n    \"password\": \"UA=nPF8*m+T#\",\n    \"database\": \"ency\",\n    \"description\": \"Workstation MySQL - ENCY Database\",\n    \"priority\": 5,\n    \"localhost_override\": false\n  },\n  \"workstation_forager\": {\n    \"db_type\": \"mysql\",\n    \"host\": \"localhost\",\n    \"port\": 3306,\n    \"username\": \"shanta_forager\",\n    \"password\": \"UA=nPF8*m+T#\",\n    \"database\": \"shanta_forager\",\n    \"description\": \"Workstation MySQL - Forager Database\",\n    \"priority\": 6,\n    \"localhost_override\": false\n  },\n  \"sqlite_offline\": {\n    \"db_type\": \"sqlite\",\n    \"database_path\": \"data/comserv_offline.db\",\n    \"description\": \"SQLite - True Offline Mode\",\n    \"priority\": 7,\n    \"localhost_override\": false\n  },\n  \"shanta_ency\": {\n    \"db_type\": \"mysql\",\n    \"host\": \"192.168.1.198\",\n    \"port\": 3306,\n    \"username\": \"shanta_forager\",\n    \"password\": \"UA=nPF8*m+T#\",\n    \"database\": \"ency\",\n    \"description\": \"Legacy DBEncy Configuration\",\n    \"priority\": 8,\n    \"localhost_override\": true\n  },\n  \"shanta_forager\": {\n    \"db_type\": \"mysql\",\n    \"host\": \"192.168.1.198\",\n    \"port\": 3306,\n    \"username\": \"shanta_forager\",\n    \"password\": \"UA=nPF8*m+T#\",\n    \"database\": \"shanta_forager\",\n    \"description\": \"Legacy DBForager Configuration\",\n    \"priority\": 9,\n    \"localhost_override\": true\n  }\n}",
+                    "language": "json"
+                },
+                "codebaseEnabled": true
+            },
+            "createdAt": 1752156142597,
+            "isInternal": false,
+            "rawContent": {
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "we are working offline. Please look at the code and see why we are not access the local database"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "a792817c-75b1-451c-870c-11148e3f2936",
+            "role": "system",
+            "content": [
+                {
+                    "type": "errorText",
+                    "text": "Could not establish websocket connection. Please try again later.",
+                    "allowRegenerate": true
+                }
+            ],
+            "createdAt": 1752165853018,
+            "isInternal": false
+        }
+    ],
+    "isAgent": true,
+    "isCustomAgent": false,
+    "isUnitTestsAgent": false,
+    "isE2EAgent": false,
+    "autoApply": false
+}
+}

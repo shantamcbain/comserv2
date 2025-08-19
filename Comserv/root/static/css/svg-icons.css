@@ -436,3 +436,17 @@
   background-color: currentColor;
   background-image: none;
 }
+
+.icon-link, .fas.fa-link {
+  -webkit-mask-image: url('/static/images/icons/link.svg');
+  mask-image: url('/static/images/icons/link.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-plus, .fas.fa-plus {
+  -webkit-mask-image: url('/static/images/icons/plus.svg');
+  mask-image: url('/static/images/icons/plus.svg');
+  background-color: currentColor;
+  background-image: none;
+}
