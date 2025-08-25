@@ -8,6 +8,7 @@ use JSON;
 use Try::Tiny;
 use Comserv::Util::Logging;
 use File::Spec;
+use FindBin;
 
 # Singleton instance
 my $instance;
@@ -68,7 +69,23 @@ sub instance {
 sub load_config {
     my ($self) = @_;
 
-    my $config_file = File::Spec->catfile('root', 'Documentation', 'config', 'documentation_config.json');
+    # Use FindBin to get absolute path to config file
+    my $config_file = File::Spec->catfile($FindBin::Bin, '..', 'root', 'Documentation', 'config', 'documentation_config.json');
+    
+    # Log the config file path for debugging
+    Comserv::Util::Logging::log_to_file(
+        "Attempting to load documentation config from: $config_file",
+        undef, 'DEBUG'
+    );
+    
+    # Check if file exists
+    unless (-f $config_file) {
+        Comserv::Util::Logging::log_to_file(
+            "Documentation config file not found at: $config_file",
+            undef, 'ERROR'
+        );
+        return;
+    }
 
     try {
         # Read the JSON file
@@ -106,6 +123,12 @@ sub load_config {
                 scalar(keys %{$self->{categories}}) . " categories, " .
                 scalar(@{$self->{pages}}) . " pages",
             undef, 'INFO'
+        );
+        
+        # Debug log category keys
+        Comserv::Util::Logging::log_to_file(
+            "Category keys loaded: " . join(", ", keys %{$self->{categories}}),
+            undef, 'DEBUG'
         );
     } catch {
         Comserv::Util::Logging::log_to_file(
