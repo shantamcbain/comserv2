@@ -314,8 +314,18 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
     );
 
     # Fetch project data from the Project Controller
-    my $project_controller = $c->controller('Project');
-    my $projects = $project_controller->fetch_projects_with_subprojects($c);
+    my $projects = [];
+    eval {
+        my $project_controller = $c->controller('Project');
+        if ($project_controller) {
+            $projects = $project_controller->fetch_projects_with_subprojects($c) || [];
+        }
+    };
+
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'addtodo',
+            "Error fetching projects: $@");
+    }
 
     # Fetch the project_id from query parameters (if any)
     my $project_id = $c->request->query_parameters->{project_id};
@@ -451,8 +461,18 @@ sub edit :Path('/todo/edit') :Args(1) {
     }
 
     # Fetch project data from the Project Controller
-    my $project_controller = $c->controller('Project');
-    my $projects = $project_controller->fetch_projects_with_subprojects($c);
+    my $projects = [];
+    eval {
+        my $project_controller = $c->controller('Project');
+        if ($project_controller) {
+            $projects = $project_controller->fetch_projects_with_subprojects($c) || [];
+        }
+    };
+
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit',
+            "Error fetching projects: $@");
+    }
 
     # Fetch all users to populate the user drop-down
     my @users = $schema->resultset('User')->search({}, { order_by => 'id' });

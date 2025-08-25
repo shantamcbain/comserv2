@@ -321,11 +321,27 @@ sub fetch_projects_with_subprojects :Private {
     my $schema = $c->model('DBEncy');
     my $SiteName = $c->session->{SiteName} || '';
 
+    # Enhanced logging for debugging
+    $self->logging->log_with_details(
+        $c, 'info', __FILE__, __LINE__, 'fetch_projects_with_subprojects',
+        "Session SiteName: '" . ($SiteName || 'EMPTY/NULL') . "'"
+    );
+
     # Check if SiteName is defined
     if (!$SiteName) {
         $self->logging->log_with_details(
             $c, 'warn', __FILE__, __LINE__, 'fetch_projects_with_subprojects',
-            'SiteName is not defined in session, using empty string'
+            'SiteName is not defined in session, using empty string - this may cause empty results'
+        );
+        
+        # Try to get all projects regardless of sitename for debugging
+        my $total_projects_count;
+        eval {
+            $total_projects_count = $schema->safe_search($c, 'Project', {})->count;
+        };
+        $self->logging->log_with_details(
+            $c, 'info', __FILE__, __LINE__, 'fetch_projects_with_subprojects',
+            "Total projects in database (all sites): " . ($total_projects_count || 'ERROR')
         );
     }
 
