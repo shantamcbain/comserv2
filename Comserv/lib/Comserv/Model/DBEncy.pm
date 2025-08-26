@@ -57,7 +57,7 @@ if ($@ || !defined $config_file) {
 # Load the configuration file
 eval {
     local $/; # Enable 'slurp' mode
-    open my $fh, "<", "db_config.json" or die "Could not open db_config.json: $!";
+    open my $fh, "<", $config_file or die "Could not open $config_file: $!";
     $json_text = <$fh>;
     close $fh;
 };
