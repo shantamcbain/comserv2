@@ -1,0 +1,702 @@
+[% PageVersion = 'Comserv/root/Documentation/developer/authentication_system.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Authentication System Documentation' %]
+
+<!-- Documentation page for authentication_system -->
+<div class="documentation-content">
+
+
+
+<!-- Include documentation CSS -->
+<link rel="stylesheet" href="/static/css/documentation.css">
+
+<div class="markdown-content">
+
+
+**Version:** 1.1  
+
+**Last Updated:** June 10, 2024  
+
+**Author:** Development Team
+
+
+
+<h2>Overview</h2>
+
+
+
+The Comserv authentication system manages user login, logout, session management, and user profile functionality. This document provides comprehensive information about the implementation, usage, and customization of the authentication system.
+
+
+
+<h2>Key Components</h2>
+
+
+
+<h3>1. User Controller (<code>Comserv/lib/Comserv/Controller/User.pm</code>)</h3>
+
+
+
+The User controller handles all authentication-related actions:
+
+
+
+<ul><li>**Login**: Authenticates users and creates sessions</li></ul>
+
+<ul><li>**Logout**: Terminates user sessions</li></ul>
+
+<ul><li>**Profile Management**: Displays and updates user information</li></ul>
+
+<ul><li>**Account Creation**: Registers new users</li></ul>
+
+<ul><li>**Password Management**: Handles password changes and resets</li></ul>
+
+
+
+<h3>2. Authentication Templates</h3>
+
+
+
+<ul><li>**Login Form** (<code>user/login.tt</code>): User login interface</li></ul>
+
+<ul><li>**Profile Page** (<code>user/profile.tt</code>): Displays user information</li></ul>
+
+<ul><li>**Settings Page** (<code>user/settings.tt</code>): Allows users to update their information</li></ul>
+
+<ul><li>**Registration Form** (<code>user/create_account.tt</code>): New user registration</li></ul>
+
+
+
+<h3>3. Navigation Components</h3>
+
+
+
+<ul><li>**Login Dropdown** (<code>Navigation/TopDropListLogin.tt</code>): Context-aware login/logout options</li></ul>
+
+
+
+<h2>Authentication Flow</h2>
+
+
+
+<h3>Login Process</h3>
+
+
+
+<ol><li>User accesses a protected page or clicks the login link</li></ol>
+
+<ol><li>The <code>login</code> method captures the referring URL in the session</li></ol>
+
+<ol><li>User submits credentials via the login form</li></ol>
+
+<ol><li><code>do_login</code> method validates credentials against the database</li></ol>
+
+<ol><li>On success:</li></ol>
+
+   - Session is created with user information
+
+   - User roles are loaded
+
+   - User is redirected to the original referring page
+
+<ol><li>On failure:</li></ol>
+
+   - Error message is stored in flash
+
+   - User is redirected back to the login page
+
+
+
+<code></code>`perl
+
+<h1>Storing the referring page in the login method</h1>
+
+sub login :Local {
+
+    my ($self, $c) = @_;
+
+    
+
+    # Store the referer URL if it hasn't been stored already
+
+    my $referer = $c->req->referer || $c->uri_for('/');
+
+    
+
+    # Get the return_to parameter if it exists (for explicit redirects)
+
+    my $return_to = $c->req->param('return_to');
+
+    if ($return_to) {
+
+        $referer = $return_to;
+
+    }
+
+
+
+    # Don't store the login page as the referer
+
+    if ($referer !~ m{/user/login} && $referer !~ m{/login} && $referer !~ m{/do_login}) {
+
+        $c->session->{referer} = $referer;
+
+    }
+
+    
+
+    # Store the referer in the stash for the template
+
+    $c->stash->{return_to} = $c->session->{referer};
+
+}
+
+
+
+<h1>Login validation code in do_login</h1>
+
+my $user = $c->model('DBEncy::User')->find({ username => $username });
+
+unless ($user) {
+
+    # Store error message in flash and redirect back to login page
+
+    $c->flash->{error_msg} = 'Invalid username or password.';
+
+    $c->response->redirect($c->uri_for('/user/login'));
+
+    return;
+
+}
+
+
+
+if ($self->hash_password($password) ne $user->password) {
+
+    # Store error message in flash and redirect back to login page
+
+    $c->flash->{error_msg} = 'Invalid username or password.';
+
+    $c->response->redirect($c->uri_for('/user/login'));
+
+    return;
+
+}
+
+
+
+<h1>Redirect handling after successful login</h1>
+
+my $redirect_path = $c->session->{referer} || '/';
+
+$c->res->redirect($redirect_path);
+
+<code></code>`
+
+
+
+<h3>Logout Process</h3>
+
+
+
+<ol><li>User clicks the logout link</li></ol>
+
+<ol><li><code>logout</code> method stores the current URL</li></ol>
+
+<ol><li>Important site information is preserved</li></ol>
+
+<ol><li>Session is properly deleted</li></ol>
+
+<ol><li>Success message is displayed</li></ol>
+
+<ol><li>User is redirected to an appropriate page based on context</li></ol>
+
+
+
+<code></code>`perl
+
+sub logout :Local {
+
+    my ($self, $c) = @_;
+
+
+
+    # Store the current URL before logout
+
+    my $current_url = $c->req->referer || $c->uri_for('/');
+
+
+
+    # Log the logout action with the current URL
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'logout',
+
+        "User '" . ($c->session->{username} || 'unknown') . "' logging out, current URL: $current_url");
+
+
+
+    # Get username before clearing session (for the success message)
+
+    my $username = $c->session->{username} || 'Guest';
+
+
+
+    # Store important site information before clearing the session
+
+    my $site_name = $c->session->{SiteName} || '';
+
+    my $theme_name = $c->session->{theme_name} || '';
+
+    my $controller_name = $c->session->{ControllerName} || '';
+
+
+
+    # Properly delete the session (instead of just emptying it)
+
+    $c->delete_session("User logged out");
+
+
+
+    # Create a new session with minimal required data
+
+    $c->session->{SiteName} = $site_name if $site_name;
+
+    $c->session->{theme_name} = $theme_name if $theme_name;
+
+    $c->session->{ControllerName} = $controller_name if $controller_name;
+
+
+
+    # Set a success message
+
+    $c->flash->{success_msg} = "You have been successfully logged out.";
+
+
+
+    # Determine if the current page is accessible to non-logged-in users
+
+    # and redirect appropriately
+
+    my $redirect_url = $c->uri_for('/');
+
+    if ($current_url =~ m{^/([^/]+)}) {
+
+        # Redirect to site-specific page if appropriate
+
+        $redirect_url = $current_url if $site_name;
+
+    }
+
+    
+
+    $c->response->redirect($redirect_url);
+
+    return;
+
+}
+
+<code></code>`
+
+
+
+<h3>Session Management</h3>
+
+
+
+Sessions are managed using Catalyst's session plugins:
+
+
+
+<code></code>`perl
+
+use Catalyst qw/
+
+    Session
+
+    Session::Store::File
+
+    Session::State::Cookie
+
+    Authentication
+
+    Authorization::Roles
+
+/;
+
+<code></code>`
+
+
+
+Session configuration in <code>Comserv.pm</code>:
+
+
+
+<code></code>`perl
+
+'Plugin::Session' => {
+
+    storage => '/tmp/session_data',
+
+    expires => 3600,
+
+},
+
+<code></code>`
+
+
+
+<h2>User Profile System</h2>
+
+
+
+<h3>Profile Display</h3>
+
+
+
+The profile page displays user information retrieved from the database:
+
+
+
+<code></code>`perl
+
+sub profile :Local {
+
+    my ($self, $c) = @_;
+
+    
+
+    # Check if user is logged in
+
+    unless ($c->session->{username}) {
+
+        $c->flash->{error_msg} = "You must be logged in to view your profile.";
+
+        $c->response->redirect($c->uri_for('/user/login'));
+
+        return;
+
+    }
+
+    
+
+    # Get user data from database
+
+    my $user = $c->model('DBEncy::User')->find({ username => $c->session->{username} });
+
+    
+
+    # Prepare user data for display
+
+    my $user_data = {
+
+        username => $user->username,
+
+        first_name => $user->first_name,
+
+        last_name => $user->last_name,
+
+        email => $user->email,
+
+        roles => $c->session->{roles} || [],
+
+    };
+
+    
+
+    # Set template and stash data
+
+    $c->stash(
+
+        user => $user_data,
+
+        template => 'user/profile.tt'
+
+    );
+
+}
+
+<code></code>`
+
+
+
+<h3>Settings Management</h3>
+
+
+
+Users can update their information through the settings page:
+
+
+
+<ol><li>User accesses the settings page</li></ol>
+
+<ol><li>Form is pre-populated with current information</li></ol>
+
+<ol><li>User submits changes</li></ol>
+
+<ol><li><code>update_settings</code> method validates and saves changes</li></ol>
+
+<ol><li>Session is updated to reflect changes</li></ol>
+
+<ol><li>User is redirected to the profile page</li></ol>
+
+
+
+<h2>Role-Based Access Control</h2>
+
+
+
+The authentication system integrates with Catalyst's Authorization::Roles plugin to provide role-based access control:
+
+
+
+<code></code>`perl
+
+<h1>Check if user has admin role</h1>
+
+[% IF c.session.roles.grep('admin').size %]
+
+    <!-- Admin-specific content -->
+
+
+<code></code>`
+
+
+
+Roles are loaded during login:
+
+
+
+<code></code>`perl
+
+<h1>Fetch user role(s)</h1>
+
+my $roles = $user->roles;
+
+
+
+<h1>Check if the roles field contains a single role (string) and wrap it into an array</h1>
+
+if (defined $roles && !ref $roles) {
+
+    $roles = [ $roles ];  # Convert single role to array.
+
+}
+
+
+
+<h1>Assign roles to session</h1>
+
+$c->session->{roles} = $roles;
+
+<code></code>`
+
+
+
+<h2>Debugging and Logging</h2>
+
+
+
+The authentication system includes comprehensive logging for debugging:
+
+
+
+<code></code>`perl
+
+$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', 
+
+    "User '$username' successfully authenticated.");
+
+<code></code>`
+
+
+
+Debug mode can be enabled in user settings to display additional information:
+
+
+
+<code></code>`perl
+
+
+    <div class="debug">
+
+
+        [% INCLUDE 'debug.tt' %]
+
+
+
+<code></code>`
+
+
+
+<h2>Customization</h2>
+
+
+
+<h3>Adding Custom Fields</h3>
+
+
+
+To add custom fields to the user profile:
+
+
+
+<ol><li>Add the field to the User database table</li></ol>
+
+<ol><li>Update the profile and settings templates to include the new field</li></ol>
+
+<ol><li>Modify the <code>update_settings</code> method to handle the new field</li></ol>
+
+
+
+<h3>Styling</h3>
+
+
+
+The authentication components use CSS classes that can be customized in your theme:
+
+
+
+<ul><li><code>.user-profile-container</code>: Main container for profile page</li></ul>
+
+<ul><li><code>.settings-container</code>: Main container for settings page</li></ul>
+
+<ul><li><code>.form-group</code>: Form field containers</li></ul>
+
+<ul><li><code>.action-button</code>: Action buttons (Edit, Save, etc.)</li></ul>
+
+
+
+<h2>Troubleshooting</h2>
+
+
+
+<h3>Common Issues</h3>
+
+
+
+<ol><li>**404 on Logout**</li></ol>
+
+   - Ensure the logout method is properly defined in the User controller
+
+   - Check that the logout link uses the correct URI: <code>[% c.uri_for('/user/logout') %]</code>
+
+
+
+<ol><li>**Session Not Persisting**</li></ol>
+
+   - Verify session configuration in Comserv.pm
+
+   - Check permissions on the session storage directory
+
+   - Ensure <code>delete_session</code> is used properly instead of just clearing the session hash
+
+
+
+<ol><li>**Login Redirect Issues**</li></ol>
+
+   - Ensure the referer URL is properly captured and sanitized
+
+   - Check for circular redirects back to the login page
+
+   - Verify that login-related pages are excluded from the referer list
+
+   - Check that the <code>return_to</code> parameter is being properly processed
+
+
+
+<ol><li>**Template Not Found Errors**</li></ol>
+
+   - Ensure error handling uses redirects instead of trying to render templates directly
+
+   - Use flash messages instead of stash for error messages that need to persist across redirects
+
+
+
+<h3>Debugging Tips</h3>
+
+
+
+<ol><li>Enable debug mode in your session: <code>$c->session->{debug_mode} = 1;</code></li></ol>
+
+<ol><li>Check the application log for detailed error messages</li></ol>
+
+<ol><li>Use the browser's developer tools to inspect session cookies</li></ol>
+
+
+
+<h2>Security Considerations</h2>
+
+
+
+<ol><li>**Password Storage**</li></ol>
+
+   - Passwords are hashed using SHA-256
+
+   - Consider upgrading to bcrypt or Argon2 for stronger security
+
+
+
+<ol><li>**Session Security**</li></ol>
+
+   - Sessions expire after 1 hour (configurable)
+
+   - Consider implementing CSRF protection for forms
+
+
+
+<ol><li>**Input Validation**</li></ol>
+
+   - All user input is validated before processing
+
+   - Email addresses are checked against a regex pattern
+
+
+
+<h2>Future Enhancements</h2>
+
+
+
+Planned improvements to the authentication system:
+
+
+
+<ol><li>Two-factor authentication support</li></ol>
+
+<ol><li>OAuth integration for social login</li></ol>
+
+<ol><li>Enhanced password policies</li></ol>
+
+<ol><li>Account lockout after failed attempts</li></ol>
+
+<ol><li>User activity logging and auditing</li></ol>
+
+<ol><li>Improved return-to-origin functionality with better security checks</li></ol>
+
+<ol><li>Support for multiple authentication methods in a single deployment</li></ol>
+
+<ol><li>Enhanced session security with IP binding and browser fingerprinting</li></ol>
+
+
+
+<h2>Recent Changes</h2>
+
+
+
+<h3>Version 1.1 (June 10, 2024)</h3>
+
+<ol><li>Improved login redirect functionality to better handle return-to-origin</li></ol>
+
+<ol><li>Added support for explicit <code>return_to</code> parameter in login URLs</li></ol>
+
+<ol><li>Fixed template rendering issues in authentication error handling</li></ol>
+
+<ol><li>Enhanced session preservation during logout to maintain site context</li></ol>
+
+<ol><li>Improved documentation and added more detailed logging</li></ol>
+
+<ol><li>Added debug information to the stash for better troubleshooting</li></ol>
+
+</div>

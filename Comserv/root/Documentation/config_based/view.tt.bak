@@ -1,0 +1,288 @@
+[% PageVersion = 'Comserv/root/Documentation/config_based/view.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'age.titl' %]
+
+<!-- Documentation page for age.titl -->
+<div class="documentation-content">
+
+
+<div class="documentation-view-container">
+    <div class="documentation-header">
+        <div class="breadcrumbs">
+            <a href="[% c.uri_for('/Documentation/ConfigBased') %]"><i class="fas fa-home"></i> Documentation Home</a>
+            <span class="separator">&raquo;</span>
+            <span class="current">[% page.title %]</span>
+        </div>
+        
+        [% IF c.user_exists && (c.user.role == 'admin' || c.user.role == 'developer') %]
+        <div class="admin-actions">
+            <a href="[% c.uri_for('/Documentation/ConfigBased') %]" class="back-button">
+                <i class="fas fa-arrow-left"></i> Back to Index
+            </a>
+            <a href="[% c.uri_for('/Documentation/Config') %]" class="config-button">
+                <i class="fas fa-cogs"></i> Manage Configuration
+            </a>
+        </div>
+    </div>
+    
+    <div class="documentation-content">
+        <h1>[% page.title %]</h1>
+        
+        [% IF page.site != 'all' %]
+        <div class="page-meta">
+            <span class="site-badge">[% page.site %]</span>
+        </div>
+        
+        <div class="page-description">
+            [% page.description %]
+        </div>
+        
+        <div class="content-wrapper">
+            [% IF page.format == 'markdown' %]
+                <div class="markdown-content">
+                    [% content | raw %]
+                </div>
+            [% ELSIF page.format == 'template' %]
+                [% PROCESS $page.path %]
+            [% ELSE %]
+                <pre class="raw-content">[% content | html %]</pre>
+        </div>
+    </div>
+</div>
+
+<style>
+    .documentation-view-container {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: var(--body-font, Arial, sans-serif);
+    }
+    
+    .documentation-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    
+    .breadcrumbs {
+        font-size: 0.9em;
+        color: var(--text-color, #555);
+    }
+    
+    .breadcrumbs a {
+        color: var(--accent-color, #0066cc);
+        text-decoration: none;
+    }
+    
+    .breadcrumbs a:hover {
+        text-decoration: underline;
+    }
+    
+    .separator {
+        margin: 0 8px;
+        color: var(--text-color, #999);
+    }
+    
+    .current {
+        font-weight: bold;
+        color: var(--text-color, #333);
+    }
+    
+    .back-button, .config-button {
+        display: inline-flex;
+        align-items: center;
+        padding: 5px 10px;
+        border-radius: 4px;
+        text-decoration: none;
+        font-size: 0.9em;
+        transition: background-color 0.2s;
+        margin-left: 5px;
+        color: white;
+    }
+    
+    .back-button {
+        background-color: var(--text-color, #555);
+    }
+    
+    .config-button {
+        background-color: var(--accent-color, #0066cc);
+    }
+    
+    .back-button:hover {
+        background-color: var(--text-hover, #333);
+    }
+    
+    .config-button:hover {
+        background-color: var(--accent-hover, #0055aa);
+    }
+    
+    .back-button i, .config-button i {
+        margin-right: 5px;
+    }
+    
+    .documentation-content {
+        background-color: white;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        padding: 30px;
+    }
+    
+    .documentation-content h1 {
+        color: var(--accent-color, #0066cc);
+        margin-top: 0;
+        border-bottom: 2px solid #eee;
+        padding-bottom: 10px;
+    }
+    
+    .page-meta {
+        margin-bottom: 15px;
+    }
+    
+    .site-badge {
+        display: inline-block;
+        background-color: var(--accent-color, #0066cc);
+        color: white;
+        font-size: 0.8em;
+        padding: 3px 8px;
+        border-radius: 3px;
+        vertical-align: middle;
+    }
+    
+    .page-description {
+        color: var(--text-color, #555);
+        font-size: 1.1em;
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .content-wrapper {
+        line-height: 1.6;
+        color: var(--text-color, #333);
+    }
+    
+    .markdown-content h2 {
+        color: var(--accent-color, #0066cc);
+        margin-top: 30px;
+        margin-bottom: 15px;
+        padding-bottom: 5px;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .markdown-content h3 {
+        color: var(--text-color, #333);
+        margin-top: 25px;
+        margin-bottom: 10px;
+    }
+    
+    .markdown-content p {
+        margin-bottom: 15px;
+    }
+    
+    .markdown-content ul, .markdown-content ol {
+        margin-bottom: 15px;
+        padding-left: 25px;
+    }
+    
+    .markdown-content li {
+        margin-bottom: 5px;
+    }
+    
+    .markdown-content code {
+        background-color: #f5f5f5;
+        padding: 2px 4px;
+        border-radius: 3px;
+        font-family: monospace;
+        font-size: 0.9em;
+    }
+    
+    .markdown-content pre {
+        background-color: #f5f5f5;
+        padding: 15px;
+        border-radius: 5px;
+        overflow-x: auto;
+        margin-bottom: 15px;
+    }
+    
+    .markdown-content pre code {
+        background-color: transparent;
+        padding: 0;
+    }
+    
+    .markdown-content blockquote {
+        border-left: 4px solid var(--accent-color, #0066cc);
+        padding-left: 15px;
+        margin-left: 0;
+        color: var(--text-color, #555);
+        font-style: italic;
+    }
+    
+    .markdown-content img {
+        max-width: 100%;
+        height: auto;
+        display: block;
+        margin: 20px 0;
+        border-radius: 5px;
+    }
+    
+    .markdown-content table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 15px;
+    }
+    
+    .markdown-content th {
+        background-color: #f5f5f5;
+        text-align: left;
+        padding: 8px;
+        border: 1px solid #ddd;
+    }
+    
+    .markdown-content td {
+        padding: 8px;
+        border: 1px solid #ddd;
+    }
+    
+    .markdown-content tr:nth-child(even) {
+        background-color: #f9f9f9;
+    }
+    
+    .raw-content {
+        background-color: #f5f5f5;
+        padding: 15px;
+        border-radius: 5px;
+        overflow-x: auto;
+        font-family: monospace;
+        font-size: 0.9em;
+        white-space: pre-wrap;
+    }
+    
+    @media (max-width: 768px) {
+        .documentation-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        
+        .admin-actions {
+            margin-top: 10px;
+            display: flex;
+            width: 100%;
+        }
+        
+        .back-button, .config-button {
+            flex: 1;
+            text-align: center;
+            justify-content: center;
+        }
+        
+        .documentation-content {
+            padding: 20px 15px;
+        }
+    }
+</style>

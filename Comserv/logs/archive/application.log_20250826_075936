@@ -1,0 +1,632 @@
+Log rotated: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/archive/application.log_20250826_075936
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Logging
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Login
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Login
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: logging_best_practices
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Logging Best Practices
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Login
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Login
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Mail
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Mail
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Mail
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Mail
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: login_authentication
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Login Authentication
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Mail
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Mail
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: markdown_viewer
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Markdown Viewer
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: mail_admin_guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Mail Admin Guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: markdown_viewer
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Markdown Viewer
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: markdown_viewer
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Markdown Viewer
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: mail_configuration_guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Mail Configuration Guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: markdown_viewer
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Markdown Viewer
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: mail_documentation_update
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Mail Documentation Update
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: markdown_viewer
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Markdown Viewer
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: mail_system
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Mail System
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: markdown_viewer
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Markdown Viewer
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: mail_troubleshooting
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Mail Troubleshooting
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: markdown_viewer
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Markdown Viewer
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: mail_user_guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Mail User Guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: markdown_viewer
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Markdown Viewer
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: MailSystem
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: MailSystem
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: markdown_viewer
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Markdown Viewer
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: menu_system
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Menu System
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: markdown_viewer
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Markdown Viewer
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: main_changelog
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Main Changelog
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: menu_system
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Menu System
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: mcoop_getting_started
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Mcoop Getting Started
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: menu_system
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Menu System
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: mcoop_module
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Mcoop Module
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: menu_system
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Menu System
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: mcoop_user_guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Mcoop User Guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: menu_system
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Menu System
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: member_resources
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Member Resources
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: menu_system
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Menu System
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: models
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Models
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: menu_system_guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Menu System Guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: models
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Models
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: models
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Models
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: model_list
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Model List
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: models
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Models
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: page_migration_guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Page Migration Guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: page_migration_guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Page Migration Guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: navigation_system
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Navigation System
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: page_migration_guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Page Migration Guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: network_diagnostics
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Network Diagnostics
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: page_migration_guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Page Migration Guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: network_map_json_storage
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Network Map Json Storage
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: page_migration_guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Page Migration Guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Overview
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Overview
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: page_migration_guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Page Migration Guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Pages
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Pages
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: project_selection_log_creation
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Project Selection Log Creation
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Pages
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Pages
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: project_selection_log_creation
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Project Selection Log Creation
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: project_management_system
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Project Management System
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: project_selection_log_creation
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Project Selection Log Creation
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: proxmox_integration
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Proxmox Integration
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Projects
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Projects
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: proxmox_integration
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Proxmox Integration
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: proxmox_integration
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Proxmox Integration
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: proxmox
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Proxmox
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: proxmox_integration
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Proxmox Integration
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Proxmox_CD_Visibility
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Proxmox CD Visibility
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: proxmox_integration
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Proxmox Integration
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: proxmox_commands
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Proxmox Commands
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: proxmox_integration
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Proxmox Integration
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: proxy_troubleshooting
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Proxy Troubleshooting
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: proxy_troubleshooting
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Proxy Troubleshooting
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Queens
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Queens
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Queens
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Queens
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: recent_updates
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Recent Updates
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: recent_updates
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Recent Updates
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: README
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: README
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: recent_updates
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Recent Updates
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Root
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Root
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: RestartStarman
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: RestartStarman
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Root
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Root
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Root
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Root
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Schema
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Schema
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Schema
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Schema
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: sessionplan
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Sessionplan
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: sessionplan
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Sessionplan
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: setup
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Setup
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: setup
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Setup
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: setupcontorller
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Setupcontorller
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: setupcontorller
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Setupcontorller
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: site_domain_resolution
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Site Domain Resolution
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: site_domain_resolution
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Site Domain Resolution
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Site
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Site
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: site_domain_resolution
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Site Domain Resolution
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: site_guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Site Guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: site_specific
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Site Specific
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: site_guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Site Guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: site_specific
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Site Specific
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Sites
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Sites
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Starman
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Starman
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Sites
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Sites
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Starman
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Starman
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: system_overview
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: System Overview
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: starman_restart_card
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Starman Restart Card
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: system_overview
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: System Overview
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: system_overview
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: System Overview
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: starman_restart_guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Starman Restart Guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: system_overview
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: System Overview
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: system_info
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: System Info
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: system_overview
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: System Overview
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: theme_mappings_handling
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Theme Mappings Handling
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: theme_mappings_handling
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Theme Mappings Handling
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: template_system
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Template System
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: theme_mappings_handling
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Theme Mappings Handling
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: templates
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Templates
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: theme_mappings_handling
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Theme Mappings Handling
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Todo
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Todo
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: theme_system
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Theme System
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Todo
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Todo
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Todo
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Todo
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: ThemeConfig
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: ThemeConfig
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Todo
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Todo
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: todo_edit_functionality
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Todo Edit Functionality
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: todo_edit_functionality
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Todo Edit Functionality
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: todo_filtering_and_views
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Todo Filtering And Views
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: todo_filtering_and_views
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Todo Filtering And Views
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: troubleshooting
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Troubleshooting
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: troubleshooting
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Troubleshooting
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: todo_system
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Todo System
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: troubleshooting
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Troubleshooting
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: user_management
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: User Management
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: tutorials
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Tutorials
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: user_management
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: User Management
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: user_management
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: User Management
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: usbm
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Usbm
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: user_management
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: User Management
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: User
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: User
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: user_management
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: User Management
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: user_docs
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: User Docs
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: user_management
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: User Management
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: view
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: View
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: view
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: View
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: user_manual
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: User Manual
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: view
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: View
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Ve7tit
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Ve7tit
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: view
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: View
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Virtualmin_Integration
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Virtualmin Integration
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2024-04-24-helpdesk-menu-enhancement
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2024 04 24 Helpdesk Menu Enhancement
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2024-06-15-login-redirect-fix
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2024 06 15 Login Redirect Fix
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2024-06-21-linux-commands-documentation
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2024 06 21 Linux Commands Documentation
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2024-06-project-edit-fix
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2024 06 Project Edit Fix
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2024-07-project-id-fix
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2024 07 Project Id Fix
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2024-07-proxmox-controller-fixes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2024 07 Proxmox Controller Fixes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2024-08-pagetop-hostname-display
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2024 08 Pagetop Hostname Display
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2024-08-proxmox-debug-msg-fix
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2024 08 Proxmox Debug Msg Fix
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2024-08-ve7tit-controller-fixes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2024 08 Ve7tit Controller Fixes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-04-08-documentation-display-fix-details
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 04 08 Documentation Display Fix Details
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-04-12-hosting-signup-implementation
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 04 12 Hosting Signup Implementation
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-04-13-mcoop-url-case-fix
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 04 13 Mcoop Url Case Fix
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-04-13-mcoop-url-case-fix-details
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 04 13 Mcoop Url Case Fix Details
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-04-18-helpdesk-controller-implementation
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 04 18 Helpdesk Controller Implementation
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-04-documentation-admin-visibility-fix
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 04 Documentation Admin Visibility Fix
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-04-documentation-display-fix
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 04 Documentation Display Fix
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-04-documentation-template-refactoring
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 04 Documentation Template Refactoring
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-04-documentation-workflow-update
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 04 Documentation Workflow Update
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-04-git-pull-functionality
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 04 Git Pull Functionality
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-04-mcoop-admin-menu-restriction
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 04 Mcoop Admin Menu Restriction
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-04-mcoop-server-room-plan
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 04 Mcoop Server Room Plan
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-04-navigation-improvements
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 04 Navigation Improvements
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-04-pagetop-hostname-display
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 04 Pagetop Hostname Display
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-04-pagetop-template-error-fix
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 04 Pagetop Template Error Fix
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-05-12-fix-documentation-controller-logging
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 05 12 Fix Documentation Controller Logging
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-05-15-documentation-system-update
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 05 15 Documentation System Update
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-05-16-documentation-workflow-consolidation
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 05 16 Documentation Workflow Consolidation
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-05-25-documentation-organization
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 05 25 Documentation Organization
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-05-25-fix-formatting-title-logs
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 05 25 Fix Formatting Title Logs
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-05-30-documentation-structure-simplification
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 05 30 Documentation Structure Simplification
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-05-31-linux-commands-reference
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 05 31 Linux Commands Reference
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-05-31-server-ip-display
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 05 31 Server Ip Display
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-06-15-api-credentials-documentation-fix
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 06 15 API Credentials Documentation Fix
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-07-01-cloudflare-application-id-and-rbac
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 07 01 Cloudflare Application Id And Rbac
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-08-18-project-cards-css-fix
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 08 18 Project Cards Css Fix
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-08-25-project-filtering-and-display
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 08 25 Project Filtering And Display
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-08-30-hosting-signup-enhancements
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 08 30 Hosting Signup Enhancements
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-09-10-restart-starman-functionality
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 09 10 Restart Starman Functionality
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-09-15-sudo-password-configuration
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 09 15 Sudo Password Configuration
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-09-starman-restart-fix
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 09 Starman Restart Fix
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-10-01-documentation-migration-to-tt
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 10 01 Documentation Migration To Tt
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-10-15-documentation-access-fixes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: 2025 10 15 Documentation Access Fixes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: account_management
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Account Management
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Admin
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Admin
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: admin
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Admin
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: admin_guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Admin Guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: admin_guides
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Admin Guides
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: admintopmenu_guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Admintopmenu Guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: AI
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: AI
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: AI_DEVELOPMENT_GUIDELINES
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: AI DEVELOPMENT GUIDELINES
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: AI_DOCUMENTATION_GUIDELINES
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: AI DOCUMENTATION GUIDELINES
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: AI_Guidelines
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: AI Guidelines
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: AIAssistants
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: AIAssistants
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: all_changelog
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: All Changelog
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: all_docs
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: All Docs
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Api
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: API
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: api
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: API
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: api_credentials
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: API Credentials
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: api_reference
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: API Reference
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: architecture
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Architecture
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: authentication_system
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Authentication System
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: back_to_top
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Back To Top
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: BMaserModel
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: BMaserModel
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: BMaster
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: BMaster
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: BMasterController
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: BMasterController
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Calendar
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Calendar
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: changelog
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Changelog
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: changelog_system
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Changelog System
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: changelog_template
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Changelog Template
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: cloudflare
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Cloudflare
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: cloudflare_api_authentication
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Cloudflare API Authentication
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: cloudflare_api_token_guide
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Cloudflare API Token Guide
+Pre-emptive log rotation triggered: 82115 bytes >= 81920 bytes
+Current log file size: 82178 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: cloudflare_api_token_ip_restriction_fix
+Pre-emptive log rotation triggered: 82447 bytes >= 81920 bytes
+Current log file size: 82510 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Cloudflare API Token Ip Restriction Fix
+Pre-emptive log rotation triggered: 82780 bytes >= 81920 bytes
+Current log file size: 82843 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: cloudflare_integration
+Pre-emptive log rotation triggered: 83095 bytes >= 81920 bytes
+Current log file size: 83158 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Cloudflare Integration
+Pre-emptive log rotation triggered: 83411 bytes >= 81920 bytes
+Current log file size: 83474 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: commands
+Pre-emptive log rotation triggered: 83712 bytes >= 81920 bytes
+Current log file size: 83775 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Commands
+Pre-emptive log rotation triggered: 84014 bytes >= 81920 bytes
+Current log file size: 84077 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: config
+Pre-emptive log rotation triggered: 84313 bytes >= 81920 bytes
+Current log file size: 84376 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Config
+Pre-emptive log rotation triggered: 84613 bytes >= 81920 bytes
+Current log file size: 84676 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: ContentManagement
+Pre-emptive log rotation triggered: 84923 bytes >= 81920 bytes
+Current log file size: 84986 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: ContentManagement
+Pre-emptive log rotation triggered: 85234 bytes >= 81920 bytes
+Current log file size: 85297 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: controller_list
+Pre-emptive log rotation triggered: 85542 bytes >= 81920 bytes
+Current log file size: 85605 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Controller List
+Pre-emptive log rotation triggered: 85851 bytes >= 81920 bytes
+Current log file size: 85914 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: controller_routing_guidelines
+Pre-emptive log rotation triggered: 86173 bytes >= 81920 bytes
+Current log file size: 86236 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Controller Routing Guidelines
+Pre-emptive log rotation triggered: 86496 bytes >= 81920 bytes
+Current log file size: 86559 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: controllers
+Pre-emptive log rotation triggered: 86800 bytes >= 81920 bytes
+Current log file size: 86863 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Controllers
+Pre-emptive log rotation triggered: 87105 bytes >= 81920 bytes
+Current log file size: 87168 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: customizing_profile
+Pre-emptive log rotation triggered: 87417 bytes >= 81920 bytes
+Current log file size: 87480 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Customizing Profile
+Pre-emptive log rotation triggered: 87730 bytes >= 81920 bytes
+Current log file size: 87793 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: db_config_loading
+Pre-emptive log rotation triggered: 88040 bytes >= 81920 bytes
+Current log file size: 88103 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Db Config Loading
+Pre-emptive log rotation triggered: 88351 bytes >= 81920 bytes
+Current log file size: 88414 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: db_config_loading_fix
+Pre-emptive log rotation triggered: 88665 bytes >= 81920 bytes
+Current log file size: 88728 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Db Config Loading Fix
+Pre-emptive log rotation triggered: 88980 bytes >= 81920 bytes
+Current log file size: 89043 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: DBIDocument
+Pre-emptive log rotation triggered: 89284 bytes >= 81920 bytes
+Current log file size: 89347 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: DBIDocument
+Pre-emptive log rotation triggered: 89589 bytes >= 81920 bytes
+Current log file size: 89652 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: developer_guides
+Pre-emptive log rotation triggered: 89898 bytes >= 81920 bytes
+Current log file size: 89961 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Developer Guides
+Pre-emptive log rotation triggered: 90208 bytes >= 81920 bytes
+Current log file size: 90271 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: document_management
+Pre-emptive log rotation triggered: 90520 bytes >= 81920 bytes
+Current log file size: 90583 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Document Management
+Pre-emptive log rotation triggered: 90833 bytes >= 81920 bytes
+Current log file size: 90896 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_config_guide
+Pre-emptive log rotation triggered: 91152 bytes >= 81920 bytes
+Current log file size: 91215 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Config Guide
+Pre-emptive log rotation triggered: 91472 bytes >= 81920 bytes
+Current log file size: 91535 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Documentation_Controller
+Pre-emptive log rotation triggered: 91789 bytes >= 81920 bytes
+Current log file size: 91852 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Controller
+Pre-emptive log rotation triggered: 92107 bytes >= 81920 bytes
+Current log file size: 92170 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_editor_guide
+Pre-emptive log rotation triggered: 92426 bytes >= 81920 bytes
+Current log file size: 92489 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Editor Guide
+Pre-emptive log rotation triggered: 92746 bytes >= 81920 bytes
+Current log file size: 92809 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_filename_issue
+Pre-emptive log rotation triggered: 93067 bytes >= 81920 bytes
+Current log file size: 93130 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Filename Issue
+Pre-emptive log rotation triggered: 93389 bytes >= 81920 bytes
+Current log file size: 93452 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_guide
+Pre-emptive log rotation triggered: 93701 bytes >= 81920 bytes
+Current log file size: 93764 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Guide
+Pre-emptive log rotation triggered: 94014 bytes >= 81920 bytes
+Current log file size: 94077 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_index_adaptation
+Pre-emptive log rotation triggered: 94337 bytes >= 81920 bytes
+Current log file size: 94400 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Index Adaptation
+Pre-emptive log rotation triggered: 94661 bytes >= 81920 bytes
+Current log file size: 94724 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Documentation_Management
+Pre-emptive log rotation triggered: 94978 bytes >= 81920 bytes
+Current log file size: 95041 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Management
+Pre-emptive log rotation triggered: 95296 bytes >= 81920 bytes
+Current log file size: 95359 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_migration_guide
+Pre-emptive log rotation triggered: 95618 bytes >= 81920 bytes
+Current log file size: 95681 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Migration Guide
+Pre-emptive log rotation triggered: 95941 bytes >= 81920 bytes
+Current log file size: 96004 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_migration_to_tt
+Pre-emptive log rotation triggered: 96263 bytes >= 81920 bytes
+Current log file size: 96326 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Migration To Tt
+Pre-emptive log rotation triggered: 96586 bytes >= 81920 bytes
+Current log file size: 96649 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_organization
+Pre-emptive log rotation triggered: 96905 bytes >= 81920 bytes
+Current log file size: 96968 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Organization
+Pre-emptive log rotation triggered: 97225 bytes >= 81920 bytes
+Current log file size: 97288 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_role_access
+Pre-emptive log rotation triggered: 97543 bytes >= 81920 bytes
+Current log file size: 97606 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Role Access
+Pre-emptive log rotation triggered: 97862 bytes >= 81920 bytes
+Current log file size: 97925 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_system
+Pre-emptive log rotation triggered: 98175 bytes >= 81920 bytes
+Current log file size: 98238 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation System
+Pre-emptive log rotation triggered: 98489 bytes >= 81920 bytes
+Current log file size: 98552 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Documentation_System
+Pre-emptive log rotation triggered: 98802 bytes >= 81920 bytes
+Current log file size: 98865 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation System
+Pre-emptive log rotation triggered: 99116 bytes >= 81920 bytes
+Current log file size: 99179 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_system_guide
+Pre-emptive log rotation triggered: 99435 bytes >= 81920 bytes
+Current log file size: 99498 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation System Guide
+Pre-emptive log rotation triggered: 99755 bytes >= 81920 bytes
+Current log file size: 99818 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_system_overview
+Pre-emptive log rotation triggered: 100077 bytes >= 81920 bytes
+Current log file size: 100141 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation System Overview
+Pre-emptive log rotation triggered: 100402 bytes >= 81920 bytes
+Current log file size: 100466 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_template
+Pre-emptive log rotation triggered: 100719 bytes >= 81920 bytes
+Current log file size: 100783 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Template
+Pre-emptive log rotation triggered: 101037 bytes >= 81920 bytes
+Current log file size: 101101 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_tt_template
+Pre-emptive log rotation triggered: 101357 bytes >= 81920 bytes
+Current log file size: 101421 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Tt Template
+Pre-emptive log rotation triggered: 101678 bytes >= 81920 bytes
+Current log file size: 101742 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_update_summary
+Pre-emptive log rotation triggered: 102001 bytes >= 81920 bytes
+Current log file size: 102065 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Update Summary
+Pre-emptive log rotation triggered: 102325 bytes >= 81920 bytes
+Current log file size: 102389 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:59:36] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Documentation_Workflow
+Pre-emptive log rotation triggered: 102642 bytes >= 81920 bytes
+Current log file size: 102706 bytes, max size: 102400 bytes
+Log file size (102706 bytes) exceeds maximum size (102400 bytes). Rotating log file.

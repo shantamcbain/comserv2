@@ -1,0 +1,204 @@
+[2025-03-17 06:51:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: csc.workstation
+[2025-03-17 06:51:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:499] auto - Site Domain: 1
+[2025-03-17 06:51:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:507] auto - Site ID: 1
+[2025-03-17 06:51:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 06:51:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: 
+[2025-03-17 06:51:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:757] auto - No roles defined in session
+[2025-03-17 06:54:24] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: bmaster.workstation
+[2025-03-17 06:54:24] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:499] auto - Site Domain: 2
+[2025-03-17 06:54:24] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:507] auto - Site ID: 2
+[2025-03-17 06:54:24] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 06:54:24] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: 
+[2025-03-17 06:54:24] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:757] auto - No roles defined in session
+[2025-03-17 07:04:09] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: bmaster.workstation
+[2025-03-17 07:04:09] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:499] auto - Site Domain: 2
+[2025-03-17 07:04:09] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:507] auto - Site ID: 2
+[2025-03-17 07:04:09] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 07:04:09] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: 
+[2025-03-17 07:04:09] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:754] auto - Session Roles: 
+[2025-03-17 07:12:46] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: bmaster.workstation
+[2025-03-17 07:12:46] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:499] auto - Site Domain: 2
+[2025-03-17 07:12:46] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:507] auto - Site ID: 2
+[2025-03-17 07:12:46] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 07:12:46] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: 
+[2025-03-17 07:12:46] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:754] auto - Session Roles: 
+[2025-03-17 07:14:24] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: bmaster.workstation
+[2025-03-17 07:14:24] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:499] auto - Site Domain: 2
+[2025-03-17 07:14:24] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:507] auto - Site ID: 2
+[2025-03-17 07:14:24] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 07:14:24] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: 
+[2025-03-17 07:14:24] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:754] auto - Session Roles: admin
+[2025-03-17 07:14:29] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:25] begin - Starting begin action
+[2025-03-17 07:14:29] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:46] begin - Roles: $VAR1 = [
+          'admin'
+        ];
+
+[2025-03-17 07:14:29] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:51] begin - Checking roles: admin
+[2025-03-17 07:14:29] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:56] begin - Admin user detected, proceeding.
+[2025-03-17 07:14:29] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: bmaster.workstation
+[2025-03-17 07:14:29] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:499] auto - Site Domain: 2
+[2025-03-17 07:14:29] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:507] auto - Site ID: 2
+[2025-03-17 07:14:29] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 07:14:29] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: 
+[2025-03-17 07:14:29] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:754] auto - Session Roles: admin
+[2025-03-17 07:14:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:25] begin - Starting begin action
+[2025-03-17 07:14:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:46] begin - Roles: $VAR1 = [
+          'admin'
+        ];
+
+[2025-03-17 07:14:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:51] begin - Checking roles: admin
+[2025-03-17 07:14:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:56] begin - Admin user detected, proceeding.
+[2025-03-17 07:14:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: bmaster.workstation
+[2025-03-17 07:14:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:499] auto - Site Domain: 2
+[2025-03-17 07:14:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:507] auto - Site ID: 2
+[2025-03-17 07:14:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 07:14:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: 
+[2025-03-17 07:14:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:754] auto - Session Roles: admin
+[2025-03-17 07:14:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:767] auto - Debug mode enabled
+[2025-03-17 07:20:10] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:25] begin - Starting begin action
+[2025-03-17 07:20:10] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:46] begin - Roles: $VAR1 = [
+          'admin'
+        ];
+
+[2025-03-17 07:20:10] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:51] begin - Checking roles: admin
+[2025-03-17 07:20:10] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:56] begin - Admin user detected, proceeding.
+[2025-03-17 07:20:10] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: bmaster.workstation
+[2025-03-17 07:20:10] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:499] auto - Site Domain: 2
+[2025-03-17 07:20:10] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:507] auto - Site ID: 2
+[2025-03-17 07:20:10] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 07:20:10] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: BMaster
+[2025-03-17 07:20:10] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:754] auto - Session Roles: admin
+[2025-03-17 07:20:10] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:767] auto - Debug mode enabled
+[2025-03-17 07:20:26] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:25] begin - Starting begin action
+[2025-03-17 07:20:26] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:46] begin - Roles: $VAR1 = [
+          'admin'
+        ];
+
+[2025-03-17 07:20:26] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:51] begin - Checking roles: admin
+[2025-03-17 07:20:26] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:56] begin - Admin user detected, proceeding.
+[2025-03-17 07:20:26] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: bmaster.workstation
+[2025-03-17 07:20:26] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 07:20:26] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: BMaster
+[2025-03-17 07:20:26] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:754] auto - Session Roles: admin
+[2025-03-17 07:20:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: bmaster.workstation
+[2025-03-17 07:20:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 07:20:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: BMaster
+[2025-03-17 07:20:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:754] auto - Session Roles: admin
+[2025-03-17 07:21:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: bmaster.workstation
+[2025-03-17 07:21:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 07:21:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: BMaster
+[2025-03-17 07:21:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:754] auto - Session Roles: admin
+[2025-03-17 07:21:26] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: bmaster.workstation
+[2025-03-17 07:21:26] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 07:21:26] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: BMaster
+[2025-03-17 07:21:26] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:754] auto - Session Roles: admin
+[2025-03-17 07:21:49] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: csc.workstation
+[2025-03-17 07:21:49] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:499] auto - Site Domain: 1
+[2025-03-17 07:21:49] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:507] auto - Site ID: 1
+[2025-03-17 07:21:49] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 07:21:49] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: CSC
+[2025-03-17 07:21:49] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:754] auto - Session Roles: 
+[2025-03-17 07:21:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: csc.workstation
+[2025-03-17 07:21:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 07:21:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: CSC
+[2025-03-17 07:21:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:754] auto - Session Roles: admin
+[2025-03-17 07:22:02] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:25] begin - Starting begin action
+[2025-03-17 07:22:02] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:46] begin - Roles: $VAR1 = [
+          'admin'
+        ];
+
+[2025-03-17 07:22:02] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:51] begin - Checking roles: admin
+[2025-03-17 07:22:02] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:56] begin - Admin user detected, proceeding.
+[2025-03-17 07:22:02] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: csc.workstation
+[2025-03-17 07:22:02] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 07:22:02] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: CSC
+[2025-03-17 07:22:02] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:754] auto - Session Roles: admin
+[2025-03-17 07:22:05] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: csc.workstation
+[2025-03-17 07:22:05] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 07:22:05] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: CSC
+[2025-03-17 07:22:05] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:754] auto - Session Roles: admin
+[2025-03-17 07:22:36] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: csc.workstation
+[2025-03-17 07:22:36] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 07:22:36] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: CSC
+[2025-03-17 07:22:36] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:754] auto - Session Roles: admin
+[2025-03-17 07:25:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: workstation.local
+[2025-03-17 07:25:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:499] auto - Site Domain: undefined
+[2025-03-17 08:24:20] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: csc.workstation
+[2025-03-17 08:24:20] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:499] auto - Site Domain: 1
+[2025-03-17 08:24:20] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:507] auto - Site ID: 1
+[2025-03-17 08:24:20] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 08:24:20] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: CSC
+[2025-03-17 08:24:20] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:757] auto - No roles defined in session
+[2025-03-17 08:24:28] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: bmaster.workstation
+[2025-03-17 08:24:28] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:499] auto - Site Domain: 2
+[2025-03-17 08:24:28] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:507] auto - Site ID: 2
+[2025-03-17 08:24:28] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 08:24:28] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: BMaster
+[2025-03-17 08:24:28] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:757] auto - No roles defined in session
+[2025-03-17 08:24:31] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: bmaster.workstation
+[2025-03-17 08:24:31] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 08:24:31] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: BMaster
+[2025-03-17 08:24:31] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:754] auto - Session Roles: 
+[2025-03-17 08:25:08] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: bmaster.workstation
+[2025-03-17 08:25:08] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 08:25:08] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: BMaster
+[2025-03-17 08:25:08] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:754] auto - Session Roles: 
+[2025-03-17 08:25:10] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: bmaster.workstation
+[2025-03-17 08:25:10] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 08:25:10] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: BMaster
+[2025-03-17 08:25:10] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:754] auto - Session Roles: 
+[2025-03-17 08:25:48] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: bmaster.workstation
+[2025-03-17 08:25:48] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 08:25:48] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: BMaster
+[2025-03-17 08:25:48] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:754] auto - Session Roles: 
+[2025-03-17 08:27:19] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: bmaster.workstation
+[2025-03-17 08:27:19] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 08:27:19] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: BMaster
+[2025-03-17 08:27:19] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:754] auto - Session Roles: 
+[2025-03-17 08:27:20] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: bmaster.workstation
+[2025-03-17 08:27:20] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 08:27:20] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: BMaster
+[2025-03-17 08:27:20] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:754] auto - Session Roles: 
+[2025-03-17 08:27:22] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: bmaster.workstation
+[2025-03-17 08:27:22] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 08:27:22] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: BMaster
+[2025-03-17 08:27:22] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:754] auto - Session Roles: 
+[2025-03-17 08:47:16] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: bmaster.workstation
+[2025-03-17 08:47:16] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 08:47:16] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: BMaster
+[2025-03-17 08:47:16] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:754] auto - Session Roles: 
+[2025-03-17 08:47:17] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: bmaster.workstation
+[2025-03-17 08:47:17] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 08:47:17] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: BMaster
+[2025-03-17 08:47:17] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:754] auto - Session Roles: 
+[2025-03-17 08:47:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: bmaster.workstation
+[2025-03-17 08:47:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 08:47:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: BMaster
+[2025-03-17 08:47:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:754] auto - Session Roles: 
+[2025-03-17 08:47:19] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: bmaster.workstation
+[2025-03-17 08:47:19] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 08:47:19] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: BMaster
+[2025-03-17 08:47:19] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:754] auto - Session Roles: 
+[2025-03-17 08:47:20] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: bmaster.workstation
+[2025-03-17 08:47:20] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 08:47:20] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: BMaster
+[2025-03-17 08:47:20] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:754] auto - Session Roles: 
+[2025-03-17 08:54:53] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: bmaster.workstation
+[2025-03-17 08:54:53] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 08:54:53] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: BMaster
+[2025-03-17 08:54:53] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:754] auto - Session Roles: admin
+[2025-03-17 08:54:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:25] begin - Starting begin action
+[2025-03-17 08:54:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:46] begin - Roles: $VAR1 = [
+          'admin'
+        ];
+
+[2025-03-17 08:54:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:51] begin - Checking roles: admin
+[2025-03-17 08:54:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:56] begin - Admin user detected, proceeding.
+[2025-03-17 08:54:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: bmaster.workstation
+[2025-03-17 08:54:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 08:54:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: BMaster
+[2025-03-17 08:54:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:754] auto - Session Roles: admin
+[2025-03-17 08:55:01] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:486] auto - Session Domain: bmaster.workstation
+[2025-03-17 08:55:01] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:731] auto - Entered auto action in Root.pm
+[2025-03-17 08:55:01] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:735] auto - Fetched SiteName: BMaster
+[2025-03-17 08:55:01] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:754] auto - Session Roles: admin

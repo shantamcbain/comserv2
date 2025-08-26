@@ -1,0 +1,49 @@
+NEXT CHAT PROMPT - COPY AND PASTE THIS TO START NEXT CHAT:
+
+---
+
+**CRITICAL**: Read /home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.tt first for context and constraints.
+
+**TASK**: Complete HybridDB Backend Integration for Database Mode Switching
+
+**PROBLEM**: The /admin/database_mode route is now FIXED and working, but the backend switching is NOT fully integrated. When users switch to SQLite mode:
+- HybridDB model tracks the selection (mysql vs sqlite) 
+- But other models (like Todo) still connect to MySQL
+- The switch doesn't actually change database connections for data models
+
+**WHAT WAS COMPLETED**:
+✅ Fixed /database_mode route - Added proper route in Admin controller at /admin/database_mode
+✅ Updated all menu links from /database_mode to /admin/database_mode in navigation templates
+✅ Made DatabaseMode controller methods :Private - proper admin organization
+✅ Clean architecture - No more Root.pm clutter
+
+**CRITICAL ISSUE TO SOLVE**:
+⚠️ **HybridDB Integration Incomplete**: The HybridDB backend switching needs to be integrated with data models so that when SQLite mode is selected, models like Todo actually use SQLite instead of MySQL.
+
+**SPECIFIC TASKS NEEDED**:
+1. **Integrate HybridDB with data models** - Make Todo/other models check HybridDB for connection info
+2. **Test the /admin/database_mode route** - Verify it works properly in browser
+3. **Complete backend switching** - Ensure SQLite mode actually uses SQLite data
+4. **Verify data persistence** - Test that data switches properly between backends
+
+**KEY FILES TO EXAMINE**:
+- `Comserv/lib/Comserv/Model/HybridDB.pm` - Backend selection tracking
+- `Comserv/lib/Comserv/Controller/Todo.pm` - Example model that needs integration
+- `Comserv/lib/Comserv/Controller/DatabaseMode.pm` - Database mode controller
+- `Comserv/root/database_mode/index.tt` - Frontend interface
+
+**CONSTRAINTS**:
+- Follow existing code patterns and naming conventions
+- Use existing database connection methods when possible
+- Test within application context (not standalone scripts)
+- Focus on implementation first, ask for specific files only when needed
+
+**SUCCESS CRITERIA**:
+- When user switches to SQLite mode, Todo data comes from SQLite
+- When user switches to MySQL mode, Todo data comes from MySQL  
+- Backend switching persists across sessions
+- No data corruption during switching
+
+**PROMPT COUNT**: This is prompt #1 for the next chat - track your prompts!
+
+---

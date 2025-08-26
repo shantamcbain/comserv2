@@ -1,0 +1,1 @@
+{"pathname":"T/TO/TOBYINK/MooX-Traits-0.005.tar.gz","dist":"MooX-Traits-0.005","target":"MooX::Traits","version":"0.005","name":"MooX::Traits","provides":{"MooX::Traits::Util":{"version":"0.005","file":"lib/MooX/Traits/Util.pm"},"MooX::Traits":{"file":"lib/MooX/Traits.pm","version":"0.005"}}}

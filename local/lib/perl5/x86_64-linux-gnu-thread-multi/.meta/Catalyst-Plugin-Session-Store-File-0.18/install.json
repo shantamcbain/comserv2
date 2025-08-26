@@ -1,0 +1,1 @@
+{"name":"Catalyst::Plugin::Session::Store::File","pathname":"F/FL/FLORA/Catalyst-Plugin-Session-Store-File-0.18.tar.gz","dist":"Catalyst-Plugin-Session-Store-File-0.18","target":"Catalyst::Plugin::Session::Store::File","version":"0.18","provides":{"Catalyst::Plugin::Session::Store::File":{"file":"lib/Catalyst/Plugin/Session/Store/File.pm","version":"0.18"}}}

@@ -1,0 +1,56 @@
+## NEXT CHAT SESSION PROMPT
+
+**CRITICAL**: Please read `/Documentation/AI_DEVELOPMENT_GUIDELINES.tt` and `/Documentation/developer/theme_system_normalization.tt` at the start of this chat.
+
+### PRIMARY OBJECTIVE: Fix Admin CSS Settings Interface
+
+**PROBLEM**: The Admin → System Setup → CSS Settings link is broken and needs implementation.
+
+**LOCATION**: Admin page under theme management section
+
+**REQUIRED IMPLEMENTATION**:
+1. **Fix the broken CSS Settings link** in admin navigation
+2. **Create theme selection interface** - CSS form to show index page for choosing themes
+3. **Implement theme modification interface** - Allow customization of theme variables
+4. **Add theme preview functionality** - Live preview of theme changes
+
+### CURRENT STATUS (COMPLETED IN PREVIOUS CHAT):
+✅ **Todo System Theme Normalization**: COMPLETE
+- Main todo.tt fully converted to unified theme system
+- Inline action buttons working correctly
+- Expandable containers implemented
+- Unicode character issues resolved
+- All styling now comes from base-containers.css
+
+✅ **Theme Documentation**: Consolidated and updated
+- Master theme documentation index created
+- All related files linked and organized
+- Current implementation status documented
+
+### TECHNICAL CONTEXT:
+- **Theme System**: Uses base-containers.css for all styling
+- **Theme Files Location**: `/static/css/themes/`
+- **Available Themes**: CSC, BMaster, USBM, Apiary, Admin, Dark, etc.
+- **Theme Variables**: CSS custom properties for colors and styling
+- **Admin Navigation**: Needs CSS Settings link implementation
+
+### WHAT NOT TO DO:
+- ❌ Don't create new module-specific CSS files
+- ❌ Don't modify base-containers.css (use theme variables instead)
+- ❌ Don't spend time on todo system (already complete)
+- ❌ Don't create standalone test files
+
+### FOCUS AREAS:
+1. **Admin Controller**: Find/create CSS settings route
+2. **Admin Templates**: Create theme selection/modification interface
+3. **Theme Management**: Implement theme switching functionality
+4. **User Experience**: Professional interface for theme customization
+
+### SUCCESS CRITERIA:
+- Admin → System Setup → CSS Settings link works
+- Theme selection interface displays available themes
+- Theme modification form allows variable customization
+- Theme preview shows changes in real-time
+- All interfaces use unified theme system classes
+
+**REMEMBER**: Follow existing file structure and naming conventions. Ask permission before creating new files or directories.

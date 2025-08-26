@@ -1,0 +1,25 @@
+[% PageVersion = 'Comserv/root/Documentation/admin_guides.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Admin Guides' %]
+
+<!-- Documentation page for Admin Guides -->
+<div class="documentation-content">
+
+[% IF categories.admin_guides %]
+<section class="doc-section admin-only">
+    <h2 class="section-toggle">Administrator Guides</h2>
+    <p>Resources for system administrators. <span class="admin-badge">Admin Only</span></p>
+    <div class="section-content">
+        [% FOREACH page_name IN categories.admin_guides.pages.sort %]
+            [% IF structured_pages.$page_name %]
+                [% page = structured_pages.$page_name %]
+            <a href="[% page.url %]" class="doc-card">
+                <h3>[% page.title %]</h3>
+                <p>[% page.description || 'Administrator documentation.' %]</p>
+                <span class="role-badge">Admin Only</span>
+            </a>
+    </div>
+</section>

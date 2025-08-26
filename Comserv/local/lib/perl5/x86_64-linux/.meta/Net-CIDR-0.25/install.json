@@ -1,0 +1,1 @@
+{"version":"0.25","pathname":"M/MR/MRSAM/Net-CIDR-0.25.tar.gz","provides":{"Net::CIDR":{"version":"0.25","file":"lib/Net/CIDR.pm"}},"dist":"Net-CIDR-0.25","target":"Net::CIDR","name":"Net::CIDR"}

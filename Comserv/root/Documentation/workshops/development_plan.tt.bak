@@ -1,0 +1,438 @@
+[% PageVersion = 'Documentation/workshops/development_plan.tt,v 0.01 2024/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Example script for converting ODP to HTML' %]
+
+<!-- Documentation page for development_plan -->
+<div class="documentation-content">
+
+[% IF debug_mode == 1 %]
+
+<div class="documentation-container">
+    <h1>Workshop System: Development Plan</h1>
+    
+    <div class="toc">
+        <h2>Table of Contents</h2>
+        <ul>
+            <li><a href="#overview">Overview</a></li>
+            <li><a href="#phases">Development Phases</a></li>
+            <li><a href="#presentation-conversion">Presentation Conversion Plan</a></li>
+            <li><a href="#database-migration">Database Migration Plan</a></li>
+            <li><a href="#user-created-workshops">User-Created Workshops</a></li>
+            <li><a href="#integration">Integration Enhancements</a></li>
+            <li><a href="#timeline">Timeline</a></li>
+        </ul>
+    
+    <div id="overview" class="section">
+        <h2>Overview</h2>
+        <p>The Workshop System is evolving from a simple workshop advertising platform to a comprehensive workshop management system. This document outlines the development roadmap for transforming the current system into a full-featured platform that enables users to create, manage, and participate in workshops.</p>
+    
+    <div id="phases" class="section">
+        <h2>Development Phases</h2>
+        
+        <div class="phase">
+            <h3>Phase 1: Core Enhancement (Current)</h3>
+            <ul>
+                <li>Improve existing workshop management functionality</li>
+                <li>Add presentation file support (download capabilities)</li>
+                <li>Create comprehensive documentation</li>
+                <li>Refine the user interface</li>
+            </ul>
+            <p><strong>Status:</strong> In progress</p>
+        
+        <div class="phase">
+            <h3>Phase 2: Presentation System</h3>
+            <ul>
+                <li>Convert presentation files to web-friendly formats</li>
+                <li>Create in-browser presentation viewer</li>
+                <li>Develop presentation management tools</li>
+                <li>Implement presentation metadata and categorization</li>
+            </ul>
+            <p><strong>Status:</strong> Planned</p>
+        
+        <div class="phase">
+            <h3>Phase 3: User-Created Workshops</h3>
+            <ul>
+                <li>Develop user interfaces for workshop creation</li>
+                <li>Implement workflow for workshop approval (if needed)</li>
+                <li>Create participant registration system</li>
+                <li>Add notification system for workshop updates</li>
+            </ul>
+            <p><strong>Status:</strong> Future</p>
+        
+        <div class="phase">
+            <h3>Phase 4: Advanced Features</h3>
+            <ul>
+                <li>Interactive workshop capabilities</li>
+                <li>Workshop series and curricula</li>
+                <li>Analytics and reporting</li>
+                <li>Integration with external calendaring systems</li>
+                <li>Mobile-optimized experience</li>
+            </ul>
+            <p><strong>Status:</strong> Future</p>
+    
+    <div id="presentation-conversion" class="section">
+        <h2>Presentation Conversion Plan</h2>
+        
+        <div class="step">
+            <h3>Step 1: File Format Conversion</h3>
+            <p>Convert existing ODP files to web-friendly formats:</p>
+            <ol>
+                <li>Set up LibreOffice headless server for automated conversion</li>
+                <li>Create conversion script:
+                    <pre>
+<h1>Example script for converting ODP to HTML</h1>
+#!/bin/bash
+LIBREOFFICE="/usr/bin/libreoffice"
+SOURCE_DIR="/home/shanta/PycharmProjects/comserv2/Comserv/root/WorkShops"
+OUTPUT_DIR="/home/shanta/PycharmProjects/comserv2/Comserv/root/WorkShops/html"
+
+<h1>Create output directory if it doesn't exist</h1>
+mkdir -p "$OUTPUT_DIR"
+
+<h1>Convert all ODP files to HTML</h1>
+for file in "$SOURCE_DIR"/*.odp; do
+    if [ -f "$file" ]; then
+        filename=$(basename "$file")
+        name="${filename%.*}"
+        $LIBREOFFICE --headless --convert-to html --outdir "$OUTPUT_DIR" "$file"
+        echo "Converted $filename to HTML"
+    fi
+done
+                    </pre>
+                </li>
+                <li>Schedule regular conversion of new presentations</li>
+            </ol>
+        
+        <div class="step">
+            <h3>Step 2: Template Integration</h3>
+            <p>Create Template Toolkit wrappers for HTML presentations:</p>
+            <ol>
+                <li>Develop a template to wrap HTML content:
+                    <pre>
+[% IF debug_mode == 1 %]
+
+<div class="presentation-viewer">
+    <h1>[% presentation.title %]</h1>
+    
+    <div class="presentation-controls">
+        <a href="#" class="prev-slide">Previous</a>
+        <span class="slide-counter">Slide <span id="current-slide">1</span> of <span id="total-slides">[% presentation.total_slides %]</span></span>
+        <a href="#" class="next-slide">Next</a>
+    
+    <div class="presentation-content">
+        [% presentation.html_content %]
+
+<script>
+    // JavaScript for controlling slide navigation
+    document.addEventListener('DOMContentLoaded', function() {
+        // Presentation viewer logic
+    });
+</script>
+                    </pre>
+                </li>
+                <li>Process HTML files to extract slides and content</li>
+                <li>Enhance CSS for consistent styling with Comserv theme</li>
+            </ol>
+        
+        <div class="step">
+            <h3>Step 3: Controller Updates</h3>
+            <p>Enhance the Workshop controller to support HTML presentations:</p>
+            <ol>
+                <li>Update the presentation action to serve HTML content</li>
+                <li>Add slide navigation capabilities</li>
+                <li>Implement presentation tracking (views, downloads)</li>
+            </ol>
+    
+    <div id="database-migration" class="section">
+        <h2>Database Migration Plan</h2>
+        
+        <div class="step">
+            <h3>Step 1: Schema Design</h3>
+            <p>Create database schema for presentation management:</p>
+            <pre>
+-- Presentations table
+CREATE TABLE presentation (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    description TEXT,
+    author TEXT,
+    created_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    last_modified DATETIME DEFAULT CURRENT_TIMESTAMP,
+    summary TEXT,
+    keywords TEXT,
+    category TEXT,
+    original_file TEXT,
+    html_version TEXT,
+    preview_image TEXT,
+    total_slides INTEGER DEFAULT 0,
+    view_count INTEGER DEFAULT 0,
+    download_count INTEGER DEFAULT 0
+);
+
+-- Slides table
+CREATE TABLE presentation_slide (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    presentation_id INTEGER NOT NULL,
+    slide_number INTEGER NOT NULL,
+    title TEXT,
+    content TEXT,
+    notes TEXT,
+    image TEXT,
+    FOREIGN KEY(presentation_id) REFERENCES presentation(id) ON DELETE CASCADE
+);
+
+-- Workshop to Presentation relationship
+CREATE TABLE workshop_presentation (
+    workshop_id INTEGER NOT NULL,
+    presentation_id INTEGER NOT NULL,
+    PRIMARY KEY(workshop_id, presentation_id),
+    FOREIGN KEY(workshop_id) REFERENCES workshop(id) ON DELETE CASCADE,
+    FOREIGN KEY(presentation_id) REFERENCES presentation(id) ON DELETE CASCADE
+);
+            </pre>
+        
+        <div class="step">
+            <h3>Step 2: Model Development</h3>
+            <p>Create models for the new schema:</p>
+            <ol>
+                <li>Develop Presentation model</li>
+                <li>Develop PresentationSlide model</li>
+                <li>Update Workshop model to handle presentation relationships</li>
+                <li>Implement methods for presentation management</li>
+            </ol>
+        
+        <div class="step">
+            <h3>Step 3: Import Existing Presentations</h3>
+            <p>Develop a migration script to import existing presentations:</p>
+            <ol>
+                <li>Scan WorkShops directory for presentation files</li>
+                <li>Extract metadata (title, author, etc.)</li>
+                <li>Convert to HTML and extract slides</li>
+                <li>Insert into database with proper relationships</li>
+            </ol>
+    
+    <div id="user-created-workshops" class="section">
+        <h2>User-Created Workshops</h2>
+        
+        <div class="feature">
+            <h3>User Interface</h3>
+            <p>Develop interfaces for workshop creation and management:</p>
+            <ul>
+                <li>Workshop creation form with advanced options</li>
+                <li>Workshop management dashboard</li>
+                <li>Participant management interface</li>
+                <li>Presentation upload and management tools</li>
+            </ul>
+        
+        <div class="feature">
+            <h3>Workflow and Permissions</h3>
+            <p>Implement workflow for workshop lifecycle:</p>
+            <ul>
+                <li>Role-based permissions for workshop creation</li>
+                <li>Approval workflow for public workshops</li>
+                <li>Moderation capabilities for administrators</li>
+                <li>Version control for workshop content</li>
+            </ul>
+        
+        <div class="feature">
+            <h3>Participant Management</h3>
+            <p>Develop registration and attendance tracking:</p>
+            <ul>
+                <li>Registration form and process</li>
+                <li>Waitlist management</li>
+                <li>Attendance tracking</li>
+                <li>Participant communication tools</li>
+                <li>Feedback and evaluation system</li>
+            </ul>
+    
+    <div id="integration" class="section">
+        <h2>Integration Enhancements</h2>
+        
+        <div class="integration">
+            <h3>Calendar Integration</h3>
+            <p>Integrate with calendaring systems:</p>
+            <ul>
+                <li>iCalendar export for workshops</li>
+                <li>Google Calendar integration</li>
+                <li>Outlook Calendar integration</li>
+            </ul>
+        
+        <div class="integration">
+            <h3>Notification System</h3>
+            <p>Develop comprehensive notification capabilities:</p>
+            <ul>
+                <li>Email notifications for workshop updates</li>
+                <li>Registration confirmations</li>
+                <li>Reminder notifications</li>
+                <li>Follow-up communications</li>
+            </ul>
+        
+        <div class="integration">
+            <h3>Content Management</h3>
+            <p>Enhance content management for workshops:</p>
+            <ul>
+                <li>Rich media support for workshop descriptions</li>
+                <li>Document repository for workshop materials</li>
+                <li>Version control for workshop content</li>
+            </ul>
+    
+    <div id="timeline" class="section">
+        <h2>Timeline</h2>
+        
+        <div class="timeline">
+            <table>
+                <tr>
+                    <th>Phase</th>
+                    <th>Timeframe</th>
+                    <th>Key Deliverables</th>
+                </tr>
+                <tr>
+                    <td>Phase 1: Core Enhancement</td>
+                    <td>Q2-Q3 2024</td>
+                    <td>
+                        <ul>
+                            <li>Improved workshop management</li>
+                            <li>Presentation download support</li>
+                            <li>Documentation</li>
+                        </ul>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Phase 2: Presentation System</td>
+                    <td>Q3-Q4 2024</td>
+                    <td>
+                        <ul>
+                            <li>Presentation conversion pipeline</li>
+                            <li>Browser-based viewer</li>
+                            <li>Database schema</li>
+                        </ul>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Phase 3: User-Created Workshops</td>
+                    <td>Q1-Q2 2025</td>
+                    <td>
+                        <ul>
+                            <li>Workshop creation interface</li>
+                            <li>Registration system</li>
+                            <li>Notification system</li>
+                        </ul>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Phase 4: Advanced Features</td>
+                    <td>Q3 2025 onward</td>
+                    <td>
+                        <ul>
+                            <li>Interactive capabilities</li>
+                            <li>Analytics</li>
+                            <li>External integrations</li>
+                        </ul>
+                    </td>
+                </tr>
+            </table>
+
+<style>
+    .documentation-container {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+    }
+    
+    .toc {
+        background-color: #f5f5f5;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 30px;
+    }
+    
+    .toc ul {
+        list-style-type: none;
+        padding-left: 20px;
+    }
+    
+    .section {
+        margin-bottom: 40px;
+    }
+    
+    .phase, .step, .feature, .integration {
+        background-color: #f9f9f9;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+        border-left: 4px solid #3498db;
+    }
+    
+    h1 {
+        color: #2c3e50;
+        border-bottom: 2px solid #3498db;
+        padding-bottom: 10px;
+    }
+    
+    h2 {
+        color: #2c3e50;
+        border-bottom: 1px solid #ddd;
+        padding-bottom: 5px;
+    }
+    
+    h3 {
+        color: #3498db;
+    }
+    
+    pre {
+        background-color: #f0f0f0;
+        border: 1px solid #ddd;
+        border-radius: 3px;
+        padding: 10px;
+        overflow-x: auto;
+        font-size: 14px;
+    }
+    
+    code {
+        background-color: #f0f0f0;
+        padding: 2px 4px;
+        border-radius: 3px;
+        font-family: monospace;
+    }
+    
+    a {
+        color: #3498db;
+        text-decoration: none;
+    }
+    
+    a:hover {
+        text-decoration: underline;
+    }
+    
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 20px 0;
+    }
+    
+    th, td {
+        padding: 10px;
+        border: 1px solid #ddd;
+        text-align: left;
+    }
+    
+    th {
+        background-color: #f5f5f5;
+    }
+    
+    tr:nth-child(even) {
+        background-color: #f9f9f9;
+    }
+    
+    .timeline table ul {
+        margin: 0;
+        padding-left: 20px;
+    }
+</style>
+
+</div>
