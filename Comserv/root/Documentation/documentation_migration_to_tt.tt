@@ -1,0 +1,179 @@
+[% META 
+   title = "Documentation Migration to Template Toolkit (.tt) Files"
+   description = "Guide explaining the transition from Markdown (.md) to Template Toolkit (.tt) files for improved browser navigation"
+   roles = "admin,developer"
+   category = "documentation"
+%]
+
+<div class="doc-page">
+    <h1>Documentation Migration to Template Toolkit (.tt) Files</h1>
+    
+    <div class="doc-section">
+        <h2>Overview</h2>
+        <p>
+            The Comserv documentation system is transitioning from Markdown (.md) files to Template Toolkit (.tt) files. 
+            This change improves browser navigation and user interaction with documentation, making it more accessible 
+            and user-friendly.
+        </p>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Why Template Toolkit?</h2>
+        <ul>
+            <li><strong>Dynamic Content:</strong> .tt files allow for dynamic content generation using Template Toolkit syntax</li>
+            <li><strong>Browser Integration:</strong> Direct rendering in the browser without conversion steps</li>
+            <li><strong>Consistent Styling:</strong> Better integration with the application's theme system</li>
+            <li><strong>Interactive Elements:</strong> Support for interactive components and user-specific content</li>
+            <li><strong>Role-Based Access:</strong> Improved handling of role-based content visibility</li>
+        </ul>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Migration Process</h2>
+        <p>All existing .md files are being gradually converted to .tt files with the following improvements:</p>
+        <ol>
+            <li>Converting Markdown syntax to HTML with Template Toolkit directives</li>
+            <li>Adding metadata headers for better categorization and access control</li>
+            <li>Implementing consistent navigation elements</li>
+            <li>Enhancing content with interactive elements where appropriate</li>
+        </ol>
+    </div>
+    
+    <div class="doc-section">
+        <h2>File Structure</h2>
+        <p>The documentation file structure remains the same, but file extensions change from .md to .tt:</p>
+        <pre class="code-block">
+/Documentation/
+  ├── index.tt                 # Main documentation index
+  ├── category_name.tt         # Category index pages
+  ├── specific_topic.tt        # Individual documentation pages
+  ├── roles/                   # Role-specific documentation
+  │   ├── admin/
+  │   ├── developer/
+  │   └── normal/
+  └── ...
+        </pre>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Template Format</h2>
+        <p>New .tt documentation files follow this basic structure:</p>
+        <pre class="code-block">
+[% META 
+   title = "Document Title"
+   description = "Brief description of the document"
+   roles = "comma,separated,roles"
+   category = "category_name"
+%]
+
+&lt;div class="doc-page"&gt;
+    &lt;h1&gt;Document Title&lt;/h1&gt;
+    
+    &lt;div class="doc-section"&gt;
+        &lt;h2&gt;Section Title&lt;/h2&gt;
+        &lt;p&gt;Content goes here...&lt;/p&gt;
+    &lt;/div&gt;
+    
+    &lt;!-- Additional sections --&gt;
+&lt;/div&gt;
+        </pre>
+    </div>
+    
+    <div class="doc-section">
+        <h2>For Developers and Content Contributors</h2>
+        <p>When creating or updating documentation:</p>
+        <ul>
+            <li>Create new documentation as .tt files, not .md files</li>
+            <li>Use the Template Toolkit syntax for dynamic content</li>
+            <li>Include proper metadata in the META block</li>
+            <li>Follow the HTML structure shown in the template above</li>
+            <li>Use CSS classes from the theme system rather than inline styles</li>
+        </ul>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Accessing Documentation</h2>
+        <p>
+            Documentation is primarily accessed through the browser interface at 
+            <code>/Documentation</code> or specific paths like <code>/Documentation/category_name</code>.
+            The system automatically renders .tt files with proper navigation and styling.
+        </p>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Benefits for Users</h2>
+        <ul>
+            <li>Improved navigation between documentation pages</li>
+            <li>Consistent styling and user experience</li>
+            <li>Role-appropriate content visibility</li>
+            <li>Interactive elements for better learning experience</li>
+            <li>Faster page loading with browser-native rendering</li>
+        </ul>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Recent Fixes and Improvements</h2>
+        <p>
+            The documentation system has been enhanced with several important fixes to address display errors
+            and improve accessibility:
+        </p>
+        
+        <h3>Role-Based Access Control Improvements</h3>
+        <ul>
+            <li>Fixed issues with normal users being unable to access documentation marked for their role</li>
+            <li>Enhanced logging to help diagnose access control problems</li>
+            <li>Improved role detection and permission handling</li>
+        </ul>
+        
+        <h3>Path Resolution Enhancements</h3>
+        <ul>
+            <li>Added support for default paths defined in documentation_config.json</li>
+            <li>Implemented a multi-stage path resolution process to find documentation files</li>
+            <li>Fixed "page not found" errors for valid documentation pages</li>
+        </ul>
+        
+        <h3>Template Rendering Improvements</h3>
+        <ul>
+            <li>Created a standardized markdown_viewer.tt template for rendering markdown content</li>
+            <li>Improved error handling with a dedicated error.tt template</li>
+            <li>Enhanced display of documentation metadata (last updated, roles, etc.)</li>
+        </ul>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Common Display Issues and Solutions</h2>
+        
+        <h3>Page Not Found Errors</h3>
+        <p>
+            If you encounter "Page not found" errors for documentation that should exist:
+        </p>
+        <ol>
+            <li>Check that the file exists in the expected location</li>
+            <li>Verify the file is properly registered in documentation_config.json</li>
+            <li>Ensure the file has the correct extension (.tt or .md)</li>
+            <li>Check that the user has the appropriate role to access the documentation</li>
+        </ol>
+        
+        <h3>Role-Based Access Issues</h3>
+        <p>
+            If users cannot access documentation they should have permission to view:
+        </p>
+        <ol>
+            <li>Verify the roles metadata in the documentation file</li>
+            <li>Check the user's assigned roles in the system</li>
+            <li>Review the category configuration in documentation_config.json</li>
+            <li>Check the server logs for access denied messages</li>
+        </ol>
+        
+        <h3>Styling and Formatting Issues</h3>
+        <p>
+            For inconsistent styling or formatting problems:
+        </p>
+        <ol>
+            <li>Use the standard CSS classes defined in the documentation template</li>
+            <li>Avoid inline styles in documentation files</li>
+            <li>Follow the HTML structure shown in the template</li>
+            <li>Use the appropriate template for the file type (.tt or .md)</li>
+        </ol>
+    </div>
+</div>

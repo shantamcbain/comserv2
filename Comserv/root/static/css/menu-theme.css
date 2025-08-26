@@ -1,0 +1,188 @@
+/* Menu styles using theme variables */
+
+/* Main Menu */
+nav {
+    background-color: var(--nav-bg);
+    width: 100%;
+    display: block;
+}
+
+/* Force horizontal layout */
+.horizontal-menu {
+    display: flex;
+    flex-direction: row;
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+}
+
+.horizontal-dropdown {
+    position: relative;
+    display: inline-block;
+    margin-right: 5px;
+}
+
+.dropbtn {
+    display: inline-block;
+    color: var(--nav-text);
+    text-align: center;
+    padding: 14px 16px;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.dropdown-content {
+    display: none;
+    position: absolute;
+    background-color: var(--dropdown-bg);
+    min-width: 160px;
+    box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
+    z-index: 100;
+    top: 100%;
+    left: 0;
+}
+
+.dropdown-content a {
+    color: var(--nav-link-color);
+    padding: 12px 16px;
+    text-decoration: none;
+    display: block;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.dropdown-content a:hover {
+    background-color: var(--nav-hover-bg);
+}
+
+/* This is the critical rule for dropdown functionality */
+.horizontal-dropdown:hover .dropdown-content {
+    display: block;
+}
+
+/* Submenu Styles */
+.submenu-item {
+    position: relative;
+}
+
+.submenu-header {
+    font-weight: bold;
+}
+
+.submenu {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 100%;
+    min-width: 160px;
+    background-color: var(--dropdown-bg);
+    box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
+    z-index: 101;
+}
+
+.submenu a {
+    color: var(--nav-link-color);
+    padding: 12px 16px;
+    text-decoration: none;
+    display: block;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.submenu a:hover {
+    background-color: var(--nav-hover-bg);
+}
+
+/* This is the critical rule for submenu functionality */
+.submenu-item:hover .submenu {
+    display: block;
+}
+
+/* Remove all theme-specific overrides - they're not needed with the new approach */
+
+/* Theme-specific menu overrides */
+body.theme-csc nav {
+    background-color: var(--nav-bg);
+}
+
+body.theme-csc .dropbtn {
+    color: var(--nav-text);
+}
+
+body.theme-csc .dropdown-content a,
+body.theme-csc .submenu a {
+    color: var(--nav-link-color);
+}
+
+body.theme-csc .dropdown-content,
+body.theme-csc .submenu {
+    background-color: var(--secondary-color);
+}
+
+/* USBM Theme Menu Styles */
+body.theme-usbm nav {
+  background-color: var(--nav-bg);
+}
+
+body.theme-usbm .dropbtn {
+  color: var(--nav-text);
+}
+
+body.theme-usbm .dropdown-content {
+  background-color: var(--secondary-color);
+}
+
+body.theme-usbm .dropdown-content a {
+  color: var(--nav-link-color);
+}
+
+body.theme-usbm .dropdown-content a:hover {
+  background-color: var(--accent-color);
+}
+
+body.theme-usbm .submenu {
+  background-color: var(--secondary-color);
+}
+
+body.theme-usbm .submenu a {
+  color: var(--nav-link-color);
+}
+
+body.theme-usbm .submenu a:hover {
+  background-color: var(--accent-color);
+}
+
+body.theme-usbm .dropdown:hover .dropbtn {
+  background-color: var(--accent-color);
+}
+
+/* Make sure the header also uses the correct colors */
+body.theme-usbm header {
+  background-color: var(--header-bg);
+  color: var(--text-color);
+}
+
+/* And the footer */
+body.theme-usbm footer {
+  background-color: var(--footer-bg);
+  color: var(--footer-text-color);
+}
+
+body.theme-apis nav {
+    background-color: var(--nav-bg);
+}
+
+body.theme-apis .dropbtn {
+    color: var(--nav-text);
+}
+
+body.theme-apis .dropdown-content a,
+body.theme-apis .submenu a {
+    color: var(--nav-link-color);
+}
+
+body.theme-apis .dropdown-content,
+body.theme-apis .submenu {
+    background-color: var(--secondary-color);
+}

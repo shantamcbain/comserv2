@@ -1,0 +1,125 @@
+[% META title = 'Contact WeaverBeck' %]
+[% PageVersion = '/weaverbeck/contact.tt,v 1.0 2023/04/19 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container mt-5">
+  <div class="row">
+    <div class="col-lg-8">
+      <h1 class="mb-4">Contact Us</h1>
+      <p class="lead">We'd love to hear from you! Please fill out the form below and we'll get back to you as soon as possible.</p>
+      
+      [% IF errors && errors.size > 0 %]
+        <div class="alert alert-danger">
+          <h4 class="alert-heading">Please correct the following errors:</h4>
+          <ul>
+            [% FOREACH error IN errors %]
+              <li>[% error %]</li>
+            [% END %]
+          </ul>
+        </div>
+      [% END %]
+      
+      [% IF c.stash.success_msg && c.stash.success_msg.size > 0 %]
+        <div class="alert alert-success">
+          [% FOREACH msg IN c.stash.success_msg %]
+            <p>[% msg %]</p>
+          [% END %]
+        </div>
+      [% END %]
+      
+      <div class="card mb-4">
+        <div class="card-body">
+          <form action="[% c.uri_for('/weaverbeck/process_contact') %]" method="post">
+            <div class="form-group mb-3">
+              <label for="name">Name</label>
+              <input type="text" class="form-control" id="name" name="name" placeholder="Your Name" value="[% form_data.name | html %]" required>
+            </div>
+            
+            <div class="form-group mb-3">
+              <label for="email">Email</label>
+              <input type="email" class="form-control" id="email" name="email" placeholder="Your Email" value="[% form_data.email | html %]" required>
+            </div>
+            
+            <div class="form-group mb-3">
+              <label for="phone">Phone (optional)</label>
+              <input type="tel" class="form-control" id="phone" name="phone" placeholder="Your Phone Number" value="[% form_data.phone | html %]">
+            </div>
+            
+            <div class="form-group mb-3">
+              <label for="subject">Subject</label>
+              <input type="text" class="form-control" id="subject" name="subject" placeholder="Subject" value="[% form_data.subject | html %]" required>
+            </div>
+            
+            <div class="form-group mb-3">
+              <label for="message">Message</label>
+              <textarea class="form-control" id="message" name="message" rows="5" placeholder="Your Message" required>[% form_data.message | html %]</textarea>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">Submit</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-lg-4">
+      <div class="card mb-4">
+        <div class="card-body">
+          <h3 class="card-title">Contact Information</h3>
+          <p class="card-text">Feel free to reach out to us using any of the following methods:</p>
+          
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">
+              <i class="fas fa-map-marker-alt mr-2"></i> <strong>Address:</strong><br>
+              123 Main Street<br>
+              Vancouver, BC V6B 1A1<br>
+              Canada
+            </li>
+            <li class="list-group-item">
+              <i class="fas fa-phone mr-2"></i> <strong>Phone:</strong><br>
+              (250) 555-1234
+            </li>
+            <li class="list-group-item">
+              <i class="fas fa-envelope mr-2"></i> <strong>Email:</strong><br>
+              info@weaverbeck.com
+            </li>
+            <li class="list-group-item">
+              <i class="fas fa-clock mr-2"></i> <strong>Business Hours:</strong><br>
+              Monday - Friday: 9:00 AM - 5:00 PM<br>
+              Saturday - Sunday: Closed
+            </li>
+          </ul>
+        </div>
+      </div>
+      
+      <div class="card mb-4">
+        <div class="card-body">
+          <h3 class="card-title">Connect With Us</h3>
+          <p class="card-text">Follow us on social media to stay updated with our latest news and announcements.</p>
+          
+          <div class="d-flex justify-content-around mt-3">
+            <a href="#" class="text-primary"><i class="fab fa-facebook-square fa-2x"></i></a>
+            <a href="#" class="text-info"><i class="fab fa-twitter-square fa-2x"></i></a>
+            <a href="#" class="text-danger"><i class="fab fa-instagram fa-2x"></i></a>
+            <a href="#" class="text-primary"><i class="fab fa-linkedin fa-2x"></i></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="row mt-5">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-body">
+          <h3 class="card-title">Our Location</h3>
+          <div class="embed-responsive embed-responsive-16by9">
+            <!-- Replace with your actual Google Maps embed code -->
+            <iframe class="embed-responsive-item" src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2602.9328382415684!2d-123.11928368431096!3d49.28299797933116!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x5486717f41ba2fb1%3A0xc6952794560a44aa!2sVancouver%2C%20BC%2C%20Canada!5e0!3m2!1sen!2sus!4v1650123456789!5m2!1sen!2sus" width="100%" height="450" style="border:0;" allowfullscreen="" loading="lazy"></iframe>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

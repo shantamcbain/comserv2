@@ -1,0 +1,24 @@
+[% PageVersion = '3D Feature Landing Page, v0.1 2024/05/28 Shanta Exp shanta' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<h1 id="top">Join us in our 3D Community!</h1>
+<nav>
+    <a id="3dtop"></a>
+    <a href="#overview">Overview</a>|
+    <a href="#explore">Explore</a>|
+    <a href="#contact">Contact</a>
+</nav>
+
+<a id="overview"></a><a href="#3dtop">back to top</a>
+<h2>Overview</h2>
+<p>Welcome to the 3D feature of the Comserv application. This page provides an overview of the 3D models and interactive content available.</p>
+
+<a id="explore"></a><a href="#3dtop">back to top</a>
+<h2>Explore</h2>
+<p>Explore the various 3D models and interactive content we have to offer. Use the navigation links to browse through different sections.</p>
+
+<a id="contact"></a><a href="#3dtop">back to top</a>
+<h2>Contact</h2>
+<p>If you have any questions or need assistance, please contact us at <a href="mailto:support@comserv.com">support@comserv.com</a>.</p>

@@ -1,0 +1,210 @@
+<!-- File: Documentation/index.tt - Theme-integrated version -->
+[% PageVersion = 'Documentation/index.tt,v 1.7 2025/01/20 shanta Exp shanta - Theme Integration' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[%# NOTE: CSS is now loaded automatically by Header.tt for Documentation pages %]
+[%# No hardcoded CSS links or inline styles - everything uses theme variables %]
+
+[%# Determine user role for display %]
+[% SET display_role = 'Guest' %]
+[% IF c.session.roles %]
+    [% IF c.session.roles.grep('admin').size %]
+        [% SET display_role = 'Administrator' %]
+    [% ELSIF c.session.roles.grep('developer').size %]
+        [% SET display_role = 'Developer' %]
+    [% ELSIF c.session.roles.grep('editor').size %]
+        [% SET display_role = 'Editor' %]
+    [% ELSIF c.session.roles.grep('user').size %]
+        [% SET display_role = 'User' %]
+    [% END %]
+[% END %]
+
+[% IF c.session.debug_mode == 1 %]
+<div class="debug-info">
+    <h3>Debug Information</h3>
+    <p>User Role from Controller: [% user_role %]</p>
+    <p>Display Role from Template: [% display_role %]</p>
+    <p>Session Roles: [% c.session.roles.join(', ') IF c.session.roles %]</p>
+    <p>Debug Message: [% debug_msg %]</p>
+    <p>Theme: [% theme_name || c.stash.theme_name || c.session.theme_name || 'default' %]</p>
+    <p>Categories Available:</p>
+    <ul>
+        <li>user_guides: [% categories.user_guides ? 'Yes' : 'No' %]</li>
+        <li>tutorials: [% categories.tutorials ? 'Yes' : 'No' %]</li>
+        <li>site_specific: [% categories.site_specific ? 'Yes' : 'No' %]</li>
+        <li>admin_guides: [% categories.admin_guides ? 'Yes' : 'No' %]</li>
+        <li>proxmox: [% categories.proxmox ? 'Yes' : 'No' %]</li>
+        <li>controllers: [% categories.controllers ? 'Yes' : 'No' %]</li>
+        <li>models: [% categories.models ? 'Yes' : 'No' %]</li>
+        <li>changelog: [% categories.changelog ? 'Yes' : 'No' %]</li>
+        <li>general: [% categories.general ? 'Yes' : 'No' %]</li>
+    </ul>
+</div>
+[% END %]
+
+<div class="documentation-container">
+    <header class="doc-header">
+        <h1>Comserv Documentation</h1>
+        <div class="user-context">
+            <span class="context-item"><strong>Site:</strong> [% site_name || 'Comserv' %]</span>
+            <span class="context-item"><strong>Role:</strong> [% display_role %]</span>
+        </div>
+    </header>
+    <p class="intro">Comprehensive guides and resources for the Comserv system, tailored to your role and site.</p>
+    
+    [% IF is_admin %]
+    <!-- Quick Access Links for Admins -->
+    <div class="quick-access-links">
+        <h2>Quick Access for Administrators</h2>
+        <div class="quick-links-grid">
+            <a href="[% c.uri_for('/Documentation/proxmox_commands.tt') %]" class="quick-link-card">
+                <h3>Proxmox Command Reference</h3>
+                <p>Essential commands for managing Proxmox VE environments</p>
+                <span class="admin-badge">Admin Only</span>
+            </a>
+            <a href="[% c.uri_for('/Documentation/api') %]" class="quick-link-card">
+                <h3>API Documentation</h3>
+                <p>Comprehensive API reference and usage guide</p>
+                <span class="admin-badge">Admin Only</span>
+            </a>
+            <a href="[% c.uri_for('/api_credentials') %]" class="quick-link-card">
+                <h3>API Credentials Management</h3>
+                <p>Manage credentials for external service integrations</p>
+                <span class="admin-badge">Admin Only</span>
+            </a>
+        </div>
+    </div>
+    [% END %]
+
+[%# User-facing sections %]
+[% INCLUDE 'Documentation/user_docs.tt' %]
+[% INCLUDE 'Documentation/tutorials.tt' %]
+[% INCLUDE 'Documentation/site_specific.tt' %]
+[% INCLUDE 'Documentation/developer_guides.tt' %]
+
+[%# Admin-only sections %]
+[% IF is_admin %]
+    [% IF c.session.debug_mode == 1 %]
+        <div class="debug-info">
+            <p>Admin sections visible: user_role=[% user_role %], session roles=[% c.session.roles.join(',') IF c.session.roles %]</p>
+        </div>
+    [% END %]
+    [% INCLUDE 'Documentation/admin_guides.tt' %]
+    [% INCLUDE 'Documentation/proxmox.tt' %]
+    [% INCLUDE 'Documentation/controllers.tt' %]
+    [% INCLUDE 'Documentation/models.tt' %]
+    [% INCLUDE 'Documentation/changelog.tt' %]
+    [% INCLUDE 'Documentation/all_docs.tt' %]
+[% END %]
+
+[%# Admin/Developer/Debug sections %]
+[% IF display_role == 'Administrator' || display_role == 'Developer' || c.session.debug_mode == 1 %]
+    [% INCLUDE 'Documentation/system_info.tt' %]
+[% END %]
+
+[% # Recent Updates Section with direct changelog entries %]
+<section class="doc-section">
+    <h2 class="section-toggle">Recent Updates</h2>
+    <div class="section-content">
+        <div class="changelog-header">
+            <h3>Latest changes and improvements to the system</h3>
+            <a href="[% c.uri_for('/Documentation/all_changelog') %]" class="view-all">View All Documentation</a>
+        </div>
+        
+        [% # Get all changelog pages from the structured_pages hash %]
+        [% changelog_pages = [] %]
+        [% FOREACH page_name IN structured_pages.keys %]
+            [% # Check if the page is in the changelog directory %]
+            [% IF structured_pages.$page_name.path.match('Documentation/changelog/') %]
+                [% changelog_pages.push(page_name) %]
+            [% END %]
+        [% END %]
+        
+        [% # Sort changelog pages by date in the filename (if available) %]
+        [% date_sorted_pages = [] %]
+        [% FOREACH page_name IN changelog_pages %]
+            [% # Extract date from filename if it exists (format: YYYY-MM-DD) %]
+            [% date_match = page_name.match('(\d{4}-\d{2}(-\d{2})?)') %]
+            [% sort_key = date_match ? date_match.0 : page_name %]
+            [% date_sorted_pages.push({ name => page_name, sort_key => sort_key }) %]
+        [% END %]
+        
+        [% # Sort by the extracted date in reverse order (newest first) %]
+        [% date_sorted_pages = date_sorted_pages.sort('sort_key').reverse %]
+        
+        [% # Display only the 5 most recent entries %]
+        [% recent_count = 0 %]
+        [% FOREACH page_info IN date_sorted_pages %]
+            [% LAST IF recent_count >= 5 %]
+            [% page_name = page_info.name %]
+            [% page = structured_pages.$page_name %]
+            [% recent_count = recent_count + 1 %]
+            
+            [% # Extract date from filename if it exists (format: YYYY-MM-DD) %]
+            [% date_match = page_name.match('(\d{4}-\d{2}(-\d{2})?)') %]
+            [% changelog_date = date_match ? date_match.0 : 'Recent' %]
+            [% # Replace hyphens with slashes for better display %]
+            [% changelog_date = changelog_date.replace('-', '/') %]
+            
+            <div class="changelog-summary">
+                <h3>[% page.title %]</h3>
+                <div class="changelog-meta">
+                    <span class="update-date">[% changelog_date %]</span>
+                    [% IF page.author %]<span class="author">by [% page.author %]</span>[% END %]
+                </div>
+                <p class="update-desc">[% page.description || 'System update' %]</p>
+                <a href="[% page.url %]" class="view-all">Read full details</a>
+            </div>
+        [% END %]
+        
+        [% IF recent_count == 0 %]
+            <p class="no-content">No recent updates available.</p>
+        [% END %]
+    </div>
+</section>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.section-toggle').forEach(header => {
+            header.addEventListener('click', function() {
+                this.classList.toggle('expanded');
+                // Find the next .section-content element within the same section
+                const section = this.closest('.doc-section');
+                const content = section.querySelector('.section-content');
+                
+                if (content.classList.contains('expanded')) {
+                    content.style.maxHeight = '0';
+                    content.classList.remove('expanded');
+                } else {
+                    content.style.maxHeight = content.scrollHeight + 'px';
+                    content.classList.add('expanded');
+                }
+            });
+        });
+        
+        // Initialize all sections as closed by default
+        document.querySelectorAll('.section-content').forEach(content => {
+            content.style.maxHeight = '0';
+        });
+    });
+
+    function showFileType(evt, fileType) {
+        var contents = document.getElementsByClassName('section-content');
+        for (var i = 0; i < contents.length; i++) {
+            contents[i].style.display = 'none';
+            contents[i].classList.remove('active');
+        }
+        var tabs = document.getElementsByClassName('file-type-tab');
+        for (var i = 0; i < tabs.length; i++) {
+            tabs[i].classList.remove('active');
+        }
+        var activeContent = document.getElementById(fileType);
+        activeContent.style.display = 'grid';
+        activeContent.classList.add('active');
+        activeContent.style.maxHeight = activeContent.scrollHeight + 'px';
+        evt.currentTarget.classList.add('active');
+    }
+</script>

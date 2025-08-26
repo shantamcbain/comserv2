@@ -1,0 +1,92 @@
+[% ViewVersion = 'v 0.03 2024/01/05 /cgi-bin/HTMLTemplates/Shanta/WB.tt,'%]
+[%# ViewVersion = 'v 0.03 2024/05/24 /cgi-bin/HTMLTemplates/Shanta/Shanta.ttml,'%]
+[%# ViewVersion = 'v 0.02 2022/11/24 /cgi-bin/HTMLTemplates/Shanta/VE7TITHome.ttml,'%]
+[%# ViewVersion = 'v 0.01 2022/11/07 /cgi-bin/HTMLTemplates/Shanta/VE7TITHome.ttml,'%]
+
+
+
+[% IF c.session.debug_mode  == 1 %]
+ [%	ViewVersion %]
+[% END %]
+
+
+[% embed('ErrorDisplayView') %]
+
+[% is_authenticated = subs.is_authenticated(data.auth_manager_config_params) %]
+	[% username = data.session_object.getAttribute('-KEY','auth_username')%]
+	[% firstname = data.session_object.getAttribute('-KEY','auth_firstname')%]
+	[% lastname = data.session_object.getAttribute('-KEY','auth_lastname')%]
+
+ <table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td>
+<div ALIGN="center">
+	[% IF username %]
+
+<h3 > [% firstname %]'s Family home.</h3>
+
+
+	[% ELSE %]
+
+	<h3>  Our Family home!</h3>
+
+	[% END %]
+
+</div>
+<A NAME="PageTop"></A>
+
+
+[% IF group == "normal" %]
+
+<h4>Thanks for logging in.
+</h4>
+<p>What you will see now is the guest view of the application.</p>
+<p>
+Depending on individual site policies, you will see different links made available. Some modules will require you to LOG ON to work. Modules requiring authentication include Forums, Address book, Calendar, Link Database. This is because the application needs to know a few things to give the user the links they need.
+
+</p>
+[% ELSIF username == "guest" %]
+   <p>On the left you will see changes in the available application and resources.</p>
+[% ELSIF username == "lew" OR
+         username == "Shanta" %]
+
+<p>This is your site home page. It is also were we share information about the site with each other. Our prime onsite way of communication is though the Forums. The Dialog here is open to all users of the site with the same access rights.</p>
+
+<p>As one of the administrators of the site, you will need to see more than even general family members. Use the Webmin link to <a href="https://weaverbeck.com:10000" target="_blank">weaverbeck</a> Log in with weaverbeck pw papalew</p>
+<p>This will give you access to the administrative view of the website. The mail is the first thing you will need to get familiar with.</p>
+<p>I still am working the bugs out of the mail system. The biggest one is the mail forwarding settings. As it stands,
+	you can get mail via pop3 mail programs, but you can't sand mail to anyone that does not have a mail account on
+	the server. This means shanta@weaverbeck.com and sends mail to lew@weaverbeck.com or shanta@forager.com but not shanta@yahoo.com. You can, however, send mail from webmin.
+This is because webmin is sending from the server, not through the server.
+</p>
+
+<p>Have a look at all the links in the site and webmin. I will also up your group from normal to WB_admin. You would be able to do this yourself by modifying your record in the wb_user_auth_tb.
+</p>
+<p>That's lots for now. Key point to learn is how to use the administrator mail system in webmin. Send some test mail
+	between shanta@weaverbeck.com and lew@weaverbeck.com</p>
+
+Between the BBS and Mail, we will be able to get Bee's geniology thing online soon.
+
+
+
+[% ELSE %]
+
+<p>To get the most out of our site, you will need to join the site. Membership access will vary according to your family rights. </p>
+<p>As a member of weaverbeck.com, you will be given a mail account.</p>
+
+	[% END %]
+<p>Use
+
+<a href="/HelpDesk" target="_Blank" > HelpDesk</a> to report errors
+    you find.
+</p>
+<p>Last Updated: Thursday, 05, January 2024
+
+</p>
+
+
+
+</td>
+</tr>
+</table>
+

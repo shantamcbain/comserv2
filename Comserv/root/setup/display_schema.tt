@@ -1,0 +1,25 @@
+<head>
+    [% PageVersion = 'display_schema.tt,v 0.01 2023/11/03 shanta Exp shanta ' %]
+    <meta charset="utf-8">
+    [% IF debug_mode == 1 %]
+        [% PageVersion %]
+        [% INCLUDE 'debug.tt' %]
+    [% END %]
+</head>
+    <h1>Database Schema Information</h1>
+    <p>This page displays information about the database schema, including the tables and their columns.</p>
+
+[% FOREACH table IN schema_info %]
+    <h2>Table: [% table.TABLE_NAME %]</h2>
+    <p>Engine: [% table.ENGINE %]</p>
+    <p>Rows: [% table.TABLE_ROWS %]</p>
+    <p>Auto increment: [% table.AUTO_INCREMENT %]</p>
+    <p>Creation time: [% table.CREATE_TIME %]</p>
+    <h3>Columns:</h3>
+    <ul>
+    [% FOREACH column IN table.columns %]
+        <li>[% column.Field %] ([% column.Type %])</li>
+    [% END %]
+    </ul>
+    <!-- Add more fields as needed -->
+[% END %]

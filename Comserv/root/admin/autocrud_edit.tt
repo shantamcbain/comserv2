@@ -1,0 +1,51 @@
+[% PageVersion = 'admin/autocrud_edit.tt,v 0.01 2024/03/01 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<h1>Edit [% table %]</h1>
+
+<form method="POST" action="[% c.uri_for('/admin/autocrud_save', table, record.id) %]">
+    [% FOREACH column IN c.model('DBEncy').source(table).columns %]
+        <div class="form-group">
+            <label for="[% column %]">[% column | ucfirst %]:</label>
+            [% IF column == 'id' %]
+                <input type="hidden" name="[% column %]" value="[% record.$column %]">
+                <span>[% record.$column %]</span>
+            [% ELSE %]
+                <input type="text" name="[% column %]" value="[% record.$column %]" class="form-control">
+            [% END %]
+        </div>
+    [% END %]
+    
+    <button type="submit" class="btn btn-primary">Save Changes</button>
+    <a href="[% c.uri_for('/admin/autocrud_list', table) %]" class="btn btn-secondary">Cancel</a>
+</form>
+
+<style>
+.form-group {
+    margin-bottom: 1rem;
+}
+.form-control {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+.btn {
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.btn-primary {
+    background: #007bff;
+    color: white;
+    border: none;
+}
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+    border: none;
+    text-decoration: none;
+}
+</style>

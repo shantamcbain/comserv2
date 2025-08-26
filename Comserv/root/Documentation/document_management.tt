@@ -1,0 +1,181 @@
+[% PageVersion = 'Documentation/document_management.tt,v 1.0 2023/07/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="documentation-page">
+    <h1>Document Management System</h1>
+    
+    <div class="section">
+        <h2>Overview</h2>
+        <p>
+            The Document Management System in Comserv provides a flexible and powerful way to manage documentation
+            files. It automatically discovers, routes, and serves documentation files from the Documentation directory.
+        </p>
+        <p>
+            The system is built around the <code>Comserv::Controller::Documentation</code> controller, which handles
+            all aspects of document management including file discovery, routing, and rendering.
+        </p>
+    </div>
+    
+    <div class="section">
+        <h2>How It Works</h2>
+        
+        <h3>File Discovery</h3>
+        <p>
+            When the application starts, the Documentation controller scans the <code>root/Documentation</code> directory
+            for all files. It processes both template files (.tt) and other file types (JSON, HTML, images, etc.).
+        </p>
+        <p>
+            For each file found, the controller creates a route that allows the file to be accessed via a URL.
+            For example, a file named <code>user_guide.tt</code> would be accessible at <code>/Documentation/user_guide</code>.
+        </p>
+        
+        <h3>Route Generation</h3>
+        <p>
+            Routes are generated dynamically based on the files found in the Documentation directory. The controller
+            uses several mechanisms to ensure that routes are valid and don't conflict with existing routes:
+        </p>
+        <ul>
+            <li><strong>Reserved Name Handling</strong> - Names that conflict with Perl built-ins or existing packages are handled safely</li>
+            <li><strong>Valid Identifier Check</strong> - Ensures that route names are valid Perl identifiers</li>
+            <li><strong>Safe Prefixing</strong> - Problematic names are prefixed with "doc_" to avoid conflicts</li>
+        </ul>
+        
+        <h3>Content Serving</h3>
+        <p>
+            The controller serves different types of content appropriately:
+        </p>
+        <ul>
+            <li><strong>Template Files (.tt)</strong> - Rendered using the Template Toolkit engine</li>
+            <li><strong>JSON Files</strong> - Served with the appropriate content type for JSON</li>
+            <li><strong>HTML Files</strong> - Served as HTML content</li>
+            <li><strong>Images</strong> - Served with the appropriate image content type</li>
+            <li><strong>Other Files</strong> - Served as plain text or with an appropriate content type</li>
+        </ul>
+    </div>
+    
+    <div class="section">
+        <h2>Adding New Documentation</h2>
+        <p>
+            Adding new documentation is simple:
+        </p>
+        <ol>
+            <li>Create a new file in the <code>root/Documentation</code> directory</li>
+            <li>For template files, use the .tt extension and include the PageVersion information</li>
+            <li>Restart the application (or wait for automatic route generation)</li>
+        </ol>
+        
+        <h3>Template Format</h3>
+        <p>
+            Template files should include the PageVersion information at the top:
+        </p>
+        <pre>
+[% PageVersion = 'Documentation/your_file_name.tt,v 1.0 2023/07/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+        </pre>
+        <p>
+            This helps track the file version and location, and is displayed when debug mode is enabled.
+        </p>
+    </div>
+    
+    <div class="section">
+        <h2>Documentation Index</h2>
+        <p>
+            The Documentation Index page (<code>/Documentation</code>) provides a comprehensive list of all available
+            documentation pages. It organizes the pages alphabetically and provides links to each page.
+        </p>
+        <p>
+            The index is generated dynamically based on the files found in the Documentation directory, so it's
+            always up-to-date with the latest documentation.
+        </p>
+    </div>
+    
+    <div class="section">
+        <h2>Controller Implementation</h2>
+        <p>
+            The Documentation controller implements several key methods:
+        </p>
+        <ul>
+            <li><strong>BUILD</strong> - Initializes the controller and scans for documentation files</li>
+            <li><strong>index</strong> - Displays the documentation index page</li>
+            <li><strong>view</strong> - Displays a specific documentation page</li>
+            <li><strong>auto</strong> - Handles automatic routing for documentation pages</li>
+            <li><strong>register_actions</strong> - Registers dynamic routes for all documentation files</li>
+        </ul>
+        <p>
+            It also includes explicit routes for common documentation pages to ensure they're always available
+            even if the files don't exist yet.
+        </p>
+    </div>
+    
+    <div class="section">
+        <h2>Error Handling</h2>
+        <p>
+            The system includes robust error handling:
+        </p>
+        <ul>
+            <li>If a requested documentation page doesn't exist, a friendly error page is displayed</li>
+            <li>If there are issues with route generation, errors are logged but don't prevent the application from starting</li>
+            <li>File paths are sanitized to prevent directory traversal attacks</li>
+        </ul>
+    </div>
+</div>
+
+<style>
+    .documentation-page {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+    }
+    
+    .section {
+        margin-bottom: 30px;
+    }
+    
+    h1 {
+        color: #333;
+        border-bottom: 2px solid #eee;
+        padding-bottom: 10px;
+    }
+    
+    h2 {
+        color: #0066cc;
+        margin-top: 20px;
+        padding-top: 10px;
+        border-top: 1px solid #eee;
+    }
+    
+    h3 {
+        color: #333;
+        margin-top: 15px;
+    }
+    
+    ul, ol {
+        padding-left: 25px;
+    }
+    
+    li {
+        margin-bottom: 8px;
+    }
+    
+    pre {
+        background-color: #f5f5f5;
+        padding: 15px;
+        border-radius: 5px;
+        overflow-x: auto;
+        font-family: monospace;
+        font-size: 14px;
+    }
+    
+    code {
+        background-color: #f5f5f5;
+        padding: 2px 4px;
+        border-radius: 3px;
+        font-family: monospace;
+    }
+</style>

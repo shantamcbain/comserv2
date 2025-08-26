@@ -1,0 +1,242 @@
+[% META title = 'Create Proxy' %]
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="page-header">Create New Proxy Host</h1>
+            <p class="lead">Configure a new proxy host to forward traffic to your application or service.</p>
+            
+            [% IF api_warning %]
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i> <strong>Warning:</strong> [% api_warning | html %]
+                </div>
+            [% END %]
+            
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">Proxy Configuration</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="[% c.uri_for('/proxymanager/create_proxy') %]" id="createProxyForm">
+                        <div class="form-group row">
+                            <label for="domain" class="col-sm-3 col-form-label">Domain Name:</label>
+                            <div class="col-sm-9">
+                                <input type="text" class="form-control" id="domain" name="domain" required 
+                                       placeholder="e.g., example.com or subdomain.example.com">
+                                <small class="form-text text-muted">
+                                    The domain name that will be used to access your application.
+                                </small>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group row">
+                            <label for="scheme" class="col-sm-3 col-form-label">Forward Scheme:</label>
+                            <div class="col-sm-9">
+                                <select class="form-control" id="scheme" name="scheme">
+                                    <option value="http">HTTP</option>
+                                    <option value="https">HTTPS</option>
+                                </select>
+                                <small class="form-text text-muted">
+                                    The protocol used to communicate with your application.
+                                </small>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group row">
+                            <label for="forward_host" class="col-sm-3 col-form-label">Forward Host:</label>
+                            <div class="col-sm-9">
+                                <input type="text" class="form-control" id="forward_host" name="forward_host" required 
+                                       placeholder="e.g., 192.168.1.100 or internal-service">
+                                <small class="form-text text-muted">
+                                    The IP address or hostname of your application server.
+                                </small>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group row">
+                            <label for="forward_port" class="col-sm-3 col-form-label">Forward Port:</label>
+                            <div class="col-sm-9">
+                                <input type="number" class="form-control" id="forward_port" name="forward_port" required 
+                                       placeholder="e.g., 8080" min="1" max="65535" value="80">
+                                <small class="form-text text-muted">
+                                    The port number your application is listening on.
+                                </small>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group row">
+                            <label for="ssl" class="col-sm-3 col-form-label">SSL Certificate:</label>
+                            <div class="col-sm-9">
+                                <select class="form-control" id="ssl" name="ssl">
+                                    <option value="0">No SSL</option>
+                                    <option value="1">Let's Encrypt (Auto SSL)</option>
+                                    <option value="2">Custom Certificate</option>
+                                </select>
+                                <small class="form-text text-muted">
+                                    Choose whether to use SSL for the domain. Let's Encrypt will automatically provision a certificate.
+                                </small>
+                            </div>
+                        </div>
+                        
+                        <div id="ssl_options" class="d-none">
+                            <div class="form-group row">
+                                <label for="ssl_forced" class="col-sm-3 col-form-label">Force SSL:</label>
+                                <div class="col-sm-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="ssl_forced" name="ssl_forced" value="1" checked>
+                                        <label class="form-check-label" for="ssl_forced">
+                                            Redirect all HTTP traffic to HTTPS
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div id="custom_cert_options" class="d-none">
+                                <div class="form-group row">
+                                    <label for="ssl_certificate" class="col-sm-3 col-form-label">SSL Certificate:</label>
+                                    <div class="col-sm-9">
+                                        <textarea class="form-control" id="ssl_certificate" name="ssl_certificate" rows="3" 
+                                                  placeholder="Paste your SSL certificate here"></textarea>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group row">
+                                    <label for="ssl_key" class="col-sm-3 col-form-label">SSL Key:</label>
+                                    <div class="col-sm-9">
+                                        <textarea class="form-control" id="ssl_key" name="ssl_key" rows="3" 
+                                                  placeholder="Paste your SSL private key here"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group row">
+                            <label for="advanced_config" class="col-sm-3 col-form-label">Advanced Config:</label>
+                            <div class="col-sm-9">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="advanced_config" name="advanced_config" value="1">
+                                    <label class="form-check-label" for="advanced_config">
+                                        Show advanced configuration options
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="advanced_options" class="d-none">
+                            <div class="form-group row">
+                                <label for="http2_support" class="col-sm-3 col-form-label">HTTP/2 Support:</label>
+                                <div class="col-sm-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="http2_support" name="http2_support" value="1" checked>
+                                        <label class="form-check-label" for="http2_support">
+                                            Enable HTTP/2 support (requires SSL)
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group row">
+                                <label for="websockets_support" class="col-sm-3 col-form-label">WebSockets Support:</label>
+                                <div class="col-sm-9">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="websockets_support" name="websockets_support" value="1">
+                                        <label class="form-check-label" for="websockets_support">
+                                            Enable WebSockets support
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group row">
+                                <label for="custom_nginx" class="col-sm-3 col-form-label">Custom Nginx Config:</label>
+                                <div class="col-sm-9">
+                                    <textarea class="form-control" id="custom_nginx" name="custom_nginx" rows="3" 
+                                              placeholder="# Add custom Nginx configuration here"></textarea>
+                                    <small class="form-text text-muted">
+                                        Advanced: Add custom Nginx configuration directives.
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group row">
+                            <div class="col-sm-9 offset-sm-3">
+                                <button type="submit" class="btn btn-primary">Create Proxy Host</button>
+                                <a href="[% c.uri_for('/proxymanager') %]" class="btn btn-secondary ml-2">Cancel</a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    // Toggle SSL options
+    $('#ssl').change(function() {
+        var sslValue = $(this).val();
+        if (sslValue === '0') {
+            $('#ssl_options').addClass('d-none');
+            $('#custom_cert_options').addClass('d-none');
+        } else {
+            $('#ssl_options').removeClass('d-none');
+            
+            if (sslValue === '2') {
+                $('#custom_cert_options').removeClass('d-none');
+            } else {
+                $('#custom_cert_options').addClass('d-none');
+            }
+        }
+    });
+    
+    // Toggle advanced options
+    $('#advanced_config').change(function() {
+        if ($(this).is(':checked')) {
+            $('#advanced_options').removeClass('d-none');
+        } else {
+            $('#advanced_options').addClass('d-none');
+        }
+    });
+    
+    // Form validation
+    $('#createProxyForm').submit(function(e) {
+        var domain = $('#domain').val();
+        var forwardHost = $('#forward_host').val();
+        var forwardPort = $('#forward_port').val();
+        
+        // Basic validation
+        if (!domain || !forwardHost || !forwardPort) {
+            e.preventDefault();
+            alert('Please fill in all required fields.');
+            return false;
+        }
+        
+        // Domain validation
+        if (!/^[a-zA-Z0-9][a-zA-Z0-9-_.]+\.[a-zA-Z]{2,}$/.test(domain)) {
+            e.preventDefault();
+            alert('Please enter a valid domain name.');
+            return false;
+        }
+        
+        // Port validation
+        if (forwardPort < 1 || forwardPort > 65535) {
+            e.preventDefault();
+            alert('Port must be between 1 and 65535.');
+            return false;
+        }
+        
+        // SSL validation
+        if ($('#ssl').val() === '2') {
+            if (!$('#ssl_certificate').val() || !$('#ssl_key').val()) {
+                e.preventDefault();
+                alert('Please provide both SSL certificate and key.');
+                return false;
+            }
+        }
+        
+        return true;
+    });
+});
+</script>

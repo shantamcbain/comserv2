@@ -1,0 +1,120 @@
+
+
+
+
+
+
+
+
+
+
+
+
+<table width="60" border="0" cellspacing="0" cellpadding="0">
+ <tr>  
+ <td >
+ 
+       <font   class="LeftSideBarHeaderStyle"> Find Answers</font><br>
+</td>
+ </tr>
+  <tr>  
+   <td >
+
+     </td>
+    </tr>
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+  <tr>  
+   <td >
+   
+       <font class="LeftSideBarHeaderStyle" >Resources and Tools</font><br>
+    </td>
+    </tr>
+    
+  <tr>  
+   <td>
+<a href="../CSC/helpdesk.cgi?" target="_content" ><font class="LeftSideBarNavStyle" > HelpDesk</font></a>
+</td>
+ </tr>
+
+ <tr>  
+  <td>
+<A HREF ="http://computersystemconsulting.ca/cgi-bin/CSC/faq.cgi?" target="_content"><font   class="LeftSideBarNavStyle"> FAQ</font></a>
+  </td>
+ </tr>
+
+<tr>	      	
+  <td>
+<a href="http://computersystemconsulting.ca/cgi-bin/CSC/csc_bug_tracker.cgi?display_add_form=on&" target="_content"><font   class="LeftSideBarNavStyle"> Report a Bug</font></a>
+</td>
+    </tr>
+
+ <tr>  
+  <td >
+	   <a href="../CSC/csc_kb.cgi?view=BasicDataView&" target="_content" ><font class="LeftSideBarNavStyle" > Knowledge Base</font></a>
+</td>
+    </tr>
+ <tr>  
+
+  <td >
+           <a href="csc_url.cgi?" target="_content"
+
+ ><font class="LeftSideBarNavStyle" >URL DB </font></a>
+</td>
+    </tr>
+
+ <tr>	      	
+  <td><A HREF ="http://computersystemconsulting.ca/cgi-bin/CSC/csc_url.cgi?display_add_form=on&" target="_content"
+
+<font   class="LeftSideBarNavStyle"> Add URL</font></a>
+  </td>
+ </tr>
+ <tr>  
+  <td>	<A HREF = "csc_url.cgi?show_devel_urls=on&searchfield=subject&search1=CSC_Developed&&columns_to_view=name&columns_to_view=ur Target ="Blank"l"><font   class="LeftSideBarNavStyle"> CSC Developed</font></a>
+  </td>
+  </tr>
+
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ <tr>
+  <td>
+   
+<font class="LeftSideBarHeaderStyle" >    Example scripts</font>
+
+</td>
+    </tr>
+  <tr>  
+  <td>	<A HREF = "csc_url.cgi?show_devel_urls=on&category=Extropia_demos&&columns_to_view=name&columns_to_view=url" Target ="Blank"><font   class="LeftSideBarNavStyle">Extropia Example scripts DB</font></a>
+  </td>
+ </tr>
+  <tr>  
+   <td>&nbsp;</td>
+ </tr>
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+<tr>    
+  <td width="1">&nbsp;<img SRC="http://d2earth.net/msfree.gif" ALT="100% Micro\$oft free! ">
+
+</td>
+</tr>
+
+</table>
+

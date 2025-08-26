@@ -1,0 +1,56 @@
+[% PageVersion = 'Documentation/User.tt,v 0.02 2024/10/05' %]
+
+<h1 id="user-management">User Management Documentation</h1>
+
+<h2 id="user-controller">User Controller</h2>
+<p>The User Controller handles all user-related actions and functionalities:</p>
+<ul>
+    <li><strong>Add New Users</strong>: Provides functionality to register new users through the `create_account` and `do_create_account` methods.</li>
+    <li><strong>Login</strong>: Facilitates user login, validating credentials and starting a session using `login` and `do_login` methods.</li>
+    <li><strong>Logout</strong>: Ends the user session, securely logging them out (not currently implemented).</li>
+    <li><strong>Edit User Profile</strong>: Enables users to update their personal information through `edit_user` and `do_edit_user` methods.</li>
+    <li><strong>List Users</strong>: Displays a list of all users using the `list_users` method.</li>
+</ul>
+
+<h3>Controller Methods</h3>
+<ul>
+    <li><strong>base</strong>: Captures the base path for user-related actions.</li>
+    <li><strong>login</strong>: Displays the login form and stores referrer URL and form data in the session.</li>
+    <li><strong>do_login</strong>: Authenticates the user by checking the username and password against the database.</li>
+    <li><strong>create_account</strong>: Displays the account creation form.</li>
+    <li><strong>do_create_account</strong>: Handles the creation of a new user, including password hashing and email notification.</li>
+    <li><strong>list_users</strong>: Retrieves and displays a list of all users.</li>
+    <li><strong>edit_user</strong>: Retrieves a user's data for editing.</li>
+    <li><strong>do_edit_user</strong>: Updates a user's information in the database.</li>
+    <li><strong>register</strong>: Displays the registration form.</li>
+</ul>
+
+<h2 id="user-model">User Model</h2>
+<p>The User Model represents the user data and business logic:</p>
+<ul>
+    <li><strong>User Account Creation</strong>: Manages the creation and validation of new user accounts through the `create_user` method.</li>
+    <li><strong>Password Hashing</strong>: Ensures that user passwords are securely hashed before storage using the `hash_password` method.</li>
+    <li><strong>User Data Retrieval</strong>: Provides methods to retrieve user data from the database.</li>
+    <li><strong>User Data Update</strong>: Handles updates to existing user information.</li>
+</ul>
+
+<h2 id="templates">Templates</h2>
+<ul>
+    <li><strong>user/login.tt</strong>: Template for the login form.</li>
+    <li><strong>user/register.tt</strong>: Template for the registration form.</li>
+    <li><strong>user/create_account.tt</strong>: Template for creating a new account.</li>
+    <li><strong>user/index.tt</strong>: Template for displaying the user index page.</li>
+    <li><strong>user/list_users.tt</strong>: Template for listing all users.</li>
+    <li><strong>user/edit_user.tt</strong>: Template for editing user information.</li>
+</ul>
+
+<h2 id="todo">TODO List</h2>
+<ul>
+    <li><strong>Email Verification</strong>: Implement email verification for new user registrations to enhance security.</li>
+    <li><strong>Error Handling</strong>: Improve error handling to provide more informative feedback to users when operations fail.</li>
+    <li><strong>Logout Functionality</strong>: Implement a method to handle user logout and session termination.</li>
+    <li><strong>Role Management</strong>: Enhance role management to allow dynamic role assignment and modification.</li>
+    <li><strong>Security Enhancements</strong>: Review and improve security measures, such as password policies and session management.</li>
+</ul>
+
+<p><a href="#user-management">Back to top</a></p>

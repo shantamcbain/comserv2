@@ -1,0 +1,155 @@
+[% PageVersion = 'admin/view_log.tt,v 0.03 2024/05/01 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<style>
+    .chunk-row {
+        background-color: #f8f9fa;
+        border-left: 3px solid #ffc107;
+    }
+    .badge.badge-warning {
+        background-color: #ffc107;
+        color: #212529;
+    }
+    .badge.badge-info {
+        background-color: #17a2b8;
+        color: white;
+    }
+</style>
+<div class="container">
+    <h1>Application Log Management</h1>
+
+    [% IF c.flash.error_msg %]
+        <div class="alert alert-danger">
+            [% c.flash.error_msg %]
+        </div>
+    [% END %]
+
+    [% IF c.flash.success_msg %]
+        <div class="alert alert-success">
+            [% c.flash.success_msg %]
+        </div>
+    [% END %]
+
+    [% IF error_msg %]
+        <div class="alert alert-danger">
+            [% error_msg %]
+        </div>
+    [% ELSE %]
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Current Log Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Current Size:</strong> [% log_size %] KB</p>
+                        <p><strong>Max Size Before Rotation:</strong> [% max_log_size %] KB</p>
+                        <div class="progress mb-3">
+                            <div class="progress-bar [% IF log_size > max_log_size %]bg-danger[% ELSE %]bg-info[% END %]" role="progressbar"
+                                 style="width: [% IF log_size > max_log_size * 2 %]100[% ELSE %][% (log_size / max_log_size * 100) | format('%.1f') %][% END %]%;"
+                                 aria-valuenow="[% log_size %]" aria-valuemin="0" aria-valuemax="[% max_log_size %]">
+                                [% (log_size / max_log_size * 100) | format('%.1f') %]%
+                            </div>
+                        </div>
+
+                        [% IF log_size > max_log_size * 2 %]
+                            <div class="alert alert-warning">
+                                <strong>Warning:</strong> The log file is extremely large ([% log_size %] KB).
+                                Clicking "Rotate Log Now" will archive the current log and create a new empty log file.
+                            </div>
+                        [% END %]
+                        <form method="get" action="[% c.uri_for('/admin/view_log') %]">
+                            <input type="hidden" name="rotate" value="1">
+                            <button type="submit" class="btn btn-warning">
+                                <i class="fas fa-sync-alt"></i> Rotate Log Now
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">Archived Logs</h5>
+                    </div>
+                    <div class="card-body">
+                        [% IF archived_logs.size > 0 %]
+                            <div class="table-responsive">
+                                <table class="table table-striped table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Log File</th>
+                                            <th>Size</th>
+                                            <th>Date</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        [%
+                                            # Track the current timestamp to group chunks
+                                            SET current_timestamp = '';
+                                            SET is_first_in_group = 0;
+                                        %]
+                                        [% FOREACH log IN archived_logs %]
+                                            [%
+                                                # Extract timestamp from filename
+                                                SET timestamp = '';
+                                                IF log.name.match('^application\.log_(\d{8}_\d{6})');
+                                                    timestamp = match.0;
+                                                END;
+
+                                                # Check if this is a new timestamp group
+                                                IF timestamp != current_timestamp;
+                                                    current_timestamp = timestamp;
+                                                    is_first_in_group = 1;
+                                                ELSE;
+                                                    is_first_in_group = 0;
+                                                END;
+                                            %]
+
+                                            [% IF is_first_in_group && !loop.first %]
+                                                <tr><td colspan="4" class="bg-light" style="height: 10px;"></td></tr>
+                                            [% END %]
+
+                                            <tr [% IF log.is_chunk %]class="chunk-row"[% END %]>
+                                                <td>
+                                                    [% log.name %]
+                                                    [% IF log.is_chunk %]
+                                                        <span class="badge badge-warning">Chunk</span>
+                                                    [% ELSIF timestamp && archived_logs.grep('^.+_' _ timestamp _ '_chunk\d+$').size > 0 %]
+                                                        <span class="badge badge-info">Multi-part</span>
+                                                    [% END %]
+                                                </td>
+                                                <td>[% log.size %]</td>
+                                                <td>[% log.date %]</td>
+                                                <td>
+                                                    <a href="[% c.uri_for('/admin/view_archived_log', log.name) %]" class="btn btn-sm btn-info">
+                                                        <i class="fas fa-eye"></i> View
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        [% END %]
+                                    </tbody>
+                                </table>
+                            </div>
+                        [% ELSE %]
+                            <p class="text-muted">No archived logs found.</p>
+                        [% END %]
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0">Current Log Content (Last 1000 lines)</h5>
+            </div>
+            <div class="card-body p-0">
+                <pre class="m-0 p-3" style="max-height: 500px; overflow-y: auto;">[% log_content %]</pre>
+            </div>
+        </div>
+    [% END %]
+</div>

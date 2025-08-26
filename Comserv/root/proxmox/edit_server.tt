@@ -1,0 +1,138 @@
+[% META title = 'Edit Proxmox Server' %]
+[% PageVersion = 'proxmox/edit_server.tt,v 1.0.0 2025/03/25 AI_Assistant Exp' %]
+
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1>Edit Proxmox Server</h1>
+    
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h2>Server Configuration</h2>
+                </div>
+                <div class="card-body">
+                    [% IF error_msg %]
+                    <div class="alert alert-danger">
+                        [% error_msg %]
+                    </div>
+                    [% END %]
+                    
+                    <form method="post" action="[% c.uri_for('/proxmox_servers/edit_server') %]" class="needs-validation" novalidate>
+                        <input type="hidden" name="server_id" value="[% server_id %]">
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h3>Server Identity</h3>
+                                <div class="form-group mb-3">
+                                    <label for="name">Display Name:</label>
+                                    <input type="text" id="name" name="name" class="form-control" required 
+                                           value="[% form_data.name | html %]" placeholder="e.g., Production Proxmox">
+                                    <div class="form-text">A friendly name for this server.</div>
+                                    <div class="invalid-feedback">
+                                        Please enter a display name.
+                                    </div>
+                                </div>
+                                
+                                <h3>Connection Details</h3>
+                                <div class="form-group mb-3">
+                                    <label for="host">Hostname/IP:</label>
+                                    <input type="text" id="host" name="host" class="form-control" required 
+                                           value="[% form_data.host | html %]" placeholder="e.g., 172.30.236.89">
+                                    <div class="form-text">The hostname or IP address of the Proxmox server.</div>
+                                    <div class="invalid-feedback">
+                                        Please enter a hostname or IP address.
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group mb-3">
+                                    <label for="api_url_base">API URL (Optional):</label>
+                                    <input type="text" id="api_url_base" name="api_url_base" class="form-control"
+                                           value="[% form_data.api_url_base | html %]" placeholder="e.g., https://172.30.236.89:8006/api2/json">
+                                    <div class="form-text">The base URL for the Proxmox API. If left blank, it will be generated from the hostname.</div>
+                                </div>
+                                
+                                <div class="form-group mb-3">
+                                    <label for="node">Node Name:</label>
+                                    <input type="text" id="node" name="node" class="form-control" required 
+                                           value="[% form_data.node | html %]" placeholder="e.g., pve">
+                                    <div class="form-text">The name of the Proxmox node. Default is 'pve'.</div>
+                                    <div class="invalid-feedback">
+                                        Please enter a node name.
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <h3>API Token Authentication</h3>
+                                <div class="alert alert-info">
+                                    <p><strong>Note:</strong> Proxmox VE 6.2+ uses API tokens for authentication. The token format is:</p>
+                                    <p><code>USER@REALM!TOKENID=UUID</code></p>
+                                    <p>Example: <code>root@pam!mytoken=11111111-2222-3333-4444-555555555555</code></p>
+                                </div>
+
+                                <div class="form-group mb-3">
+                                    <label for="token_user">API Token User:</label>
+                                    <input type="text" id="token_user" name="token_user" class="form-control" required
+                                           value="[% form_data.token_user | html %]" placeholder="e.g., root@pam!mytoken">
+                                    <div class="form-text">The API token user in format: USER@REALM!TOKENID</div>
+                                    <div class="invalid-feedback">
+                                        Please enter the API token user.
+                                    </div>
+                                </div>
+
+                                <div class="form-group mb-3">
+                                    <label for="token_value">API Token Value:</label>
+                                    <input type="password" id="token_value" name="token_value" class="form-control"
+                                           placeholder="Leave blank to keep current token">
+                                    <div class="form-text">The API token value (UUID). Leave blank to keep the current token. This will be encrypted before storage.</div>
+                                </div>
+                                
+                                <h3>VM Templates</h3>
+                                <div class="form-group mb-3">
+                                    <label for="image_url_base">Template URL Base:</label>
+                                    <input type="text" id="image_url_base" name="image_url_base" class="form-control" required 
+                                           value="[% form_data.image_url_base | html %]" 
+                                           placeholder="e.g., http://172.30.167.222/kvm-images">
+                                    <div class="form-text">The base URL for VM template images.</div>
+                                    <div class="invalid-feedback">
+                                        Please enter a template URL base.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group mt-4">
+                            <button type="submit" class="btn btn-primary">Update Server</button>
+                            <a href="[% c.uri_for('/proxmox_servers') %]" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Form validation
+(function() {
+    'use strict';
+    window.addEventListener('load', function() {
+        // Fetch all the forms we want to apply custom Bootstrap validation styles to
+        var forms = document.getElementsByClassName('needs-validation');
+        // Loop over them and prevent submission
+        var validation = Array.prototype.filter.call(forms, function(form) {
+            form.addEventListener('submit', function(event) {
+                if (form.checkValidity() === false) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+                form.classList.add('was-validated');
+            }, false);
+        });
+    }, false);
+})();
+</script>

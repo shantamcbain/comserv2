@@ -1,0 +1,50 @@
+[% META title = 'Mail System Documentation' %]
+[% PageVersion = 'Documentation/Mail.tt,v 0.01 2024/11/22 Shanta Exp shanta ' %]
+[%# PageVersion = 'Documentation/Mail.tt,v 0.01 2024/11/22 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+
+[% END %]
+
+
+<h1 id="mail-top">Mail System Documentation</h1>
+
+<nav>
+    <a href="#Mail-overview">Overview</a> |
+    <a href="#Mail-controller">Controller</a> |
+    <a href="#Mail-model">Model</a> |
+    <a href="#Mail-templates">Templates</a> |
+    <a href="#Mail-workflow">Workflow</a>
+</nav>
+
+<h2 id="Mail-overview">Overview</h2>
+<p>The Mail system is responsible for managing email communications within the application. It handles the configuration of SMTP settings and the sending of emails to users.</p>
+<p><a href="#mail-top">Back to top</a></p>
+<h2 id="Mail-controller">Controller</h2>
+<p>The <code>Comserv::Controller::Mail</code> module handles the routing and logic for mail-related actions:</p>
+<ul>
+    <li><strong>Index:</strong> Provides a basic entry point for mail-related actions.</li>
+    <li><strong>Send Welcome Email:</strong> Sends a welcome email to a new user using the configured SMTP settings.</li>
+    <li><strong>Add Mail Config Form:</strong> Displays a form to add or update SMTP configuration settings.</li>
+    <li><strong>Add Mail Config:</strong> Processes the form submission to store SMTP configuration in the database.</li>
+</ul>
+<p><a href="#mail-top">Back to top</a></p>
+<h2 id="Mail-model">Model</h2>
+<p>The <code>Comserv::Model::Mail</code> module provides methods for interacting with SMTP configuration data and sending emails:</p>
+<ul>
+    <li><strong>Send Email:</strong> Sends an email using the SMTP configuration retrieved from the database.</li>
+    <li><strong>Get SMTP Config:</strong> Retrieves SMTP configuration details for a specific site from the database.</li>
+</ul>
+<p><a href="#mail-top">Back to top</a></p>
+<h2 id="Mail-templates">Templates</h2>
+<p>The following templates are used in the Mail system:</p>
+<ul>
+    <li><strong>mail.add_mail_config_form.tt:</strong> The template for rendering the form to add or update SMTP configuration.</li>
+    <li><strong>mail.success.tt:</strong> Displays a success message upon successful configuration update.</li>
+    <li><strong>mail.error.tt:</strong> Shows error messages when configuration fails.</li>
+</ul>
+<p><a href="#mail-top">Back to top</a></p>
+<h2 id="Mail-workflow">Workflow</h2>
+<p>The typical workflow for managing mail involves displaying the SMTP configuration form, processing the configuration data, and sending emails using the configured settings. The system provides feedback through success and error messages to guide the user through the configuration and email sending process.</p>
+
+<p><a href="#mail-top">Back to top</a></p>

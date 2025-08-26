@@ -1,0 +1,26 @@
+[% PageVersion = 'Bmaster/products.tt,v 0.01 2023/08/30 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+[% END %]
+[% PageVersion %]
+<h1>Our Bee Products</h1>
+
+<p>We offer a variety of bee products, each carefully harvested and processed to ensure the highest quality. Explore our range below:</p>
+
+<h2>Honey</h2>
+<p>Our honey is 100% pure, raw, and unfiltered, harvested from our healthy hives. It's rich in flavor and packed with natural goodness.</p>
+
+<h2>Bee Pollen</h2>
+<p>Bee pollen is a superfood, packed with proteins, vitamins, and minerals. It's harvested from our hives and carefully dried to preserve its nutritional content.</p>
+
+<h2>Beeswax</h2>
+<p>Our beeswax is pure and natural, perfect for making candles, cosmetics, and more. It's harvested from our hives and carefully processed to remove impurities.</p>
+
+<h2>Propolis</h2>
+<p>Propolis is a resinous substance collected by bees from tree buds and used for its antimicrobial properties. Our propolis is harvested from our hives and processed into various products.</p>
+
+<h2>Royal Jelly</h2>
+<p>Royal jelly is a nutrient-rich substance produced by worker bees and fed to larvae. Our royal jelly is harvested from our hives and carefully processed to preserve its nutritional content.</p>
+
+<!-- Add more products as needed -->
+
+<p>For more information on any of our products, please contact us.</p>

@@ -1,0 +1,208 @@
+[% META title = 'Cloudflare Integration Documentation' %]
+
+<section id="cloudflare-integration" class="doc-section">
+    <h2 class="section-toggle">Cloudflare Integration</h2>
+    <div class="section-content">
+        <h3>Overview</h3>
+        <p>
+            The Cloudflare integration provides role-based access control for managing DNS records and other Cloudflare features
+            for domains managed by the Comserv2 system. It integrates with the existing site and user management system to
+            ensure that users can only access domains they have permission to manage.
+        </p>
+        
+        <h3>Configuration</h3>
+        <p>
+            The Cloudflare integration is configured using a JSON file located at <code>Comserv/config/cloudflare_config.json</code>.
+            This file contains the following sections:
+        </p>
+        
+        <pre><code>{
+  "cloudflare": {
+    "api_token": "YOUR_TOKEN",
+    "account_id": "YOUR_ACCOUNT_ID",
+    "email": "admin@example.com"
+  },
+  "roles": {
+    "admin": {
+      "permissions": ["dns:edit", "zone:edit", "ssl:edit", "cache:edit"]
+    },
+    "developer": {
+      "permissions": ["dns:edit", "cache:edit"]
+    },
+    "editor": {
+      "permissions": ["dns:edit"]
+    }
+  },
+  "site_specific_permissions": {
+    "beemaster.ca": {
+      "editor": ["dns:edit", "cache:edit"]
+    }
+  }
+}</code></pre>
+        
+        <h4>Configuration Sections</h4>
+        <ul>
+            <li>
+                <strong>cloudflare</strong>: Contains the API credentials for accessing the Cloudflare API.
+                <ul>
+                    <li><strong>api_token</strong>: Your Cloudflare API token</li>
+                    <li><strong>account_id</strong>: Your Cloudflare account ID</li>
+                    <li><strong>email</strong>: The email address associated with your Cloudflare account</li>
+                </ul>
+            </li>
+            <li>
+                <strong>roles</strong>: Defines the default permissions for each role.
+                <ul>
+                    <li>Each role has a list of permissions it is granted by default</li>
+                    <li>Available permissions: dns:edit, zone:edit, ssl:edit, cache:edit</li>
+                </ul>
+            </li>
+            <li>
+                <strong>site_specific_permissions</strong>: Defines domain-specific permission overrides.
+                <ul>
+                    <li>Allows you to grant additional permissions for specific domains</li>
+                    <li>Overrides the default permissions for the specified role and domain</li>
+                </ul>
+            </li>
+        </ul>
+        
+        <h3>Integration with Existing System</h3>
+        <p>
+            The Cloudflare integration uses the existing site and user management system in Comserv2:
+        </p>
+        <ul>
+            <li>Sites are managed through the <code>Site</code> table</li>
+            <li>Domains are managed through the <code>SiteDomain</code> table</li>
+            <li>User roles are managed through the <code>users</code> table</li>
+        </ul>
+        
+        <h3>Available Features</h3>
+        <p>
+            The Cloudflare integration provides the following features:
+        </p>
+        <ul>
+            <li>
+                <strong>DNS Management</strong>
+                <ul>
+                    <li>View DNS records for a domain</li>
+                    <li>Add new DNS records</li>
+                    <li>Edit existing DNS records</li>
+                    <li>Delete DNS records</li>
+                </ul>
+            </li>
+            <li>
+                <strong>Cache Management</strong>
+                <ul>
+                    <li>Purge cache for a domain</li>
+                </ul>
+            </li>
+        </ul>
+        
+        <h3>Role-Based Access Control</h3>
+        <p>
+            The Cloudflare integration implements role-based access control to ensure that users can only access domains they have permission to manage:
+        </p>
+        <ul>
+            <li><strong>Admin</strong>: Can manage all domains and all features</li>
+            <li><strong>Developer</strong>: Can manage DNS records and cache for all domains</li>
+            <li><strong>Editor</strong>: Can only manage DNS records for domains they have access to</li>
+        </ul>
+        
+        <h3>Technical Implementation</h3>
+        <p>
+            The Cloudflare integration consists of the following components:
+        </p>
+        <ul>
+            <li>
+                <strong>CloudflareManager.py</strong>: A Python module that handles the interaction with the Cloudflare API and implements role-based access control.
+            </li>
+            <li>
+                <strong>CloudflareAPI.pm</strong>: A Catalyst controller that provides a web interface for managing Cloudflare features.
+            </li>
+            <li>
+                <strong>cloudflare/index.tt</strong>: A template for the Cloudflare management interface.
+            </li>
+            <li>
+                <strong>cloudflare.css</strong>: CSS styles for the Cloudflare management interface.
+            </li>
+        </ul>
+        
+        <h3>Dependencies</h3>
+        <p>
+            The Cloudflare integration requires the following dependencies:
+        </p>
+        <ul>
+            <li>Python 3.6 or higher</li>
+            <li>Cloudflare Python SDK (<code>pip install cloudflare</code>)</li>
+            <li>JSON module for Python</li>
+            <li>IPC::Run3 Perl module</li>
+        </ul>
+        
+        <h3>Installation</h3>
+        <p>
+            To install the Cloudflare integration:
+        </p>
+        <ol>
+            <li>Install the required dependencies: <code>pip install cloudflare</code></li>
+            <li>Configure the <code>cloudflare_config.json</code> file with your Cloudflare API credentials</li>
+            <li>Restart the Comserv2 application</li>
+        </ol>
+        
+        <h3>Usage</h3>
+        <p>
+            To use the Cloudflare integration:
+        </p>
+        <ol>
+            <li>Log in to the Comserv2 application</li>
+            <li>Navigate to the Cloudflare management interface at <code>/cloudflareapi</code></li>
+            <li>Select a site to manage</li>
+            <li>Select a domain to manage DNS records</li>
+            <li>Use the interface to view, add, edit, or delete DNS records</li>
+        </ol>
+    </div>
+</section>
+
+<style>
+    pre {
+        background-color: #f5f5f5;
+        padding: 15px;
+        border-radius: 5px;
+        overflow-x: auto;
+    }
+    
+    code {
+        font-family: monospace;
+    }
+    
+    .doc-section {
+        margin-bottom: 30px;
+    }
+    
+    .section-toggle {
+        cursor: pointer;
+        padding: 10px 0;
+        border-bottom: 1px solid #ddd;
+    }
+    
+    .section-content {
+        padding: 15px 0;
+    }
+    
+    h3 {
+        color: #0066cc;
+        margin-top: 20px;
+    }
+    
+    h4 {
+        color: #333;
+        margin-top: 15px;
+    }
+    
+    ul, ol {
+        padding-left: 20px;
+    }
+    
+    li {
+        margin-bottom: 5px;
+    }
+</style>

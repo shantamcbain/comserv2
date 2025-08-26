@@ -1,0 +1,33 @@
+[% META title = 'Edit Theme CSS' %]
+
+<div class="container">
+    <h1>Edit Theme CSS: [% theme_name %]</h1>
+
+    [% IF c.flash.success %]
+        <div class="alert alert-success">[% c.flash.success %]</div>
+    [% END %]
+
+    [% IF c.flash.error %]
+        <div class="alert alert-danger">[% c.flash.error %]</div>
+    [% END %]
+
+    <form method="POST" action="[% c.uri_for('/admin/theme/edit', theme_name) %]">
+        <div class="form-group">
+            <textarea name="css_content" id="css_content" class="form-control" rows="20" style="font-family: monospace;">[% css_content | html %]</textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+        <a href="[% c.uri_for('/admin/theme') %]" class="btn btn-secondary">Back to Themes</a>
+    </form>
+</div>
+
+<script>
+// Add syntax highlighting if CodeMirror is available
+if (typeof CodeMirror !== 'undefined') {
+    var editor = CodeMirror.fromTextArea(document.getElementById('css_content'), {
+        mode: 'css',
+        theme: 'default',
+        lineNumbers: true,
+        autoCloseBrackets: true
+    });
+}
+</script>

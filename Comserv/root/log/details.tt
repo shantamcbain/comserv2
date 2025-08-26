@@ -1,0 +1,61 @@
+[% PageVersion = 'log/index.tt,v 0.02 2024/01/28 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+
+<h2>Log Entry Details</h2>
+
+<form method="post" action="[% c.uri_for('/log/update') %]" class="log-form">
+    <input type="hidden" name="record_id" value="[% log.record_id %]">
+
+    <label for="sitename">Site Name:</label><br>
+    <input type="text" id="sitename" name="sitename" value="[% log.sitename %]" readonly><br>
+
+    <label for="start_date">Start Date:</label><br>
+    <input type="date" id="start_date" name="start_date" value="[% log.start_date %]"><br>
+
+    <label for="project_code">Project Code:</label><br>
+    <input type="text" id="project_code" name="project_code" value="[% log.project_code %]"><br>
+
+    <label for="due_date">Due Date:</label><br>
+    <input type="date" id="due_date" name="due_date" value="[% log.due_date %]"><br>
+
+    <label for="abstract">Abstract:</label><br>
+    <textarea id="abstract" name="abstract" required rows="4" cols="50">[% log.abstract %]</textarea><br>
+
+    <label for="details">Details:</label><br>
+    <textarea id="details" name="details" required rows="4" cols="50">[% log.details %]</textarea><br>
+
+    <label for="start_time">Start Time:</label><br>
+    <input type="time" id="start_time" name="start_time" value="[% log.start_time %]"><br>
+
+    <label for="end_time">End Time:</label><br>
+    <input type="time" id="end_time" name="end_time" value="[% log.end_time %]"><br>
+
+<label for="group_of_poster">Group of Poster:</label><br>
+<input type="text" id="group_of_poster" name="group_of_poster" value="[% log.group_of_poster %]"><br>
+    <label for="priority">Priority:</label><br>
+    <select id="priority" name="priority">
+        [% FOREACH key IN build_priority.keys.sort %]
+            <option value="[% key %]" [% 'selected' IF key == log.priority %]>[% build_priority.$key %]</option>
+        [% END %]
+    </select><br>
+
+    <label for="status">Status:</label><br>
+    <select id="status" name="status">
+        [% FOREACH key IN build_status.keys.sort %]
+            <option value="[% key %]" [% 'selected' IF key == log.status %]>[% build_status.$key %]</option>
+        [% END %]
+    </select><br>
+
+    <label for="comments">Comments:</label><br>
+    <textarea id="comments" name="comments" rows="4" cols="50">[% log.comments %]</textarea><br>
+
+    <div class="form-actions">
+        <input type="submit" value="Update" class="btn btn-primary">
+        <button type="button" onclick="window.history.back()" class="btn btn-secondary">Cancel</button>
+    </div>
+</form>
+
+<link rel="stylesheet" href="/static/css/log.css">

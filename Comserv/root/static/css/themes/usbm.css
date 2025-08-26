@@ -1,0 +1,21 @@
+/* Theme: usbm */
+:root {
+  --accent-color: #006622;
+  --background-color: #ffffff;
+  --border-color: #00cc44;
+  --footer-bg: #009933;
+  --footer-text-color: #ffffff;
+  --header-bg: #009933;
+  --link-color: #006622;
+  --link-hover-color: #004d1a;
+  --nav-bg: #009933;
+  --nav-link-color: #ffffff;
+  --nav-text: #ffffff;
+  --primary-color: #009933;
+  --secondary-color: #00cc44;
+  --success-color: #27ae60;
+  --table-header-bg: #00cc44;
+  --text-color: #333333;
+  --warning-color: #f39c12;
+}
+

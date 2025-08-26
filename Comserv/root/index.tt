@@ -1,0 +1,60 @@
+[%# INCLUDE 'layout.tt' %]
+[% PageVersion = 'index.tt,v 0.01 2024/15/30 shanta Exp shanta ' %]
+
+[% IF c.session.debug_mode == 2 %]
+<div class="debug-info">
+    <h3>Debug Information:</h3>
+    <ul>
+        <li>Page Version: [% PageVersion %]</li>
+        <li>HostName: [% HostName || 'Not defined' %]</li>
+        <li>Domain: [% c.session.Domain || c.req.uri.host || 'Not defined' %]</li>
+        <li>SiteName: [% SiteName || 'Not defined' %]</li>
+        <li>ScriptDisplayName: [% ScriptDisplayName || 'Not defined' %]</li>
+        <li>Controller: [% c.session.ControllerName || 'Not defined' %]</li>
+    </ul>
+
+    [% IF debug_errors && debug_errors.size %]
+    <div class="debug-errors">
+        <h4>Errors:</h4>
+        <ul>
+            [% FOREACH error IN debug_errors %]
+            <li>[% error %]</li>
+            [% END %]
+        </ul>
+    </div>
+    [% END %]
+</div>
+[% END %]
+
+<h1>[% c.session.Domain || c.req.uri.host %]</h1>
+<p>This site is currently under construction. Please check back later.</p>
+
+<style>
+.debug-info {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 15px;
+    margin-bottom: 20px;
+    font-family: monospace;
+}
+.debug-info h3 {
+    margin-top: 0;
+    color: #007bff;
+}
+.debug-info ul {
+    margin: 0;
+    padding-left: 20px;
+}
+.debug-errors {
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    border-radius: 4px;
+    padding: 10px;
+    margin-top: 10px;
+}
+.debug-errors h4 {
+    margin-top: 0;
+    color: #dc3545;
+}
+</style>

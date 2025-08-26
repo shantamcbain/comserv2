@@ -1,0 +1,127 @@
+[% META title = 'Starman Server Documentation' %]
+[% PageVersion = 'Documentation/Starman.tt,v 0.10 2024/05/20 Admin Exp admin ' %]
+
+<h1 id="starman-top">Starman High-Performance Perl PSGI Server</h1>
+
+<nav>
+    <a href="#installation">1. Installation</a> |
+    <a href="#configuration">2. Configuration</a> |
+    <a href="#ssl-config">3. SSL Setup</a> |
+    <a href="#catalyst">4. Catalyst Integration</a> |
+    <a href="#scaling">5. Scaling & Proxmox</a> |
+    <a href="#troubleshooting">6. Troubleshooting</a>
+</nav>
+
+<!-- SECTION 1: INSTALLATION -->
+<h2 id="installation">1. Installation Sequence</h2>
+<ol class="steps">
+    <li><strong>Base System Preparation</strong>
+        <pre>sudo apt update && sudo apt upgrade -y</pre>
+    </li>
+    <li><strong>Dependency Installation</strong>
+        <pre>sudo apt install cpanminus build-essential libssl-dev</pre>
+    </li>
+    <li><strong>Starman Installation</strong>
+        <pre>sudo cpanm Starman</pre>
+    </li>
+    <li><strong>Verification</strong>
+        <pre>starman --version</pre>
+        Expected output: <em>Starman version x.x</em>
+    </li>
+</ol>
+
+<!-- SECTION 2: CONFIGURATION -->
+<h2 id="configuration">2. Configuration Workflow</h2>
+<ol class="steps">
+    <li><strong>Create Service Account</strong>
+        <pre>sudo useradd --system --home-dir /var/www/starman starman</pre>
+    </li>
+    <li><strong>Directory Structure</strong>
+        <pre>
+sudo mkdir -p /var/www/starman/{app,logs,tmp}
+sudo chown -R starman:starman /var/www/starman</pre>
+    </li>
+    <li><strong>Systemd Service File</strong>
+        <pre>/etc/systemd/system/starman.service</pre>
+        <em>(Contents as previous documentation)</em>
+    </li>
+    <li><strong>Reload Daemon</strong>
+        <pre>sudo systemctl daemon-reload</pre>
+    </li>
+</ol>
+
+<!-- SECTION 3: SSL CONFIGURATION -->
+<h2 id="ssl-config">3. SSL Implementation Sequence</h2>
+<ol class="steps">
+    <li><strong>Port Preparation</strong>
+        <pre>sudo ufw allow 80/tcp  # For Let's Encrypt validation</pre>
+    </li>
+    <li><strong>Certificate Generation</strong>
+        <pre>sudo certbot certonly --standalone -d starman.example.com</pre>
+    </li>
+    <li><strong>Service File Modification</strong>
+        <pre>
+--listen :443 \
+--ssl \
+--ssl-cert /etc/letsencrypt/live/example.com/fullchain.pem \
+--ssl-key /etc/letsencrypt/live/example.com/privkey.pem</pre>
+    </li>
+    <li><strong>Firewall Adjustment</strong>
+        <pre>sudo ufw delete allow 80/tcp && sudo ufw allow 443/tcp</pre>
+    </li>
+</ol>
+
+<!-- SECTION 4: CATALYST INTEGRATION -->
+<h2 id="catalyst">4. Catalyst Deployment Flow</h2>
+<ol class="steps">
+    <li><strong>PSGI File Creation</strong>
+        <pre>/var/www/starman/app/myapp.psgi</pre>
+        <em>(Contents as previous)</em>
+    </li>
+    <li><strong>Dependency Isolation</strong>
+        <pre>
+# In app directory
+carton init
+echo "requires 'Catalyst::Runtime';" >> cpanfile
+carton install</pre>
+    </li>
+    <li><strong>Environment Configuration</strong>
+        <pre>/etc/starman/environment.conf</pre>
+        <em>(Set CATALYST_DEBUG=0 etc.)</em>
+    </li>
+</ol>
+
+<!-- SECTION 5: SCALING -->
+<h2 id="scaling">5. Proxmox Scaling Procedure</h2>
+<ol class="steps">
+    <li><strong>Base VM Preparation</strong>
+        <pre>qm clone 1000 1001 --name starman-worker1</pre>
+    </li>
+    <li><strong>Network Configuration</strong>
+        <pre>qm set 1001 -net0 virtio,bridge=vmbr1</pre>
+    </li>
+    <li><strong>Load Balancer Setup</strong>
+        <pre>/etc/haproxy/haproxy.cfg</pre>
+        <em>(Backend config as previous)</em>
+    </li>
+    <li><strong>Service Deployment</strong>
+        <pre>scp myapp.psgi starman@worker1:/var/www/starman/app/</pre>
+    </li>
+</ol>
+
+<!-- SECTION 6: TROUBLESHOOTING -->
+<h2 id="troubleshooting">6. Diagnostic Sequence</h2>
+<ol class="steps">
+    <li><strong>Service Status Check</strong>
+        <pre>sudo systemctl status starman</pre>
+    </li>
+    <li><strong>Log Inspection</strong>
+        <pre>journalctl -u starman -f --since "5 minutes ago"</pre>
+    </li>
+    <li><strong>Port Verification</strong>
+        <pre>sudo ss -tulpn | grep starman</pre>
+    </li>
+    <li><strong>Worker Health Check</strong>
+        <pre>curl -I https://starman.example.com/status</pre>
+    </li>
+</ol>

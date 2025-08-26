@@ -1,0 +1,54 @@
+[% META title = 'Proxmox Dashboard' %]
+[% PageVersion = 'app/templates/proxmox/inex.tt,v 0.2 2023/08/30 shanta Exp shanta ' %]
+[% IF debug == 1 %]
+    [% PageVersion %]
+    [% #INCLUDE 'debug.tt' %]
+[% END %]
+<script>
+// Fetch virtual machine data from the new endpoint
+fetch('[% c.uri_for('/proxmox/virtual_machines') %]')
+    .then(response => response.json())
+    .then(data => initializeVirtualMachineTable(data.virtual_machines));
+
+function initializeVirtualMachineTable(virtualMachines) {
+    // Code to initialize the virtual machine table
+}
+</script>
+
+<div class="container">
+    <h1>Proxmox Dashboard 222</h1>
+    <table id="virtual-machine-table" class="table table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Virtual machine data will be dynamically inserted here -->
+        </tbody>
+    </table>
+    <button class="btn btn-primary" data-toggle="modal" data-target="#create-vm-modal">Create VM</button>
+</div>
+
+<div class="modal fade" id="create-vm-modal" tabindex="-1" role="dialog" aria-labelledby="create-vm-modal-label" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="create-vm-modal-label">Create Virtual Machine</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- Form to create a new virtual machine -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="create-vm-btn">Create</button>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,132 @@
+
+
+
+
+
+
+
+
+
+    <HTML>
+    <HEAD>
+    <TITLE>: </TITLE>
+
+
+    <SCRIPT LANGUAGE="JavaScript">
+    <!--
+    var clicks = 0;
+
+    function submitOnce() {
+        clicks ++;
+        if (clicks < 2) {
+            return true;
+        } else {
+            // alert("You have already clicked the submit button. " + clicks + " clicks");
+            return false;
+        }
+    }
+    //-->
+    </SCRIPT>
+
+<script language="JavaScript">
+function testfunction()
+{ if ((typeof window.sidebar == "object") && (typeof window.sidebar.addPanel == "function"))
+
+      { 
+         window.sidebar.addPanel ("CSC HelpDesk", 
+         "http://computersystemconsulting.ca/cgi-bin/CSC/csc_devel_debug.cgi?view=SideBarHomeView&page_top=SBPageTopView&pagebottom=SBPageBottomView",""); 
+      } 
+      else 
+      {          var rv = window.confirm ("This page is enhanced for use with Netscape 6.  " + "Would you like to upgrade now?"); 
+         if (rv) 
+            document.location.href = "http://home.netscape.com/download/index.html";
+      } 
+ } </script> 
+<SCRIPT LANGUAGE="JavaScript">
+
+<!-- This script and many more are available free online at -->
+<!-- The JavaScript Source!! http://javascript.internet.com -->
+
+<!-- Begin
+function formHandler(form) {
+var windowprops = "height=600,width=700,location=no,"
++ "scrollbars=yes,menubars=no,toolbars=no,resizable=yes";
+
+var URL = form.site.options[form.site.selectedIndex].value;
+popup = window.open(URL,"MenuPopup",windowprops);
+}
+// End -->
+</script>
+
+    </HEAD>
+    <BODY>
+
+    <CENTER>
+    <TABLE WIDTH = "95%" BORDER = "0"
+           CELLSPACING = "0" CELLPADDING = "2">
+
+    <TR>
+    <TD VALIGN = "TOP" ALIGN = "LEFT">
+    <IMG SRC = "/"
+         WIDTH = ""
+         HEIGHT = ""
+         BORDER = "0" ALT = ""
+    >
+    </TD>
+    <td>
+
+
+Host your site with us. Web Applications, virtual offices, and HelpDesk systems  built to your needs.	      
+    
+</td>
+
+
+ 
+    </TR>
+ 
+   <tr>
+    <td class="tablePageTopWelcomeCellStyle" >
+
+
+
+	Hello!
+
+
+    </td>
+    <td class="tablePageTopLoginCellStyle">
+
+
+	| <A HREF = "?session_id=&submit_logon=on"
+                 TARGET = "">Logon</A>
+               
+
+    </TD>
+    </TR>
+<tr>
+<td>
+ 
+    </TD>
+
+<td>
+ 
+
+    </TD>
+
+</tr>
+    </TABLE>
+    </CENTER>
+<table>
+<tr>
+<td width="15%">
+
+
+
+
+
+
+ 
+
+</td>
+<td>
+
+

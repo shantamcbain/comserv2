@@ -1,0 +1,129 @@
+[% META title = 'System Information' %]
+<!-- File: /home/shanta/PycharmProjects/comserv2/Comserv/root/admin/network_diagnostics_system_info.tt -->
+[% PageVersion = 'admin/network_diagnostics_system_info.tt,v 0.01 2025/08/31 shanta Exp shanta ' %]
+
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<!-- Quick Navigation -->
+<div class="quick-nav">
+    <a href="[% c.uri_for('/admin') %]" class="btn btn-sm btn-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Admin Dashboard
+    </a>
+    <a href="[% c.uri_for('/admin/network_diagnostics') %]" class="btn btn-sm btn-primary">
+        <i class="fas fa-network-wired"></i> Network Diagnostics
+    </a>
+    <a href="[% c.uri_for('/admin/restart_starman') %]" class="btn btn-sm btn-warning">
+        <i class="fas fa-sync"></i> Restart Starman
+    </a>
+</div>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>System Information</h1>
+            
+            <!-- User status banner -->
+            <div class="alert alert-info mb-4">
+                <strong>Welcome [% c.session.username || 'Guest' %][% IF c.session.roles.grep('^admin$').size %] Administrator[% END %] to Computer System Consulting!</strong>
+            </div>
+            
+            [% IF debug_msg || c.session.debug_mode == 1 %]
+                <div class="alert alert-info">
+                    <strong>Debug Information:</strong>
+                    [% IF debug_msg %]
+                        [% FOREACH msg IN debug_msg %]
+                            <p>[% msg %]</p>
+                        [% END %]
+                    [% END %]
+                    <p>User: [% c.session.username || 'Guest' %]</p>
+                    <p>Roles: [% c.session.roles.join(', ') || 'None' %]</p>
+                </div>
+            [% END %]
+            
+            [% IF error_msg %]
+                <div class="alert alert-danger">
+                    <strong>Error:</strong> [% error_msg %]
+                </div>
+            [% END %]
+            
+            [% IF success_msg %]
+                <div class="alert alert-success">
+                    <strong>Success:</strong> [% success_msg %]
+                </div>
+            [% END %]
+            
+            [% IF warning_msg %]
+                <div class="alert alert-warning">
+                    <strong>Warning:</strong> [% warning_msg %]
+                </div>
+            [% END %]
+            
+            <!-- System Information Sections -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <h3 class="mb-0">Basic System Information</h3>
+                        </div>
+                        <div class="card-body">
+                            <h4>Hostname</h4>
+                            <pre class="command-output">[% hostname | html %]</pre>
+                            
+                            <h4>Kernel Information</h4>
+                            <pre class="command-output">[% kernel | html %]</pre>
+                            
+                            <h4>Operating System</h4>
+                            <pre class="command-output">[% os_info | html %]</pre>
+                        </div>
+                    </div>
+                    
+                    <div class="card mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <h3 class="mb-0">Resource Usage</h3>
+                        </div>
+                        <div class="card-body">
+                            <h4>Disk Usage</h4>
+                            <pre class="command-output">[% disk_usage | html %]</pre>
+                            
+                            <h4>Memory Information</h4>
+                            <pre class="command-output">[% memory_info | html %]</pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <h3 class="mb-0">Network Configuration</h3>
+                        </div>
+                        <div class="card-body">
+                            <h4>IP Configuration</h4>
+                            <pre class="command-output">[% ip_info | html %]</pre>
+                            
+                            <h4>Routing Table</h4>
+                            <pre class="command-output">[% routing_table | html %]</pre>
+                            
+                            <h4>DNS Configuration</h4>
+                            <pre class="command-output">[% dns_config | html %]</pre>
+                        </div>
+                    </div>
+                    
+                    <div class="card mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <h3 class="mb-0">Network Status</h3>
+                        </div>
+                        <div class="card-body">
+                            <h4>Open Network Connections</h4>
+                            <pre class="command-output">[% network_connections | html %]</pre>
+                            
+                            <h4>Hosts File</h4>
+                            <pre class="command-output">[% hosts_file | html %]</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

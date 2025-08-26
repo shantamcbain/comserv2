@@ -1,0 +1,14 @@
+[% META title = 'List of Users' %]
+[% PageVersion = 'list_users.tt,v 0.01 2023/12/30 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+    [% INCLUDE 'debug.tt' %]
+[% END %]
+<ul>
+[% FOREACH user IN users %]
+    <li>
+        <a href="[% c.uri_for('/user/edit_user', user.id) %]">Edit</a>
+        [% user.username %]
+    </li>
+[% END %]
+</ul>

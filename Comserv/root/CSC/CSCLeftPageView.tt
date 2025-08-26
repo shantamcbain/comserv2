@@ -1,0 +1,118 @@
+
+
+
+
+
+
+
+
+ 
+ <!--This is the current CSCLeftPageView.ttml
+ The fallowing code is what gets displayed on the left nave bar -->
+
+<table  class ="LeftTableView">
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+ <tr>  
+  <td >
+
+    </td>
+    </tr>
+ 
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+ 
+
+
+ 
+
+
+ 
+
+
+
+ 
+
+
+ 
+
+
+
+
+
+
+ 
+
+
+ 
+
+
+ 
+
+
+ 
+       
+ 
+ 
+
+
+ 
+
+
+ 
+<!-- Call SSOPS links -->
+
+<!-- End Call Linux Tut links -->
+
+ 
+
+
+
+ 
+
+
+
+ 
+
+
+
+</tr>
+
+
+ <tr>  
+      	      	<td Class='LeftSideBarNavLinkStyle'>
+
+	<A HREF ="http://computersystemconsulting.ca/cgi-bin/CSC/helpdesk.cgi?&view=HelpDeskHomeView&site=" Target ="blank"> <font   class="LeftSideBarNavStyle">HelpHesk </font></a>
+	
+      	</td>
+ </tr>      	
+
+ <tr>
+  <td>
+
+
+    </td>
+    </tr>
+
+ 
+
+
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+<tr>    
+          			<td width="100%">&nbsp;<img SRC="http://d2earth.net/msfree.gif" ALT="100% Micro\$oft free!">
+
+</td>
+</tr>
+<tr>    
+          			<td width="100%">&nbsp;<img SRC="http://24.71.38.219/images/poweredbymysql-125.png" ALT="Powered By MySQL">
+
+</td>
+</tr>
+
+
+</table>
+<!--This is the end of LeftPageView.ttml-->

@@ -1,0 +1,41 @@
+[% PageVersion = 'Documentation/sessionplan.tt,v 0.02 2024/05/28 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+[% PageVersion %]
+[% END %]
+
+<h1 id="session-plan-top">Session Plan</h1>
+
+<nav>
+    <a href="#common-reminders">Common Reminders</a> |
+    <a href="#current-session-plan">Current Session Plan</a> |
+    <a href="#completed-items">Completed Items</a>
+</nav>
+
+<h2 id="common-reminders">Common Reminders</h2>
+<ul>
+    <li>Always use the `+-` patch format in code returns to prevent overwriting existing functions.</li>
+    <li>Update documentation after making changes to the code.</li>
+    <li>Commit changes regularly with meaningful messages.</li>
+    <li>Ensure all navigation links within each sub-document are unique.</li>
+    <li>Ensure that all URLs referenced in the application have corresponding routes defined in controllers to avoid 404 errors.</li>
+</ul>
+
+<h2 id="example-prompt">Example Prompt</h2>
+<p>When reminding the assistant, you can say: "Please follow the guidelines outlined in guidelines.tt, especially regarding the `+-` patch format for code returns and the prohibition on using placeholders in code returns."</p>
+
+<h2 id="current-session-plan">Current Session Plan</h2>
+<p>This section tracks items from the last session and new items created in the current session:</p>
+
+
+<ul>
+ </ul>
+
+
+
+<h2 id="completed-items">Completed Items</h2>
+<p>This section tracks items that have been completed:</p>
+<ul>
+   <li>Open master and move the completed User branch into master.</li>
+
+</ul>
+<h3 id="session-plan"><a href="#top">Back to top of Session Plan</a></h3>

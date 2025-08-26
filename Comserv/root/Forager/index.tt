@@ -1,0 +1,19 @@
+[% PageVersion = 'forager/index.tt,v 0.01 2024/11/22 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+<nav>
+    <ul>
+        <li><a href="[% c.uri_for('/') %]">Home</a></li>
+        <li><a href="[% c.uri_for('/forager') %]">Forager Home</a></li>
+        <li><a href="[% c.uri_for('/documentation') %]">Documentation</a></li>
+        <li><a href="[% c.uri_for('/coop') %]">Coop</a></li>
+        <!-- Add more navigation links as needed -->
+    </ul>
+</nav>
+
+
+<main>
+    <p>This site is dedicated to teaching people about foraging, primarily focusing on medicinal herbs.</p>
+    <p>Explore our resources to learn more about foraging and the benefits of various herbs.</p>
+</main>

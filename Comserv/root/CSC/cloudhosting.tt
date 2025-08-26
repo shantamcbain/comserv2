@@ -1,0 +1,93 @@
+[% PageVersion	= 'CSC/cloudhosting.tt,v 0.02 2025/04/12 shanta Exp shanta '	%]
+
+[% IF c.session.debug_mode == 1 %]
+ [%	PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+	[%# INCLUDE 'debug.tt' %]
+[% END %]
+
+
+<A NAME="PageTop"></A>
+
+<table>
+<tr>
+	<td>
+
+<h1>Our Cloud Hosting Options</h1>
+
+<div class="row">
+  <div class="col-md-4 mb-4">
+    <div class="card h-100">
+      <div class="card-header bg-primary text-white">
+        <h3 class="card-title">Basic Hosting</h3>
+      </div>
+      <div class="card-body">
+        <h4 class="card-subtitle mb-3">$9.95/month</h4>
+        <ul class="list-group list-group-flush">
+          <li class="list-group-item">5GB Storage</li>
+          <li class="list-group-item">50GB Bandwidth</li>
+          <li class="list-group-item">1 Website</li>
+          <li class="list-group-item">5 Email Accounts</li>
+          <li class="list-group-item">24/7 Support</li>
+        </ul>
+      </div>
+      <div class="card-footer">
+        <a href="/hosting_signup" class="btn btn-primary btn-block">Sign Up Now</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4 mb-4">
+    <div class="card h-100">
+      <div class="card-header bg-success text-white">
+        <h3 class="card-title">Professional Hosting</h3>
+      </div>
+      <div class="card-body">
+        <h4 class="card-subtitle mb-3">$19.95/month</h4>
+        <ul class="list-group list-group-flush">
+          <li class="list-group-item">20GB Storage</li>
+          <li class="list-group-item">200GB Bandwidth</li>
+          <li class="list-group-item">10 Websites</li>
+          <li class="list-group-item">20 Email Accounts</li>
+          <li class="list-group-item">24/7 Priority Support</li>
+        </ul>
+      </div>
+      <div class="card-footer">
+        <a href="/contact" class="btn btn-success btn-block">Contact Sales</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4 mb-4">
+    <div class="card h-100">
+      <div class="card-header bg-info text-white">
+        <h3 class="card-title">Enterprise Hosting</h3>
+      </div>
+      <div class="card-body">
+        <h4 class="card-subtitle mb-3">$49.95/month</h4>
+        <ul class="list-group list-group-flush">
+          <li class="list-group-item">100GB Storage</li>
+          <li class="list-group-item">1TB Bandwidth</li>
+          <li class="list-group-item">Unlimited Websites</li>
+          <li class="list-group-item">Unlimited Email Accounts</li>
+          <li class="list-group-item">24/7 Dedicated Support</li>
+        </ul>
+      </div>
+      <div class="card-footer">
+        <a href="/contact" class="btn btn-info btn-block">Contact Sales</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row mt-4">
+  <div class="col-12 text-center">
+    <h2>Ready to Get Started?</h2>
+    <p class="lead">Choose the plan that's right for you and launch your website today.</p>
+    <a href="/hosting_signup" class="btn btn-primary btn-lg me-3">Sign Up for Basic Hosting</a>
+    <a href="/contact" class="btn btn-outline-secondary btn-lg">Contact Sales</a>
+  </div>
+</div>
+
+</td></tr>
+</table>

@@ -1,0 +1,15 @@
+[% PageVersion  = 'display_tables.tt,v 0.1 2023/11/21 Shanta Exp Shanta' %]
+[% IF debug == 1 %]
+    [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [% INCLUDE 'debug.tt' %]
+[% END %]
+[%# display_tables.tt %]
+
+<h1>Relevant Tables</h1>
+
+<ul>
+[% FOREACH table IN relevant_tables %]
+    <li>[% table.TABLE_NAME %]</li>
+[% END %]
+</ul>

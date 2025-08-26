@@ -1,0 +1,102 @@
+[% ViewVersion = 'v 0.03 2024/01/05 /cgi-bin/HTMLTemplates/Shanta/Shanta.ttml,'%]
+[%# ViewVersion = 'v 0.02 2022/11/24 /cgi-bin/HTMLTemplates/Shanta/VE7TITHome.ttml,'%]
+[%# ViewVersion = 'v 0.01 2022/11/07 /cgi-bin/HTMLTemplates/Shanta/VE7TITHome.ttml,'%]
+
+
+
+[% IF c.session.debug_mode  == 1 %]
+ [%	ViewVersion %]
+[% END %]
+
+[% embed('ErrorDisplayView') %]
+
+
+
+ <table cellpadding="0" cellspacing="0" border="0" align="left" width="100%">
+<tr align="left">
+<td align="left" >
+
+[% IF username == 'Shanta' %]
+
+[% embed(todolistview) %]
+
+<h2>Key navigation links.</h2>
+<ul>
+   <li><h2>Calendar</h2>
+	<iframe src="https://calendar.google.com/calendar/embed?height=600&amp;wkst=1&amp;bgcolor=%23ffffff&amp;ctz=America%2FVancouver&amp;src=c2hhbnRhbWNiYWluQGdtYWlsLmNvbQ&amp;src=cjRwMmE2cDNrdDFsYXRhdjY2dTR2NG50bWdAZ3JvdXAuY2FsZW5kYXIuZ29vZ2xlLmNvbQ&amp;src=dGFidnZpcTlsMW5jZmxiY2VkbDc4cWExMTRAZ3JvdXAuY2FsZW5kYXIuZ29vZ2xlLmNvbQ&amp;src=amNybGpxY2VvOThxa29xcjE2Nm5vY3ZoNzRAZ3JvdXAuY2FsZW5kYXIuZ29vZ2xlLmNvbQ&amp;src=ODBybGZubWZvazN2am85YW4zNXJ2ZGswNThAZ3JvdXAuY2FsZW5kYXIuZ29vZ2xlLmNvbQ&amp;src=YWRkcmVzc2Jvb2sjY29udGFjdHNAZ3JvdXAudi5jYWxlbmRhci5nb29nbGUuY29t&amp;src=OGE0Njk5YzByaDVhdmE5M3JrbGFzMWVtYmtAZ3JvdXAuY2FsZW5kYXIuZ29vZ2xlLmNvbQ&amp;src=ZGIyZjhyc2ZuMGR1ZTgxbW4wbGE4cmUzb2dAZ3JvdXAuY2FsZW5kYXIuZ29vZ2xlLmNvbQ&amp;src=aTdvMjdrZ3U5NDJ0aWRnbW5jN3RrZDllZzhAZ3JvdXAuY2FsZW5kYXIuZ29vZ2xlLmNvbQ&amp;src=ZW4uY2FuYWRpYW4jaG9saWRheUBncm91cC52LmNhbGVuZGFyLmdvb2dsZS5jb20&amp;src=aHQzamxmYWFjNWxmZDYyNjN1bGZoNHRxbDhAZ3JvdXAuY2FsZW5kYXIuZ29vZ2xlLmNvbQ&amp;color=%23039BE5&amp;color=%23E67C73&amp;color=%23B39DDB&amp;color=%23009688&amp;color=%23E67C73&amp;color=%237986CB&amp;color=%237986CB&amp;color=%23E4C441&amp;color=%234285F4&amp;color=%23009688&amp;color=%2333B679" style="border:solid 1px #777" width="800" height="600" frameborder="0" scrolling="no"></iframe></li>
+   <li> edit <a href="http://calendar.google.com" target="_self">calendar</a>.</li>
+   <li><a href="https://beeherenow.beemaster.ca/cgi-bin/index.cgi?site=BHN" target="_blank">Bee Here Now</a></li>
+   <li><a href="https://beemaster.ca/cgi-bin/index.cgi?site=BMaster" target="_blank">Beemaster</a></li>
+	<li><a href="https://brew.computersystemconsulting.ca" target="_blank">Brew</a></li>
+	<li><a href="https://forager.com/cgi-bin/index.cgi?site=Forager" target="_blank">Forager.com</a></li>
+	<li><a href="https://computersystemconsulting.ca/cgi-bin/index.cgi?site=CSC" target="_blank">CSC</a></li>
+   <li><a href="https://beemaster.ca/cgi-bin/index.cgi?site=SMO" target="_blank">Saddle Mountain organics</a></li>
+	<li><a href="https://ulc.usbm.ca/cgi-bin/index.cgi?site=ULC" target="_blank">ULC</a></li>
+	<li><a href="/cgi-bin/index.cgi?site=ShantaWorkShop">Shanta's work shop</a></li>
+	<li><a href="https://usbm.ca/cgi-bin/index.cgi?site=USBM" target="_blank">USBM</a></li>
+	<li><a href="https://telmark.usbm.ca/cgi-bin/index.cgi?site=TelMark" target="_blank">TelMark</a> Our Adventure
+    <li><a href="https://ve7tit.weaverbeck.ca/cgi-bin/index.cgi?site=VE7TIT" target="_blank">VE7TIT</a> Our Ham Shank
+	</li>
+
+	</ul>
+
+
+
+[% ELSE %]
+
+	[% IF username %]
+
+
+<h3 > Hello  [% firstname%]  [% lastname%]! Welcome to Shantaloft!</h3>
+
+
+
+
+
+
+	[% END %]
+
+
+
+	<p>This is my personal site. You will find some of the things I am into here. <p>
+
+ <p>We are proud to sponsor <a href="https://usbm.ca" target="_blank" name="Universal School of Biological Life"
+                               title="Click here to see details.">The Universal School of Biological Life Site</a>.</p>
+<br>
+<br>
+
+<ul>
+  <li><a href="https://beemaster.ca" target="_blank">Beemaster</a></li>
+  <li><a href="https://brew.computersystemconsulting.ca" target="_blank">Brew</a></li>
+  <li><a href="https://computersystemconsulting.ca" target="_blank">CSC</a></li>
+  <li><a href="https://forager.com/" target="_blank">Forager.com</a></li>
+  <li><a href="https://usbm.ca/" target="_blank">USBM</a></li>
+  <li><a href="https://telmark.usbm.ca" target="_blank">TelMark</a> Our Adventure
+	log</li>
+ <li><a href="https://ve7tit.ca" target="_blank">VE7TIT</a> Our Ham Shank
+	</li>
+</ul>
+
+
+[% END %]
+
+<br>
+<br>
+<br>
+<p>
+<a href="https://helpdesk.computersystemconsulting.ca" target="_Blank" > HelpDesk</a>
+
+<p>Last Updated: [% data.site_last_update %]
+
+
+[% embed('CSCCopyRight') %]
+
+
+
+</td>
+</tr>
+</table>
+
+
+[%# embed(data.page_bottom_view) %]
+

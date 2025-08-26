@@ -1,0 +1,41 @@
+[% PageVersion	= 'edit_link.tt,v 0.02 2023/08/30 shanta Exp shanta '	%]
+[% IF debug_mode == 1 %]
+ [%	PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+<form method="POST" action="/edit_link">
+    <label for="sitename">Site Name:</label><br>
+    <input type="text" id="sitename" name="sitename" value="[% link.sitename %]"><br>
+    <input type="text" id="share" name="share" value="[% link.share %]"><br>
+
+    <label for="link_order">Link Order:</label><br>
+    <input type="text" id="link_order" name="link_order" value="[% link.link_order %]"><br>
+
+    <label for="target">Target:</label><br>
+    <input type="text" id="target" name="target" value="[% link.target %]"><br>
+
+    <label for="name">Name:</label><br>
+    <input type="text" id="name" name="name" value="[% link.name %]"><br>
+
+    <label for="description">Description:</label><br>
+    <textarea id="description" name="description">[% link.description %]</textarea><br>
+
+    <label for="url">URL:</label><br>
+    <input type="text" id="url" name="url" value="[% link.url %]"><br>
+
+    <label for="subject">Subject:</label><br>
+    <input type="text" id="subject" name="subject" value="[% link.subject %]"><br>
+   <label for="owner">Owner:</label><br>
+    <input type="text" id="owner" name="owner" value="[% link.owner %]"><br>
+    <label for="category">Category:</label><br>
+    <input type="text" id="category" name="category" value="[% link.category %]"><br>
+    <!-- Add more fields for the other columns in the internal_links_tb table -->
+
+    <!-- Modify button -->
+    <button type="submit" formaction="/modify_link">Modify</button>
+
+    <!-- Delete button -->
+    <button type="submit" formaction="/confirm_delete">Delete</button>
+
+</form>

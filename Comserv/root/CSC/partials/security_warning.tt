@@ -1,0 +1,5 @@
+[% IF security_warning %]
+<div class="alert alert-warning">
+    <strong>Security Notice:</strong> [% security_warning %]
+</div>
+[% END %]

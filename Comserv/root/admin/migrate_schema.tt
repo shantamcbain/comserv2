@@ -1,0 +1,18 @@
+[% PageVersion = 'Admin/migrate_schema.tt,v 0.01 2024/06/01 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<h1>Schema Migration</h1>
+
+[% IF message %]
+    <p>[% message %]</p>
+[% END %]
+
+<form method="post" action="[% c.uri_for('/admin/migrate_schema') %]">
+    <input type="submit" value="Migrate Schema">
+</form>
+
+<p>This will apply any pending schema changes to the database.</p>
+
+<p><a href="[% c.uri_for('/admin') %]">Back to Admin Home</a></p>

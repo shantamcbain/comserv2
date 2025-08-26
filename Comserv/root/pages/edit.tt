@@ -1,0 +1,109 @@
+[% PageVersion = 'pages/edit.tt,v 1.0 2024/12/29 Page Edit Template with Multi-Site Support' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="page-edit">
+    <h1>Edit Page: [% page.title %]</h1>
+    
+    [% IF error_msg %]
+    <div class="alert alert-error">
+        [% error_msg %]
+    </div>
+    [% END %]
+    
+    <form method="POST" action="/pages/edit/[% page.page_code %]">
+        <div class="form-group">
+            <label for="sitename">Site Name:</label>
+            [% IF is_csc %]
+                <select name="sitename" id="sitename" required>
+                    [% FOREACH site IN available_sites %]
+                        <option value="[% site %]" [% IF page.sitename == site %]selected[% END %]>[% site %]</option>
+                    [% END %]
+                </select>
+                <small>CSC can assign pages to any site</small>
+            [% ELSE %]
+                <input type="hidden" name="sitename" value="[% current_sitename %]">
+                <input type="text" value="[% current_sitename %]" disabled>
+                <small>You can only assign pages to your site: [% current_sitename %]</small>
+            [% END %]
+        </div>
+        
+        <div class="form-group">
+            <label for="menu">Menu:</label>
+            <select name="menu" id="menu" required>
+                <option value="Main" [% IF page.menu == 'Main' %]selected[% END %]>Main</option>
+                <option value="member" [% IF page.menu == 'member' %]selected[% END %]>Member</option>
+                <option value="Admin" [% IF page.menu == 'Admin' %]selected[% END %]>Admin</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="page_code">Page Code:</label>
+            <input type="text" value="[% page.page_code %]" disabled>
+            <small>Page code cannot be changed after creation</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="title">Title:</label>
+            <input type="text" name="title" id="title" value="[% page.title %]" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="body">Content:</label>
+            <textarea name="body" id="body" rows="10" required>[% page.body %]</textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="description">Meta Description:</label>
+            <textarea name="description" id="description" rows="3">[% page.description %]</textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="keywords">Meta Keywords:</label>
+            <input type="text" name="keywords" id="keywords" value="[% page.keywords %]">
+        </div>
+        
+        <div class="form-group">
+            <label for="link_order">Link Order:</label>
+            <input type="number" name="link_order" id="link_order" value="[% page.link_order %]">
+        </div>
+        
+        <div class="form-group">
+            <label for="status">Status:</label>
+            <select name="status" id="status">
+                <option value="active" [% IF page.status == 'active' %]selected[% END %]>Active</option>
+                <option value="inactive" [% IF page.status == 'inactive' %]selected[% END %]>Inactive</option>
+                <option value="draft" [% IF page.status == 'draft' %]selected[% END %]>Draft</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="roles">Required Roles:</label>
+            <select name="roles" id="roles">
+                <option value="public" [% IF page.roles == 'public' %]selected[% END %]>Public</option>
+                <option value="member" [% IF page.roles == 'member' %]selected[% END %]>Member</option>
+                <option value="admin" [% IF page.roles == 'admin' %]selected[% END %]>Admin</option>
+            </select>
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Update Page</button>
+            <a href="/page/[% page.page_code %]" class="btn btn-secondary">View Page</a>
+            <a href="/pages" class="btn btn-secondary">Back to List</a>
+        </div>
+    </form>
+    
+    [% IF c.session.debug_mode == 1 %]
+    <div class="debug-info">
+        <h4>Debug Info:</h4>
+        <p>Page ID: [% page.id %]</p>
+        <p>Original Site: [% page.sitename %]</p>
+        <p>Current User Site: [% current_sitename %]</p>
+        <p>Is CSC: [% is_csc %]</p>
+        <p>Created: [% page.created_at %]</p>
+        <p>Updated: [% page.updated_at %]</p>
+        <p>Created By: [% page.created_by %]</p>
+    </div>
+    [% END %]
+</div>

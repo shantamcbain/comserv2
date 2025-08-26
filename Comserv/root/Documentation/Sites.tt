@@ -1,0 +1,49 @@
+[% PageVersion = 'Documentation/Sites.tt,v 0.02 2024/05/23 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [%# "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+
+
+<h1 id="site-top">Sites</h1>
+<nav>
+    <ul>
+        <li><a href="#site-overview">Overview</a></li>
+        <li><a href="#site-route-auto-setup">Route Auto Setup</a></li>
+        <li><a href="#site-fetch-and-set">Fetching and Setting Site Configuration</a></li>
+        <li><a href="#site-setup">Site Setup</a></li>
+        <li><a href="#site-improvements">Suggestions for Improvement</a></li>
+        <li><a href="#top">Back to top</a></li>
+    </ul>
+</nav>
+
+
+
+<p>
+    This document provides a detailed explanation of how we manage hosting multiple sites on our server. We will be hosting sites for our clients as well as for our own use. The following steps outline the process of mapping domain names to site configurations and setting up site-specific routes.
+</p>
+<h2 id="site-overview"><a href="#site-top">Overview of the Process</a></h2>
+<p>
+
+</p>p>
+    **Overview of the Process:**
+    1. **Retrieve Domain Name:** Extract the domain name from the request and store it in the session as `HostName`. The domain name is typically in the format `http://shanta.local:3000/`.
+    2. **Set Site Name:** Use the `HostName` to determine the `SiteName`.
+    3. **Domain-Site Mapping:** The mapping between `HostName` and `SiteName` is stored in the `sitedomain` table. The `DomainName` field stores the domain, and the `SiteName` field stores the corresponding site ID.
+    4. **Site Details Retrieval:** Use the `site_id` from the `sitedomain` table to fetch site setup details from the `sites` table. This includes parameters such as the site controller, CSS view name, site display name, email address, etc.
+    5. **Site Controller Setup:** The site controller is responsible for setting site-specific routes.
+</p>
+
+<p>
+    **Detailed Explanation:**
+    The following sections explain the code used to implement the above steps, highlighting the purpose of each part and suggesting improvements.
+</p>
+
+
+
+<h2 id="site-route-auto-setup"><a href="#site-top">Route Auto Setup</a></h2>
+
+<p>
+    In the `auto` subroutine of the `Root` controller, the following operations are performed to set up the site-specific configurations.
+</p>

@@ -1,0 +1,48 @@
+[%# INCLUDE 'layout.tt' %]
+[% PageVersion = 'dev/index.tt,v 0.01 2024/01/03 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+[% END %]
+    [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+<h1>Welcome to the Dev Site</h1>
+
+<p>This site is dedicated to tracking the development of our application and keeping the team on track.</p>
+
+<h2>Best Practices for Organizing Code in a Multi-Site Application</h2>
+<ol>
+    <li>
+<h2> Modularization</h2>
+<p>Keep the code for each site in separate modules or packages. This makes it easier to understand the code related to a specific site and reduces the risk of changes in one site affecting others.</p>
+</li>
+    <li><h2>Project Management</h2>
+<p>Project management tools are used to manage tasks, track progress, and organize work into sprints or milestones. These tools allow you to create, assign, and track tasks, and they often integrate with your codebase for seamless tracking of features and bugs.</p>
+
+<h3>GitHub Projects</h3>
+<p>GitHub Projects is a project management tool built into GitHub. It integrates seamlessly with your GitHub repositories, making it easy to link tasks to issues and pull requests.</p>
+<p>For more information on how to use GitHub Projects and to access our GitHub Projects, click <a href="/dev/github_projects">here</a>.</p>
+        <p><strong>Pros:</strong> Integrated with GitHub, easy to link tasks to code, supports automation.</p>
+<p><strong>Cons:</strong> Lacks some features compared to standalone project management tools, less powerful for non-code tasks.</p>
+</li>
+<li><h2> Shared Code</h2>
+<p>Any code that is common across multiple sites should be kept in a shared module or package. This follows the DRY (Don't Repeat Yourself) principle and makes the code easier to maintain.</p>
+</li>
+</li><li><h2> Configuration</h2>
+<p>Use a configuration file to store site-specific settings. This allows you to easily change the behavior of your application for each site without modifying the code.</p>
+</li>
+<li><h2> Routing</h2>
+<p>Use a clear and consistent routing structure. This makes it easier to understand how requests are handled and which code is responsible for each route.</p>
+</li>
+<li><h2> Documentation</h2>
+<p>Document your code and your directory structure. This makes it easier for other developers to understand how your application is organized.</p>
+</li>
+<li><h2> Automated Testing</h2>
+<p>Write automated tests for your code. This helps ensure that your application works correctly, even as you make changes and add new sites.</p>
+</li>
+<li><h2> Version Control</h2>
+<p>Use a version control system to track changes to your code. This allows you to easily see what changes have been made, who made them, and why.</p>
+</li>
+<li><h2> Continuous Integration/Continuous Deployment (CI/CD)</h2>
+<p>Use CI/CD practices to automatically test your code and deploy your application. This helps catch errors quickly and reduces the effort needed to deploy updates.</p>
+</ol>
+<p>Remember, the goal of these practices is to make your code easier to understand, maintain, and extend. The specific practices you choose may vary depending on the needs of your project and your team.</p>

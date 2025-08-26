@@ -1,0 +1,21 @@
+<head>
+    [% PageVersion = 'BMaster/yards.tt,v 0.01 2023/11/03 shanta Exp shanta ' %]
+    <meta charset="utf-8">
+    [% IF debug_mode == 1 %]
+        [% PageVersion %]
+    [% END %]
+
+</head>
+<h2>Yards</h2>
+
+[% IF yards.size %]
+    <p>Here is a list of yards in the operation:</p>
+
+    [% FOREACH yard IN yards %]
+        <h3><a href="/yards/[% yard.id %]">[% yard.name %]</a></h3>
+        <p><a href="/yards/[% yard.id %]/edit">Modify yard</a></p>
+        <p><a href="/yards/[% yard.id %]/delete">Delete yard</a></p>
+    [% END %]
+[% ELSE %]
+    <p>No yards found. <a href="/BMaster/add_yard">Add a new yard</a></p>
+[% END %]

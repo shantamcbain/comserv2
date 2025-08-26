@@ -1,0 +1,40 @@
+
+
+
+
+
+
+
+
+
+
+
+<style type="text/css">
+<!--
+
+.combobox {
+background-color: #FFFFFF;
+color: #808080;
+font-size: 10pt;
+font-family: arial;
+font-weight: bold;
+}
+
+-->
+</style>
+
+
+
+
+
+
+<form>
+
+<select class="combobox" name="SiteMap" onchange="if(options[selectedIndex].value){location = options[selectedIndex].value}" size="1">
+<option selected>Select Page  </option>
+<option value="http://computersystemconsulting.ca/cgi-bin/CSC/csc.cgi?">Home</option><option value="http://computersystemconsulting.ca/cgi-bin/CSC/webcal.cgi?">Calendar</option><option value="faq.cgi?">FAQ</option><option value="bbs.cgi?"">Forums</option><option value="http://computersystemconsulting.ca/cgi-bin/CSC/news.cgi?">News</option><option value="csc_url.cgi?">URL DB</option><option value="/cgi-bin/Extropia/extropia.cgi?">Extropia support</option><option value="/cgi-bin/Extropia/faq.cgi$">eXtropia FAQ</option><option value="/cgi-bin/Extropia/extropia_kb.cgi?">Extropia KB</option><option value="/cgi-bin/Extropia/extropia_methouds.cgi?">Extropia Methouds</option>
+</select>
+</form>
+
+
+

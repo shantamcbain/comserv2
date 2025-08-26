@@ -1,0 +1,159 @@
+[% PageVersion = 'todo/month.tt,v 0.01 2025/03/26 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<link rel="stylesheet" type="text/css" href="/static/css/week_view.css">
+
+<style>
+    .month-calendar {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+    }
+    
+    .month-calendar th, .month-calendar td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: center;
+        vertical-align: top;
+        height: 100px;
+        width: 14.28%;
+    }
+    
+    .month-calendar th {
+        background-color: #4CAF50;
+        color: white;
+        height: auto;
+    }
+    
+    .month-calendar .day-number {
+        font-weight: bold;
+        float: right;
+        margin-bottom: 5px;
+    }
+    
+    .month-calendar .todo-item {
+        background-color: #f1f1f1;
+        margin-bottom: 3px;
+        padding: 3px;
+        border-radius: 3px;
+        text-align: left;
+        font-size: 0.8em;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    
+    .month-calendar .todo-item.priority-1 {
+        background-color: #ffcccc;
+    }
+    
+    .month-calendar .todo-item.priority-2 {
+        background-color: #ffffcc;
+    }
+    
+    .month-calendar .todo-item.priority-3 {
+        background-color: #ccffcc;
+    }
+    
+    .month-navigation {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 15px;
+    }
+    
+    .month-navigation a {
+        padding: 8px 16px;
+        background-color: #4CAF50;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+    }
+    
+    .month-navigation a:hover {
+        background-color: #45a049;
+    }
+    
+    .empty-cell {
+        background-color: #f9f9f9;
+    }
+    
+    .today {
+        background-color: #e6f7ff;
+    }
+</style>
+
+<h1>[% sitename %] Todos for [% month_name %] [% year %]</h1>
+
+<div class="month-navigation">
+    <a href="/todo/month/[% prev_month_date %]">Previous Month</a>
+    <a href="/todo">Back to Todo List</a>
+    <a href="/todo/month/[% next_month_date %]">Next Month</a>
+</div>
+
+<table class="month-calendar">
+    <tr>
+        <th>Sunday</th>
+        <th>Monday</th>
+        <th>Tuesday</th>
+        <th>Wednesday</th>
+        <th>Thursday</th>
+        <th>Friday</th>
+        <th>Saturday</th>
+    </tr>
+    
+    [% SET day_count = 0 %]
+    [% FOREACH cell IN calendar %]
+        [% IF day_count % 7 == 0 %]<tr>[% END %]
+        
+        [% IF cell.day == '' %]
+            <td class="empty-cell"></td>
+        [% ELSE %]
+            [% SET is_today = 0 %]
+            [% IF cell.date == date.format(DateTime.now, '%Y-%m-%d') %]
+                [% SET is_today = 1 %]
+            [% END %]
+            
+            <td class="[% IF is_today %]today[% END %]">
+                <div class="day-number">[% cell.day %]</div>
+                
+                [% IF cell.todos.size > 0 %]
+                    [% FOREACH todo IN cell.todos %]
+                        <div class="todo-item priority-[% todo.priority %]" title="[% todo.description %]">
+                            <form action="/todo/details" method="POST">
+                                <input type="hidden" name="record_id" value="[% todo.record_id %]">
+                                <button type="submit" style="background:none; border:none; padding:0; color:inherit; text-decoration:underline; cursor:pointer; text-align:left; width:100%; overflow:hidden; text-overflow:ellipsis;">
+                                    [% todo.subject %]
+                                </button>
+                            </form>
+                        </div>
+                    [% END %]
+                [% END %]
+                
+                <form action="/todo/addtodo" method="post" style="margin-top: 5px;">
+                    <input type="hidden" name="start_date" value="[% cell.date %]">
+                    <button type="submit" style="font-size: 0.8em; padding: 2px 5px;">+</button>
+                </form>
+            </td>
+        [% END %]
+        
+        [% SET day_count = day_count + 1 %]
+        [% IF day_count % 7 == 0 %]</tr>[% END %]
+    [% END %]
+    
+    [% # Add empty cells to complete the last row if needed %]
+    [% SET remaining = 7 - (day_count % 7) %]
+    [% IF remaining < 7 %]
+        [% FOREACH i IN [1..remaining] %]
+            <td class="empty-cell"></td>
+        [% END %]
+        </tr>
+    [% END %]
+</table>
+
+<div class="month-navigation">
+    <a href="/todo/month/[% prev_month_date %]">Previous Month</a>
+    <a href="/todo">Back to Todo List</a>
+    <a href="/todo/month/[% next_month_date %]">Next Month</a>
+</div>

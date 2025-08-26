@@ -1,0 +1,232 @@
+[% META title = 'Knowledge Base' %]
+[% PageVersion = 'CSC/HelpDesk/kb.tt,v 0.01 2025/04/18 shanta Exp shanta ' %]
+
+[% IF c.session.debug_mode == 1 %]
+ <br>[% PageVersion %]</br>
+ [% IF debug_msg %]<div class="debug-message">[% debug_msg %]</div>[% END %]
+[% END %]
+
+<div class="helpdesk-container">
+    <h1>Knowledge Base</h1>
+    
+    <div class="kb-search">
+        <form method="get" action="[% c.uri_for('/HelpDesk/kb/search') %]">
+            <div class="search-container">
+                <input type="text" name="query" placeholder="Search the knowledge base..." class="search-input">
+                <button type="submit" class="search-button">Search</button>
+            </div>
+        </form>
+    </div>
+    
+    <div class="kb-categories">
+        <h2>Browse by Category</h2>
+        
+        <div class="category-grid">
+            <div class="category-card">
+                <h3>Getting Started</h3>
+                <p>Basic information for new users</p>
+                <ul>
+                    <li><a href="#">Account Setup Guide</a></li>
+                    <li><a href="#">First-Time Login</a></li>
+                    <li><a href="#">Dashboard Overview</a></li>
+                </ul>
+            </div>
+            
+            <div class="category-card">
+                <h3>Website Management</h3>
+                <p>Managing your website</p>
+                <ul>
+                    <li><a href="#">Content Management</a></li>
+                    <li><a href="#">SEO Best Practices</a></li>
+                    <li><a href="#">Website Backups</a></li>
+                </ul>
+            </div>
+            
+            <div class="category-card">
+                <h3>Email Services</h3>
+                <p>Email configuration and troubleshooting</p>
+                <ul>
+                    <li><a href="#">Setting Up Email Accounts</a></li>
+                    <li><a href="#">Email Client Configuration</a></li>
+                    <li><a href="#">Spam Filter Settings</a></li>
+                </ul>
+            </div>
+            
+            <div class="category-card">
+                <h3>Security</h3>
+                <p>Keeping your account secure</p>
+                <ul>
+                    <li><a href="#">Password Best Practices</a></li>
+                    <li><a href="#">Two-Factor Authentication</a></li>
+                    <li><a href="#">Security Audits</a></li>
+                </ul>
+            </div>
+            
+            <div class="category-card">
+                <h3>Billing & Payments</h3>
+                <p>Managing your subscription</p>
+                <ul>
+                    <li><a href="#">Payment Methods</a></li>
+                    <li><a href="#">Billing Cycles Explained</a></li>
+                    <li><a href="#">Upgrading Your Plan</a></li>
+                </ul>
+            </div>
+            
+            <div class="category-card">
+                <h3>Troubleshooting</h3>
+                <p>Common issues and solutions</p>
+                <ul>
+                    <li><a href="#">Website Loading Issues</a></li>
+                    <li><a href="#">Database Connection Errors</a></li>
+                    <li><a href="#">Error Log Analysis</a></li>
+                </ul>
+            </div>
+            
+            <div class="category-card">
+                <h3>System Administration</h3>
+                <p>Server and system administration guides</p>
+                <ul>
+                    <li><a href="[% c.uri_for('/HelpDesk/kb/linux_commands') %]">Linux Commands Reference</a></li>
+                    <li><a href="#">Server Maintenance Guide</a></li>
+                    <li><a href="#">Backup and Recovery</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <div class="kb-popular">
+        <h2>Popular Articles</h2>
+        
+        <ul class="article-list">
+            <li>
+                <a href="#">How to Reset Your Password</a>
+                <span class="article-views">1,245 views</span>
+            </li>
+            <li>
+                <a href="#">Troubleshooting Email Delivery Issues</a>
+                <span class="article-views">982 views</span>
+            </li>
+            <li>
+                <a href="#">Setting Up Website Redirects</a>
+                <span class="article-views">876 views</span>
+            </li>
+            <li>
+                <a href="#">Optimizing Website Performance</a>
+                <span class="article-views">754 views</span>
+            </li>
+            <li>
+                <a href="#">Understanding Hosting Plans</a>
+                <span class="article-views">689 views</span>
+            </li>
+        </ul>
+    </div>
+</div>
+
+<style>
+    .helpdesk-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .kb-search {
+        margin-bottom: 30px;
+    }
+    
+    .search-container {
+        display: flex;
+        max-width: 600px;
+        margin: 0 auto;
+    }
+    
+    .search-input {
+        flex: 1;
+        padding: 12px;
+        border: 1px solid #ced4da;
+        border-radius: 4px 0 0 4px;
+        font-size: 16px;
+    }
+    
+    .search-button {
+        padding: 12px 24px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 0 4px 4px 0;
+        cursor: pointer;
+        font-size: 16px;
+    }
+    
+    .kb-categories {
+        margin-bottom: 40px;
+    }
+    
+    .category-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        gap: 20px;
+        margin-top: 20px;
+    }
+    
+    .category-card {
+        background-color: #f8f9fa;
+        border-radius: 5px;
+        padding: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .category-card h3 {
+        color: #007bff;
+        margin-top: 0;
+        margin-bottom: 10px;
+    }
+    
+    .category-card p {
+        color: #6c757d;
+        margin-bottom: 15px;
+    }
+    
+    .category-card ul {
+        padding-left: 20px;
+    }
+    
+    .category-card li {
+        margin-bottom: 8px;
+    }
+    
+    .kb-popular {
+        background-color: #e9ecef;
+        padding: 20px;
+        border-radius: 5px;
+    }
+    
+    .article-list {
+        list-style: none;
+        padding: 0;
+    }
+    
+    .article-list li {
+        padding: 12px 0;
+        border-bottom: 1px solid #dee2e6;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .article-list li:last-child {
+        border-bottom: none;
+    }
+    
+    .article-views {
+        color: #6c757d;
+        font-size: 0.875rem;
+    }
+    
+    .debug-message {
+        background-color: #f8d7da;
+        color: #721c24;
+        padding: 10px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+    }
+</style>

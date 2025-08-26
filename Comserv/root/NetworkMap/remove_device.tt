@@ -1,0 +1,150 @@
+[% META title = 'Remove Device' %]
+[% PageVersion = 'NetworkMap/remove_device.tt,v 0.01 2025/04/20 shanta Exp shanta ' %]
+
+[% IF c.session.debug_mode == 1 %]
+ <br>[% PageVersion %]</br>
+ [% IF debug_msg.size %]
+   <div class="debug-message">
+     <ul>
+     [% FOREACH msg IN debug_msg %]
+       <li>[% msg %]</li>
+     [% END %]
+     </ul>
+   </div>
+ [% END %]
+[% END %]
+
+<div class="network-map-container">
+    <h1>Remove Device: [% device_name | html %]</h1>
+    
+    <div class="network-map-actions">
+        <div class="action-buttons">
+            <a href="[% c.uri_for('/NetworkMap') %]" class="btn btn-secondary">Back to Network Map</a>
+            <a href="[% c.uri_for('/NetworkMap/view_device', device_name) %]" class="btn btn-info">View Device Details</a>
+        </div>
+    </div>
+    
+    [% IF status_msg %]
+        <div class="alert alert-success">[% status_msg %]</div>
+    [% END %]
+    
+    [% IF error_msg %]
+        <div class="alert alert-danger">[% error_msg %]</div>
+    [% END %]
+    
+    <div class="confirmation-box">
+        <div class="warning-message">
+            <h2>Warning: This action cannot be undone!</h2>
+            <p>You are about to remove the device <strong>[% device_name | html %]</strong> from the network map.</p>
+            <p>IP Address: <strong>[% device.ip | html %]</strong></p>
+            <p>Type: <strong>[% device.type | html %]</strong></p>
+            <p>Description: <strong>[% device.description | html %]</strong></p>
+        </div>
+        
+        <form action="[% c.uri_for('/NetworkMap/remove_device', device_name) %]" method="post" class="remove-form">
+            <div class="form-actions">
+                <button type="submit" class="btn btn-danger">Confirm Removal</button>
+                <a href="[% c.uri_for('/NetworkMap') %]" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .network-map-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .network-map-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    
+    .action-buttons {
+        display: flex;
+        gap: 10px;
+    }
+    
+    .btn {
+        display: inline-block;
+        padding: 8px 16px;
+        text-decoration: none;
+        border-radius: 4px;
+        font-weight: 500;
+        border: none;
+        cursor: pointer;
+    }
+    
+    .btn-danger {
+        background-color: #dc3545;
+        color: white;
+    }
+    
+    .btn-secondary {
+        background-color: #6c757d;
+        color: white;
+    }
+    
+    .btn-info {
+        background-color: #17a2b8;
+        color: white;
+    }
+    
+    .alert {
+        padding: 12px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+    }
+    
+    .alert-success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .alert-danger {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+    
+    .confirmation-box {
+        background-color: #f8f9fa;
+        padding: 20px;
+        border-radius: 5px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .warning-message {
+        margin-bottom: 20px;
+        padding: 15px;
+        background-color: #fff3cd;
+        border: 1px solid #ffeeba;
+        border-radius: 4px;
+        color: #856404;
+    }
+    
+    .warning-message h2 {
+        color: #dc3545;
+        margin-top: 0;
+        font-size: 1.5rem;
+    }
+    
+    .form-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+    }
+    
+    .debug-message {
+        background-color: #f8d7da;
+        color: #721c24;
+        padding: 10px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+    }
+</style>

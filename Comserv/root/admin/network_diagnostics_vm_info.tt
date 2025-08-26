@@ -1,0 +1,220 @@
+[% META title = 'VM and Container Information' %]
+<!-- File: /home/shanta/PycharmProjects/comserv2/Comserv/root/admin/network_diagnostics_vm_info.tt -->
+[% PageVersion = 'admin/network_diagnostics_vm_info.tt,v 0.01 2025/08/31 shanta Exp shanta ' %]
+
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<!-- Quick Navigation -->
+<div class="quick-nav">
+    <a href="[% c.uri_for('/admin') %]" class="btn btn-sm btn-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Admin Dashboard
+    </a>
+    <a href="[% c.uri_for('/admin/network_diagnostics') %]" class="btn btn-sm btn-primary">
+        <i class="fas fa-network-wired"></i> Network Diagnostics
+    </a>
+    <a href="[% c.uri_for('/admin/network_diagnostics/system_info') %]" class="btn btn-sm btn-info">
+        <i class="fas fa-server"></i> System Info
+    </a>
+</div>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>VM and Container Information</h1>
+            
+            <!-- User status banner -->
+            <div class="alert alert-info mb-4">
+                <strong>Welcome [% c.session.username || 'Guest' %][% IF c.session.roles.grep('^admin$').size %] Administrator[% END %] to Computer System Consulting!</strong>
+            </div>
+            
+            [% IF debug_msg || c.session.debug_mode == 1 %]
+                <div class="alert alert-info">
+                    <strong>Debug Information:</strong>
+                    [% IF debug_msg %]
+                        [% FOREACH msg IN debug_msg %]
+                            <p>[% msg %]</p>
+                        [% END %]
+                    [% END %]
+                    <p>User: [% c.session.username || 'Guest' %]</p>
+                    <p>Roles: [% c.session.roles.join(', ') || 'None' %]</p>
+                </div>
+            [% END %]
+            
+            [% IF error_msg %]
+                <div class="alert alert-danger">
+                    <strong>Error:</strong> [% error_msg %]
+                </div>
+            [% END %]
+            
+            [% IF success_msg %]
+                <div class="alert alert-success">
+                    <strong>Success:</strong> [% success_msg %]
+                </div>
+            [% END %]
+            
+            [% IF warning_msg %]
+                <div class="alert alert-warning">
+                    <strong>Warning:</strong> [% warning_msg %]
+                </div>
+            [% END %]
+            
+            <!-- Network Map Information -->
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h3 class="mb-0">Network Map Overview</h3>
+                        </div>
+                        <div class="card-body">
+                            <h4>Networks</h4>
+                            <div class="table-responsive">
+                                <table class="table table-striped table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Name</th>
+                                            <th>CIDR</th>
+                                            <th>Description</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        [% FOREACH network_id IN networks.keys.sort %]
+                                            <tr>
+                                                <td>[% network_id | html %]</td>
+                                                <td>[% networks.$network_id.name | html %]</td>
+                                                <td>[% networks.$network_id.cidr | html %]</td>
+                                                <td>[% networks.$network_id.description | html %]</td>
+                                            </tr>
+                                        [% END %]
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <h4>Devices</h4>
+                            <div class="table-responsive">
+                                <table class="table table-striped table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>IP</th>
+                                            <th>Network</th>
+                                            <th>Type</th>
+                                            <th>Location</th>
+                                            <th>Purpose</th>
+                                            <th>Services</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        [% FOREACH device_id IN devices.keys.sort %]
+                                            <tr>
+                                                <td>[% device_id | html %]</td>
+                                                <td>[% devices.$device_id.ip | html %]</td>
+                                                <td>[% devices.$device_id.network | html %]</td>
+                                                <td>[% devices.$device_id.type | html %]</td>
+                                                <td>[% devices.$device_id.location | html %]</td>
+                                                <td>[% devices.$device_id.purpose | html %]</td>
+                                                <td>[% devices.$device_id.services.join(', ') | html %]</td>
+                                            </tr>
+                                        [% END %]
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Virtual Machine Information -->
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header bg-success text-white">
+                            <h3 class="mb-0">Virtual Machine Status</h3>
+                        </div>
+                        <div class="card-body">
+                            <pre class="command-output">[% vm_status | html %]</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Docker Information -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-info text-white">
+                            <h3 class="mb-0">Docker Containers</h3>
+                        </div>
+                        <div class="card-body">
+                            <pre class="command-output">[% docker_status | html %]</pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-info text-white">
+                            <h3 class="mb-0">Docker Images</h3>
+                        </div>
+                        <div class="card-body">
+                            <pre class="command-output">[% docker_images | html %]</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header bg-info text-white">
+                            <h3 class="mb-0">Docker Networks</h3>
+                        </div>
+                        <div class="card-body">
+                            <pre class="command-output">[% docker_networks | html %]</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Kubernetes Information -->
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header bg-warning text-white">
+                            <h3 class="mb-0">Kubernetes Nodes</h3>
+                        </div>
+                        <div class="card-body">
+                            <pre class="command-output">[% kubectl_nodes | html %]</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-warning text-white">
+                            <h3 class="mb-0">Kubernetes Pods</h3>
+                        </div>
+                        <div class="card-body">
+                            <pre class="command-output">[% kubectl_pods | html %]</pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-warning text-white">
+                            <h3 class="mb-0">Kubernetes Services</h3>
+                        </div>
+                        <div class="card-body">
+                            <pre class="command-output">[% kubectl_services | html %]</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

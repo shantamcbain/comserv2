@@ -1,0 +1,35 @@
+[% PageVersion	= 'SiteAdminNotes.tt,v 0.01 2024/01/12 shanta Exp shanta '	%]
+[% IF c.session.debug_mode == 1 %]
+ [%	PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+[%  group = c.session.group %]
+[% IF username == 'Shanta' OR
+        group   == 'admin' OR
+       group   == 'BHN_admin' OR
+       group   == 'BMaster_Admin' OR
+       group   == 'USBM_admin' OR
+  	    group   == 'Apis_Admin' OR
+  	    group   == 'AnuCollective_admin' OR
+       group   == 'ECF_admin' OR
+       group   == 'LumbyThrift_admin' OR
+       group   == 'HE_admin' OR
+       group   == 'WiseWoman_admin'
+%]
+
+
+  [% FOREACH link = c.stash.query("SELECT * FROM page_tb
+                                  WHERE  (status  = 2 AND
+                                         page_code = 'SiteAdminNotes' AND
+                                         sitename = '$SiteName' )
+                                  ORDER BY sitename
+                                  ")%]
+               [% PROCESS AdminNotes.ttml %]
+ [% END %]
+
+
+  <p><a href="/cgi-bin/page.cgi?site=[% SiteName %]&[% session_string %]&display_modification_form=on&record_id=[%
+  ARecord_id %]" target="_blank"><h3>Click this link to edit admin notes </h3></a> </p>
+   [% AdminNotes   %]
+ [% END %]

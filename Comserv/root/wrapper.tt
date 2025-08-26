@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>[% template.title || 'Comserv' %]</title>
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/css/bootstrap.min.css">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    
+    <!-- Base CSS -->
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="/static/css/base.css">
+
+    <!-- Theme CSS - using JSON-based theme system -->
+    [%
+        # The theme_name should be set in the stash by the Root controller's set_theme method
+        # But we'll add a fallback just in case
+
+        # Default theme
+        IF !theme_name;
+            theme_name = 'default';
+
+            # Set theme based on site name (lowercase)
+            site_name_lower = c.session.SiteName | lower;
+
+            # Check if we have a CSS file for this site
+            IF site_name_lower == 'csc' || site_name_lower == 'apis' || site_name_lower == 'usbm';
+                theme_name = site_name_lower;
+            END;
+        END;
+
+        # Log the theme selection
+        IF c.session.debug_mode == 1;
+            c.log.info("Selected theme: " _ theme_name _ " for site: " _ c.session.SiteName);
+            IF available_themes;
+                c.log.info("Available themes: " _ available_themes.join(", "));
+            END;
+        END;
+    %]
+    <!-- Theme CSS: [% theme_name %] -->
+    <link rel="stylesheet" type="text/css" href="/static/css/themes/[% theme_name %].css">
+
+    <!-- Site-specific CSS (for backward compatibility) -->
+    [% IF c.session.SiteName %]
+    <link rel="stylesheet" href="/static/css/[% c.session.SiteName %]style.css">
+    [% END %]
+    
+    <!-- Back to Top CSS -->
+    <link rel="stylesheet" href="/static/css/back-to-top.css">
+    
+    <!-- Additional CSS -->
+    [% IF additional_css %]
+    [% FOREACH css_file IN additional_css %]
+    <link rel="stylesheet" href="[% css_file %]">
+    [% END %]
+    [% END %]
+    
+    <!-- Additional JavaScript -->
+    [% IF additional_js %]
+    [% FOREACH js_file IN additional_js %]
+    <script src="[% js_file %]"></script>
+    [% END %]
+    [% END %]
+</head>
+<body class="theme-[% theme_name %]">
+    <header class="site-header">
+        <div class="container">
+            <div class="row">
+                <div class="col-50">
+                    <h1>[% c.session.SiteName || 'Comserv' %]</h1>
+                </div>
+                <div class="col-50" style="text-align: right;">
+                    [% IF c.user_exists %]
+                    <p>Welcome, [% c.user.username %] | <a href="/logout">Logout</a></p>
+                    [% ELSE %]
+                    <p><a href="/login">Login</a></p>
+                    [% END %]
+                </div>
+            </div>
+        </div>
+    </header>
+    
+    <nav>
+        [% INCLUDE 'navigation.tt' %]
+    </nav>
+    
+    <!-- Use container or container-fluid based on template needs -->
+    [% IF use_fluid_container %]
+    <div class="container-fluid">
+    [% ELSE %]
+    <div class="container">
+    [% END %]
+        <div class="row">
+            <div class="col-md-3">
+                [% INCLUDE 'sidebar.tt' %]
+            </div>
+            <div class="col-md-9">
+                <main class="main-content">
+                    [% IF error %]
+                    <div class="alert alert-danger" role="alert">
+                        <i class="fas fa-exclamation-circle"></i> [% error %]
+                    </div>
+                    [% END %]
+                    
+                    [% IF message %]
+                    <div class="alert alert-success" role="alert">
+                        <i class="fas fa-check-circle"></i> [% message %]
+                    </div>
+                    [% END %]
+                    
+                    [% content %]
+                </main>
+            </div>
+        </div>
+    </div>
+    
+    <footer class="site-footer">
+        <div class="container">
+            <p>&copy; [% current_year || '2023' %] [% c.session.SiteName || 'Comserv' %]. All rights reserved.</p>
+        </div>
+    </footer>
+    
+    <!-- Back to Top Button -->
+    <button id="back-to-top" title="Back to Top" aria-label="Back to Top">
+        <i class="fas fa-arrow-up" aria-hidden="true"></i>
+    </button>
+
+    <!-- jQuery and Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Back to Top Script -->
+    <script src="/static/js/back-to-top.js"></script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+[% PageVersion  = 'old_todo.tt,v 0.01 2023/12/07 Shanta Exp Shanta' %]
+[% IF debug_mode == 1 %]
+
+    <p>Error: [% error_msg %]</p>
+    [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [% INCLUDE 'debug.tt' %]
+[% END %]
+<h1>Old todo add form.</h1>
+[% database = 'ency' %][% table = 'todo'%]
+<form action="/create/[% database %]/[% table %]" method="post">
+    [% FOREACH column IN columns %]
+        <label for="[% column %]">[% column %]:</label>
+        [% IF column == 'sitename' %]
+            <select id="sitename" name="sitename">
+                [% FOREACH site IN sites %]
+                    <option value="[% site %]" [% IF site == session.sitename %]selected[% END %]>[% site %]</option>
+                [% END %]
+            </select>
+            <button type="button" onclick="location.href='/add_site';">Add Site</button><br>
+        [% ELSIF column == 'company_code' %]
+            <select id="company_code" name="company_code">
+                [% FOREACH code IN company_codes %]
+                    <option value="[% code %]">[% code %]</option>
+                [% END %]
+            </select>
+            <button type="button" onclick="location.href='/add_client';">Add Client</button><br>
+        [% ELSIF column == 'priority' %]
+            <select id="priority" name="priority">
+                [% FOREACH key IN priority.keys.sort %]
+                    <option value="[% key %]">[% priority.$key %]</option>
+                [% END %]
+            </select><br>
+        [% ELSIF column == 'status' %]
+            <select id="status" name="status">
+                [% FOREACH key IN status.keys.sort %]
+                    <option value="[% key %]">[% status.$key %]</option>
+                [% END %]
+            </select><br>
+        [% ELSIF column == 'share' %]
+            <select id="share" name="share">
+                [% FOREACH key IN share.keys.sort %]
+                    <option value="[% key %]">[% share.$key %]</option>
+                [% END %]
+            </select><br>
+
+        [% ELSIF column == 'project_name' %]
+            <select id="project_name" name="project_name">
+                [% FOREACH name IN project_names %]
+                    <option value="[% name %]">[% name %]</option>
+                [% END %]
+            </select><br>
+        [% ELSIF column == 'project_code' %]
+            <select id="project_code" name="project_code">
+                [% FOREACH code IN project_codes %]
+                    <option value="[% code %]">[% code %]</option>
+                [% END %]
+            </select>
+            <button type="button" onclick="location.href='/add_project';">Add Project</button><br>
+        [% ELSIF column.match('date') %]
+            <input type="date" id="[% column %]" name="[% column %]" value="[% date.format('%Y-%m-%d') %]"><br>
+        [% ELSIF column == 'record_id' %]
+            <input type="text" id="record_id" name="record_id" readonly><br>
+        [% ELSE %]
+            <input type="text" id="[% column %]" name="[% column %]"><br>
+        [% END %]
+    [% END %]
+    <input type="submit" value="Add Record">
+</form>

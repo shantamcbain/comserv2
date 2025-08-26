@@ -1,0 +1,69 @@
+[% PageVersion	= 'Monashee/MonasheeCoopAdmin.tt,v 0.01 2024/01/12 shanta Exp shanta '	%]
+[% IF c.session.debug_mode == 1 %]
+ [%	PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+
+
+<p>Thanks for logging in! This is your admin view of the site.</p>
+
+
+
+
+<ul>
+ <li><h2>Education</h2>
+  <ul>
+   <li>Admin users in how to edit and maintain the main site.  </li>
+  <li>Provide ToDo's, logs etc for admin to see what is being worked on on the site. This can also apply to internal activities of the coop as well.</li>
+  </ul>
+ <li><h2>Plan the future of the site.</h2>
+  </li>
+
+   <li><h2>Customer Support.</h2>
+    <ul>
+     <li>Added a Chat link to site. Removed due to incompatibility of plug-in.</li>
+     <li>Added HelpDesk link</li>
+    </ul>
+  </li>
+   <li><h2>Staff Support.</h2>
+    <ul>
+     <li>Use the Chat link for immediate help from support.</li>
+     <li>Please use the Submit a support ticket link in the HelpDesk Drop list in the upper right.</li>
+    </ul>
+  </li><li><h2>Perks provided by CSC for the.</h2>
+    <ul>
+     <li><a href="http://www.computersystemconsulting.ca/whmcs/affiliates.php" target="_blank">Affiliate program</a>. We have an affiliate system System available. If you opt  in to this program you will receive a credit to your support account for any payed referral to our services. We pay a percent each time the referral pays for as long as they stay with us.</li>
+    </ul>
+  </li>
+ </ul>
+
+
+
+
+<ul>
+ <li><h2>Education</h2>
+  <ul>
+   <li>Admin users in how to edit and maintain the main site.  </li>
+  <li>Provide ToDo's, logs etc for admin to see what is being worked on on the site. This can also apply to internal activities of the coop as well.</li>
+  </ul>
+ <li><h2>Plan the future of the site.</h2>
+  </li>
+
+   <li><h2>Customer Support.</h2>
+    <ul>
+     <li>Added Chat link to site. Removed due to incompatibility of plug in.</li>
+     <li>Added HelpDesk link</li>
+    </ul>
+  </li>
+   <li><h2>Staff Support.</h2>
+    <ul>
+     <li>Use the Chat link for immediate help from support.</li>
+     <li>Please use the Submit a support ticket link in the HelpDesk Drop list in the upper right.</li>
+    </ul>
+  </li><li><h2>Perks provided by CSC for the.</h2>
+    <ul>
+     <li><a href="http://www.computersystemconsulting.ca/whmcs/affiliates.php" target="_blank">Affiliate program</a>. We have an affiliate system available. If you opt in to this program, you will receive a credit to your support account for any payed referral to our services. We pay a percent each time the referral pays for as long as they stay with us.</li>
+    </ul>
+  </li>
+ </ul>

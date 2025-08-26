@@ -1,0 +1,13 @@
+[% IF c.stash.error_msg %]
+    <div class="error-message">
+        [% FOREACH msg IN c.stash.error_msg %]
+            <p class="error">[% msg %]</p>
+        [% END %]
+    </div>
+[% END %]
+
+[% IF c.session.success_msg %]
+    <div class="success-message">
+        [% c.session.success_msg %]
+    </div>
+[% END %]

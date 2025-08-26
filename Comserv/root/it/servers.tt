@@ -1,0 +1,344 @@
+[% PageVersion = 'it/servers.tt,v 1.0 2025/05/15 Shanta Exp Shanta' %]
+[% IF c.session.debug_mode == 1 %]
+    [%	PageVersion %]
+
+    [% INCLUDE 'debug.tt' %]
+[% END %]
+
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>Server Information</h1>
+            <p class="lead">Information about our server infrastructure.</p>
+            
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="[% c.uri_for('/it') %]">IT Home</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Servers</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h4>Server Infrastructure Overview</h4>
+                </div>
+                <div class="card-body">
+                    <p>Our server infrastructure is built on a virtualized environment using Proxmox VE, providing high availability, scalability, and efficient resource utilization. The infrastructure is designed with redundancy at multiple levels to ensure business continuity.</p>
+                    
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <h5>Physical Infrastructure</h5>
+                            <ul>
+                                <li><strong>Server Hardware:</strong> Dell PowerEdge R740 Servers</li>
+                                <li><strong>Storage:</strong> Dell EMC Unity XT Storage Array</li>
+                                <li><strong>Backup:</strong> Dell EMC Data Domain</li>
+                                <li><strong>Network:</strong> Cisco Nexus Switches</li>
+                                <li><strong>Power:</strong> Redundant UPS and Generator Backup</li>
+                                <li><strong>Cooling:</strong> Precision Air Conditioning</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h5>Virtualization Platform</h5>
+                            <ul>
+                                <li><strong>Hypervisor:</strong> Proxmox VE 8.0</li>
+                                <li><strong>Cluster Size:</strong> 5 Nodes</li>
+                                <li><strong>High Availability:</strong> Yes, with automatic failover</li>
+                                <li><strong>Storage Replication:</strong> ZFS with synchronous replication</li>
+                                <li><strong>Backup Strategy:</strong> Daily snapshots, weekly full backups</li>
+                                <li><strong>Disaster Recovery:</strong> Offsite replication</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h4>Server Environment</h4>
+                </div>
+                <div class="card-body">
+                    <ul class="nav nav-tabs" id="serverTabs" role="tablist">
+                        <li class="nav-item">
+                            <a class="nav-link active" id="production-tab" data-toggle="tab" href="#production" role="tab" aria-controls="production" aria-selected="true">Production</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="development-tab" data-toggle="tab" href="#development" role="tab" aria-controls="development" aria-selected="false">Development</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="testing-tab" data-toggle="tab" href="#testing" role="tab" aria-controls="testing" aria-selected="false">Testing</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="backup-tab" data-toggle="tab" href="#backup" role="tab" aria-controls="backup" aria-selected="false">Backup</a>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content mt-3" id="serverTabContent">
+                        <div class="tab-pane fade show active" id="production" role="tabpanel" aria-labelledby="production-tab">
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Server Name</th>
+                                            <th>Role</th>
+                                            <th>Operating System</th>
+                                            <th>Resources</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>PROD-WEB01</td>
+                                            <td>Web Server</td>
+                                            <td>Ubuntu 22.04 LTS</td>
+                                            <td>8 vCPU, 16GB RAM, 100GB SSD</td>
+                                            <td><span class="badge badge-success">Online</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>PROD-WEB02</td>
+                                            <td>Web Server</td>
+                                            <td>Ubuntu 22.04 LTS</td>
+                                            <td>8 vCPU, 16GB RAM, 100GB SSD</td>
+                                            <td><span class="badge badge-success">Online</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>PROD-DB01</td>
+                                            <td>Database Server</td>
+                                            <td>Ubuntu 22.04 LTS</td>
+                                            <td>16 vCPU, 64GB RAM, 500GB SSD</td>
+                                            <td><span class="badge badge-success">Online</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>PROD-DB02</td>
+                                            <td>Database Server (Replica)</td>
+                                            <td>Ubuntu 22.04 LTS</td>
+                                            <td>16 vCPU, 64GB RAM, 500GB SSD</td>
+                                            <td><span class="badge badge-success">Online</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>PROD-APP01</td>
+                                            <td>Application Server</td>
+                                            <td>Ubuntu 22.04 LTS</td>
+                                            <td>8 vCPU, 32GB RAM, 200GB SSD</td>
+                                            <td><span class="badge badge-success">Online</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>PROD-APP02</td>
+                                            <td>Application Server</td>
+                                            <td>Ubuntu 22.04 LTS</td>
+                                            <td>8 vCPU, 32GB RAM, 200GB SSD</td>
+                                            <td><span class="badge badge-success">Online</span></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <div class="tab-pane fade" id="development" role="tabpanel" aria-labelledby="development-tab">
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Server Name</th>
+                                            <th>Role</th>
+                                            <th>Operating System</th>
+                                            <th>Resources</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>DEV-WEB01</td>
+                                            <td>Web Server</td>
+                                            <td>Ubuntu 22.04 LTS</td>
+                                            <td>4 vCPU, 8GB RAM, 100GB SSD</td>
+                                            <td><span class="badge badge-success">Online</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>DEV-DB01</td>
+                                            <td>Database Server</td>
+                                            <td>Ubuntu 22.04 LTS</td>
+                                            <td>8 vCPU, 16GB RAM, 200GB SSD</td>
+                                            <td><span class="badge badge-success">Online</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>DEV-APP01</td>
+                                            <td>Application Server</td>
+                                            <td>Ubuntu 22.04 LTS</td>
+                                            <td>4 vCPU, 16GB RAM, 100GB SSD</td>
+                                            <td><span class="badge badge-success">Online</span></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <div class="tab-pane fade" id="testing" role="tabpanel" aria-labelledby="testing-tab">
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Server Name</th>
+                                            <th>Role</th>
+                                            <th>Operating System</th>
+                                            <th>Resources</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>TEST-WEB01</td>
+                                            <td>Web Server</td>
+                                            <td>Ubuntu 22.04 LTS</td>
+                                            <td>4 vCPU, 8GB RAM, 100GB SSD</td>
+                                            <td><span class="badge badge-success">Online</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>TEST-DB01</td>
+                                            <td>Database Server</td>
+                                            <td>Ubuntu 22.04 LTS</td>
+                                            <td>8 vCPU, 16GB RAM, 200GB SSD</td>
+                                            <td><span class="badge badge-success">Online</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>TEST-APP01</td>
+                                            <td>Application Server</td>
+                                            <td>Ubuntu 22.04 LTS</td>
+                                            <td>4 vCPU, 16GB RAM, 100GB SSD</td>
+                                            <td><span class="badge badge-warning">Maintenance</span></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <div class="tab-pane fade" id="backup" role="tabpanel" aria-labelledby="backup-tab">
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Server Name</th>
+                                            <th>Role</th>
+                                            <th>Operating System</th>
+                                            <th>Resources</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>BACKUP-01</td>
+                                            <td>Backup Server</td>
+                                            <td>Ubuntu 22.04 LTS</td>
+                                            <td>8 vCPU, 32GB RAM, 10TB Storage</td>
+                                            <td><span class="badge badge-success">Online</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>BACKUP-02</td>
+                                            <td>Offsite Backup Server</td>
+                                            <td>Ubuntu 22.04 LTS</td>
+                                            <td>8 vCPU, 32GB RAM, 10TB Storage</td>
+                                            <td><span class="badge badge-success">Online</span></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h4>Server Maintenance Schedule</h4>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Time</th>
+                                    <th>Servers</th>
+                                    <th>Maintenance Type</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>May 20, 2025</td>
+                                    <td>22:00 - 00:00</td>
+                                    <td>All Production Servers</td>
+                                    <td>Security Updates</td>
+                                </tr>
+                                <tr>
+                                    <td>May 25, 2025</td>
+                                    <td>22:00 - 02:00</td>
+                                    <td>Database Servers</td>
+                                    <td>Database Maintenance</td>
+                                </tr>
+                                <tr>
+                                    <td>June 5, 2025</td>
+                                    <td>22:00 - 00:00</td>
+                                    <td>All Development Servers</td>
+                                    <td>OS Upgrades</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h4>Server Documentation</h4>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group">
+                        <li class="list-group-item"><a href="#"><i class="fas fa-file-pdf"></i> Server Architecture Diagram</a></li>
+                        <li class="list-group-item"><a href="#"><i class="fas fa-file-alt"></i> Server Naming Convention</a></li>
+                        <li class="list-group-item"><a href="#"><i class="fas fa-file-alt"></i> Backup and Recovery Procedures</a></li>
+                        <li class="list-group-item"><a href="#"><i class="fas fa-file-alt"></i> Server Hardening Guidelines</a></li>
+                        <li class="list-group-item"><a href="#"><i class="fas fa-file-alt"></i> Disaster Recovery Plan</a></li>
+                        <li class="list-group-item"><a href="#"><i class="fas fa-file-alt"></i> Server Monitoring Guide</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+[% IF debug_mode == 1 %]
+    <div class="container mt-4">
+        <div class="card">
+            <div class="card-header bg-dark text-white">
+                Debug Information
+            </div>
+            <div class="card-body">
+                <p>Page Version: [% PageVersion %]</p>
+                [% IF debug_msg.defined && debug_msg.size > 0 %]
+                    <div class="debug-messages">
+                        [% FOREACH msg IN debug_msg %]
+                            <p class="debug">Debug: [% msg %]</p>
+                        [% END %]
+                    </div>
+                [% END %]
+            </div>
+        </div>
+    </div>
+[% END %]
+
+[% PROCESS footer.tt %]

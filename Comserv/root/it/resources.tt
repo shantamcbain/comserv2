@@ -1,0 +1,95 @@
+[% PageVersion = 'it/resources.tt,v 1.0 2025/05/15 Shanta Exp Shanta' %]
+[% IF c.session.debug_mode == 1 %]
+    [%	PageVersion %]
+
+    [% INCLUDE 'debug.tt' %]
+[% END %]
+
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>IT Resources</h1>
+            <p class="lead">Access IT resources and information.</p>
+            
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="[% c.uri_for('/it') %]">IT Home</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Resources</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h4>Available Resources</h4>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Resource</th>
+                                    <th>Description</th>
+                                    <th>Access</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Knowledge Base</td>
+                                    <td>IT knowledge base with solutions to common problems</td>
+                                    <td><a href="#" class="btn btn-sm btn-primary">Access</a></td>
+                                </tr>
+                                <tr>
+                                    <td>Software Repository</td>
+                                    <td>Repository of approved software for installation</td>
+                                    <td><a href="#" class="btn btn-sm btn-primary">Access</a></td>
+                                </tr>
+                                <tr>
+                                    <td>IT Policies</td>
+                                    <td>IT policies and procedures documentation</td>
+                                    <td><a href="#" class="btn btn-sm btn-primary">Access</a></td>
+                                </tr>
+                                <tr>
+                                    <td>Training Materials</td>
+                                    <td>IT training materials and guides</td>
+                                    <td><a href="#" class="btn btn-sm btn-primary">Access</a></td>
+                                </tr>
+                                <tr>
+                                    <td>Asset Management</td>
+                                    <td>IT asset management system</td>
+                                    <td><a href="#" class="btn btn-sm btn-primary">Access</a></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+[% IF debug_mode == 1 %]
+    <div class="container mt-4">
+        <div class="card">
+            <div class="card-header bg-dark text-white">
+                Debug Information
+            </div>
+            <div class="card-body">
+                <p>Page Version: [% PageVersion %]</p>
+                [% IF debug_msg.defined && debug_msg.size > 0 %]
+                    <div class="debug-messages">
+                        [% FOREACH msg IN debug_msg %]
+                            <p class="debug">Debug: [% msg %]</p>
+                        [% END %]
+                    </div>
+                [% END %]
+            </div>
+        </div>
+    </div>
+[% END %]
+
+[% PROCESS footer.tt %]

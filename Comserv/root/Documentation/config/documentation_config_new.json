@@ -1,0 +1,128 @@
+{
+  "categories": {
+    "user_guides": {
+      "title": "User Guides",
+      "description": "Documentation for end users of the system",
+      "icon": "fas fa-users",
+      "display_order": 1
+    },
+    "admin_guides": {
+      "title": "Administrator Guides",
+      "description": "Documentation for system administrators",
+      "icon": "fas fa-shield-alt",
+      "display_order": 2
+    },
+    "developer_guides": {
+      "title": "Developer Documentation",
+      "description": "Documentation for developers",
+      "icon": "fas fa-code",
+      "display_order": 3
+    },
+    "tutorials": {
+      "title": "Tutorials",
+      "description": "Step-by-step guides for common tasks",
+      "icon": "fas fa-graduation-cap",
+      "display_order": 4
+    },
+    "site_specific": {
+      "title": "Site-Specific Documentation",
+      "description": "Documentation specific to this site",
+      "icon": "fas fa-building",
+      "display_order": 5
+    },
+    "modules": {
+      "title": "Module Documentation",
+      "description": "Documentation for specific system modules",
+      "icon": "fas fa-puzzle-piece",
+      "display_order": 6
+    },
+    "changelog": {
+      "title": "Changelog",
+      "description": "System changes and updates",
+      "icon": "fas fa-history",
+      "display_order": 7
+    },
+    "controllers": {
+      "title": "Controller Documentation",
+      "description": "Documentation for system controllers",
+      "icon": "fas fa-cogs",
+      "display_order": 8
+    },
+    "models": {
+      "title": "Model Documentation",
+      "description": "Documentation for system models",
+      "icon": "fas fa-database",
+      "display_order": 9
+    },
+    "proxmox": {
+      "title": "Proxmox Documentation",
+      "description": "Documentation for Proxmox virtualization environment",
+      "icon": "fas fa-server",
+      "display_order": 10
+    },
+    "documentation": {
+      "title": "Documentation System",
+      "description": "Documentation about the documentation system itself",
+      "icon": "fas fa-book",
+      "display_order": 11
+    }
+  },
+  "tags": {
+    "login": {
+      "title": "Login",
+      "description": "Documentation related to login functionality"
+    },
+    "authentication": {
+      "title": "Authentication",
+      "description": "Documentation related to authentication"
+    },
+    "user_management": {
+      "title": "User Management",
+      "description": "Documentation related to user management"
+    },
+    "configuration": {
+      "title": "Configuration",
+      "description": "Documentation related to system configuration"
+    },
+    "installation": {
+      "title": "Installation",
+      "description": "Documentation related to installation"
+    },
+    "api": {
+      "title": "API",
+      "description": "Documentation related to API functionality"
+    },
+    "templates": {
+      "title": "Templates",
+      "description": "Documentation related to templates"
+    },
+    "troubleshooting": {
+      "title": "Troubleshooting",
+      "description": "Documentation related to troubleshooting"
+    },
+    "security": {
+      "title": "Security",
+      "description": "Documentation related to security"
+    },
+    "performance": {
+      "title": "Performance",
+      "description": "Documentation related to performance"
+    },
+    "database": {
+      "title": "Database",
+      "description": "Documentation related to database"
+    },
+    "documentation": {
+      "title": "Documentation",
+      "description": "Documentation about documentation"
+    },
+    "migration": {
+      "title": "Migration",
+      "description": "Documentation related to migration"
+    },
+    "metadata": {
+      "title": "Metadata",
+      "description": "Documentation related to metadata"
+    }
+  }
+}

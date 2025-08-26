@@ -1,0 +1,472 @@
+[% PageVersion = 'todo_system.tt,v 0.01 2025/04/01 Shanta Exp shanta' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<style>
+    .doc-section {
+        margin-bottom: 30px;
+    }
+    
+    .doc-section h2 {
+        color: #2196F3;
+        border-bottom: 1px solid #ddd;
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+    }
+    
+    .doc-section h3 {
+        color: #4CAF50;
+        margin-top: 20px;
+        margin-bottom: 15px;
+    }
+    
+    .doc-section h4 {
+        color: #FF9800;
+        margin-top: 15px;
+        margin-bottom: 10px;
+    }
+    
+    .doc-section ul {
+        margin-left: 20px;
+        margin-bottom: 15px;
+    }
+    
+    .doc-section li {
+        margin-bottom: 5px;
+    }
+    
+    .doc-section code {
+        background-color: #f5f5f5;
+        padding: 2px 5px;
+        border-radius: 3px;
+        font-family: monospace;
+    }
+    
+    .doc-image {
+        max-width: 100%;
+        margin: 20px 0;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+    
+    .doc-note {
+        background-color: #e1f5fe;
+        border-left: 4px solid #03a9f4;
+        padding: 15px;
+        margin: 15px 0;
+        border-radius: 0 4px 4px 0;
+    }
+    
+    .doc-warning {
+        background-color: #fff8e1;
+        border-left: 4px solid #ffc107;
+        padding: 15px;
+        margin: 15px 0;
+        border-radius: 0 4px 4px 0;
+    }
+    
+    .doc-tip {
+        background-color: #e8f5e9;
+        border-left: 4px solid #4caf50;
+        padding: 15px;
+        margin: 15px 0;
+        border-radius: 0 4px 4px 0;
+    }
+</style>
+
+<div class="doc-section">
+    <h1>Todo System Documentation</h1>
+    
+    <div class="doc-note">
+        <p><strong>Note:</strong> This documentation is also available in <a href="/documentation/todo_system.md">Markdown format</a>.</p>
+    </div>
+</div>
+
+<div class="doc-section">
+    <h2>Overview</h2>
+    
+    <p>The Todo System in Comserv is a comprehensive task management solution that allows users to create, view, edit, and track tasks across different projects. This document provides a complete overview of the Todo System's functionality, components, and recent enhancements.</p>
+</div>
+
+<div class="doc-section">
+    <h2>Key Features</h2>
+    
+    <div class="doc-subsection">
+        <h3>1. Todo Creation</h3>
+        
+        <p>Users can create new todo items with the following information:</p>
+        <ul>
+            <li>Site name</li>
+            <li>Start date</li>
+            <li>Project association</li>
+            <li>Due date</li>
+            <li>Subject</li>
+            <li>Description</li>
+            <li>Estimated man hours</li>
+            <li>Accumulative time</li>
+            <li>Status (NEW, IN PROGRESS, DONE)</li>
+            <li>Priority (1-10)</li>
+            <li>Sharing options (Public/Private)</li>
+            <li>User assignment</li>
+        </ul>
+    </div>
+    
+    <div class="doc-subsection">
+        <h3>2. Multiple Views</h3>
+        
+        <p>The Todo System offers several views to help users manage their tasks effectively:</p>
+        
+        <h4>List View</h4>
+        <ul>
+            <li>Displays todos in a tabular format</li>
+            <li>Includes filtering options</li>
+            <li>Shows key information for each todo</li>
+            <li>Provides action buttons for each todo (Add Log, Details, Edit)</li>
+        </ul>
+        
+        <h4>Day View</h4>
+        <ul>
+            <li>Shows todos for a specific day</li>
+            <li>Includes navigation to move between days</li>
+            <li>Color-codes todos based on priority</li>
+            <li>Provides the same action buttons as the list view</li>
+        </ul>
+        
+        <h4>Week View</h4>
+        <ul>
+            <li>Displays todos in a calendar-style layout for the entire week</li>
+            <li>Includes navigation to move between weeks</li>
+            <li>Color-codes todos based on priority</li>
+            <li>Allows adding todos for specific days</li>
+        </ul>
+        
+        <h4>Month View</h4>
+        <ul>
+            <li>Shows a calendar-style layout for the entire month</li>
+            <li>Displays todos on their respective days</li>
+            <li>Provides navigation between months</li>
+            <li>Allows adding todos for specific days</li>
+            <li>Color-codes todos based on priority</li>
+        </ul>
+    </div>
+    
+    <div class="doc-subsection">
+        <h3>3. Filtering and Search</h3>
+        
+        <p>The Todo System includes comprehensive filtering options:</p>
+        <ul>
+            <li>Filter by time period (day, week, month, all)</li>
+            <li>Filter by project</li>
+            <li>Filter by status (new, in progress, completed, all)</li>
+            <li>Search in subject, description, and comments</li>
+        </ul>
+    </div>
+    
+    <div class="doc-subsection">
+        <h3>4. Todo Details and Editing</h3>
+        
+        <p>Users can view and edit todo details:</p>
+        
+        <h4>Details View</h4>
+        <ul>
+            <li>Shows all information about a todo item</li>
+            <li>Provides a form for updating the todo</li>
+            <li>Includes buttons for adding log entries</li>
+            <li>Features navigation buttons to return to different views:
+                <ul>
+                    <li>Return to List View</li>
+                    <li>Return to Day View</li>
+                    <li>Return to Week View</li>
+                    <li>Return to Month View</li>
+                    <li>Return to Previous Page</li>
+                </ul>
+            </li>
+        </ul>
+        
+        <h4>Edit View</h4>
+        <ul>
+            <li>Provides a comprehensive form for editing todo items</li>
+            <li>Pre-fills the form with the current todo data</li>
+            <li>Includes dropdowns for projects and users</li>
+            <li>Features the same navigation buttons as the Details View</li>
+        </ul>
+    </div>
+    
+    <div class="doc-subsection">
+        <h3>5. Log Integration</h3>
+        
+        <p>The Todo System integrates with the Log System:</p>
+        <ul>
+            <li>Users can create log entries directly from todo items</li>
+            <li>Log entries can track time spent on todos</li>
+            <li>The accumulative time is calculated and displayed on todo items</li>
+        </ul>
+    </div>
+</div>
+
+<div class="doc-section">
+    <h2>Technical Components</h2>
+    
+    <div class="doc-subsection">
+        <h3>Templates</h3>
+        
+        <ol>
+            <li>
+                <strong>addtodo.tt</strong>
+                <ul>
+                    <li>Form for creating new todo items</li>
+                    <li>Includes project selection dropdown</li>
+                </ul>
+            </li>
+            <li>
+                <strong>todo.tt</strong>
+                <ul>
+                    <li>Main list view template</li>
+                    <li>Includes filtering options and view buttons</li>
+                    <li>Displays todos in a tabular format</li>
+                </ul>
+            </li>
+            <li>
+                <strong>day.tt</strong>
+                <ul>
+                    <li>Day view template</li>
+                    <li>Shows todos for a specific day</li>
+                </ul>
+            </li>
+            <li>
+                <strong>week.tt</strong>
+                <ul>
+                    <li>Week view template</li>
+                    <li>Shows todos in a calendar-style layout</li>
+                </ul>
+            </li>
+            <li>
+                <strong>month.tt</strong>
+                <ul>
+                    <li>Month view template</li>
+                    <li>Shows todos in a monthly calendar</li>
+                </ul>
+            </li>
+            <li>
+                <strong>details.tt</strong>
+                <ul>
+                    <li>Details view template</li>
+                    <li>Shows all information about a todo item</li>
+                    <li>Includes form for updating the todo</li>
+                </ul>
+            </li>
+            <li>
+                <strong>edit.tt</strong>
+                <ul>
+                    <li>Edit form template</li>
+                    <li>Provides a comprehensive form for editing todo items</li>
+                </ul>
+            </li>
+            <li>
+                <strong>project_list.tt</strong>
+                <ul>
+                    <li>Reusable template for project selection</li>
+                    <li>Used in addtodo.tt, edit.tt, and other templates</li>
+                </ul>
+            </li>
+        </ol>
+    </div>
+    
+    <div class="doc-subsection">
+        <h3>Controller Actions</h3>
+        
+        <ol>
+            <li>
+                <strong>index</strong>
+                <ul>
+                    <li>Main entry point for the Todo System</li>
+                    <li>Handles filtering and displays the list view</li>
+                </ul>
+            </li>
+            <li>
+                <strong>day</strong>
+                <ul>
+                    <li>Displays the day view</li>
+                    <li>Handles navigation between days</li>
+                </ul>
+            </li>
+            <li>
+                <strong>week</strong>
+                <ul>
+                    <li>Displays the week view</li>
+                    <li>Handles navigation between weeks</li>
+                </ul>
+            </li>
+            <li>
+                <strong>month</strong>
+                <ul>
+                    <li>Displays the month view</li>
+                    <li>Handles navigation between months</li>
+                </ul>
+            </li>
+            <li>
+                <strong>addtodo</strong>
+                <ul>
+                    <li>Displays the form for creating new todo items</li>
+                </ul>
+            </li>
+            <li>
+                <strong>create</strong>
+                <ul>
+                    <li>Processes the form submission from addtodo</li>
+                    <li>Creates new todo items in the database</li>
+                </ul>
+            </li>
+            <li>
+                <strong>details</strong>
+                <ul>
+                    <li>Displays the details view for a specific todo item</li>
+                </ul>
+            </li>
+            <li>
+                <strong>edit</strong>
+                <ul>
+                    <li>Displays the edit form for a specific todo item</li>
+                    <li>Pre-fills the form with the current todo data</li>
+                </ul>
+            </li>
+            <li>
+                <strong>modify</strong>
+                <ul>
+                    <li>Processes the form submission from edit or details</li>
+                    <li>Updates todo items in the database</li>
+                </ul>
+            </li>
+        </ol>
+    </div>
+</div>
+
+<div class="doc-section">
+    <h2>Recent Enhancements</h2>
+    
+    <div class="doc-subsection">
+        <h3>1. Enhanced Navigation in Details and Edit Views</h3>
+        
+        <p>Added comprehensive navigation options to both the details and edit views:</p>
+        <ul>
+            <li>Return to List View</li>
+            <li>Return to Day View</li>
+            <li>Return to Week View</li>
+            <li>Return to Month View</li>
+            <li>Return to Previous Page</li>
+        </ul>
+        
+        <p>These navigation buttons are displayed at both the top and bottom of the pages, ensuring users can easily return to their preferred view after viewing or editing a todo item.</p>
+    </div>
+    
+    <div class="doc-subsection">
+        <h3>2. Improved Filtering and Views</h3>
+        
+        <p>Enhanced the filtering and view options:</p>
+        <ul>
+            <li>Added a filter panel with dropdowns for time period, project, and status</li>
+            <li>Added a search box for finding todos by keywords</li>
+            <li>Added view buttons for switching between list, day, week, and month views</li>
+            <li>Implemented color-coding based on priority</li>
+        </ul>
+    </div>
+    
+    <div class="doc-subsection">
+        <h3>3. Project Selection and Log Creation</h3>
+        
+        <p>Fixed issues with project selection and log creation:</p>
+        <ul>
+            <li>Standardized field naming between templates and controllers</li>
+            <li>Ensured proper parameter passing to project_list.tt</li>
+            <li>Fixed the "Column 'project_code' cannot be null" error when creating log entries</li>
+        </ul>
+    </div>
+    
+    <div class="doc-subsection">
+        <h3>4. Todo Edit Functionality</h3>
+        
+        <p>Implemented a comprehensive edit functionality:</p>
+        <ul>
+            <li>Added a new edit action to the Todo controller</li>
+            <li>Created a new edit.tt template</li>
+            <li>Ensured the edit form includes all necessary fields and dropdowns</li>
+            <li>Fixed the issue with the edit button in the todo list</li>
+        </ul>
+    </div>
+</div>
+
+<div class="doc-section">
+    <h2>Usage Guidelines</h2>
+    
+    <div class="doc-subsection">
+        <h3>Creating a New Todo</h3>
+        
+        <ol>
+            <li>Navigate to the Todo System by clicking on "Todo" in the main menu</li>
+            <li>Click on "Add New Todo" button</li>
+            <li>Fill in the required fields:
+                <ul>
+                    <li>Site Name (pre-filled)</li>
+                    <li>Start Date</li>
+                    <li>Project (select from dropdown)</li>
+                    <li>Due Date</li>
+                    <li>Subject</li>
+                    <li>Description</li>
+                    <li>Estimated Man Hours</li>
+                    <li>Priority</li>
+                    <li>Status</li>
+                </ul>
+            </li>
+            <li>Click "Add Todo" to create the todo item</li>
+        </ol>
+    </div>
+    
+    <div class="doc-subsection">
+        <h3>Viewing Todos</h3>
+        
+        <ol>
+            <li>Navigate to the Todo System</li>
+            <li>Use the view buttons to switch between list, day, week, and month views</li>
+            <li>Use the filter panel to filter todos by time period, project, status, or search terms</li>
+        </ol>
+    </div>
+    
+    <div class="doc-subsection">
+        <h3>Editing a Todo</h3>
+        
+        <ol>
+            <li>Find the todo item you want to edit in any of the views</li>
+            <li>Click the "Edit" button for that todo</li>
+            <li>Update the fields as needed</li>
+            <li>Click "Update Todo" to save your changes</li>
+        </ol>
+    </div>
+    
+    <div class="doc-subsection">
+        <h3>Adding a Log Entry for a Todo</h3>
+        
+        <ol>
+            <li>Find the todo item you want to log time for</li>
+            <li>Click the "Add Log" button for that todo</li>
+            <li>Fill in the log entry form</li>
+            <li>Click "Submit" to create the log entry</li>
+        </ol>
+    </div>
+</div>
+
+<div class="doc-section">
+    <h2>Conclusion</h2>
+    
+    <p>The Todo System in Comserv provides a comprehensive solution for task management. With its multiple views, filtering options, and integration with the Log System, it helps users effectively manage their tasks and track their progress.</p>
+</div>
+
+<div class="doc-section">
+    <h2>Related Documentation</h2>
+    
+    <ul>
+        <li><a href="/documentation/todo_edit_functionality.md">Todo Edit Functionality</a></li>
+        <li><a href="/documentation/todo_filtering_and_views.md">Todo Filtering and Views</a></li>
+        <li><a href="/documentation/project_selection_log_creation.md">Project Selection and Log Creation</a></li>
+    </ul>
+</div>

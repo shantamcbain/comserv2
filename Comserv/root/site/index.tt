@@ -1,0 +1,46 @@
+[% META title = 'Mcoop home page' %]
+[% PageVersion	= 'site/index.tt,v 0.01.01 2025/03/31 shanta Exp shanta '	%]
+[% IF debug_mode == 1 %]
+ [%	PageVersion %]
+ [% IF debug_msg %]<div class="debug-message">[% debug_msg %]</div>[% END %]
+[% END %]
+
+<div class="container">
+    <div class="info-panel">
+        <h2>HelpDesk Support Portal</h2>
+        [% IF help_message %]
+            <div class="help-message">
+                <p>[%# help_message %]</p>
+            </div>
+        [% END %]
+
+        [% IF account_message %]
+            <div class="account-message">
+                <p>[% account_message %]</p>
+            </div>
+        [% END %]
+
+        [% IF main_website %]
+            <div class="main-website-link">
+                <p>Visit our main website: <a href="[% main_website %]" target="_blank">[% main_website %]</a></p>
+            </div>
+        [% END %]
+    </div>
+
+    <h1>Site Management</h1>
+    <button type="button" onclick="window.open('/site/add_site_form', '_blank');">Add Site</button><br>
+
+    [% IF sites.size > 0 %]
+        <div class="sites-list">
+            [% FOREACH site IN sites %]
+                <div class="site-item">
+                    <a href="/site/details?id=[% site.id %]">[% site.id %]  [% site.name %]</a>
+                </div>
+            [% END %]
+        </div>
+    [% ELSE %]
+        <div class="no-sites">
+            <p>No sites available for your current access level.</p>
+        </div>
+    [% END %]
+</div>

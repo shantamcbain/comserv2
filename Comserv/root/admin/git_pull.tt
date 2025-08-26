@@ -1,0 +1,140 @@
+[% META title = 'Git Pull Confirmation' %]
+<!-- File: /home/shanta/PycharmProjects/comserv/Comserv/root/admin/git_pull.tt -->
+[% PageVersion = 'admin/git_pull.tt,v 0.03 2025/04/10 shanta Exp shanta ' %]
+
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<!-- Quick Navigation -->
+<div class="quick-nav">
+    <a href="[% c.uri_for('/admin') %]" class="btn btn-sm btn-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Admin Dashboard
+    </a>
+</div>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>Git Pull Confirmation</h1>
+            
+            [% IF debug_msg || c.session.debug_mode == 1 %]
+                <div class="alert alert-info">
+                    <strong>Debug Information:</strong>
+                    [% IF debug_msg %]
+                        [% FOREACH msg IN debug_msg %]
+                            <p>[% msg %]</p>
+                        [% END %]
+                    [% END %]
+                    <p>User exists: [% c.user_exists ? 'Yes' : 'No' %]</p>
+                    <p>Username: [% c.user.username || 'Not logged in' %]</p>
+                    <p>Session roles: [% c.session.roles.join(', ') || 'None' %]</p>
+                    <p>Is admin: [% c.session.roles.grep('^admin$').size ? 'Yes' : 'No' %]</p>
+                </div>
+            [% END %]
+            
+            [% IF error_msg %]
+                <div class="alert alert-danger">
+                    <strong>Error:</strong> [% error_msg %]
+                </div>
+            [% END %]
+            
+            [% IF success_msg %]
+                <div class="alert alert-success">
+                    <strong>Success:</strong> [% success_msg %]
+                </div>
+            [% END %]
+            
+            [% IF warning_msg %]
+                <div class="alert alert-warning">
+                    <strong>Warning:</strong> [% warning_msg %]
+                </div>
+            [% END %]
+            
+            [% IF output %]
+                <div class="card mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h3 class="mb-0">Git Command Output</h3>
+                    </div>
+                    <div class="card-body">
+                        <pre class="git-output">[% output | html %]</pre>
+                    </div>
+                </div>
+            [% END %]
+            
+            [% UNLESS output %]
+                <div class="alert alert-warning">
+                    <strong>Warning:</strong> This action will pull the latest changes from the Git repository.
+                </div>
+                
+                <div class="alert alert-info">
+                    <strong>Note:</strong> Changes to <code>theme_mappings.json</code> will be automatically handled:
+                    <ul>
+                        <li>Your local changes will be backed up</li>
+                        <li>Changes will be stashed before pulling</li>
+                        <li>After pulling, your changes will be reapplied</li>
+                        <li>If conflicts occur, you can restore from the backup</li>
+                    </ul>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h3 class="mb-0">Confirm Git Pull</h3>
+                    </div>
+                    <div class="card-body">
+                        <p>
+                            Pulling from Git will update your local repository with the latest changes from the remote repository.
+                            This operation is generally safe, but if you have local changes, they might conflict with the remote changes.
+                        </p>
+                        
+                        <p>Are you sure you want to proceed?</p>
+                        
+                        <form method="POST" action="[% c.uri_for('/admin/git_pull') %]">
+                            <input type="hidden" name="confirm" value="1">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-code-branch"></i> Yes, Pull from Git
+                            </button>
+                            <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                        </form>
+                    </div>
+                </div>
+            [% ELSE %]
+                <div class="mt-4">
+                    <a href="[% c.uri_for('/admin/git_pull') %]" class="btn btn-primary">
+                        <i class="fas fa-sync"></i> Pull Again
+                    </a>
+                    <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Back to Admin Dashboard
+                    </a>
+                </div>
+            [% END %]
+        </div>
+    </div>
+</div>
+
+<style>
+    .git-output {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 4px;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        max-height: 400px;
+        overflow-y: auto;
+        font-family: monospace;
+        margin: 0;
+    }
+    .quick-nav {
+        margin-bottom: 15px;
+        padding: 10px 0;
+        border-bottom: 1px solid #eee;
+    }
+    .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+        line-height: 1.5;
+        border-radius: 0.2rem;
+    }
+</style>

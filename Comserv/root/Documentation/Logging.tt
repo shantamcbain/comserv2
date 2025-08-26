@@ -1,0 +1,34 @@
+[% PageVersion = 'Documentation/Logging.tt,v 0.01 2024/01/28 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [%# "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+<h1>Logging</h1>
+<h2>We currently have two separate logging systems:</h2>
+<ul>
+    <li><strong>ToDo Logging:</strong> This system logs daily activities related to todos. Each log entry is linked to a todo and a project, tracking actions, start and end times, and the total time spent. The system calculates accumulative time for todos.</li>
+    <li><strong>Debug Logging:</strong> Used for debugging purposes, with detailed log messages indicating the location and status of operations within the code.</li>
+</ul>
+
+<h2 id="controller">Controller</h2>
+<p>The <code>Comserv::Controller::Log</code> module handles the routing and logic for log-related actions:</p>
+<ul>
+    <li><strong>Index:</strong> Fetches logs based on status, defaults to excluding status 3 (DONE).</li>
+    <li><strong>Details:</strong> Fetches a log entry by record ID, sets the <code>end_time</code> to the current local time, and passes data to the template.</li>
+    <li><strong>Update:</strong> Updates a log entry with new values from form data, calculates time difference, and redirects to log details.</li>
+    <li><strong>Log Form:</strong> Displays a form for log entry, pre-filling data from a todo record.</li>
+    <li><strong>Create Log:</strong> Creates a new log entry with form data, calculates time difference, and handles default values.</li>
+</ul>
+
+<h2 id="model">Model</h2>
+<p>The <code>Comserv::Model::Log</code> module provides methods for interacting with the log data:</p>
+<ul>
+    <li><strong>Get Logs:</strong> Retrieves logs based on status, with options for all, open, or specific status.</li>
+    <li><strong>Modify:</strong> Updates a log record with new values.</li>
+    <li><strong>Calculate Accumulative Time:</strong> Calculates total time from log entries for a specific todo.</li>
+</ul>
+<h2 id="priority-status">Priority and Status Fields</h2>
+<p>
+    The log details form has been updated to include the `priority` and `status` fields. These fields are now populated from the controller and displayed as drop-down lists in the form. The `priority` and `status` values are fetched from the database and passed to the template, ensuring that the form displays the correct options for these fields.
+</p>

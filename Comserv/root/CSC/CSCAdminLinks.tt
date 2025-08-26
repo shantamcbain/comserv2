@@ -1,0 +1,75 @@
+
+
+
+
+
+
+
+
+<!--Open CSCAdminLinks-->
+  <tr>
+  <td class="NavTableCellStyle">
+  <!--CallCSCSiteChangeView.ttml-->
+
+  </td>
+ </tr>
+  <tr>
+  <td class="NavTableCellStyle">	<A HREF = "csc_url_admin.cgi?show_devel_urls=on&amp;search1=CSC_Development&amp;visibility=public&amp;&amp;columns_to_view=name&amp;columns_to_view=url" target="_content"><font   class="LeftSideBarNavStyle"> Show Devel links</font></a>
+  </td>
+ </tr>
+
+  <tr>  
+  <td class="NavTableCellStyle">	<A HREF = "cs.cgi?&amp;view=CSFrameView" target="_content"><font   class="LeftSideBarNavStyle"> CityShop Admin</font></a>
+  </td>
+ </tr>
+
+  <tr>  
+  <td class="NavTableCellStyle">	<A HREF = "csc_bug_tracker_admin.cgi?" target="_content"><font   class="LeftSideBarNavStyle"> Bugtracker</font></a>
+  </td>
+ </tr>
+ <tr>  
+  <td class="NavTableCellStyle">
+<A HREF ="http://computersystemconsulting.ca/cgi-bin/CSC/faq_manager.cgi?" Target ="Blank"><font   class="LeftSideBarNavStyle"> FAQ manager</font></a>
+  </td>
+ </tr>
+<tr>
+  <td class="NavtableHeaderCellStyle">
+       ADD Tools<br>
+
+      	</td>
+ </tr>      	
+	<tr>  
+ 	 <td class="NavTableCellStyle">
+<a href="http://computersystemconsulting.ca/cgi-bin/CSC/csc_url_cat.cgi?display_add_form=on&amp;" target='_Blank'><font   class="LeftSideBarNavStyle"> Category</font></a>
+	<a href="http://computersystemconsulting.ca/cgi-bin/CSC/client.cgi?display_add_form=on&amp;" target='_Blank'><font   class="LeftSideBarNavStyle">Client</font></a>
+<a href="http://computersystemconsulting.ca/cgi-bin/CSC/csc_kb.cgi?display_add_form=on&amp;" target='_Blank'><font   class="LeftSideBarNavStyle"> KB</font></a>
+<A HREF ="http://computersystemconsulting.ca/cgi-bin/CSC/csc_log.cgi?display_add_form=on&amp;" Target ="Blank"><font   class="LeftSideBarNavStyle">  Log</font></a>
+ <br>
+
+           <a href="csc_project_tracker.cgi?&amp;display_add_form=on" target='_Blank' ><font class="LeftSideBarNavStyle" > Project </font></a>
+
+<a href="http://computersystemconsulting.ca/cgi-bin/CSC/csc_url_sub.cgi?display_add_form=on&amp;" target='_Blank'><font   class="LeftSideBarNavStyle">&nbsp; Subject</font></a>
+	
+<a href="http://computersystemconsulting.ca/cgi-bin/CSC/todo.cgi?display_add_form=on&amp;" target='_Blank'><font   class="LeftSideBarNavStyle"> ToDo</font></a>
+<br>
+ <A HREF ="http://computersystemconsulting.ca/cgi-bin/CSC/csc_url_admin.cgi?display_add_form=on&amp;" Target ="Blank"><font   class="LeftSideBarNavStyle"> URL</font></a>
+ <!--testforapis-->
+
+	 </td>
+ 	</tr>
+	<tr>
+ 	 <td class="NavtableHeaderCellStyle">
+      Extropia ADD Tools<br>
+
+
+	 </td>
+ 	</tr>	
+	<tr>  
+ 	 <td class="NavTableCellStyle">
+<a href="http://computersystemconsulting.ca/cgi-bin/Extropia/extropia_kb.cgi?display_add_form=on&amp;" target='_Blank'><font   class="LeftSideBarNavStyle"> Extropia kb</font></a>
+
+<!--testforshanta-->
+
+
+
+<!--End CSCAdminLinks-->

@@ -1,0 +1,27 @@
+[% PageVersion  = 'select_tables.tt,v 0.1 2023/11/09 Shanta Exp Shanta' %]
+[% IF debug_mode == 1 %]
+
+    <p>Error: [% error_msg %]</p>
+    [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [% INCLUDE 'debug.tt' %]
+[% END %]
+<h1>Select Tables to Sync</h1>
+[% IF error_msg %]
+[% END %]
+<form action="/sync_options" method="post">
+    [% FOREACH database IN selected_databases %]
+    <input type="hidden" name="databases" value="[% database %]">
+    [% END %]
+    [% FOREACH database IN tables.keys %]
+    <div style="display: inline-block; margin-right: 20px;">
+      <h2>[% database %]</h2>
+      <select multiple name="tables_[% database %]">
+        [% FOREACH table IN tables.$database %]
+          <option value="[% table %]">[% table %]</option>
+        [% END %]
+      </select>
+    </div>
+  [% END %]
+  <input type="submit" value="Sync Selected Tables">
+</form>

@@ -1,0 +1,37 @@
+[% PageVersion = 'WorkShops/edit.tt,v 0.01 2024/03/11 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+ [% PageVersion %]
+[% END %]
+<h2>Edit Workshop:</h2>
+<form method="POST" action="/workshop/edit/[% workshop.id %]">
+    <label for="title">Title:</label>
+    <input type="text" id="title" name="title" value="[% workshop.title %]">
+    <br>
+    <label for="description">Description:</label>
+    <textarea id="description" name="description">[% workshop.description %]</textarea>
+    <br>
+<label for="date">Date:</label>
+<input type="date" id="date" name="date" value="[% formatted_date %]">
+<br>
+
+
+     <label for="time">Time:</label>
+    <input type="time" id="time" name="time" value="[% workshop.time %]">
+    <br>
+    <label for="end_time">End Time:</label>
+    <input type="time" id="end_time" name="end_time" value="[% workshop.end_time %]">
+    <br>
+   <label for="location">Location:</label>
+    <input type="text" id="location" name="location" value="[% workshop.location %]">
+    <br>
+    <label for="instructor">Instructor:</label>
+    <input type="text" id="instructor" name="instructor" value="[% workshop.instructor %]">
+    <br>
+    <label for="share">Share:</label>
+    <input type="text" id="share" name="share" value="[% workshop.share %]">
+    <br>
+    <label for="max_participants">Max Participants:</label>
+    <input type="number" id="max_participants" name="max_participants" value="[% workshop.max_participants %]">
+    <br>
+    <input type="submit" value="Update Workshop">
+</form>
