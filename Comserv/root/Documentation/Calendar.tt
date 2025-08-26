@@ -1,0 +1,138 @@
+[% PageVersion = 'Documentation/Calendar.tt,v 0.01 2024/05/27 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+   [% PageVersion %]
+[% END %]
+
+
+<h2 id="calendar"><a href="#top">Calendar Module:</a></h2>
+<nav>
+<a href="#calendar_overview">Overview</a> |
+<a href="#calendar_features">Features</a> |
+<a href="#calendar_usage">Usage</a> |
+<a href="#calendar_development">Development</a>
+</nav>
+
+<h3 id="calendar_overview"><a href="#calendar">Overview:</a></h3>
+<p>The Calendar module is a web-based calendar that can be used by all other modules in the application for scheduling and event management. It provides features such as creating, viewing, and editing events, setting reminders, and sharing events with other users.</p>
+
+<h3 id="calendar_features"><a href="#calendar">Features:</a></h3>
+<p>The Calendar module provides the following features:</p>
+<ul>
+    <li>Creating, viewing, and editing events</li>
+    <li>Setting reminders</li>
+    <li>Sharing events with other users</li>
+    <li>Integration with other modules for scheduling and event management</li>
+</ul>
+
+<h3 id="calendar_usage"><a href="#calendar">Usage:</a></h3>
+<p>Here's how to use the Calendar module:</p>
+<!-- Provide detailed instructions on how to use the Calendar module -->
+
+<h3 id="calendar_development_plan"><a href="#calendar">Development Plan:</a></h3>
+<p>Here's a detailed plan for the development of the calendar module in Catalyst:</p>
+<h4 id="database_schema"><a href="#calendar_development_plan">1. Database Schema:</a></h4>
+<p>Define a database schema for the calendar events. This schema will be used to create a table in your database. The table includes fields such as `event_id`, `event_name`, `start_date`, `end_date`, `description`, `location`, `organizer`, `attendees`, `status`, `last_modified_by`, `last_mod_date`, and `user_id`.</p>
+
+<p>To create this schema, you can use the Catalyst helper scripts. Here are the steps:</p>
+
+<ol>
+    <li>First, create a new Catalyst model using the `comserv_create.pl` script. This script will generate a new model class in your application. For example:</li>
+    <pre>
+    script/comserv_create.pl model Calendar DBIC::Schema Comserv::Schema::Ency::Result create=static `perl -MComserv::Model::DBEncy -e 'print Comserv::Model::DBEncy->config->{connect_info}->{dsn}'`
+    </pre>
+    <p>In this command, `Calendar` is the name of the model, `DBIC::Schema` specifies that we're creating a DBIx::Class schema, `Comserv::Schema::Ency::Result` is the namespace of the schema, `create=static` tells the script to create a static schema, and the Perl one-liner is used to retrieve the DSN from `DBEncy.pm`.</p>
+
+    <li>Next, define your schema in the generated model class. Here's an example:</li>
+    <pre>
+    package Comserv::Model::Schema::Ency::Result::Event;
+
+    use base 'DBIx::Class::Core';
+
+    __PACKAGE__->table('event');
+    __PACKAGE__->add_columns(
+        event_id => {
+            data_type => 'integer',
+            is_auto_increment => 1,
+        },
+        event_name => {
+            data_type => 'varchar',
+            size => 255,
+        },
+        start_date => {
+            data_type => 'date',
+        },
+        end_date => {
+            data_type => 'date',
+        },
+        description => {
+            data_type => 'text',
+        },
+        location => {
+            data_type => 'varchar',
+            size => 255,
+        },
+        "organizer",
+        { data_type => "varchar", default_value => "", is_nullable => 1, size => 50 },
+        "attendees",
+        { data_type => "text", is_nullable => 1 },
+        status => {
+            data_type => 'varchar',
+            size => 255,
+        },
+        "last_modified_by",
+        { data_type => "varchar", default_value => "", is_nullable => 1, size => 50 },
+        last_mod_date => {
+            data_type => 'date',
+        },
+        user_id => {
+            data_type => 'integer',
+        },
+    );
+    __PACKAGE__->set_primary_key('event_id');
+    __PACKAGE__->belongs_to(user => 'Comserv::Model::Schema::Ency::Result::User', 'user_id');
+    </pre>
+    <p>This code defines an `event` table with fields such as `event_id`, `event_name`, `start_date`, `end_date`, `description`, `location`, `organizer`, `attendees`, `status`, `last_modified_by`, `last_mod_date`, and `user_id`.</p>
+
+    <li>Finally, use the `deploy` method on your schema object to create the table in your database. For example:</li>
+    <pre>
+    my $schema = $c->model('Calendar')->schema;
+    $schema->deploy;
+    </pre>
+    <p>This code should be run in a script or controller action that has access to your Catalyst context (`$c`).</p>
+</ol>
+
+<p>To create the table directly in the database using SQL, you can use the following SQL command:</p>
+
+```sql
+CREATE TABLE event (
+    event_id INT PRIMARY KEY AUTO_INCREMENT,
+    event_name VARCHAR(255),
+    start_date DATE,
+    end_date DATE,
+    description TEXT,
+    location VARCHAR(255),
+    organizer VARCHAR(50),
+    attendees TEXT,
+    status VARCHAR(255),
+    last_modified_by VARCHAR(50),
+    last_mod_date DATE,
+    user_id INT,
+    FOREIGN KEY (user_id) REFERENCES User(user_id)
+);
+<h4 id="model_creation"><a href="#calendar_development_plan">2. Catalyst Model (Calendar.pm):</a></h4>
+<p>We have created a Catalyst model named `Calendar` that extends `Comserv::Model::DBEncy` and adds custom methods to interact with the Calendar related tables. Currently, it has a method `get_events` that fetches events from the 'Event' table that match a given search criteria.</p>
+
+
+<h4 id="controller_creation"><a href="#calendar_development_plan">3. Catalyst Controller (Calendar.pm):</a></h4>
+<p>Create a Catalyst controller with actions for creating, reading, updating, and deleting events.</p>
+
+<h4 id="view_creation"><a href="#calendar_development_plan">4. Catalyst View (Calendar.tt):</a></h4>
+<p>Create a Catalyst view to display the events in a calendar format.</p>
+
+<h4 id="authentication_authorization"><a href="#calendar_development_plan">5. Authentication and Authorization:</a></h4>
+<p>Use the existing `User` and `Admin` modules to handle authentication and authorization. If necessary, restrict access to certain actions (for example, only logged-in users can create events).</p>
+
+<h4 id="prebuilt_applications"><a href="#calendar_development_plan">6. Prebuilt Applications:</a></h4>
+<p>There are several Perl modules on CPAN that might be useful. `Data::ICal` can generate iCalendar files, and `DateTime::Event::ICal` can calculate dates based on iCalendar recurrence rules.</p>
+
+<p>Please note that this is a high-level plan and the actual implementation might require additional steps or modifications.</p>

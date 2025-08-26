@@ -1,3 +1,5 @@
+
+# Perl build files
 !Build/
 .last_cover_stats
 /META.yml
@@ -33,6 +35,37 @@ inc/
 /MANIFEST.bak
 /pm_to_blib
 /*.zip
-/.idea/.gitignore
-/.idea/comserv2.iml
-/.codebuddy/.gitignore
+
+# IDE files
+.idea/
+*.iml
+workspace.xml
+
+# Local Perl installation
+/local/
+Comserv/local/
+
+# Configuration files
+/Comserv/db_config.json
+/Comserv/config/api_credentials.json
+/Comserv/comserv.psgi
+
+# Logs
+Comserv/logs/
+
+# Temporary files
+_deparsed_XSubs.pm
+_Deparsed_XSubs.pm
+DefaultDBI.tt
+*.tmp
+*.bak
+
+# Development files
+/main.py
+/aimanager/
+/.codebuddy/
+/AI_ASSISTANT_GUIDELINES.md
+/db_config.json
+/git_commit_message.txt
+/grokpromts.txt
+

@@ -1,0 +1,316 @@
+/* Navigation styles */
+/* Admin menu specific styles are in admin-menu.css */
+nav {
+  background-color: var(--nav-bg);
+}
+
+.horizontal-menu {
+  display: flex;
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+}
+
+.horizontal-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.dropbtn {
+  display: inline-block;
+  color: var(--nav-text);
+  text-align: center;
+  padding: var(--spacing-medium);
+  text-decoration: none;
+}
+
+.dropbtn:hover {
+  background-color: var(--nav-hover-bg);
+}
+
+.dropdown-content {
+  display: none;
+  position: absolute;
+  background-color: var(--dropdown-bg);
+  min-width: 160px;
+  box-shadow: var(--dropdown-shadow);
+  z-index: 1;
+}
+
+.dropdown-content a {
+  color: var(--text-color);
+  padding: var(--spacing-small) var(--spacing-medium);
+  text-decoration: none;
+  display: block;
+  text-align: left;
+}
+
+.dropdown-content a:hover {
+  background-color: var(--nav-hover-bg);
+}
+
+.horizontal-dropdown:hover .dropdown-content {
+  display: block;
+}
+
+/* Submenu Styles */
+.submenu-item {
+  position: relative;
+}
+
+.submenu-header {
+  font-weight: bold;
+}
+
+.submenu {
+  display: none;
+  position: absolute;
+  top: 0;
+  left: 100%;
+  min-width: 160px;
+  background-color: var(--dropdown-bg);
+  box-shadow: var(--dropdown-shadow);
+  z-index: 1;
+}
+
+/* Add a class for right-aligned submenus */
+.horizontal-dropdown:last-child .submenu,
+.horizontal-dropdown:nth-last-child(2) .submenu,
+.horizontal-dropdown:nth-last-child(3) .submenu {
+  left: auto;
+  right: 100%;
+}
+
+.submenu a {
+  color: var(--text-color);
+  padding: var(--spacing-small) var(--spacing-medium);
+  text-decoration: none;
+  display: block;
+  text-align: left;
+}
+
+.submenu a:hover {
+  background-color: var(--nav-hover-bg);
+}
+
+.submenu-item:hover .submenu {
+  display: block;
+}
+
+/* Enhanced Admin Menu Styles */
+.project-list-container {
+  max-height: 300px;
+  overflow-y: auto;
+  margin-top: 10px;
+  border-top: 1px solid var(--border-color);
+  padding-top: 10px;
+}
+
+.project-list {
+  list-style-type: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+.project-list.level-2 {
+  padding-left: 15px;
+}
+
+.project-list.level-3 {
+  padding-left: 30px;
+}
+
+.project-list li {
+  padding: 3px 0;
+}
+
+.project-list li a {
+  display: block;
+  padding: 3px 8px;
+  text-decoration: none;
+  color: var(--text-color);
+  border-radius: 3px;
+  transition: background-color 0.2s ease;
+}
+
+.project-list li a:hover {
+  background-color: var(--nav-hover-bg);
+  color: var(--nav-hover-text);
+}
+
+.no-projects {
+  font-style: italic;
+  color: var(--text-muted);
+  padding: 5px 10px;
+}
+
+/* Improved submenu headers */
+.submenu-header {
+  display: block;
+  padding: 8px 12px;
+  font-weight: bold;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-color);
+  transition: background-color 0.2s ease;
+}
+
+.submenu-header:hover {
+  background-color: var(--nav-hover-bg);
+}
+
+.submenu-header a {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+/* Documentation submenu enhancements */
+.documentation-categories {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 5px;
+  padding: 5px;
+}
+
+.documentation-category {
+  padding: 5px;
+  border-radius: 3px;
+  transition: background-color 0.2s ease;
+}
+
+.documentation-category:hover {
+  background-color: var(--nav-hover-bg);
+}
+
+/* ToDo submenu enhancements */
+.submenu-section {
+  margin-top: 10px;
+  border-top: 1px solid var(--border-color);
+  padding-top: 5px;
+}
+
+.submenu-section-title {
+  display: block;
+  font-weight: bold;
+  font-size: 0.9em;
+  color: var(--text-muted);
+  padding: 3px 8px;
+  margin-bottom: 5px;
+}
+
+.recent-todos-container {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.recent-todo-form {
+  margin: 2px 0;
+}
+
+.recent-todo-button {
+  background: none;
+  border: none;
+  padding: 3px 8px;
+  color: var(--link-color);
+  text-decoration: none;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 250px;
+  border-radius: 3px;
+  transition: background-color 0.2s ease;
+  display: flex;
+  align-items: center;
+}
+
+.recent-todo-button:hover {
+  background-color: var(--nav-hover-bg);
+}
+
+.todo-priority {
+  display: inline-block;
+  min-width: 20px;
+  text-align: center;
+  margin-right: 5px;
+  font-weight: bold;
+}
+
+.priority-1 { color: var(--priority-high, #d9534f); }
+.priority-2 { color: var(--priority-medium, #f0ad4e); }
+.priority-3 { color: var(--priority-normal, #5bc0de); }
+.priority-4 { color: var(--priority-low, #5cb85c); }
+.priority-5 { color: var(--priority-lowest, #777777); }
+
+.todo-subject {
+  flex: 1;
+}
+
+/* File Management enhancements */
+.file-search-container {
+  padding: 5px 8px;
+}
+
+.file-search-form {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.file-type-select {
+  width: 100%;
+  padding: 4px;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  background-color: var(--input-bg, #fff);
+  color: var(--text-color);
+  font-size: 0.9em;
+}
+
+.file-search-button {
+  padding: 4px 8px;
+  background-color: var(--button-bg, #007bff);
+  color: var(--button-text, #fff);
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.9em;
+  transition: background-color 0.2s ease;
+}
+
+.file-search-button:hover {
+  background-color: var(--button-hover-bg, #0069d9);
+}
+
+/* Domain selection enhancements */
+.domain-list-container {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.site-dropdown-item {
+  display: block;
+  padding: 4px 8px;
+  transition: background-color 0.2s ease;
+  border-radius: 3px;
+  margin: 2px 0;
+}
+
+.site-dropdown-item:hover {
+  background-color: var(--nav-hover-bg);
+}
+
+/* General submenu section enhancements */
+.submenu-section {
+  margin-top: 10px;
+  border-top: 1px solid var(--border-color);
+  padding-top: 5px;
+}
+
+.submenu-section:first-child {
+  margin-top: 0;
+  border-top: none;
+  padding-top: 0;
+}

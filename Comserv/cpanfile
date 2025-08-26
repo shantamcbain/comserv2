@@ -1,0 +1,95 @@
+requires 'Moose';
+requires 'namespace::autoclean';
+requires 'JSON::MaybeXS';
+requires 'Term::Menus';
+
+# System modules
+requires 'Socket';
+requires 'Sys::Hostname';
+requires 'MooseX::MarkAsMethods';
+requires 'Catalyst::Runtime' => '5.90130';
+requires 'Catalyst::Model';
+requires 'Catalyst::Restarter';
+requires 'DBIx::Class';
+requires 'DBIx::Class::Schema::Loader';
+requires 'DBIx::Class::TimeStamp';
+requires 'DBIx::Class::Migration';
+requires 'DBIx::Class::EncodedColumn';
+requires 'SQL::Translator';
+requires 'DBD::mysql';
+#json
+requires 'JSON';
+requires 'Config::JSON';
+
+# Template Toolkit and plugins
+requires 'Template';
+requires 'Template::Plugin::DateTime';
+requires 'Template::Plugin::JSON';
+requires 'Template::Plugin::Number::Format';
+requires 'Template::Plugin::URL';
+requires 'Template::Plugin::DBI';
+requires 'Template::Plugin::Markdown';
+
+# Catalyst Plugins
+requires 'Catalyst::Plugin::ConfigLoader';
+requires 'Catalyst::Plugin::Static::Simple';
+requires 'Catalyst::Plugin::StackTrace';
+requires 'Catalyst::Plugin::Session';
+requires 'Catalyst::Plugin::Session::Store::FastMmap';
+requires 'Catalyst::Plugin::Session::Store::Delegate';
+requires 'Catalyst::Plugin::Session::Store::DBIC';
+requires 'Catalyst::Plugin::Session::Store::Cookie';
+requires 'Catalyst::Plugin::Session::Store::File';
+requires 'Catalyst::Plugin::Session::State::Cookie';
+requires 'Catalyst::Plugin::Authentication';
+requires 'Catalyst::Authentication::Store::DBIx::Class';
+requires 'Catalyst::Plugin::Authorization::Roles';
+requires 'Catalyst::Plugin::Authorization::ACL';
+requires 'Catalyst::Plugin::Log::Dispatch';
+requires 'Log::Dispatch::Config';
+requires 'Catalyst::View::TT';
+requires 'Catalyst::View::JSON';
+# DateTime related
+requires 'DateTime';
+requires 'DateTime::Event::Recurrence';
+requires 'DateTime::Format::Strptime';
+requires 'DateTime::Format::ISO8601';
+requires 'Net::CIDR';
+
+# File handling
+requires 'File::Find';
+requires 'File::Basename';
+requires 'File::Slurp';
+
+# Network related
+
+# Cryptography and Security
+requires 'Digest::SHA';
+
+# Email handling
+requires 'Email::Simple';
+requires 'Email::Simple::Creator';
+requires 'Email::Sender::Simple';
+
+# Utility modules
+requires 'URI::Escape';
+requires 'Data::FormValidator';
+requires 'LWP::UserAgent';
+requires 'HTTP::Request';
+requires 'Try::Tiny';
+requires 'Text::Markdown';
+requires 'YAML::XS';
+requires 'YAML::Tiny';
+requires 'YAML::Syck';
+
+# Development and testing
+requires 'Term::ReadPassword';
+requires 'Text::CSV';
+requires 'Starman';
+requires 'Test::More' => '0.88';
+requires 'Test::Pod';
+requires 'Test::Pod::Coverage';
+requires 'Test::WWW::Mechanize::Catalyst';
+requires 'Catalyst::ScriptRunner';
+requires 'Log::Log4perl';
+requires 'local::lib';

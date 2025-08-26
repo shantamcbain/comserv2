@@ -1,0 +1,95 @@
+[% PageVersion = 'pages/create.tt,v 1.0 2024/12/29 Page Create Template' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="page-create">
+    <h1>Create New Page</h1>
+    
+    [% IF error_msg %]
+    <div class="alert alert-error">
+        [% error_msg %]
+    </div>
+    [% END %]
+    
+    <form method="POST" action="/pages/create">
+        <div class="form-group">
+            <label for="sitename">Site Name:</label>
+            [% IF is_csc %]
+                <select name="sitename" id="sitename" required>
+                    [% FOREACH site IN available_sites %]
+                        <option value="[% site %]" [% IF form_data.sitename == site || (!form_data.sitename && site == current_sitename) %]selected[% END %]>[% site %]</option>
+                    [% END %]
+                </select>
+                <small>CSC can create pages for any site</small>
+            [% ELSE %]
+                <input type="hidden" name="sitename" value="[% current_sitename %]">
+                <input type="text" value="[% current_sitename %]" disabled>
+                <small>You can only create pages for your site: [% current_sitename %]</small>
+            [% END %]
+        </div>
+        
+        <div class="form-group">
+            <label for="menu">Menu:</label>
+            <select name="menu" id="menu" required>
+                <option value="Main" [% IF form_data.menu == 'Main' %]selected[% END %]>Main</option>
+                <option value="member" [% IF form_data.menu == 'member' %]selected[% END %]>Member</option>
+                <option value="Admin" [% IF form_data.menu == 'Admin' %]selected[% END %]>Admin</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="page_code">Page Code:</label>
+            <input type="text" name="page_code" id="page_code" value="[% form_data.page_code %]" required>
+            <small>Unique identifier for this page (no spaces, lowercase)</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="title">Title:</label>
+            <input type="text" name="title" id="title" value="[% form_data.title %]" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="body">Content:</label>
+            <textarea name="body" id="body" rows="10" required>[% form_data.body %]</textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="description">Meta Description:</label>
+            <textarea name="description" id="description" rows="3">[% form_data.description %]</textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="keywords">Meta Keywords:</label>
+            <input type="text" name="keywords" id="keywords" value="[% form_data.keywords %]">
+        </div>
+        
+        <div class="form-group">
+            <label for="link_order">Link Order:</label>
+            <input type="number" name="link_order" id="link_order" value="[% form_data.link_order || 0 %]">
+        </div>
+        
+        <div class="form-group">
+            <label for="status">Status:</label>
+            <select name="status" id="status">
+                <option value="active" [% IF form_data.status == 'active' %]selected[% END %]>Active</option>
+                <option value="inactive" [% IF form_data.status == 'inactive' %]selected[% END %]>Inactive</option>
+                <option value="draft" [% IF form_data.status == 'draft' %]selected[% END %]>Draft</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="roles">Required Roles:</label>
+            <select name="roles" id="roles">
+                <option value="public" [% IF form_data.roles == 'public' %]selected[% END %]>Public</option>
+                <option value="member" [% IF form_data.roles == 'member' %]selected[% END %]>Member</option>
+                <option value="admin" [% IF form_data.roles == 'admin' %]selected[% END %]>Admin</option>
+            </select>
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Create Page</button>
+            <a href="/pages" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>

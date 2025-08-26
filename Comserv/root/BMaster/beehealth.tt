@@ -1,0 +1,20 @@
+[% PageVersion = 'Bmaster/beehealth.tt,v 0.01 2023/08/30 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+[% END %]
+[% PageVersion %]
+<h1>Bee Health</h1>
+
+<p>The health of our bees is our top priority. Here's an overview of how we help our bees maintain their health:</p>
+
+<h2>Pasture Management</h2>
+<p>We carefully manage our pastures to provide a diverse and abundant source of nectar and pollen for our bees.</p>
+
+<h2>Yard Arrangements</h2>
+<p>Our bee yards are arranged to provide optimal conditions for our bees, including adequate sun exposure, protection from wind, and access to clean water.</p>
+
+<h2>Disease Management</h2>
+<p>We regularly monitor our hives for signs of diseases and pests, and we use integrated pest management practices to control any issues that arise.</p>
+
+<!-- Add more bee health information as needed -->
+
+<p>For more information on our bee health practices, please contact us.</p>

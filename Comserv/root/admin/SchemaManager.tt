@@ -1,0 +1,44 @@
+
+[% PageVersion = 'admin/SchemaManager.tt,v 0.01 2025/01/19 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<h1>Schema Manager</h1>
+
+<!-- Form to select database -->
+<form method="post" action="/admin/schema_manager">
+    <label for="database">Select Database:</label>
+    <select name="database" id="database" onchange="this.form.submit()">
+        <option value="ENCY" [% IF database == 'ENCY' %]selected[% END %]>ENCY</option>
+        <option value="FORAGER" [% IF database == 'FORAGER' %]selected[% END %]>FORAGER</option>
+    </select>
+</form>
+
+<h2>Tables in [% database %]</h2>
+<table>
+    <thead>
+    <tr>
+        <th>Table Name</th>
+        <th>Result Mapping</th>
+        <th>Actions</th>
+    </tr>
+    </thead>
+    <tbody>
+    [% FOREACH table IN tables %]
+    <tr>
+        <td>[% table %]</td>
+        <td>
+            [% IF file_exists %]
+            Mapped
+            [% ELSE %]
+            Not Mapped
+            [% END %]
+        </td>
+        <td>
+            <a href="/Admin/map_table_to_result?database=[% database %]&table=[% table %]">Map/Update</a>
+        </td>
+    </tr>
+    [% END %]
+    </tbody>
+</table>

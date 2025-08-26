@@ -1,0 +1,57 @@
+ [% PageVersion	= 'AdminNotes.tt,v 0.01 2024/01/12 shanta Exp shanta '	%]
+[% IF c.session.debug_mode == 1 %]
+<br> [%	PageVersion %] <br>
+    [%# "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+
+[% END %]
+[% SiteName = c.session.SiteName %]
+[% username = c.session.username %][%# username  %]
+ [% Page = c.session.page %]
+ [%# SiteName %]
+[% group = c.session.group %]
+		[% IF group    ==  'Alegro_admin' OR
+			       group    ==  'Apis_Admin' OR
+			       group    ==  'admin' OR
+		           group    == 'BHN_Admin' OR
+			       group    ==  'AltPower_admin' OR
+		  	       group    ==  'Apis_Admin' OR
+			       group    ==  'AnuCollective_admin' OR
+			       group    ==  'Brew_admin' OR
+			       group    ==  'CS_admin' OR
+			       group    ==  'CSC_admin' OR
+			       group    ==  'CSPS_admin' OR
+			       group    ==  'ENCY_admin' OR
+			       group    ==  'FeedBees_admin' OR
+			       group    ==  'Forager_admin' OR
+			       group    ==  'eXtropia_admin' OR
+			       group    ==  'GPMarket_admin' OR
+			       group    ==  'HE_admin' OR
+			       group    ==  'NOWD_admin' OR
+			       group    ==  'News_admin' OR
+			       group    ==  'OKB_admin'OR
+			       group    ==  'Organic_admin' OR
+			       group    ==  'Shanta_admin' OR
+			       group    ==  'VitalVic_admin' OR
+			       group    ==  'rv_admin' OR
+			       group    == 'MJB_Admin' OR
+			       group    ==  'ULC_admin' OR
+			       group    ==  'USBM_admin' OR
+			       group    ==  'WB_admin' OR
+			       group    ==  'WW_admin' OR
+			       username == 'Shanta' OR
+			      group    == 'Demo_admin'
+			 %][% FOREACH link = c.stash.dbi.query("SELECT * FROM page_tb
+                                  WHERE  (status  = 2 AND
+                                         page_code = 'SiteAdminNotes' AND
+                                         sitename = '$SiteName' )
+                                  ORDER BY sitename
+                                  ") %]
+
+     [% PROCESS 'CSC/pagefields.tt' %]
+  [% END %]
+
+
+[% body   %]
+ 			[%# INCLUDE 'todo/todo.tt' %]
+			[% END %]

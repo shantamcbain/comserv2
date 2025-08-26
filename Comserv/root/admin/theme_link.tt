@@ -1,0 +1,34 @@
+[% META title = 'Theme Management Link' %]
+
+<h1>Theme Management Link</h1>
+
+<p>Click the link below to access the Theme Management page:</p>
+
+<p><a href="[% c.uri_for('/admin/theme') %]" class="button">Go to Theme Management</a></p>
+
+<p>If you're having trouble accessing the admin area, you can try this direct link:</p>
+
+<p><a href="/admin/theme" class="button">Direct Link to Theme Management</a></p>
+
+<h2>Debug Information</h2>
+
+<div style="background-color: #f8f9fa; padding: 15px; margin-bottom: 20px; border: 1px solid #ddd;">
+    <p><strong>User Exists:</strong> [% c.user_exists ? 'Yes' : 'No' %]</p>
+    <p><strong>Session ID:</strong> [% c.sessionid %]</p>
+    
+    <h4>Roles:</h4>
+    [% IF c.session.roles %]
+        <ul>
+            [% FOREACH role IN c.session.roles %]
+                <li>[% role %]</li>
+            [% END %]
+        </ul>
+    [% ELSE %]
+        <p>No roles defined</p>
+    [% END %]
+    
+    <h4>Session Data:</h4>
+    <pre>[% USE Dumper; Dumper.dump(c.session) %]</pre>
+</div>
+
+<p><a href="[% c.uri_for('/') %]">Back to Home</a></p>

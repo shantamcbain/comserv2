@@ -1,0 +1,32 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<form>
+
+<select class="combobox" name="SiteMap" onchange="if(options[selectedIndex].value){location = options[selectedIndex].value}" size="1">
+<option selected>SiteName  </option>
+
+
+
+
+
+
+
+
+     	 
+		  
+
+

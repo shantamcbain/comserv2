@@ -1,0 +1,63 @@
+[% PageVersion = 'Bmaster/apiary.tt,v 0.02 2025/05/259 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+     [% PageVersion %]
+[% END %]
+
+<h1>Welcome to the Apiary Management System</h1>
+
+<p>This system is designed to provide you with a comprehensive overview of your beekeeping operation. It allows you to track, manage, and plan your apiary activities effectively.</p>
+
+<!-- Check if data is available -->
+<div style="border: 1px solid black; padding: 10px; margin: 10px; position: static; z-index: auto;">
+[% IF no_data %]
+ <!-- If no data, display a clickable message to add a yard -->
+<a href="/BMaster/yards" >Please add a Yard
+
+</a>
+[% ELSE %]
+    <!-- If data is available, display the graph -->
+
+    <iframe src="http://localhost:5000/graph" width="100%" height="600px"></iframe>
+[% END %]
+</div>
+
+<p>Start your beekeeping day by checking the graph above. It shows the changes in the number of frames of bees, brood, and other elements over the course of the season. This visual representation helps you understand the dynamics of your apiary at a glance.</p>
+
+<h2>Key Features of Our System</h2>
+
+<h3>Hive Tracking</h3>
+
+<p>Our system allows you to monitor various aspects of your hives, such as:</p>
+
+<ul>
+    <li>Hive condition</li>
+    <li>Number of bees</li>
+    <li>Frames of brood, honey, foundation, comb, and empty</li>
+    <li>Weight</li>
+    <li>Disease</li>
+    <li>Internal temperature</li>
+    <li>Temperament</li>
+</ul>
+
+<h3>Inventory Management</h3>
+
+<p>Keep track of your apiary equipment inventory. This feature helps you plan what is needed for your next visit to the yard. You can track items like:</p>
+
+<ul>
+    <li>Tops</li>
+    <li>Brood boxes</li>
+    <li>Entrance reducers</li>
+    <li>Frames</li>
+    <li>Bottom boards</li>
+    <li>Inner covers</li>
+    <li>Frame feeders</li>
+</ul>
+
+<h3>Seasonal Calendar</h3>
+
+<p>Plan your activities for the season with our integrated calendar. It helps you schedule and manage your tasks effectively.</p>
+
+<p>Explore more features by visiting the following pages:</p>
+
+<a href="/BMaster/Queens">Queens Page</a>
+<a href="/BMaster/yards">Yards Page</a>

@@ -1,0 +1,55 @@
+[% META title = 'Admin Dashboard' %]
+[% PageVersion = 'admin/index.tt,v 0.01 2023/08/10 shanta Exp shanta ' %]
+
+<h1>Admin Dashboard</h1>
+
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="admin-menu">
+  <h2>Admin Menu</h2>
+
+  <div class="admin-section">
+    <h3>Database Management</h3>
+    <ul>
+      <li><a href="[% c.uri_for('/admin/schema_manager') %]">Schema Manager</a></li>
+      <li><a href="[% c.uri_for('/admin/compare_schema') %]">Compare Schema</a></li>
+      <li><a href="[% c.uri_for('/admin/migrate_schema') %]">Migrate Schema</a></li>
+      <li><a href="[% c.uri_for('/admin/migrate_pages') %]">Migrate Pages (Forager → Ency)</a></li>
+    </ul>
+  </div>
+
+  <div class="admin-section">
+    <h3>System Management</h3>
+    <ul>
+      <li><a href="[% c.uri_for('/admin/theme') %]">Theme Management</a></li>
+      <li><a href="[% c.uri_for('/admin/view_log') %]">View Application Log</a></li>
+      <li><a href="[% c.uri_for('/admin/git_pull') %]">Pull from Git Repository</a></li>
+      <li><a href="[% c.uri_for('/admin/restart_starman') %]">Restart Starman Server</a></li>
+      <li><a href="[% c.uri_for('/admin/network_diagnostics') %]">Network Diagnostics</a></li>
+    </ul>
+  </div>
+
+  <div class="admin-section">
+    <h3>Infrastructure</h3>
+    <ul>
+      <li><a href="[% c.uri_for('/proxmox') %]">Proxmox VM Management</a></li>
+      <li><a href="[% c.uri_for('/proxmox_servers') %]">Proxmox Server Management</a></li>
+    </ul>
+  </div>
+</div>
+
+<style>
+  .admin-section {
+    margin-bottom: 20px;
+  }
+  .admin-section h3 {
+    margin-bottom: 10px;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 5px;
+  }
+  .admin-section ul {
+    margin-left: 20px;
+  }
+</style>

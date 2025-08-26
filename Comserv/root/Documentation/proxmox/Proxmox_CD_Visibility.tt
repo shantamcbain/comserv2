@@ -1,0 +1,71 @@
+[% META title = 'Linux CD Visibility in Proxmox/KVM' %]
+[% PageVersion = 'Documentation/proxmox/Proxmox_CD_Visibility.tt,v 0.03 2024/07/10 Admin Exp admin ' %]
+<h1 id="cd-visibility-top">CD Visibility in Proxmox Linux VMs</h1>
+<nav>
+    <a href="#cli-detection">CLI Detection</a> |
+    <a href="#manual-mount">Manual Mounting</a> |
+    <a href="#proxmox-checks">Proxmox Checks</a> |
+    <a href="#troubleshooting">Troubleshooting</a>
+</nav>
+<h2 id="cli-detection">Command Line Detection</h2>
+<p>For headless Linux servers using <code>mc</code>:</p>
+<ol>
+    <li><strong>Verify Device Existence:</strong>
+        <pre>ls -l /dev/sr*</pre>
+        Expected output:
+        <pre>lrwxrwxrwx 1 root root 3 May 20 10:00 /dev/cdrom -> sr0</pre>
+    </li>
+    <li><strong>Check Block Devices:</strong>
+        <pre>lsblk | grep rom</pre>
+        Should show:
+        <pre>sr0   11:0    1 1024M  0 rom</pre>
+    </li>
+</ol>
+<h2 id="manual-mount">Manual Mount Procedure</h2>
+<pre>
+sudo mkdir -p /mnt/cdrom
+sudo mount -t iso9660 -o ro /dev/sr0 /mnt/cdrom
+cd /mnt/cdrom
+mc  # Now visible in Midnight Commander</pre>
+<h2 id="proxmox-checks">Proxmox Configuration Checks</h2>
+<ol>
+    <li><strong>Verify ISO Attachment:</strong>
+        <pre>qm config &lt;VMID&gt; | grep ide</pre>
+        Correct output:
+        <pre>ide2: local:iso/kvm_shared.iso,media=cdrom</pre>
+    </li>
+    <li><strong>Ensure Proper Bus Type:</strong>
+        <ul>
+            <li>For Linux VMs, use VirtIO SCSI:
+                <pre>qm set &lt;VMID&gt; -scsihw virtio-scsi-pci</pre>
+            </li>
+        </ul>
+    </li>
+</ol>
+<h2 id="troubleshooting">Troubleshooting Steps</h2>
+<table class="table">
+    <tr>
+        <th>Issue</th>
+        <th>Solution</th>
+    </tr>
+    <tr>
+        <td>No /dev/sr* devices</td>
+        <td>
+            1. Check VM configuration:
+            <pre>qm config &lt;VMID&gt; | grep media=cdrom</pre>
+            2. Hot-plug if needed:
+            <pre>qm monitor &lt;VMID&gt;
+drive_add 0 id=cdrom0,if=none,media=cdrom
+device_add ide-cd,drive=cdrom0,bus=ide.0</pre>
+        </td>
+    </tr>
+    <tr>
+        <td>Mount errors</td>
+        <td>
+            <pre>sudo dmesg | grep CD-ROM
+# Check for driver issues
+sudo modprobe sr_mod</pre>
+        </td>
+    </tr>
+</table>
+<p><a href="#cd-visibility-top">Back to top</a></p>

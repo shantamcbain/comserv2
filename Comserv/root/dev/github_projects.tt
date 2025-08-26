@@ -1,0 +1,33 @@
+[%# INCLUDE 'layout.tt' %]
+[% PageVersion = 'dev/github_projects.tt,v 0.01 2024/01/03 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+[% END %]
+    [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+<h1>GitHub Projects Guide</h1>
+
+<p>GitHub Projects is a project management tool built into GitHub. It integrates seamlessly with your GitHub repositories, making it easy to link tasks to issues and pull requests.</p>
+
+<p>Here are some steps to get started with GitHub Projects:</p>
+
+<ol>
+    <li>Created an organization on GitHub named "computersystemconsulting".</li>
+    <li>Go to your organization's page on GitHub and click on the "Projects" tab.</li>
+    <li>Click on "New project" to create a new project board.</li>
+    <li>Give your project a name and an optional description, then click "Create project".</li>
+    <li>You can now add columns to your project board, such as "To do", "In progress", and "Done".</li>
+    <li>To add a new task, click on the "+" button in a column and create a new card.</li>
+    <li>You can move cards between columns by dragging and dropping them.</li>
+    <li>Attempt to transfer the "CatalystComser1" repository from your personal account to the "computersystemconsulting" organization. (This step was not successful due to issues with the GitHub interface.)</li>
+    <li>Next steps: Investigate alternative methods for transferring the repository to the organization, or consider creating a new repository within the organization and pushing your local code to this new repository.</li>
+</ol>
+
+<p>For more detailed instructions, check out the <a href="https://docs.github
+.com/en/issues/organizing-your-work-with-project-boards" target="_blank">official GitHub Projects documentation</a>.</p>
+
+<p>You can access our GitHub Projects by clicking <a href="https://github.com/shantamcbain/CatalystComser1/projects" target="_blank"
+    >here</a>
+    .</p>
+
+<iframe src="https://github.com/shantamcbain/CatalystComser1/projects" width="100%" height="600"></iframe>

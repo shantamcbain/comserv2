@@ -1,0 +1,525 @@
+[% META title = 'Infrastructure Setup' %]
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="page-header">Infrastructure Setup</h1>
+            <p class="lead">This page helps you set up the required infrastructure components for the Proxy Manager.</p>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">System Information</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <tbody>
+                            <tr>
+                                <th>Operating System:</th>
+                                <td>[% status.system.os | html %]</td>
+                            </tr>
+                            <tr>
+                                <th>Kernel:</th>
+                                <td>[% status.system.kernel | html %]</td>
+                            </tr>
+                            <tr>
+                                <th>Architecture:</th>
+                                <td>[% status.system.architecture | html %]</td>
+                            </tr>
+                            <tr>
+                                <th>Memory:</th>
+                                <td>[% status.system.memory | html %]</td>
+                            </tr>
+                            <tr>
+                                <th>CPU Cores:</th>
+                                <td>[% status.system.cpu_cores | html %]</td>
+                            </tr>
+                            <tr>
+                                <th>Can Run Containers:</th>
+                                <td>
+                                    [% IF status.system.can_run_containers %]
+                                        <span class="badge badge-success">Yes</span>
+                                    [% ELSE %]
+                                        <span class="badge badge-danger">No</span>
+                                    [% END %]
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-8">
+            <div class="alert alert-info">
+                <h5>Infrastructure Components</h5>
+                <p>The following components are required for the Proxy Manager to function properly:</p>
+                <ol>
+                    <li><strong>Docker</strong> - Container runtime for running Nginx Proxy Manager</li>
+                    <li><strong>Kubernetes</strong> (optional) - For advanced container orchestration</li>
+                    <li><strong>Nginx Proxy Manager</strong> - For managing proxy configurations</li>
+                </ol>
+            </div>
+            
+            <div class="alert alert-warning">
+                <h5>Important Notes</h5>
+                <ul>
+                    <li>Installation requires administrative privileges</li>
+                    <li>You may need to log out and log back in after Docker installation</li>
+                    <li>After installing Nginx Proxy Manager, you'll need to generate an API key</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header [% IF status.docker.installed %]bg-success[% ELSE %]bg-secondary[% END %] text-white">
+                    <h5 class="card-title mb-0">Docker</h5>
+                </div>
+                <div class="card-body">
+                    <p>
+                        <strong>Status:</strong> 
+                        [% IF status.docker.installed %]
+                            <span class="badge badge-success">[% status.docker.status | html %]</span>
+                        [% ELSE %]
+                            <span class="badge badge-secondary">Not Installed</span>
+                        [% END %]
+                    </p>
+                    
+                    [% IF status.docker.installed %]
+                        <p><strong>Version:</strong> [% status.docker.version | html %]</p>
+                    [% END %]
+                    
+                    <div class="mt-3">
+                        [% IF status.docker.installed %]
+                            <button class="btn btn-sm btn-outline-success" disabled>Already Installed</button>
+                        [% ELSIF status.docker.can_install %]
+                            <button id="install-docker" class="btn btn-sm btn-primary">Install Docker</button>
+                            <a href="[% c.uri_for('/proxymanager/install_docker') %]" class="btn btn-sm btn-outline-secondary mt-1">Direct Link</a>
+                        [% ELSE %]
+                            <button class="btn btn-sm btn-outline-secondary" disabled>Cannot Install</button>
+                            <small class="text-muted d-block mt-1">System requirements not met</small>
+                        [% END %]
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header [% IF status.kubernetes.installed %]bg-success[% ELSE %]bg-secondary[% END %] text-white">
+                    <h5 class="card-title mb-0">Kubernetes</h5>
+                </div>
+                <div class="card-body">
+                    <p>
+                        <strong>Status:</strong> 
+                        [% IF status.kubernetes.installed %]
+                            <span class="badge badge-success">[% status.kubernetes.status | html %]</span>
+                        [% ELSE %]
+                            <span class="badge badge-secondary">Not Installed</span>
+                        [% END %]
+                    </p>
+                    
+                    [% IF status.kubernetes.installed %]
+                        <p><strong>Version:</strong> [% status.kubernetes.version | html %]</p>
+                    [% END %]
+                    
+                    <div class="mt-3">
+                        [% IF status.kubernetes.installed %]
+                            <button class="btn btn-sm btn-outline-success" disabled>Already Installed</button>
+                        [% ELSIF status.kubernetes.can_install %]
+                            <button id="install-kubernetes" class="btn btn-sm btn-primary">Install Kubernetes</button>
+                            <a href="[% c.uri_for('/proxymanager/install_kubernetes') %]" class="btn btn-sm btn-outline-secondary mt-1">Direct Link</a>
+                        [% ELSE %]
+                            <button class="btn btn-sm btn-outline-secondary" disabled>Cannot Install</button>
+                            <small class="text-muted d-block mt-1">Docker must be installed first</small>
+                        [% END %]
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header [% IF status.npm.installed %]bg-success[% ELSE %]bg-secondary[% END %] text-white">
+                    <h5 class="card-title mb-0">Nginx Proxy Manager</h5>
+                </div>
+                <div class="card-body">
+                    <p>
+                        <strong>Status:</strong> 
+                        [% IF status.npm.installed %]
+                            <span class="badge badge-success">[% status.npm.status | html %]</span>
+                        [% ELSE %]
+                            <span class="badge badge-secondary">Not Installed</span>
+                        [% END %]
+                    </p>
+                    
+                    [% IF status.npm.installed && status.npm.version %]
+                        <p><strong>Version:</strong> [% status.npm.version | html %]</p>
+                    [% END %]
+                    
+                    <div class="mt-3">
+                        [% IF status.npm.installed && status.npm.status == 'Running in Docker' %]
+                            <a href="[% npm_admin_url %]" target="_blank" class="btn btn-sm btn-outline-primary">Open Admin UI</a>
+                        [% ELSIF status.npm.installed %]
+                            <button id="start-npm" class="btn btn-sm btn-warning">Start NPM</button>
+                        [% ELSIF status.npm.can_install %]
+                            <button id="install-npm" class="btn btn-sm btn-primary">Install NPM</button>
+                            <a href="[% c.uri_for('/proxymanager/install_npm') %]" class="btn btn-sm btn-outline-secondary mt-1">Direct Link</a>
+                        [% ELSE %]
+                            <button class="btn btn-sm btn-outline-secondary" disabled>Cannot Install</button>
+                            <small class="text-muted d-block mt-1">Docker must be installed first</small>
+                        [% END %]
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-2">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="card-title mb-0">Installation Progress</h5>
+                </div>
+                <div class="card-body">
+                    <div id="installation-progress" class="d-none">
+                        <div class="progress mb-3">
+                            <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                        </div>
+                        <div id="installation-status" class="alert alert-info">
+                            Waiting for installation to start...
+                        </div>
+                        <pre id="installation-output" class="bg-dark text-light p-3" style="max-height: 300px; overflow-y: auto;"></pre>
+                    </div>
+                    <div id="no-installation" class="text-center py-3">
+                        <p class="text-muted">No installation in progress</p>
+                    </div>
+                    
+                    <!-- Debug section -->
+                    <div class="mt-4 p-3 border border-warning">
+                        <h5>Debug Tools</h5>
+                        <p>Use these buttons to test if JavaScript is working properly:</p>
+                        <button id="test-jquery" class="btn btn-sm btn-warning">Test jQuery</button>
+                        <button id="test-alert" class="btn btn-sm btn-warning">Test Alert</button>
+                        <button id="test-progress" class="btn btn-sm btn-warning">Test Progress Bar</button>
+                        <div id="debug-output" class="mt-2 p-2 bg-light"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Debug function to check if jQuery is loaded
+function checkJQuery() {
+    if (typeof jQuery !== 'undefined') {
+        return "jQuery is loaded (version: " + jQuery.fn.jquery + ")";
+    } else {
+        return "jQuery is NOT loaded!";
+    }
+}
+
+// Debug function to log to console and debug output
+function debugLog(message) {
+    console.log(message);
+    $('#debug-output').append("<div>" + message + "</div>");
+}
+
+$(document).ready(function() {
+    // Log jQuery status on page load
+    debugLog(checkJQuery());
+    
+    // Debug buttons
+    $('#test-jquery').click(function() {
+        debugLog("jQuery button clicked at " + new Date().toLocaleTimeString());
+    });
+    
+    $('#test-alert').click(function() {
+        alert("Alert test successful!");
+        debugLog("Alert button clicked at " + new Date().toLocaleTimeString());
+    });
+    
+    $('#test-progress').click(function() {
+        debugLog("Progress test button clicked at " + new Date().toLocaleTimeString());
+        $('#no-installation').addClass('d-none');
+        $('#installation-progress').removeClass('d-none');
+        $('#progress-bar').css('width', '50%');
+        $('#installation-status').html('Test progress bar at 50%');
+    });
+    // Add AJAX setup for error handling
+    $.ajaxSetup({
+        error: function(xhr, status, error) {
+            console.error("AJAX Error:", status, error);
+            completeInstallation('error', 'AJAX Error: ' + status, 'Error details: ' + error + '\nResponse: ' + xhr.responseText);
+        }
+    });
+    // Docker installation
+    $('#install-docker').click(function() {
+        console.log("Docker installation button clicked");
+        startInstallation('docker');
+        
+        // Start the installation
+        $.ajax({
+            url: '[% c.uri_for("/proxymanager/install_docker") %]',
+            method: 'POST',
+            dataType: 'json',
+            success: function(data) {
+                if (data.success) {
+                    // Installation started successfully
+                    debugLog("Docker installation started with ID: " + data.install_id);
+                    
+                    // Update the installation status
+                    $('#installation-status').html('Docker installation started. Monitoring progress...');
+                    
+                    // Start polling for progress updates
+                    monitorInstallationProgress(data.install_id, data.progress_url);
+                } else {
+                    completeInstallation('error', 'Docker installation failed to start: ' + data.error, data.details || '');
+                }
+            },
+            error: function(xhr, status, error) {
+                completeInstallation('error', 'Failed to communicate with the server', 'Status: ' + status + ', Error: ' + error);
+                debugLog("AJAX Error: " + status + " - " + error);
+            }
+        });
+    });
+    
+    // Kubernetes installation
+    $('#install-kubernetes').click(function() {
+        console.log("Kubernetes installation button clicked");
+        startInstallation('kubernetes');
+        
+        // Start the installation
+        $.ajax({
+            url: '[% c.uri_for("/proxymanager/install_kubernetes") %]',
+            method: 'POST',
+            dataType: 'json',
+            success: function(data) {
+                if (data.success) {
+                    // Installation started successfully
+                    debugLog("Kubernetes installation started with ID: " + data.install_id);
+                    
+                    // Update the installation status
+                    $('#installation-status').html('Kubernetes installation started. Monitoring progress...');
+                    
+                    // Start polling for progress updates
+                    monitorInstallationProgress(data.install_id, data.progress_url);
+                } else {
+                    completeInstallation('error', 'Kubernetes installation failed to start: ' + data.error, data.details || '');
+                }
+            },
+            error: function(xhr, status, error) {
+                completeInstallation('error', 'Failed to communicate with the server', 'Status: ' + status + ', Error: ' + error);
+                debugLog("AJAX Error: " + status + " - " + error);
+            }
+        });
+    });
+    
+    // NPM installation
+    $('#install-npm').click(function() {
+        console.log("NPM installation button clicked");
+        startInstallation('npm');
+        
+        // Start the installation
+        $.ajax({
+            url: '[% c.uri_for("/proxymanager/install_npm") %]',
+            method: 'POST',
+            dataType: 'json',
+            success: function(data) {
+                if (data.success) {
+                    // Installation started successfully
+                    debugLog("NPM installation started with ID: " + data.install_id);
+                    
+                    // Update the installation status
+                    $('#installation-status').html('Nginx Proxy Manager installation started. Monitoring progress...');
+                    
+                    // Start polling for progress updates
+                    monitorInstallationProgress(data.install_id, data.progress_url);
+                } else {
+                    completeInstallation('error', 'NPM installation failed to start: ' + data.error, data.details || '');
+                }
+            },
+            error: function(xhr, status, error) {
+                completeInstallation('error', 'Failed to communicate with the server', 'Status: ' + status + ', Error: ' + error);
+                debugLog("AJAX Error: " + status + " - " + error);
+            }
+        });
+    });
+    
+    // Start NPM
+    $('#start-npm').click(function() {
+        startInstallation('npm-start');
+        // This would need a backend endpoint to start NPM
+        // For now, just show a message
+        completeInstallation('info', 'Starting NPM is not implemented yet', 'Please start NPM manually using docker-compose up -d in the NPM directory.');
+    });
+    
+    // Add vanilla JavaScript event listeners as fallback
+    document.addEventListener('DOMContentLoaded', function() {
+        debugLog("Adding vanilla JS event listeners");
+        
+        // Docker installation button
+        var dockerBtn = document.getElementById('install-docker');
+        if (dockerBtn) {
+            dockerBtn.addEventListener('click', function() {
+                debugLog("Docker button clicked (vanilla JS)");
+                startInstallation('docker');
+                // Make AJAX request using vanilla JS
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', '[% c.uri_for("/proxymanager/install_docker") %]', true);
+                xhr.setRequestHeader('Content-Type', 'application/json');
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4) {
+                        if (xhr.status === 200) {
+                            var data = JSON.parse(xhr.responseText);
+                            if (data.success) {
+                                completeInstallation('success', 'Docker installation completed successfully!', data.output);
+                                setTimeout(function() {
+                                    window.location.reload();
+                                }, 3000);
+                            } else {
+                                completeInstallation('error', 'Docker installation failed: ' + data.error, data.details || data.output);
+                            }
+                        } else {
+                            completeInstallation('error', 'Failed to communicate with the server', 'Status: ' + xhr.status);
+                        }
+                    }
+                };
+                xhr.send();
+            });
+        } else {
+            debugLog("Docker button not found!");
+        }
+    });
+    
+    function startInstallation(type) {
+        // Show the installation progress section
+        $('#no-installation').addClass('d-none');
+        $('#installation-progress').removeClass('d-none');
+        
+        // Reset the progress bar
+        $('#progress-bar').css('width', '10%').removeClass('bg-danger').addClass('progress-bar-animated');
+        
+        // Clear any existing progress interval
+        if (window.progressInterval) {
+            clearInterval(window.progressInterval);
+            window.progressInterval = null;
+        }
+        
+        // Set the initial message based on the installation type
+        let message = '';
+        switch(type) {
+            case 'docker':
+                message = 'Preparing to install Docker... This may take several minutes.';
+                break;
+            case 'kubernetes':
+                message = 'Preparing to install Kubernetes... This may take several minutes.';
+                break;
+            case 'npm':
+                message = 'Preparing to install Nginx Proxy Manager... This may take a few minutes.';
+                break;
+            case 'npm-start':
+                message = 'Starting Nginx Proxy Manager...';
+                break;
+        }
+        
+        // Update the status and output
+        $('#installation-status').removeClass('alert-success alert-danger').addClass('alert-info').html(message);
+        $('#installation-output').html('Initializing installation...');
+        
+        // Log the start of the installation
+        debugLog("Starting " + type + " installation");
+    }
+    
+    // Function to monitor installation progress
+    function monitorInstallationProgress(installId, progressUrl) {
+        // Clear any existing progress interval
+        if (window.progressInterval) {
+            clearInterval(window.progressInterval);
+        }
+        
+        // Store the installation ID and progress URL
+        window.currentInstallId = installId;
+        window.currentProgressUrl = progressUrl;
+        
+        // Initialize the progress polling
+        pollInstallationProgress();
+        
+        // Set up an interval to poll for progress updates
+        window.progressInterval = setInterval(pollInstallationProgress, 2000);
+    }
+    
+    // Function to poll for installation progress
+    function pollInstallationProgress() {
+        if (!window.currentProgressUrl) {
+            debugLog("No progress URL available");
+            return;
+        }
+        
+        $.ajax({
+            url: window.currentProgressUrl,
+            method: 'GET',
+            dataType: 'json',
+            success: function(data) {
+                if (data.success) {
+                    // Update the progress bar
+                    $('#progress-bar').css('width', data.progress + '%');
+                    
+                    // Update the output
+                    $('#installation-output').html(data.output.replace(/\n/g, '<br>'));
+                    
+                    // Check if the installation is complete
+                    if (data.status === 'complete') {
+                        completeInstallation('success', 'Installation completed successfully!', data.output.replace(/\n/g, '<br>'));
+                        
+                        // Reload the page after a delay
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 3000);
+                    } else if (data.status === 'error') {
+                        completeInstallation('error', 'Installation failed!', data.output.replace(/\n/g, '<br>'));
+                    }
+                } else {
+                    // Handle error response
+                    debugLog("Error polling progress: " + data.error);
+                    $('#installation-output').append("<div class='text-danger'>Error polling progress: " + data.error + "</div>");
+                }
+            },
+            error: function(xhr, status, error) {
+                debugLog("AJAX Error polling progress: " + status + " - " + error);
+                $('#installation-output').append("<div class='text-danger'>Error polling progress: " + status + " - " + error + "</div>");
+            }
+        });
+    }
+    
+    function completeInstallation(status, message, output) {
+        // Clear the progress interval
+        if (window.progressInterval) {
+            clearInterval(window.progressInterval);
+            window.progressInterval = null;
+        }
+        
+        if (status === 'success') {
+            $('#progress-bar').css('width', '100%').removeClass('progress-bar-animated');
+            $('#installation-status').removeClass('alert-info alert-danger').addClass('alert-success').html(message);
+        } else if (status === 'error') {
+            $('#progress-bar').css('width', '100%').removeClass('progress-bar-animated').addClass('bg-danger');
+            $('#installation-status').removeClass('alert-info alert-success').addClass('alert-danger').html(message);
+        } else {
+            $('#progress-bar').css('width', '100%').removeClass('progress-bar-animated');
+            $('#installation-status').removeClass('alert-success alert-danger').addClass('alert-info').html(message);
+        }
+        
+        if (output) {
+            $('#installation-output').html(output);
+        }
+    }
+});
+</script>

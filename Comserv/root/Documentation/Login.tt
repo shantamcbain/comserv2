@@ -1,0 +1,43 @@
+[% META title = 'Login Documentation' %]
+[% PageVersion = 'Documentation/Login.tt,v 0.02 2024/11/22 Shanta Exp shanta ' %]
+
+<h1 id="login-top">Login System Documentation</h1>
+
+<nav>
+    <a href="#overview">Overview</a> |
+    <a href="#controller">Controller</a> |
+    <a href="#model">Model</a> |
+    <a href="#templates">Templates</a> |
+    <a href="#workflow">Workflow</a>
+</nav>
+
+<h2 id="overview">Overview</h2>
+<p>The Login system is responsible for authenticating users and managing their sessions within the application. It ensures secure access to the system's features and data.</p>
+
+<h2 id="controller">Controller</h2>
+<p>The <code>Comserv::Controller::Login</code> module handles the routing and logic for login-related actions:</p>
+<ul>
+    <li><strong>Index:</strong> Displays the login form to the user.</li>
+    <li><strong>Authenticate:</strong> Processes user credentials, verifies them against the database, and initiates a session on successful authentication.</li>
+    <li><strong>Logout:</strong> Ends the user's session and redirects to the login page.</li>
+</ul>
+
+<h2 id="model">Model</h2>
+<p>The <code>Comserv::Model::Login</code> module provides methods for interacting with user authentication data:</p>
+<ul>
+    <li><strong>Verify Credentials:</strong> Checks the provided username and password against stored user data.</li>
+    <li><strong>Get User Details:</strong> Retrieves user information based on the authenticated session.</li>
+</ul>
+
+<h2 id="templates">Templates</h2>
+<p>The following templates are used in the Login system:</p>
+<ul>
+    <li><strong>log.index.tt:</strong> The main template for rendering the login page, including the login form and error messages.</li>
+    <li><strong>log.success.tt:</strong> Displays a success message upon successful login.</li>
+    <li><strong>log.error.tt:</strong> Shows error messages when login fails.</li>
+</ul>
+
+<h2 id="workflow">Workflow</h2>
+<p>The typical workflow for user login involves displaying the login form, processing user credentials, and managing session states. The system provides feedback through success and error messages to guide the user through the login process.</p>
+
+<p><a href="#login-top">Back to top</a></p>

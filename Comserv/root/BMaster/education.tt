@@ -1,0 +1,23 @@
+[% PageVersion = 'Bmaster/education.tt,v 0.01 2023/08/30 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+[% END %]
+[% PageVersion %]
+<h1>Education</h1>
+
+<p>We believe in the importance of education in promoting beekeeping and conserving our bee populations. Here's an overview of our educational offerings:</p>
+
+<h2>Anatomy and Physiology</h2>
+<p>Learn about the anatomy and physiology of bees, including the different types of bees in a hive and their roles, the life cycle of a bee, and how bees communicate.</p>
+
+<h2>Diseases and Pests</h2>
+<p>Learn about the common diseases and pests that affect bees, how to identify them, and how to manage them.</p>
+
+<h2>Hive Management</h2>
+<p>Learn about best practices for hive management, including hive inspections, swarm prevention, and winter preparation.</p>
+
+<h2>Workshops and Courses</h2>
+<p>We offer a variety of workshops and courses for both beginner and experienced beekeepers. Check out our schedule for upcoming events.</p>
+
+<!-- Add more education information as needed -->
+
+<p>For more information on our educational offerings, please contact us.</p>

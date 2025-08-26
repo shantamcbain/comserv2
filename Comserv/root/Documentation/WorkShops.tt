@@ -1,0 +1,114 @@
+
+[% PageVersion = 'Documentation/WorkShops.tt,v 0.02 2025/02/27 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+[% END %]
+[% PageVersion %]
+
+<nav>
+    <ul>
+        <li><a href="#WorkshopController">Workshop Controller</a></li>
+        <li><a href="#WorkshopModel">Workshop Model</a></li>
+        <li><a href="#WorkshopResult">Workshop Result</a></li>
+        <li><a href="#NextSteps">Next Steps</a></li>
+    </ul>
+</nav>
+
+<h1>Workshop Application Creation Process</h1>
+<p>The workshop application is a Catalyst web-based application that allows users to create, schedule, and manage workshops. The application includes features for adding new workshops, editing existing workshops, and deleting workshops. It also includes features for scheduling workshops at specific times and locations, and for managing the participants who have signed up for each workshop.</p>
+<p>To create the Workshop application, we are following a structured approach that involves several steps:</p>
+
+<ol>
+    <li><h3 id="WorkshopController">Workshop Controller</h3>
+        <p>The Workshop Controller is a Perl module that handles user interactions with the application. It uses the models to interact with the database and the views to generate the user interface. The controller is responsible for processing user input, invoking the appropriate models to perform the required actions, and rendering the views to display the results.</p>
+        <p>Example of adding a new workshop:</p>
+        <pre>
+            sub add_workshop :Path('/workshop/add'):Args(0) {
+                my ( $self, $c ) = @_;
+                my $params = $c->request->params;
+                my $workshop = $c->model('DB::Workshop')->create({
+                    title => $params->{title},
+                    description => $params->{description},
+                    date => $params->{date},
+                    location => $params->{location},
+                    instructor => $params->{instructor},
+                    max_participants => $params->{max_participants},
+                    share => $params->{share},
+                    start_time => $params->{start_time},
+                    end_time => $params->{end_time},
+                });
+                $c->response->redirect($c->uri_for('/workshop/list'));
+            }
+        </pre>
+        <p>Example of editing an existing workshop:</p>
+        <pre>
+            sub edit_workshop :Path('/workshop/edit'):Args(1) {
+                my ( $self, $c, $id ) = @_;
+                my $workshop = $c->model('DB::Workshop')->find($id);
+                if ($workshop) {
+                    my $params = $c->request->params;
+                    $workshop->update({
+                        title => $params->{title},
+                        description => $params->{description},
+                        date => $params->{date},
+                        location => $params->{location},
+                        instructor => $params->{instructor},
+                        max_participants => $params->{max_participants},
+                        share => $params->{share},
+                        start_time => $params->{start_time},
+                        end_time => $params->{end_time},
+                    });
+                    $c->response->redirect($c->uri_for('/workshop/list'));
+                } else {
+                    $c->response->body('Workshop not found');
+                }
+            }
+        </pre>
+        <p>Example of deleting a workshop:</p>
+        <pre>
+            sub delete_workshop :Path('/workshop/delete'):Args(1) {
+                my ( $self, $c, $id ) = @_;
+                my $workshop = $c->model('DB::Workshop')->find($id);
+                $workshop->delete if $workshop;
+                $c->response->redirect($c->uri_for('/workshop/list'));
+            }
+        </pre>
+    </li>
+    <li><h3 id="WorkshopModel">Workshop Model</h3>
+        <p>The Workshop Model is a Perl module that represents the core entity in our application. The model is responsible for querying the database to retrieve, insert, update, and delete workshops, as well as for performing any business logic related to workshops.</p>
+        <p>Example of connecting to the database and retrieving a user:</p>
+        <pre>
+            my $schema = $c->model('DBEncy');
+            my $rs = $schema->resultset('User');
+            my $user = $rs->find({ username => $username });
+        </pre>
+    </li>
+    <li><h3 id="WorkshopResult">Workshop Result</h3>
+        <ol>
+            <li>id: this field is auto incremented.</li>
+            <li>sitename: this field is the sitename of the owner of the site.</li>
+            <li>title: this field is the name of the workshop.</li>
+            <li>description: this field is the description of the workshop.</li>
+            <li>date: this field is the date of the workshop.</li>
+            <li>location: the location of the workshop.</li>
+            <li>instructor: this field is the instructor(s).</li>
+            <li>max_participants: this field is the maximum number of participants for the workshop.</li>
+            <li>share: this field is the share status of the workshop.</li>
+            <li>end_time: this field is the end time of the workshop.</li>
+            <li>time: this field is the time of the workshop.</li>
+        </ol>
+    </li>
+</ol>
+
+<h2 id="NextSteps">Next steps:</h2>
+
+<ol>
+    <li>Define the Data Models: We have defined several data models to represent the core entities in our application. These include Workshop, Participant, and SiteWorkshop. Each model corresponds to a table in the database and defines the fields (columns) in that table.</li>
+    <li>Establish Relationships Between Models: We have established relationships between our models to reflect the associations between our entities. For example, we have a `belongs_to` relationship from Workshop to Site, indicating that each workshop belongs to a site.</li>
+    <li>Create the Views: We have created a Template Toolkit file `workshops.tt` that defines the user interface for displaying and interacting with workshops. This file includes HTML and Template Toolkit directives to display a list of workshops and provide links for adding, editing, and deleting workshops.</li>
+    <li>Implement the Controllers: We will implement controllers that handle user interactions with our application. These controllers will use the models to interact with the database and the views to generate the user interface.</li>
+    <li>Implement the Service Layer: We will implement a service layer that encapsulates the business logic of our application. This will include functions for checking if a user is allowed to create a workshop, if a workshop is full, or if a workshop can be scheduled at a certain time.</li>
+    <li>Test the Application: We will thoroughly test our application to ensure that it works as expected. This will include unit tests for our models, controllers, and service layer, as well as integration tests for the application as a whole.</li>
+    <li>Deploy the Application: Once we are confident that our application is working correctly, we will deploy it to a production environment.</li>
+</ol>
+
+<p>Remember, this is a high-level overview and the actual implementation might involve additional steps depending on the specific requirements of your application.</p>

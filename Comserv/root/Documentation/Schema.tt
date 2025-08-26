@@ -1,0 +1,103 @@
+[% PageVersion  = 'documents/schema.tt,v 0.1 2024/04/04 Shanta Exp Shanta'; %]
+[% IF debug_mode == 1 %]
+    <p>Error: [% error_msg %]</p>
+    [% PageVersion %]
+[% END %]
+
+<h1 id="schema-top"><a href="#top">Database Schema Installation</a></h1>
+
+<nav>
+    <a href="#schema-prerequisites">Prerequisites</a> |
+    <a href="#schema-installation">Installation</a>
+</nav>
+
+<h3 id="schema-prerequisites"><a href="#schema-top">Back to top</a> </h3>
+<p>Before you begin, make sure you have the following:</p>
+<ul>
+    <li>MySQL Server installed on your server</li>
+    <li>Access to the command line on your server</li>
+    <li>The `ency.sql` backup file</li>
+</ul>
+
+<h3 id="schema-installation"><a href="#schema-top">Back to top</a></h3>
+
+<h1 id="schemam-top">Database Schema Management Guide</h1>
+
+<nav>
+    <a href="#schemam-overview">1. Overview</a> |
+    <a href="#current-schemam">2. Current Schema Structure</a> |
+    <a href="#schemam-evolution">3. Schema Evolution Plan</a> |
+    <a href="#schemam-database-synchronization">4. Database Synchronization</a> |
+    <a href="#schemam-best-practices">5. Best Practices</a> |
+    <a href="#schemam-versioning">6. Schema Versioning</a> |
+    <a href="#schemam-documentation-updates">7. Schema Documentation Updates</a> |
+    <a href="#schemam-troubleshooting">8. Troubleshooting and Common Issues</a> |
+    <a href="#schemam-references">9. References</a>
+</nav>
+
+<h2 id="schemam-overview"><a href="#schemam-top">1. Overview</a></h2>
+<p>Brief introduction to the purpose of the schema and its importance in the application.</p>
+
+<h2 id="current-schemam"><a href="#schemam-top">2. Current Schema Structure</a></h2>
+<p>Detailed description of the existing tables and their relationships in both the Ency and Forager databases.</p>
+
+<h2 id="schemam-evolution"><a href="#schemam-top">3. Schema Evolution Plan</a></h2>
+<p>Step-by-step guide on how to update the schema to accommodate changes in the application requirements:</p>
+<ol>
+    <li>Identify required schema changes based on application updates.</li>
+    <li>Create SQL migration scripts to implement schema changes.</li>
+    <li>Test migration scripts in a development environment.</li>
+    <li>Execute migration scripts in production, ensuring proper backups are in place.</li>
+    <li>Verify schema changes and test application functionality.</li>
+</ol>
+
+<h2 id="schemam-database-synchronization"><a href="#schemam-top">4. Database Synchronization</a></h2>
+<p>Strategies and tools for keeping schema and data synchronized across multiple servers:</p>
+<ol>
+    <li>Implement automated database synchronization tools.</li>
+    <li>Establish replication or clustering for high availability and data redundancy.</li>
+    <li>Regularly monitor synchronization status and resolve any discrepancies.</li>
+</ol>
+
+<h2 id="schemam-best-practices"><a href="#schemam-top">5. Best Practices</a></h2>
+<p>Recommendations for maintaining a well-organized and efficient database schema:</p>
+<ol>
+    <li>Follow naming conventions for tables, columns, and relationships.</li>
+    <li>Document schema changes and rationale for future reference.</li>
+    <li>Regularly optimize database performance and indexes.</li>
+</ol>
+
+<h2 id="schemam-versioning"><a href="#schemam-top">6. Schema Versioning</a></h2>
+<p>Implementation of version control for the schema to track changes and ensure consistency:</p>
+<ol>
+    <li>Use version control systems (e.g., Git) to track schema changes.</li>
+    <li>Tag schema versions for easy reference and rollback if needed.</li>
+</ol>
+
+<h2 id="schemam-documentation-updates"><a href="#schemam-top">7. Schema Documentation Updates</a></h2>
+<p>Procedures for keeping the schema documentation up-to-date with any changes made to the database structure:</p>
+<ol>
+    <li>Automate documentation generation from schema metadata.</li>
+    <li>Include schema change logs in documentation updates.</li>
+</ol>
+
+<h2 id="schemam-troubleshooting"><a href="#schemam-top">8. Troubleshooting and Common Issues</a></h2>
+<p>Solutions for common problems encountered during schema management and synchronization:</p>
+<ol>
+    <li>Identify and resolve database conflicts during schema synchronization.</li>
+    <li>Address performance issues resulting from schema changes.</li>
+</ol>
+
+<h2 id="schemam-references"><a href="#schemam-top">9. References</a></h2>
+<p>Additional resources and tools for further reading on database schema management.</p>
+
+<p>Follow these steps to install the MySQL backup on your server:</p>
+<ol>
+    <li>Open the command line on your server.</li>
+    <li>Navigate to the directory where the `ency.sql` file is located.</li>
+    <li>Log in to the MySQL server with the following command: `mysql -u username -p`. Replace `username` with your MySQL username. You will be prompted to enter your password.</li>
+    <li>Create a new database with the following command: `CREATE DATABASE new_database;`. Replace `new_database` with the name of your new database.</li>
+    <li>Select the new database with the following command: `USE new_database;`.</li>
+    <li>Import the `ency.sql` file with the following command: `source ency.sql;`.</li>
+</ol>
+<p>Your MySQL database should now be installed on your server.</p>

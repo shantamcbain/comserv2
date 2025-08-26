@@ -1,0 +1,50 @@
+[% PageVersion = 'admin/edit_documentation.tt,v 0.01 2024/03/01 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<h1>Edit Documentation</h1>
+
+[% IF error_msg %]
+    <div class="error">[% error_msg %]</div>
+[% END %]
+
+[% IF success_msg %]
+    <div class="success">[% success_msg %]</div>
+[% END %]
+
+<form method="POST" action="[% c.uri_for(c.controller('Admin').action_for('edit_documentation')) %]">
+    <div class="form-group">
+        <label for="title">Title:</label>
+        <input type="text" id="title" name="title" required class="form-control">
+    </div>
+
+    <div class="form-group">
+        <label for="section">Section:</label>
+        <select id="section" name="section" required class="form-control">
+            <option value="overview">Overview</option>
+            <option value="installation">Installation</option>
+            <option value="configuration">Configuration</option>
+            <option value="usage">Usage</option>
+            <option value="api">API</option>
+            <option value="troubleshooting">Troubleshooting</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="version">Version:</label>
+        <input type="text" id="version" name="version" required class="form-control" 
+               pattern="\d+\.\d+\.\d+" placeholder="1.0.0">
+    </div>
+
+    <div class="form-group">
+        <label for="content">Content:</label>
+        <textarea id="content" name="content" required class="form-control" rows="20"></textarea>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Save Documentation</button>
+</form>
+
+<script>
+    // Add any JavaScript for enhanced editing functionality here
+</script>

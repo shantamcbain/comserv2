@@ -1,0 +1,32 @@
+[% PageVersion = 'Documentation/Ve7tit.tt,v 0.02 2024/08/31 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<h1 id="Ve7tittop">The 'Ve7tit' Documentation</h1>
+
+<p>This is my documentation for the 've7tit' application. All the information you need to know about the application is here.</p>
+
+<p> All routes are dealt with in the ve7tit controller.</p>
+<ul>
+    <li><a href="#routes">Routes</a></li>
+    <li><a href="#templates">Templates</a></li>
+    <li><a href="#database">Database</a></li>
+    <li><a href="#functions">Functions</a></li>
+    <li><a href="#tests">Tests</a></li>
+</ul>
+<h2 id="routes">Routes</h2>
+<ul>
+    <li>Index This return the index page located at root/ve7tit/index.tt <a href="http:ve7tit.com:5000">ve7tit</a></li>
+    <li><a href="#login">Login</a></li>
+    <li><a href="#register">Register</a></li>
+    <li><a href="#logout">Logout</a></li>
+    <li><a href="#profile">Profile</a></li>
+    <li><a href="#editprofile">Edit Profile</a></li>
+    <li><a href="#additem">Add Item</a></li>
+    <li><a href="#edititem">Edit Item</a></li>
+    <li><a href="#deleteitem">Delete Item</a></li>
+    <li><a href="#viewitem">View Item</a></li>
+    <li><a href="#search">Search</a></li>
+    <li><a href="#contact">Contact</a></li>
+</ul>

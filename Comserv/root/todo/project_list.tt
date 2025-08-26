@@ -1,0 +1,21 @@
+[% MACRO display_project_options(projects, selected_project_id, level) BLOCK %]
+    [% FOREACH project IN projects.sort('name') %]
+        [% SET indent = '' %]
+        [% FOREACH i IN [1 .. level] %]
+            [% indent = indent _ '--- ' %]
+        [% END %]
+        <option value="[% project.id %]"
+            [% IF project.id == selected_project_id %]style="font-weight: bold;" selected[% END %]>
+            [% indent %][% project.name %]
+        </option>
+        [% IF project.sub_projects.size %]
+            [% display_project_options(project.sub_projects, selected_project_id, level + 1) %]
+        [% END %]
+    [% END %]
+[% END %]
+
+
+<select id="project_id" name="project_id">
+    <option value="" [% IF !selected_project_id %]selected[% END %]>None</option>
+    [% display_project_options(projects, selected_project_id, 0) %]
+</select>

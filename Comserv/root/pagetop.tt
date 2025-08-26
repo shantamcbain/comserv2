@@ -1,0 +1,87 @@
+
+<!-- File: /home/shanta/PycharmProjects/comserv/Comserv/root/pagetop.tt -->
+[% PageVersion = 'pagetop.tt,v 0.024.0 2025/05/31 shanta Exp shanta ' %]
+[%# PageVersion = 'pagetop.tt,v 0.023.0 2025/04/09 shanta Exp shanta ' %]
+
+[% SET roles = c.session.roles || [] %]
+[% SET is_admin = roles.grep('admin').size > 0 ? 1 : 0 %]
+
+[% IF is_admin || c.session.debug_mode == 1 %]
+<div class="server-info" style="background-color: #e9ecef; border-bottom: 1px solid #dee2e6; padding: 5px 10px; font-size: 12px; text-align: right; color: #495057;">
+    Domain: <strong>[% c.req.uri.host %]</strong> | 
+    Client IP: <strong>[% c.req.address %]</strong> | 
+    Server: <strong>[% server_hostname %]</strong> | 
+    Server IP: <strong>[% server_ip %]</strong>
+    [% IF c.session.debug_mode == 1 %] | [% PageVersion %][% END %]
+</div>
+[% END %]
+
+[% IF c.session.debug_mode == 1 %]
+<div class="debug">
+    [% INCLUDE 'debug.tt' %]
+</div>
+
+[% IF c.stash.debug_msg.defined && c.stash.debug_msg.size > 0 %]
+    <div class="debug-messages" style="background-color: #f8f9fa; border: 1px solid #ddd; padding: 10px; margin-bottom: 15px;">
+        <h4>Debug Messages</h4>
+        [% FOREACH msg IN c.stash.debug_msg %]
+            <p class="debug" style="margin: 2px 0; font-family: monospace;">Debug [% loop.index %]: [% msg %]</p>
+        [% END %]
+    </div>
+[% END %]
+[% END %]
+
+<header>
+    <h1>
+        Welcome [% IF roles.grep('admin').size %]
+[% c.session.first_name %] [% c.session.last_name %] Administrator
+[% ELSIF roles.grep('user').size %]
+ [% c.session.first_name %] [% c.session.last_name %] User
+[% ELSE %]
+ Guest
+[% END %] to [% c.stash.ScriptDisplayName %]!
+    </h1>
+
+
+
+
+
+
+    <!-- Main Menu -->
+    <nav>
+        <ul class="horizontal-menu">
+            <li class="horizontal-dropdown">
+                <a href="[% c.session.return_url %]" class="dropbtn">Back</a>
+            </li>
+        [% INCLUDE 'Navigation/TopDropListMain.tt' %]
+        [% INCLUDE 'Navigation/TopDropListLogin.tt' %]
+        [% INCLUDE 'Navigation/TopDropListGlobal.tt' %]
+        [% INCLUDE 'Navigation/TopDropListHosted.tt' %]
+        [% INCLUDE 'Navigation/TopDropListMember.tt' %]
+        [% INCLUDE 'Navigation/TopDropListIT.tt' %]
+        <!-- TopDropListCoop.tt has been removed and merged into admintopmenu.tt -->
+
+        [% IF is_admin %]
+            [% INCLUDE 'Navigation/admintopmenu.tt' %]
+        [% END %]
+
+        [% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]
+        </ul>
+    </nav>
+</header>
+[% IF error_msg %]<div class="alert error">[% error_msg %]</div>[% END %]
+[% IF success_msg %]<div class="alert success">[% success_msg %]</div>[% END %]
+[% IF error_msg %]
+<p class="error">Error: [% error_msg %]</p>
+[% END %]
+
+[% IF success_msg %]
+<p class="success">Success: [% success_msg %]</p>
+[% END %]
+    [% IF c.stash.success_msg %]
+        [% FOREACH msg IN c.stash.success_msg %]
+        <p class="debug">Debug: [% msg %]</p>
+        [% END %]
+    [% END %]
+
+[% # Admin role check is now done at the top of the file %]

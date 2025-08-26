@@ -1,0 +1,63 @@
+[% PageVersion = 'admin/autocrud_list.tt,v 0.01 2024/03/01 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<h1>[% table %] Management</h1>
+
+<div class="autocrud-controls">
+    <a href="[% c.uri_for('/admin/autocrud_edit', table, 'new') %]" class="button">Add New [% table %]</a>
+</div>
+
+<table class="autocrud-table">
+    <thead>
+        <tr>
+            [% FOREACH column IN c.model('DBEncy').source(table).columns %]
+                <th>[% column %]</th>
+            [% END %]
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        [% FOREACH record IN records %]
+            <tr>
+                [% FOREACH column IN c.model('DBEncy').source(table).columns %]
+                    <td>[% record.$column %]</td>
+                [% END %]
+                <td>
+                    <a href="[% c.uri_for('/admin/autocrud_edit', table, record.id) %]">Edit</a>
+                    <form method="POST" action="[% c.uri_for('/admin/autocrud_delete', table, record.id) %]" 
+                          style="display:inline" onsubmit="return confirm('Are you sure?');">
+                        <button type="submit">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        [% END %]
+    </tbody>
+</table>
+
+<style>
+.autocrud-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+}
+
+.autocrud-table th,
+.autocrud-table td {
+    padding: 8px;
+    border: 1px solid #ddd;
+}
+
+.autocrud-controls {
+    margin: 20px 0;
+}
+
+.button {
+    padding: 8px 16px;
+    background: #007bff;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+}
+</style>

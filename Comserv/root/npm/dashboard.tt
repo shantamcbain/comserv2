@@ -1,0 +1,88 @@
+[% META title = 'NPM Dashboard' %]
+
+<div class="container">
+    <h1>NPM Dashboard</h1>
+    
+    <div class="alert alert-info">
+        <strong>Environment:</strong> [% npm_environment %]
+        <br>
+        <strong>Endpoint:</strong> [% npm_endpoint %]
+        <br>
+        <strong>Access Scope:</strong> [% access_scope %]
+    </div>
+    
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h2>Nginx Proxy Manager</h2>
+                </div>
+                <div class="card-body">
+                    <p>
+                        This dashboard allows you to manage your Nginx Proxy Manager configuration directly from the Catalyst application.
+                    </p>
+                    
+                    <div class="list-group">
+                        <a href="[% c.uri_for('/npm/proxy-hosts') %]" class="list-group-item list-group-item-action">
+                            <i class="fa fa-server"></i> Manage Proxy Hosts
+                        </a>
+                        
+                        [% IF access_scope != 'read-only' %]
+                        <a href="[% c.uri_for('/npm/create-proxy-host') %]" class="list-group-item list-group-item-action">
+                            <i class="fa fa-plus"></i> Create New Proxy Host
+                        </a>
+                        [% END %]
+                        
+                        [% IF c.check_user_roles('admin') %]
+                        <a href="[% c.uri_for('/npm/rotate-api-key') %]" class="list-group-item list-group-item-action">
+                            <i class="fa fa-key"></i> Rotate API Key
+                        </a>
+                        [% END %]
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h2>Environment Matrix</h2>
+                </div>
+                <div class="card-body">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Environment</th>
+                                <th>Config Path</th>
+                                <th>Key Prefix</th>
+                                <th>Access Scope</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Production</td>
+                                <td>/etc/catalyst/npm-prod.conf</td>
+                                <td>npm_prod_</td>
+                                <td>Full access</td>
+                            </tr>
+                            <tr>
+                                <td>Staging</td>
+                                <td>/etc/catalyst/npm-stage.conf</td>
+                                <td>npm_stage_</td>
+                                <td>Read-only</td>
+                            </tr>
+                            <tr>
+                                <td>Development</td>
+                                <td>/etc/catalyst/npm-dev.conf</td>
+                                <td>npm_dev_</td>
+                                <td>Localhost only</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

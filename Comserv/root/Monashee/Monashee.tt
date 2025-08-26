@@ -1,0 +1,70 @@
+[% PageVersion	= 'Monashee/Monashee.tt,v 0.01 2024/01/12 shanta Exp shanta '	%]
+[% IF c.session.debug_mode == 1 %]
+ [%	PageVersion %]
+    [%# "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+<h1>Monashee Coop Site support.</h1>
+
+<h2>'In order to change an existing paradigm you do not struggle to try and change the problematic model. You create a new model and make the old one obsolete' - R. Buckminster Fuller</h2>
+[% IF group == 'admin' %]
+			[% embed ('MonasheeCoopAdmin') %]
+<p>Be sure to join the admin mailing list below!</p>
+
+<p>Thanks for joining us. Here you will get support for the  [% SiteDisplayName %]. This application will help Monashee Coop handle
+ the current issues and plans for the overall IT structure. Here we will support staff and volunteer's
+ with training.
+ </p>
+<p>
+
+
+<h2>Site Goals</h2>
+
+
+[% ELSE %]
+<h3>To use this site as admin you will need to create an account. Follow the following steps</h3>
+<ul>
+ <li>Click any of the log on links. There are 3 on most pages One in the top drop list one at the head of the page the other in the page footer.</li>
+ <li>Click the register link</li>
+ <li>Fill in the fields</li>
+ <li>We will get a notification of your registration. We will upgrade your group. The next time you log in you will see
+ a view of the site that your group has access to.
+ </li>
+</ul>
+<p>Some of the below will be only seen by admin users</p>
+
+[% END %]
+<ul>
+<li>The site has currently three groups. But will be expanding to this group list.</p>
+
+<ul>
+ <li>Not logged in which can view all public areas of the site but cannot enter any data into the site.</li>
+ <li> Normal registered with the site sees all public areas and can add data to public applications such as the BuyAndSell.</li>
+ <li> Member, this group is for members of the Monashee Coop. They see all the public areas and member only applications such as the member directory, member only buy and sell, member only streaming software etc.</li>
+ <li> Volunteer, this group is for volunteers of the Monashee Coop. They see all the public areas and member only
+ applications such as the member directory, member only buy and sell, member only streaming software etc.</li>
+ <li> Staff, this group is for staff of the Monashee Coop. They see all the public areas and member only<li>
+ <li> Vendor, this group is for vendors of the Monashee Coop. They see all the public areas and member only applications such as the member directory, member only buy and sell, member only streaming software etc.</li>
+ <li>  Admin. They see all the site and admin only applications such as ToDo,s Logs, Pages, Streaming software create
+ links etc. Future groups can be added such as members, volunteers and staff.</li>
+ <li>Exact rigths for each group can be set by the admin and the board.</li>
+ </p>
+<p>
+</ul>
+  </li>
+ <li><h3>Education</h3>
+  <ul>
+     <li><h2><a href="https://ency.usbm.ca/cgi-bin/index.cgi?site=MonasheeSupport&view=BotanicalNameView" target="_blank">The Encyclopedia of Biological Life</a></h2><p></p></li>
+     <li>Admin users in how to edit and maintain the main site.  </li>
+     <li>Provide ToDo's, logs etc for admin to see what is being worked on on the site.</li>
+  </ul>
+ <li><h3>Plan the future of the site</h3>
+  </li>
+
+   <li><h3>Customer Support</h3>
+
+   <p>Aid customers with website-related problems.</p>
+   </li>
+   <li><h3>create an email list for board, staff and volunteer's.</h3>
+   </li>
+ </ul>

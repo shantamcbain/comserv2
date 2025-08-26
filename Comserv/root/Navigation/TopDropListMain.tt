@@ -1,0 +1,88 @@
+[% PageVersion = 'Navigation/TopDropListMain.tt,v 0.01 2024/01/01hanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [%# PageVersion %]
+    [%# "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+    [%# /HTMLTemplates/Default/TopDropListMain.ttml %]
+[%# 	$Id: TopDropListMain.ttml,v 0.01 2019/12/09 06:33:25 shanta Exp shanta $	%]
+
+ <!-- Start /HTMLTemplates/Default/TopDropListMain.tt-->
+         <li class="horizontal-dropdown">
+                <a href="/" class="dropbtn"><i class="icon-main"></i>Main</a>
+                <div class="dropdown-content">
+                    <a href="/" onclick="activateSite('Home')"><i class="icon-home"></i>Home</a>
+                    <a href="[% c.session.return_url %]"><i class="icon-back"></i>Go Back</a>
+               <span><a href="/workshop" onclick="activateSite('Workshops')" target="_blenk"><i class="icon-workshop"></i>Workshops</a></span>
+            <div class="submenu-item">
+                <span class="submenu-header"><i class="icon-mail"></i>Mail</span>
+                <div class="submenu">
+     [% IF c.session.username == 'Shanta' %]
+    <a href="https://beemaster.ca:20000" target="_Blank">BMaster</a>
+    <a href="https://computersystemconsulting.ca:20000" target="_Blank">CSC</a>
+    <a href="https://forager.com:20000" target="_Blank">Forager</a>
+     <a href="https://grindrodbc.com:20000" target="_Blank">Grindrod</a>
+   <a href="https://helpfullearth.com:20000" target="_Blank">Helpfullearth</a>
+    <a href="https://skyefarm.com:20000" target="_Blank">skyefarm.com</a>
+    <a href="https://usbm.ca:20000" target="_Blank">Usbm</a>
+    <a href="https://weaverbeck.com:20000" target="_Blank">Weaverback</a>
+[% END %][%# HostName %][% MailServer %]
+ <!-- Ensure the URL does not include a port number -->
+[% IF c.session.first_name %]
+    <!-- Construct the URL without a port number -->
+    <A HREF="[% c.session.MailServer.replace(':80', '') %]" target="_Blank">[%c.session.first_name %]'s Mail</a>
+[% ELSE %]
+    <A HREF="[% c.session.MailServer.replace(':3000', '') %]" target="_Blank">Mail</a>
+[% END %]
+
+ </div>
+            </div>
+                    <ul>
+      <!-- populate from Page_tb -->
+       [% IF main_pages.defined %]
+           [% FOREACH link IN main_pages %]
+	           <a href="&amp;page=[% link.page_code %]" name="Contact" target="[% link.target %]"
+                  title=" [% linkview_.name %] "><font   class="LeftSideBarNavStyle">[% link.view_name %]</font></a>
+               [% IF c.session.group == 'admin' %]
+                  <a href="/edit_link?link_id=[% link.record_id %]">Edit/Delete</a>
+               [% END %]
+	       [% END %]
+       [% END %]
+	      <!-- populate from links_tb -->
+       [% IF main_links.defined %]
+	       [% FOREACH link IN main_links %]
+	           <a href="[% link.url %]?site=[% SiteName %]&amp;[% link.view_name %]" name="Contact" target="[% link.target %]" title=" [% link.name %] "><font   class="LeftSideBarNavStyle">[% link.name %]</font ></a>
+               [% IF c.session.group == 'admin' %]
+                  <a href="/edit_link/[% link.record_id %]">Edit/Delete</a>
+               [% END %]
+	       [% END %]
+       [% END %]
+       </ul>[% IF c.session.main_links.size %]
+    [% FOREACH link IN c.session.main_links %]
+        <a href="site=[% SiteName %]&amp;page=[% link.page_code %]" name="Contact" target="[% link.target %]" title=" [% link.view_name %] "><font class="LeftSideBarNavStyle">[% link.view_name %]</font></a>
+    [% END %]
+[% END %]
+                    <!-- Add more main menu options
+Main menu -->
+[% "main_links: " _ c.session.main_links | html %]
+<!-- Main menu -->
+
+
+
+
+<!-- Main menu -->
+[% IF c.session.main_links.defined AND c.session.main_links.size %]
+    [% FOREACH link IN c.session.main_links %]
+        test
+        <a href="[% link.url %]">[% link.name %]</a>
+        [% IF c.session.group == 'admin' %]
+            <a href="/edit_link?link_id=[% link.id %]">Edit/Delete</a>
+        [% END %]
+    [% END %]
+[% END %]
+[% IF c.session.group == 'admin' %]
+    <a href="/add_link?menu=main">Add</a>
+[% END %]
+             </div>
+        </li>
+      <!-- End /HTMLTemplates/Default/TopDropListMain.ttml -->

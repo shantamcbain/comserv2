@@ -1,0 +1,66 @@
+/* week_view.css */
+.week-view-table th, .week-view-table td {
+    border: 1px solid black;
+    padding: 10px;
+}
+.week-view-table th {
+    background-color: #ccffff; /* Change this to the color you want for the day headers */
+}
+.week-view-table td {
+    background-color: #ccffff; /* Change this to the color you want for the todos */
+.todo-button {
+    color: white;
+    background-color: blue;
+}
+.overdue {
+    background-color: red;
+}
+.week-view-table {
+    width: 100%;
+}
+.week-view-table th {
+    background-color: green;
+}
+/* CSS for responsive table */
+@media screen and (max-width: 600px) {
+    .week-view-table, .week-view-table thead, .week-view-table tbody, .week-view-table th, .week-view-table td, .week-view-table tr {
+        display: block;
+    }
+    .week-view-table thead tr {
+        position: absolute;
+        top: -9999px;
+        left: -9999px;
+    }
+    .week-view-table tr {
+        margin: 0 0 1rem 0;
+    }
+    .week-view-table td {
+        border: none;
+        border-bottom: 1px solid #eee;
+        position: relative;
+        padding-left: 50%;
+    }
+    .week-view-table td:before {
+        position: absolute;
+        top: 0;
+        left: 6px;
+        width: 45%;
+        padding-right: 10px;
+        white-space: nowrap;
+    }
+    .week-view-table td:nth-of-type(1):before { content: "Sitename"; }
+    .week-view-table td:nth-of-type(2):before { content: "Project"; }
+    /* Add the rest of the columns here */
+}
+/* CSS for row highlighting */
+.highlight {
+    background-color: yellow; /* Change this to the color you want for highlighting */
+}
+/* CSS for top controls */
+.top-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+     flex-wrap: wrap;
+}
+}

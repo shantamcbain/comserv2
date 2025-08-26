@@ -1,0 +1,69 @@
+[% META title = 'Add Project' %]
+[% PageVersion = 'todo/add_project.tt,v 0.01 2023/11/28 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<h1>Add Project</h1>
+
+<!-- Display the error message if there is one -->
+[% IF error_message %]
+    <p class="error">[% error_message %]</p>
+[% END %]
+
+<form method="POST" action="/project/create_project">
+    [% IF form_data.parent_id %]
+    <input type="hidden" name="parent_id" value="[% form_data.parent_id %]">
+    [% END %]
+  [% INCLUDE "todo/site_list.tt" %]<br>
+
+    <label for="name">Project Name:</label><br>
+    <input type="text" id="name" name="name" value="[% form_data.name %]" required><br>
+
+[% INCLUDE "todo/project_list.tt" projects=projects selected_project_id=form_data.parent_id %]<br>
+
+    <label for="description">Description:</label><br>
+    <textarea id="description" name="description" required>[% form_data.description %]</textarea><br>
+
+    <label for="start_date">Start Date:</label><br>
+    <input type="date" id="start_date" name="start_date" value="[% form_data.start_date %]" required><br>
+
+    <label for="end_date">End Date:</label><br>
+    <input type="date" id="end_date" name="end_date" value="[% form_data.end_date %]" required><br>
+
+    <label for="status">Status:</label><br>
+    <select id="status" name="status" required>
+        <option value="Requested" [% IF form_data.status == 'Requested' %]selected[% END %]>Requested</option>
+        <option value="Public" [% IF form_data.status == 'Public' %]selected[% END %]>Public</option>
+        <option value="In-Process" [% IF form_data.status == 'In-Process' %]selected[% END %]>In-Process</option>
+        <option value="Testing" [% IF form_data.status == 'Testing' %]selected[% END %]>Testing</option>
+        <option value="Delivered" [% IF form_data.status == 'Delivered' %]selected[% END %]>Delivered</option>
+    </select><br>
+
+    <label for="project_code">Project Code:</label><br>
+    <input type="text" id="project_code" name="project_code" value="[% form_data.project_code %]" required><br>
+
+    <label for="project_size">Project Size:</label><br>
+    <input type="number" id="project_size" name="project_size" value="[% form_data.project_size %]" required><br>
+
+    <label for="estimated_man_hours">Estimated Man Hours:</label><br>
+    <input type="number" id="estimated_man_hours" name="estimated_man_hours" value="[% form_data.estimated_man_hours %]" required><br>
+
+    <label for="developer_name">Developer Name:</label><br>
+    <input type="text" id="developer_name" name="developer_name" value="[% form_data.developer_name %]" required><br>
+
+    <label for="client_name">Client Name:</label><br>
+    <input type="text" id="client_name" name="client_name" value="[% form_data.client_name %]" required><br>
+
+    <label for="comments">Comments:</label><br>
+    <textarea id="comments" name="comments" required>[% form_data.comments %]</textarea><br>
+
+    <input type="submit" value="Add Project">
+</form>
+<script>
+function openAddSiteForm() {
+    var url = window.location.origin + '/site/add_site_form';
+    console.log("Opening URL: " + url);
+    window.open(url, '_blank');
+}
+</script>

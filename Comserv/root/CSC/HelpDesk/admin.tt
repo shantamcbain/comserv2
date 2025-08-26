@@ -1,0 +1,174 @@
+[% META title = 'HelpDesk Administration' %]
+[% PageVersion = 'CSC/HelpDesk/admin.tt,v 0.01 2024/04/24 shanta Exp shanta ' %]
+
+[% IF c.session.debug_mode == 1 %]
+ <br>[% PageVersion %]</br>
+ [% IF debug_msg.size %]
+   <div class="debug-message">
+     <ul>
+     [% FOREACH msg IN debug_msg %]
+       <li>[% msg %]</li>
+     [% END %]
+     </ul>
+   </div>
+ [% END %]
+[% END %]
+
+<div class="helpdesk-admin-container">
+    <h1>HelpDesk Administration</h1>
+    
+    [% IF error_msg %]
+    <div class="error-message">
+        <p>[% error_msg %]</p>
+    </div>
+    [% END %]
+    
+    [% IF success_msg %]
+    <div class="success-message">
+        <p>[% success_msg %]</p>
+    </div>
+    [% END %]
+    
+    <div class="admin-section">
+        <h2>Ticket Management</h2>
+        <div class="admin-cards">
+            <div class="admin-card">
+                <h3>Open Tickets</h3>
+                <p>View and manage all open support tickets.</p>
+                <a href="/HelpDesk/admin/tickets/open" class="btn btn-primary">View Open Tickets</a>
+            </div>
+            
+            <div class="admin-card">
+                <h3>Closed Tickets</h3>
+                <p>View archive of resolved support tickets.</p>
+                <a href="/HelpDesk/admin/tickets/closed" class="btn btn-primary">View Closed Tickets</a>
+            </div>
+            
+            <div class="admin-card">
+                <h3>Ticket Categories</h3>
+                <p>Manage ticket categories and priorities.</p>
+                <a href="/HelpDesk/admin/categories" class="btn btn-primary">Manage Categories</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="admin-section">
+        <h2>Knowledge Base Management</h2>
+        <div class="admin-cards">
+            <div class="admin-card">
+                <h3>KB Articles</h3>
+                <p>Manage knowledge base articles.</p>
+                <a href="/HelpDesk/admin/kb/articles" class="btn btn-primary">Manage Articles</a>
+            </div>
+            
+            <div class="admin-card">
+                <h3>KB Categories</h3>
+                <p>Organize knowledge base categories.</p>
+                <a href="/HelpDesk/admin/kb/categories" class="btn btn-primary">Manage Categories</a>
+            </div>
+            
+            <div class="admin-card">
+                <h3>FAQ Management</h3>
+                <p>Manage frequently asked questions.</p>
+                <a href="/HelpDesk/admin/kb/faq" class="btn btn-primary">Manage FAQs</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="admin-section">
+        <h2>System Configuration</h2>
+        <div class="admin-cards">
+            <div class="admin-card">
+                <h3>Email Templates</h3>
+                <p>Customize notification email templates.</p>
+                <a href="/HelpDesk/admin/email_templates" class="btn btn-primary">Edit Templates</a>
+            </div>
+            
+            <div class="admin-card">
+                <h3>User Permissions</h3>
+                <p>Manage staff access to HelpDesk features.</p>
+                <a href="/HelpDesk/admin/permissions" class="btn btn-primary">Manage Permissions</a>
+            </div>
+            
+            <div class="admin-card">
+                <h3>System Settings</h3>
+                <p>Configure HelpDesk system settings.</p>
+                <a href="/HelpDesk/admin/settings" class="btn btn-primary">System Settings</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .helpdesk-admin-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .admin-section {
+        margin-bottom: 40px;
+    }
+    
+    .admin-section h2 {
+        border-bottom: 2px solid #007bff;
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+    }
+    
+    .admin-cards {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+    }
+    
+    .admin-card {
+        flex: 1 1 300px;
+        background-color: #f8f9fa;
+        border-radius: 5px;
+        padding: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .admin-card h3 {
+        color: #007bff;
+        margin-top: 0;
+    }
+    
+    .btn {
+        display: inline-block;
+        padding: 8px 16px;
+        text-decoration: none;
+        border-radius: 4px;
+        margin-top: 10px;
+    }
+    
+    .btn-primary {
+        background-color: #007bff;
+        color: white;
+    }
+    
+    .error-message {
+        background-color: #f8d7da;
+        color: #721c24;
+        padding: 10px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+    }
+    
+    .success-message {
+        background-color: #d4edda;
+        color: #155724;
+        padding: 10px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+    }
+    
+    .debug-message {
+        background-color: #f8d7da;
+        color: #721c24;
+        padding: 10px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+    }
+</style>

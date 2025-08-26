@@ -1,0 +1,69 @@
+[% PageVersion = 'add_site_form.tt,v 0.01 2023/11/28 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+[% PageVersion %]
+[% END %]
+<h1>Add Site</h1>
+
+<form method="POST" action="/site/add_site">
+    <label for="name">Name:</label>
+    <input type="text" id="name" name="name" required><br>
+    <label for="description">Description:</label>
+    <input type="text" id="description" name="description" required><br>
+    <label for="affiliate">Affiliate:</label>
+    <input type="text" id="affiliate" name="affiliate"><br>
+    <label for="pid">PID:</label>
+    <input type="text" id="pid" name="pid"><br>
+    <label for="auth_table">Auth Table:</label>
+    <input type="text" id="auth_table" name="auth_table"><br>
+    <label for="home_view">Home View:</label>
+    <input type="text" id="home_view" name="home_view"><br>
+    <label for="app_logo">App Logo:</label>
+    <input type="text" id="app_logo" name="app_logo"><br>
+    <label for="app_logo_alt">App Logo Alt:</label>
+    <input type="text" id="app_logo_alt" name="app_logo_alt"><br>
+    <label for="app_logo_width">App Logo Width:</label>
+    <input type="text" id="app_logo_width" name="app_logo_width"><br>
+    <label for="app_logo_height">App Logo Height:</label>
+    <input type="text" id="app_logo_height" name="app_logo_height"><br>
+    <label for="css_view_name">CSS View Name:</label>
+    <input type="text" id="css_view_name" name="css_view_name"><br>
+    <label for="mail_from">Mail From:</label>
+    <input type="text" id="mail_from" name="mail_from"><br>
+    <label for="mail_to">Mail To:</label>
+    <input type="text" id="mail_to" name="mail_to"><br>
+    <label for="mail_to_discussion">Mail To Discussion:</label>
+    <input type="text" id="mail_to_discussion" name="mail_to_discussion"><br>
+    <label for="mail_to_admin">Mail To Admin:</label>
+    <input type="text" id="mail_to_admin" name="mail_to_admin"><br>
+    <label for="mail_to_user">Mail To User:</label>
+    <input type="text" id="mail_to_user" name="mail_to_user"><br>
+    <label for="mail_to_client">Mail To Client:</label>
+    <input type="text" id="mail_to_client" name="mail_to_client"><br>
+    <label for="mail_replyto">Mail ReplyTo:</label>
+    <input type="text" id="mail_replyto" name="mail_replyto"><br>
+    <label for="site_display_name">Site Display Name:</label>
+    <input type="text" id="site_display_name" name="site_display_name"><br>
+    <label for="document_root_url">Document Root URL:</label>
+    <input type="text" id="document_root_url" name="document_root_url"><br>
+    <label for="link_target">Link Target:</label>
+    <input type="text" id="link_target" name="link_target"><br>
+    <label for="http_header_params">HTTP Header Params:</label>
+    <input type="text" id="http_header_params" name="http_header_params"><br>
+    <label for="image_root_url">Image Root URL:</label>
+    <input type="text" id="image_root_url" name="image_root_url"><br>
+    <label for="global_datafiles_directory">Global Datafiles Directory:</label>
+    <input type="text" id="global_datafiles_directory" name="global_datafiles_directory"><br>
+    <label for="templates_cache_directory">Templates Cache Directory:</label>
+    <input type="text" id="templates_cache_directory" name="templates_cache_directory"><br>
+    <label for="app_datafiles_directory">App Datafiles Directory:</label>
+    <input type="text" id="app_datafiles_directory" name="app_datafiles_directory"><br>
+    <label for="datasource_type">Datasource Type:</label>
+    <input type="text" id="datasource_type" name="datasource_type"><br>
+    <label for="cal_table">Cal Table:</label>
+    <input type="text" id="cal_table" name="cal_table"><br>
+    <label for="http_header_description">HTTP Header Description:</label>
+    <input type="text" id="http_header_description" name="http_header_description"><br>
+    <label for="http_header_keywords">HTTP Header Keywords:</label>
+    <input type="text" id="http_header_keywords" name="http_header_keywords"><br>
+    <input type="submit" value="Add Site">
+</form>

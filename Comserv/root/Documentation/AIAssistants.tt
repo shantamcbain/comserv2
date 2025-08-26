@@ -1,0 +1,128 @@
+[% PageVersion = 'Documentation/AIAssistants.tt,v 1.1 2025/04/24 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="warning-box">
+    <h2>⚠️ IMPORTANT: File Modification Guidelines</h2>
+    <p><strong>WARNING TO ALL AI ASSISTANTS</strong>: Never replace or modify existing files without explicit permission from the user. Always ask for confirmation before making changes to the codebase.</p>
+</div>
+
+<nav id="AIAssistants_nav">
+<h1 id="AIAssistants_top"><a href="#top">AI Assistants Overview</a></h1>
+    <a href="#AIAssistants_overview">Overview</a> |
+    <a href="#AIAssistants_features">Features</a> |
+    <a href="#AIAssistants_guidelines">Guidelines for AI Assistants</a> |
+    <a href="#AIAssistants_instructions">Instructions for Developers</a> |
+    <a href="#AIAssistants_list">AI Assistants List</a> |
+    <a href="#AIAssistants_usage">How to Use AI Assistants</a>
+</nav>
+<p>AI Assistants are tools that can help developers in various tasks such as code generation, bug detection, and documentation. They use machine learning algorithms to understand the context and provide relevant suggestions.</p>
+
+<h2 id="AIAssistants_features"><a href="#AIAssistants_top">Features</a></h2>
+<p>AI Assistants offer several features to assist developers:</p>
+<ul>
+    <li>Code Generation: AI Assistants can generate code snippets based on the context and the developer's instructions.</li>
+    <li>Bug Detection: AI Assistants can detect potential bugs in the code and suggest fixes.</li>
+    <li>Documentation: AI Assistants can generate documentation for the code, making it easier for other developers to understand the codebase.</li>
+</ul>
+<h2 id="AIAssistants_list"><a href="#AIAssistants_top">List of AI Assistants</a></h2>
+<p>Here are some AI assistants that developers may find useful:</p>
+
+<h3>GitHub Copilot</h3>
+<p>GitHub Copilot is an AI-powered code completion tool. It suggests whole lines or blocks of code as you type, helping you to code faster and with fewer errors.</p>
+<ul>
+    <li><strong>Platform:</strong> Integrated into Visual Studio Code</li>
+    <li><strong>Pros:</strong> Provides context-aware code suggestions, supports many programming languages</li>
+    <li><strong>Cons:</strong> Suggestions may not always be accurate, requires review</li>
+    <li><strong>Usage:</strong> Once installed as a VS Code extension, it automatically suggests code as you type</li>
+</ul>
+
+<h3>Kite</h3>
+<p>Kite is an AI coding assistant that provides code completions for Python, JavaScript, and other languages.</p>
+<ul>
+    <li><strong>Platform:</strong> Integrated into various IDEs including PyCharm</li>
+    <li><strong>Pros:</strong> Provides context-aware code suggestions, supports many programming languages</li>
+    <li><strong>Cons:</strong> Free version has limited features, requires internet connection for best results</li>
+    <li><strong>Usage:</strong> Once installed as a plugin in your IDE, it automatically suggests code as you type</li>
+</ul>
+
+<!-- Add more AI assistants as needed -->
+
+<h2 id="AIAssistants_usage"><a href="#AIAssistants_top">How to Use AI Assistants</a></h2>
+<p>AI assistants can be used to speed up coding and reduce errors. However, it's important to remember that they are tools to assist you, not replace you. Always review the code suggestions provided by AI assistants to ensure they are correct and fit your needs. If the AI assistant makes a mistake, correct it and provide feedback to help it improve.</p>
+<h2 id="AIAssistants_guidelines"><a href="#AIAssistants_top">Guidelines for AI Assistants</a></h2>
+<p>AI Assistants working with the Comserv codebase must adhere to the following guidelines:</p>
+<ul>
+    <li><strong>File Modification Policy:</strong> Never replace or modify existing files without explicit permission from the user.</li>
+    <li><strong>Filename and Package Consistency:</strong> Ensure that filenames match their package declarations (e.g., a file named <code>Documentation.pm</code> should contain the package <code>Comserv::Controller::Documentation</code>).</li>
+    <li><strong>Logging Standards:</strong> Always use the <code>log_with_details</code> method for comprehensive logging.</li>
+    <li><strong>Error Handling:</strong> Log errors with appropriate details and provide user-friendly error messages.</li>
+    <li><strong>Documentation:</strong> Document all code changes and additions thoroughly.</li>
+</ul>
+
+<h3>Known Issue Example</h3>
+<p>The system previously had an issue where:</p>
+<ul>
+    <li>The controller file was named <code>Documantation.pm</code> (with an 'a')</li>
+    <li>But the package inside was declared as <code>Comserv::Controller::Documentation</code> (with an 'o')</li>
+</ul>
+<p>This mismatch caused both the <code>/documentation</code> and <code>/Documentation</code> routes to fail.</p>
+
+<h3>Proper Logging Example</h3>
+<pre><code>$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'method_name',
+    "Detailed message with relevant information");</code></pre>
+
+<h2 id="AIAssistants_instructions"><a href="#AIAssistants_top">Instructions for Developers</a></h2>
+<p>Developers working with AI Assistants should adhere to the following guidelines:</p>
+<ul>
+    <li><strong>Clear Instructions:</strong> Provide clear and detailed instructions to the AI Assistant to get the most accurate results.</li>
+    <li><strong>Review Generated Code:</strong> Always review the code generated by the AI Assistant to ensure it meets the project's standards and doesn't introduce any bugs.</li>
+    <li><strong>Continuous Learning:</strong> AI Assistants learn from the feedback they receive. If the AI Assistant makes a mistake, correct it and provide feedback to help it improve.</li>
+    <li><strong>Verify File Names:</strong> Always verify that filenames match their package declarations, especially when creating new files.</li>
+</ul>
+
+<h2 id="AIAssistants_future"><a href="#AIAssistants_top">Future Improvements</a></h2>
+<p>Future improvements to AI Assistants may include better understanding of context, improved code generation, and more accurate bug detection. Developers are encouraged to provide feedback to help improve the AI Assistants.</p>
+
+<h2 id="AIAssistants_related"><a href="#AIAssistants_top">Related Documentation</a></h2>
+<ul>
+    <li><a href="[% c.uri_for('/Documentation/documentation_system_overview') %]">Documentation System Overview</a></li>
+    <li><a href="[% c.uri_for('/Documentation/documentation_filename_issue') %]">Documentation Filename Issue</a></li>
+    <li><a href="[% c.uri_for('/Documentation/logging_best_practices') %]">Logging Best Practices</a></li>
+</ul>
+
+<style>
+    .warning-box {
+        background-color: #fff3cd;
+        border: 1px solid #ffeeba;
+        border-radius: 5px;
+        padding: 15px;
+        margin: 20px 0;
+    }
+    
+    .warning-box h2 {
+        color: #856404;
+        margin-top: 0;
+    }
+    
+    pre {
+        background-color: #f8f9fa;
+        border: 1px solid #eaecf0;
+        border-radius: 3px;
+        padding: 10px;
+        overflow-x: auto;
+    }
+    
+    code {
+        font-family: Consolas, Monaco, 'Andale Mono', monospace;
+        background-color: #f8f9fa;
+        padding: 2px 4px;
+        border-radius: 3px;
+    }
+    
+    pre code {
+        background-color: transparent;
+        padding: 0;
+    }
+</style>

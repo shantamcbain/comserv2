@@ -1,0 +1,428 @@
+
+       P {
+           font-family : Verdana, Helvetica, sans-serif;
+           font-size : 15px;
+       }
+
+       TD {
+           font-family : Verdana, Helvetica, sans-serif;
+           font-size : 15px;
+           vertical-align : top;
+       }
+
+       TH {
+           font-family : Verdana, Helvetica, sans-serif;
+           font-size : 15px;
+           vertical-align : top;
+           text-align : left;
+       }
+       
+A  {}
+
+       BODY  {
+           background-color: #CCCCCC; 
+           background-attachment: scroll; 
+           background-image:    url(http://forager.com/images/forager/backgroundtile.jpg); 
+           background-repeat: repeat; 
+           font-family : Verdana, Helvetica, sans-serif;
+           font-style: normal; 
+           color: #000000; 
+           text-transform: none
+           }
+
+       .CSA_LeftHelpViewBodyStyle {
+           color: black;
+           background:  #E5DDC6;
+           font-family : Verdana, Helvetica, sans-serif;
+
+       }
+       .ShopBodyStyle {
+           color: black;
+           background:  #E5DDC6;
+           font-family : Verdana, Helvetica, sans-serif;
+
+       }
+
+       A:link {
+           color: #000000;
+       }
+
+       A:visited {
+           color: #000000;
+       }
+
+       A:active {
+           color: #000000;
+       }
+
+/************************************************************
+*                   SECTION HEADER STYLINGS                 *
+************************************************************/
+
+       .sectionHeaderStyle {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 14px;
+                font-weight : bold;
+                color : yellow;
+                background : #FF9900;
+        }
+
+/************************************************************
+*                   TABLE HEADER STYLINGS                 *
+************************************************************/
+
+       .tableHeaderStyle {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 14px;
+                font-weight : bold;
+                color : white;
+                vertical-align : top;
+                background : #D9E7D0;
+        }
+/************************************************************
+*                  Store  HEADER STYLINGS                 *
+************************************************************/
+
+
+       .StorePageTableStyle {
+                 border      :0;
+                 width       :670;
+                 cellspacing: 0;
+                 cellpadding: 0;
+                 font-family : tahoma, Verdana, Helvetica, sans-serif;
+                font-size : 14px;
+                font-weight : bold;
+                color : #FFFF00;
+                vertical-align : top;
+                background : #D9E7D0;
+        }
+       .ShopManPageStyle {
+                font-family : tahoma, Verdana, Helvetica, sans-serif;
+                font-size : 14px;
+                font-weight : bold;
+                color : #FFFF00;
+                vertical-align : top;
+                background : #E5DDC6;
+        }
+       .ShopLeftNaveStyle {
+                font-family : tahoma, Verdana, Helvetica, sans-serif;
+                font-size : 14px;
+                font-weight : bold;
+                color : #FFFF00;
+                vertical-align : top;
+                background : #E5DDC6;
+        }
+       .StoreHeaderStyle {
+                font-family : tahoma, Verdana, Helvetica, sans-serif;
+                font-size : 14px;
+                font-weight : bold;
+                color : #FFFF00;
+                vertical-align : top;
+                background : #FF9900;
+        }
+      .ShopAdminNaveTableStyle{
+                font-family : tahoma, Verdana, Helvetica, sans-serif;
+                font-size : 14px;
+                font-weight : bold;
+                color : #FFFF00;
+                vertical-align : top;
+                background : #AB8944;
+        }
+      .StoreHeaderNavStyle {
+                font-family : tahoma, Verdana, Helvetica, sans-serif;
+                font-size : 14px;
+                font-weight : bold;
+                color : #FFFF00;
+                vertical-align : top;
+                background : #FF9900;
+        }
+
+/************************************************************
+*                   TABLE header login CELL STYLINGS                 *
+************************************************************/
+
+       .tablePageTopLoginCellStyle {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 14px;
+                color : green;
+                vertical-align : top; 
+           	text-align : right;
+        }
+/************************************************************
+*                   TABLE CELL STYLINGS                 *
+************************************************************/
+
+       .tablePageTopWelcomeCellStyle {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 14px;
+                color : green;
+                vertical-align : top; 
+           	text-align : left;
+        }
+
+/************************************************************
+*                   TABLE CELL STYLINGS                 *
+************************************************************/
+
+       .tableCellStyle {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 14px;
+                color : black;
+                vertical-align : top; 
+        }
+
+/************************************************************
+*                   TABLE ROW HEADER STYLINGS               *
+************************************************************/
+
+       .tableRowHeaderStyle {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 14px;
+                color : black;
+                background : #D9E7D0;
+                vertical-align : top; 
+                text-align : left
+        }
+/************************************************************
+*                   TABLE ROW STYLINGS                      *
+************************************************************/
+
+       .tableRowStyle {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 14px;
+                color : black;
+                background : white;
+                vertical-align : top; 
+        }
+
+/************************************************************
+*               APPLICATION SUB MENU STYLINGS               *
+************************************************************/
+
+       .applicationSubMenuStyle {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 10px;
+                color : black;
+                background : white;
+        }
+
+       A.applicationSubMenuLinkStyle:link {
+           color: black;
+       }
+
+       A.applicationSubMenuLinkStyle:visited {
+           color: black;
+       }
+
+       A.applicationSubMenuLinkStyle:active {
+           color: black;
+       }
+
+/************************************************************
+*                   Warning box                             *
+************************************************************/
+
+       .warning {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 18px;
+                color : red;
+                background : #E5E5E5;
+                text-align: center; 
+                vertical-align : top;
+                border: medium green;
+                border-style: dashed;
+        }
+
+/************************************************************
+*                   Left Side Bar STYLINGS                      *
+************************************************************/
+       .LeftNavTableStyle {
+                BACKGROUND:  #D9E7D0;
+                WIDTH:       100%;
+                BORDER: 0;
+ }
+      .NavtableHeaderCellStyle {
+                background :  #A5ABA1;
+                color : #FFFF00;
+                vertical-align : top;
+                text-align: center;
+ }
+       .NavtableCellStyle {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 10px;
+                /*background :  #CCFFFF;*/
+                color : black;
+                vertical-align : top;
+                text-align : left;
+       }
+
+       font.LeftSideBarHeaderStyle {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 15px;
+                color : black;
+                vertical-align : top;
+                text-align : left;
+        }
+
+       font.LeftSideBarHeaderStyle {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 15px;
+                color : black;
+                vertical-align : top; 
+                text-align : left;
+        }
+
+       font.LeftSideBarNavStyle {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 10px;
+                color : #BE7200;
+                vertical-align : top; 
+                text-align : left;
+        }
+td.LeftSideBarNavHeaderStyle {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 20px;
+                color : black;
+                vertical-align : top; 
+                text-align : left;
+       }   
+
+td.LeftSideBarNavLinkStyle {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 15px;
+                color : black;
+                vertical-align : top; 
+                text-align : left;
+        }   
+font.HeaderMitegoneStyle {
+                font-family : Verdana,Helvetica, sans-serif;
+                font-size : 50px;
+                color : black;
+                vertical-align : bottom; 
+                text-align : left;
+        }   
+
+font.LoginStyle {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 10px;
+                color : green;
+                vertical-align : bottom; 
+                text-align : right;
+        }   
+
+font.PageTopStyle {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 20px;
+                color : black;
+                vertical-align : bottom; 
+                text-align : center;
+        }   
+dev.PageTopStyle {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 15px;
+                color : black;
+                vertical-align : bottom; 
+                text-align : center;
+        }   
+font.ThankYouStyle {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 15px;
+                color : black;
+                vertical-align : bottom; 
+                text-align : right;
+        }   
+
+/************************************************************
+*                   Day Box Stylings                      *
+************************************************************/
+
+       .day_title_header {
+                font-family : Verdana, Helvetica, sans-serif;
+                color : black;
+                background : #D9E7D0;
+                vertical-align : top; 
+                text-align : center; 
+        }
+
+
+/************************************************************
+*                   Month Box Stylings                      *
+************************************************************/
+
+       .month_title_header {
+                font-family : Verdana, Helvetica, sans-serif;
+                color : black;
+                background : #D9E7D0;
+                vertical-align : top; 
+                text-align : center; 
+        }
+
+       .month_wday_header {
+                font-family : Verdana, Helvetica, sans-serif;
+                color : black;
+                background : #FF9900;
+                vertical-align : top;
+                text-align : center; 
+                font-size : 20px;
+        }
+
+       .month_day_cell_text {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 75%;
+                color : black;
+        }
+
+       .month_day_cell_selected_text {
+                font-family : Verdana, Helvetica, sans-serif;
+                font-size : 75%;
+                color : black;
+        }
+
+       .month_day_cell {
+                background : #EEEEEE;
+                vertical-align : top; 
+                text-align : center; 
+        }
+
+       .month_day_cell_selected {
+                background : #D9E7D0;
+                vertical-align : top; 
+                text-align : center; 
+        }
+
+       .month_view_day_header {
+                background : #999999;
+                vertical-align : top; 
+                text-align : center; 
+        }
+
+ /* Add this to usbmstyle.css */
+
+/************************************************************
+*                   Project Details Table Style             *
+************************************************************/
+
+.project-details-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+}
+
+.project-details-table th, .project-details-table td {
+    border: 1px solid #ccc;
+    padding: 8px;
+    text-align: left;
+}
+
+.project-details-table th {
+    background-color: #f2f2f2;
+    font-weight: bold;
+}
+
+.project-details-table tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+.project-details-table tr:hover {
+    background-color: #e0e0e0;
+}

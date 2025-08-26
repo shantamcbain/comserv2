@@ -1,0 +1,48 @@
+[% PageVersion = 'Documentation/BMasterController.tt,v 0.03 2024/06/01 Shanta Exp shanta ' %]
+
+<h1 id="BMaster_top"><a href="#BMaster_top">BMaster Controller Documentation</a></h1>
+
+<h2 id="base">base</h2>
+<p>The 'base' function serves as the root of the chained actions in the BMaster controller. It captures '/BMaster' in the URL and performs common setup tasks that are shared by multiple actions in the controller. This function is crucial for avoiding code duplication and enhancing code maintainability and readability. Here are some tasks that the 'base' function can perform:</p>
+
+<ul>
+    <li><strong>Loading Model Data:</strong> The 'base' function can load data from the BMaster model that is required by multiple actions in the BMaster controller. This data is stored in the stash for other actions to use.</li>
+    <li><strong>Checking User Permissions:</strong> The 'base' function can verify if the user has the necessary permissions for multiple actions in the BMaster controller. If the user lacks the required permissions, they are redirected to an error page.</li>
+    <li><strong>Setting Common Template Variables:</strong> The 'base' function can set template variables that are used by multiple actions in the BMaster controller.</li>
+</ul>
+
+<h2 id="index">index</h2>
+<p>The 'index' function sets the template to 'BMaster/BMaster.tt' and forwards to the TT view. This function is responsible for rendering the main page of the BMaster section.</p>
+
+<h2 id="frames">frames</h2>
+<p>The 'frames' function retrieves the frames for a specified queen and sets the template to 'BMaster/frames.tt'. This function is used to display the frames associated with a particular queen bee.</p>
+
+<h2 id="api_frames">api_frames</h2>
+<p>The 'api_frames' function fetches the data for the frames and sets the response body to the JSON representation of the data. This function is used to provide a JSON API for accessing frame data.</p>
+
+<h2 id="products">products</h2>
+<p>The 'products' function sets the template to 'BMaster/products.tt'. This function is used to render the page that displays the products of the BMaster.</p>
+
+<h2 id="yards">yards</h2>
+<p>The 'yards' function retrieves the yards and sets the template to 'BMaster/yards.tt'. This function is used to display the yards associated with the BMaster.</p>
+
+<h2 id="apiary">apiary</h2>
+<p>The 'apiary' function sets the template to 'BMaster/apiary.tt'. This function is used to render the page that displays the apiary of the BMaster.</p>
+
+<h2 id="queens">queens</h2>
+<p>The 'queens' function sets the template to 'BMaster/Queens.tt'. This function is used to render the page that displays the queens of the BMaster. It also calculates and displays the graft dates for each queen.</p>
+
+<h2 id="hive">hive</h2>
+<p>The 'hive' function sets the template to 'BMaster/hive.tt'. This function is used to render the page that displays the hives of the BMaster.</p>
+
+<h2 id="honey">honey</h2>
+<p>The 'honey' function sets the template to 'BMaster/honey.tt'. This function is used to render the page that displays the honey products of the BMaster.</p>
+
+<h2 id="beehealth">beehealth</h2>
+<p>The 'beehealth' function sets the template to 'BMaster/beehealth.tt'. This function is used to render the page that displays the health status of the bees in the BMaster.</p>
+
+<h2 id="environment">environment</h2>
+<p>The 'environment' function sets the template to 'BMaster/environment.tt'. This function is used to render the page that displays the environmental conditions of the BMaster.</p>
+
+<h2 id="education">education</h2>
+<p>The 'education' function sets the template to 'BMaster/education.tt'. This function is used to render the page that displays the educational resources of the BMaster.</p>
