@@ -1,0 +1,541 @@
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/admin/page_migration_guide.tt -> Title: 'Page Migration Guide', Category: user_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/admin/git_pull_guide.tt -> Title: 'Git Pull Guide', Category: user_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/admin/theme_mappings_handling.tt -> Title: 'Theme Mappings Handling', Category: user_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/admin/production_deployment_system.tt -> Title: 'Production Deployment System', Category: user_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/admin/schema-compare-guide.tt -> Title: 'Schema Compare Guide', Category: user_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/roles/admin/KVM_ISO_Transfer.tt -> Title: 'KVM ISO Transfer', Category: admin_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/roles/admin/user_management.tt -> Title: 'User Management', Category: admin_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/roles/admin/Documentation_Management.tt -> Title: 'Documentation Management', Category: admin_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/roles/admin/mail_admin_guide.tt -> Title: 'Mail Admin Guide', Category: admin_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/roles/admin/linux_commands.tt -> Title: 'Linux Commands', Category: admin_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/roles/admin/todo_admin_guide.tt -> Title: 'Todo Admin Guide', Category: admin_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/roles/admin/admin_guide.tt -> Title: 'Admin Guide', Category: admin_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/roles/admin/documentation_system_guide.tt -> Title: 'Documentation System Guide', Category: admin_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/roles/admin/starman_restart_guide.tt -> Title: 'Starman Restart Guide', Category: admin_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/roles/admin/quick_reference/starman_restart_card.tt -> Title: 'Starman Restart Card', Category: admin_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/roles/developer/api_reference.tt -> Title: 'Api Reference', Category: developer_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/roles/developer/todo_developer_guide.tt -> Title: 'Todo Developer Guide', Category: developer_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/roles/developer/Documentation_Controller.tt -> Title: 'Documentation Controller', Category: developer_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/roles/normal/account_management.tt -> Title: 'Account Management', Category: user_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/roles/normal/mcoop_user_guide.tt -> Title: 'Mcoop User Guide', Category: user_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/roles/normal/Documentation_System.tt -> Title: 'Documentation System', Category: user_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/roles/normal/todo_user_guide.tt -> Title: 'Todo User Guide', Category: user_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/roles/normal/mail_user_guide.tt -> Title: 'Mail User Guide', Category: user_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/roles/normal/getting_started.tt -> Title: 'Getting Started', Category: user_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/developer/documentation_migration_guide.tt -> Title: 'Documentation Migration Guide', Category: developer_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/developer/inventory_accounting_system.tt -> Title: 'Inventory Accounting System', Category: developer_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/developer/admintopmenu_guide.tt -> Title: 'Admintopmenu Guide', Category: developer_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/developer/authentication_system.tt -> Title: 'Authentication System', Category: developer_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/developer/offline_mode_system.tt -> Title: 'Offline Mode System', Category: developer_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/developer/navigation_system.tt -> Title: 'Navigation System', Category: developer_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/developer/troubleshooting.tt -> Title: 'Troubleshooting', Category: developer_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/developer/template_system.tt -> Title: 'Template System', Category: developer_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/developer/network_map_json_storage.tt -> Title: 'Network Map Json Storage', Category: developer_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/developer/documentation_index_adaptation.tt -> Title: 'Documentation Index Adaptation', Category: developer_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/developer/file-locations.tt -> Title: 'File Locations', Category: developer_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/developer/css_theme_system_rules.tt -> Title: 'Css Theme System Rules', Category: developer_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/developer/documentation_role_access.tt -> Title: 'Documentation Role Access', Category: developer_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/developer/css_theme_guidelines.tt -> Title: 'Css Theme Guidelines', Category: developer_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/developer/menu_system_guide.tt -> Title: 'Menu System Guide', Category: developer_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/developer/theme_system_normalization.tt -> Title: 'Theme System Normalization', Category: developer_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/developer/db_config_loading.tt -> Title: 'Db Config Loading', Category: developer_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/developer/json_handling_guidelines.tt -> Title: 'Json Handling Guidelines', Category: developer_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/developer/hybrid_database_architecture.tt -> Title: 'Hybrid Database Architecture', Category: developer_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/deployment/SERVER_DEPLOYMENT.tt -> Title: 'SERVER DEPLOYMENT', Category: user_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/AutoDiscovery/index.tt -> Title: 'Index', Category: user_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/sites/mcoop/documentation_guide.tt -> Title: 'Documentation Guide', Category: user_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/sites/mcoop/member_resources.tt -> Title: 'Member Resources', Category: user_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/sites/mcoop/templates.tt -> Title: 'Templates', Category: user_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/sites/mcoop/site_guide.tt -> Title: 'Site Guide', Category: user_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/workshops/development_plan.tt -> Title: 'Development Plan', Category: user_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/workshops/index.tt -> Title: 'Index', Category: user_guides
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:229] unconfigured_detail - Unconfigured: Documentation/workshops/technical.tt -> Title: 'Technical', Category: user_guides
+INFO: [2025-08-19 18:39:29] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:63] scan_results - Scan completed: 398 unconfigured files found, 4 already configured
+DEBUG: [2025-08-19 18:39:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:70] categories_loaded - Loaded 11 available categories for form
+INFO: [2025-08-19 18:39:29] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation/AutoDiscovery.pm:81] template_prepared - Template prepared with 398 unconfigured files and 11 categories
+WARN: [2025-08-19 18:39:32] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1509] default - Page not found: /admin/index
+INFO: [2025-08-19 18:39:43] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:306] view - Accessing documentation page: api_credentials, Username: Shanta, Site: CSC, Session roles: admin
+DEBUG: [2025-08-19 18:39:43] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:321] view - User role determined from session: admin
+DEBUG: [2025-08-19 18:39:43] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:373] view - Displaying documentation page: api_credentials (template: Documentation/api_credentials.tt) for role: admin
+INFO: [2025-08-19 18:39:48] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:306] view - Accessing documentation page: proxmox_commands, Username: Shanta, Site: CSC, Session roles: admin
+DEBUG: [2025-08-19 18:39:48] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:321] view - User role determined from session: admin
+DEBUG: [2025-08-19 18:39:48] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:373] view - Displaying documentation page: proxmox_commands (template: Documentation/proxmox_commands.tt) for role: admin
+WARN: [2025-08-19 18:39:48] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1509] default - Page not found: /static/css/components/documentation.css
+INFO: [2025-08-19 18:40:49] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:564] search - Search request for query: todo
+INFO: [2025-08-19 18:40:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:306] view - Accessing documentation page: enhanced_todo_navigation, Username: Shanta, Site: CSC, Session roles: admin
+DEBUG: [2025-08-19 18:40:51] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:321] view - User role determined from session: admin
+DEBUG: [2025-08-19 18:40:51] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:373] view - Displaying documentation page: enhanced_todo_navigation (template: Documentation/general/enhanced_todo_navigation.tt) for role: admin
+INFO: [2025-08-19 18:40:55] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:306] view - Accessing documentation page: todo_admin_guide, Username: Shanta, Site: CSC, Session roles: admin
+DEBUG: [2025-08-19 18:40:55] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:321] view - User role determined from session: admin
+DEBUG: [2025-08-19 18:40:55] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:373] view - Displaying documentation page: todo_admin_guide (template: Documentation/roles/admin/todo_admin_guide.tt) for role: admin
+INFO: [2025-08-19 18:40:58] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:306] view - Accessing documentation page: todo_edit_functionality, Username: Shanta, Site: CSC, Session roles: admin
+DEBUG: [2025-08-19 18:40:58] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:321] view - User role determined from session: admin
+DEBUG: [2025-08-19 18:40:58] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:373] view - Displaying documentation page: todo_edit_functionality (template: Documentation/changelog/todo_edit_functionality.tt) for role: admin
+INFO: [2025-08-19 18:41:01] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:306] view - Accessing documentation page: fix_project_selection_todo_filtering, Username: Shanta, Site: CSC, Session roles: admin
+DEBUG: [2025-08-19 18:41:01] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:321] view - User role determined from session: admin
+DEBUG: [2025-08-19 18:41:01] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:373] view - Displaying documentation page: fix_project_selection_todo_filtering (template: Documentation/changelog/fix_project_selection_todo_filtering.tt) for role: admin
+INFO: [2025-08-19 18:41:05] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:306] view - Accessing documentation page: todo_developer_guide, Username: Shanta, Site: CSC, Session roles: admin
+DEBUG: [2025-08-19 18:41:05] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:321] view - User role determined from session: admin
+INFO: [2025-08-19 18:41:22] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:306] view - Accessing documentation page: todo_filtering_and_views, Username: Shanta, Site: CSC, Session roles: admin
+DEBUG: [2025-08-19 18:41:22] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:321] view - User role determined from session: admin
+DEBUG: [2025-08-19 18:41:22] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:373] view - Displaying documentation page: todo_filtering_and_views (template: Documentation/general/todo_filtering_and_views.tt) for role: admin
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-08-19 19:35:19] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [197:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+INFO: [2025-08-19 19:35:20] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/NPM.pm:36] BUILD - NPM Controller initialized
+INFO: Starting Documentation controller initialization with hybrid approach (directory scan + config overrides)
+DEBUG: Attempting to load documentation config from: /home/shanta/PycharmProjects/comserv2/Comserv/script/../root/Documentation/config/documentation_config.json
+INFO: Loaded documentation configuration: 11 categories, 4 pages
+DEBUG: Category keys loaded: documentation, tutorials, models, changelog, site_specific, controllers, developer_guides, user_guides, admin_guides, proxmox, modules
+INFO: Step 1: Auto-discovering documentation files via directory scan
+INFO: Starting directory scan for documentation files
+INFO: Directory scan completed. Found 263 pages.
+INFO: Auto-discovered 263 documentation files
+INFO: Step 2: Applying configuration overrides
+INFO: Applied 4 configuration overrides
+INFO: Step 3: Categorizing all documentation pages
+INFO: Categorizing documentation pages
+INFO: Page categorization completed
+INFO: Hybrid documentation system initialized: 264 total pages (263 auto-discovered + 4 overrides) across 11 categories
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-08-19 19:37:05] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [197:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+INFO: [2025-08-19 19:37:07] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/NPM.pm:36] BUILD - NPM Controller initialized
+INFO: Starting Documentation controller initialization with hybrid approach (directory scan + config overrides)
+DEBUG: Attempting to load documentation config from: /home/shanta/PycharmProjects/comserv2/Comserv/script/../root/Documentation/config/documentation_config.json
+INFO: Loaded documentation configuration: 11 categories, 4 pages
+DEBUG: Category keys loaded: modules, proxmox, admin_guides, user_guides, developer_guides, controllers, changelog, models, site_specific, tutorials, documentation
+INFO: Step 1: Auto-discovering documentation files via directory scan
+INFO: Starting directory scan for documentation files
+INFO: Directory scan completed. Found 263 pages.
+INFO: Auto-discovered 263 documentation files
+INFO: Step 2: Applying configuration overrides
+INFO: Applied 4 configuration overrides
+INFO: Step 3: Categorizing all documentation pages
+INFO: Categorizing documentation pages
+INFO: Page categorization completed
+INFO: Hybrid documentation system initialized: 264 total pages (263 auto-discovered + 4 overrides) across 11 categories
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:454] _perform_startup_operations - Performing one-time startup operations
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:334] track_application_start - Application started at 2025-08-20
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:363] generate_all_theme_css - Starting theme CSS generation
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:397] generate_all_theme_css - Adding special styles for theme: apis
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: apis
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:397] generate_all_theme_css - Adding special styles for theme: mcoop
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: mcoop
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: usbm
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: csc
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: default
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: dark
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:421] generate_all_theme_css - Completed theme CSS generation
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:477] _perform_startup_operations - Cached system info - Hostname: workstation.computersystemconsulting.ca, IP: 192.168.1.199
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:550] _test_database_connections - All database connections tested successfully
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:505] _perform_startup_operations - Startup operations completed successfully
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:560] _setup_site_cached - Setting up site for domain: workstation.local
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:799] setup_site - Starting setup_site action
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:809] setup_site - Extracted domain: workstation.local
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:815] setup_site - SiteName is either undefined, 'none', or 'root'. Proceeding with domain extraction and site domain retrieval
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm:160] get_site_domain - Looking up domain: workstation.local
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:832] setup_site - Found site domain for workstation.local
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm:93] get_site_details - Getting site details for ID: 1
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:855] setup_site - ControllerName set to: CSC
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1038] site_setup - SiteName: CSC
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1054] site_setup - Using Catalyst's built-in proxy configuration for URLs without port
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1058] site_setup - Test URL: http://workstation.local:3000/test
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1065] site_setup - Set default HostName: http://workstation.local
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm:122] get_site_details_by_name - Getting site details for name: CSC
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm:133] get_site_details_by_name - Found site: ID=1, Name=CSC
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1106] site_setup - ControllerName set to: CSC
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:138] get_site_theme - Getting theme for site: CSC
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:98] load_theme_mappings - Loading theme mappings from: /home/shanta/PycharmProjects/comserv2/Comserv/root/static/config/theme_mappings.json
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:108] load_theme_mappings - Loaded theme mappings: WeaverBeck => default, Ve7tit => apis, BMaster => apis, USBM => usbm, MCOOP => mcoop, CSC => csc
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:175] get_site_theme - Available mappings: WeaverBeck, Ve7tit, BMaster, USBM, MCOOP, CSC
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:181] get_site_theme - Found exact match for site CSC: csc
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:87] validate_theme - Validated theme: csc (from: csc)
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:214] get_site_theme - Selected theme for CSC: csc
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1127] site_setup - Set theme_name in stash: csc
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1137] site_setup - Completed site_setup action with HostName: http://workstation.local
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1033] setup_site - Completed site setup
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:231] set_theme - Setting theme for site: CSC
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:54] get_all_themes - Getting all available themes
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:235] set_theme - Available themes: apis, csc, dark, default, mcoop, usbm
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:138] get_site_theme - Getting theme for site: CSC
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:162] get_site_theme - Using theme from session for CSC: csc
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:254] set_theme - Set theme for site CSC to csc
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:591] _setup_site_cached - Cached site setup for domain: workstation.local, SiteName: CSC
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:22] documentation_base - Captured lowercase documentation route
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:29] documentation_index - Handling lowercase documentation index route
+INFO: [2025-08-19 19:43:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:199] index - Accessing documentation index
+DEBUG: [2025-08-19 19:43:51] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:297] index - Documentation index loaded with 238 pages for role: normal
+INFO: [2025-08-19 20:25:46] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:591] search - Search request for query: doc
+INFO: [2025-08-19 20:25:51] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:306] view - Accessing documentation page: 2024-05-documentation-system-fixes, Username: unknown, Site: CSC, Session roles: none
+DEBUG: [2025-08-19 20:25:51] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:400] view - Displaying documentation page: 2024-05-documentation-system-fixes (template: Documentation/changelog/2024-05-documentation-system-fixes.tt) for role: normal
+INFO: [2025-08-19 20:25:55] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:306] view - Accessing documentation page: 2024-06-21-linux-commands-documentation, Username: unknown, Site: CSC, Session roles: none
+DEBUG: [2025-08-19 20:25:55] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:400] view - Displaying documentation page: 2024-06-21-linux-commands-documentation (template: Documentation/changelog/2024-06-21-linux-commands-documentation.tt) for role: normal
+INFO: [2025-08-19 20:25:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:306] view - Accessing documentation page: 2025-01-15_documentation_system_completion, Username: unknown, Site: CSC, Session roles: none
+DEBUG: [2025-08-19 20:25:59] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:400] view - Displaying documentation page: 2025-01-15_documentation_system_completion (template: Documentation/changelog/2025-01-15_documentation_system_completion.tt) for role: normal
+INFO: [2025-08-19 20:26:03] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:306] view - Accessing documentation page: 2025-04-08-documentation-display-fix-details, Username: unknown, Site: CSC, Session roles: none
+DEBUG: [2025-08-19 20:26:03] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:400] view - Displaying documentation page: 2025-04-08-documentation-display-fix-details (template: Documentation/changelog/2025-04-08-documentation-display-fix-details.tt) for role: normal
+INFO: [2025-08-19 20:26:06] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:306] view - Accessing documentation page: 2025-04-documentation-admin-visibility-fix, Username: unknown, Site: CSC, Session roles: none
+DEBUG: [2025-08-19 20:26:06] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:400] view - Displaying documentation page: 2025-04-documentation-admin-visibility-fix (template: Documentation/changelog/2025-04-documentation-admin-visibility-fix.tt) for role: normal
+INFO: [2025-08-19 20:26:16] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:306] view - Accessing documentation page: 2025-04-documentation-workflow-update, Username: unknown, Site: CSC, Session roles: none
+DEBUG: [2025-08-19 20:26:16] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:400] view - Displaying documentation page: 2025-04-documentation-workflow-update (template: Documentation/changelog/2025-04-documentation-workflow-update.tt) for role: normal
+INFO: [2025-08-19 20:26:20] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:306] view - Accessing documentation page: 2025-04-documentation-template-refactoring, Username: unknown, Site: CSC, Session roles: none
+DEBUG: [2025-08-19 20:26:20] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:400] view - Displaying documentation page: 2025-04-documentation-template-refactoring (template: Documentation/changelog/2025-04-documentation-template-refactoring.tt) for role: normal
+INFO: [2025-08-19 20:26:25] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:306] view - Accessing documentation page: 2025-05-12-fix-documentation-controller-logging, Username: unknown, Site: CSC, Session roles: none
+DEBUG: [2025-08-19 20:26:25] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:400] view - Displaying documentation page: 2025-05-12-fix-documentation-controller-logging (template: Documentation/changelog/2025-05-12-fix-documentation-controller-logging.tt) for role: normal
+INFO: [2025-08-19 20:26:31] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:306] view - Accessing documentation page: 2025-05-15-documentation-system-update, Username: unknown, Site: CSC, Session roles: none
+DEBUG: [2025-08-19 20:26:31] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:400] view - Displaying documentation page: 2025-05-15-documentation-system-update (template: Documentation/changelog/2025-05-15-documentation-system-update.tt) for role: normal
+INFO: [2025-08-20 11:34:09] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:199] index - Accessing documentation index
+DEBUG: [2025-08-20 11:34:09] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:297] index - Documentation index loaded with 238 pages for role: normal
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:560] _setup_site_cached - Setting up site for domain: comserv.local
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:799] setup_site - Starting setup_site action
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:809] setup_site - Extracted domain: comserv.local
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:815] setup_site - SiteName is either undefined, 'none', or 'root'. Proceeding with domain extraction and site domain retrieval
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm:160] get_site_domain - Looking up domain: comserv.local
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:832] setup_site - Found site domain for comserv.local
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm:93] get_site_details - Getting site details for ID: 1
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:855] setup_site - ControllerName set to: CSC
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1038] site_setup - SiteName: CSC
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1054] site_setup - Using Catalyst's built-in proxy configuration for URLs without port
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1058] site_setup - Test URL: http://comserv.local:3000/test
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1065] site_setup - Set default HostName: http://comserv.local
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm:122] get_site_details_by_name - Getting site details for name: CSC
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm:133] get_site_details_by_name - Found site: ID=1, Name=CSC
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1106] site_setup - ControllerName set to: CSC
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:138] get_site_theme - Getting theme for site: CSC
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:98] load_theme_mappings - Loading theme mappings from: /home/shanta/PycharmProjects/comserv2/Comserv/root/static/config/theme_mappings.json
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:108] load_theme_mappings - Loaded theme mappings: USBM => usbm, MCOOP => mcoop, CSC => csc, WeaverBeck => default, Ve7tit => apis, BMaster => apis
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:175] get_site_theme - Available mappings: USBM, MCOOP, CSC, WeaverBeck, Ve7tit, BMaster
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:181] get_site_theme - Found exact match for site CSC: csc
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:87] validate_theme - Validated theme: csc (from: csc)
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:214] get_site_theme - Selected theme for CSC: csc
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1127] site_setup - Set theme_name in stash: csc
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1137] site_setup - Completed site_setup action with HostName: http://comserv.local
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1033] setup_site - Completed site setup
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:231] set_theme - Setting theme for site: CSC
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:54] get_all_themes - Getting all available themes
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:235] set_theme - Available themes: apis, csc, dark, default, mcoop, usbm
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:138] get_site_theme - Getting theme for site: CSC
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:162] get_site_theme - Using theme from session for CSC: csc
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:254] set_theme - Set theme for site CSC to csc
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:591] _setup_site_cached - Cached site setup for domain: comserv.local, SiteName: CSC
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:18] auto - CSC controller auto method called
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:19] auto - Request path: /CSC
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:20] auto - Request method: GET
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:21] auto - Controller: Comserv::Controller::CSC
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:28] base - Base method called, forwarding to index
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:41] index - Entered Index Method
+INFO: [2025-08-20 13:10:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:43] index - Rendering CSC template
+INFO: [2025-08-20 17:19:50] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:171] index - Starting index action. User exists: No
+INFO: [2025-08-20 17:19:50] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:182] index - Fetched ControllerName from session: CSC
+INFO: [2025-08-20 17:19:50] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:195] index - Forwarding to CSC controller's index action
+INFO: [2025-08-20 17:19:50] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:18] auto - CSC controller auto method called
+INFO: [2025-08-20 17:19:50] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:19] auto - Request path: /CSC
+INFO: [2025-08-20 17:19:50] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:20] auto - Request method: GET
+INFO: [2025-08-20 17:19:50] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:21] auto - Controller: Comserv::Controller::CSC
+INFO: [2025-08-20 17:19:50] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:28] base - Base method called, forwarding to index
+INFO: [2025-08-20 17:19:50] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:41] index - Entered Index Method
+INFO: [2025-08-20 17:19:50] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:43] index - Rendering CSC template
+INFO: [2025-08-20 20:35:00] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:171] index - Starting index action. User exists: No
+INFO: [2025-08-20 20:35:00] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:182] index - Fetched ControllerName from session: CSC
+INFO: [2025-08-20 20:35:00] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:195] index - Forwarding to CSC controller's index action
+INFO: [2025-08-20 20:35:00] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:18] auto - CSC controller auto method called
+INFO: [2025-08-20 20:35:00] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:19] auto - Request path: /CSC
+INFO: [2025-08-20 20:35:00] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:20] auto - Request method: GET
+INFO: [2025-08-20 20:35:00] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:21] auto - Controller: Comserv::Controller::CSC
+INFO: [2025-08-20 20:35:00] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:28] base - Base method called, forwarding to index
+INFO: [2025-08-20 20:35:00] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:41] index - Entered Index Method
+INFO: [2025-08-20 20:35:00] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:43] index - Rendering CSC template
+INFO: [2025-08-21 11:19:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:171] index - Starting index action. User exists: No
+INFO: [2025-08-21 11:19:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:182] index - Fetched ControllerName from session: CSC
+INFO: [2025-08-21 11:19:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:195] index - Forwarding to CSC controller's index action
+INFO: [2025-08-21 11:19:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:18] auto - CSC controller auto method called
+INFO: [2025-08-21 11:19:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:19] auto - Request path: /CSC
+INFO: [2025-08-21 11:19:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:20] auto - Request method: GET
+INFO: [2025-08-21 11:19:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:21] auto - Controller: Comserv::Controller::CSC
+INFO: [2025-08-21 11:19:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:28] base - Base method called, forwarding to index
+INFO: [2025-08-21 11:19:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:41] index - Entered Index Method
+INFO: [2025-08-21 11:19:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:43] index - Rendering CSC template
+INFO: [2025-08-21 11:24:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:199] index - Accessing documentation index
+DEBUG: [2025-08-21 11:24:04] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:297] index - Documentation index loaded with 238 pages for role: normal
+INFO: [2025-08-22 14:22:03] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:171] index - Starting index action. User exists: No
+INFO: [2025-08-22 14:22:03] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:182] index - Fetched ControllerName from session: CSC
+INFO: [2025-08-22 14:22:03] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:195] index - Forwarding to CSC controller's index action
+INFO: [2025-08-22 14:22:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:18] auto - CSC controller auto method called
+INFO: [2025-08-22 14:22:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:19] auto - Request path: /CSC
+INFO: [2025-08-22 14:22:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:20] auto - Request method: GET
+INFO: [2025-08-22 14:22:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:21] auto - Controller: Comserv::Controller::CSC
+INFO: [2025-08-22 14:22:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:28] base - Base method called, forwarding to index
+INFO: [2025-08-22 14:22:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:41] index - Entered Index Method
+INFO: [2025-08-22 14:22:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:43] index - Rendering CSC template
+INFO: [2025-08-23 14:46:15] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:171] index - Starting index action. User exists: No
+INFO: [2025-08-23 14:46:15] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:182] index - Fetched ControllerName from session: CSC
+INFO: [2025-08-23 14:46:15] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:195] index - Forwarding to CSC controller's index action
+INFO: [2025-08-23 14:46:16] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:18] auto - CSC controller auto method called
+INFO: [2025-08-23 14:46:16] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:19] auto - Request path: /CSC
+INFO: [2025-08-23 14:46:16] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:20] auto - Request method: GET
+INFO: [2025-08-23 14:46:16] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:21] auto - Controller: Comserv::Controller::CSC
+INFO: [2025-08-23 14:46:16] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:28] base - Base method called, forwarding to index
+INFO: [2025-08-23 14:46:16] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:41] index - Entered Index Method
+INFO: [2025-08-23 14:46:16] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:43] index - Rendering CSC template
+INFO: [2025-08-23 14:51:24] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:18] auto - CSC controller auto method called
+INFO: [2025-08-23 14:51:24] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:19] auto - Request path: /CSC
+INFO: [2025-08-23 14:51:24] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:20] auto - Request method: GET
+INFO: [2025-08-23 14:51:24] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:21] auto - Controller: Comserv::Controller::CSC
+INFO: [2025-08-23 14:51:24] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:28] base - Base method called, forwarding to index
+INFO: [2025-08-23 14:51:24] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:41] index - Entered Index Method
+INFO: [2025-08-23 14:51:24] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:43] index - Rendering CSC template
+INFO: [2025-08-23 17:33:39] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:171] index - Starting index action. User exists: No
+INFO: [2025-08-23 17:33:39] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:182] index - Fetched ControllerName from session: CSC
+INFO: [2025-08-23 17:33:39] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:195] index - Forwarding to CSC controller's index action
+INFO: [2025-08-23 17:33:40] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:18] auto - CSC controller auto method called
+INFO: [2025-08-23 17:33:40] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:19] auto - Request path: /CSC
+INFO: [2025-08-23 17:33:40] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:20] auto - Request method: GET
+INFO: [2025-08-23 17:33:40] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:21] auto - Controller: Comserv::Controller::CSC
+INFO: [2025-08-23 17:33:40] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:28] base - Base method called, forwarding to index
+INFO: [2025-08-23 17:33:40] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:41] index - Entered Index Method
+INFO: [2025-08-23 17:33:40] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:43] index - Rendering CSC template
+INFO: [2025-08-25 07:31:06] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:171] index - Starting index action. User exists: No
+INFO: [2025-08-25 07:31:06] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:182] index - Fetched ControllerName from session: CSC
+INFO: [2025-08-25 07:31:06] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:195] index - Forwarding to CSC controller's index action
+INFO: [2025-08-25 07:31:06] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:18] auto - CSC controller auto method called
+INFO: [2025-08-25 07:31:06] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:19] auto - Request path: /CSC
+INFO: [2025-08-25 07:31:06] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:20] auto - Request method: GET
+INFO: [2025-08-25 07:31:06] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:21] auto - Controller: Comserv::Controller::CSC
+INFO: [2025-08-25 07:31:06] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:28] base - Base method called, forwarding to index
+INFO: [2025-08-25 07:31:06] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:41] index - Entered Index Method
+INFO: [2025-08-25 07:31:06] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:43] index - Rendering CSC template
+INFO: [2025-08-25 07:31:14] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:23] login - Accessing login page
+INFO: [2025-08-25 07:31:14] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:38] login - Stored referer in session: http://comserv.local:3000/CSC
+INFO: [2025-08-25 07:31:14] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:58] login - Referer: http://comserv.local:3000/CSC
+INFO: [2025-08-25 07:31:14] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:59] login - Session referer: http://comserv.local:3000/CSC
+INFO: [2025-08-25 07:31:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:77] do_login - Login process initiated.
+INFO: [2025-08-25 07:31:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:80] do_login - Request URI: http://comserv.local:3000/user/do_login, Method: POST
+INFO: [2025-08-25 07:31:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:95] do_login - Request method: POST
+INFO: [2025-08-25 07:31:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:114] do_login - Attempting login for username: Shanta
+INFO: [2025-08-25 07:31:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:133] do_login - Using session referer for redirect: http://comserv.local:3000/CSC
+DEBUG: [2025-08-25 07:31:18] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:152] do_login - Final redirect path: http://comserv.local:3000/CSC
+INFO: [2025-08-25 07:31:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1194] authenticate_user_with_fallback - Starting hybrid authentication for user 'Shanta'
+INFO: [2025-08-25 07:31:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1201] authenticate_user_with_fallback - Current backend: production_server
+INFO: [2025-08-25 07:31:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1207] authenticate_user_with_fallback - Available backends: shanta_ency, zerotier_forager, sqlite_offline, workstation_mysql, production_forager, shanta_forager, production_server, workstation_forager, zerotier_server
+DEBUG: [2025-08-25 07:31:18] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1212] authenticate_user_with_fallback - Backend 'shanta_ency': type=mysql, available=yes
+DEBUG: [2025-08-25 07:31:18] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1212] authenticate_user_with_fallback - Backend 'zerotier_forager': type=mysql, available=yes
+DEBUG: [2025-08-25 07:31:18] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1212] authenticate_user_with_fallback - Backend 'sqlite_offline': type=sqlite, available=yes
+DEBUG: [2025-08-25 07:31:18] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1212] authenticate_user_with_fallback - Backend 'workstation_mysql': type=mysql, available=yes
+DEBUG: [2025-08-25 07:31:18] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1212] authenticate_user_with_fallback - Backend 'production_forager': type=mysql, available=yes
+DEBUG: [2025-08-25 07:31:18] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1212] authenticate_user_with_fallback - Backend 'shanta_forager': type=mysql, available=yes
+DEBUG: [2025-08-25 07:31:18] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1212] authenticate_user_with_fallback - Backend 'production_server': type=mysql, available=yes
+DEBUG: [2025-08-25 07:31:18] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1212] authenticate_user_with_fallback - Backend 'workstation_forager': type=mysql, available=yes
+DEBUG: [2025-08-25 07:31:18] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1212] authenticate_user_with_fallback - Backend 'zerotier_server': type=mysql, available=yes
+INFO: [2025-08-25 07:31:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1219] authenticate_user_with_fallback - Step 1: Attempting local authentication for user 'Shanta'
+DEBUG: [2025-08-25 07:31:18] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1298] _try_local_authentication - Attempting local authentication for user 'Shanta'
+DEBUG: [2025-08-25 07:31:18] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1304] _try_local_authentication - Local connection DSN: dbi:mysql:database=ency;host=192.168.1.198;port=3306
+DEBUG: [2025-08-25 07:31:18] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1320] _try_local_authentication - Successfully connected to local database
+DEBUG: [2025-08-25 07:31:18] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1333] _try_local_authentication - Users table found in local database
+DEBUG: [2025-08-25 07:31:18] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1349] _try_local_authentication - User 'Shanta' found in local database, verifying password
+DEBUG: [2025-08-25 07:31:18] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1356] _try_local_authentication - Password hash comparison - provided: 6db9c32fe5..., stored: 6db9c32fe5...
+INFO: [2025-08-25 07:31:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1360] _try_local_authentication - Local authentication successful for user 'Shanta'
+INFO: [2025-08-25 07:31:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1224] authenticate_user_with_fallback - Local authentication successful for user 'Shanta'
+INFO: [2025-08-25 07:31:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:175] do_login - User 'Shanta' successfully authenticated via local backend 'production_server'
+INFO: [2025-08-25 07:31:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:206] do_login - Skipping site access validation for hybrid authentication - using site_id: 1
+INFO: [2025-08-25 07:31:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:237] do_login - Setting roles in session: admin
+INFO: [2025-08-25 07:31:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:267] do_login - Final roles in session: admin
+INFO: [2025-08-25 07:31:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:283] do_login - Redirecting user 'Shanta' to: http://comserv.local:3000/CSC
+INFO: [2025-08-25 07:31:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:18] auto - CSC controller auto method called
+INFO: [2025-08-25 07:31:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:19] auto - Request path: /CSC
+INFO: [2025-08-25 07:31:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:20] auto - Request method: GET
+INFO: [2025-08-25 07:31:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:21] auto - Controller: Comserv::Controller::CSC
+INFO: [2025-08-25 07:31:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:28] base - Base method called, forwarding to index
+INFO: [2025-08-25 07:31:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:41] index - Entered Index Method
+INFO: [2025-08-25 07:31:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:43] index - Rendering CSC template
+WARN: [2025-08-25 07:31:21] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1509] default - Page not found: /static/images/icons/link.svg
+WARN: [2025-08-25 07:31:34] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1509] default - Page not found: /static/images/icons/link.svg
+DEBUG: [2025-08-25 07:32:04] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/day
+WARN: [2025-08-25 07:32:04] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:41] begin - Unauthorized access attempt by user: Guest
+DEBUG: [2025-08-25 07:32:04] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:48] begin - Redirecting unauthorized user to the home page.
+INFO: [2025-08-25 07:32:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:171] index - Starting index action. User exists: No
+INFO: [2025-08-25 07:32:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:182] index - Fetched ControllerName from session: CSC
+INFO: [2025-08-25 07:32:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:195] index - Forwarding to CSC controller's index action
+INFO: [2025-08-25 07:32:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:18] auto - CSC controller auto method called
+INFO: [2025-08-25 07:32:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:19] auto - Request path: /CSC
+INFO: [2025-08-25 07:32:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:20] auto - Request method: GET
+INFO: [2025-08-25 07:32:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:21] auto - Controller: Comserv::Controller::CSC
+INFO: [2025-08-25 07:32:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:28] base - Base method called, forwarding to index
+INFO: [2025-08-25 07:32:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:41] index - Entered Index Method
+INFO: [2025-08-25 07:32:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:43] index - Rendering CSC template
+DEBUG: [2025-08-25 07:32:52] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/day
+WARN: [2025-08-25 07:32:52] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:41] begin - Unauthorized access attempt by user: Guest
+DEBUG: [2025-08-25 07:32:52] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:48] begin - Redirecting unauthorized user to the home page.
+INFO: [2025-08-25 07:32:52] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:171] index - Starting index action. User exists: No
+INFO: [2025-08-25 07:32:52] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:182] index - Fetched ControllerName from session: CSC
+INFO: [2025-08-25 07:32:52] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:195] index - Forwarding to CSC controller's index action
+INFO: [2025-08-25 07:32:52] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:18] auto - CSC controller auto method called
+INFO: [2025-08-25 07:32:52] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:19] auto - Request path: /CSC
+INFO: [2025-08-25 07:32:52] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:20] auto - Request method: GET
+INFO: [2025-08-25 07:32:52] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:21] auto - Controller: Comserv::Controller::CSC
+INFO: [2025-08-25 07:32:52] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:28] base - Base method called, forwarding to index
+INFO: [2025-08-25 07:32:52] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:41] index - Entered Index Method
+INFO: [2025-08-25 07:32:52] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:43] index - Rendering CSC template
+INFO: [2025-08-25 08:24:55] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:23] login - Accessing login page
+INFO: [2025-08-25 08:24:55] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:38] login - Stored referer in session: http://workstation.local:3000/CSC
+INFO: [2025-08-25 08:24:55] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:58] login - Referer: http://workstation.local:3000/CSC
+INFO: [2025-08-25 08:24:55] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:59] login - Session referer: http://workstation.local:3000/CSC
+INFO: [2025-08-25 08:24:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:77] do_login - Login process initiated.
+INFO: [2025-08-25 08:24:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:80] do_login - Request URI: http://workstation.local:3000/user/do_login, Method: POST
+INFO: [2025-08-25 08:24:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:95] do_login - Request method: POST
+INFO: [2025-08-25 08:24:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:114] do_login - Attempting login for username: Shanta
+INFO: [2025-08-25 08:24:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:133] do_login - Using session referer for redirect: http://workstation.local:3000/CSC
+DEBUG: [2025-08-25 08:24:59] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:152] do_login - Final redirect path: http://workstation.local:3000/CSC
+INFO: [2025-08-25 08:24:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1194] authenticate_user_with_fallback - Starting hybrid authentication for user 'Shanta'
+INFO: [2025-08-25 08:24:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1201] authenticate_user_with_fallback - Current backend: production_server
+INFO: [2025-08-25 08:24:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1207] authenticate_user_with_fallback - Available backends: shanta_ency, zerotier_forager, sqlite_offline, workstation_mysql, production_forager, shanta_forager, production_server, workstation_forager, zerotier_server
+DEBUG: [2025-08-25 08:24:59] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1212] authenticate_user_with_fallback - Backend 'shanta_ency': type=mysql, available=yes
+DEBUG: [2025-08-25 08:24:59] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1212] authenticate_user_with_fallback - Backend 'zerotier_forager': type=mysql, available=yes
+DEBUG: [2025-08-25 08:24:59] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1212] authenticate_user_with_fallback - Backend 'sqlite_offline': type=sqlite, available=yes
+DEBUG: [2025-08-25 08:24:59] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1212] authenticate_user_with_fallback - Backend 'workstation_mysql': type=mysql, available=yes
+DEBUG: [2025-08-25 08:24:59] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1212] authenticate_user_with_fallback - Backend 'production_forager': type=mysql, available=yes
+DEBUG: [2025-08-25 08:24:59] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1212] authenticate_user_with_fallback - Backend 'shanta_forager': type=mysql, available=yes
+DEBUG: [2025-08-25 08:24:59] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1212] authenticate_user_with_fallback - Backend 'production_server': type=mysql, available=yes
+DEBUG: [2025-08-25 08:24:59] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1212] authenticate_user_with_fallback - Backend 'workstation_forager': type=mysql, available=yes
+DEBUG: [2025-08-25 08:24:59] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1212] authenticate_user_with_fallback - Backend 'zerotier_server': type=mysql, available=yes
+INFO: [2025-08-25 08:24:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1219] authenticate_user_with_fallback - Step 1: Attempting local authentication for user 'Shanta'
+DEBUG: [2025-08-25 08:24:59] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1298] _try_local_authentication - Attempting local authentication for user 'Shanta'
+DEBUG: [2025-08-25 08:24:59] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1304] _try_local_authentication - Local connection DSN: dbi:mysql:database=ency;host=192.168.1.198;port=3306
+DEBUG: [2025-08-25 08:24:59] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1320] _try_local_authentication - Successfully connected to local database
+DEBUG: [2025-08-25 08:24:59] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1333] _try_local_authentication - Users table found in local database
+DEBUG: [2025-08-25 08:24:59] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1349] _try_local_authentication - User 'Shanta' found in local database, verifying password
+DEBUG: [2025-08-25 08:24:59] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1356] _try_local_authentication - Password hash comparison - provided: 6db9c32fe5..., stored: 6db9c32fe5...
+INFO: [2025-08-25 08:24:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1360] _try_local_authentication - Local authentication successful for user 'Shanta'
+INFO: [2025-08-25 08:24:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1224] authenticate_user_with_fallback - Local authentication successful for user 'Shanta'
+INFO: [2025-08-25 08:24:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:175] do_login - User 'Shanta' successfully authenticated via local backend 'production_server'
+INFO: [2025-08-25 08:24:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:206] do_login - Skipping site access validation for hybrid authentication - using site_id: 1
+INFO: [2025-08-25 08:24:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:237] do_login - Setting roles in session: admin
+INFO: [2025-08-25 08:24:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:267] do_login - Final roles in session: admin
+INFO: [2025-08-25 08:24:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:283] do_login - Redirecting user 'Shanta' to: http://workstation.local:3000/CSC
+INFO: [2025-08-25 08:24:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:18] auto - CSC controller auto method called
+INFO: [2025-08-25 08:24:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:19] auto - Request path: /CSC
+INFO: [2025-08-25 08:24:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:20] auto - Request method: GET
+INFO: [2025-08-25 08:24:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:21] auto - Controller: Comserv::Controller::CSC
+INFO: [2025-08-25 08:24:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:28] base - Base method called, forwarding to index
+INFO: [2025-08-25 08:24:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:41] index - Entered Index Method
+INFO: [2025-08-25 08:24:59] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/CSC.pm:43] index - Rendering CSC template
+WARN: [2025-08-25 08:25:00] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1509] default - Page not found: /static/images/icons/link.svg
+DEBUG: [2025-08-25 08:25:05] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo?filter=day
+DEBUG: [2025-08-25 08:25:05] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-25 08:25:05] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+INFO: [2025-08-25 08:25:05] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:87] todo - Fetching todos for the todo page
+DEBUG: [2025-08-25 08:25:05] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:99] todo - Redirecting to dedicated day view
+DEBUG: [2025-08-25 08:25:05] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/day
+DEBUG: [2025-08-25 08:25:05] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-25 08:25:05] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+DEBUG: [2025-08-25 08:25:05] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:968] day - Processing todo: Add new project Documentation., time_of_day: NULL, length: N/A
+DEBUG: [2025-08-25 08:25:05] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:978] day - Adding todo 'Add new project Documentation.' to unscheduled (time: NULL)
+DEBUG: [2025-08-25 08:25:05] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:985] day - Day view debug: Found 83 total todos, 1 filtered todos for date: 2025-08-25
+DEBUG: [2025-08-25 08:25:17] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo
+DEBUG: [2025-08-25 08:25:17] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-25 08:25:17] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+INFO: [2025-08-25 08:25:17] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:87] todo - Fetching todos for the todo page
+DEBUG: [2025-08-25 08:25:17] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:132] todo - Using MySQL backend for database access
+INFO: [2025-08-25 08:25:17] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:316] fetch_projects_with_subprojects - Fetching parent projects with sub-projects
+INFO: [2025-08-25 08:25:17] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:326] fetch_projects_with_subprojects - Session SiteName: 'CSC'
+ERROR: [2025-08-25 08:25:17] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:367] fetch_projects_with_subprojects - Error fetching top-level projects: Can't locate object method "all" via package "17" (perhaps you forgot to load "17"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 351.
+
+DEBUG: [2025-08-25 08:25:24] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/day
+DEBUG: [2025-08-25 08:25:24] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-25 08:25:24] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+DEBUG: [2025-08-25 08:25:24] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:968] day - Processing todo: Add new project Documentation., time_of_day: NULL, length: N/A
+DEBUG: [2025-08-25 08:25:24] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:978] day - Adding todo 'Add new project Documentation.' to unscheduled (time: NULL)
+DEBUG: [2025-08-25 08:25:24] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:985] day - Day view debug: Found 83 total todos, 1 filtered todos for date: 2025-08-25
+DEBUG: [2025-08-25 08:25:27] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/week
+DEBUG: [2025-08-25 08:25:27] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-25 08:25:27] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+DEBUG: [2025-08-25 08:25:27] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:33] get_top_todos - Roles available for Todo: admin
+DEBUG: [2025-08-25 08:25:27] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:37] get_top_todos - User has admin privilege.
+INFO: [2025-08-25 08:25:27] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:45] get_top_todos - Site name: CSC
+INFO: [2025-08-25 08:25:27] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:57] get_top_todos - Visited the todo page
+DEBUG: [2025-08-25 08:25:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/month
+DEBUG: [2025-08-25 08:25:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-25 08:25:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-08-25 08:31:13] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [197:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+INFO: [2025-08-25 08:31:15] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/NPM.pm:36] BUILD - NPM Controller initialized
+INFO: Starting Documentation controller initialization with hybrid approach (directory scan + config overrides)
+DEBUG: Attempting to load documentation config from: /home/shanta/PycharmProjects/comserv2/Comserv/script/../root/Documentation/config/documentation_config.json
+INFO: Loaded documentation configuration: 11 categories, 5 pages
+DEBUG: Category keys loaded: site_specific, models, changelog, tutorials, documentation, modules, proxmox, user_guides, admin_guides, developer_guides, controllers
+INFO: Step 1: Auto-discovering documentation files via directory scan
+INFO: Starting directory scan for documentation files
+INFO: Directory scan completed. Found 263 pages.
+INFO: Auto-discovered 263 documentation files
+INFO: Step 2: Applying configuration overrides
+INFO: Applied 5 configuration overrides
+INFO: Step 3: Categorizing all documentation pages
+INFO: Categorizing documentation pages
+INFO: Page categorization completed
+INFO: Hybrid documentation system initialized: 264 total pages (263 auto-discovered + 5 overrides) across 11 categories
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:454] _perform_startup_operations - Performing one-time startup operations
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:334] track_application_start - Application started at 2025-08-25
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:363] generate_all_theme_css - Starting theme CSS generation
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: usbm
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: csc
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: default
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: dark
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:397] generate_all_theme_css - Adding special styles for theme: apis
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: apis
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:397] generate_all_theme_css - Adding special styles for theme: mcoop
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: mcoop
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:421] generate_all_theme_css - Completed theme CSS generation
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:477] _perform_startup_operations - Cached system info - Hostname: workstation.computersystemconsulting.ca, IP: 192.168.1.199
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:550] _test_database_connections - All database connections tested successfully
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:505] _perform_startup_operations - Startup operations completed successfully
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:560] _setup_site_cached - Setting up site for domain: workstation.local
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:799] setup_site - Starting setup_site action
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:809] setup_site - Extracted domain: workstation.local
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1038] site_setup - SiteName: CSC
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1054] site_setup - Using Catalyst's built-in proxy configuration for URLs without port
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1058] site_setup - Test URL: http://workstation.local:3000/test
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1065] site_setup - Set default HostName: http://workstation.local
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm:122] get_site_details_by_name - Getting site details for name: CSC
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm:133] get_site_details_by_name - Found site: ID=1, Name=CSC
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1106] site_setup - ControllerName set to: CSC
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:138] get_site_theme - Getting theme for site: CSC
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:98] load_theme_mappings - Loading theme mappings from: /home/shanta/PycharmProjects/comserv2/Comserv/root/static/config/theme_mappings.json
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:108] load_theme_mappings - Loaded theme mappings: Ve7tit => apis, BMaster => apis, WeaverBeck => default, CSC => csc, USBM => usbm, MCOOP => mcoop
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:175] get_site_theme - Available mappings: Ve7tit, BMaster, WeaverBeck, CSC, USBM, MCOOP
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:181] get_site_theme - Found exact match for site CSC: csc
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:87] validate_theme - Validated theme: csc (from: csc)
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:214] get_site_theme - Selected theme for CSC: csc
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1127] site_setup - Set theme_name in stash: csc
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1137] site_setup - Completed site_setup action with HostName: http://workstation.local
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1033] setup_site - Completed site setup
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:231] set_theme - Setting theme for site: CSC
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:54] get_all_themes - Getting all available themes
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:235] set_theme - Available themes: apis, csc, dark, default, mcoop, usbm
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:138] get_site_theme - Getting theme for site: CSC
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:162] get_site_theme - Using theme from session for CSC: csc
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:254] set_theme - Set theme for site CSC to csc
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:591] _setup_site_cached - Cached site setup for domain: workstation.local, SiteName: CSC
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:23] documentation_base - Captured lowercase documentation route
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:30] documentation_index - Handling lowercase documentation index route
+INFO: [2025-08-25 08:32:38] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:222] index - Accessing documentation index
+DEBUG: [2025-08-25 08:32:38] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:230] index - Session roles: admin
+DEBUG: [2025-08-25 08:32:38] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:238] index - User role determined from session: admin, is_admin: 1
+DEBUG: [2025-08-25 08:32:38] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:320] index - Documentation index loaded with 254 pages for role: admin
+WARN: [2025-08-25 08:32:58] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1509] default - Page not found: /static/images/icons/link.svg
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-08-25 08:37:31] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [197:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+INFO: [2025-08-25 08:37:33] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/NPM.pm:36] BUILD - NPM Controller initialized
+INFO: Starting Documentation controller initialization with hybrid approach (directory scan + config overrides)
+DEBUG: Attempting to load documentation config from: /home/shanta/PycharmProjects/comserv2/Comserv/script/../root/Documentation/config/documentation_config.json
+INFO: Loaded documentation configuration: 11 categories, 5 pages
+DEBUG: Category keys loaded: changelog, models, site_specific, documentation, tutorials, proxmox, modules, admin_guides, user_guides, controllers, developer_guides

@@ -1,0 +1,162 @@
+{
+    "checksum": "e2481bfc73145d787e796e572b5fbd8659e52ea3464df91d46f064aaff1ecbfc",
+    "data": {
+    "id": "3b88ab13-bd1e-45fb-95fd-6b5c04b270cb",
+    "createdAt": 1755618483125,
+    "updatedAt": 1755618491316,
+    "title": "PR Description Creation Guide",
+    "messages": [
+        {
+            "id": "d96c8d9c-926b-46f5-a0c7-0f9ad3638379",
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "Create a PR description based on the latest changes that we've been working on"
+                }
+            ],
+            "createdAt": 1755618483130,
+            "isInternal": false,
+            "rawContent": {
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Create a PR description based on the latest changes that we've been working on"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "autoAppliedRules": [
+                {
+                    "name": "User AI Instruction",
+                    "description": "User AI Instruction",
+                    "uri": "zen-rules://user/custom",
+                    "content": "Please read and fallow the instructions in AI_DEVELOPMENT_GUIDELINES. \ndo not create new documents/code files if one already exist  without .\nIf there are two or more documents/code files ask to consolidate into one.",
+                    "alwaysApply": true
+                },
+                {
+                    "name": "Repository Information Overview",
+                    "description": "Repository Information Overview",
+                    "uri": "zen-rules://repo/repo",
+                    "mimeType": "text/markdown",
+                    "content": "\n\n# Comserv Project Information\n\n## Summary\nComserv is a comprehensive web-based system for managing business operations, projects, and documentation. It's built using the Catalyst Perl web framework and provides features for project management, theme customization, and user authentication.\n\n## Structure\n- `Comserv/`: Main application directory containing the core application code\n  - `lib/`: Application code and models\n  - `docs/`: Documentation files\n  - `root/`: Static assets and templates\n  - `script/`: Utility scripts for server management and database operations\n  - `t/`: Test files\n- `app/`: Additional application components\n- `data/`: Data files including pricing information\n- `proxmox/`: Proxmox VE integration components\n\n## Language & Runtime\n**Language**: Perl\n**Version**: 5.x (compatible with Perl 5.40.0)\n**Framework**: Catalyst 5.90130\n**Build System**: Module::Install\n**Package Manager**: CPAN\n\n## Dependencies\n**Main Dependencies**:\n- Catalyst::Runtime (5.90130)\n- Moose\n- DBIx::Class\n- Template (Template Toolkit)\n- JSON/JSON::MaybeXS\n- Log::Log4perl\n- DateTime\n- File::Slurp\n\n**Development Dependencies**:\n- Test::More (0.88+)\n- Test::Pod\n- Test::Pod::Coverage\n- Test::WWW::Mechanize::Catalyst\n- Catalyst::Devel\n\n## Build & Installation\n```bash\ncd Comserv\nperl Makefile.PL\nmake\nmake test\nmake install\n```\n\n## Database\n**Type**: MySQL\n**Setup**: \n```bash\nmysql -u root -p < database_initialization_script.sql\n```\n**Schema Management**: DBIx::Class::Schema::Loader\n\n## Testing\n**Framework**: Test::More\n**Test Location**: Comserv/t/\n**Run Command**:\n```bash\ncd Comserv\nprove -l t/\n```\n\n## Server Execution\n**Development Server**:\n```bash\ncd Comserv\nscript/comserv_server.pl\n```\n**Production Deployment**:\n```bash\ncd Comserv\nscript/comserv_fastcgi.pl\n# or\nstarman --port 5000 --workers 5 comserv.psgi\n```\n\n## Authentication & Authorization\n- Session-based authentication\n- Role-based access control\n- Multiple authentication realms\n- Support for user groups and site-specific permissions\n\n## Features\n- Project management system\n- Theme customization system\n- Email integration\n- PDF generation\n- Proxmox VE integration\n- Multi-site support",
+                    "alwaysApply": true
+                },
+                {
+                    "name": "Database Development Standards and Best Practices",
+                    "description": "Database Development Standards and Best Practices",
+                    "uri": "zen-rules://repo/database-standards",
+                    "mimeType": "text/markdown",
+                    "content": "\n\n# Database Development Standards\n\n## Query Standards\n- **Table Aliases:** Use table aliases in all queries to avoid ambiguity (e.g., 'me.column_name')\n- **Error Handling:** Implement proper error handling with eval blocks and try/catch\n- **Parameterized Queries:** Use parameterized queries to prevent SQL injection\n\n## Schema Management\n- **Naming Conventions:** Follow naming conventions for tables, columns, and relationships\n- **Documentation:** Document schema changes and rationale for future reference\n- **Performance:** Regularly optimize database performance and indexes\n- **Version Control:** Use Git to track schema changes with proper tagging\n- **Backup Protocol:** Always backup database before making schema changes\n\n## Model Standards (DBIx::Class)\n- **Result Classes:** Located in `/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema/Ency/Result/`\n- **Relationships:** Define proper relationships between tables\n- **Validation:** Implement data validation in model classes\n\n## Configuration Priority\n- **Primary:** ZeroTier production server (172.30.161.222) - works from any network\n- **Secondary:** Local network production server (192.168.1.198) - home/office only\n- **Tertiary:** localhost MySQL (development)\n- **Fallback:** SQLite (offline mode)\n\n## Security Protocols\n- **Input Validation:** Validate all user inputs before database operations\n- **Access Controls:** Implement proper access controls based on user roles\n- **Regular Reviews:** Regularly review and update security protocols",
+                    "alwaysApply": true
+                },
+                {
+                    "name": "Template Toolkit Standards and Requirements",
+                    "description": "Template Toolkit Standards and Requirements",
+                    "uri": "zen-rules://repo/template-standards",
+                    "mimeType": "text/markdown",
+                    "content": "\n\n# Template Toolkit (.tt) Standards\n\n## Required PageVersion Header Format\nAll .tt files must include this exact format:\n```\n[% META title = 'Page Title Here' %]\n[% PageVersion = 'relative/path/filename.tt,v 0.01 YYYY/MM/DD author Exp author ' %]\n[% IF c.session.debug_mode == 1 %]\n    [% PageVersion %]\n[% END %]\n```\n\n## Template Standards\n- **Theme Compliance:** Use theme system variables for styling - NO page-specific CSS\n- **Debug Mode:** Include debug mode blocks for development visibility\n- **Responsive Design:** Implement mobile-first responsive design patterns\n- **HTML Structure:** Use proper semantic HTML structure\n- **Template Toolkit:** Follow Template Toolkit best practices\n\n## Navigation Integration\nWhen working with navigation templates:\n- **Main Navigation:** Include via `/Navigation/navigation.tt`\n- **Admin Menu:** Use `/Navigation/admintopmenu.tt` for admin-only sections\n- **Dropdown Menus:** Reference existing dropdown templates in `/Navigation/` directory\n\n## Documentation File Rules - CRITICAL\n- **File Format:** ONLY `.tt` files for application documentation - NO `.md` files\n- **EXISTING FILES FIRST:** ALWAYS search for and use existing files before creating new ones\n- **Naming Consistency:** Use same file names across AI sessions to prevent content loss\n- **Content Priority:** Always improve existing files rather than creating new ones\n- **Role-Based Access:** Respect existing Documentation/index.tt role-based structure\n- **Directory Consolidation:** Use established directory structure - don't create new directories\n\n## File Creation Protocol\n1. **Search First:** Use file search tools to find existing similar files\n2. **Check Directory:** Look at existing directory structure in target location\n3. **Ask User:** If multiple similar files exist, ask which should be updated\n4. **Update Existing:** Improve existing files rather than creating duplicates\n\n## Documentation Configuration Management - CRITICAL\nWhen adding new documentation files (.tt):\n- **ALWAYS update:** `/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/config/documentation_config.json`\n- **NEVER update:** `/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/documentation_config.json` (legacy file)\n- **Required fields:** id, title, description, path, categories, roles, site, format\n- **Format:** \"template\" for .tt files, \"markdown\" for .md files\n- **Categories:** Use existing categories: user_guides, admin_guides, developer_guides, tutorials, modules, controllers, models, changelog, proxmox, documentation, templates\n- **Roles:** [\"developer\", \"admin\"] for technical docs, [\"normal\", \"editor\", \"admin\", \"developer\"] for user docs",
+                    "alwaysApply": true
+                },
+                {
+                    "name": "AI Behavior Enforcement Rules for Zencoder",
+                    "description": "AI Behavior Enforcement Rules for Zencoder",
+                    "uri": "zen-rules://repo/ai-behavior-enforcement",
+                    "mimeType": "text/markdown",
+                    "content": "\n\n# AI Behavior Enforcement Rules\n\n## MANDATORY PROMPT TRACKING\n**CURRENT PROMPT:** This is prompt #[X] of 5 maximum allowed prompts.\n\n### Prompt Counter Protocol\n- **Start Each Response:** Begin every response with current prompt count\n- **Track Internally:** Keep running count throughout conversation\n- **Warn at Prompt 4:** Alert user that next prompt will trigger handoff\n- **Stop at Prompt 5:** Refuse to continue, provide handoff documentation\n\n## MANDATORY APPROVAL WORKFLOW\n\n### Before ANY Code Changes\n1. **STOP:** Do not modify any files without explicit user approval\n2. **PRESENT:** Show exactly what will be changed using the standard format\n3. **WAIT:** Wait for explicit approval (\"yes\", \"approved\", \"apply changes\")\n4. **CONFIRM:** Acknowledge approval before proceeding\n5. **EXECUTE:** Apply changes only after confirmation\n\n### Standard Change Presentation\n```\n🔄 PROPOSED CHANGE TO: [filename]\n📝 CHANGE TYPE: [Addition/Modification/Deletion]\n📋 DESCRIPTION: [what this accomplishes]\n\n❌ CURRENT CODE:\n[existing code or \"N/A\"]\n\n✅ NEW CODE:\n[proposed code or \"DELETED\"]\n\n💡 REASON: [why needed]\n\n⚠️  APPROVAL REQUIRED: Please confirm with \"approved\" or \"yes\"\n🔄 REVERT: Changes can be undone if needed\n```\n\n## VIOLATION CONSEQUENCES\n- **Prompt Limit Exceeded:** Immediate session termination with handoff\n- **Unapproved Changes:** Acknowledge violation and request approval retroactively\n- **Missing Counter:** Add prompt counter to current response\n\n## HANDOFF TEMPLATE (Use on 5th Prompt)\n```\n🚨 PROMPT LIMIT REACHED - HANDOFF REQUIRED\n\n📊 SESSION SUMMARY:\n- Prompts Used: 5/5\n- Files Modified: [list]\n- Tasks Completed: [list]\n- Tasks Remaining: [list]\n\n🔄 HANDOFF PROMPT FOR NEXT AI:\n\"Continue working on [project/task]. Read development-guidelines.md and ai-behavior-enforcement.md first. \nCurrent context: [brief context]\nFiles being worked on: [list]\nNext steps needed: [specific actions]\"\n\n📚 REQUIRED READING FOR NEXT AI:\n- .zencoder/rules/development-guidelines.md\n- .zencoder/rules/ai-behavior-enforcement.md\n- [any other relevant docs]\n\n✅ DOCUMENTATION UPDATED: [what was recorded]\n```\n\n## EMERGENCY PROTOCOLS\n- **User Says \"Stop\":** Immediately cease all activities\n- **User Says \"Revert\":** Provide instructions for undoing changes\n- **User Says \"Handoff\":** Immediately provide handoff documentation",
+                    "alwaysApply": true
+                }
+            ]
+        },
+        {
+            "id": "d78490ad-41b3-41b7-a84b-6d5f4c8c79e0",
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "**CURRENT PROMPT:** This is prompt #1 of 5 maximum allowed prompts.\n\nI'll help you create a PR description based on the latest changes. To do this effectively, I need to understand what changes have been made recently. Let me search for recent modifications and gather context about the work that's been done."
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01Kgpyp2tLsnN6QVSY7rYx1c",
+                    "status": "IN_PROGRESS",
+                    "isHidden": true,
+                    "localResult": "{\"status\":\"SUCCESS\",\"exitCode\":0,\"output\":\"\\u001b[33mc5826a0\\u001b[m\\u001b[33m (\\u001b[m\\u001b[1;36mHEAD\\u001b[m\\u001b[33m -> \\u001b[m\\u001b[1;32mmaster\\u001b[m\\u001b[33m, \\u001b[m\\u001b[1;31morigin/master\\u001b[m\\u001b[33m)\\u001b[m Merge remote-tracking branch 'origin/master' - resolved conflicts in edit_private_link.tt\\r\\n\\u001b[33md2f955d\\u001b[m removed xencoder files and addes two documentation files added by cascade.\\r\\n\\u001b[33m1417a2f\\u001b[m feat(docs): enhance documentation workflow and verify navigation system integrity\\r\\n\\u001b[33md10a720\\u001b[m\\u001b[33m (\\u001b[m\\u001b[1;32mbackup-20250819-080548\\u001b[m\\u001b[33m)\\u001b[m Merge remote-tracking branch 'origin/master'\\r\\n\\u001b[33mbcb1708\\u001b[m Fix: Handle empty input in calculation function\\r\\n\\u001b[33m03ba0e1\\u001b[m Fix: Handle empty input in calculation function\\r\\n\\u001b[33meb5e4db\\u001b[m Fix: Handle empty input in calculation function\\r\\n\\u001b[33m23358f8\\u001b[m [BUG FIX]: Complete Todo Time Field Fix Documentation\\r\\n\\u001b[33ma6be18d\\u001b[m RECOVERY: Restore working Admin.pm and preserve menu system improvements\\r\\n\\u001b[33me727166\\u001b[m docs: Update Projects.tt documentation with system status and recent fixes\\r\\n\"}"
+                },
+                {
+                    "type": "shellCommand",
+                    "command": "git log --oneline -10",
+                    "id": "421d4a17-08af-44c1-bf4e-2795f60a8f6d",
+                    "status": "SUCCESS",
+                    "toolCallId": "toolu_01Kgpyp2tLsnN6QVSY7rYx1c",
+                    "commandsRequiringConfirmation": [],
+                    "exitCode": 0,
+                    "output": "\u001b[33mc5826a0\u001b[m\u001b[33m (\u001b[m\u001b[1;36mHEAD\u001b[m\u001b[33m -> \u001b[m\u001b[1;32mmaster\u001b[m\u001b[33m, \u001b[m\u001b[1;31morigin/master\u001b[m\u001b[33m)\u001b[m Merge remote-tracking branch 'origin/master' - resolved conflicts in edit_private_link.tt\r\n\u001b[33md2f955d\u001b[m removed xencoder files and addes two documentation files added by cascade.\r\n\u001b[33m1417a2f\u001b[m feat(docs): enhance documentation workflow and verify navigation system integrity\r\n\u001b[33md10a720\u001b[m\u001b[33m (\u001b[m\u001b[1;32mbackup-20250819-080548\u001b[m\u001b[33m)\u001b[m Merge remote-tracking branch 'origin/master'\r\n\u001b[33mbcb1708\u001b[m Fix: Handle empty input in calculation function\r\n\u001b[33m03ba0e1\u001b[m Fix: Handle empty input in calculation function\r\n\u001b[33meb5e4db\u001b[m Fix: Handle empty input in calculation function\r\n\u001b[33m23358f8\u001b[m [BUG FIX]: Complete Todo Time Field Fix Documentation\r\n\u001b[33ma6be18d\u001b[m RECOVERY: Restore working Admin.pm and preserve menu system improvements\r\n\u001b[33me727166\u001b[m docs: Update Projects.tt documentation with system status and recent fixes\r\n",
+                    "outputPath": "/tmp/Zencoder-b80f71fd-2837-44db-b9f4-d6e0ffb88cf37910863756634744858.log",
+                    "isBackground": false,
+                    "maxWaitTimeInSeconds": 240
+                }
+            ],
+            "context": {
+                "author": "Code agent",
+                "operationId": "0238234f-d88f-40bf-bb82-c54afad63d36"
+            },
+            "createdAt": 1755618485050,
+            "isInternal": false
+        },
+        {
+            "id": "4a968ca7-524e-4e51-843b-20fe378162b1",
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01VkuY2Vc5bSY42zePA1NYro",
+                    "status": "IN_PROGRESS",
+                    "isHidden": true
+                },
+                {
+                    "type": "shellCommand",
+                    "command": "git show --stat HEAD",
+                    "id": "c53ed795-45cc-452a-812b-e1456f9c5281",
+                    "status": "CONFIRMATION",
+                    "toolCallId": "toolu_01VkuY2Vc5bSY42zePA1NYro",
+                    "commandsRequiringConfirmation": [
+                        {
+                            "name": "git",
+                            "arguments": [
+                                "show",
+                                "--stat",
+                                "HEAD"
+                            ]
+                        }
+                    ],
+                    "isBackground": false,
+                    "maxWaitTimeInSeconds": 240
+                }
+            ],
+            "context": {
+                "author": "Code agent",
+                "operationId": "c0247332-51bd-4a9d-a94f-ab9672980011"
+            },
+            "createdAt": 1755618491316,
+            "isInternal": false
+        }
+    ],
+    "isAgent": true,
+    "isNameGenerated": true,
+    "isCustomAgent": false,
+    "isUnitTestsAgent": false,
+    "isE2EAgent": false,
+    "isQnaAgent": false,
+    "isRepoInfoAgent": false,
+    "isClaudeCode": false,
+    "isZencoderCli": false,
+    "autoApply": false,
+    "model": "default"
+}
+}

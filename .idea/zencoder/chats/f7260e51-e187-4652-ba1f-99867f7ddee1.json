@@ -1,0 +1,1590 @@
+{
+    "checksum": "ef78e9fca0b9662e71e5ff7f3e2bd22f129d3a1dd46b61b4169a3f4c41d73454",
+    "data": {
+    "id": "f7260e51-e187-4652-ba1f-99867f7ddee1",
+    "createdAt": 1747748922798,
+    "updatedAt": 1747748943483,
+    "title": "Proxmox Network Command Guide",
+    "messages": [
+        {
+            "id": "df2540d8-d5c9-40c1-a19d-db19997eb33f",
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "Please go through our proxmox documentation and add to it. a comprehesive list of the commads to set this like a container/vm ip address, etc"
+                }
+            ],
+            "context": {
+                "currentFile": {
+                    "path": "Comserv/root/footer.tt",
+                    "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/footer.tt",
+                    "sources": [
+                        "opened_tab"
+                    ],
+                    "content": "[% PageVersion\t= 'footer.tt,v 0.03 2024/08/31 shanta Exp shanta '\t%]\n[% IF c.session.debug_mode == 1 %]\n <br>[%\tPageVersion %] </br>\n <br><a href=\"/reset_session\">Reset Session</a></br>\n[% END %]\n\n<!-- Live chat implementation -->\n<script type=\"text/javascript\" src=\"/static/js/local-chat.js\"></script>\n\n<!-- Debug information about the current page -->\n[% IF c.session.debug_mode == 1 %]\n<div class=\"debug-footer\">\n    <details>\n        <summary>Debug Information</summary>\n        <ul>\n            <li>Controller: [% c.session.ControllerName || 'Not defined' %]</li>\n            <li>Theme: [% c.session.theme_name || 'Not defined' %]</li>\n            <li>SiteName: [% c.session.SiteName || 'Not defined' %]</li>\n            <li>Username: [% c.session.username || 'Not logged in' %]</li>\n            <li>Session ID: [% c.sessionid || 'Not available' %]</li>\n        </ul>\n    </details>\n</div>\n[% END %]\n"
+                },
+                "codebaseEnabled": true,
+                "ragFiles": [
+                    {
+                        "path": "Comserv/root/Documentation/proxmox.tt",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/proxmox.tt",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/index.tt",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/index.tt",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/DBIx/Class/Manual/DocMap.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/DBIx/Class/Manual/DocMap.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/x86_64-linux-gnu-thread-multi/Moose/Manual/Delta.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/x86_64-linux-gnu-thread-multi/Moose/Manual/Delta.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/x86_64-linux-gnu-thread-multi/Moose/Cookbook/Basics/Genome_OverloadingSubtypesAndCoercion.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/x86_64-linux-gnu-thread-multi/Moose/Cookbook/Basics/Genome_OverloadingSubtypesAndCoercion.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/x86_64-linux-gnu-thread-multi/Moose/Cookbook/Basics/Company_Subtypes.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/x86_64-linux-gnu-thread-multi/Moose/Cookbook/Basics/Company_Subtypes.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/root/pagetop.tt",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/pagetop.tt",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/YAML.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/YAML.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/DBIx/Class/Manual/Features.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/DBIx/Class/Manual/Features.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/Date/Calc.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/Date/Calc.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/x86_64-linux-gnu-thread-multi/Bit/Vector.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/x86_64-linux-gnu-thread-multi/Bit/Vector.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/x86_64-linux-gnu-thread-multi/Bit/Vector/Overload.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/x86_64-linux-gnu-thread-multi/Bit/Vector/Overload.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/x86_64-linux-gnu-thread-multi/Template/Tutorial/Web.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/x86_64-linux-gnu-thread-multi/Template/Tutorial/Web.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/IO/All.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/IO/All.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/x86_64-linux-gnu-thread-multi/Moose/Manual/Unsweetened.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/x86_64-linux-gnu-thread-multi/Moose/Manual/Unsweetened.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/SQL/Statement/Structure.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/SQL/Statement/Structure.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/SQL/Statement/Roadmap.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/SQL/Statement/Roadmap.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/DBIx/Class/Migration/Tutorial.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/DBIx/Class/Migration/Tutorial.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/DBIx/Class/Migration/Script/Help/help.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/DBIx/Class/Migration/Script/Help/help.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/DBIx/Class/Migration/Tutorial/Setup.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/DBIx/Class/Migration/Tutorial/Setup.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "app/controllers/proxmox_controller.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/app/controllers/proxmox_controller.pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/lib/Comserv/Controller/Proxmox.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Proxmox.pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/lib/Comserv/Model/Proxmox.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Proxmox.pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/root/static/js/linux_commands.js",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/static/js/linux_commands.js",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/lib/Comserv/Controller/ProxmoxServers.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/ProxmoxServers.pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/MooX::Options::Manual::Man.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/MooX::Options::Manual::Man.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/DBIx/Class/Migration/FAQ.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/DBIx/Class/Migration/FAQ.pod",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/Template::Manual::VMethods.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/Template::Manual::VMethods.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/lib/Comserv.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv.pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/MooX::Options::Manual::MooXCmd.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/MooX::Options::Manual::MooXCmd.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/Config::General::Extended.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/Config::General::Extended.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/DBIx::Class::Manual::DocMap.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/DBIx::Class::Manual::DocMap.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/MooX::Options.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/MooX::Options.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/lib/Comserv/Util/ProxmoxCredentials.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Util/ProxmoxCredentials.pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::fixture_sets.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::fixture_sets.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/Moose::Manual::Resources.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/Moose::Manual::Resources.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/MooX::Options::Descriptive.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/MooX::Options::Descriptive.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/Moose::Manual::MooseX.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/Moose::Manual::MooseX.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/Template::Manual::Filters.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/Template::Manual::Filters.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::help.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::help.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/Pod::ParseUtils.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/Pod::ParseUtils.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/Module::Install::API.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/Module::Install::API.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/DBIx::Class::Manual::Reading.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/DBIx::Class::Manual::Reading.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/Template::Manual.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/Template::Manual.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/DBIx::Class::Migration::Script::Help.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/DBIx::Class::Migration::Script::Help.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::install_version_storage.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::install_version_storage.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/lib/Comserv/Controller/Admin/NetworkDiagnostics.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Admin/NetworkDiagnostics.pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/DBIx::Class::Migration::FAQ.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/DBIx::Class::Migration::FAQ.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::sandbox_dir.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::sandbox_dir.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/DBIx::Class::Manual::Features.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/DBIx::Class::Manual::Features.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/Test2::Manual::Contributing.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/Test2::Manual::Contributing.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/Test::Base::Filter.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/Test::Base::Filter.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/Module/Install/API.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/Module/Install/API.pod",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/MooX/Options/Manual/Man.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/MooX/Options/Manual/Man.pod",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::to_version.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::to_version.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::password.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::password.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/ExtUtils::Helpers::Unix.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/ExtUtils::Helpers::Unix.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::install.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::install.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/x86_64-linux-gnu-thread-multi/perllocal.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/x86_64-linux-gnu-thread-multi/perllocal.pod",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/lib/Comserv/Controller/IT.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/IT.pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/Moose::Manual::Delegation.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/Moose::Manual::Delegation.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/ExtUtils::Helpers::VMS.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/ExtUtils::Helpers::VMS.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/DBIx/Class/Manual/DocMap.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/DBIx/Class/Manual/DocMap.pod",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/DBIx/Class/Manual/Features.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/DBIx/Class/Manual/Features.pod",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv2.iml",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv2.iml",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/DBIx::Class::Manual::FAQ.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/DBIx::Class::Manual::FAQ.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::username.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::username.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::sandbox_class.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::sandbox_class.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/Template::VMethods.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/Template::VMethods.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::dsn.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::dsn.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/roles/admin/linux_commands.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/roles/admin/linux_commands.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/docs/proxmox_api.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/docs/proxmox_api.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/proxmox_integration.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/proxmox_integration.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/changelog/2024-06-21-linux-commands-documentation.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/changelog/2024-06-21-linux-commands-documentation.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/docs/CHANGELOG.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/docs/CHANGELOG.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/changelog/2024-07-proxmox-controller-fixes.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/changelog/2024-07-proxmox-controller-fixes.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/docs/2024-07-proxmox-authentication-changes.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/docs/2024-07-proxmox-authentication-changes.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/docs/proxmox_authentication_changes.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/docs/proxmox_authentication_changes.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/docs/bug_fixes_documentation.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/docs/bug_fixes_documentation.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/docs/technical_changes.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/docs/technical_changes.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/docs/README.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/docs/README.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/network_diagnostics.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/network_diagnostics.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/changelog/2024-08-proxmox-debug-msg-fix.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/changelog/2024-08-proxmox-debug-msg-fix.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/roles/normal/Documentation_System.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/roles/normal/Documentation_System.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/roles/admin/documentation_system_guide.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/roles/admin/documentation_system_guide.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/Documentation_Workflow.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Documentation_Workflow.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/config/network_map.json",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/config/network_map.json",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: README.md:0:4800",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: README.md:0:4800",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: User.md:0:4800",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: User.md:0:4800",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/proxy_troubleshooting.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/proxy_troubleshooting.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: Documentation_Controller.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: Documentation_Controller.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: admin_guide.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: admin_guide.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: templates.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: templates.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: Site.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: Site.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: user_management.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: user_management.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: Documentation_System.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: Documentation_System.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: HostingSignup.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: HostingSignup.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: mcoop_user_guide.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: mcoop_user_guide.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: ThemeConfig.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: ThemeConfig.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: getting_started.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: getting_started.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: member_resources.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: member_resources.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: model_list.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: model_list.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: documentation_system_guide.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: documentation_system_guide.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: site_guide.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: site_guide.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: Documentation_Management.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: Documentation_Management.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: Documentation.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: Documentation.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: documentation_guide.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: documentation_guide.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: Root.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: Root.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: api_reference.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: api_reference.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: account_management.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: account_management.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: controller_list.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: controller_list.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/MailSystem.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/MailSystem.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/roles/admin/Documentation_Management.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/roles/admin/Documentation_Management.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: troubleshooting.md:0:800",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: troubleshooting.md:0:800",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: navigation_system.md:0:800",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: navigation_system.md:0:800",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: customizing_profile.md:0:800",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: customizing_profile.md:0:800",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/cpanfile",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/cpanfile",
+                        "sources": [
+                            "opened_tab"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/lib/Comserv/Model/DBEncy.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/DBEncy.pm",
+                        "sources": [
+                            "opened_tab"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/lib/Comserv/Util/NetworkMap.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Util/NetworkMap.pm",
+                        "sources": [
+                            "opened_tab"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/lib/Comserv/Model/DBForager.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/DBForager.pm",
+                        "sources": [
+                            "opened_tab"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/lib/Comserv/Controller/Admin.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Admin.pm",
+                        "sources": [
+                            "opened_tab"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/lib/Comserv/Controller/Log.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Log.pm",
+                        "sources": [
+                            "opened_tab"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/lib/Comserv/Model/User.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/User.pm",
+                        "sources": [
+                            "opened_tab"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/lib/Comserv/Controller/Ve7tit.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Ve7tit.pm",
+                        "sources": [
+                            "opened_tab"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/lib/Comserv/Controller/Documentation.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Documentation.pm",
+                        "sources": [
+                            "opened_tab"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/changelog/2025-05-12-fix-documentation-controller-logging.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/changelog/2025-05-12-fix-documentation-controller-logging.md",
+                        "sources": [
+                            "opened_tab"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/scripts/cleanup_formatting_title_files.sh",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/scripts/cleanup_formatting_title_files.sh",
+                        "sources": [
+                            "opened_tab"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/root/footer.tt",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/footer.tt",
+                        "sources": [
+                            "opened_tab"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/lib/Comserv/Controller/Documentation/ScanMethods.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Documentation/ScanMethods.pm",
+                        "sources": [
+                            "opened_tab"
+                        ]
+                    }
+                ],
+                "rerankedFiles": [
+                    {
+                        "path": "Comserv/docs/proxmox_api.md",
+                        "fsPath": "Comserv/docs/proxmox_api.md"
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/changelog/2024-06-21-linux-commands-documentation.md",
+                        "fsPath": "Comserv/root/Documentation/changelog/2024-06-21-linux-commands-documentation.md"
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/proxmox_integration.md",
+                        "fsPath": "Comserv/root/Documentation/proxmox_integration.md"
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/roles/admin/linux_commands.md",
+                        "fsPath": "Comserv/root/Documentation/roles/admin/linux_commands.md"
+                    }
+                ],
+                "usedFilePaths": [
+                    {
+                        "path": "Comserv/root/footer.tt",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/footer.tt",
+                        "sources": [
+                            "opened_tab"
+                        ],
+                        "content": "[% PageVersion\t= 'footer.tt,v 0.03 2024/08/31 shanta Exp shanta '\t%]\n[% IF c.session.debug_mode == 1 %]\n <br>[%\tPageVersion %] </br>\n <br><a href=\"/reset_session\">Reset Session</a></br>\n[% END %]\n\n<!-- Live chat implementation -->\n<script type=\"text/javascript\" src=\"/static/js/local-chat.js\"></script>\n\n<!-- Debug information about the current page -->\n[% IF c.session.debug_mode == 1 %]\n<div class=\"debug-footer\">\n    <details>\n        <summary>Debug Information</summary>\n        <ul>\n            <li>Controller: [% c.session.ControllerName || 'Not defined' %]</li>\n            <li>Theme: [% c.session.theme_name || 'Not defined' %]</li>\n            <li>SiteName: [% c.session.SiteName || 'Not defined' %]</li>\n            <li>Username: [% c.session.username || 'Not logged in' %]</li>\n            <li>Session ID: [% c.sessionid || 'Not available' %]</li>\n        </ul>\n    </details>\n</div>\n[% END %]\n"
+                    },
+                    {
+                        "path": "Comserv/docs/proxmox_api.md",
+                        "fsPath": "Comserv/docs/proxmox_api.md"
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/changelog/2024-06-21-linux-commands-documentation.md",
+                        "fsPath": "Comserv/root/Documentation/changelog/2024-06-21-linux-commands-documentation.md"
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/proxmox_integration.md",
+                        "fsPath": "Comserv/root/Documentation/proxmox_integration.md"
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/roles/admin/linux_commands.md",
+                        "fsPath": "Comserv/root/Documentation/roles/admin/linux_commands.md"
+                    }
+                ]
+            },
+            "createdAt": 1747748922801,
+            "isInternal": false,
+            "rawContent": {
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Please go through our proxmox documentation and add to it. a comprehesive list of the commads to set this like a container/vm ip address, etc"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "8f5e6869-dd63-4ac7-bb98-61273b5f2bee",
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "To enhance the Proxmox documentation with a comprehensive list of commands for setting up a container or VM IP address, we can integrate the following commands and explanations into the existing documentation. This will provide users with a clear guide on how to manage network configurations within Proxmox environments.\n\n### Proxmox Network Configuration Commands\n\n#### Viewing and Editing Network Configuration\n\n1. **View Current Network Configuration:**\n   ```bash\n   cat /etc/network/interfaces\n   ```\n   - This command displays the current network configuration for the Proxmox host. It includes details about interfaces, bridges, and IP addresses.\n\n2. **Edit Network Configuration:**\n   ```bash\n   nano /etc/network/interfaces\n   ```\n   - Use a text editor like `nano` to modify the network configuration. Ensure you have root privileges to make changes.\n\n#### Setting Static IP for a VM or Container\n\n1. **Configure Static IP for a VM:**\n   - Access the VM's configuration file and set the network parameters:\n   ```bash\n   qm set <VM_ID> --net0 model=virtio,bridge=vmbr0,firewall=1,ip=192.168.1.101/24,gw=192.168.1.1\n   ```\n   - Replace `<VM_ID>` with the actual VM ID. This command sets a static IP address, subnet mask, and gateway for the VM.\n\n2. **Configure Static IP for a Container:**\n   - Use the following command to set a static IP for a container:\n   ```bash\n   pct set <CT_ID> -net0 name=eth0,bridge=vmbr0,ip=192.168.1.102/24,gw=192.168.1.1\n   ```\n   - Replace `<CT_ID>` with the container ID. This sets the network interface, bridge, IP address, and gateway.\n\n#### Applying Network Changes\n\n1. **Apply Network Changes:**\n   ```bash\n   systemctl restart networking\n   ```\n   - After editing the network configuration, restart the networking service to apply changes.\n\n2. **Verify Network Configuration:**\n   ```bash\n   ip addr show\n   ```\n   - Use this command to verify that the network settings have been applied correctly.\n\n### Additional Notes\n\n- **Network Bridges:** Proxmox uses Linux bridges to connect VMs and containers to the network. Each bridge acts as a virtual switch.\n- **DHCP Configuration:** If using DHCP, ensure the Proxmox host or network provides a DHCP service.\n- **Firewall Rules:** Ensure that firewall rules allow necessary traffic to and from the VMs or containers.\n\n### Integration into Documentation\n\nThese commands and explanations should be integrated into the Proxmox documentation under a section dedicated to network management. This will provide users with a clear and concise reference for configuring network settings in Proxmox environments.\n\nIf you need further assistance or have specific requirements for the documentation format, please let me know!"
+                }
+            ],
+            "context": {
+                "currentFile": {
+                    "path": "Comserv/root/footer.tt",
+                    "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/footer.tt",
+                    "sources": [
+                        "opened_tab"
+                    ],
+                    "content": "[% PageVersion\t= 'footer.tt,v 0.03 2024/08/31 shanta Exp shanta '\t%]\n[% IF c.session.debug_mode == 1 %]\n <br>[%\tPageVersion %] </br>\n <br><a href=\"/reset_session\">Reset Session</a></br>\n[% END %]\n\n<!-- Live chat implementation -->\n<script type=\"text/javascript\" src=\"/static/js/local-chat.js\"></script>\n\n<!-- Debug information about the current page -->\n[% IF c.session.debug_mode == 1 %]\n<div class=\"debug-footer\">\n    <details>\n        <summary>Debug Information</summary>\n        <ul>\n            <li>Controller: [% c.session.ControllerName || 'Not defined' %]</li>\n            <li>Theme: [% c.session.theme_name || 'Not defined' %]</li>\n            <li>SiteName: [% c.session.SiteName || 'Not defined' %]</li>\n            <li>Username: [% c.session.username || 'Not logged in' %]</li>\n            <li>Session ID: [% c.sessionid || 'Not available' %]</li>\n        </ul>\n    </details>\n</div>\n[% END %]\n"
+                },
+                "codebaseEnabled": true,
+                "ragFiles": [
+                    {
+                        "path": "Comserv/root/Documentation/proxmox.tt",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/proxmox.tt",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/index.tt",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/index.tt",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/DBIx/Class/Manual/DocMap.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/DBIx/Class/Manual/DocMap.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/x86_64-linux-gnu-thread-multi/Moose/Manual/Delta.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/x86_64-linux-gnu-thread-multi/Moose/Manual/Delta.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/x86_64-linux-gnu-thread-multi/Moose/Cookbook/Basics/Genome_OverloadingSubtypesAndCoercion.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/x86_64-linux-gnu-thread-multi/Moose/Cookbook/Basics/Genome_OverloadingSubtypesAndCoercion.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/x86_64-linux-gnu-thread-multi/Moose/Cookbook/Basics/Company_Subtypes.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/x86_64-linux-gnu-thread-multi/Moose/Cookbook/Basics/Company_Subtypes.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/root/pagetop.tt",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/pagetop.tt",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/YAML.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/YAML.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/DBIx/Class/Manual/Features.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/DBIx/Class/Manual/Features.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/Date/Calc.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/Date/Calc.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/x86_64-linux-gnu-thread-multi/Bit/Vector.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/x86_64-linux-gnu-thread-multi/Bit/Vector.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/x86_64-linux-gnu-thread-multi/Bit/Vector/Overload.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/x86_64-linux-gnu-thread-multi/Bit/Vector/Overload.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/x86_64-linux-gnu-thread-multi/Template/Tutorial/Web.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/x86_64-linux-gnu-thread-multi/Template/Tutorial/Web.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/IO/All.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/IO/All.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/x86_64-linux-gnu-thread-multi/Moose/Manual/Unsweetened.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/x86_64-linux-gnu-thread-multi/Moose/Manual/Unsweetened.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/SQL/Statement/Structure.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/SQL/Statement/Structure.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/SQL/Statement/Roadmap.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/SQL/Statement/Roadmap.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/DBIx/Class/Migration/Tutorial.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/DBIx/Class/Migration/Tutorial.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/DBIx/Class/Migration/Script/Help/help.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/DBIx/Class/Migration/Script/Help/help.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/DBIx/Class/Migration/Tutorial/Setup.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/DBIx/Class/Migration/Tutorial/Setup.pod",
+                        "sources": [
+                            "keyword_search"
+                        ]
+                    },
+                    {
+                        "path": "app/controllers/proxmox_controller.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/app/controllers/proxmox_controller.pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/lib/Comserv/Controller/Proxmox.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Proxmox.pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/lib/Comserv/Model/Proxmox.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Proxmox.pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/root/static/js/linux_commands.js",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/static/js/linux_commands.js",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/lib/Comserv/Controller/ProxmoxServers.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/ProxmoxServers.pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/MooX::Options::Manual::Man.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/MooX::Options::Manual::Man.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/DBIx/Class/Migration/FAQ.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/DBIx/Class/Migration/FAQ.pod",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/Template::Manual::VMethods.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/Template::Manual::VMethods.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/lib/Comserv.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv.pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/MooX::Options::Manual::MooXCmd.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/MooX::Options::Manual::MooXCmd.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/Config::General::Extended.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/Config::General::Extended.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/DBIx::Class::Manual::DocMap.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/DBIx::Class::Manual::DocMap.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/MooX::Options.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/MooX::Options.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/lib/Comserv/Util/ProxmoxCredentials.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Util/ProxmoxCredentials.pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::fixture_sets.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::fixture_sets.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/Moose::Manual::Resources.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/Moose::Manual::Resources.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/MooX::Options::Descriptive.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/MooX::Options::Descriptive.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/Moose::Manual::MooseX.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/Moose::Manual::MooseX.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/Template::Manual::Filters.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/Template::Manual::Filters.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::help.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::help.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/Pod::ParseUtils.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/Pod::ParseUtils.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/Module::Install::API.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/Module::Install::API.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/DBIx::Class::Manual::Reading.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/DBIx::Class::Manual::Reading.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/Template::Manual.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/Template::Manual.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/DBIx::Class::Migration::Script::Help.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/DBIx::Class::Migration::Script::Help.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::install_version_storage.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::install_version_storage.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/lib/Comserv/Controller/Admin/NetworkDiagnostics.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Admin/NetworkDiagnostics.pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/DBIx::Class::Migration::FAQ.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/DBIx::Class::Migration::FAQ.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::sandbox_dir.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::sandbox_dir.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/DBIx::Class::Manual::Features.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/DBIx::Class::Manual::Features.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/Test2::Manual::Contributing.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/Test2::Manual::Contributing.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/Test::Base::Filter.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/Test::Base::Filter.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/Module/Install/API.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/Module/Install/API.pod",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/MooX/Options/Manual/Man.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/MooX/Options/Manual/Man.pod",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::to_version.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::to_version.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::password.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::password.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/ExtUtils::Helpers::Unix.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/ExtUtils::Helpers::Unix.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::install.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::install.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/x86_64-linux-gnu-thread-multi/perllocal.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/x86_64-linux-gnu-thread-multi/perllocal.pod",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/lib/Comserv/Controller/IT.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/IT.pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/Moose::Manual::Delegation.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/Moose::Manual::Delegation.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/ExtUtils::Helpers::VMS.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/ExtUtils::Helpers::VMS.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/DBIx/Class/Manual/DocMap.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/DBIx/Class/Manual/DocMap.pod",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/lib/perl5/DBIx/Class/Manual/Features.pod",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/lib/perl5/DBIx/Class/Manual/Features.pod",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv2.iml",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv2.iml",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/DBIx::Class::Manual::FAQ.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/DBIx::Class::Manual::FAQ.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::username.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::username.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::sandbox_class.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::sandbox_class.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/Template::VMethods.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/Template::VMethods.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::dsn.3pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/local/man/man3/DBIx::Class::Migration::Script::Help::dsn.3pm",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/roles/admin/linux_commands.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/roles/admin/linux_commands.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/docs/proxmox_api.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/docs/proxmox_api.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/proxmox_integration.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/proxmox_integration.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/changelog/2024-06-21-linux-commands-documentation.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/changelog/2024-06-21-linux-commands-documentation.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/docs/CHANGELOG.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/docs/CHANGELOG.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/changelog/2024-07-proxmox-controller-fixes.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/changelog/2024-07-proxmox-controller-fixes.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/docs/2024-07-proxmox-authentication-changes.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/docs/2024-07-proxmox-authentication-changes.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/docs/proxmox_authentication_changes.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/docs/proxmox_authentication_changes.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/docs/bug_fixes_documentation.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/docs/bug_fixes_documentation.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/docs/technical_changes.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/docs/technical_changes.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/docs/README.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/docs/README.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/network_diagnostics.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/network_diagnostics.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/changelog/2024-08-proxmox-debug-msg-fix.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/changelog/2024-08-proxmox-debug-msg-fix.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/roles/normal/Documentation_System.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/roles/normal/Documentation_System.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/roles/admin/documentation_system_guide.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/roles/admin/documentation_system_guide.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/Documentation_Workflow.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Documentation_Workflow.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/config/network_map.json",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/config/network_map.json",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: README.md:0:4800",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: README.md:0:4800",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: User.md:0:4800",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: User.md:0:4800",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/proxy_troubleshooting.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/proxy_troubleshooting.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: Documentation_Controller.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: Documentation_Controller.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: admin_guide.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: admin_guide.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: templates.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: templates.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: Site.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: Site.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: user_management.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: user_management.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: Documentation_System.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: Documentation_System.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: HostingSignup.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: HostingSignup.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: mcoop_user_guide.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: mcoop_user_guide.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: ThemeConfig.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: ThemeConfig.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: getting_started.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: getting_started.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: member_resources.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: member_resources.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: model_list.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: model_list.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: documentation_system_guide.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: documentation_system_guide.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: site_guide.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: site_guide.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: Documentation_Management.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: Documentation_Management.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: Documentation.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: Documentation.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: documentation_guide.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: documentation_guide.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: Root.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: Root.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: api_reference.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: api_reference.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: account_management.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: account_management.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: controller_list.md:0:2400",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: controller_list.md:0:2400",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/MailSystem.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/MailSystem.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/roles/admin/Documentation_Management.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/roles/admin/Documentation_Management.md",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: troubleshooting.md:0:800",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: troubleshooting.md:0:800",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: navigation_system.md:0:800",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: navigation_system.md:0:800",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/Formatting title from: customizing_profile.md:0:800",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Formatting title from: customizing_profile.md:0:800",
+                        "sources": []
+                    },
+                    {
+                        "path": "Comserv/cpanfile",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/cpanfile",
+                        "sources": [
+                            "opened_tab"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/lib/Comserv/Model/DBEncy.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/DBEncy.pm",
+                        "sources": [
+                            "opened_tab"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/lib/Comserv/Util/NetworkMap.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Util/NetworkMap.pm",
+                        "sources": [
+                            "opened_tab"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/lib/Comserv/Model/DBForager.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/DBForager.pm",
+                        "sources": [
+                            "opened_tab"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/lib/Comserv/Controller/Admin.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Admin.pm",
+                        "sources": [
+                            "opened_tab"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/lib/Comserv/Controller/Log.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Log.pm",
+                        "sources": [
+                            "opened_tab"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/lib/Comserv/Model/User.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/User.pm",
+                        "sources": [
+                            "opened_tab"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/lib/Comserv/Controller/Ve7tit.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Ve7tit.pm",
+                        "sources": [
+                            "opened_tab"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/lib/Comserv/Controller/Documentation.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Documentation.pm",
+                        "sources": [
+                            "opened_tab"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/changelog/2025-05-12-fix-documentation-controller-logging.md",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/changelog/2025-05-12-fix-documentation-controller-logging.md",
+                        "sources": [
+                            "opened_tab"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/scripts/cleanup_formatting_title_files.sh",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/scripts/cleanup_formatting_title_files.sh",
+                        "sources": [
+                            "opened_tab"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/root/footer.tt",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/footer.tt",
+                        "sources": [
+                            "opened_tab"
+                        ]
+                    },
+                    {
+                        "path": "Comserv/lib/Comserv/Controller/Documentation/ScanMethods.pm",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Documentation/ScanMethods.pm",
+                        "sources": [
+                            "opened_tab"
+                        ]
+                    }
+                ],
+                "rerankedFiles": [
+                    {
+                        "path": "Comserv/docs/proxmox_api.md",
+                        "fsPath": "Comserv/docs/proxmox_api.md"
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/changelog/2024-06-21-linux-commands-documentation.md",
+                        "fsPath": "Comserv/root/Documentation/changelog/2024-06-21-linux-commands-documentation.md"
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/proxmox_integration.md",
+                        "fsPath": "Comserv/root/Documentation/proxmox_integration.md"
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/roles/admin/linux_commands.md",
+                        "fsPath": "Comserv/root/Documentation/roles/admin/linux_commands.md"
+                    }
+                ],
+                "usedFilePaths": [
+                    {
+                        "path": "Comserv/root/footer.tt",
+                        "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/footer.tt",
+                        "sources": [
+                            "opened_tab"
+                        ],
+                        "content": "[% PageVersion\t= 'footer.tt,v 0.03 2024/08/31 shanta Exp shanta '\t%]\n[% IF c.session.debug_mode == 1 %]\n <br>[%\tPageVersion %] </br>\n <br><a href=\"/reset_session\">Reset Session</a></br>\n[% END %]\n\n<!-- Live chat implementation -->\n<script type=\"text/javascript\" src=\"/static/js/local-chat.js\"></script>\n\n<!-- Debug information about the current page -->\n[% IF c.session.debug_mode == 1 %]\n<div class=\"debug-footer\">\n    <details>\n        <summary>Debug Information</summary>\n        <ul>\n            <li>Controller: [% c.session.ControllerName || 'Not defined' %]</li>\n            <li>Theme: [% c.session.theme_name || 'Not defined' %]</li>\n            <li>SiteName: [% c.session.SiteName || 'Not defined' %]</li>\n            <li>Username: [% c.session.username || 'Not logged in' %]</li>\n            <li>Session ID: [% c.sessionid || 'Not available' %]</li>\n        </ul>\n    </details>\n</div>\n[% END %]\n"
+                    },
+                    {
+                        "path": "Comserv/docs/proxmox_api.md",
+                        "fsPath": "Comserv/docs/proxmox_api.md"
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/changelog/2024-06-21-linux-commands-documentation.md",
+                        "fsPath": "Comserv/root/Documentation/changelog/2024-06-21-linux-commands-documentation.md"
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/proxmox_integration.md",
+                        "fsPath": "Comserv/root/Documentation/proxmox_integration.md"
+                    },
+                    {
+                        "path": "Comserv/root/Documentation/roles/admin/linux_commands.md",
+                        "fsPath": "Comserv/root/Documentation/roles/admin/linux_commands.md"
+                    }
+                ]
+            },
+            "createdAt": 1747748943483,
+            "isInternal": false
+        }
+    ],
+    "isAgent": false,
+    "isNameGenerated": true,
+    "isCustomAgent": false,
+    "isUnitTestsAgent": false,
+    "autoApply": false
+}
+}

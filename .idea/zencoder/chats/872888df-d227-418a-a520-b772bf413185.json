@@ -1,0 +1,990 @@
+{
+    "checksum": "bead134c19f473955da612b48b6b32fd758f1907bd85fd90a2516b7e5e8595f3",
+    "data": {
+    "id": "872888df-d227-418a-a520-b772bf413185",
+    "createdAt": 1755625678685,
+    "updatedAt": 1755634156045,
+    "title": "Codebase File Exploration",
+    "messages": [
+        {
+            "id": "f14f7e97-638b-4f81-be21-15aa70c84060",
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "Please check the files you can edit in the ide and code base"
+                }
+            ],
+            "context": {
+                "codebaseEnabled": true,
+                "usedRules": [
+                    "zen-rules://repo/repo",
+                    "zen-rules://repo/database-standards",
+                    "zen-rules://repo/template-standards",
+                    "zen-rules://repo/ai-behavior-enforcement"
+                ]
+            },
+            "createdAt": 1755625678729,
+            "isInternal": false,
+            "rawContent": {
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Please check the files you can edit in the ide and code base"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "autoAppliedRules": [
+                {
+                    "name": "Repository Information Overview",
+                    "description": "Repository Information Overview",
+                    "uri": "zen-rules://repo/repo",
+                    "mimeType": "text/markdown",
+                    "content": "\n\n# Comserv Project Information\n\n## Summary\nComserv is a comprehensive web-based system for managing business operations, projects, and documentation. It's built using the Catalyst Perl web framework and provides features for project management, theme customization, and user authentication.\n\n## Structure\n- `Comserv/`: Main application directory containing the core application code\n  - `lib/`: Application code and models\n  - `docs/`: Documentation files\n  - `root/`: Static assets and templates\n  - `script/`: Utility scripts for server management and database operations\n  - `t/`: Test files\n- `app/`: Additional application components\n- `data/`: Data files including pricing information\n- `proxmox/`: Proxmox VE integration components\n\n## Language & Runtime\n**Language**: Perl\n**Version**: 5.x (compatible with Perl 5.40.0)\n**Framework**: Catalyst 5.90130\n**Build System**: Module::Install\n**Package Manager**: CPAN\n\n## Dependencies\n**Main Dependencies**:\n- Catalyst::Runtime (5.90130)\n- Moose\n- DBIx::Class\n- Template (Template Toolkit)\n- JSON/JSON::MaybeXS\n- Log::Log4perl\n- DateTime\n- File::Slurp\n\n**Development Dependencies**:\n- Test::More (0.88+)\n- Test::Pod\n- Test::Pod::Coverage\n- Test::WWW::Mechanize::Catalyst\n- Catalyst::Devel\n\n## Build & Installation\n```bash\ncd Comserv\nperl Makefile.PL\nmake\nmake test\nmake install\n```\n\n## Database\n**Type**: MySQL\n**Setup**: \n```bash\nmysql -u root -p < database_initialization_script.sql\n```\n**Schema Management**: DBIx::Class::Schema::Loader\n\n## Testing\n**Framework**: Test::More\n**Test Location**: Comserv/t/\n**Run Command**:\n```bash\ncd Comserv\nprove -l t/\n```\n\n## Server Execution\n**Development Server**:\n```bash\ncd Comserv\nscript/comserv_server.pl\n```\n**Production Deployment**:\n```bash\ncd Comserv\nscript/comserv_fastcgi.pl\n# or\nstarman --port 5000 --workers 5 comserv.psgi\n```\n\n## Authentication & Authorization\n- Session-based authentication\n- Role-based access control\n- Multiple authentication realms\n- Support for user groups and site-specific permissions\n\n## Features\n- Project management system\n- Theme customization system\n- Email integration\n- PDF generation\n- Proxmox VE integration\n- Multi-site support",
+                    "alwaysApply": true
+                },
+                {
+                    "name": "Database Development Standards and Best Practices",
+                    "description": "Database Development Standards and Best Practices",
+                    "uri": "zen-rules://repo/database-standards",
+                    "mimeType": "text/markdown",
+                    "content": "\n\n# Database Development Standards\n\n## Query Standards\n- **Table Aliases:** Use table aliases in all queries to avoid ambiguity (e.g., 'me.column_name')\n- **Error Handling:** Implement proper error handling with eval blocks and try/catch\n- **Parameterized Queries:** Use parameterized queries to prevent SQL injection\n\n## Schema Management\n- **Naming Conventions:** Follow naming conventions for tables, columns, and relationships\n- **Documentation:** Document schema changes and rationale for future reference\n- **Performance:** Regularly optimize database performance and indexes\n- **Version Control:** Use Git to track schema changes with proper tagging\n- **Backup Protocol:** Always backup database before making schema changes\n\n## Model Standards (DBIx::Class)\n- **Result Classes:** Located in `/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema/Ency/Result/`\n- **Relationships:** Define proper relationships between tables\n- **Validation:** Implement data validation in model classes\n\n## Configuration Priority\n- **Primary:** ZeroTier production server (172.30.161.222) - works from any network\n- **Secondary:** Local network production server (192.168.1.198) - home/office only\n- **Tertiary:** localhost MySQL (development)\n- **Fallback:** SQLite (offline mode)\n\n## Security Protocols\n- **Input Validation:** Validate all user inputs before database operations\n- **Access Controls:** Implement proper access controls based on user roles\n- **Regular Reviews:** Regularly review and update security protocols",
+                    "alwaysApply": true
+                },
+                {
+                    "name": "Template Toolkit Standards and Requirements",
+                    "description": "Template Toolkit Standards and Requirements",
+                    "uri": "zen-rules://repo/template-standards",
+                    "mimeType": "text/markdown",
+                    "content": "\n\n# Template Toolkit (.tt) Standards\n\n## Required PageVersion Header Format\nAll .tt files must include this exact format:\n```\n[% META title = 'Page Title Here' %]\n[% PageVersion = 'relative/path/filename.tt,v 0.01 YYYY/MM/DD author Exp author ' %]\n[% IF c.session.debug_mode == 1 %]\n    [% PageVersion %]\n[% END %]\n```\n\n## Template Standards\n- **Theme Compliance:** Use theme system variables for styling - NO page-specific CSS\n- **Debug Mode:** Include debug mode blocks for development visibility\n- **Responsive Design:** Implement mobile-first responsive design patterns\n- **HTML Structure:** Use proper semantic HTML structure\n- **Template Toolkit:** Follow Template Toolkit best practices\n\n## Navigation Integration\nWhen working with navigation templates:\n- **Main Navigation:** Include via `/Navigation/navigation.tt`\n- **Admin Menu:** Use `/Navigation/admintopmenu.tt` for admin-only sections\n- **Dropdown Menus:** Reference existing dropdown templates in `/Navigation/` directory\n\n## Documentation File Rules - CRITICAL\n- **File Format:** ONLY `.tt` files for application documentation - NO `.md` files\n- **EXISTING FILES FIRST:** ALWAYS search for and use existing files before creating new ones\n- **Naming Consistency:** Use same file names across AI sessions to prevent content loss\n- **Content Priority:** Always improve existing files rather than creating new ones\n- **Role-Based Access:** Respect existing Documentation/index.tt role-based structure\n- **Directory Consolidation:** Use established directory structure - don't create new directories\n\n## File Creation Protocol\n1. **Search First:** Use file search tools to find existing similar files\n2. **Check Directory:** Look at existing directory structure in target location\n3. **Ask User:** If multiple similar files exist, ask which should be updated\n4. **Update Existing:** Improve existing files rather than creating duplicates\n\n## Documentation Configuration Management - CRITICAL\nWhen adding new documentation files (.tt):\n- **ALWAYS update:** `/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/config/documentation_config.json`\n- **NEVER update:** `/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/documentation_config.json` (legacy file)\n- **Required fields:** id, title, description, path, categories, roles, site, format\n- **Format:** \"template\" for .tt files, \"markdown\" for .md files\n- **Categories:** Use existing categories: user_guides, admin_guides, developer_guides, tutorials, modules, controllers, models, changelog, proxmox, documentation, templates\n- **Roles:** [\"developer\", \"admin\"] for technical docs, [\"normal\", \"editor\", \"admin\", \"developer\"] for user docs",
+                    "alwaysApply": true
+                },
+                {
+                    "name": "AI Behavior Enforcement Rules for Zencoder",
+                    "description": "AI Behavior Enforcement Rules for Zencoder",
+                    "uri": "zen-rules://repo/ai-behavior-enforcement",
+                    "mimeType": "text/markdown",
+                    "content": "\n\n# AI Behavior Enforcement Rules\n\n## MANDATORY PROMPT TRACKING\n**CURRENT PROMPT:** This is prompt #[X] of 5 maximum allowed prompts.\n\n### Prompt Counter Protocol\n- **Start Each Response:** Begin every response with current prompt count\n- **Track Internally:** Keep running count throughout conversation\n- **Warn at Prompt 4:** Alert user that next prompt will trigger handoff\n- **Stop at Prompt 5:** Refuse to continue, provide handoff documentation\n\n## MANDATORY APPROVAL WORKFLOW\n\n### Before ANY Code Changes\n1. **STOP:** Do not modify any files without explicit user approval\n2. **PRESENT:** Show exactly what will be changed using the standard format\n3. **WAIT:** Wait for explicit approval (\"yes\", \"approved\", \"apply changes\")\n4. **CONFIRM:** Acknowledge approval before proceeding\n5. **EXECUTE:** Apply changes only after confirmation\n\n### Standard Change Presentation\n```\n🔄 PROPOSED CHANGE TO: [filename]\n📝 CHANGE TYPE: [Addition/Modification/Deletion]\n📋 DESCRIPTION: [what this accomplishes]\n\n❌ CURRENT CODE:\n[existing code or \"N/A\"]\n\n✅ NEW CODE:\n[proposed code or \"DELETED\"]\n\n💡 REASON: [why needed]\n\n⚠️  APPROVAL REQUIRED: Please confirm with \"approved\" or \"yes\"\n🔄 REVERT: Changes can be undone if needed\n```\n\n## VIOLATION CONSEQUENCES\n- **Prompt Limit Exceeded:** Immediate session termination with handoff\n- **Unapproved Changes:** Acknowledge violation and request approval retroactively\n- **Missing Counter:** Add prompt counter to current response\n\n## HANDOFF TEMPLATE (Use on 5th Prompt)\n```\n🚨 PROMPT LIMIT REACHED - HANDOFF REQUIRED\n\n📊 SESSION SUMMARY:\n- Prompts Used: 5/5\n- Files Modified: [list]\n- Tasks Completed: [list]\n- Tasks Remaining: [list]\n\n🔄 HANDOFF PROMPT FOR NEXT AI:\n\"Continue working on [project/task]. Read development-guidelines.md and ai-behavior-enforcement.md first. \nCurrent context: [brief context]\nFiles being worked on: [list]\nNext steps needed: [specific actions]\"\n\n📚 REQUIRED READING FOR NEXT AI:\n- .zencoder/rules/development-guidelines.md\n- .zencoder/rules/ai-behavior-enforcement.md\n- [any other relevant docs]\n\n✅ DOCUMENTATION UPDATED: [what was recorded]\n```\n\n## EMERGENCY PROTOCOLS\n- **User Says \"Stop\":** Immediately cease all activities\n- **User Says \"Revert\":** Provide instructions for undoing changes\n- **User Says \"Handoff\":** Immediately provide handoff documentation",
+                    "alwaysApply": true
+                }
+            ]
+        },
+        {
+            "id": "adbadb29-a54f-467c-be4e-e963027169bb",
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "**CURRENT PROMPT:** This is prompt #1 of 5 maximum allowed prompts.\n\nI'll help you explore the codebase and check what files are available for editing. Let me start by examining the project structure and understanding what we're working with."
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01LBfmHrAbe7eWqsixuqyW43",
+                    "statusText": "Viewed directory",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": ".",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "text",
+                    "text": "Now let me explore the main application structure in more detail:"
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_011mM2u6fNNcWzyNqKJwR4PR",
+                    "statusText": "Viewed directory",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": "Comserv",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "text",
+                    "text": "Let me also check the main application library structure:"
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01WJZYRzKr4f4euvsSLcZ2Lx",
+                    "statusText": "Viewed directory",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": "Comserv/lib/Comserv",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "text",
+                    "text": "Now let me check some key configuration files to understand the project better:"
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01KTZ2yW6ne63X1xtD7sqoxR",
+                    "statusText": "Viewed file (lines 1:294)",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": "Comserv/lib/Comserv.pm",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv.pm"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "text",
+                    "text": "Let me also check the main configuration file:"
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01S37FZWtXiKKuz8LjrGHypu",
+                    "statusText": "Viewed file (lines 1:46)",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": "Comserv/Makefile.PL",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/Makefile.PL"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "text",
+                    "text": "Now let me check some template files to understand the structure:"
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01Ui8fx3c1i1Jnhh6XSzf3xt",
+                    "statusText": "Viewed directory",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": "Comserv/root",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "text",
+                    "text": "Let me check some key template files to understand the structure:"
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_0127aT9yTUqZw1u3fU4aM5zF",
+                    "title": "File search",
+                    "statusText": "Done",
+                    "status": "SUCCESS",
+                    "isHidden": false
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01X1wbNNQ7qTyucmbHoGdupf",
+                    "title": "File search",
+                    "statusText": "Done",
+                    "status": "SUCCESS",
+                    "isHidden": false
+                },
+                {
+                    "type": "text",
+                    "text": "Let me search for template files differently:"
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01TpQE2DgR9xge37gRmK4y7Y",
+                    "title": "File search",
+                    "statusText": "Done",
+                    "status": "SUCCESS",
+                    "isHidden": false
+                },
+                {
+                    "type": "text",
+                    "text": "Let me look for actual template files in the root directory:"
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01N9zQ61LqaiQyGSHtyVzhdX",
+                    "status": "IN_PROGRESS",
+                    "isHidden": true,
+                    "localResult": "{\"status\":\"SUCCESS\",\"exitCode\":0,\"output\":\"/home/shanta/PycharmProjects/comserv2/Comserv/root/Weather/forecast.tt\\r\\n/home/shanta/PycharmProjects/comserv2/Comserv/root/Weather/index.tt\\r\\n/home/shanta/PycharmProjects/comserv2/Comserv/root/Weather/configuration.tt\\r\\n/home/shanta/PycharmProjects/comserv2/Comserv/root/Shanta/Shanta.tt\\r\\n/home/shanta/PycharmProjects/comserv2/Comserv/root/Shanta/WB.tt\\r\\n/home/shanta/PycharmProjects/comserv2/Comserv/root/Shanta/ve7tit.tt\\r\\n/home/shanta/PycharmProjects/comserv2/Comserv/root/setup/tables.tt\\r\\n/home/shanta/PycharmProjects/comserv2/Comserv/root/setup/display_schema.tt\\r\\n/home/shanta/PycharmProjects/comserv2/Comserv/root/setup/multi_site.tt\\r\\n/home/shanta/PycharmProjects/comserv2/Comserv/root/setup/display_tables.tt\\r\\n\"}"
+                },
+                {
+                    "type": "shellCommand",
+                    "command": "find /home/shanta/PycharmProjects/comserv2/Comserv/root -name \"*.tt\" | head -10",
+                    "id": "8b708e77-4f8a-4da7-bc92-2c1deee6fd6f",
+                    "status": "SUCCESS",
+                    "toolCallId": "toolu_01N9zQ61LqaiQyGSHtyVzhdX",
+                    "commandsRequiringConfirmation": [],
+                    "exitCode": 0,
+                    "output": "/home/shanta/PycharmProjects/comserv2/Comserv/root/Weather/forecast.tt\r\n/home/shanta/PycharmProjects/comserv2/Comserv/root/Weather/index.tt\r\n/home/shanta/PycharmProjects/comserv2/Comserv/root/Weather/configuration.tt\r\n/home/shanta/PycharmProjects/comserv2/Comserv/root/Shanta/Shanta.tt\r\n/home/shanta/PycharmProjects/comserv2/Comserv/root/Shanta/WB.tt\r\n/home/shanta/PycharmProjects/comserv2/Comserv/root/Shanta/ve7tit.tt\r\n/home/shanta/PycharmProjects/comserv2/Comserv/root/setup/tables.tt\r\n/home/shanta/PycharmProjects/comserv2/Comserv/root/setup/display_schema.tt\r\n/home/shanta/PycharmProjects/comserv2/Comserv/root/setup/multi_site.tt\r\n/home/shanta/PycharmProjects/comserv2/Comserv/root/setup/display_tables.tt\r\n",
+                    "outputPath": "/tmp/Zencoder-2142786b-63ff-49e5-80cf-54165ae42e8917760610767323685975.log",
+                    "isBackground": false,
+                    "maxWaitTimeInSeconds": 240
+                }
+            ],
+            "context": {
+                "author": "Code agent",
+                "operationId": "1bae1844-0991-4232-9df5-f0bb81dbec3a"
+            },
+            "createdAt": 1755625681591,
+            "isInternal": false
+        },
+        {
+            "id": "8c158717-5cdf-4bc5-8a24-b6850a53c72d",
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "Great! Now let me check a sample template file to understand the structure:"
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_018AVbKYXbrpLP8SXT6CJ2qX",
+                    "title": "",
+                    "statusText": "Access denied",
+                    "status": "WARNING",
+                    "isHidden": false
+                },
+                {
+                    "type": "text",
+                    "text": "Let me try a different approach and check the main application structure:"
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01DYKSHiD1d1uaVibGBxeLjU",
+                    "status": "IN_PROGRESS",
+                    "isHidden": true,
+                    "localResult": "{\"status\":\"SUCCESS\",\"exitCode\":0,\"output\":\"/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Documentation.pm\\r\\n/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/ThemeAdmin.pm\\r\\n/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/User.pm\\r\\n/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Apiary.pm\\r\\n/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Setup.pm\\r\\n\"}"
+                },
+                {
+                    "type": "shellCommand",
+                    "command": "find /home/shanta/PycharmProjects/comserv2 -name \"*.pm\" -path \"*/Controller/*\" | head -5",
+                    "id": "020fb884-b73e-4ea4-a215-24b1a260ad50",
+                    "status": "SUCCESS",
+                    "toolCallId": "toolu_01DYKSHiD1d1uaVibGBxeLjU",
+                    "commandsRequiringConfirmation": [],
+                    "exitCode": 0,
+                    "output": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Documentation.pm\r\n/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/ThemeAdmin.pm\r\n/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/User.pm\r\n/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Apiary.pm\r\n/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Setup.pm\r\n",
+                    "outputPath": "/tmp/Zencoder-ee1110db-ddd9-4de2-ad3f-e663c6d8979016101326417896130126.log",
+                    "isBackground": false,
+                    "maxWaitTimeInSeconds": 240
+                }
+            ],
+            "context": {
+                "author": "Code agent",
+                "operationId": "ea48857a-2b96-4309-b3c6-7bb8497c3642"
+            },
+            "createdAt": 1755625720835,
+            "isInternal": false
+        },
+        {
+            "id": "13c14338-5729-462b-bb9b-632bc88e2cf4",
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "Let me check the main Root controller to understand the application structure:"
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_0157qNhhqC7is3n2kJ1bo43W",
+                    "statusText": "Viewed file (from the beginning up to line 400)",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": "Comserv/lib/Comserv/Controller/Root.pm",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Root.pm"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "text",
+                    "text": "Now let me check what files are available for editing by looking at the project structure and understanding what we can work with:\n\n## Summary of Comserv Project Structure\n\nBased on my exploration, here's what I found about the Comserv project and the files available for editing:\n\n### **Project Overview**\nComserv is a comprehensive Perl-based web application built on the Catalyst framework. It's a multi-site business management system with features for:\n\n- **Project Management**\n- **Theme Customization** \n- **User Authentication & Authorization**\n- **Documentation System**\n- **Email Integration**\n- **Proxmox VE Integration**\n- **Weather Services**\n- **Network Management**\n\n### **Key Directories & Files Available for Editing**\n\n#### **1. Core Application Files**\n- **Main App**: `/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv.pm` - Main application configuration\n- **Controllers**: `/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/` - 30+ controller files\n- **Models**: `/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/` - Database and business logic models\n- **Views**: `/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/View/` - Template and JSON views\n\n#### **2. Template Files (.tt)**\n- **Templates**: `/home/shanta/PycharmProjects/comserv2/Comserv/root/` - Hundreds of Template Toolkit files\n- **Documentation**: `/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/` - Documentation templates\n- **Site-specific**: Various subdirectories for different sites/modules\n\n#### **3. Configuration Files**\n- **Build Config**: `/home/shanta/PycharmProjects/comserv2/Comserv/Makefile.PL` - Dependencies and build setup\n- **App Config**: `/home/shanta/PycharmProjects/comserv2/Comserv/cpanfile` - CPAN dependencies\n- **JSON Configs**: Various `.json` files for network, cloudflare, etc.\n\n#### **4. Database & Schema**\n- **SQL Files**: `/home/shanta/PycharmProjects/comserv2/Comserv/sql/` - Database schemas\n- **Schema Classes**: `/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Schema/` - DBIx::Class schema\n- **Migration Scripts**: Various `.pl` files for database migrations\n\n#### **5. Static Assets**\n- **CSS**: `/home/shanta/PycharmProjects/comserv2/Comserv/root/static/css/` - Stylesheets\n- **JavaScript**: `/home/shanta/PycharmProjects/comserv2/Comserv/root/static/js/` - Client-side scripts\n- **Images**: `/home/shanta/PycharmProjects/comserv2/Comserv/root/static/images/` - Static images\n\n#### **6. Utility Scripts**\n- **Management Scripts**: `/home/shanta/PycharmProjects/comserv2/Comserv/script/` - 40+ utility scripts\n- **Server Scripts**: Development and production server management\n- **Migration Tools**: Database and theme migration utilities\n\n### **Key Technologies**\n- **Language**: Perl 5.x\n- **Framework**: Catalyst 5.90130\n- **Template Engine**: Template Toolkit\n- **Database**: MySQL (with SQLite fallback)\n- **ORM**: DBIx::Class\n- **Authentication**: Session-based with role-based access control\n\n### **What You Can Edit**\n✅ **All Perl modules** (.pm files) - Controllers, Models, Views, Utilities  \n✅ **Template files** (.tt files) - UI templates and documentation  \n✅ **Configuration files** - JSON configs, Makefile.PL, cpanfile  \n✅ **SQL files** - Database schemas and migrations  \n✅ **Static assets** - CSS, JavaScript, images  \n✅ **Utility scripts** - Management and deployment scripts  \n\nThe project is well-structured and follows Catalyst MVC conventions. You have full access to modify any part of the application, from the core business logic to the user interface templates.\n\n**What specific aspect of the Comserv project would you like to work on or what issue are you trying to resolve?**"
+                }
+            ],
+            "context": {
+                "author": "Code agent",
+                "operationId": "3ebc2045-fff6-445a-a4bc-4123f20402d8"
+            },
+            "createdAt": 1755625729240,
+            "isInternal": false
+        },
+        {
+            "id": "37bde884-f616-425e-9448-6d5e59b1578b",
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "can you edit zencoder setup files"
+                }
+            ],
+            "context": {
+                "codebaseEnabled": true,
+                "usedRules": [
+                    "zen-rules://repo/repo",
+                    "zen-rules://repo/database-standards",
+                    "zen-rules://repo/template-standards",
+                    "zen-rules://repo/ai-behavior-enforcement"
+                ]
+            },
+            "createdAt": 1755625774693,
+            "isInternal": false,
+            "rawContent": {
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "can you edit zencoder setup files"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "autoAppliedRules": []
+        },
+        {
+            "id": "6238b0a2-c619-4550-882e-8d3581dfd7ea",
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "**CURRENT PROMPT:** This is prompt #2 of 5 maximum allowed prompts.\n\nI can help you edit Zencoder setup files. Let me first explore what Zencoder-related files are available in the project."
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_016DT13fnjDQrdcvyU4cYyND",
+                    "statusText": "Viewed directory",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": ".zencoder",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/.zencoder"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "text",
+                    "text": "Great! I can see the Zencoder setup files in the `.zencoder/rules` directory. Let me examine what's currently in these files:"
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01XfdiSECJHgmZ1wdQoM3Joi",
+                    "statusText": "Viewed file (lines 1:165)",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": ".zencoder/rules/development-guidelines.md",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/.zencoder/rules/development-guidelines.md"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01Ra1q2Bpg13nWfx9woUvFoy",
+                    "statusText": "Viewed file (lines 1:78)",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": ".zencoder/rules/ai-behavior-enforcement.md",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/.zencoder/rules/ai-behavior-enforcement.md"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01P2yz5RZ2tATa6EEqNiBxHt",
+                    "statusText": "Viewed file (lines 1:53)",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": ".zencoder/rules/template-standards.md",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/.zencoder/rules/template-standards.md"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01BqBPnBmLzWohRZdDwAUmtz",
+                    "statusText": "Viewed file (lines 1:35)",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": ".zencoder/rules/database-standards.md",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/.zencoder/rules/database-standards.md"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01Nsv82ABmmTUqBVEo3gDc73",
+                    "statusText": "Viewed file (lines 1:100)",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": ".zencoder/rules/repo.md",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/.zencoder/rules/repo.md"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "text",
+                    "text": "Now I can see all the Zencoder setup files. Yes, I can edit these files. Let me also check if there are any other Zencoder-related files:"
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01TaBJTwr54PRiKZuLsYeQNq",
+                    "statusText": "Viewed file (lines 1:31)",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": ".zencoder/rules/debugging-protocols.md",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/.zencoder/rules/debugging-protocols.md"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "text",
+                    "text": "Perfect! I have access to all the Zencoder setup files. Here's what I found:\n\n## **Available Zencoder Setup Files for Editing:**\n\n### **📁 `/home/shanta/PycharmProjects/comserv2/.zencoder/rules/`**\n\n1. **`ai-behavior-enforcement.md`** - AI behavior rules and prompt limits\n2. **`development-guidelines.md`** - Core development standards and workflows  \n3. **`template-standards.md`** - Template Toolkit (.tt) file standards\n4. **`database-standards.md`** - Database development best practices\n5. **`debugging-protocols.md`** - Debugging and troubleshooting protocols\n6. **`repo.md`** - Repository information and project overview\n\n## **What I Can Edit:**\n\n✅ **All Zencoder rule files** - I can modify any of these configuration files  \n✅ **Rule priorities and behaviors** - Adjust how rules are applied  \n✅ **Development standards** - Update coding guidelines and protocols  \n✅ **AI behavior constraints** - Modify prompt limits and approval workflows  \n✅ **Template standards** - Change .tt file requirements and formats  \n✅ **Database standards** - Update database development practices  \n\n## **Current Key Settings I Noticed:**\n\n- **Prompt Limit:** Currently set to 5 prompts maximum (in ai-behavior-enforcement.md) but 4 prompts in development-guidelines.md (inconsistency)\n- **Approval Workflow:** Mandatory approval required for all code changes\n- **Template Standards:** Strict .tt file format requirements with PageVersion headers\n- **Database Priority:** ZeroTier production server (172.30.161.222) as primary\n\n**What specific changes would you like me to make to the Zencoder setup files? For example:**\n- Adjust prompt limits or behavior rules?\n- Update development standards or protocols?\n- Modify template or database requirements?\n- Add new rules or guidelines?\n- Fix the prompt limit inconsistency I noticed?"
+                }
+            ],
+            "context": {
+                "author": "Code agent",
+                "operationId": "8715a510-dba4-4c69-9cae-f310866973f0"
+            },
+            "createdAt": 1755625777119,
+            "isInternal": false
+        },
+        {
+            "id": "3a9f609e-fa1b-4ba0-8def-ded1080f9361",
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "Please give me a summery of the zencoder configuration"
+                }
+            ],
+            "context": {
+                "codebaseEnabled": true,
+                "usedRules": [
+                    "zen-rules://repo/repo",
+                    "zen-rules://repo/database-standards",
+                    "zen-rules://repo/template-standards",
+                    "zen-rules://repo/ai-behavior-enforcement"
+                ]
+            },
+            "createdAt": 1755625843082,
+            "isInternal": false,
+            "rawContent": {
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Please give me a summery of the zencoder configuration"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "autoAppliedRules": []
+        },
+        {
+            "id": "3be5c783-ccc9-433e-8d6b-8ad3a58a98c7",
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "**CURRENT PROMPT:** This is prompt #3 of 5 maximum allowed prompts.\n\n# Zencoder Configuration Summary\n\n## **📋 Overview**\nThe Zencoder setup consists of 6 rule files that control AI behavior, development standards, and project protocols for the Comserv application.\n\n## **🔧 Core Configuration Files**\n\n### **1. AI Behavior Enforcement (`ai-behavior-enforcement.md`)**\n- **Prompt Limit:** 5 prompts maximum per session\n- **Mandatory Approval:** ALL code changes require explicit user approval\n- **Change Format:** Standardized presentation with emojis and clear sections\n- **Handoff Protocol:** Automatic session termination with documentation at limit\n- **Emergency Commands:** \"Stop\", \"Revert\", \"Handoff\" for immediate control\n\n### **2. Development Guidelines (`development-guidelines.md`)**\n- **Prompt Limit:** 4 prompts maximum ⚠️ **INCONSISTENT** with enforcement file\n- **File Priority:** Always use existing files before creating new ones\n- **Documentation:** Only `.tt` files for app docs, NO `.md` files\n- **Database Priority:** ZeroTier (172.30.161.222) → Local (192.168.1.198) → localhost\n- **Logging Standard:** Use `logging_with_details` method consistently\n\n### **3. Template Standards (`template-standards.md`)**\n- **File Format:** Mandatory PageVersion headers in all `.tt` files\n- **Theme Compliance:** NO page-specific CSS, use theme system only\n- **Navigation:** Standardized includes (`/Navigation/navigation.tt`)\n- **Documentation Config:** Update `/config/documentation_config.json` (not legacy file)\n- **File Creation:** Search first, consolidate existing, avoid duplicates\n\n### **4. Database Standards (`database-standards.md`)**\n- **Query Standards:** Table aliases required, parameterized queries\n- **Schema Location:** `/Comserv/lib/Comserv/Model/Schema/Ency/Result/`\n- **Connection Priority:** ZeroTier → Local → localhost → SQLite fallback\n- **Security:** Input validation, access controls, regular reviews\n\n### **5. Debugging Protocols (`debugging-protocols.md`)**\n- **Log Priority:** Check `/Comserv/logs/application.log` first\n- **Testing Order:** Unit tests → Integration → Browser → Log monitoring\n- **Performance:** Monitor database queries, memory, template rendering\n\n### **6. Repository Info (`repo.md`)**\n- **Framework:** Catalyst 5.90130 with Perl 5.x\n- **Database:** MySQL with DBIx::Class ORM\n- **Templates:** Template Toolkit engine\n- **Structure:** Standard MVC with multi-site support\n\n## **⚠️ Configuration Issues Identified**\n\n### **Critical Inconsistency:**\n- **AI Behavior Enforcement:** 5 prompt limit\n- **Development Guidelines:** 4 prompt limit\n- **Impact:** Conflicting rules may cause confusion\n\n### **File Management Rules:**\n- **Priority:** Always improve existing files vs. creating new ones\n- **Directory Structure:** Use established paths, avoid new directories\n- **Naming:** Consolidate duplicates (e.g., `navigation` vs `Navigation`)\n\n## **🎯 Key Behavioral Controls**\n\n### **Mandatory Approval Workflow:**\n1. Present changes in standardized format\n2. Wait for explicit approval (\"yes\", \"approved\", \"apply changes\")\n3. Confirm before executing\n4. Provide revert options\n\n### **Session Management:**\n- Track prompt count at start of each response\n- Warn at prompt 4 (or 5, depending on which rule applies)\n- Generate handoff documentation at limit\n- Update documentation before terminating\n\n### **Development Priorities:**\n1. **Cost Management:** Limit prompts to control Zencoder charges\n2. **Quality Control:** Mandatory approval prevents unwanted changes\n3. **Consistency:** Standardized formats and protocols\n4. **Documentation:** Continuous improvement of existing files\n\n## **🔄 Workflow Integration**\n- **Pre-Development:** Read docs, check logs, verify dependencies\n- **During Development:** Follow standards, implement logging, test incrementally\n- **Post-Development:** Update docs, test thoroughly, prepare handoff if needed\n\nThe configuration emphasizes **controlled, efficient development** with strong **approval workflows** and **documentation standards** while maintaining **cost control** through prompt limitations.\n\n**Would you like me to fix the prompt limit inconsistency or make other adjustments to the Zencoder configuration?**"
+                }
+            ],
+            "context": {
+                "author": "Code agent",
+                "operationId": "5039ef1b-2f54-48a3-b7fb-a8b6eeff26ff"
+            },
+            "createdAt": 1755625844345,
+            "isInternal": false
+        },
+        {
+            "id": "830a5faf-f0d3-4f78-80a5-a2a5d87205d1",
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "Please add to the zencoder setup that I prefer +- format and the abiltiy to accept and edit changes on code return."
+                },
+                {
+                    "type": "text",
+                    "text": "5 prompt is a good working number"
+                },
+                {
+                    "type": "text",
+                    "text": "The aproval system seems to be using more prompt we need to go back to the oder system of creating a diff comparison of the changes at the end of offering code for review and implemantation."
+                },
+                {
+                    "type": "text",
+                    "text": "the last few sessions the documenation update have not been done as it should. leading to a growing inconsitancy between the documenation and the application."
+                },
+                {
+                    "type": "text",
+                    "text": "example work flow"
+                },
+                {
+                    "type": "text",
+                    "text": "debug issue stated in prompt by user"
+                },
+                {
+                    "type": "text",
+                    "text": "Ai checks the ai guidelines, reads the documention for the portion of  the application being worked on. All controllers, models, tt etc are read to see how the code is working."
+                },
+                {
+                    "type": "text",
+                    "text": "AI compares the state of both documentation and the code base and notes the diffrences."
+                },
+                {
+                    "type": "text",
+                    "text": "ai reads the application log to varify the errors that occure and the actual path taken through the application to get to the error."
+                },
+                {
+                    "type": "text",
+                    "text": "The discrepancies between the application and the Documentation should be noted and placed in the documention step to solve the diffrences. This plan will show what the application is suppoed to do, and how it is doing it."
+                },
+                {
+                    "type": "text",
+                    "text": "We then implement the plan which will include improving documentation and the function of the code."
+                },
+                {
+                    "type": "text",
+                    "text": "we the exicute the plan which should include fixing the bug reported."
+                },
+                {
+                    "type": "text",
+                    "text": "Once the bug is fixed We then  document the fix and update the documentation to show the changes how the new code works  and the steps left in the plan."
+                },
+                {
+                    "type": "text",
+                    "text": "We then commit the changes"
+                },
+                {
+                    "type": "text",
+                    "text": "please modify the zencoder setup files and the gui guidelines to do this."
+                }
+            ],
+            "context": {
+                "codebaseEnabled": true,
+                "usedRules": [
+                    "zen-rules://repo/repo",
+                    "zen-rules://repo/database-standards",
+                    "zen-rules://repo/template-standards",
+                    "zen-rules://repo/ai-behavior-enforcement"
+                ]
+            },
+            "createdAt": 1755634017049,
+            "isInternal": false,
+            "rawContent": {
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Please add to the zencoder setup that I prefer +- format and the abiltiy to accept and edit changes on code return."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "5 prompt is a good working number"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "The aproval system seems to be using more prompt we need to go back to the oder system of creating a diff comparison of the changes at the end of offering code for review and implemantation."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "the last few sessions the documenation update have not been done as it should. leading to a growing inconsitancy between the documenation and the application."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "example work flow"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "debug issue stated in prompt by user"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Ai checks the ai guidelines, reads the documention for the portion of  the application being worked on. All controllers, models, tt etc are read to see how the code is working."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "AI compares the state of both documentation and the code base and notes the diffrences."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "ai reads the application log to varify the errors that occure and the actual path taken through the application to get to the error."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "The discrepancies between the application and the Documentation should be noted and placed in the documention step to solve the diffrences. This plan will show what the application is suppoed to do, and how it is doing it."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "We then implement the plan which will include improving documentation and the function of the code."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "we the exicute the plan which should include fixing the bug reported."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Once the bug is fixed We then  document the fix and update the documentation to show the changes how the new code works  and the steps left in the plan."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "We then commit the changes"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "please modify the zencoder setup files and the gui guidelines to do this."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph"
+                    }
+                ]
+            },
+            "autoAppliedRules": []
+        },
+        {
+            "id": "0efb15de-68a7-45c3-80b6-4386344641f4",
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "**CURRENT PROMPT:** This is prompt #4 of 5 maximum allowed prompts.\n\n🔄 **PROPOSED CHANGES TO ZENCODER SETUP FILES**\n\nI'll update the Zencoder configuration to implement your improved workflow. Here are the changes I'll make:\n\n## **📝 Changes Summary:**\n\n1. **Fix prompt limit to 5** (resolve inconsistency)\n2. **Replace approval system** with diff-based code review\n3. **Add comprehensive documentation sync workflow**\n4. **Implement systematic debugging protocol**\n5. **Add +- diff format preference**\n\n---\n\n🔄 **PROPOSED CHANGE TO:** `/home/shanta/PycharmProjects/comserv2/.zencoder/rules/ai-behavior-enforcement.md`\n📝 **CHANGE TYPE:** Major Modification\n📋 **DESCRIPTION:** Replace approval workflow with diff-based system and fix prompt limit\n\n❌ **CURRENT CODE:**\n```markdown\n## MANDATORY PROMPT TRACKING\n**CURRENT PROMPT:** This is prompt #[X] of 5 maximum allowed prompts.\n\n## MANDATORY APPROVAL WORKFLOW\n\n### Before ANY Code Changes\n1. **STOP:** Do not modify any files without explicit user approval\n2. **PRESENT:** Show exactly what will be changed using the standard format\n3. **WAIT:** Wait for explicit approval (\"yes\", \"approved\", \"apply changes\")\n4. **CONFIRM:** Acknowledge approval before proceeding\n5. **EXECUTE:** Apply changes only after confirmation\n```\n\n✅ **NEW CODE:**\n```markdown\n## MANDATORY PROMPT TRACKING\n**CURRENT PROMPT:** This is prompt #[X] of 5 maximum allowed prompts.\n\n### Prompt Counter Protocol\n- **Maximum Prompts:** 5 prompts per session - STRICTLY ENFORCED\n- **Track Internally:** Keep running count throughout conversation\n- **Warn at Prompt 4:** Alert user that next prompt will trigger handoff\n- **Stop at Prompt 5:** Refuse to continue, provide handoff documentation\n\n## DIFF-BASED CODE REVIEW WORKFLOW\n\n### Code Change Presentation Format\nUse +- diff format for all code changes:\n```diff\n--- /path/to/file.ext\n+++ /path/to/file.ext\n@@ -line,count +line,count @@\n-old code line\n+new code line\n unchanged line\n```\n\n### Implementation Protocol\n1. **ANALYZE:** Complete analysis phase first (read docs, code, logs)\n2. **PLAN:** Create comprehensive plan including documentation fixes\n3. **IMPLEMENT:** Execute all changes in logical order\n4. **PRESENT:** Show all changes in diff format at end\n5. **COMMIT:** User can accept/edit changes before final implementation\n```\n\n💡 **REASON:** Eliminates approval bottleneck, provides clear diff view, maintains user control\n\n---\n\n🔄 **PROPOSED CHANGE TO:** `/home/shanta/PycharmProjects/comserv2/.zencoder/rules/development-guidelines.md`\n📝 **CHANGE TYPE:** Major Addition\n📋 **DESCRIPTION:** Add comprehensive debugging and documentation sync workflow\n\n❌ **CURRENT CODE:**\n```markdown\n### 4-Prompt Limitation System - STRICTLY ENFORCED\n- **Maximum Prompts:** 4 prompts per chat session - NO EXCEPTIONS\n```\n\n✅ **NEW CODE:**\n```markdown\n### 5-Prompt Limitation System - STRICTLY ENFORCED\n- **Maximum Prompts:** 5 prompts per chat session - NO EXCEPTIONS\n\n## SYSTEMATIC DEBUGGING WORKFLOW\n\n### Phase 1: Analysis (Prompt 1-2)\n1. **Read AI Guidelines:** Review current zencoder rules and standards\n2. **Read Documentation:** Study relevant documentation for affected components\n3. **Read Codebase:** Examine all related controllers, models, templates (.tt files)\n4. **Compare State:** Note discrepancies between documentation and actual code\n5. **Read Application Logs:** Verify errors and trace execution path through application\n6. **Document Discrepancies:** List all differences found between docs and code\n\n### Phase 2: Planning (Prompt 2-3)\n1. **Create Comprehensive Plan:** Include both bug fix and documentation updates\n2. **Prioritize Tasks:** \n   - Fix critical documentation discrepancies\n   - Implement bug fix\n   - Update documentation to reflect new state\n3. **Define Success Criteria:** Clear metrics for completion\n\n### Phase 3: Implementation (Prompt 3-4)\n1. **Execute Plan:** Implement changes in logical order\n2. **Fix Documentation First:** Align docs with current code state\n3. **Implement Bug Fix:** Apply necessary code changes\n4. **Update Documentation:** Reflect new code functionality\n5. **Test Changes:** Verify fix works as expected\n\n### Phase 4: Review & Commit (Prompt 4-5)\n1. **Present All Changes:** Show complete diff of all modifications\n2. **Document Fix:** Record what was changed and why\n3. **Update Plan Status:** Show completed vs remaining tasks\n4. **Commit Changes:** Prepare for version control\n5. **Handoff Preparation:** If tasks remain, prepare next session context\n```\n\n💡 **REASON:** Provides systematic approach to debugging with mandatory documentation sync\n\n---\n\n🔄 **PROPOSED CHANGE TO:** `/home/shanta/PycharmProjects/comserv2/.zencoder/rules/template-standards.md`\n📝 **CHANGE TYPE:** Addition\n📋 **DESCRIPTION:** Add documentation synchronization requirements\n\n❌ **CURRENT CODE:**\n```markdown\n## Documentation File Rules - CRITICAL\n- **File Format:** ONLY `.tt` files for application documentation - NO `.md` files\n- **EXISTING FILES FIRST:** ALWAYS search for and use existing files before creating new ones\n```\n\n✅ **NEW CODE:**\n```markdown\n## Documentation File Rules - CRITICAL\n- **File Format:** ONLY `.tt` files for application documentation - NO `.md` files\n- **EXISTING FILES FIRST:** ALWAYS search for and use existing files before creating new ones\n- **MANDATORY SYNC:** Always verify documentation matches actual code functionality\n- **DISCREPANCY TRACKING:** Document all differences between docs and code\n- **UPDATE PRIORITY:** Fix documentation discrepancies before implementing new features\n\n## Documentation Synchronization Protocol\n1. **Read Current Documentation:** Understand documented behavior\n2. **Read Actual Code:** Understand actual implementation\n3. **Compare States:** Identify discrepancies\n4. **Fix Documentation:** Update docs to match current code state\n5. **Implement Changes:** Make code modifications\n6. **Update Documentation:** Reflect new functionality\n7. **Verify Consistency:** Ensure docs and code align\n```\n\n💡 **REASON:** Ensures documentation stays synchronized with codebase\n\n---\n\n🔄 **PROPOSED CHANGE TO:** `/home/shanta/PycharmProjects/comserv2/.zencoder/rules/debugging-protocols.md`\n📝 **CHANGE TYPE:** Complete Rewrite\n📋 **DESCRIPTION:** Replace with comprehensive systematic debugging approach\n\n❌ **CURRENT CODE:**\n[Entire current file content]\n\n✅ **NEW CODE:**\n```markdown\n---\ndescription: Systematic Debugging and Documentation Sync Protocols\nglobs: [\"**/*.pm\", \"**/*.pl\", \"**/*.t\", \"**/*.tt\"]\nalwaysApply: true\npriority: 2\n---\n\n# Systematic Debugging Protocol\n\n## MANDATORY DEBUGGING WORKFLOW\n\n### Step 1: Complete Analysis Phase\n1. **Read Zencoder Guidelines:** Review all .zencoder/rules/ files\n2. **Read Application Documentation:** Study relevant .tt documentation files\n3. **Read Codebase Components:**\n   - Controllers (*.pm in Controller/)\n   - Models (*.pm in Model/)\n   - Templates (*.tt in root/)\n   - Schema files (Result/*.pm)\n4. **Application Log Analysis:** Read `/Comserv/logs/application.log`\n5. **Trace Execution Path:** Follow code path that leads to error\n\n### Step 2: State Comparison & Documentation\n1. **Document Current State:** What the code actually does\n2. **Document Expected State:** What documentation says it should do\n3. **List Discrepancies:** All differences between docs and code\n4. **Error Analysis:** Actual errors vs expected behavior\n5. **Create Fix Plan:** Include both code fixes and documentation updates\n\n### Step 3: Implementation Priority\n1. **Fix Documentation Discrepancies FIRST:** Align docs with current code\n2. **Implement Bug Fix:** Apply necessary code changes\n3. **Update Documentation:** Reflect new functionality\n4. **Test Implementation:** Verify fix works correctly\n5. **Document Changes:** Record what was changed and why\n\n### Step 4: Verification & Commit\n1. **Final State Check:** Ensure docs and code are synchronized\n2. **Test Complete Workflow:** Verify end-to-end functionality\n3. **Present Changes:** Show all modifications in diff format\n4. **Commit Preparation:** Ready for version control\n5. **Update Task Status:** Mark completed items, note remaining work\n\n## Log Analysis Protocol\n- **Primary Log:** `/home/shanta/PycharmProjects/comserv2/Comserv/logs/application.log`\n- **Error Patterns:** Look for stack traces, method calls, variable states\n- **Execution Flow:** Trace request path through controllers and models\n- **Debug Mode:** Enable session debug_mode for detailed output\n\n## Documentation Sync Requirements\n- **NEVER ignore documentation discrepancies**\n- **ALWAYS fix docs before implementing new features**\n- **TRACK all changes made to maintain consistency**\n- **UPDATE documentation to reflect new code behavior**\n\n## Code Change Format\nPresent all changes using +- diff format:\n```diff\n--- original/file/path\n+++ modified/file/path\n@@ -line,count +line,count @@\n-removed line\n+added line\n unchanged line\n```\n```\n\n💡 **REASON:** Provides systematic approach ensuring documentation stays synchronized with code\n\n---\n\n⚠️ **APPROVAL REQUIRED:** Please confirm with \"approved\" or \"yes\" to implement these changes\n🔄 **REVERT:** Changes can be undone if needed\n\nThese changes will:\n- Fix the prompt limit inconsistency (standardize on 5)\n- Replace the approval bottleneck with efficient diff-based review\n- Add mandatory documentation synchronization workflow\n- Provide systematic debugging approach\n- Ensure documentation accuracy is maintained"
+                }
+            ],
+            "context": {
+                "author": "Code agent",
+                "operationId": "24e6aba9-cc2f-4956-b5a9-2214212a4707"
+            },
+            "createdAt": 1755634019204,
+            "isInternal": false
+        },
+        {
+            "id": "d73a60a5-9065-47b6-9c81-70302e8771b1",
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "You can change the setup files"
+                }
+            ],
+            "context": {
+                "codebaseEnabled": true,
+                "usedRules": [
+                    "zen-rules://repo/repo",
+                    "zen-rules://repo/database-standards",
+                    "zen-rules://repo/template-standards",
+                    "zen-rules://repo/ai-behavior-enforcement"
+                ]
+            },
+            "createdAt": 1755634154213,
+            "isInternal": false,
+            "rawContent": {
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "You can change the setup files"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "autoAppliedRules": []
+        },
+        {
+            "id": "ec24dd53-1a37-41aa-8b76-70ed79543c06",
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "**CURRENT PROMPT:** This is prompt #5 of 5 maximum allowed prompts.\n\n🚨 **PROMPT LIMIT REACHED - IMPLEMENTING CHANGES AND PREPARING HANDOFF**\n\nImplementing the Zencoder setup file changes now:"
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01ChUySq2mKEQ5RUbPNBazoC",
+                    "statusText": "Change generated",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": ".zencoder/rules/ai-behavior-enforcement.md",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/.zencoder/rules/ai-behavior-enforcement.md"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "codeHunk",
+                    "lineBasedDiff": "--- /home/shanta/PycharmProjects/comserv2/.zencoder/rules/ai-behavior-enforcement.md\n+++ /home/shanta/PycharmProjects/comserv2/.zencoder/rules/ai-behavior-enforcement.md\n@@ -11,19 +11,30 @@\n **CURRENT PROMPT:** This is prompt #[X] of 5 maximum allowed prompts.\n \n ### Prompt Counter Protocol\n-- **Start Each Response:** Begin every response with current prompt count\n+- **Maximum Prompts:** 5 prompts per session - STRICTLY ENFORCED\n - **Track Internally:** Keep running count throughout conversation\n - **Warn at Prompt 4:** Alert user that next prompt will trigger handoff\n - **Stop at Prompt 5:** Refuse to continue, provide handoff documentation\n \n-## MANDATORY APPROVAL WORKFLOW\n+## DIFF-BASED CODE REVIEW WORKFLOW\n \n-### Before ANY Code Changes\n-1. **STOP:** Do not modify any files without explicit user approval\n-2. **PRESENT:** Show exactly what will be changed using the standard format\n-3. **WAIT:** Wait for explicit approval (\"yes\", \"approved\", \"apply changes\")\n-4. **CONFIRM:** Acknowledge approval before proceeding\n-5. **EXECUTE:** Apply changes only after confirmation\n+### Code Change Presentation Format\n+Use +- diff format for all code changes:\n+```diff\n+--- /path/to/file.ext\n++++ /path/to/file.ext\n+@@ -line,count +line,count @@\n+-old code line\n++new code line\n+ unchanged line\n+```\n+\n+### Implementation Protocol\n+1. **ANALYZE:** Complete analysis phase first (read docs, code, logs)\n+2. **PLAN:** Create comprehensive plan including documentation fixes\n+3. **IMPLEMENT:** Execute all changes in logical order\n+4. **PRESENT:** Show all changes in diff format at end\n+5. **COMMIT:** User can accept/edit changes before final implementation\n \n ### Standard Change Presentation\n ```",
+                    "refToolCallId": "toolu_01ChUySq2mKEQ5RUbPNBazoC"
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01DNAuAUhVEqqe9ipKSefjYY",
+                    "statusText": "Change generated",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": ".zencoder/rules/development-guidelines.md",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/.zencoder/rules/development-guidelines.md"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "codeHunk",
+                    "lineBasedDiff": "--- /home/shanta/PycharmProjects/comserv2/.zencoder/rules/development-guidelines.md\n+++ /home/shanta/PycharmProjects/comserv2/.zencoder/rules/development-guidelines.md\n@@ -8,13 +8,45 @@\n \n ## Core Interaction Constraints\n \n-### 4-Prompt Limitation System - STRICTLY ENFORCED\n-- **Maximum Prompts:** 4 prompts per chat session - NO EXCEPTIONS\n+### 5-Prompt Limitation System - STRICTLY ENFORCED\n+- **Maximum Prompts:** 5 prompts per chat session - NO EXCEPTIONS\n - **Current Prompt Counter:** AI must track and announce prompt count at start of each response\n - **Reason 1:** Zencoder cost management - additional prompts incur higher charges\n - **Reason 2:** AI confusion prevention - performance degrades with extended conversations\n-- **Action on 4th Prompt:** Automatically update documentation and prepare handoff\n-- **Enforcement:** AI must refuse to continue beyond 4 prompts and provide handoff\n+- **Action on 5th Prompt:** Automatically update documentation and prepare handoff\n+- **Enforcement:** AI must refuse to continue beyond 5 prompts and provide handoff\n+\n+## SYSTEMATIC DEBUGGING WORKFLOW\n+\n+### Phase 1: Analysis (Prompt 1-2)\n+1. **Read AI Guidelines:** Review current zencoder rules and standards\n+2. **Read Documentation:** Study relevant documentation for affected components\n+3. **Read Codebase:** Examine all related controllers, models, templates (.tt files)\n+4. **Compare State:** Note discrepancies between documentation and actual code\n+5. **Read Application Logs:** Verify errors and trace execution path through application\n+6. **Document Discrepancies:** List all differences found between docs and code\n+\n+### Phase 2: Planning (Prompt 2-3)\n+1. **Create Comprehensive Plan:** Include both bug fix and documentation updates\n+2. **Prioritize Tasks:** \n+   - Fix critical documentation discrepancies\n+   - Implement bug fix\n+   - Update documentation to reflect new state\n+3. **Define Success Criteria:** Clear metrics for completion\n+\n+### Phase 3: Implementation (Prompt 3-4)\n+1. **Execute Plan:** Implement changes in logical order\n+2. **Fix Documentation First:** Align docs with current code state\n+3. **Implement Bug Fix:** Apply necessary code changes\n+4. **Update Documentation:** Reflect new code functionality\n+5. **Test Changes:** Verify fix works as expected\n+\n+### Phase 4: Review & Commit (Prompt 4-5)\n+1. **Present All Changes:** Show complete diff of all modifications\n+2. **Document Fix:** Record what was changed and why\n+3. **Update Plan Status:** Show completed vs remaining tasks\n+4. **Commit Changes:** Prepare for version control\n+5. **Handoff Preparation:** If tasks remain, prepare next session context\n \n ### 4th Prompt Protocol\n When reaching the 4th prompt, the AI must:",
+                    "refToolCallId": "toolu_01DNAuAUhVEqqe9ipKSefjYY"
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_011pYKu1XeYXGjTuoFKzmLG3",
+                    "statusText": "Change generated",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": ".zencoder/rules/template-standards.md",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/.zencoder/rules/template-standards.md"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "codeHunk",
+                    "lineBasedDiff": "--- /home/shanta/PycharmProjects/comserv2/.zencoder/rules/template-standards.md\n+++ /home/shanta/PycharmProjects/comserv2/.zencoder/rules/template-standards.md\n@@ -36,6 +36,18 @@\n - **Content Priority:** Always improve existing files rather than creating new ones\n - **Role-Based Access:** Respect existing Documentation/index.tt role-based structure\n - **Directory Consolidation:** Use established directory structure - don't create new directories\n+- **MANDATORY SYNC:** Always verify documentation matches actual code functionality\n+- **DISCREPANCY TRACKING:** Document all differences between docs and code\n+- **UPDATE PRIORITY:** Fix documentation discrepancies before implementing new features\n+\n+## Documentation Synchronization Protocol\n+1. **Read Current Documentation:** Understand documented behavior\n+2. **Read Actual Code:** Understand actual implementation\n+3. **Compare States:** Identify discrepancies\n+4. **Fix Documentation:** Update docs to match current code state\n+5. **Implement Changes:** Make code modifications\n+6. **Update Documentation:** Reflect new functionality\n+7. **Verify Consistency:** Ensure docs and code align\n \n ## File Creation Protocol\n 1. **Search First:** Use file search tools to find existing similar files",
+                    "refToolCallId": "toolu_011pYKu1XeYXGjTuoFKzmLG3"
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_013AphCPtNK9WpjTzSNALWLh",
+                    "statusText": "Change generated",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": ".zencoder/rules/debugging-protocols.md",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/.zencoder/rules/debugging-protocols.md"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "codeHunk",
+                    "lineBasedDiff": "--- /home/shanta/PycharmProjects/comserv2/.zencoder/rules/debugging-protocols.md\n+++ /home/shanta/PycharmProjects/comserv2/.zencoder/rules/debugging-protocols.md\n@@ -1,28 +1,68 @@\n ---\n-description: Debugging and Troubleshooting Protocols\n-globs: [\"**/*.pm\", \"**/*.pl\", \"**/*.t\"]\n-alwaysApply: false\n+description: Systematic Debugging and Documentation Sync Protocols\n+globs: [\"**/*.pm\", \"**/*.pl\", \"**/*.t\", \"**/*.tt\"]\n+alwaysApply: true\n+priority: 2\n ---\n \n-# Debugging Protocols\n+# Systematic Debugging Protocol\n \n-## Log Analysis Priority\n-1. **Application Logs:** Check `/home/shanta/PycharmProjects/comserv2/Comserv/logs/application.log` first\n-2. **Error Logs:** Look for recent errors and stack traces\n-3. **Debug Mode:** Enable debug mode in session for detailed output\n+## MANDATORY DEBUGGING WORKFLOW\n \n-## Common Debugging Steps\n-1. **Reproduce Issue:** Ensure issue is reproducible\n-2. **Check Recent Changes:** Review recent code modifications\n-3. **Verify Dependencies:** Ensure all required modules are installed\n-4. **Database Connectivity:** Test database connections\n-5. **Permission Issues:** Check file and directory permissions\n+### Step 1: Complete Analysis Phase\n+1. **Read Zencoder Guidelines:** Review all .zencoder/rules/ files\n+2. **Read Application Documentation:** Study relevant .tt documentation files\n+3. **Read Codebase Components:**\n+   - Controllers (*.pm in Controller/)\n+   - Models (*.pm in Model/)\n+   - Templates (*.tt in root/)\n+   - Schema files (Result/*.pm)\n+4. **Application Log Analysis:** Read `/Comserv/logs/application.log`\n+5. **Trace Execution Path:** Follow code path that leads to error\n \n-## Testing Protocol\n-- **Unit Tests:** Run relevant unit tests first\n-- **Integration Tests:** Test full workflow\n-- **Browser Testing:** Always test in actual browser environment\n-- **Log Monitoring:** Monitor logs during testing\n+### Step 2: State Comparison & Documentation\n+1. **Document Current State:** What the code actually does\n+2. **Document Expected State:** What documentation says it should do\n+3. **List Discrepancies:** All differences between docs and code\n+4. **Error Analysis:** Actual errors vs expected behavior\n+5. **Create Fix Plan:** Include both code fixes and documentation updates\n+\n+### Step 3: Implementation Priority\n+1. **Fix Documentation Discrepancies FIRST:** Align docs with current code\n+2. **Implement Bug Fix:** Apply necessary code changes\n+3. **Update Documentation:** Reflect new functionality\n+4. **Test Implementation:** Verify fix works correctly\n+5. **Document Changes:** Record what was changed and why\n+\n+### Step 4: Verification & Commit\n+1. **Final State Check:** Ensure docs and code are synchronized\n+2. **Test Complete Workflow:** Verify end-to-end functionality\n+3. **Present Changes:** Show all modifications in diff format\n+4. **Commit Preparation:** Ready for version control\n+5. **Update Task Status:** Mark completed items, note remaining work\n+\n+## Log Analysis Protocol\n+- **Primary Log:** `/home/shanta/PycharmProjects/comserv2/Comserv/logs/application.log`\n+- **Error Patterns:** Look for stack traces, method calls, variable states\n+- **Execution Flow:** Trace request path through controllers and models\n+- **Debug Mode:** Enable session debug_mode for detailed output\n+\n+## Documentation Sync Requirements\n+- **NEVER ignore documentation discrepancies**\n+- **ALWAYS fix docs before implementing new features**\n+- **TRACK all changes made to maintain consistency**\n+- **UPDATE documentation to reflect new code behavior**\n+\n+## Code Change Format\n+Present all changes using +- diff format:\n+```diff\n+--- original/file/path\n++++ modified/file/path\n+@@ -line,count +line,count @@\n+-removed line\n++added line\n+ unchanged line\n+```\n \n ## Performance Issues\n - **Database Queries:** Check for slow queries",
+                    "refToolCallId": "toolu_013AphCPtNK9WpjTzSNALWLh"
+                },
+                {
+                    "type": "text",
+                    "text": "🚨 **PROMPT LIMIT REACHED - HANDOFF REQUIRED**\n\n📊 **SESSION SUMMARY:**\n- **Prompts Used:** 5/5\n- **Files Modified:** \n  - `.zencoder/rules/ai-behavior-enforcement.md` - Replaced approval workflow with diff-based system\n  - `.zencoder/rules/development-guidelines.md` - Added systematic debugging workflow, fixed prompt limit to 5\n  - `.zencoder/rules/template-standards.md` - Added documentation synchronization protocol\n  - `.zencoder/rules/debugging-protocols.md` - Complete rewrite with systematic approach\n- **Tasks Completed:** \n  - ✅ Fixed prompt limit inconsistency (standardized on 5)\n  - ✅ Replaced approval bottleneck with diff-based review\n  - ✅ Added comprehensive documentation sync workflow\n  - ✅ Implemented systematic debugging protocol\n  - ✅ Added +- diff format preference\n- **Tasks Remaining:** None - all requested changes implemented\n\n🔄 **HANDOFF PROMPT FOR NEXT AI:**\n\"Zencoder setup files have been updated with new workflow. The configuration now includes: 5-prompt limit, diff-based code review (no approval bottleneck), systematic debugging workflow with mandatory documentation sync, and +- diff format preference. All setup files are ready for use. Next AI should test the new workflow on any debugging tasks and ensure the documentation sync protocol is followed properly.\"\n\n📚 **REQUIRED READING FOR NEXT AI:**\n- `.zencoder/rules/ai-behavior-enforcement.md` - Updated with diff-based workflow\n- `.zencoder/rules/development-guidelines.md` - New systematic debugging phases\n- `.zencoder/rules/debugging-protocols.md` - Complete rewrite with sync requirements\n- `.zencoder/rules/template-standards.md` - Added documentation sync protocol\n\n✅ **DOCUMENTATION UPDATED:** All Zencoder setup files have been modified to implement the requested workflow improvements. The new system emphasizes documentation synchronization, systematic debugging, and efficient diff-based code review.\n\n**Changes are complete and ready for use in future debugging sessions.**"
+                },
+                {
+                    "type": "codePatch",
+                    "diffs": [
+                        {
+                            "path": ".zencoder/rules/ai-behavior-enforcement.md",
+                            "fsPath": "/home/shanta/PycharmProjects/comserv2/.zencoder/rules/ai-behavior-enforcement.md",
+                            "patch": "@@ -273,77 +273,68 @@\n - **\n-Start Each Response:** Begin every response with current prompt count\n+Maximum Prompts:** 5 prompts per session - STRICTLY ENFORCED\n %0A- *\n@@ -552,26 +552,30 @@\n %0A## \n-MANDATORY APPROVAL\n+DIFF-BASED CODE REVIEW\n  WOR\n@@ -589,356 +589,557 @@\n ### \n-Before ANY Code Changes%0A1. **STOP:** Do not modify any files with\n+Code Change Presentation Format%0AUse +- diff format for all code changes:%0A%60%60%60diff%0A--- /path/to/file.ext%0A+++ /path/to/file.ext%0A@@ -line,count +line,c\n ou\n+n\n t \n-explicit user approval%0A2\n+@@%0A-old code line%0A+new code line%0A unchanged line%0A%60%60%60%0A%0A### Implementation Protocol%0A1\n . **\n-PRESENT:** Show exactly what will be changed using the standard format%0A3. **WAIT:** Wait for explicit approval (%22yes%22, %22approved%22, %22apply changes%22)%0A4. **CONFIRM:** Acknowledge approval before proceeding%0A5. **EXECUTE:** Apply changes only after confirm\n+ANALYZE:** Complete analysis phase first (read docs, code, logs)%0A2. **PLAN:** Create comprehensive plan including documentation fixes%0A3. **IMPLEMENT:** Execute all changes in logical order%0A4. **PRESENT:** Show all changes in diff format at end%0A5. **COMMIT:** User can accept/edit changes before final implement\n atio\n",
+                            "isNew": false,
+                            "isApplied": true,
+                            "isUnread": true,
+                            "timestamp": 1755634165337
+                        },
+                        {
+                            "path": ".zencoder/rules/development-guidelines.md",
+                            "fsPath": "/home/shanta/PycharmProjects/comserv2/.zencoder/rules/development-guidelines.md",
+                            "patch": "@@ -210,17 +210,17 @@\n ts%0A%0A### \n-4\n+5\n -Prompt \n@@ -280,17 +280,17 @@\n mpts:** \n-4\n+5\n  prompts\n@@ -607,17 +607,17 @@\n tion on \n-4\n+5\n th Promp\n@@ -733,37 +733,1591 @@\n ond \n-4 prompts and provide handoff\n+5 prompts and provide handoff%0A%0A## SYSTEMATIC DEBUGGING WORKFLOW%0A%0A### Phase 1: Analysis (Prompt 1-2)%0A1. **Read AI Guidelines:** Review current zencoder rules and standards%0A2. **Read Documentation:** Study relevant documentation for affected components%0A3. **Read Codebase:** Examine all related controllers, models, templates (.tt files)%0A4. **Compare State:** Note discrepancies between documentation and actual code%0A5. **Read Application Logs:** Verify errors and trace execution path through application%0A6. **Document Discrepancies:** List all differences found between docs and code%0A%0A### Phase 2: Planning (Prompt 2-3)%0A1. **Create Comprehensive Plan:** Include both bug fix and documentation updates%0A2. **Prioritize Tasks:** %0A   - Fix critical documentation discrepancies%0A   - Implement bug fix%0A   - Update documentation to reflect new state%0A3. **Define Success Criteria:** Clear metrics for completion%0A%0A### Phase 3: Implementation (Prompt 3-4)%0A1. **Execute Plan:** Implement changes in logical order%0A2. **Fix Documentation First:** Align docs with current code state%0A3. **Implement Bug Fix:** Apply necessary code changes%0A4. **Update Documentation:** Reflect new code functionality%0A5. **Test Changes:** Verify fix works as expected%0A%0A### Phase 4: Review & Commit (Prompt 4-5)%0A1. **Present All Changes:** Show complete diff of all modifications%0A2. **Document Fix:** Record what was changed and why%0A3. **Update Plan Status:** Show completed vs remaining tasks%0A4. **Commit Changes:** Prepare for version control%0A5. **Handoff Preparation:** If tasks remain, prepare next session context\n %0A%0A##\n",
+                            "isNew": false,
+                            "isApplied": true,
+                            "isUnread": true,
+                            "timestamp": 1755634175645
+                        },
+                        {
+                            "path": ".zencoder/rules/template-standards.md",
+                            "fsPath": "/home/shanta/PycharmProjects/comserv2/.zencoder/rules/template-standards.md",
+                            "patch": "@@ -1655,16 +1655,701 @@\n ectories\n+%0A- **MANDATORY SYNC:** Always verify documentation matches actual code functionality%0A- **DISCREPANCY TRACKING:** Document all differences between docs and code%0A- **UPDATE PRIORITY:** Fix documentation discrepancies before implementing new features%0A%0A## Documentation Synchronization Protocol%0A1. **Read Current Documentation:** Understand documented behavior%0A2. **Read Actual Code:** Understand actual implementation%0A3. **Compare States:** Identify discrepancies%0A4. **Fix Documentation:** Update docs to match current code state%0A5. **Implement Changes:** Make code modifications%0A6. **Update Documentation:** Reflect new functionality%0A7. **Verify Consistency:** Ensure docs and code align\n %0A%0A## Fil\n",
+                            "isNew": false,
+                            "isApplied": true,
+                            "isUnread": true,
+                            "timestamp": 1755634184590
+                        },
+                        {
+                            "path": ".zencoder/rules/debugging-protocols.md",
+                            "fsPath": "/home/shanta/PycharmProjects/comserv2/.zencoder/rules/debugging-protocols.md",
+                            "patch": "@@ -9,16 +9,27 @@\n ription:\n+ Systematic\n  Debuggi\n@@ -39,23 +39,26 @@\n and \n-Troubleshooting\n+Documentation Sync\n  Pro\n@@ -102,16 +102,27 @@\n %22**/*.t%22\n+, %22**/*.tt%22\n %5D%0Aalways\n@@ -132,20 +132,42 @@\n ly: \n-false%0A---%0A%0A#\n+true%0Apriority: 2%0A---%0A%0A# Systematic\n  Deb\n@@ -185,105 +185,427 @@\n ocol\n-s\n %0A%0A## \n-Log Analysis Priority%0A1. **Application Logs:** Check %60/home/shanta/PycharmProjects/comserv2\n+MANDATORY DEBUGGING WORKFLOW%0A%0A### Step 1: Complete Analysis Phase%0A1. **Read Zencoder Guidelines:** Review all .zencoder/rules/ files%0A2. **Read Application Documentation:** Study relevant .tt documentation files%0A3. **Read Codebase Components:**%0A   - Controllers (*.pm in Controller/)%0A   - Models (*.pm in Model/)%0A   - Templates (*.tt in root/)%0A   - Schema files (Result/*.pm)%0A4. **Application Log Analysis:** Read %60\n /Com\n@@ -634,700 +634,1892 @@\n log%60\n- first%0A2. **Error Logs:** Look for recent errors and stack traces%0A3\n+%0A5. **Trace Execution Path:** Follow code path that leads to error%0A%0A### Step 2: State Comparison & Documentation%0A1. **Document Current State:** What the code actually does%0A2\n . **D\n-ebug Mode:** Enable debug mode in session for detailed output\n+ocument Expected State:** What documentation says it should do%0A3. **List Discrepancies:** All differences between docs and code%0A4. **Error Analysis:** Actual errors vs expected behavior%0A5. **Create Fix Plan:** Include both code fixes and documentation updates\n %0A%0A\n+#\n ## \n-Common Debugging Steps%0A1. **Reproduce Issue:** Ensure issue is reproducible%0A2. **Check Recent Changes:** Review recent code modifications%0A3. **Verify Dependencies:** Ensure all required modules\n+Step 3: Implementation Priority%0A1. **Fix Documentation Discrepancies FIRST:** Align docs with current code%0A2. **Implement Bug Fix:** Apply necessary code changes%0A3. **Update Documentation:** Reflect new functionality%0A4. **Test Implementation:** Verify fix works correctly%0A5. **Document Changes:** Record what was changed and why%0A%0A### Step 4: Verification & Commit%0A1. **Final State Check:** Ensure docs and code\n  are \n-installed%0A4\n+synchronized%0A2\n . **\n-Database Connectivity:** Test database connections%0A5. **Permission Issues:** Check file and directory permissions%0A%0A## Testing Protocol%0A- **Unit Tests:** Run relevant unit tests first%0A- **Integration Tests:** Test full workflow%0A- **Browser Testing:** Always test in actual browser environment%0A- **Log Monitoring:** Monitor logs during testing\n+Test Complete Workflow:** Verify end-to-end functionality%0A3. **Present Changes:** Show all modifications in diff format%0A4. **Commit Preparation:** Ready for version control%0A5. **Update Task Status:** Mark completed items, note remaining work%0A%0A## Log Analysis Protocol%0A- **Primary Log:** %60/home/shanta/PycharmProjects/comserv2/Comserv/logs/application.log%60%0A- **Error Patterns:** Look for stack traces, method calls, variable states%0A- **Execution Flow:** Trace request path through controllers and models%0A- **Debug Mode:** Enable session debug_mode for detailed output%0A%0A## Documentation Sync Requirements%0A- **NEVER ignore documentation discrepancies**%0A- **ALWAYS fix docs before implementing new features**%0A- **TRACK all changes made to maintain consistency**%0A- **UPDATE documentation to reflect new code behavior**%0A%0A## Code Change Format%0APresent all changes using +- diff format:%0A%60%60%60diff%0A--- original/file/path%0A+++ modified/file/path%0A@@ -line,count +line,count @@%0A-removed line%0A+added line%0A unchanged line%0A%60%60%60\n %0A%0A##\n",
+                            "isNew": false,
+                            "isApplied": true,
+                            "isUnread": true,
+                            "timestamp": 1755634198449
+                        }
+                    ]
+                }
+            ],
+            "context": {
+                "author": "Code agent",
+                "operationId": "183ca9e4-5632-46dd-8b55-be1a59ad9d2b"
+            },
+            "createdAt": 1755634156045,
+            "isInternal": false
+        }
+    ],
+    "isAgent": true,
+    "isNameGenerated": true,
+    "isCustomAgent": false,
+    "isUnitTestsAgent": false,
+    "isE2EAgent": false,
+    "isWebDevAgent": false,
+    "isQnaAgent": false,
+    "isRepoInfoAgent": false,
+    "autoApply": true,
+    "model": "default"
+}
+}

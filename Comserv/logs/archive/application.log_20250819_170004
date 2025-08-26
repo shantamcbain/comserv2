@@ -1,0 +1,872 @@
+Deleted old log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/archive/application.log_20250715_082340
+INFO: Processing file: root/Documentation/changelog/2025-05-26-changelog-system.tt, key: 2025-05-26-changelog-system, path: Documentation/changelog/2025-05-26-changelog-system.tt
+INFO: Processing file: root/Documentation/changelog/2025-04-pagetop-template-error-fix.tt.bak, key: 2025-04-pagetop-template-error-fix, path: Documentation/changelog/2025-04-pagetop-template-error-fix.tt.bak
+INFO: Processing file: root/Documentation/changelog/2025-09-15-sudo-password-configuration.tt, key: 2025-09-15-sudo-password-configuration, path: Documentation/changelog/2025-09-15-sudo-password-configuration.tt
+INFO: Processing file: root/Documentation/changelog/2025-05-25-git-pull-debug-msg-fix.tt, key: 2025-05-25-git-pull-debug-msg-fix, path: Documentation/changelog/2025-05-25-git-pull-debug-msg-fix.tt
+INFO: Processing file: root/Documentation/changelog/2025-01-27-fix-debug-display-enhance-data-type-normalization.tt, key: 2025-01-27-fix-debug-display-enhance-data-type-normalization, path: Documentation/changelog/2025-01-27-fix-debug-display-enhance-data-type-normalization.tt
+INFO: Processing file: root/Documentation/changelog/2024-06-15-login-redirect-fix.tt, key: 2024-06-15-login-redirect-fix, path: Documentation/changelog/2024-06-15-login-redirect-fix.tt
+INFO: Processing file: root/Documentation/changelog/2025-04-18-helpdesk-controller-implementation.tt, key: 2025-04-18-helpdesk-controller-implementation, path: Documentation/changelog/2025-04-18-helpdesk-controller-implementation.tt
+INFO: Processing file: root/Documentation/changelog/2025-01-17-menu-links-implementation.tt, key: 2025-01-17-menu-links-implementation, path: Documentation/changelog/2025-01-17-menu-links-implementation.tt
+INFO: Processing file: root/Documentation/changelog/changelog_template.tt, key: changelog_template, path: Documentation/changelog/changelog_template.tt
+INFO: Processing file: root/Documentation/changelog/2025-05-25-documentation-organization.tt, key: 2025-05-25-documentation-organization, path: Documentation/changelog/2025-05-25-documentation-organization.tt
+INFO: Processing file: root/Documentation/changelog/2025-04-git-pull-functionality.tt, key: 2025-04-git-pull-functionality, path: Documentation/changelog/2025-04-git-pull-functionality.tt
+INFO: Processing file: root/Documentation/changelog/2025-05-31-server-ip-display.tt, key: 2025-05-31-server-ip-display, path: Documentation/changelog/2025-05-31-server-ip-display.tt
+INFO: Processing file: root/Documentation/changelog/2025-01-15-mailing-list-system-implementation.tt, key: 2025-01-15-mailing-list-system-implementation, path: Documentation/changelog/2025-01-15-mailing-list-system-implementation.tt
+INFO: Processing file: root/Documentation/changelog/role_based_access_fix.tt, key: role_based_access_fix, path: Documentation/changelog/role_based_access_fix.tt
+INFO: Processing file: root/Documentation/changelog/2025-05-26-mail-system-docs.tt, key: 2025-05-26-mail-system-docs, path: Documentation/changelog/2025-05-26-mail-system-docs.tt
+INFO: Processing file: root/Documentation/changelog/2024-06-21-linux-commands-documentation.tt, key: 2024-06-21-linux-commands-documentation, path: Documentation/changelog/2024-06-21-linux-commands-documentation.tt
+INFO: Processing file: root/Documentation/changelog/2025-04-navigation-improvements.tt, key: 2025-04-navigation-improvements, path: Documentation/changelog/2025-04-navigation-improvements.tt
+INFO: Processing file: root/Documentation/changelog/2025-01-27-fix-schema-compare-table-mapping.tt, key: 2025-01-27-fix-schema-compare-table-mapping, path: Documentation/changelog/2025-01-27-fix-schema-compare-table-mapping.tt
+INFO: Processing file: root/Documentation/changelog/2025-04-pagetop-template-error-fix.tt, key: 2025-04-pagetop-template-error-fix, path: Documentation/changelog/2025-04-pagetop-template-error-fix.tt
+INFO: Processing file: root/Documentation/changelog/2025-04-08-documentation-display-fix-details.tt, key: 2025-04-08-documentation-display-fix-details, path: Documentation/changelog/2025-04-08-documentation-display-fix-details.tt
+INFO: Processing file: root/Documentation/changelog/2025-08-30-hosting-signup-enhancements.tt, key: 2025-08-30-hosting-signup-enhancements, path: Documentation/changelog/2025-08-30-hosting-signup-enhancements.tt
+INFO: Processing file: root/Documentation/changelog/2025-04-documentation-admin-visibility-fix.tt.bak, key: 2025-04-documentation-admin-visibility-fix, path: Documentation/changelog/2025-04-documentation-admin-visibility-fix.tt.bak
+INFO: Processing file: root/Documentation/changelog/2024-06-project-edit-fix.tt, key: 2024-06-project-edit-fix, path: Documentation/changelog/2024-06-project-edit-fix.tt
+INFO: Processing file: root/Documentation/changelog/fix_project_selection_todo_filtering.tt, key: fix_project_selection_todo_filtering, path: Documentation/changelog/fix_project_selection_todo_filtering.tt
+INFO: Processing file: root/Documentation/changelog/2024-05-documentation-system-fixes.tt, key: 2024-05-documentation-system-fixes, path: Documentation/changelog/2024-05-documentation-system-fixes.tt
+INFO: Processing file: root/Documentation/changelog/2025-01-27-template-system-fixes.tt, key: 2025-01-27-template-system-fixes, path: Documentation/changelog/2025-01-27-template-system-fixes.tt
+INFO: Processing file: root/Documentation/changelog/2025-05-30-documentation-structure-simplification.tt, key: 2025-05-30-documentation-structure-simplification, path: Documentation/changelog/2025-05-30-documentation-structure-simplification.tt
+INFO: Processing file: root/Documentation/changelog/2025-10-01-documentation-migration-to-tt.tt, key: 2025-10-01-documentation-migration-to-tt, path: Documentation/changelog/2025-10-01-documentation-migration-to-tt.tt
+INFO: Processing file: root/Documentation/changelog/2025-04-13-mcoop-url-case-fix.tt, key: 2025-04-13-mcoop-url-case-fix, path: Documentation/changelog/2025-04-13-mcoop-url-case-fix.tt
+INFO: Processing file: root/Documentation/changelog/2025-04-documentation-template-refactoring.tt, key: 2025-04-documentation-template-refactoring, path: Documentation/changelog/2025-04-documentation-template-refactoring.tt
+INFO: Processing file: root/Documentation/changelog/2025-04-documentation-admin-visibility-fix.tt, key: 2025-04-documentation-admin-visibility-fix, path: Documentation/changelog/2025-04-documentation-admin-visibility-fix.tt
+INFO: Processing file: root/Documentation/changelog/TODO_SYSTEM_CHANGELOG.tt, key: TODO_SYSTEM_CHANGELOG, path: Documentation/changelog/TODO_SYSTEM_CHANGELOG.tt
+INFO: Processing file: root/Documentation/changelog/2025-01-27-fix-schema-compare-containers.tt, key: 2025-01-27-fix-schema-compare-containers, path: Documentation/changelog/2025-01-27-fix-schema-compare-containers.tt
+INFO: Processing file: root/Documentation/changelog/2025-08-25-project-filtering-and-display.tt, key: 2025-08-25-project-filtering-and-display, path: Documentation/changelog/2025-08-25-project-filtering-and-display.tt
+INFO: Processing file: root/Documentation/changelog/2025-05-16-documentation-workflow-consolidation.tt, key: 2025-05-16-documentation-workflow-consolidation, path: Documentation/changelog/2025-05-16-documentation-workflow-consolidation.tt
+INFO: Processing file: root/Documentation/changelog/2025-01-15-software-upgrade-manager.tt, key: 2025-01-15-software-upgrade-manager, path: Documentation/changelog/2025-01-15-software-upgrade-manager.tt
+INFO: Processing file: root/Documentation/changelog/2024-07-project-id-fix.tt, key: 2024-07-project-id-fix, path: Documentation/changelog/2024-07-project-id-fix.tt
+INFO: Processing file: root/Documentation/changelog/2025-07-30-todo-time-field-fix.tt, key: 2025-07-30-todo-time-field-fix, path: Documentation/changelog/2025-07-30-todo-time-field-fix.tt
+INFO: Processing file: root/Documentation/changelog/2025-04-pagetop-hostname-display.tt, key: 2025-04-pagetop-hostname-display, path: Documentation/changelog/2025-04-pagetop-hostname-display.tt
+INFO: Processing file: root/Documentation/changelog/2025-04-mcoop-admin-menu-restriction.tt, key: 2025-04-mcoop-admin-menu-restriction, path: Documentation/changelog/2025-04-mcoop-admin-menu-restriction.tt
+INFO: Processing file: root/Documentation/changelog/2025-01-15-mailing-list-phase1.tt, key: 2025-01-15-mailing-list-phase1, path: Documentation/changelog/2025-01-15-mailing-list-phase1.tt
+INFO: Processing file: root/Documentation/changelog/2024-04-24-helpdesk-menu-enhancement.tt, key: 2024-04-24-helpdesk-menu-enhancement, path: Documentation/changelog/2024-04-24-helpdesk-menu-enhancement.tt
+INFO: Processing file: root/Documentation/changelog/2025-04-documentation-display-fix.tt, key: 2025-04-documentation-display-fix, path: Documentation/changelog/2025-04-documentation-display-fix.tt
+INFO: Processing file: root/Documentation/changelog/2025-08-18-project-cards-css-fix.tt, key: 2025-08-18-project-cards-css-fix, path: Documentation/changelog/2025-08-18-project-cards-css-fix.tt
+INFO: Processing file: root/Documentation/changelog/2025-09-starman-restart-fix.tt, key: 2025-09-starman-restart-fix, path: Documentation/changelog/2025-09-starman-restart-fix.tt
+INFO: Processing file: root/Documentation/changelog/2025-04-13-mcoop-url-case-fix-details.tt, key: 2025-04-13-mcoop-url-case-fix-details, path: Documentation/changelog/2025-04-13-mcoop-url-case-fix-details.tt
+INFO: Processing file: root/Documentation/changelog/2024-08-ve7tit-controller-fixes.tt, key: 2024-08-ve7tit-controller-fixes, path: Documentation/changelog/2024-08-ve7tit-controller-fixes.tt
+INFO: Processing file: root/Documentation/changelog/todo_edit_functionality.tt, key: todo_edit_functionality, path: Documentation/changelog/todo_edit_functionality.tt
+INFO: Processing file: root/Documentation/changelog/2025-07-07-navigation-system-consolidation.tt, key: 2025-07-07-navigation-system-consolidation, path: Documentation/changelog/2025-07-07-navigation-system-consolidation.tt
+INFO: Processing file: root/Documentation/changelog/2025-01-15_documentation_system_completion.tt, key: 2025-01-15_documentation_system_completion, path: Documentation/changelog/2025-01-15_documentation_system_completion.tt
+INFO: Processing file: root/Documentation/changelog/2025-05-31-linux-commands-reference.tt, key: 2025-05-31-linux-commands-reference, path: Documentation/changelog/2025-05-31-linux-commands-reference.tt
+INFO: Processing file: root/Documentation/changelog/2025-05-12-fix-documentation-controller-logging.tt, key: 2025-05-12-fix-documentation-controller-logging, path: Documentation/changelog/2025-05-12-fix-documentation-controller-logging.tt
+INFO: Processing file: root/Documentation/changelog/2025-10-15-documentation-access-fixes.tt, key: 2025-10-15-documentation-access-fixes, path: Documentation/changelog/2025-10-15-documentation-access-fixes.tt
+INFO: Processing file: root/Documentation/changelog/2025-07-01-cloudflare-application-id-and-rbac.tt, key: 2025-07-01-cloudflare-application-id-and-rbac, path: Documentation/changelog/2025-07-01-cloudflare-application-id-and-rbac.tt
+INFO: Processing file: root/Documentation/changelog/2025-04-12-hosting-signup-implementation.tt, key: 2025-04-12-hosting-signup-implementation, path: Documentation/changelog/2025-04-12-hosting-signup-implementation.tt
+INFO: Processing file: root/Documentation/changelog/2024-07-proxmox-controller-fixes.tt, key: 2024-07-proxmox-controller-fixes, path: Documentation/changelog/2024-07-proxmox-controller-fixes.tt
+INFO: Processing file: root/Documentation/changelog/2025-05-25-fix-formatting-title-logs.tt, key: 2025-05-25-fix-formatting-title-logs, path: Documentation/changelog/2025-05-25-fix-formatting-title-logs.tt
+INFO: Processing file: root/Documentation/changelog/2025-06-15-api-credentials-documentation-fix.tt, key: 2025-06-15-api-credentials-documentation-fix, path: Documentation/changelog/2025-06-15-api-credentials-documentation-fix.tt
+INFO: Processing file: root/Documentation/changelog/main_changelog.tt, key: main_changelog, path: Documentation/changelog/main_changelog.tt
+INFO: Processing file: root/Documentation/changelog/2025-01-20-collapsible-changelog-enhancement.tt, key: 2025-01-20-collapsible-changelog-enhancement, path: Documentation/changelog/2025-01-20-collapsible-changelog-enhancement.tt
+INFO: Processing file: root/Documentation/changelog/2024-08-proxmox-debug-msg-fix.tt, key: 2024-08-proxmox-debug-msg-fix, path: Documentation/changelog/2024-08-proxmox-debug-msg-fix.tt
+INFO: Processing file: root/Documentation/changelog/2025-05-25-file-location-standardization.tt, key: 2025-05-25-file-location-standardization, path: Documentation/changelog/2025-05-25-file-location-standardization.tt
+INFO: Processing file: root/Documentation/changelog/2025-04-documentation-workflow-update.tt, key: 2025-04-documentation-workflow-update, path: Documentation/changelog/2025-04-documentation-workflow-update.tt
+INFO: Processing file: root/Documentation/changelog/2025-04-mcoop-admin-menu-restriction.tt.bak, key: 2025-04-mcoop-admin-menu-restriction, path: Documentation/changelog/2025-04-mcoop-admin-menu-restriction.tt.bak
+INFO: Processing file: root/Documentation/changelog/2025-01-15-tt-file-compliance-fix.tt, key: 2025-01-15-tt-file-compliance-fix, path: Documentation/changelog/2025-01-15-tt-file-compliance-fix.tt
+INFO: Processing file: root/Documentation/changelog/2025-05-15-documentation-system-update.tt, key: 2025-05-15-documentation-system-update, path: Documentation/changelog/2025-05-15-documentation-system-update.tt
+INFO: Processing file: root/Documentation/changelog/2024-08-pagetop-hostname-display.tt, key: 2024-08-pagetop-hostname-display, path: Documentation/changelog/2024-08-pagetop-hostname-display.tt
+INFO: Processing file: root/Documentation/changelog/2025-09-10-restart-starman-functionality.tt, key: 2025-09-10-restart-starman-functionality, path: Documentation/changelog/2025-09-10-restart-starman-functionality.tt
+INFO: Processing file: root/Documentation/changelog/2025-04-mcoop-server-room-plan.tt, key: 2025-04-mcoop-server-room-plan, path: Documentation/changelog/2025-04-mcoop-server-room-plan.tt
+INFO: Processing file: root/Documentation/changelog/db_config_loading_fix.tt, key: db_config_loading_fix, path: Documentation/changelog/db_config_loading_fix.tt
+INFO: Processing file: root/Documentation/scripts/cleanup_categorization_files.pl, key: cleanup_categorization_files, path: Documentation/scripts/cleanup_categorization_files.pl
+INFO: Processing file: root/Documentation/scripts/convert_md_to_tt.pl, key: convert_md_to_tt, path: Documentation/scripts/convert_md_to_tt.pl
+INFO: Processing file: root/Documentation/scripts/cleanup_formatting_title_files.sh, key: cleanup_formatting_title_files, path: Documentation/scripts/cleanup_formatting_title_files.sh
+INFO: Processing file: root/Documentation/scripts/move_docs_to_proper_location.pl, key: move_docs_to_proper_location, path: Documentation/scripts/move_docs_to_proper_location.pl
+INFO: Processing file: root/Documentation/scripts/MetadataParser.pm, key: MetadataParser, path: Documentation/scripts/MetadataParser.pm
+INFO: Processing file: root/Documentation/scripts/migrate_documentation.pl, key: migrate_documentation, path: Documentation/scripts/migrate_documentation.pl
+INFO: Processing file: root/Documentation/scripts/test_metadata_parser.pl, key: test_metadata_parser, path: Documentation/scripts/test_metadata_parser.pl
+INFO: Processing file: root/Documentation/scripts/setup_directory_structure.sh, key: setup_directory_structure, path: Documentation/scripts/setup_directory_structure.sh
+INFO: Processing file: root/Documentation/Sites/shamanbotanicals.tt, key: shamanbotanicals, path: Documentation/Sites/shamanbotanicals.tt
+INFO: Processing file: root/Documentation/controllers/Project.tt, key: Project, path: Documentation/controllers/Project.tt
+INFO: Processing file: root/Documentation/controllers/Root.tt, key: Root, path: Documentation/controllers/Root.tt
+INFO: Processing file: root/Documentation/controllers/todo_system.tt, key: todo_system, path: Documentation/controllers/todo_system.tt
+INFO: Processing file: root/Documentation/controllers/README.tt, key: README, path: Documentation/controllers/README.tt
+INFO: Processing file: root/Documentation/controllers/HostingSignup.tt, key: HostingSignup, path: Documentation/controllers/HostingSignup.tt
+INFO: Processing file: root/Documentation/controllers/index.tt, key: index, path: Documentation/controllers/index.tt
+INFO: Processing file: root/Documentation/controllers/controller_list.tt, key: controller_list, path: Documentation/controllers/controller_list.tt
+INFO: Processing file: root/Documentation/controllers/Mail.tt, key: Mail, path: Documentation/controllers/Mail.tt
+INFO: Processing file: root/Documentation/controllers/User.tt, key: User, path: Documentation/controllers/User.tt
+INFO: Processing file: root/Documentation/controllers/Documentation_Controller.tt, key: Documentation_Controller, path: Documentation/controllers/Documentation_Controller.tt
+INFO: Processing file: root/Documentation/controllers/Ve7tit.tt, key: Ve7tit, path: Documentation/controllers/Ve7tit.tt
+INFO: Processing file: root/Documentation/controllers/HelpDesk.tt, key: HelpDesk, path: Documentation/controllers/HelpDesk.tt
+INFO: Processing file: root/Documentation/controllers/FAQ.tt, key: FAQ, path: Documentation/controllers/FAQ.tt
+INFO: Processing file: root/Documentation/controllers/HostingSignup_Mail.tt, key: HostingSignup_Mail, path: Documentation/controllers/HostingSignup_Mail.tt
+INFO: Processing file: root/Documentation/admin/page_migration_guide.tt, key: page_migration_guide, path: Documentation/admin/page_migration_guide.tt
+INFO: Found admin directory doc - setting admin roles
+INFO: Processing file: root/Documentation/admin/git_pull_guide.tt, key: git_pull_guide, path: Documentation/admin/git_pull_guide.tt
+INFO: Found admin directory doc - setting admin roles
+INFO: Processing file: root/Documentation/admin/theme_mappings_handling.tt, key: theme_mappings_handling, path: Documentation/admin/theme_mappings_handling.tt
+INFO: Found admin directory doc - setting admin roles
+INFO: Processing file: root/Documentation/admin/production_deployment_system.tt, key: production_deployment_system, path: Documentation/admin/production_deployment_system.tt
+INFO: Found admin directory doc - setting admin roles
+INFO: Processing file: root/Documentation/admin/schema-compare-guide.tt, key: schema-compare-guide, path: Documentation/admin/schema-compare-guide.tt
+INFO: Found admin directory doc - setting admin roles
+INFO: Processing file: root/Documentation/roles/admin/KVM_ISO_Transfer.tt, key: KVM_ISO_Transfer, path: Documentation/roles/admin/KVM_ISO_Transfer.tt
+INFO: Found role-specific doc for roles: admin,developer
+INFO: Processing file: root/Documentation/roles/admin/user_management.tt, key: user_management, path: Documentation/roles/admin/user_management.tt
+INFO: Found role-specific doc for roles: admin,developer
+INFO: Processing file: root/Documentation/roles/admin/Documentation_Management.tt, key: Documentation_Management, path: Documentation/roles/admin/Documentation_Management.tt
+INFO: Found role-specific doc for roles: admin,developer
+INFO: Processing file: root/Documentation/roles/admin/mail_admin_guide.tt, key: mail_admin_guide, path: Documentation/roles/admin/mail_admin_guide.tt
+INFO: Found role-specific doc for roles: admin,developer
+INFO: Processing file: root/Documentation/roles/admin/linux_commands.tt, key: linux_commands, path: Documentation/roles/admin/linux_commands.tt
+INFO: Found role-specific doc for roles: admin,developer
+INFO: Processing file: root/Documentation/roles/admin/todo_admin_guide.tt, key: todo_admin_guide, path: Documentation/roles/admin/todo_admin_guide.tt
+INFO: Found role-specific doc for roles: admin,developer
+INFO: Processing file: root/Documentation/roles/admin/admin_guide.tt, key: admin_guide, path: Documentation/roles/admin/admin_guide.tt
+INFO: Found role-specific doc for roles: admin,developer
+INFO: Processing file: root/Documentation/roles/admin/documentation_system_guide.tt, key: documentation_system_guide, path: Documentation/roles/admin/documentation_system_guide.tt
+INFO: Found role-specific doc for roles: admin,developer
+INFO: Processing file: root/Documentation/roles/admin/starman_restart_guide.tt, key: starman_restart_guide, path: Documentation/roles/admin/starman_restart_guide.tt
+INFO: Found role-specific doc for roles: admin,developer
+INFO: Processing file: root/Documentation/roles/admin/quick_reference/starman_restart_card.tt, key: starman_restart_card, path: Documentation/roles/admin/quick_reference/starman_restart_card.tt
+INFO: Found role-specific doc for roles: admin,developer
+INFO: Processing file: root/Documentation/roles/developer/api_reference.tt, key: api_reference, path: Documentation/roles/developer/api_reference.tt
+INFO: Found role-specific doc for roles: developer
+INFO: Processing file: root/Documentation/roles/developer/todo_documentation_consolidation_plan.tt, key: todo_documentation_consolidation_plan, path: Documentation/roles/developer/todo_documentation_consolidation_plan.tt
+INFO: Found role-specific doc for roles: developer
+INFO: Processing file: root/Documentation/roles/developer/todo_developer_guide.tt, key: todo_developer_guide, path: Documentation/roles/developer/todo_developer_guide.tt
+INFO: Found role-specific doc for roles: developer
+INFO: Processing file: root/Documentation/roles/developer/Documentation_Controller.tt, key: Documentation_Controller, path: Documentation/roles/developer/Documentation_Controller.tt
+INFO: Found role-specific doc for roles: developer
+INFO: Processing file: root/Documentation/roles/normal/account_management.tt, key: account_management, path: Documentation/roles/normal/account_management.tt
+INFO: Found role-specific doc for roles: normal,editor,admin,developer
+INFO: Processing file: root/Documentation/roles/normal/mcoop_user_guide.tt, key: mcoop_user_guide, path: Documentation/roles/normal/mcoop_user_guide.tt
+INFO: Found role-specific doc for roles: normal,editor,admin,developer
+INFO: Processing file: root/Documentation/roles/normal/Documentation_System.tt, key: Documentation_System, path: Documentation/roles/normal/Documentation_System.tt
+INFO: Found role-specific doc for roles: normal,editor,admin,developer
+INFO: Processing file: root/Documentation/roles/normal/todo_user_guide.tt, key: todo_user_guide, path: Documentation/roles/normal/todo_user_guide.tt
+INFO: Found role-specific doc for roles: normal,editor,admin,developer
+INFO: Processing file: root/Documentation/roles/normal/mail_user_guide.tt, key: mail_user_guide, path: Documentation/roles/normal/mail_user_guide.tt
+INFO: Found role-specific doc for roles: normal,editor,admin,developer
+INFO: Processing file: root/Documentation/roles/normal/getting_started.tt, key: getting_started, path: Documentation/roles/normal/getting_started.tt
+INFO: Found role-specific doc for roles: normal,editor,admin,developer
+INFO: Processing file: root/Documentation/developer/documentation_migration_guide.tt, key: documentation_migration_guide, path: Documentation/developer/documentation_migration_guide.tt
+INFO: Processing file: root/Documentation/developer/documentation_role_access.tt.bak, key: documentation_role_access, path: Documentation/developer/documentation_role_access.tt.bak
+INFO: Processing file: root/Documentation/developer/template_system.tt.bak, key: template_system, path: Documentation/developer/template_system.tt.bak
+INFO: Processing file: root/Documentation/developer/inventory_accounting_system.tt, key: inventory_accounting_system, path: Documentation/developer/inventory_accounting_system.tt
+INFO: Processing file: root/Documentation/developer/admintopmenu_guide.tt, key: admintopmenu_guide, path: Documentation/developer/admintopmenu_guide.tt
+INFO: Processing file: root/Documentation/developer/authentication_system.tt, key: authentication_system, path: Documentation/developer/authentication_system.tt
+INFO: Processing file: root/Documentation/developer/offline_mode_system.tt, key: offline_mode_system, path: Documentation/developer/offline_mode_system.tt
+INFO: Processing file: root/Documentation/developer/navigation_system.tt, key: navigation_system, path: Documentation/developer/navigation_system.tt
+INFO: Processing file: root/Documentation/developer/troubleshooting.tt.bak, key: troubleshooting, path: Documentation/developer/troubleshooting.tt.bak
+INFO: Processing file: root/Documentation/developer/troubleshooting.tt, key: troubleshooting, path: Documentation/developer/troubleshooting.tt
+INFO: Processing file: root/Documentation/developer/template_system.tt, key: template_system, path: Documentation/developer/template_system.tt
+INFO: Processing file: root/Documentation/developer/network_map_json_storage.tt, key: network_map_json_storage, path: Documentation/developer/network_map_json_storage.tt
+INFO: Processing file: root/Documentation/developer/documentation_index_adaptation.tt, key: documentation_index_adaptation, path: Documentation/developer/documentation_index_adaptation.tt
+INFO: Processing file: root/Documentation/developer/admintopmenu_guide.tt.bak, key: admintopmenu_guide, path: Documentation/developer/admintopmenu_guide.tt.bak
+INFO: Processing file: root/Documentation/developer/file-locations.tt, key: file-locations, path: Documentation/developer/file-locations.tt
+INFO: Processing file: root/Documentation/developer/css_theme_system_rules.tt, key: css_theme_system_rules, path: Documentation/developer/css_theme_system_rules.tt
+INFO: Processing file: root/Documentation/developer/documentation_role_access.tt, key: documentation_role_access, path: Documentation/developer/documentation_role_access.tt
+INFO: Processing file: root/Documentation/developer/css_theme_guidelines.tt, key: css_theme_guidelines, path: Documentation/developer/css_theme_guidelines.tt
+INFO: Processing file: root/Documentation/developer/menu_system_guide.tt, key: menu_system_guide, path: Documentation/developer/menu_system_guide.tt
+INFO: Processing file: root/Documentation/developer/navigation_system.tt.bak, key: navigation_system, path: Documentation/developer/navigation_system.tt.bak
+INFO: Processing file: root/Documentation/developer/authentication_system.tt.bak, key: authentication_system, path: Documentation/developer/authentication_system.tt.bak
+INFO: Processing file: root/Documentation/developer/menu_system_guide.tt.bak, key: menu_system_guide, path: Documentation/developer/menu_system_guide.tt.bak
+INFO: Processing file: root/Documentation/developer/theme_system_normalization.tt, key: theme_system_normalization, path: Documentation/developer/theme_system_normalization.tt
+INFO: Processing file: root/Documentation/developer/db_config_loading.tt, key: db_config_loading, path: Documentation/developer/db_config_loading.tt
+INFO: Processing file: root/Documentation/developer/json_handling_guidelines.tt, key: json_handling_guidelines, path: Documentation/developer/json_handling_guidelines.tt
+INFO: Processing file: root/Documentation/developer/hybrid_database_architecture.tt, key: hybrid_database_architecture, path: Documentation/developer/hybrid_database_architecture.tt
+INFO: Processing file: root/Documentation/developer/documentation_index_adaptation.tt.bak, key: documentation_index_adaptation, path: Documentation/developer/documentation_index_adaptation.tt.bak
+INFO: Processing file: root/Documentation/deployment/SERVER_DEPLOYMENT.tt, key: SERVER_DEPLOYMENT, path: Documentation/deployment/SERVER_DEPLOYMENT.tt
+INFO: Processing file: root/Documentation/AutoDiscovery/index.tt, key: index, path: Documentation/AutoDiscovery/index.tt
+INFO: Processing file: root/Documentation/sites/mcoop/documentation_guide.tt, key: documentation_guide, path: Documentation/sites/mcoop/documentation_guide.tt
+INFO: Found site-specific doc for site: MCOOP
+INFO: Processing file: root/Documentation/sites/mcoop/templates.tt.bak, key: templates, path: Documentation/sites/mcoop/templates.tt.bak
+INFO: Found site-specific doc for site: MCOOP
+INFO: Processing file: root/Documentation/sites/mcoop/member_resources.tt, key: member_resources, path: Documentation/sites/mcoop/member_resources.tt
+INFO: Found site-specific doc for site: MCOOP
+INFO: Processing file: root/Documentation/sites/mcoop/templates.tt, key: templates, path: Documentation/sites/mcoop/templates.tt
+INFO: Found site-specific doc for site: MCOOP
+INFO: Processing file: root/Documentation/sites/mcoop/site_guide.tt, key: site_guide, path: Documentation/sites/mcoop/site_guide.tt
+INFO: Found site-specific doc for site: MCOOP
+INFO: Processing file: root/Documentation/workshops/development_plan.tt.bak, key: development_plan, path: Documentation/workshops/development_plan.tt.bak
+INFO: Processing file: root/Documentation/workshops/development_plan.tt, key: development_plan, path: Documentation/workshops/development_plan.tt
+INFO: Processing file: root/Documentation/workshops/index.tt, key: index, path: Documentation/workshops/index.tt
+INFO: Processing file: root/Documentation/workshops/technical.tt, key: technical, path: Documentation/workshops/technical.tt
+INFO: Directory scan completed. Found 272 pages.
+INFO: Auto-discovered 272 documentation files
+INFO: Step 2: Applying configuration overrides
+INFO: Applied 4 configuration overrides
+INFO: Step 3: Categorizing all documentation pages
+INFO: Categorizing documentation pages
+DEBUG: Categorizing page: mail_troubleshooting (path: Documentation/general/mail_troubleshooting.tt)
+DEBUG: Categorizing page: user_docs (path: Documentation/user_docs.tt)
+DEBUG: Categorizing page: 2024-05-documentation-system-fixes (path: Documentation/changelog/2024-05-documentation-system-fixes.tt)
+INFO: Added '2024-05-documentation-system-fixes' to changelog category
+DEBUG: Categorizing page: 2025-04-documentation-display-fix (path: Documentation/changelog/2025-04-documentation-display-fix.tt)
+INFO: Added '2025-04-documentation-display-fix' to changelog category
+DEBUG: Categorizing page: documentation_tt_template (path: Documentation/documentation_tt_template.tt.bak)
+DEBUG: Categorizing page: Inventory (path: Documentation/Inventory.tt)
+DEBUG: Categorizing page: 2025-05-25-file-location-standardization (path: Documentation/changelog/2025-05-25-file-location-standardization.tt)
+INFO: Added '2025-05-25-file-location-standardization' to changelog category
+DEBUG: Categorizing page: 2025-05-25-documentation-organization (path: Documentation/changelog/2025-05-25-documentation-organization.tt)
+INFO: Added '2025-05-25-documentation-organization' to changelog category
+DEBUG: Categorizing page: error (path: Documentation/error.tt)
+DEBUG: Categorizing page: KVM_ISO_Transfer (path: Documentation/roles/admin/KVM_ISO_Transfer.tt)
+INFO: Added 'KVM_ISO_Transfer' to admin_guides category
+DEBUG: Categorizing page: 2025-04-18-helpdesk-controller-implementation (path: Documentation/changelog/2025-04-18-helpdesk-controller-implementation.tt)
+INFO: Added '2025-04-18-helpdesk-controller-implementation' to controllers category
+INFO: Added '2025-04-18-helpdesk-controller-implementation' to changelog category
+DEBUG: Categorizing page: todo_developer_guide (path: Documentation/roles/developer/todo_developer_guide.tt)
+INFO: Added 'todo_developer_guide' to developer_guides category
+INFO: Added 'todo_developer_guide' to modules category
+DEBUG: Categorizing page: css_theme_guidelines (path: Documentation/developer/css_theme_guidelines.tt)
+INFO: Added 'css_theme_guidelines' to developer_guides category
+DEBUG: Categorizing page: Files (path: Documentation/Files.tt)
+DEBUG: Categorizing page: HelpDeskSystem (path: Documentation/general/HelpDeskSystem.tt)
+DEBUG: Categorizing page: documentation_role_access (path: Documentation/developer/documentation_role_access.tt)
+INFO: Added 'documentation_role_access' to developer_guides category
+DEBUG: Categorizing page: 2025-04-documentation-admin-visibility-fix (path: Documentation/changelog/2025-04-documentation-admin-visibility-fix.tt)
+INFO: Added '2025-04-documentation-admin-visibility-fix' to changelog category
+DEBUG: Categorizing page: changelog_template (path: Documentation/changelog/changelog_template.tt)
+INFO: Added 'changelog_template' to changelog category
+DEBUG: Categorizing page: config (path: Documentation/config.tt.bak)
+DEBUG: Categorizing page: 2025-09-15-sudo-password-configuration (path: Documentation/changelog/2025-09-15-sudo-password-configuration.tt)
+INFO: Added '2025-09-15-sudo-password-configuration' to changelog category
+DEBUG: Categorizing page: 2025-05-25-git-pull-routing-fix (path: Documentation/changelog/2025-05-25-git-pull-routing-fix.tt)
+INFO: Added '2025-05-25-git-pull-routing-fix' to changelog category
+DEBUG: Categorizing page: page_migration_guide (path: Documentation/admin/page_migration_guide.tt)
+INFO: Added 'page_migration_guide' to admin_guides category
+DEBUG: Categorizing page: documentation_config_guide (path: Documentation/general/documentation_config_guide.tt)
+DEBUG: Categorizing page: guidelines (path: Documentation/guidelines.tt)
+DEBUG: Categorizing page: AI_DEVELOPMENT_GUIDELINES (path: Documentation/general/AI_DEVELOPMENT_GUIDELINES.tt)
+DEBUG: Categorizing page: domain_sync_feature (path: Documentation/cloudflare/domain_sync_feature.tt)
+DEBUG: Categorizing page: BMasterController (path: Documentation/BMasterController.tt)
+INFO: Added 'BMasterController' to controllers category
+DEBUG: Categorizing page: models (path: Documentation/models.tt)
+INFO: Added 'models' to models category
+DEBUG: Categorizing page: admin_guides (path: Documentation/admin_guides.tt.bak)
+INFO: Added 'admin_guides' to admin_guides category
+DEBUG: Categorizing page: 2025-04-mcoop-server-room-plan (path: Documentation/changelog/2025-04-mcoop-server-room-plan.tt)
+INFO: Added '2025-04-mcoop-server-room-plan' to changelog category
+DEBUG: Categorizing page: Schema (path: Documentation/Schema.tt)
+DEBUG: Categorizing page: documentation_workflow (path: Documentation/documentation_workflow.tt)
+DEBUG: Categorizing page: migrate_documentation (path: Documentation/scripts/migrate_documentation.pl)
+DEBUG: Categorizing page: 2025-01-15-mailing-list-phase1 (path: Documentation/changelog/2025-01-15-mailing-list-phase1.tt)
+INFO: Added '2025-01-15-mailing-list-phase1' to changelog category
+DEBUG: Categorizing page: 2025-09-starman-restart-fix (path: Documentation/changelog/2025-09-starman-restart-fix.tt)
+INFO: Added '2025-09-starman-restart-fix' to changelog category
+DEBUG: Categorizing page: HelpDesk (path: Documentation/controllers/HelpDesk.tt)
+INFO: Added 'HelpDesk' to controllers category
+DEBUG: Categorizing page: ENCYController (path: Documentation/ENCYController.tt)
+INFO: Added 'ENCYController' to controllers category
+DEBUG: Categorizing page: controllers (path: Documentation/controllers.tt)
+INFO: Added 'controllers' to controllers category
+DEBUG: Categorizing page: 2025-04-08-documentation-display-fix-details (path: Documentation/changelog/2025-04-08-documentation-display-fix-details.tt)
+INFO: Added '2025-04-08-documentation-display-fix-details' to changelog category
+DEBUG: Categorizing page: system_info (path: Documentation/system_info.tt)
+INFO: Added 'system_info' to admin_guides category
+DEBUG: Categorizing page: 2025-07-07-navigation-system-consolidation (path: Documentation/changelog/2025-07-07-navigation-system-consolidation.tt)
+INFO: Added '2025-07-07-navigation-system-consolidation' to changelog category
+DEBUG: Categorizing page: starman_restart_guide (path: Documentation/roles/admin/starman_restart_guide.tt)
+INFO: Added 'starman_restart_guide' to admin_guides category
+DEBUG: Categorizing page: schema-compare-guide (path: Documentation/admin/schema-compare-guide.tt)
+INFO: Added 'schema-compare-guide' to admin_guides category
+DEBUG: Categorizing page: THEME_SYSTEM_README (path: Documentation/general/THEME_SYSTEM_README.tt)
+DEBUG: Categorizing page: 2024-07-project-id-fix (path: Documentation/changelog/2024-07-project-id-fix.tt)
+INFO: Added '2024-07-project-id-fix' to changelog category
+DEBUG: Categorizing page: 2025-05-26-changelog-system (path: Documentation/changelog/2025-05-26-changelog-system.tt)
+INFO: Added '2025-05-26-changelog-system' to changelog category
+DEBUG: Categorizing page: 2025-05-26-mail-system-docs (path: Documentation/changelog/2025-05-26-mail-system-docs.tt)
+INFO: Added '2025-05-26-mail-system-docs' to changelog category
+DEBUG: Categorizing page: login_authentication (path: Documentation/tutorials/login_authentication.tt)
+INFO: Added 'login_authentication' to tutorials category
+DEBUG: Categorizing page: WorkShops (path: Documentation/WorkShops.tt)
+DEBUG: Categorizing page: system_overview (path: Documentation/system_overview.tt)
+INFO: Added 'system_overview' to admin_guides category
+DEBUG: Categorizing page: Calendar (path: Documentation/Calendar.tt)
+INFO: Added 'Calendar' to models category
+DEBUG: Categorizing page: ComservDocumentation (path: Documentation/ComservDocumentation.tt)
+DEBUG: Categorizing page: commands (path: Documentation/proxmox/commands.tt)
+INFO: Added 'commands' to proxmox category
+DEBUG: Categorizing page: json_handling_guidelines (path: Documentation/developer/json_handling_guidelines.tt)
+INFO: Added 'json_handling_guidelines' to developer_guides category
+DEBUG: Categorizing page: technical (path: Documentation/workshops/technical.tt)
+INFO: Added 'technical' to tutorials category
+DEBUG: Categorizing page: todo_documentation_consolidation_plan (path: Documentation/roles/developer/todo_documentation_consolidation_plan.tt)
+INFO: Added 'todo_documentation_consolidation_plan' to developer_guides category
+INFO: Added 'todo_documentation_consolidation_plan' to modules category
+DEBUG: Categorizing page: Queens (path: Documentation/Queens.tt)
+DEBUG: Categorizing page: documentation_update_summary (path: Documentation/general/documentation_update_summary.tt)
+DEBUG: Categorizing page: 2024-08-controller-fixes (path: Documentation/general/2024-08-controller-fixes.tt)
+INFO: Added '2024-08-controller-fixes' to controllers category
+DEBUG: Categorizing page: 2024-04-24-helpdesk-menu-enhancement (path: Documentation/changelog/2024-04-24-helpdesk-menu-enhancement.tt)
+INFO: Added '2024-04-24-helpdesk-menu-enhancement' to changelog category
+DEBUG: Categorizing page: THEME_SYSTEM_FIXES (path: Documentation/general/THEME_SYSTEM_FIXES.tt)
+DEBUG: Categorizing page: cloudflare_integration (path: Documentation/cloudflare_integration.tt)
+DEBUG: Categorizing page: TODO_SYSTEM_CHANGELOG (path: Documentation/changelog/TODO_SYSTEM_CHANGELOG.tt)
+INFO: Added 'TODO_SYSTEM_CHANGELOG' to changelog category
+INFO: Added 'TODO_SYSTEM_CHANGELOG' to modules category
+DEBUG: Categorizing page: integration (path: Documentation/proxmox/integration.tt)
+INFO: Added 'integration' to proxmox category
+DEBUG: Categorizing page: hosting_signup_templates (path: Documentation/general/hosting_signup_templates.tt)
+DEBUG: Categorizing page: menu_system_guide (path: Documentation/developer/menu_system_guide.tt.bak)
+INFO: Added 'menu_system_guide' to developer_guides category
+DEBUG: Categorizing page: fix_project_selection_todo_filtering (path: Documentation/changelog/fix_project_selection_todo_filtering.tt)
+INFO: Added 'fix_project_selection_todo_filtering' to changelog category
+DEBUG: Categorizing page: 2025-05-31-server-ip-display (path: Documentation/changelog/2025-05-31-server-ip-display.tt)
+INFO: Added '2025-05-31-server-ip-display' to changelog category
+DEBUG: Categorizing page: 2025-01-27-fix-debug-display-enhance-data-type-normalization (path: Documentation/changelog/2025-01-27-fix-debug-display-enhance-data-type-normalization.tt)
+INFO: Added '2025-01-27-fix-debug-display-enhance-data-type-normalization' to changelog category
+DEBUG: Categorizing page: mail_admin_guide (path: Documentation/roles/admin/mail_admin_guide.tt)
+INFO: Added 'mail_admin_guide' to admin_guides category
+DEBUG: Categorizing page: menu_system (path: Documentation/general/menu_system.tt)
+DEBUG: Categorizing page: BMaserModel (path: Documentation/BMaserModel.tt)
+INFO: Added 'BMaserModel' to models category
+DEBUG: Categorizing page: NEW_THEME_SYSTEM_README (path: Documentation/general/NEW_THEME_SYSTEM_README.tt)
+DEBUG: Categorizing page: Overview (path: Documentation/Overview.tt)
+DEBUG: Categorizing page: Logging (path: Documentation/Logging.tt)
+DEBUG: Categorizing page: 2025-04-git-pull-functionality (path: Documentation/changelog/2025-04-git-pull-functionality.tt)
+INFO: Added '2025-04-git-pull-functionality' to changelog category
+DEBUG: Categorizing page: 2025-01-20-collapsible-changelog-enhancement (path: Documentation/changelog/2025-01-20-collapsible-changelog-enhancement.tt)
+INFO: Added '2025-01-20-collapsible-changelog-enhancement' to changelog category
+DEBUG: Categorizing page: SYSTEM_REQUIREMENTS (path: Documentation/general/SYSTEM_REQUIREMENTS.tt)
+INFO: Added 'SYSTEM_REQUIREMENTS' to admin_guides category
+DEBUG: Categorizing page: sessionplan (path: Documentation/sessionplan.tt)
+DEBUG: Categorizing page: 2025-01-17-menu-links-implementation (path: Documentation/changelog/2025-01-17-menu-links-implementation.tt)
+INFO: Added '2025-01-17-menu-links-implementation' to changelog category
+DEBUG: Categorizing page: todo_user_guide (path: Documentation/roles/normal/todo_user_guide.tt)
+INFO: Added 'todo_user_guide' to user_guides category
+INFO: Added 'todo_user_guide' to modules category
+DEBUG: Categorizing page: documentation_system (path: Documentation/general/documentation_system.tt)
+DEBUG: Categorizing page: navigation_system (path: Documentation/developer/navigation_system.tt.bak)
+INFO: Added 'navigation_system' to developer_guides category
+DEBUG: Categorizing page: Root (path: Documentation/controllers/Root.tt)
+INFO: Added 'Root' to controllers category
+DEBUG: Categorizing page: 2025-04-documentation-template-refactoring (path: Documentation/changelog/2025-04-documentation-template-refactoring.tt)
+INFO: Added '2025-04-documentation-template-refactoring' to changelog category
+DEBUG: Categorizing page: cleanup_categorization_files (path: Documentation/scripts/cleanup_categorization_files.pl)
+DEBUG: Categorizing page: fix_project_edit_form (path: Documentation/general/fix_project_edit_form.tt)
+DEBUG: Categorizing page: controller_list (path: Documentation/controllers/controller_list.tt)
+INFO: Added 'controller_list' to controllers category
+DEBUG: Categorizing page: cloudflare (path: Documentation/cloudflare.tt)
+DEBUG: Categorizing page: documentation_system_overview (path: Documentation/general/documentation_system_overview.tt)
+DEBUG: Categorizing page: AI (path: Documentation/AI.tt)
+DEBUG: Categorizing page: 2025-04-pagetop-hostname-display (path: Documentation/changelog/2025-04-pagetop-hostname-display.tt)
+INFO: Added '2025-04-pagetop-hostname-display' to changelog category
+DEBUG: Categorizing page: proxmox (path: Documentation/proxmox.tt)
+INFO: Added 'proxmox' to controllers category
+INFO: Added 'proxmox' to models category
+INFO: Added 'proxmox' to proxmox category
+DEBUG: Categorizing page: CSS_Theme_System (path: Documentation/CSS_Theme_System.tt)
+DEBUG: Categorizing page: SERVER_DEPLOYMENT (path: Documentation/deployment/SERVER_DEPLOYMENT.tt)
+DEBUG: Categorizing page: AI_Guidelines (path: Documentation/general/AI_Guidelines.tt)
+DEBUG: Categorizing page: architecture (path: Documentation/architecture.tt)
+DEBUG: Categorizing page: documentation_template (path: Documentation/general/documentation_template.tt)
+DEBUG: Categorizing page: theme_mappings_handling (path: Documentation/admin/theme_mappings_handling.tt)
+INFO: Added 'theme_mappings_handling' to admin_guides category
+DEBUG: Categorizing page: ThemeConfig (path: Documentation/general/ThemeConfig.tt)
+INFO: Added 'ThemeConfig' to models category
+DEBUG: Categorizing page: 2025-01-27-fix-schema-compare-table-mapping (path: Documentation/changelog/2025-01-27-fix-schema-compare-table-mapping.tt)
+INFO: Added '2025-01-27-fix-schema-compare-table-mapping' to changelog category
+DEBUG: Categorizing page: customizing_profile (path: Documentation/tutorials/customizing_profile.tt)
+INFO: Added 'customizing_profile' to tutorials category
+DEBUG: Categorizing page: Login (path: Documentation/Login.tt)
+DEBUG: Categorizing page: theme_system (path: Documentation/theme_system.tt)
+DEBUG: Categorizing page: EMAIL_MODULE_FIX (path: Documentation/general/EMAIL_MODULE_FIX.tt)
+DEBUG: Categorizing page: Documentation_Controller (path: Documentation/roles/developer/Documentation_Controller.tt)
+INFO: Added 'Documentation_Controller' to controllers category
+INFO: Added 'Documentation_Controller' to developer_guides category
+DEBUG: Categorizing page: site_specific (path: Documentation/site_specific.tt)
+DEBUG: Categorizing page: mcoop_user_guide (path: Documentation/sites/mcoop/mcoop_user_guide.tt)
+INFO: Added 'mcoop_user_guide' to site-specific category (site: MCOOP)
+DEBUG: Categorizing page: BMaster (path: Documentation/BMaster.tt)
+INFO: Added 'BMaster' to controllers category
+INFO: Added 'BMaster' to models category
+DEBUG: Categorizing page: theme_system_normalization (path: Documentation/developer/theme_system_normalization.tt)
+INFO: Added 'theme_system_normalization' to developer_guides category
+DEBUG: Categorizing page: git_merge_conflicts (path: Documentation/docs/admin/git_merge_conflicts.tt)
+DEBUG: Categorizing page: THEME_SYSTEM_CLEANUP (path: Documentation/general/THEME_SYSTEM_CLEANUP.tt)
+DEBUG: Categorizing page: ENCYModel (path: Documentation/ENCYModel.tt)
+INFO: Added 'ENCYModel' to models category
+DEBUG: Categorizing page: db_config_loading_fix (path: Documentation/changelog/db_config_loading_fix.tt)
+INFO: Added 'db_config_loading_fix' to changelog category
+DEBUG: Categorizing page: AI_DOCUMENTATION_GUIDELINES (path: Documentation/AI_DOCUMENTATION_GUIDELINES.tt)
+DEBUG: Categorizing page: 2025-08-25-project-filtering-and-display (path: Documentation/changelog/2025-08-25-project-filtering-and-display.tt)
+INFO: Added '2025-08-25-project-filtering-and-display' to changelog category
+DEBUG: Categorizing page: git_pull_guide (path: Documentation/admin/git_pull_guide.tt)
+INFO: Added 'git_pull_guide' to admin_guides category
+DEBUG: Categorizing page: site_guide (path: Documentation/sites/mcoop/site_guide.tt)
+INFO: Added 'site_guide' to site-specific category (site: MCOOP)
+DEBUG: Categorizing page: mail_system (path: Documentation/general/mail_system.tt)
+DEBUG: Categorizing page: model_list (path: Documentation/general/model_list.tt)
+INFO: Added 'model_list' to models category
+DEBUG: Categorizing page: documentation_index_adaptation (path: Documentation/developer/documentation_index_adaptation.tt.bak)
+INFO: Added 'documentation_index_adaptation' to developer_guides category
+DEBUG: Categorizing page: Project (path: Documentation/controllers/Project.tt)
+INFO: Added 'Project' to controllers category
+INFO: Added 'Project' to models category
+INFO: Added 'Project' to modules category
+DEBUG: Categorizing page: enhanced_todo_navigation (path: Documentation/general/enhanced_todo_navigation.tt)
+DEBUG: Categorizing page: 2025-05-31-linux-commands-reference (path: Documentation/changelog/2025-05-31-linux-commands-reference.tt)
+INFO: Added '2025-05-31-linux-commands-reference' to changelog category
+DEBUG: Categorizing page: 2025-04-13-mcoop-url-case-fix (path: Documentation/changelog/2025-04-13-mcoop-url-case-fix.tt)
+INFO: Added '2025-04-13-mcoop-url-case-fix' to changelog category
+DEBUG: Categorizing page: convert_md_to_tt (path: Documentation/scripts/convert_md_to_tt.pl)
+DEBUG: Categorizing page: 2025-04-documentation-workflow-update (path: Documentation/changelog/2025-04-documentation-workflow-update.tt)
+INFO: Added '2025-04-documentation-workflow-update' to changelog category
+DEBUG: Categorizing page: Virtualmin_Integration (path: Documentation/Virtualmin_Integration.tt)
+DEBUG: Categorizing page: ENCY (path: Documentation/ENCY.tt)
+INFO: Added 'ENCY' to controllers category
+DEBUG: Categorizing page: HostingSignup (path: Documentation/controllers/HostingSignup.tt)
+INFO: Added 'HostingSignup' to controllers category
+DEBUG: Categorizing page: 2024-08-ve7tit-controller-fixes (path: Documentation/changelog/2024-08-ve7tit-controller-fixes.tt)
+INFO: Added '2024-08-ve7tit-controller-fixes' to controllers category
+INFO: Added '2024-08-ve7tit-controller-fixes' to changelog category
+DEBUG: Categorizing page: controller_routing_guidelines (path: Documentation/general/controller_routing_guidelines.tt)
+INFO: Added 'controller_routing_guidelines' to controllers category
+DEBUG: Categorizing page: site_domain_resolution (path: Documentation/general/site_domain_resolution.tt)
+DEBUG: Categorizing page: documentation_system_guide (path: Documentation/roles/admin/documentation_system_guide.tt)
+INFO: Added 'documentation_system_guide' to admin_guides category
+DEBUG: Categorizing page: logging_best_practices (path: Documentation/general/logging_best_practices.tt)
+DEBUG: Categorizing page: member_resources (path: Documentation/sites/mcoop/member_resources.tt)
+INFO: Added 'member_resources' to site-specific category (site: MCOOP)
+DEBUG: Categorizing page: usbm (path: Documentation/usbm.tt)
+INFO: Added 'usbm' to controllers category
+DEBUG: Categorizing page: 2025-01-15-git-divergent-branches-fix (path: Documentation/changelog/2025-01-15-git-divergent-branches-fix.tt)
+INFO: Added '2025-01-15-git-divergent-branches-fix' to changelog category
+DEBUG: Categorizing page: Sites (path: Documentation/Sites.tt)
+DEBUG: Categorizing page: 2025-09-10-restart-starman-functionality (path: Documentation/changelog/2025-09-10-restart-starman-functionality.tt)
+INFO: Added '2025-09-10-restart-starman-functionality' to changelog category
+DEBUG: Categorizing page: api_credentials (path: Documentation/api_credentials.tt)
+DEBUG: Categorizing page: admintopmenu_guide (path: Documentation/developer/admintopmenu_guide.tt.bak)
+INFO: Added 'admintopmenu_guide' to admin_guides category
+INFO: Added 'admintopmenu_guide' to developer_guides category
+DEBUG: Categorizing page: role_based_access_fix (path: Documentation/changelog/role_based_access_fix.tt)
+INFO: Added 'role_based_access_fix' to changelog category
+DEBUG: Categorizing page: project_management_system (path: Documentation/general/project_management_system.tt)
+INFO: Added 'project_management_system' to modules category
+DEBUG: Categorizing page: 2025-07-01-cloudflare-application-id-and-rbac (path: Documentation/changelog/2025-07-01-cloudflare-application-id-and-rbac.tt)
+INFO: Added '2025-07-01-cloudflare-application-id-and-rbac' to changelog category
+DEBUG: Categorizing page: 2024-08-pagetop-hostname-display (path: Documentation/changelog/2024-08-pagetop-hostname-display.tt)
+INFO: Added '2024-08-pagetop-hostname-display' to changelog category
+DEBUG: Categorizing page: TODO_SYSTEM_DOCUMENTATION (path: Documentation/TODO_SYSTEM_DOCUMENTATION.tt)
+INFO: Added 'TODO_SYSTEM_DOCUMENTATION' to modules category
+DEBUG: Categorizing page: development_plan (path: Documentation/workshops/development_plan.tt)
+INFO: Added 'development_plan' to tutorials category
+DEBUG: Categorizing page: Documentation_Management (path: Documentation/roles/admin/Documentation_Management.tt)
+INFO: Added 'Documentation_Management' to admin_guides category
+DEBUG: Categorizing page: proxy_troubleshooting (path: Documentation/general/proxy_troubleshooting.tt)
+DEBUG: Categorizing page: tutorials (path: Documentation/tutorials.tt)
+DEBUG: Categorizing page: MailSystem (path: Documentation/general/MailSystem.tt)
+DEBUG: Categorizing page: admin (path: Documentation/admin.tt)
+INFO: Added 'admin' to controllers category
+INFO: Added 'admin' to admin_guides category
+DEBUG: Categorizing page: 2025-01-15-tt-file-compliance-fix (path: Documentation/changelog/2025-01-15-tt-file-compliance-fix.tt)
+INFO: Added '2025-01-15-tt-file-compliance-fix' to changelog category
+DEBUG: Categorizing page: documentation_guide (path: Documentation/sites/mcoop/documentation_guide.tt)
+INFO: Added 'documentation_guide' to site-specific category (site: MCOOP)
+DEBUG: Categorizing page: cloudflare_api_token_guide (path: Documentation/cloudflare_api_token_guide.tt)
+DEBUG: Categorizing page: all_docs (path: Documentation/all_docs.tt)
+DEBUG: Categorizing page: 2025-05-30-documentation-structure-simplification (path: Documentation/changelog/2025-05-30-documentation-structure-simplification.tt)
+INFO: Added '2025-05-30-documentation-structure-simplification' to changelog category
+DEBUG: Categorizing page: 2025-01-27-fix-schema-compare-containers (path: Documentation/changelog/2025-01-27-fix-schema-compare-containers.tt)
+INFO: Added '2025-01-27-fix-schema-compare-containers' to changelog category
+DEBUG: Categorizing page: todo_admin_guide (path: Documentation/roles/admin/todo_admin_guide.tt)
+INFO: Added 'todo_admin_guide' to admin_guides category
+INFO: Added 'todo_admin_guide' to modules category
+DEBUG: Categorizing page: move_docs_to_proper_location (path: Documentation/scripts/move_docs_to_proper_location.pl)
+DEBUG: Categorizing page: mail_user_guide (path: Documentation/roles/normal/mail_user_guide.tt)
+INFO: Added 'mail_user_guide' to user_guides category
+DEBUG: Categorizing page: user_management (path: Documentation/roles/admin/user_management.tt)
+INFO: Added 'user_management' to admin_guides category
+DEBUG: Categorizing page: 2025-05-16-documentation-workflow-consolidation (path: Documentation/changelog/2025-05-16-documentation-workflow-consolidation.tt)
+INFO: Added '2025-05-16-documentation-workflow-consolidation' to changelog category
+DEBUG: Categorizing page: Mail (path: Documentation/controllers/Mail.tt)
+INFO: Added 'Mail' to controllers category
+INFO: Added 'Mail' to models category
+DEBUG: Categorizing page: documentation_filename_issue (path: Documentation/general/documentation_filename_issue.tt)
+DEBUG: Categorizing page: Proxmox_CD_Visibility (path: Documentation/proxmox/Proxmox_CD_Visibility.tt)
+INFO: Added 'Proxmox_CD_Visibility' to proxmox category
+DEBUG: Categorizing page: documentation_organization (path: Documentation/documentation_organization.tt)
+DEBUG: Categorizing page: index (path: Documentation/workshops/index.tt)
+INFO: Added 'index' to tutorials category
+DEBUG: Categorizing page: Todo (path: Documentation/Todo.tt)
+INFO: Added 'Todo' to controllers category
+INFO: Added 'Todo' to models category
+INFO: Added 'Todo' to modules category
+DEBUG: Categorizing page: AIAssistants (path: Documentation/AIAssistants.tt)
+DEBUG: Categorizing page: template_system (path: Documentation/developer/template_system.tt)
+INFO: Added 'template_system' to developer_guides category
+DEBUG: Categorizing page: authentication_system (path: Documentation/developer/authentication_system.tt.bak)
+INFO: Added 'authentication_system' to developer_guides category
+DEBUG: Categorizing page: Api (path: Documentation/Api.tt)
+DEBUG: Categorizing page: ip_configuration (path: Documentation/proxmox/ip_configuration.tt)
+INFO: Added 'ip_configuration' to proxmox category
+DEBUG: Categorizing page: network_map_json_storage (path: Documentation/developer/network_map_json_storage.tt)
+INFO: Added 'network_map_json_storage' to developer_guides category
+DEBUG: Categorizing page: api (path: Documentation/proxmox/api.tt)
+INFO: Added 'api' to proxmox category
+DEBUG: Categorizing page: cleanup_formatting_title_files (path: Documentation/scripts/cleanup_formatting_title_files.sh)
+DEBUG: Categorizing page: mcoop_getting_started (path: Documentation/tutorials/mcoop_getting_started.tt)
+INFO: Added 'mcoop_getting_started' to site-specific category (site: MCOOP)
+INFO: Added 'mcoop_getting_started' to tutorials category
+DEBUG: Categorizing page: inventory_accounting_system_guideline (path: Documentation/developer/inventory-accounting-system-guideline.tt)
+INFO: Added 'inventory_accounting_system_guideline' to developer_guides category
+DEBUG: Categorizing page: offline_mode_system (path: Documentation/developer/offline_mode_system.tt)
+INFO: Added 'offline_mode_system' to developer_guides category
+DEBUG: Categorizing page: MetadataParser (path: Documentation/scripts/MetadataParser.pm)
+DEBUG: Categorizing page: 2025-04-navigation-improvements (path: Documentation/changelog/2025-04-navigation-improvements.tt)
+INFO: Added '2025-04-navigation-improvements' to changelog category
+DEBUG: Categorizing page: troubleshooting (path: Documentation/developer/troubleshooting.tt)
+INFO: Added 'troubleshooting' to developer_guides category
+DEBUG: Categorizing page: mail_documentation_update (path: Documentation/general/mail_documentation_update.tt)
+DEBUG: Categorizing page: Projects (path: Documentation/Projects.tt)
+INFO: Added 'Projects' to modules category
+DEBUG: Categorizing page: todo_edit_functionality (path: Documentation/changelog/todo_edit_functionality.tt)
+INFO: Added 'todo_edit_functionality' to changelog category
+INFO: Added 'todo_edit_functionality' to modules category
+DEBUG: Categorizing page: 2025-06-15-api-credentials-documentation-fix (path: Documentation/changelog/2025-06-15-api-credentials-documentation-fix.tt)
+INFO: Added '2025-06-15-api-credentials-documentation-fix' to changelog category
+DEBUG: Categorizing page: Documentation_Workflow (path: Documentation/general/Documentation_Workflow.tt)
+DEBUG: Categorizing page: linux_commands_reference (path: Documentation/general/linux_commands_reference.tt)
+DEBUG: Categorizing page: 2025-05-25-git-pull-debug-msg-fix (path: Documentation/changelog/2025-05-25-git-pull-debug-msg-fix.tt)
+INFO: Added '2025-05-25-git-pull-debug-msg-fix' to changelog category
+DEBUG: Categorizing page: mail_configuration_guide (path: Documentation/general/mail_configuration_guide.tt)
+DEBUG: Categorizing page: 2024-06-21-linux-commands-documentation (path: Documentation/changelog/2024-06-21-linux-commands-documentation.tt)
+INFO: Added '2024-06-21-linux-commands-documentation' to changelog category
+DEBUG: Categorizing page: main_changelog (path: Documentation/changelog/main_changelog.tt)
+INFO: Added 'main_changelog' to changelog category
+DEBUG: Categorizing page: shamanbotanicals (path: Documentation/Sites/shamanbotanicals.tt)
+DEBUG: Categorizing page: README (path: Documentation/controllers/README.tt)
+INFO: Added 'README' to controllers category
+DEBUG: Categorizing page: 2025-04-12-hosting-signup-implementation (path: Documentation/changelog/2025-04-12-hosting-signup-implementation.tt)
+INFO: Added '2025-04-12-hosting-signup-implementation' to changelog category
+DEBUG: Categorizing page: inventory_accounting_system (path: Documentation/developer/inventory_accounting_system.tt)
+INFO: Added 'inventory_accounting_system' to developer_guides category
+DEBUG: Categorizing page: todo_system (path: Documentation/controllers/todo_system.tt)
+INFO: Added 'todo_system' to controllers category
+INFO: Added 'todo_system' to modules category
+DEBUG: Categorizing page: document_management (path: Documentation/document_management.tt)
+DEBUG: Categorizing page: setup (path: Documentation/setup.tt)
+DEBUG: Categorizing page: 2024-06-project-edit-fix (path: Documentation/changelog/2024-06-project-edit-fix.tt)
+INFO: Added '2024-06-project-edit-fix' to changelog category
+DEBUG: Categorizing page: css_theme_system_rules (path: Documentation/developer/css_theme_system_rules.tt)
+INFO: Added 'css_theme_system_rules' to developer_guides category
+DEBUG: Categorizing page: test_metadata_parser (path: Documentation/scripts/test_metadata_parser.pl)
+DEBUG: Categorizing page: linux_commands (path: Documentation/roles/admin/linux_commands.tt)
+INFO: Added 'linux_commands' to admin_guides category
+DEBUG: Categorizing page: hybrid_database_architecture (path: Documentation/developer/hybrid_database_architecture.tt)
+INFO: Added 'hybrid_database_architecture' to developer_guides category
+DEBUG: Categorizing page: 2025-08-18-project-cards-css-fix (path: Documentation/changelog/2025-08-18-project-cards-css-fix.tt)
+INFO: Added '2025-08-18-project-cards-css-fix' to changelog category
+DEBUG: Categorizing page: completed_items (path: Documentation/completed_items.json.backup)
+DEBUG: Categorizing page: documentation_editor_guide (path: Documentation/general/documentation_editor_guide.tt)
+DEBUG: Categorizing page: THEME_SYSTEM_CONSOLIDATION (path: Documentation/general/THEME_SYSTEM_CONSOLIDATION.tt)
+DEBUG: Categorizing page: 2025-01-15-mailing-list-system-implementation (path: Documentation/changelog/2025-01-15-mailing-list-system-implementation.tt)
+INFO: Added '2025-01-15-mailing-list-system-implementation' to changelog category
+DEBUG: Categorizing page: 2025-05-15-documentation-system-update (path: Documentation/changelog/2025-05-15-documentation-system-update.tt)
+INFO: Added '2025-05-15-documentation-system-update' to changelog category
+DEBUG: Categorizing page: 2024-08-proxmox-debug-msg-fix (path: Documentation/changelog/2024-08-proxmox-debug-msg-fix.tt)
+INFO: Added '2024-08-proxmox-debug-msg-fix' to proxmox category
+INFO: Added '2024-08-proxmox-debug-msg-fix' to changelog category
+DEBUG: Categorizing page: DocumentManagement (path: Documentation/DocumentManagement.tt)
+DEBUG: Categorizing page: developer_guides (path: Documentation/developer_guides.tt.bak)
+DEBUG: Categorizing page: 2025-04-mcoop-admin-menu-restriction (path: Documentation/changelog/2025-04-mcoop-admin-menu-restriction.tt.bak)
+INFO: Added '2025-04-mcoop-admin-menu-restriction' to changelog category
+DEBUG: Categorizing page: 2024-06-15-login-redirect-fix (path: Documentation/changelog/2024-06-15-login-redirect-fix.tt)
+INFO: Added '2024-06-15-login-redirect-fix' to changelog category
+DEBUG: Categorizing page: authentication (path: Documentation/proxmox/authentication.tt)
+INFO: Added 'authentication' to proxmox category
+DEBUG: Categorizing page: 2025-04-pagetop-template-error-fix (path: Documentation/changelog/2025-04-pagetop-template-error-fix.tt)
+INFO: Added '2025-04-pagetop-template-error-fix' to changelog category
+DEBUG: Categorizing page: proxmox_commands (path: Documentation/proxmox_commands.tt)
+INFO: Added 'proxmox_commands' to proxmox category
+DEBUG: Categorizing page: templates (path: Documentation/sites/mcoop/templates.tt)
+INFO: Added 'templates' to site-specific category (site: MCOOP)
+DEBUG: Categorizing page: getting_started (path: Documentation/roles/normal/getting_started.tt)
+INFO: Added 'getting_started' to user_guides category
+DEBUG: Categorizing page: Forager (path: Documentation/Forager.tt)
+INFO: Added 'Forager' to controllers category
+DEBUG: Categorizing page: 2025-05-12-fix-documentation-controller-logging (path: Documentation/changelog/2025-05-12-fix-documentation-controller-logging.tt)
+INFO: Added '2025-05-12-fix-documentation-controller-logging' to controllers category
+INFO: Added '2025-05-12-fix-documentation-controller-logging' to changelog category
+DEBUG: Categorizing page: fix_project_edit_button (path: Documentation/general/fix_project_edit_button.tt)
+DEBUG: Categorizing page: starman_restart_card (path: Documentation/roles/admin/quick_reference/starman_restart_card.tt)
+INFO: Added 'starman_restart_card' to admin_guides category
+DEBUG: Categorizing page: 2024-07-proxmox-controller-fixes (path: Documentation/changelog/2024-07-proxmox-controller-fixes.tt)
+INFO: Added '2024-07-proxmox-controller-fixes' to controllers category
+INFO: Added '2024-07-proxmox-controller-fixes' to proxmox category
+INFO: Added '2024-07-proxmox-controller-fixes' to changelog category
+DEBUG: Categorizing page: file-locations (path: Documentation/developer/file-locations.tt)
+INFO: Added 'file-locations' to developer_guides category
+DEBUG: Categorizing page: Ve7tit (path: Documentation/controllers/Ve7tit.tt)
+INFO: Added 'Ve7tit' to controllers category
+DEBUG: Categorizing page: setup_directory_structure (path: Documentation/scripts/setup_directory_structure.sh)
+DEBUG: Categorizing page: 2025-08-30-hosting-signup-enhancements (path: Documentation/changelog/2025-08-30-hosting-signup-enhancements.tt)
+INFO: Added '2025-08-30-hosting-signup-enhancements' to changelog category
+DEBUG: Categorizing page: Site (path: Documentation/general/Site.tt)
+INFO: Added 'Site' to controllers category
+INFO: Added 'Site' to models category
+DEBUG: Categorizing page: User (path: Documentation/controllers/User.tt)
+INFO: Added 'User' to controllers category
+INFO: Added 'User' to models category
+DEBUG: Categorizing page: back_to_top (path: Documentation/general/back_to_top.tt)
+DEBUG: Categorizing page: todo_filtering_and_views (path: Documentation/general/todo_filtering_and_views.tt)
+INFO: Added 'todo_filtering_and_views' to modules category
+DEBUG: Categorizing page: markdown_viewer (path: Documentation/markdown_viewer.tt)
+DEBUG: Categorizing page: account_management (path: Documentation/roles/normal/account_management.tt)
+INFO: Added 'account_management' to user_guides category
+DEBUG: Categorizing page: cloudflare_api_token_ip_restriction_fix (path: Documentation/changelog/cloudflare_api_token_ip_restriction_fix.tt)
+INFO: Added 'cloudflare_api_token_ip_restriction_fix' to changelog category
+DEBUG: Categorizing page: 2025-01-27-template-system-fixes (path: Documentation/changelog/2025-01-27-template-system-fixes.tt)
+INFO: Added '2025-01-27-template-system-fixes' to changelog category
+DEBUG: Categorizing page: user_manual (path: Documentation/user_manual.tt)
+DEBUG: Categorizing page: documentation_migration_to_tt (path: Documentation/documentation_migration_to_tt.tt)
+DEBUG: Categorizing page: RestartStarman (path: Documentation/RestartStarman.tt)
+DEBUG: Categorizing page: 2025-01-15-software-upgrade-manager (path: Documentation/changelog/2025-01-15-software-upgrade-manager.tt)
+INFO: Added '2025-01-15-software-upgrade-manager' to changelog category
+DEBUG: Categorizing page: 2025-05-25-fix-formatting-title-logs (path: Documentation/changelog/2025-05-25-fix-formatting-title-logs.tt)
+INFO: Added '2025-05-25-fix-formatting-title-logs' to changelog category
+DEBUG: Categorizing page: recent_updates (path: Documentation/recent_updates.tt)
+DEBUG: Categorizing page: 2025-07-30-todo-time-field-fix (path: Documentation/changelog/2025-07-30-todo-time-field-fix.tt)
+INFO: Added '2025-07-30-todo-time-field-fix' to changelog category
+DEBUG: Categorizing page: proxmox_integration (path: Documentation/general/proxmox_integration.tt)
+INFO: Added 'proxmox_integration' to proxmox category
+DEBUG: Categorizing page: project_selection_log_creation (path: Documentation/general/project_selection_log_creation.tt)
+INFO: Added 'project_selection_log_creation' to modules category
+DEBUG: Categorizing page: admin_guide (path: Documentation/roles/admin/admin_guide.tt)
+INFO: Added 'admin_guide' to admin_guides category
+DEBUG: Categorizing page: ROUTING_FIXES (path: Documentation/general/ROUTING_FIXES.tt)
+DEBUG: Categorizing page: workshop_system (path: Documentation/general/workshop_system.tt)
+DEBUG: Categorizing page: HostingSignup_Mail (path: Documentation/controllers/HostingSignup_Mail.tt)
+INFO: Added 'HostingSignup_Mail' to controllers category
+DEBUG: Categorizing page: Mailing_List_System_Plan (path: Documentation/Mailing_List_System_Plan.tt)
+DEBUG: Categorizing page: api_reference (path: Documentation/roles/developer/api_reference.tt)
+INFO: Added 'api_reference' to developer_guides category
+DEBUG: Categorizing page: 2025-10-15-documentation-access-fixes (path: Documentation/changelog/2025-10-15-documentation-access-fixes.tt)
+INFO: Added '2025-10-15-documentation-access-fixes' to changelog category
+DEBUG: Categorizing page: Documentation_System (path: Documentation/roles/normal/Documentation_System.tt)
+INFO: Added 'Documentation_System' to user_guides category
+DEBUG: Categorizing page: Git (path: Documentation/Git.tt)
+DEBUG: Categorizing page: Starman (path: Documentation/Starman.tt)
+DEBUG: Categorizing page: mcoop_module (path: Documentation/general/mcoop_module.tt)
+DEBUG: Categorizing page: db_config_loading (path: Documentation/developer/db_config_loading.tt)
+INFO: Added 'db_config_loading' to developer_guides category
+DEBUG: Categorizing page: cloudflare_api_authentication (path: Documentation/cloudflare_api_authentication.tt)
+DEBUG: Categorizing page: setupcontorller (path: Documentation/setupcontorller.tt)
+DEBUG: Categorizing page: 2025-10-01-documentation-migration-to-tt (path: Documentation/changelog/2025-10-01-documentation-migration-to-tt.tt)
+INFO: Added '2025-10-01-documentation-migration-to-tt' to changelog category
+DEBUG: Categorizing page: production_deployment_system (path: Documentation/admin/production_deployment_system.tt)
+INFO: Added 'production_deployment_system' to admin_guides category
+DEBUG: Categorizing page: 2025-04-13-mcoop-url-case-fix-details (path: Documentation/changelog/2025-04-13-mcoop-url-case-fix-details.tt)
+INFO: Added '2025-04-13-mcoop-url-case-fix-details' to changelog category
+DEBUG: Categorizing page: DB_CONFIG_README (path: Documentation/system/DB_CONFIG_README.tt)
+DEBUG: Categorizing page: network_diagnostics (path: Documentation/general/network_diagnostics.tt)
+DEBUG: Categorizing page: documentation_migration_guide (path: Documentation/developer/documentation_migration_guide.tt)
+INFO: Added 'documentation_migration_guide' to developer_guides category
+DEBUG: Categorizing page: domain_sync (path: Documentation/cloudflare/domain_sync.tt)
+DEBUG: Categorizing page: FAQ (path: Documentation/controllers/FAQ.tt)
+INFO: Added 'FAQ' to controllers category
+INFO: Added 'FAQ' to user_guides category
+DEBUG: Categorizing page: DBIDocument (path: Documentation/DBIDocument.tt)
+DEBUG: Categorizing page: 2025-01-15_documentation_system_completion (path: Documentation/changelog/2025-01-15_documentation_system_completion.tt)
+INFO: Added '2025-01-15_documentation_system_completion' to changelog category
+DEBUG: Categorizing page: Installation (path: Documentation/Installation.tt)
+INFO: Added 'Installation' to admin_guides category
+INFO: Category 'changelog' has 70 pages
+INFO: Category 'developer_guides' has 24 pages
+INFO: Category 'controllers' has 30 pages
+INFO: Category 'modules' has 14 pages
+INFO: Category 'tutorials' has 6 pages
+INFO: Category 'proxmox' has 11 pages
+INFO: Category 'user_guides' has 6 pages
+INFO: Category 'admin_guides' has 22 pages
+INFO: Category 'general' has 273 pages
+INFO: Category 'models' has 13 pages
+INFO: Category 'site_specific' has 6 pages
+INFO: Category 'documentation' has 0 pages
+INFO: Page categorization completed
+INFO: Hybrid documentation system initialized: 273 total pages (272 auto-discovered + 4 overrides) across 12 categories
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:454] _perform_startup_operations - Performing one-time startup operations
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:334] track_application_start - Application started at 2025-08-19
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:363] generate_all_theme_css - Starting theme CSS generation
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: csc
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:397] generate_all_theme_css - Adding special styles for theme: mcoop
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: mcoop
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: default
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:397] generate_all_theme_css - Adding special styles for theme: apis
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: apis
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: dark
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: usbm
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:421] generate_all_theme_css - Completed theme CSS generation
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:477] _perform_startup_operations - Cached system info - Hostname: workstation.computersystemconsulting.ca, IP: 192.168.1.199
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:550] _test_database_connections - All database connections tested successfully
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:505] _perform_startup_operations - Startup operations completed successfully
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:560] _setup_site_cached - Setting up site for domain: workstation.local
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:799] setup_site - Starting setup_site action
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:809] setup_site - Extracted domain: workstation.local
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1038] site_setup - SiteName: CSC
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1054] site_setup - Using Catalyst's built-in proxy configuration for URLs without port
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1058] site_setup - Test URL: http://workstation.local:3000/test
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1065] site_setup - Set default HostName: http://workstation.local
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm:122] get_site_details_by_name - Getting site details for name: CSC
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm:133] get_site_details_by_name - Found site: ID=1, Name=CSC
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1106] site_setup - ControllerName set to: CSC
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:138] get_site_theme - Getting theme for site: CSC
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:98] load_theme_mappings - Loading theme mappings from: /home/shanta/PycharmProjects/comserv2/Comserv/root/static/config/theme_mappings.json
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:108] load_theme_mappings - Loaded theme mappings: WeaverBeck => default, MCOOP => mcoop, USBM => usbm, BMaster => apis, CSC => csc, Ve7tit => apis
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:175] get_site_theme - Available mappings: WeaverBeck, MCOOP, USBM, BMaster, CSC, Ve7tit
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:181] get_site_theme - Found exact match for site CSC: csc
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:87] validate_theme - Validated theme: csc (from: csc)
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:214] get_site_theme - Selected theme for CSC: csc
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1127] site_setup - Set theme_name in stash: csc
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1137] site_setup - Completed site_setup action with HostName: http://workstation.local
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1033] setup_site - Completed site setup
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:231] set_theme - Setting theme for site: CSC
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:54] get_all_themes - Getting all available themes
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:235] set_theme - Available themes: apis, csc, dark, default, mcoop, usbm
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:138] get_site_theme - Getting theme for site: CSC
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:162] get_site_theme - Using theme from session for CSC: csc
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:254] set_theme - Set theme for site CSC to csc
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:591] _setup_site_cached - Cached site setup for domain: workstation.local, SiteName: CSC
+INFO: [2025-08-19 15:47:41] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:198] index - Accessing documentation index
+DEBUG: [2025-08-19 15:47:41] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:267] index - Documentation index loaded with 0 pages for role: normal
+WARN: [2025-08-19 15:47:56] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1509] default - Page not found: /Documentation/search
+INFO: [2025-08-19 15:48:08] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:23] login - Accessing login page
+INFO: [2025-08-19 15:48:08] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:38] login - Stored referer in session: http://workstation.local:3000/Documentation
+INFO: [2025-08-19 15:48:08] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:58] login - Referer: http://workstation.local:3000/Documentation
+INFO: [2025-08-19 15:48:08] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:59] login - Session referer: http://workstation.local:3000/Documentation
+INFO: [2025-08-19 15:48:11] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:23] login - Accessing login page
+INFO: [2025-08-19 15:48:11] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:42] login - Using existing session referer: http://workstation.local:3000/Documentation
+INFO: [2025-08-19 15:48:11] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:58] login - Referer: http://workstation.local:3000/user/login
+INFO: [2025-08-19 15:48:11] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:59] login - Session referer: http://workstation.local:3000/Documentation
+INFO: [2025-08-19 15:48:14] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:77] do_login - Login process initiated.
+INFO: [2025-08-19 15:48:14] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:80] do_login - Request URI: http://workstation.local:3000/user/do_login, Method: POST
+INFO: [2025-08-19 15:48:14] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:95] do_login - Request method: POST
+INFO: [2025-08-19 15:48:14] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:114] do_login - Attempting login for username: Shanta
+INFO: [2025-08-19 15:48:14] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:133] do_login - Using session referer for redirect: http://workstation.local:3000/Documentation
+DEBUG: [2025-08-19 15:48:14] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:152] do_login - Final redirect path: http://workstation.local:3000/Documentation
+INFO: [2025-08-19 15:48:14] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1194] authenticate_user_with_fallback - Starting hybrid authentication for user 'Shanta'
+INFO: [2025-08-19 15:48:14] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1201] authenticate_user_with_fallback - Current backend: production_server
+INFO: [2025-08-19 15:48:14] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1207] authenticate_user_with_fallback - Available backends: shanta_forager, zerotier_forager, sqlite_offline, production_server, zerotier_server, workstation_forager, workstation_mysql, shanta_ency, production_forager
+DEBUG: [2025-08-19 15:48:14] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1212] authenticate_user_with_fallback - Backend 'shanta_forager': type=mysql, available=yes
+DEBUG: [2025-08-19 15:48:14] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1212] authenticate_user_with_fallback - Backend 'zerotier_forager': type=mysql, available=yes
+DEBUG: [2025-08-19 15:48:14] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1212] authenticate_user_with_fallback - Backend 'sqlite_offline': type=sqlite, available=yes
+DEBUG: [2025-08-19 15:48:14] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1212] authenticate_user_with_fallback - Backend 'production_server': type=mysql, available=yes
+DEBUG: [2025-08-19 15:48:14] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1212] authenticate_user_with_fallback - Backend 'zerotier_server': type=mysql, available=yes
+DEBUG: [2025-08-19 15:48:14] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1212] authenticate_user_with_fallback - Backend 'workstation_forager': type=mysql, available=yes
+DEBUG: [2025-08-19 15:48:14] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1212] authenticate_user_with_fallback - Backend 'workstation_mysql': type=mysql, available=yes
+DEBUG: [2025-08-19 15:48:14] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1212] authenticate_user_with_fallback - Backend 'shanta_ency': type=mysql, available=yes
+DEBUG: [2025-08-19 15:48:14] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1212] authenticate_user_with_fallback - Backend 'production_forager': type=mysql, available=yes
+INFO: [2025-08-19 15:48:14] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1219] authenticate_user_with_fallback - Step 1: Attempting local authentication for user 'Shanta'
+DEBUG: [2025-08-19 15:48:14] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1298] _try_local_authentication - Attempting local authentication for user 'Shanta'
+DEBUG: [2025-08-19 15:48:14] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1304] _try_local_authentication - Local connection DSN: dbi:mysql:database=ency;host=192.168.1.198;port=3306
+DEBUG: [2025-08-19 15:48:14] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1320] _try_local_authentication - Successfully connected to local database
+DEBUG: [2025-08-19 15:48:14] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1333] _try_local_authentication - Users table found in local database
+DEBUG: [2025-08-19 15:48:14] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1349] _try_local_authentication - User 'Shanta' found in local database, verifying password
+DEBUG: [2025-08-19 15:48:14] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1356] _try_local_authentication - Password hash comparison - provided: 6db9c32fe5..., stored: 6db9c32fe5...
+INFO: [2025-08-19 15:48:14] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1360] _try_local_authentication - Local authentication successful for user 'Shanta'
+INFO: [2025-08-19 15:48:14] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/HybridDB.pm:1224] authenticate_user_with_fallback - Local authentication successful for user 'Shanta'
+INFO: [2025-08-19 15:48:14] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:175] do_login - User 'Shanta' successfully authenticated via local backend 'production_server'
+INFO: [2025-08-19 15:48:14] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:206] do_login - Skipping site access validation for hybrid authentication - using site_id: 1
+INFO: [2025-08-19 15:48:14] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:237] do_login - Setting roles in session: admin
+INFO: [2025-08-19 15:48:14] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:267] do_login - Final roles in session: admin
+INFO: [2025-08-19 15:48:14] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/User.pm:283] do_login - Redirecting user 'Shanta' to: http://workstation.local:3000/Documentation
+INFO: [2025-08-19 15:48:14] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:198] index - Accessing documentation index
+DEBUG: [2025-08-19 15:48:14] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:207] index - Session roles: admin
+DEBUG: [2025-08-19 15:48:14] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:218] index - User role determined from session: admin, is_admin: 1
+DEBUG: [2025-08-19 15:48:14] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:267] index - Documentation index loaded with 4 pages for role: admin
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-08-19 15:49:51] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [197:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+INFO: [2025-08-19 15:49:53] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/NPM.pm:36] BUILD - NPM Controller initialized
+INFO: Starting Documentation controller initialization with hybrid approach (directory scan + config overrides)
+INFO: Loaded documentation configuration: 11 categories, 4 pages
+INFO: Step 1: Auto-discovering documentation files via directory scan
+INFO: Starting directory scan for documentation files
+INFO: Directory scan completed. Found 263 pages.
+INFO: Auto-discovered 263 documentation files
+INFO: Step 2: Applying configuration overrides
+INFO: Applied 4 configuration overrides
+INFO: Step 3: Categorizing all documentation pages
+INFO: Categorizing documentation pages
+INFO: Page categorization completed
+INFO: Hybrid documentation system initialized: 264 total pages (263 auto-discovered + 4 overrides) across 11 categories
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-08-19 15:50:12] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [197:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-08-19 15:50:26] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [197:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:454] _perform_startup_operations - Performing one-time startup operations
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:334] track_application_start - Application started at 2025-08-19
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:363] generate_all_theme_css - Starting theme CSS generation
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: usbm
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: dark
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:397] generate_all_theme_css - Adding special styles for theme: apis
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: apis
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: default
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:397] generate_all_theme_css - Adding special styles for theme: mcoop
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: mcoop
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: csc
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:421] generate_all_theme_css - Completed theme CSS generation
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:477] _perform_startup_operations - Cached system info - Hostname: workstation.computersystemconsulting.ca, IP: 192.168.1.199
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:550] _test_database_connections - All database connections tested successfully
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:505] _perform_startup_operations - Startup operations completed successfully
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:560] _setup_site_cached - Setting up site for domain: workstation.local
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:799] setup_site - Starting setup_site action
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:809] setup_site - Extracted domain: workstation.local
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1038] site_setup - SiteName: CSC
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1054] site_setup - Using Catalyst's built-in proxy configuration for URLs without port
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1058] site_setup - Test URL: http://workstation.local:3000/test
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1065] site_setup - Set default HostName: http://workstation.local
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm:122] get_site_details_by_name - Getting site details for name: CSC
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm:133] get_site_details_by_name - Found site: ID=1, Name=CSC
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1106] site_setup - ControllerName set to: CSC
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:138] get_site_theme - Getting theme for site: CSC
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:162] get_site_theme - Using theme from session for CSC: csc
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1127] site_setup - Set theme_name in stash: csc
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1137] site_setup - Completed site_setup action with HostName: http://workstation.local
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1033] setup_site - Completed site setup
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:231] set_theme - Setting theme for site: CSC
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:54] get_all_themes - Getting all available themes
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:235] set_theme - Available themes: apis, csc, dark, default, mcoop, usbm
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:138] get_site_theme - Getting theme for site: CSC
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:162] get_site_theme - Using theme from session for CSC: csc
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:254] set_theme - Set theme for site CSC to csc
+INFO: [2025-08-19 15:50:44] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:591] _setup_site_cached - Cached site setup for domain: workstation.local, SiteName: CSC
+WARN: [2025-08-19 15:50:44] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1509] default - Page not found: /static/images/icons/link.svg
+INFO: [2025-08-19 15:50:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:198] index - Accessing documentation index
+DEBUG: [2025-08-19 15:50:45] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:207] index - Session roles: admin
+DEBUG: [2025-08-19 15:50:45] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:218] index - User role determined from session: admin, is_admin: 1
+DEBUG: [2025-08-19 15:50:45] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:267] index - Documentation index loaded with 4 pages for role: admin
+WARN: [2025-08-19 15:50:51] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1509] default - Page not found: /Documentation/search
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-08-19 15:54:42] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [197:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+INFO: [2025-08-19 15:54:43] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/NPM.pm:36] BUILD - NPM Controller initialized
+INFO: Starting Documentation controller initialization with hybrid approach (directory scan + config overrides)
+INFO: Loaded documentation configuration: 11 categories, 4 pages
+INFO: Step 1: Auto-discovering documentation files via directory scan
+INFO: Starting directory scan for documentation files
+INFO: Directory scan completed. Found 263 pages.
+INFO: Auto-discovered 263 documentation files
+INFO: Step 2: Applying configuration overrides
+INFO: Applied 4 configuration overrides
+INFO: Step 3: Categorizing all documentation pages
+INFO: Categorizing documentation pages
+INFO: Page categorization completed
+INFO: Hybrid documentation system initialized: 264 total pages (263 auto-discovered + 4 overrides) across 11 categories
+INFO: [2025-08-19 17:00:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:454] _perform_startup_operations - Performing one-time startup operations
+INFO: [2025-08-19 17:00:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:334] track_application_start - Application started at 2025-08-20
+INFO: [2025-08-19 17:00:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:363] generate_all_theme_css - Starting theme CSS generation
+INFO: [2025-08-19 17:00:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: usbm
+INFO: [2025-08-19 17:00:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: dark
+INFO: [2025-08-19 17:00:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:397] generate_all_theme_css - Adding special styles for theme: apis
+INFO: [2025-08-19 17:00:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: apis
+INFO: [2025-08-19 17:00:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: default
+INFO: [2025-08-19 17:00:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:397] generate_all_theme_css - Adding special styles for theme: mcoop
+INFO: [2025-08-19 17:00:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: mcoop
+INFO: [2025-08-19 17:00:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: csc
+INFO: [2025-08-19 17:00:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:421] generate_all_theme_css - Completed theme CSS generation

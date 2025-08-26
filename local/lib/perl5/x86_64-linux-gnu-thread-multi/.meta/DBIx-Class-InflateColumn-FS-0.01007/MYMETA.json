@@ -1,0 +1,56 @@
+{
+   "abstract" : "Inflate/deflate columns to Path::Class::File objects",
+   "author" : [
+      "semifor: Marc Mims <marc@questright.com>"
+   ],
+   "dynamic_config" : 0,
+   "generated_by" : "Module::Install version 0.99, CPAN::Meta::Converter version 2.150010",
+   "license" : [
+      "perl_5"
+   ],
+   "meta-spec" : {
+      "url" : "http://search.cpan.org/perldoc?CPAN::Meta::Spec",
+      "version" : 2
+   },
+   "name" : "DBIx-Class-InflateColumn-FS",
+   "no_index" : {
+      "directory" : [
+         "inc",
+         "t"
+      ]
+   },
+   "prereqs" : {
+      "build" : {
+         "requires" : {
+            "DBD::SQLite" : "1.12",
+            "DBICx::TestDatabase" : "0",
+            "ExtUtils::MakeMaker" : "6.42",
+            "File::Find" : "0"
+         }
+      },
+      "configure" : {
+         "requires" : {
+            "ExtUtils::MakeMaker" : "0"
+         }
+      },
+      "runtime" : {
+         "requires" : {
+            "DBD::SQLite" : "1.12",
+            "DBICx::TestDatabase" : "0",
+            "DBIx::Class" : "0.08",
+            "DBIx::Class::UUIDColumns" : "0.02005",
+            "File::Find" : "0",
+            "Path::Class" : "0",
+            "perl" : "5.006001"
+         }
+      }
+   },
+   "release_status" : "stable",
+   "resources" : {
+      "license" : [
+         "http://dev.perl.org/licenses/"
+      ]
+   },
+   "version" : "0.01007",
+   "x_serialization_backend" : "JSON::PP version 4.16"
+}

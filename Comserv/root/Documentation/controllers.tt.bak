@@ -1,0 +1,53 @@
+[% PageVersion = 'Comserv/root/Documentation/controllers.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Controllers' %]
+
+<!-- Documentation page for Controllers -->
+<div class="documentation-content">
+
+[% IF categories.controllers %]
+<section class="doc-section admin-only">
+    <h2 class="section-toggle">Controller Documentation</h2>
+    <p>Technical details for system controllers. <span class="admin-badge">Admin Only</span></p>
+    <div class="section-content">
+        <a href="[% c.uri_for('/Documentation/controllers/index') %]" class="doc-card special-card">
+            <h3>All Controllers</h3>
+            <p>View a complete list of all controllers in the system.</p>
+            <span class="file-type-badge template">template</span>
+            <span class="role-badge">Admin Only</span>
+        </a>
+        
+        <div class="controller-grid">
+            [% controller_count = 0 %]
+            [% # Debug output %]
+                <div class="debug-info">
+                    <p>Controller pages: [% categories.controllers.pages.size %]</p>
+                    <p>Controller pages: [% categories.controllers.pages.join(", ") %]</p>
+                </div>
+            [% FOREACH page_name IN categories.controllers.pages.sort %]
+                [% IF structured_pages.$page_name %]
+                    [% page = structured_pages.$page_name %]
+                    [% controller_count = controller_count + 1 %]
+                    <a href="[% page.url %]" class="doc-card">
+                        <h3>[% page.title %]</h3>
+                        <p>[% page.description || 'Controller documentation.' %]</p>
+                        <span class="role-badge">Admin Only</span>
+                    </a>
+        </div>
+        
+        [% IF controller_count == 0 %]
+        <div class="no-docs-message">
+            <p>No controller documentation files found. Please check the Documentation controller configuration.</p>
+        </div>
+        
+        <a href="[% c.uri_for('/Documentation/controllers/controller_list') %]" class="doc-card special-card">
+            <h3>Controller Documentation Status</h3>
+            <p>View the documentation status of all controllers in the system.</p>
+            <span class="file-type-badge markdown">markdown</span>
+            <span class="role-badge">Admin Only</span>
+        </a>
+    </div>
+</section>

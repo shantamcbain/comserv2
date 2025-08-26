@@ -1,0 +1,1357 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="091e6bc3-eca4-486d-bab0-56e425fed0ec" name="Changes" comment="added all files out of tracking mostly .tt files for documentation." />
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="documentation" />
+      </map>
+    </option>
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;shantamcbain&quot;
+  }
+}</component>
+  <component name="GitToolBoxStore">
+    <option name="recentBranches">
+      <RecentBranches>
+        <option name="branchesForRepo">
+          <list>
+            <RecentBranchesForRepo>
+              <option name="branches">
+                <list>
+                  <RecentBranch>
+                    <option name="branchName" value="main" />
+                    <option name="lastUsedInstant" value="1756220476" />
+                  </RecentBranch>
+                  <RecentBranch>
+                    <option name="branchName" value="Pages" />
+                    <option name="lastUsedInstant" value="1756220349" />
+                  </RecentBranch>
+                  <RecentBranch>
+                    <option name="branchName" value="documentation" />
+                    <option name="lastUsedInstant" value="1756220318" />
+                  </RecentBranch>
+                  <RecentBranch>
+                    <option name="branchName" value="master" />
+                    <option name="lastUsedInstant" value="1756218271" />
+                  </RecentBranch>
+                  <RecentBranch>
+                    <option name="branchName" value="Coop" />
+                    <option name="lastUsedInstant" value="1745510991" />
+                  </RecentBranch>
+                </list>
+              </option>
+              <option name="repositoryRootUrl" value="file://$PROJECT_DIR$" />
+            </RecentBranchesForRepo>
+          </list>
+        </option>
+      </RecentBranches>
+    </option>
+  </component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/shantamcbain/comserv2.git&quot;,
+    &quot;accountId&quot;: &quot;fa86b72c-4ab6-42e3-8631-55fc4f6699f1&quot;
+  }
+}</component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 1
+}</component>
+  <component name="ProjectId" id="2si15jTiM8KARMz1aHq3sgUXksG" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.zencoder-patch-add-chat-message-raw-content": "true",
+    "RunOnceActivity.zencoder-patch-chat-storage-migration": "true",
+    "RunOnceActivity.zencoder-patch-generate-chat-message-id": "true",
+    "RunOnceActivity.zencoder-patch-migrate-custom-instruction": "true",
+    "RunOnceActivity.zencoder-patch-migrate-repo-info-to-rules": "true",
+    "SHELLCHECK.PATH": "/home/shanta/.local/share/JetBrains/PyCharmCE2025.1/Shell Script/shellcheck",
+    "git-widget-placeholder": "main",
+    "last_opened_file_path": "/home/shanta/PycharmProjects/comserv2",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "preferences.pluginManager",
+    "settings.editor.splitter.proportion": "0.30549607",
+    "vue.rearranger.settings.migration": "true"
+  },
+  "keyToStringList": {
+    "ChangesTree.GroupingKeys": [
+      "repository"
+    ]
+  }
+}]]></component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/Comserv/root/WorkShops/uploads" />
+      <recent name="$PROJECT_DIR$/Comserv/root/Documentation" />
+      <recent name="$PROJECT_DIR$/Comserv/root/templates/Documentation" />
+      <recent name="$PROJECT_DIR$/Comserv/root/cloudflare" />
+      <recent name="$PROJECT_DIR$/Comserv/root/Documentation/developer" />
+    </key>
+  </component>
+  <component name="RunManager">
+    <configuration name="main" type="PythonConfigurationType" factoryName="Python" nameIsGenerated="true">
+      <module name="comserv2" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/main.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-python-sdk-d9fa9deec7cb-d902c0275401-com.jetbrains.pycharm.community.sharedIndexes.bundled-PC-252.23892.515" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="091e6bc3-eca4-486d-bab0-56e425fed0ec" name="Changes" comment="" />
+      <created>1738923400237</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1738923400237</updated>
+      <workItem from="1745937252483" duration="26000" />
+      <workItem from="1746202530538" duration="89000" />
+      <workItem from="1746202632318" duration="1540000" />
+      <workItem from="1747080170062" duration="31000" />
+    </task>
+    <task id="LOCAL-00046" summary="Enhance: Update documentation pages with improved structure and role-based access checks">
+      <option name="closed" value="true" />
+      <created>1749653081012</created>
+      <option name="number" value="00046" />
+      <option name="presentableId" value="LOCAL-00046" />
+      <option name="project" value="LOCAL" />
+      <updated>1749653081012</updated>
+    </task>
+    <task id="LOCAL-00047" summary="Add PDF conversion functionality and presentation management features">
+      <option name="closed" value="true" />
+      <created>1749696953032</created>
+      <option name="number" value="00047" />
+      <option name="presentableId" value="LOCAL-00047" />
+      <option name="project" value="LOCAL" />
+      <updated>1749696953032</updated>
+    </task>
+    <task id="LOCAL-00048" summary="Enhance: Add user authentication methods and update herb management functionality">
+      <option name="closed" value="true" />
+      <created>1750132316879</created>
+      <option name="number" value="00048" />
+      <option name="presentableId" value="LOCAL-00048" />
+      <option name="project" value="LOCAL" />
+      <updated>1750132316879</updated>
+    </task>
+    <task id="LOCAL-00049" summary="fix: Resolve sync button functionality and improve schema comparison UX&#10;&#10;- Fixed result file lookup logic in sync methods by correcting mapping key structure&#10;- Enhanced result file parsing to handle both hash and array field definition formats&#10;- Added missing File::Slurp function imports (read_file, write_file)&#10;- Improved field replacement logic to support inconsistent Result file formats&#10;- Enhanced data type display by separating base type from size (varchar vs 255)&#10;- Added sticky field headers for better navigation in long field lists&#10;- Implemented directional sync buttons with clear visual indicators&#10;- Added comprehensive error debugging for troubleshooting sync issues&#10;- Enhanced visual feedback with difference highlighting and warning icons&#10;- Added color-coded legend and improved user instructions&#10;&#10;Fixes sync button error: &quot;Result file not found for table 'event'&quot;&#10;Addresses user concerns about confusing data type display and field navigation">
+      <option name="closed" value="true" />
+      <created>1750178299598</created>
+      <option name="number" value="00049" />
+      <option name="presentableId" value="LOCAL-00049" />
+      <option name="project" value="LOCAL" />
+      <updated>1750178299598</updated>
+    </task>
+    <task id="LOCAL-00050" summary="Fix debug information display and enhance data type normalization in schema comparison&#10;&#10;This commit addresses two critical issues in the schema comparison functionality:&#10;&#10;1. **Fixed Debug Information Display Issue**&#10;   - Debug information was showing regardless of session debug_mode setting&#10;   - Added proper debug_mode checks throughout the application&#10;   - Fixed in Admin.pm, DBForager.pm, Mail.pm, and schema_compare.tt&#10;   - Debug info now only displays when session debug_mode = 1&#10;&#10;2. **Enhanced Data Type Normalization**&#10;   - Improved normalize_data_type() function to handle size specifications&#10;   - Added comprehensive database type mapping for cross-database compatibility&#10;   - Removes size specs: varchar(255) → varchar, int(11) → int&#10;   - Handles case variations: INT → integer, VARCHAR → varchar&#10;   - Removes modifiers: unsigned, signed, zerofill, binary&#10;   - Added support for 25+ database type variations&#10;&#10;**Files Modified:**&#10;- Comserv/lib/Comserv/Controller/Admin.pm&#10;  * Fixed debug message display in all admin actions&#10;  * Enhanced normalize_data_type() with comprehensive type mapping&#10;  * Added debug info for data type comparisons when debug_mode enabled&#10;  * Updated compare_field_attributes() to include context and field name&#10;&#10;- Comserv/lib/Comserv/Model/DBForager.pm&#10;  * Fixed herb search debug messages to respect debug_mode&#10;&#10;- Comserv/lib/Comserv/Model/Mail.pm&#10;  * Fixed SMTP and email debug messages to respect debug_mode&#10;&#10;- Comserv/root/admin/schema_compare.tt&#10;  * Modified JavaScript to conditionally show debug info&#10;  * Added debug_mode parameter to buildFieldComparisonHTML()&#10;  * Updated AJAX handling to pass debug_mode from server&#10;&#10;**Impact:**&#10;- Eliminates unwanted debug information display for regular users&#10;- Significantly reduces false positives in schema comparison&#10;- Improves accuracy of database-to-Result file type matching&#10;- Better cross-database compatibility (MySQL, PostgreSQL, SQLite)&#10;&#10;**Testing:**&#10;- Verified debug info only shows when debug_mode = 1&#10;- Confirmed data type normalization handles common variations&#10;- Tested schema comparison with various database types&#10;&#10;Fixes: Debug information display issue&#10;Enhances: Data type comparison accuracy in schema_compare tool">
+      <option name="closed" value="true" />
+      <created>1750189936872</created>
+      <option name="number" value="00050" />
+      <option name="presentableId" value="LOCAL-00050" />
+      <option name="project" value="LOCAL" />
+      <updated>1750189936872</updated>
+    </task>
+    <task id="LOCAL-00051" summary="feat: Implement Apiary Management System Foundation with Development Planning&#10;&#10;- Add comprehensive Apiary landing page with dashboard statistics&#10;- Integrate Queen Rearing module as requested&#10;- Leverage existing todo system for task management&#10;- Add development planning section with progress tracking&#10;- Create bee-inspired theme (apiary.css) with responsive design&#10;- Enhance Apiary controller with statistics methods&#10;- Extend ApiaryModel with hive, inspection, and todo statistics&#10;- Add role-based access control (Guest, User, Beekeeper, Admin)&#10;- Create comprehensive changelog documentation&#10;- Implement debug mode following established patterns&#10;&#10;Files Added:&#10;- Comserv/root/Apiary/index.tt (main dashboard)&#10;- Comserv/root/static/css/themes/apiary.css (custom theme)&#10;- Comserv/root/Documentation/changelog/2025-01-27-apiary-management-system-foundation.tt&#10;&#10;Files Modified:&#10;- Comserv/lib/Comserv/Controller/Apiary.pm (enhanced with statistics)&#10;- Comserv/lib/Comserv/Model/ApiaryModel.pm (added statistical methods)&#10;&#10;This foundation provides a development planning approach that integrates&#10;with existing infrastructure while maintaining focus on beekeeping operations.">
+      <option name="closed" value="true" />
+      <created>1750261120159</created>
+      <option name="number" value="00051" />
+      <option name="presentableId" value="LOCAL-00051" />
+      <option name="project" value="LOCAL" />
+      <updated>1750261120159</updated>
+    </task>
+    <task id="LOCAL-00052" summary="fix: Resolve template system double header issues and enhance Apiary Management System&#10;&#10;PROBLEMS RESOLVED:&#10;- Double header display caused by conflicting H1 tags between layout wrapper and individual templates&#10;- Template syntax errors causing missing end token errors in TT processing&#10;- Inconsistent PageVersion format across templates (incorrect dates like 2025/05/259)&#10;- Inline CSS styles not following the established theme system architecture&#10;- Template structure confusion due to misunderstanding of Catalyst TT wrapper system&#10;&#10;TEMPLATE SYSTEM FIXES:&#10;- Fixed layout.tt wrapper system understanding - individual templates auto-wrapped&#10;- Converted conflicting H1 headers to H2 in individual templates (apiary.tt, dev/index.tt, BMaster.tt, accounts.tt)&#10;- Standardized PageVersion format: filename.tt,v version date username Exp username&#10;- Cleaned up template syntax errors and improved debug block handling&#10;- Removed unnecessary layout includes from individual templates&#10;&#10;CSS THEME SYSTEM IMPROVEMENTS:&#10;- Moved inline styles from templates to theme-specific CSS files&#10;- Enhanced apiary.css with new classes: .graph-container, .no-data-message&#10;- Added responsive content-wrapper styles to base.css&#10;- Maintained theme color consistency and hover effects&#10;&#10;APIARY MANAGEMENT SYSTEM ENHANCEMENTS:&#10;- Improved Apiary/index.tt with proper role-based access control&#10;- Enhanced dashboard statistics display and quick actions&#10;- Added comprehensive feature grid for hive management, tasks, projects, inventory&#10;- Implemented proper guest/user/beekeeper access levels&#10;&#10;DOCUMENTATION UPDATES:&#10;- Created comprehensive changelog documenting template system fixes&#10;- Replaced apiary foundation changelog with focused template system fixes&#10;- Documented proper template hierarchy and wrapper system usage&#10;&#10;TECHNICAL IMPROVEMENTS:&#10;- Standardized debug mode checking to c.session.debug_mode&#10;- Improved semantic HTML hierarchy (H1 for app header, H2 for page headers)&#10;- Enhanced maintainability through consistent coding patterns&#10;- Better separation of concerns between layout, styling, and content&#10;&#10;Files modified: 9 templates, 2 CSS files, 1 changelog&#10;Status: Template system stabilized, ready for continued Apiary development">
+      <option name="closed" value="true" />
+      <created>1750282178555</created>
+      <option name="number" value="00052" />
+      <option name="presentableId" value="LOCAL-00052" />
+      <option name="project" value="LOCAL" />
+      <updated>1750282178555</updated>
+    </task>
+    <task id="LOCAL-00053" summary="feat: Enhanced schema comparison with Result file generation and expandable table interface&#10;&#10;This commit implements comprehensive improvements to the admin schema comparison functionality:&#10;&#10;## New Features:&#10;- **Expandable Table Interface**: Tables without Result files now display expandable field lists showing column details (name, type, nullable status)&#10;- **Automated Result File Generation**: Added &quot;Create Result&quot; button that generates proper DBIx::Class Result files from database table schema&#10;- **Improved User Experience**: Enhanced feedback system with informative messages and graceful handling of application restarts&#10;&#10;## Backend Changes (Admin.pm):&#10;- Added `create_result_from_table` AJAX endpoint with proper authentication and error handling&#10;- Implemented comprehensive table schema introspection using database information_schema&#10;- Added automatic Result file generation with proper DBIx::Class structure including:&#10;  - Package declaration with correct namespace&#10;  - Table configuration with add_columns() method&#10;  - Primary key detection and configuration&#10;  - Proper column data types, constraints, and default values&#10;  - Template structure for future relationship definitions&#10;- Enhanced logging for debugging and troubleshooting&#10;&#10;## Frontend Changes (schema_compare.tt):&#10;- Removed redundant layout wrapper to prevent double-wrapping issues&#10;- Added expandable table rows with toggle functionality for tables without Result files&#10;- Implemented AJAX-powered table schema loading with loading indicators&#10;- Added &quot;Create Result&quot; button with progress feedback and error handling&#10;- Enhanced user experience with informative alerts and automatic page refresh after app restart&#10;- Cleaned up debugging console statements for production readiness&#10;&#10;## Technical Implementation:&#10;- **Schema Introspection**: Queries information_schema.columns for accurate table structure&#10;- **File Generation**: Creates Result files in proper location (lib/Comserv/Model/Schema/Forager/Result/)&#10;- **Error Handling**: Comprehensive error checking for database connections, file operations, and user permissions&#10;- **Security**: Admin role verification for all Result file creation operations&#10;- **Development Integration**: Handles expected app restart behavior when new Result files are created&#10;&#10;## User Workflow Improvements:&#10;1. Tables without Result files now show expandable field information&#10;2. Single-click Result file creation with progress feedback&#10;3. Automatic handling of development server restart&#10;4. Clear success/error messaging throughout the process&#10;&#10;This enhancement significantly improves the database schema management workflow by providing both visibility into table structures and automated Result file generation capabilities.&#10;&#10;Files modified:&#10;- Comserv/lib/Comserv/Controller/Admin.pm&#10;- Comserv/root/admin/schema_compare.tt">
+      <option name="closed" value="true" />
+      <created>1750341751585</created>
+      <option name="number" value="00053" />
+      <option name="presentableId" value="LOCAL-00053" />
+      <option name="project" value="LOCAL" />
+      <updated>1750341751585</updated>
+    </task>
+    <task id="LOCAL-00054" summary="&#10;- Added detailed 4-phase migration roadmap to Apiary index page&#10;- Phase 1: Database Foundation (In Progress) - normalized table structure&#10;- Phase 2: Data Migration Utilities (Planned) - Forager to Ency migration&#10;- Phase 3: Application Development (Planned) - modern interfaces&#10;- Phase 4: Legacy Integration (Planned) - backward compatibility&#10;&#10;Key Features:&#10;- Visual progress tracking with status indicators&#10;- Current focus on Queen Performance normalization&#10;- Legacy data analysis and migration strategy&#10;- Action-oriented interface with Todo system integration&#10;- Comprehensive CSS styling matching apiary theme&#10;&#10;Migration Strategy:&#10;- Hybrid approach: new features in Ency, legacy data accessible&#10;- Normalize ApisQueenLogTb denormalized structure (box_1_*, box_2_*, etc.)&#10;- Create proper Hive → Box → Frame → Content relationships&#10;- Preserve historical data while enabling modern functionality&#10;&#10;Files modified:&#10;- Comserv/root/Apiary/index.tt: Added migration planning section&#10;- Comserv/root/static/css/themes/apiary.css: Added migration styling&#10;&#10;This provides a persistent roadmap for multi-session development work.&quot;">
+      <option name="closed" value="true" />
+      <created>1750349395489</created>
+      <option name="number" value="00054" />
+      <option name="presentableId" value="LOCAL-00054" />
+      <option name="project" value="LOCAL" />
+      <updated>1750349395489</updated>
+    </task>
+    <task id="LOCAL-00055" summary="Fix incorrect schema references causing module loading errors&#10;&#10;- Remove duplicate Hive.pm file from incorrect Schema/Result directory&#10;- Update schema references in Site.pm files to use correct Ency namespace&#10;- Fix belongs_to and has_many relationships to reference Comserv::Model::Schema::Ency::Result:: instead of Comserv::Model::Schema::Result::&#10;- Resolves &quot;Can't locate Comserv/Model/Schema/Result/Yard.pm&quot; compilation error&#10;&#10;Files changed:&#10;- Deleted: Comserv/lib/Comserv/Model/Schema/Result/Hive.pm (duplicate/incorrect)&#10;- Modified: Comserv/lib/Comserv/Model/Schema/Ency/Result/Site.pm&#10;- Modified: Comserv/lib/Comserv/Model/Schema/Ency/Result/System/Site.pm&#10;&#10;The schema structure follows the pattern:&#10;- Ency schema: Main application models&#10;- Forager schema: Legacy models  &#10;- Base Result directory: Should remain empty">
+      <option name="closed" value="true" />
+      <created>1750352645700</created>
+      <option name="number" value="00055" />
+      <option name="presentableId" value="LOCAL-00055" />
+      <option name="project" value="LOCAL" />
+      <updated>1750352645700</updated>
+    </task>
+    <task id="LOCAL-00056" summary="fix(Apiary): Correct template location and apply theme formatting to inspection form&#10;&#10;- Move new_inspection template from ENCY module to proper Apiary directory&#10;  * Relocated ENCY/apiary/new_inspection_enhanced.tt → Apiary/new_inspection.tt&#10;  * Updated Apiary.pm controller references to use correct template path&#10;  * Removed incorrectly placed file from ENCY module (plant database)&#10;&#10;- Apply theme system styling to replace Bootstrap classes&#10;  * Replace Bootstrap accordion with feature-card layout&#10;  * Convert form-control to form-input with theme variables&#10;  * Update container structure to use apiary-container system&#10;  * Maintain all JavaScript functionality with updated class names&#10;&#10;- Extend base-containers.css with comprehensive form styling&#10;  * Add form-grid layouts and input field styling&#10;  * Implement checkbox groups and search input components&#10;  * Add alert and display components using theme variables&#10;  * Include responsive design for mobile compatibility&#10;&#10;- Create supporting Apiary templates&#10;  * Add Apiary/inspections.tt for inspection management&#10;  * Maintain existing Apiary/index.tt theme structure&#10;&#10;- Preserve all form functionality&#10;  * Queen search and selection system&#10;  * Dynamic hive configuration loading&#10;  * Auto-save and form validation&#10;  * Box-by-box inspection interface&#10;&#10;Fixes inspection form displaying with gray Bootstrap styling instead of &#10;proper theme colors. Form now integrates seamlessly with Apiary module&#10;design system and follows established naming conventions.&#10;Modified:&#10;- Comserv/lib/Comserv/Controller/Apiary.pm&#10;- Comserv/root/static/css/themes/base-containers.css&#10;&#10;Added:&#10;- Comserv/root/Apiary/new_inspection.tt&#10;- Comserv/root/Apiary/inspections.tt&#10;&#10;Deleted:&#10;- Comserv/root/ENCY/apiary/new_inspection_enhanced.tt">
+      <option name="closed" value="true" />
+      <created>1750379735764</created>
+      <option name="number" value="00056" />
+      <option name="presentableId" value="LOCAL-00056" />
+      <option name="project" value="LOCAL" />
+      <updated>1750379735764</updated>
+    </task>
+    <task id="LOCAL-00057" summary="Fix field addition functionality in schema comparison tool&#10;&#10;- Fixed get_table_result_comparison_v2() to properly check file existence&#10;  * Changed has_result_file logic to verify both mapping and actual file presence&#10;  * Prevents false negatives when result files exist but weren't being detected&#10;&#10;- Enhanced build_result_table_mapping() with improved debugging&#10;  * Added logging to track result file discovery and table name extraction&#10;  * Streamlined mapping process while maintaining comprehensive error tracking&#10;&#10;- Fixed syntax errors in WeatherConfig.pm Result file&#10;  * Added missing commas between field definitions&#10;  * Corrected indentation for consistency with project standards&#10;&#10;- Improved error handling and logging in add_field_to_table action&#10;  * Added detailed mapping verification before field addition attempts&#10;  * Enhanced debugging output for troubleshooting mapping issues&#10;&#10;- Cleaned up excessive debug logging while preserving essential error tracking&#10;&#10;This resolves the &quot;No result file found for table&quot; errors and enables proper&#10;bidirectional field synchronization between database tables and Result files.&#10;Both &quot;Add to Table&quot; and &quot;Add to Result&quot; buttons should now function correctly.">
+      <option name="closed" value="true" />
+      <created>1750553415329</created>
+      <option name="number" value="00057" />
+      <option name="presentableId" value="LOCAL-00057" />
+      <option name="project" value="LOCAL" />
+      <updated>1750553415329</updated>
+    </task>
+    <task id="LOCAL-00058" summary="Fix logging method and integrate documentation CSS with universal theme system&#10;&#10;## Logging Fix&#10;- Fixed parameter misalignment in Comserv::Util::Logging::log_to_file method&#10;- Added proper handling for both instance and class method calls&#10;- Resolved &quot;Use of uninitialized value&quot; warnings in logging operations&#10;&#10;## CSS Theme System Integration&#10;- Moved documentation CSS from separate files to universal theme system&#10;- Removed standalone documentation.css and components/documentation.css files&#10;- Created themes/documentation.css using universal container classes from base-containers.css&#10;- Updated all .tt files to remove CSS includes (now handled by theme system)&#10;- Added documentation variables to default.css and mcoop.css themes&#10;&#10;## Universal Container System Implementation&#10;- Documentation now uses apiary management system's universal container classes&#10;- Applied consistent styling: .apiary-container, .feature-card, .btn classes&#10;- Ensured theme-aware styling through CSS variables&#10;- Maintained responsive design and accessibility&#10;&#10;## Files Modified&#10;- lib/Comserv/Util/Logging.pm - Fixed method parameter handling&#10;- root/static/css/themes/default.css - Added documentation variables&#10;- root/static/css/themes/mcoop.css - Added documentation variables&#10;- root/static/css/themes/documentation.css - New universal container-based CSS&#10;- All Documentation/*.tt files - Removed CSS includes, added theme system comments&#10;&#10;## Files Removed&#10;- root/static/css/documentation.css&#10;- root/static/css/components/documentation.css&#10;&#10;## Benefits&#10;- Consistent styling across all modules&#10;- Reduced CSS redundancy and maintenance overhead&#10;- Theme-aware documentation styling&#10;- Improved performance with fewer CSS files&#10;- Single source of truth for container styling">
+      <option name="closed" value="true" />
+      <created>1750556362387</created>
+      <option name="number" value="00058" />
+      <option name="presentableId" value="LOCAL-00058" />
+      <option name="project" value="LOCAL" />
+      <updated>1750556362387</updated>
+    </task>
+    <task id="LOCAL-00059" summary="Summary of Changes Made&#10;Fixed Universal Container Colors Across All Themes&#10;Problem Resolved:&#10;&#10;Theme files were missing required CSS variables that base-containers.css expects&#10;Colors weren't properly theme-specific (e.g., beemaster theme wasn't using honey/bee colors)&#10;Some themes had incomplete variable definitions&#10;Files Modified:&#10;&#10;apis.css (Beemaster Theme)&#10;&#10;Enhanced with proper honey/bee themed colors&#10;Added all missing CSS variables required by base-containers.css&#10;Colors now reflect honey gold (#FFB300), bee yellows (#FFC107), and natural browns (#3E2723)&#10;usbm.css (Green Nature Theme)&#10;&#10;Improved green color palette with forest greens (#2E7D32) and natural tones&#10;Added all missing CSS variables&#10;Better contrast and readability&#10;csc.css (Cyan/Blue Ocean Theme)&#10;&#10;Updated to use proper cyan/blue ocean colors (#0097A7, #00BCD4)&#10;Added all missing CSS variables&#10;Maintains ocean theme consistency&#10;mcoop.css (Cooperative Green Theme)&#10;&#10;Added missing CSS variables for complete theme support&#10;Maintained existing cooperative green color scheme&#10;Enhanced with proper error and muted text colors&#10;default.css (Clean Professional Theme)&#10;&#10;Completely updated with professional blue color scheme&#10;Added all missing CSS variables&#10;Clean, modern appearance suitable as default&#10;dark.css (Dark Mode Theme)&#10;&#10;Enhanced dark theme with proper purple/teal accent colors&#10;Added all missing CSS variables&#10;Better contrast for dark mode readability&#10;ve7tit.css (Amateur Radio Blue Theme)&#10;&#10;Complete overhaul from hardcoded colors to CSS variables&#10;Now uses radio blue theme (#3498db) with emergency red accents&#10;Equipment details section now uses universal container system&#10;Key Improvements:&#10;&#10;All themes now have complete CSS variable definitions&#10;Theme-specific colors properly applied (bee colors for beemaster, ocean colors for csc, etc.)&#10;Universal container system now works consistently across all themes&#10;Removed hardcoded colors in favor of CSS variables&#10;Enhanced color contrast and accessibility&#10;Expected Result:&#10;&#10;When users select &quot;beemaster&quot; theme, containers display honey/bee colors&#10;When users select &quot;usbm&quot; theme, containers display green nature colors&#10;When users select &quot;csc&quot; theme, containers display cyan/blue ocean colors&#10;All themes maintain consistent container shapes/layouts while showing theme-specific colors&#10;No more generic colors overriding theme-specific styling&#10;The universal container system from the apiary management system now properly respects individual theme colors while maintaining consistent layouts and functionality across all modules.">
+      <option name="closed" value="true" />
+      <created>1750557447776</created>
+      <option name="number" value="00059" />
+      <option name="presentableId" value="LOCAL-00059" />
+      <option name="project" value="LOCAL" />
+      <updated>1750557447776</updated>
+    </task>
+    <task id="LOCAL-00060" summary="Fix navigation menu links not working when dropdowns are present&#10;&#10;This commit resolves the issue where main navigation links (Main, Hosted, &#10;Member, Weather, IT, Admin, HelpDesk) were not clickable when they had &#10;dropdown submenus.&#10;&#10;Changes made:&#10;&#10;1. **JavaScript fixes (sub-menu.js)**:&#10;   - Simplified click handler logic to only prevent default behavior for &#10;     dropdown-only buttons (like Global menu)&#10;   - Removed overly complex mobile/desktop detection that was blocking navigation&#10;   - Added proper detection for dropdown-only buttons using class or href checks&#10;   - Added debugging console logs to help troubleshoot menu issues&#10;&#10;2. **CSS organization**:&#10;   - Moved inline CSS from TopDropListLogin.tt to components/navigation.css&#10;   - Added navigation component CSS to Header.tt for proper loading&#10;   - Consolidated login/user menu styles into the theme system&#10;&#10;3. **Template improvements**:&#10;   - Fixed Global navigation link from href=&quot;#&quot; to href=&quot;javascript:void(0)&quot; &#10;     with dropdown-only class for proper identification&#10;   - Maintained existing navigation structure while fixing functionality&#10;&#10;4. **Theme system compliance**:&#10;   - Moved all navigation-related CSS into the components system&#10;   - Removed inline styles from template files&#10;   - Added proper CSS loading in Header.tt&#10;&#10;The navigation now works as expected:&#10;- Main navigation links navigate to their respective pages&#10;- Dropdown menus still function properly on hover and click&#10;- Global menu remains dropdown-only as intended&#10;- Mobile and desktop compatibility maintained&#10;&#10;Fixes: Navigation menu links with submenus not working">
+      <option name="closed" value="true" />
+      <created>1750568441906</created>
+      <option name="number" value="00060" />
+      <option name="presentableId" value="LOCAL-00060" />
+      <option name="project" value="LOCAL" />
+      <updated>1750568441906</updated>
+    </task>
+    <task id="LOCAL-00061" summary="feat: Implement comprehensive Software Upgrade Manager with admin security fixes&#10;&#10;## Summary&#10;Added a complete step-by-step software upgrade management system for production &#10;deployments, addressing the need for safer and more organized server updates.&#10;&#10;## New Features&#10;- **Software Upgrade Manager** (/admin/software_upgrade)&#10;  - Step-by-step guided upgrade process (Git pull → Dependencies → Dev testing → Production restart)&#10;  - Real-time system status monitoring (Git branch, server status, disk space)&#10;  - Visual progress indicators with completion tracking&#10;  - Comprehensive logging of all upgrade actions&#10;  - Safety confirmations for critical operations&#10;&#10;## Security Improvements&#10;- **Admin Access Control**: Added proper role checking to admin templates&#10;  - Admin dashboard now requires admin privileges to view&#10;  - Added &quot;Access Denied&quot; page for unauthorized users&#10;  - Enhanced admin controller with is_admin flag&#10;&#10;## User Interface&#10;- Modern, responsive design with professional styling&#10;- Color-coded status indicators (good/warning/error)&#10;- Mobile-friendly layout with collapsible sections&#10;- Industry-standard progress visualization&#10;&#10;## Technical Implementation&#10;- Enhanced Admin.pm controller with upgrade functionality&#10;- Created comprehensive software_upgrade.tt template&#10;- Added extensive CSS styling to admin.css theme&#10;- Integrated with existing git_pull, dev_server, and starman functionality&#10;- Session-based upgrade state management&#10;&#10;## Files Modified/Added&#10;- Comserv/lib/Comserv/Controller/Admin.pm - Added upgrade methods and security&#10;- Comserv/root/admin/index.tt - Added role checks and upgrade link&#10;- Comserv/root/admin/software_upgrade.tt - New upgrade interface (NEW)&#10;- Comserv/root/static/css/themes/admin.css - Added comprehensive styling&#10;- Comserv/root/Documentation/changelog/2025-01-15-software-upgrade-manager.tt - Documentation (NEW)&#10;&#10;## Benefits&#10;- Safer production deployments with mandatory testing phase&#10;- Reduced human error through guided process&#10;- Complete audit trail of upgrade actions&#10;- Better system visibility and monitoring&#10;- Industry-standard DevOps practices&#10;&#10;Fixes: Admin menu visibility for non-admin users&#10;Fixes: Non-functional software upgrade link">
+      <option name="closed" value="true" />
+      <created>1750607006307</created>
+      <option name="number" value="00061" />
+      <option name="presentableId" value="LOCAL-00061" />
+      <option name="project" value="LOCAL" />
+      <updated>1750607006307</updated>
+    </task>
+    <task id="LOCAL-00062" summary="Fix menu links: Back, Hosted, and Member functionality&#10;&#10;- Fixed Back button to use JavaScript history.back() for proper navigation&#10;- Implemented /hosted route with comprehensive hosting services page&#10;- Implemented /membership and /applymembership routes with full membership system&#10;- Updated templates to use actual domain names (site_domain) instead of site codes&#10;- Integrated all CSS into base-containers.css to avoid theme system fragmentation&#10;- Added database integration for hosted accounts and membership applications&#10;- Created responsive design for all new pages&#10;- Removed inline CSS from templates per project guidelines&#10;&#10;Files modified:&#10;- Comserv/lib/Comserv/Controller/Root.pm (added routes and domain lookup)&#10;- Comserv/root/Navigation/navigation.tt (fixed back button)&#10;- Comserv/root/Header.tt (removed separate CSS loading)&#10;- Comserv/root/static/css/themes/base-containers.css (added hosted/membership styles)&#10;&#10;Files created:&#10;- Comserv/root/hosted/index.tt&#10;- Comserv/root/membership/index.tt&#10;- Comserv/root/membership/apply.tt&#10;- Comserv/root/membership/application_success.tt&#10;- Comserv/root/Documentation/changelog/2025-01-17-menu-links-implementation.tt&#10;&#10;All three menu links now provide meaningful functionality with proper domain name display.">
+      <option name="closed" value="true" />
+      <created>1750694630276</created>
+      <option name="number" value="00062" />
+      <option name="presentableId" value="LOCAL-00062" />
+      <option name="project" value="LOCAL" />
+      <updated>1750694630276</updated>
+    </task>
+    <task id="LOCAL-00063" summary="Fix Git divergent branches issue for production deployment&#10;&#10;- Enhanced execute_git_pull method to handle divergent branches automatically&#10;- Added automatic detection of local vs remote commit differences&#10;- Implemented merge strategy configuration (pull.rebase false) for divergent branches&#10;- Added comprehensive Git status checking and error handling&#10;- Created emergency Git operations interface (/admin/git_emergency)&#10;- Added git_emergency, execute_git_status_check, execute_git_force_pull, execute_git_reset_hard methods&#10;- Enhanced logging and backup protection for theme_mappings.json&#10;- Created production deployment documentation and guides&#10;&#10;This resolves the &quot;Need to specify how to reconcile divergent branches&quot; error&#10;that was preventing deployment of menu link fixes (commits 86dc11e to 1f2c575).&#10;&#10;Files modified:&#10;- Comserv/lib/Comserv/Controller/Admin.pm (enhanced Git operations)&#10;&#10;Files added:&#10;- Comserv/root/admin/git_emergency.tt (emergency Git interface)&#10;- Comserv/root/Documentation/changelog/2025-01-15-git-divergent-branches-fix.tt&#10;- PRODUCTION_DEPLOYMENT_GUIDE.tt&#10;&#10;Fixes: Production Git pull failures due to divergent branches&#10;Enables: Deployment of pending menu functionality fixes">
+      <option name="closed" value="true" />
+      <created>1750696011378</created>
+      <option name="number" value="00063" />
+      <option name="presentableId" value="LOCAL-00063" />
+      <option name="project" value="LOCAL" />
+      <updated>1750696011378</updated>
+    </task>
+    <task id="LOCAL-00064" summary="added missing module to cpan file.">
+      <option name="closed" value="true" />
+      <created>1750696431226</created>
+      <option name="number" value="00064" />
+      <option name="presentableId" value="LOCAL-00064" />
+      <option name="project" value="LOCAL" />
+      <updated>1750696431226</updated>
+    </task>
+    <task id="LOCAL-00065" summary="Remove emergency git operations and related files&#10;&#10;This commit removes the emergency git operations feature, the production deployment guide, the pdf converter requirements, the project fixes patch, and modifies the git documentation, proxy manager, DBEncy, Setup controllers, and gitignore. It also removes the db_config.json file.">
+      <option name="closed" value="true" />
+      <created>1750700854873</created>
+      <option name="number" value="00065" />
+      <option name="presentableId" value="LOCAL-00065" />
+      <option name="project" value="LOCAL" />
+      <updated>1750700854873</updated>
+    </task>
+    <task id="LOCAL-00066" summary="Fix STARTTLS TLS negotiation failure&#10;&#10;- Enhanced Net::SMTP starttls() calls with proper SSL parameters&#10;- Added IO::Socket::SSL support for modern TLS versions&#10;- Fixed &quot;STARTTLS failed: 2.0.0 Ready to start TLS&quot; error&#10;- Applied fix to both Mail.pm and Root.pm&#10;- Updated documentation with fix details&#10;- Improved error handling and logging for TLS negotiation&#10;&#10;Files modified:&#10;- Comserv/lib/Comserv/Model/Mail.pm&#10;- Comserv/lib/Comserv/Controller/Root.pm  &#10;- Comserv/root/Documentation/MailSystem.tt">
+      <option name="closed" value="true" />
+      <created>1750703636577</created>
+      <option name="number" value="00066" />
+      <option name="presentableId" value="LOCAL-00066" />
+      <option name="project" value="LOCAL" />
+      <updated>1750703636577</updated>
+    </task>
+    <task id="LOCAL-00067" summary="added directoies and files that should not be tracked.">
+      <option name="closed" value="true" />
+      <created>1750704202790</created>
+      <option name="number" value="00067" />
+      <option name="presentableId" value="LOCAL-00067" />
+      <option name="project" value="LOCAL" />
+      <updated>1750704202790</updated>
+    </task>
+    <task id="LOCAL-00068" summary="added directoies and files that should not be tracked.">
+      <option name="closed" value="true" />
+      <created>1750704558165</created>
+      <option name="number" value="00068" />
+      <option name="presentableId" value="LOCAL-00068" />
+      <option name="project" value="LOCAL" />
+      <updated>1750704558165</updated>
+    </task>
+    <task id="LOCAL-00069" summary="added directoies and files that should not be tracked.">
+      <option name="closed" value="true" />
+      <created>1750707738700</created>
+      <option name="number" value="00069" />
+      <option name="presentableId" value="LOCAL-00069" />
+      <option name="project" value="LOCAL" />
+      <updated>1750707738701</updated>
+    </task>
+    <task id="LOCAL-00070" summary="Add log files to gitignore&#10;&#10;This commit adds log directories and files to .gitignore and Comserv/.gitignore. This prevents log data from being accidentally committed to the repository.">
+      <option name="closed" value="true" />
+      <created>1750711794531</created>
+      <option name="number" value="00070" />
+      <option name="presentableId" value="LOCAL-00070" />
+      <option name="project" value="LOCAL" />
+      <updated>1750711794531</updated>
+    </task>
+    <task id="LOCAL-00071" summary="git add .&#10;git commit -m &quot;Fix multi-database backup system to include both ENCY and FORAGER databases&#10;&#10;- Updated create_database_backup() to handle multiple database models&#10;- Added support for backing up both DBEncy and DBForager databases&#10;- Enhanced error handling with per-database fault tolerance&#10;- Improved file naming: individual files combined into single backup&#10;- Updated test_database_connection() to test all available databases&#10;- Added detailed logging for each database backup attempt&#10;- Fixed DSN extraction to use model config instead of storage internals&#10;- Enhanced MySQL backup command with better password escaping&#10;- Added backup verification and file size checking&#10;- Improved mysqldump availability testing per database&#10;&#10;Files modified:&#10;- Comserv/lib/Comserv/Controller/Admin.pm&#10;&#10;The backup system now creates individual backups for each database&#10;(e.g., backup_TIMESTAMP_DBEncy_database.sql, backup_TIMESTAMP_DBForager_database.sql)&#10;and combines them into a single file (backup_TIMESTAMP_all_databases.sql)&#10;for easy management while providing detailed status reporting.&quot;">
+      <option name="closed" value="true" />
+      <created>1750795573438</created>
+      <option name="number" value="00071" />
+      <option name="presentableId" value="LOCAL-00071" />
+      <option name="project" value="LOCAL" />
+      <updated>1750795573438</updated>
+    </task>
+    <task id="LOCAL-00072" summary="git add .&#10;git commit -m &quot;Fix undefined user object error in Project controller and other controllers&#10;&#10;- Fixed 'Can't call method username on an undefined value' error in Project.pm&#10;- Added proper null checks for user object before calling -&gt;username method&#10;- Changed from '$c-&gt;user_exists ? $c-&gt;user-&gt;username : fallback' &#10;  to '($c-&gt;user_exists &amp;&amp; $c-&gt;user) ? $c-&gt;user-&gt;username : ($c-&gt;session-&gt;{username} || fallback)'&#10;- Applied same fix preventively to ENCY.pm, HelpDesk.pm, and NetworkDevices.pm&#10;- Added fallback to session username when user object is undefined&#10;- Ensures robust username retrieval across all controllers&#10;&#10;The issue occurred when user_exists returned true but the user object was undefined,&#10;causing fatal errors when trying to access user properties. This fix provides&#10;multiple fallback layers for safe username retrieval.&quot;">
+      <option name="closed" value="true" />
+      <created>1750800369142</created>
+      <option name="number" value="00072" />
+      <option name="presentableId" value="LOCAL-00072" />
+      <option name="project" value="LOCAL" />
+      <updated>1750800369143</updated>
+    </task>
+    <task id="LOCAL-00073" summary="Fix: Documentation system - Critical dash removal bug and missing directories&#10;&#10;CRITICAL FIXES:&#10;- Fixed dash removal bug causing 404 errors for documentation files with dashes&#10;  * Changed regex from s/[^a-zA-Z0-9_\.]//g to s/[^a-zA-Z0-9_\.\-]//g&#10;  * Files like 2024-05-documentation-system-fixes.tt now accessible&#10;  &#10;- Fixed missing documentation directories (76 → 376 files now scanned)&#10;  * Added comprehensive scanning for all subdirectories&#10;  * general/ (128 files), changelog/ (59 files), proxmox/ (7 files)&#10;  * features/, docs/, migration/, system/, cloudflare/, themes/, tutorials/, scripts/, admin/&#10;&#10;IMPROVEMENTS:&#10;- Increased search result limit from 20 to 100 for comprehensive search&#10;- Made documentation attributes writable to allow force rebuild&#10;- Added /Documentation/force_rebuild endpoint for testing and maintenance&#10;- Removed extensive debugging code from failed previous thread&#10;&#10;FILES MODIFIED:&#10;- Comserv/lib/Comserv/Controller/Documentation.pm (core fixes + comprehensive scanning)&#10;- Comserv/lib/Comserv/Controller/Documentation/ConfigBased.pm (routing conflict fix)&#10;- Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.tt (updated workflow)&#10;- CHANGELOG.tt (documented changes)&#10;&#10;IMPACT: Documentation system now fully functional with all 376 files accessible&#10;and searchable with working links for files containing dashes in names.&#10;&#10;Co-authored-by: AI Assistant">
+      <option name="closed" value="true" />
+      <created>1750884443039</created>
+      <option name="number" value="00073" />
+      <option name="presentableId" value="LOCAL-00073" />
+      <option name="project" value="LOCAL" />
+      <updated>1750884443040</updated>
+    </task>
+    <task id="LOCAL-00074" summary="[Documentation] Complete .tt file compliance - Fix PageVersion headers and Markdown conversion&#10;&#10;• Added proper PageVersion headers to 2 changelog files&#10;• Converted Markdown content to HTML/.tt format in git-divergent-branches-fix.tt&#10;• Verified all documentation files now follow .tt template standards&#10;• Created changelog entry documenting the compliance fix&#10;• Cleaned up AI_DEVELOPMENT_GUIDELINES.tt for next thread&#10;&#10;Related files:&#10;• Comserv/root/Documentation/changelog/2025-01-15-git-divergent-branches-fix.tt&#10;• Comserv/root/Documentation/changelog/2025-01-15-software-upgrade-manager.tt&#10;• Comserv/root/Documentation/changelog/2025-01-15-tt-file-compliance-fix.tt&#10;• Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.tt&#10;&#10;Documentation updates:&#10;• Created 2025-01-15-tt-file-compliance-fix.tt changelog entry&#10;• Updated AI_DEVELOPMENT_GUIDELINES.tt with next thread task information">
+      <option name="closed" value="true" />
+      <created>1750889292342</created>
+      <option name="number" value="00074" />
+      <option name="presentableId" value="LOCAL-00074" />
+      <option name="project" value="LOCAL" />
+      <updated>1750889292342</updated>
+    </task>
+    <task id="LOCAL-00075" summary="[Todo] Fixed Template Toolkit parsing error in week view&#10;&#10;- Fixed &quot;unexpected token (DateTime::Format::ISO8601)&quot; error in week.tt template&#10;- Enhanced week controller to pre-calculate all date information in Perl&#10;- Created week_days array with date, day_name, day_number, month_name, is_today&#10;- Removed DateTime parsing calls from template (TT doesn't support Perl object methods)&#10;- Fixed todo filtering logic to use pre-calculated dates&#10;- Follows proper MVC pattern: controller handles date logic, template displays data&#10;&#10;Related files:&#10;- Comserv/lib/Comserv/Controller/Todo.pm&#10;- Comserv/root/todo/week.tt">
+      <option name="closed" value="true" />
+      <created>1750909363772</created>
+      <option name="number" value="00075" />
+      <option name="presentableId" value="LOCAL-00075" />
+      <option name="project" value="LOCAL" />
+      <updated>1750909363772</updated>
+    </task>
+    <task id="LOCAL-00076" summary="Fix Todo month calendar display issues - complete resolution&#10;&#10;FIXES APPLIED:&#10;1. Database ambiguity error: Changed ORDER BY 'start_date' to 'me.start_date' &#10;   - Resolved MySQL error when both todo and projects tables have start_date columns&#10;2. Logging method error: Changed $c-&gt;log_with_details() to $c-&gt;log-&gt;info()&#10;   - Fixed &quot;Can't locate object method&quot; error using correct Catalyst logging&#10;3. Removed logs from todo calendar: Eliminated log fetching and processing&#10;   - Todo month view now displays only todos as intended&#10;&#10;TECHNICAL DETAILS:&#10;- Fixed SQL column ambiguity in Todo.pm line 796&#10;- Corrected logging method call in Todo.pm line 809  &#10;- Removed log database queries and processing (lines 812-818, 837-845)&#10;- Removed logs from calendar structure, keeping only todos&#10;&#10;RESULT: Month calendar now properly displays todos without errors&#10;&#10;Files modified:&#10;- Comserv/lib/Comserv/Controller/Todo.pm (database query fixes, log removal)&#10;- Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.tt (task completion)&#10;&#10;Testing: Verified todos display correctly, no database errors, no logs shown">
+      <option name="closed" value="true" />
+      <created>1750912445500</created>
+      <option name="number" value="00076" />
+      <option name="presentableId" value="LOCAL-00076" />
+      <option name="project" value="LOCAL" />
+      <updated>1750912445500</updated>
+    </task>
+    <task id="LOCAL-00077" summary="feat: Complete Documentation system with toggle icons and comprehensive docs&#10;&#10;- Fix: Toggle icons now visible using Unicode arrows (▼/▲)&#10;- Add: Documentation controller CSS loading via additional_css stash&#10;- Add: Documentation_System.tt - Complete architecture guide&#10;- Add: CSS_Theme_System.tt - Theme system documentation  &#10;- Add: Changelog entry for system completion&#10;- Refactor: Simplified toggle icons from FontAwesome to Unicode&#10;- Clean: AI_DEVELOPMENT_GUIDELINES ready for next task&#10;&#10;Files modified:&#10;- Comserv/lib/Comserv/Controller/Documentation.pm&#10;- Comserv/root/static/css/themes/base-containers.css&#10;- Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.tt&#10;&#10;Files created:&#10;- Comserv/root/Documentation/Documentation_System.tt&#10;- Comserv/root/Documentation/CSS_Theme_System.tt&#10;- Comserv/root/Documentation/changelog/2025-01-15_documentation_system_completion.tt">
+      <option name="closed" value="true" />
+      <created>1750983743878</created>
+      <option name="number" value="00077" />
+      <option name="presentableId" value="LOCAL-00077" />
+      <option name="project" value="LOCAL" />
+      <updated>1750983743878</updated>
+    </task>
+    <task id="LOCAL-00078" summary="feat: Complete Documentation system with toggle icons and comprehensive docs&#10;&#10;- Fix: Toggle icons now visible using Unicode arrows (▼/▲)&#10;- Add: Documentation controller CSS loading via additional_css stash&#10;- Add: Documentation_System.tt - Complete architecture guide&#10;- Add: CSS_Theme_System.tt - Theme system documentation  &#10;- Add: Changelog entry for system completion&#10;- Refactor: Simplified toggle icons from FontAwesome to Unicode&#10;- Clean: AI_DEVELOPMENT_GUIDELINES ready for next task&#10;&#10;Files modified:&#10;- Comserv/lib/Comserv/Controller/Documentation.pm&#10;- Comserv/root/static/css/themes/base-containers.css&#10;- Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.tt&#10;&#10;Files created:&#10;- Comserv/root/Documentation/Documentation_System.tt&#10;- Comserv/root/Documentation/CSS_Theme_System.tt&#10;- Comserv/root/Documentation/changelog/2025-01-15_documentation_system_completion.tt">
+      <option name="closed" value="true" />
+      <created>1751002660247</created>
+      <option name="number" value="00078" />
+      <option name="presentableId" value="LOCAL-00078" />
+      <option name="project" value="LOCAL" />
+      <updated>1751002660247</updated>
+    </task>
+    <task id="LOCAL-00079" summary="feat: Implement mailing list system fixes and opt-out functionality&#10;&#10;- Fix admin link in register.tt to point to /mail/lists/create with role checking&#10;- Add radio button opt-in/opt-out interface in settings.tt for mailing lists&#10;- Implement default SiteName announcement list auto-subscription for new users&#10;- Add email notifications handling through mailing list subscriptions&#10;- Create helper methods: _user_has_email_notifications, _update_user_email_notifications, _get_or_create_announcement_list&#10;- Use proper MailingListSubscription link table instead of direct user fields&#10;- Update documentation for User and Mail controllers&#10;- Mark mailing list system fixes task as completed in AI_DEVELOPMENT_GUIDELINES&#10;&#10;Files modified:&#10;- Comserv/root/user/register.tt&#10;- Comserv/root/user/settings.tt  &#10;- Comserv/lib/Comserv/Controller/User.pm&#10;- Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.tt&#10;- Comserv/root/Documentation/controllers/User.tt&#10;- Comserv/root/Documentation/controllers/Mail.tt (new)&#10;&#10;The mailing list system now provides proper opt-in/opt-out functionality with default announcement list subscriptions for all new users, using the correct data model architecture.">
+      <option name="closed" value="true" />
+      <created>1751057251470</created>
+      <option name="number" value="00079" />
+      <option name="presentableId" value="LOCAL-00079" />
+      <option name="project" value="LOCAL" />
+      <updated>1751057251470</updated>
+    </task>
+    <task id="LOCAL-00080" summary="docs: Complete conversion of menu_system.tt from markdown to HTML&#10;&#10;- Removed all unreadable markdown-style headers and formatting&#10;- Converted to semantic HTML5 structure with proper sections and IDs&#10;- Applied apiary-container and theme-aware CSS classes for consistency&#10;- Added Font Awesome icons and structured content blocks&#10;- Maintained all technical content while improving readability&#10;- Updated PageVersion to 1.1 with current date&#10;- File now fully integrated with Comserv theme system&#10;&#10;Fixes: Mixed markdown/HTML content making documentation unreadable">
+      <option name="closed" value="true" />
+      <created>1751472202638</created>
+      <option name="number" value="00080" />
+      <option name="presentableId" value="LOCAL-00080" />
+      <option name="project" value="LOCAL" />
+      <updated>1751472202638</updated>
+    </task>
+    <task id="LOCAL-00081" summary="Fix: Button theme color compliance - Remove hardcoded orange override&#10;&#10;ISSUE: All buttons showing orange (#FF9900) across all themes instead of theme-specific colors&#10;&#10;ROOT CAUSE: theme-editor.js was dynamically setting button-bg to accent-color after CSS loading&#10;&#10;SOLUTION:&#10;- Removed JavaScript button-bg override in theme-editor.js&#10;- Updated components/buttons.css to use proper theme variables&#10;- Fixed theme-editor.css preview buttons&#10;- Enhanced base-containers.css button classes with theme compliance&#10;&#10;FILES MODIFIED:&#10;- Comserv/root/static/js/theme-editor.js - Commented out button-bg override&#10;- Comserv/root/static/css/components/buttons.css - Use secondary-color/primary-color&#10;- Comserv/root/static/css/theme-editor.css - Fixed preview button colors  &#10;- Comserv/root/static/css/themes/base-containers.css - Enhanced .btn classes&#10;&#10;RESULT: Buttons now respect individual theme color schemes&#10;- Default buttons: secondary-color background&#10;- Primary buttons: primary-color background&#10;- Hover states: proper theme color transitions&#10;- All button types: theme-appropriate colors&#10;&#10;Testing needed: Verify buttons on /mail, admin areas, and theme switching">
+      <option name="closed" value="true" />
+      <created>1751555067678</created>
+      <option name="number" value="00081" />
+      <option name="presentableId" value="LOCAL-00081" />
+      <option name="project" value="LOCAL" />
+      <updated>1751555067678</updated>
+    </task>
+    <task id="LOCAL-00082" summary="feat: Enhanced Todo system error handling and admin notifications&#10;&#10;- Fixed database constraint error in Todo controller modify method&#10;- Implemented field preservation logic to maintain existing values when form fields are empty&#10;- Added comprehensive error handling with user-friendly messages&#10;- Created admin notification system with email alerts and detailed logging&#10;- Enhanced user experience with form data preservation on errors&#10;- Added _notify_admin_of_error private method for automated error reporting&#10;- Created comprehensive todo system documentation&#10;&#10;Files modified:&#10;- Comserv/lib/Comserv/Controller/Todo.pm: Enhanced error handling and admin notifications&#10;- Comserv/root/Documentation/controllers/todo_system.tt: New comprehensive documentation&#10;- Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.tt: Updated with task completion and next session setup&#10;&#10;Fixes production database error: &quot;Incorrect integer value: '' for column project_id&quot;&#10;Improves maintainability by preserving existing data instead of overwriting with empty strings&#10;Provides immediate admin awareness of critical system errors">
+      <option name="closed" value="true" />
+      <created>1751899447336</created>
+      <option name="number" value="00082" />
+      <option name="presentableId" value="LOCAL-00082" />
+      <option name="project" value="LOCAL" />
+      <updated>1751899447337</updated>
+    </task>
+    <task id="LOCAL-00083" summary="feat: Navigation system consolidation and CSS form restoration&#10;&#10;CRITICAL FIXES:&#10;- Consolidated duplicate navigation directories (navigation/ → Navigation/)&#10;- Restored proper Navigation/navigation.tt with correct menu includes&#10;- Fixed navigation menu order: Main, Login, Global, Hosted, Member, Weather, IT, Admin, HelpDesk&#10;- Fixed CSS form system route /admin/theme/edit/{theme_name}&#10;&#10;NAVIGATION SYSTEM:&#10;- Removed duplicate navigation/ directory structure&#10;- Rebuilt Navigation/navigation.tt with proper TopDropList includes&#10;- Maintained role-based access (admin-only, site-specific menus)&#10;- Restored all missing navigation menus and functionality&#10;&#10;CSS FORM SYSTEM:&#10;- Renamed edit_css method to edit in Admin::Theme controller&#10;- Updated admin/theme/edit_css.tt form action route&#10;- Fixed CSS editing form display and save functionality&#10;&#10;DOCUMENTATION:&#10;- Complete rewrite of navigation system documentation&#10;- Updated all file path references to correct Navigation/ directory&#10;- Added comprehensive changelog for navigation consolidation&#10;- Updated AI development guidelines with completed tasks&#10;&#10;FILES MODIFIED:&#10;- Comserv/root/Navigation/navigation.tt (rebuilt)&#10;- Comserv/lib/Comserv/Controller/Admin/Theme.pm (method rename)&#10;- Comserv/root/admin/theme/edit_css.tt (route fix)&#10;- Comserv/root/Documentation/general/navigation_system.tt (rewritten)&#10;- Comserv/root/Documentation/general/menu_system.tt (path updates)&#10;- Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.tt (task updates)&#10;&#10;FILES CREATED:&#10;- Comserv/root/Documentation/changelog/2025-07-07-navigation-system-consolidation.tt&#10;&#10;FILES REMOVED:&#10;- Comserv/root/navigation/ (entire duplicate directory)&#10;&#10;TESTING REQUIRED:&#10;- Verify navigation menu order and functionality&#10;- Test CSS form system at /admin/theme/edit/{theme_name}&#10;- Confirm role-based menu visibility works properly">
+      <option name="closed" value="true" />
+      <created>1751930665160</created>
+      <option name="number" value="00083" />
+      <option name="presentableId" value="LOCAL-00083" />
+      <option name="project" value="LOCAL" />
+      <updated>1751930665161</updated>
+    </task>
+    <task id="LOCAL-00084" summary="feat: Complete todo system theme normalization and documentation consolidation&#10;&#10;## Todo System Theme Normalization (COMPLETE)&#10;- ✅ Converted todo.tt to use unified theme classes (.feature-card, .feature-header, .feature-content)&#10;- ✅ Replaced todo.css with todo-functional.css (functional CSS only, no styling)&#10;- ✅ Fixed inline action button layout - buttons now appear on same line as todo content&#10;- ✅ Resolved Unicode character issues - replaced ▼ with HTML entities (&amp;#9660;)&#10;- ✅ Implemented expandable container functionality with proper state persistence&#10;- ✅ Updated overdue todos section to match main todo list layout&#10;- ✅ All buttons now use standard theme classes (.btn, .btn-primary, .btn-secondary, etc.)&#10;&#10;## Theme Documentation Consolidation&#10;- ✅ Updated theme_system_normalization.tt as master theme documentation index&#10;- ✅ Added current implementation status section with completed normalizations&#10;- ✅ Linked all related theme documentation files&#10;- ✅ Documented next priority: Admin CSS Settings interface&#10;- ✅ Updated AI_DEVELOPMENT_GUIDELINES.tt with current progress and next chat objectives&#10;&#10;## Technical Improvements&#10;- ✅ Fixed todo_actions.tt include to use inline-flex layout preventing button line breaks&#10;- ✅ Updated JavaScript functions to use HTML entities instead of Unicode characters&#10;- ✅ Enhanced todo-functional.css with proper form inline support&#10;- ✅ Maintained responsive design for mobile devices&#10;&#10;## Files Modified/Created:&#10;- Modified: Comserv/root/todo/todo.tt (complete theme conversion)&#10;- Modified: Comserv/root/include/todo_actions.tt (inline button layout)&#10;- Created: Comserv/root/static/css/todo-functional.css (functional CSS only)&#10;- Modified: Comserv/root/static/js/todo-enhancements.js (HTML entity support)&#10;- Modified: Comserv/root/Documentation/developer/theme_system_normalization.tt (master index)&#10;- Modified: Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.tt (progress update)&#10;&#10;## Theme System Benefits Achieved:&#10;- ✅ Unified appearance across all themes (CSC, BMaster, USBM, etc.)&#10;- ✅ Centralized theme management through base-containers.css&#10;- ✅ Consistent button styling and layout patterns&#10;- ✅ Future-proof architecture for AI developme">
+      <option name="closed" value="true" />
+      <created>1751988558975</created>
+      <option name="number" value="00084" />
+      <option name="presentableId" value="LOCAL-00084" />
+      <option name="project" value="LOCAL" />
+      <updated>1751988558975</updated>
+    </task>
+    <task id="LOCAL-00085" summary="Implement theme management in admin panel&#10;&#10;This commit introduces a theme management interface to the admin panel, allowing administrators to:&#10;&#10;- Select from available themes.&#10;- Preview themes before applying.&#10;- Customize theme colors.&#10;&#10;It includes the following:&#10;&#10;- New `css_form` action to display the settings form.&#10;- `update_theme_from_css_form` action to update the theme selection.&#10;- `customize_theme` action to generate custom CSS based on color selections.&#10;- New `admin/css_settings.tt` template for the UI.&#10;- Updates to documentation to reflect completion of the feature.">
+      <option name="closed" value="true" />
+      <created>1751990707474</created>
+      <option name="number" value="00085" />
+      <option name="presentableId" value="LOCAL-00085" />
+      <option name="project" value="LOCAL" />
+      <updated>1751990707475</updated>
+    </task>
+    <task id="LOCAL-00086" summary="Good question! Let me quickly check what's happening with the database connection when you switch to SQLite mode.&#10;&#10;Let me check the HybridDB model's switch_backend method:&#10;&#10;Quick Answer: The HybridDB model only tracks which backend type is selected (mysql or sqlite) but doesn't actually change the database connections used by your models like Todo.&#10;&#10;The Todo data you're seeing is likely still coming from MySQL because:&#10;&#10;HybridDB is separate: It's a standalone model for backend selection&#10;Other models unchanged: Your Todo model probably still connects to MySQL&#10;No integration: The switch doesn't automatically update other database models&#10;To truly switch backends, you'd need the HybridDB to either:&#10;&#10;Update the database configuration for all models&#10;Or have models check HybridDB for connection info&#10;The current implementation appears to be a framework for backend switching but may not be fully integrated with the actual data models yet.&#10;&#10;Shanta McBain, 1m ago&#10;Now I know our chat is stale you did not take heed of the prompt count. time pass the torch for the next chat.&#10;&#10;Coding Agent&#10;You're absolutely right - I should have been more mindful of the prompt count. Let me quickly summarize what we accomplished and what needs to be passed to the next chat:&#10;&#10;Summary for Next Chat:&#10;✅ COMPLETED:&#10;Fixed /database_mode route - Added proper route in Admin controller at /admin/database_mode&#10;Updated all menu links - Changed from /database_mode to /admin/database_mode in:&#10;admintopmenu.tt&#10;admin/index.tt&#10;Updated JavaScript URLs in database_mode/index.tt template&#10;Made DatabaseMode controller methods :Private - Removed direct access, only accessible through Admin controller&#10;Clean architecture - No more Root.pm clutter, proper admin organization&#10;🔄 DISCOVERED ISSUE:&#10;The HybridDB backend switching is NOT fully integrated. When you switch to SQLite mode:&#10;&#10;HybridDB model tracks the selection (mysql vs sqlite)&#10;But other models (like Todo) still connect to MySQL&#10;The switch doesn't actually change database connections for data models&#10;📋 NEXT STEPS NEEDED:&#10;Integrate HybridDB with data models - Make Todo/other models check HybridDB for connection info&#10;Test the /admin/database_mode route - Verify it works properly&#10;Complete the backend switching functionality - Ensure SQLite mode actually uses SQLite data&#10;📁 KEY FILES MODIFIED:&#10;Comserv/lib/Comserv/Controller/Admin.pm - Added database_mode route&#10;Comserv/lib/Comserv/Controller/DatabaseMode.pm - Made methods private&#10;Comserv/root/Navigation/admintopmenu.tt - Updated menu link&#10;Comserv/root/admin/index.tt - Updated menu link&#10;Comserv/root/database_mode/index.tt - Updated JavaScript URLs&#10;The route issue is SOLVED but the backend switching needs deeper integration work.">
+      <option name="closed" value="true" />
+      <created>1752004712025</created>
+      <option name="number" value="00086" />
+      <option name="presentableId" value="LOCAL-00086" />
+      <option name="project" value="LOCAL" />
+      <updated>1752004712025</updated>
+    </task>
+    <task id="LOCAL-00087" summary="fix: resolve &quot;Table 'ency.todo' doesn't exist&quot; error and add database mode toggle&#10;&#10;PROBLEM:&#10;- Todo functionality failing with &quot;Table 'ency.todo' doesn't exist&quot; error&#10;- System connecting to local database instead of production server&#10;- No user interface to control database connection mode&#10;&#10;ROOT CAUSE:&#10;- localhost_override: true in production_server config caused connection to localhost instead of 192.168.1.198&#10;- Multiple controllers bypassing safe_search mechanism&#10;- Tables existed on production server but system connected to wrong database&#10;&#10;SOLUTION:&#10;- Disabled localhost_override for production_server backend in db_config.json&#10;- Added user toggle interface for localhost_override setting via DatabaseMode controller&#10;- Enhanced connection debugging to show exact DSN being used&#10;- Fixed controller bypasses in Todo.pm, Project.pm, and Apiary.pm to use safe_search&#10;&#10;FEATURES ADDED:&#10;- toggle_localhost_override method in DatabaseMode controller (AJAX endpoint)&#10;- _save_config method in HybridDB for runtime configuration changes&#10;- Enhanced logging for database connection debugging&#10;- Automatic configuration backup before changes&#10;&#10;RESULT:&#10;- Todo functionality now working - getting all production data&#10;- Users can toggle between production and local database access&#10;- Enhanced debugging for future database connection issues&#10;&#10;Files modified:&#10;- db_config.json&#10;- Comserv/lib/Comserv/Controller/DatabaseMode.pm&#10;- Comserv/lib/Comserv/Model/HybridDB.pm  &#10;- Comserv/lib/Comserv/Model/DBEncy.pm&#10;- Comserv/lib/Comserv/Controller/Todo.pm&#10;- Comserv/lib/Comserv/Controller/Project.pm&#10;- Comserv/lib/Comserv/Controller/Apiary.pm&#10;- Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.tt">
+      <option name="closed" value="true" />
+      <created>1752088483911</created>
+      <option name="number" value="00087" />
+      <option name="presentableId" value="LOCAL-00087" />
+      <option name="project" value="LOCAL" />
+      <updated>1752088483911</updated>
+    </task>
+    <task id="LOCAL-00088" summary="attempting to sync data from production to locally all failed.">
+      <option name="closed" value="true" />
+      <created>1752098837271</created>
+      <option name="number" value="00088" />
+      <option name="presentableId" value="LOCAL-00088" />
+      <option name="project" value="LOCAL" />
+      <updated>1752098837271</updated>
+    </task>
+    <task id="LOCAL-00089" summary="Implement enhanced error reporting and log management&#10;&#10;This commit introduces several key enhancements:&#10;&#10;-   **Enhanced Error Reporting:** Implement error tracking, a separate error log file, and admin notifications for critical errors.&#10;-   **Log Management:** Adds an admin interface for managing log levels, toggling debug mode, and forcing log rotation.&#10;-   **Application Log Level:** Introduce a separate application log level configuration, independent of the browser debug mode.&#10;-   **Performance Improvements:** Implement caching for backend detection to reduce page load lag.&#10;-   **Testing Route:** Add a `/test_error_reporting` route to demonstrate all logging features.">
+      <option name="closed" value="true" />
+      <created>1752701493198</created>
+      <option name="number" value="00089" />
+      <option name="presentableId" value="LOCAL-00089" />
+      <option name="project" value="LOCAL" />
+      <updated>1752701493198</updated>
+    </task>
+    <task id="LOCAL-00090" summary="[BUG FIX]: Complete Todo Time Field Fix Documentation&#10;&#10;Problem: Todo modification failing with MySQL time field error - missing documentation and changelog updates&#10;Solution: Added comprehensive documentation, changelog entries, and cross-references for the time field fix&#10;&#10;Files Modified:&#10;- /CHANGELOG.tt - Added Todo Time Field Fix entry to Unreleased section&#10;- /Comserv/root/Documentation/TODO_SYSTEM_DOCUMENTATION.tt - Added troubleshooting section with fix details&#10;- /Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.tt - Updated task context and marked as fully completed&#10;&#10;Status: COMPLETED&#10;Next: Ready for new assignments - no active tasks">
+      <option name="closed" value="true" />
+      <created>1753902351549</created>
+      <option name="number" value="00090" />
+      <option name="presentableId" value="LOCAL-00090" />
+      <option name="project" value="LOCAL" />
+      <updated>1753902351549</updated>
+    </task>
+    <task id="LOCAL-00091" summary="Fix: Handle empty input in calculation function&#10;&#10;The calculation function crashes when receiving empty input. This commit adds a check for empty input and returns a default value to prevent the crash.">
+      <option name="closed" value="true" />
+      <created>1753902938327</created>
+      <option name="number" value="00091" />
+      <option name="presentableId" value="LOCAL-00091" />
+      <option name="project" value="LOCAL" />
+      <updated>1753902938327</updated>
+    </task>
+    <task id="LOCAL-00092" summary="Fix: Handle empty input in calculation function&#10;&#10;The calculation function crashes when receiving empty input. This commit adds a check for empty input and returns a default value to prevent the crash.">
+      <option name="closed" value="true" />
+      <created>1753903231381</created>
+      <option name="number" value="00092" />
+      <option name="presentableId" value="LOCAL-00092" />
+      <option name="project" value="LOCAL" />
+      <updated>1753903231381</updated>
+    </task>
+    <task id="LOCAL-00093" summary="Fix: Handle empty input in calculation function&#10;&#10;The calculation function crashes when receiving empty input. This commit adds a check for empty input and returns a default value to prevent the crash.">
+      <option name="closed" value="true" />
+      <created>1753903294684</created>
+      <option name="number" value="00093" />
+      <option name="presentableId" value="LOCAL-00093" />
+      <option name="project" value="LOCAL" />
+      <updated>1753903294684</updated>
+    </task>
+    <task id="LOCAL-00094" summary="added all files out of tracking mostly .tt files for documentation.">
+      <option name="closed" value="true" />
+      <created>1756217381257</created>
+      <option name="number" value="00094" />
+      <option name="presentableId" value="LOCAL-00094" />
+      <option name="project" value="LOCAL" />
+      <updated>1756217381257</updated>
+    </task>
+    <option name="localTasksCounter" value="95" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State>
+              <option name="FILTERS">
+                <map>
+                  <entry key="branch">
+                    <value>
+                      <list>
+                        <option value="origin/Coop" />
+                      </list>
+                    </value>
+                  </entry>
+                </map>
+              </option>
+            </State>
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="Remove emergency git operations and related files&#10;&#10;This commit removes the emergency git operations feature, the production deployment guide, the pdf converter requirements, the project fixes patch, and modifies the git documentation, proxy manager, DBEncy, Setup controllers, and gitignore. It also removes the db_config.json file." />
+    <MESSAGE value="Fix STARTTLS TLS negotiation failure&#10;&#10;- Enhanced Net::SMTP starttls() calls with proper SSL parameters&#10;- Added IO::Socket::SSL support for modern TLS versions&#10;- Fixed &quot;STARTTLS failed: 2.0.0 Ready to start TLS&quot; error&#10;- Applied fix to both Mail.pm and Root.pm&#10;- Updated documentation with fix details&#10;- Improved error handling and logging for TLS negotiation&#10;&#10;Files modified:&#10;- Comserv/lib/Comserv/Model/Mail.pm&#10;- Comserv/lib/Comserv/Controller/Root.pm  &#10;- Comserv/root/Documentation/MailSystem.tt" />
+    <MESSAGE value="added directoies and files that should not be tracked." />
+    <MESSAGE value="Add log files to gitignore&#10;&#10;This commit adds log directories and files to .gitignore and Comserv/.gitignore. This prevents log data from being accidentally committed to the repository." />
+    <MESSAGE value="git add .&#10;git commit -m &quot;Fix multi-database backup system to include both ENCY and FORAGER databases&#10;&#10;- Updated create_database_backup() to handle multiple database models&#10;- Added support for backing up both DBEncy and DBForager databases&#10;- Enhanced error handling with per-database fault tolerance&#10;- Improved file naming: individual files combined into single backup&#10;- Updated test_database_connection() to test all available databases&#10;- Added detailed logging for each database backup attempt&#10;- Fixed DSN extraction to use model config instead of storage internals&#10;- Enhanced MySQL backup command with better password escaping&#10;- Added backup verification and file size checking&#10;- Improved mysqldump availability testing per database&#10;&#10;Files modified:&#10;- Comserv/lib/Comserv/Controller/Admin.pm&#10;&#10;The backup system now creates individual backups for each database&#10;(e.g., backup_TIMESTAMP_DBEncy_database.sql, backup_TIMESTAMP_DBForager_database.sql)&#10;and combines them into a single file (backup_TIMESTAMP_all_databases.sql)&#10;for easy management while providing detailed status reporting.&quot;" />
+    <MESSAGE value="git add .&#10;git commit -m &quot;Fix undefined user object error in Project controller and other controllers&#10;&#10;- Fixed 'Can't call method username on an undefined value' error in Project.pm&#10;- Added proper null checks for user object before calling -&gt;username method&#10;- Changed from '$c-&gt;user_exists ? $c-&gt;user-&gt;username : fallback' &#10;  to '($c-&gt;user_exists &amp;&amp; $c-&gt;user) ? $c-&gt;user-&gt;username : ($c-&gt;session-&gt;{username} || fallback)'&#10;- Applied same fix preventively to ENCY.pm, HelpDesk.pm, and NetworkDevices.pm&#10;- Added fallback to session username when user object is undefined&#10;- Ensures robust username retrieval across all controllers&#10;&#10;The issue occurred when user_exists returned true but the user object was undefined,&#10;causing fatal errors when trying to access user properties. This fix provides&#10;multiple fallback layers for safe username retrieval.&quot;" />
+    <MESSAGE value="Fix: Documentation system - Critical dash removal bug and missing directories&#10;&#10;CRITICAL FIXES:&#10;- Fixed dash removal bug causing 404 errors for documentation files with dashes&#10;  * Changed regex from s/[^a-zA-Z0-9_\.]//g to s/[^a-zA-Z0-9_\.\-]//g&#10;  * Files like 2024-05-documentation-system-fixes.tt now accessible&#10;  &#10;- Fixed missing documentation directories (76 → 376 files now scanned)&#10;  * Added comprehensive scanning for all subdirectories&#10;  * general/ (128 files), changelog/ (59 files), proxmox/ (7 files)&#10;  * features/, docs/, migration/, system/, cloudflare/, themes/, tutorials/, scripts/, admin/&#10;&#10;IMPROVEMENTS:&#10;- Increased search result limit from 20 to 100 for comprehensive search&#10;- Made documentation attributes writable to allow force rebuild&#10;- Added /Documentation/force_rebuild endpoint for testing and maintenance&#10;- Removed extensive debugging code from failed previous thread&#10;&#10;FILES MODIFIED:&#10;- Comserv/lib/Comserv/Controller/Documentation.pm (core fixes + comprehensive scanning)&#10;- Comserv/lib/Comserv/Controller/Documentation/ConfigBased.pm (routing conflict fix)&#10;- Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.tt (updated workflow)&#10;- CHANGELOG.tt (documented changes)&#10;&#10;IMPACT: Documentation system now fully functional with all 376 files accessible&#10;and searchable with working links for files containing dashes in names.&#10;&#10;Co-authored-by: AI Assistant" />
+    <MESSAGE value="[Documentation] Complete .tt file compliance - Fix PageVersion headers and Markdown conversion&#10;&#10;• Added proper PageVersion headers to 2 changelog files&#10;• Converted Markdown content to HTML/.tt format in git-divergent-branches-fix.tt&#10;• Verified all documentation files now follow .tt template standards&#10;• Created changelog entry documenting the compliance fix&#10;• Cleaned up AI_DEVELOPMENT_GUIDELINES.tt for next thread&#10;&#10;Related files:&#10;• Comserv/root/Documentation/changelog/2025-01-15-git-divergent-branches-fix.tt&#10;• Comserv/root/Documentation/changelog/2025-01-15-software-upgrade-manager.tt&#10;• Comserv/root/Documentation/changelog/2025-01-15-tt-file-compliance-fix.tt&#10;• Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.tt&#10;&#10;Documentation updates:&#10;• Created 2025-01-15-tt-file-compliance-fix.tt changelog entry&#10;• Updated AI_DEVELOPMENT_GUIDELINES.tt with next thread task information" />
+    <MESSAGE value="[Todo] Fixed Template Toolkit parsing error in week view&#10;&#10;- Fixed &quot;unexpected token (DateTime::Format::ISO8601)&quot; error in week.tt template&#10;- Enhanced week controller to pre-calculate all date information in Perl&#10;- Created week_days array with date, day_name, day_number, month_name, is_today&#10;- Removed DateTime parsing calls from template (TT doesn't support Perl object methods)&#10;- Fixed todo filtering logic to use pre-calculated dates&#10;- Follows proper MVC pattern: controller handles date logic, template displays data&#10;&#10;Related files:&#10;- Comserv/lib/Comserv/Controller/Todo.pm&#10;- Comserv/root/todo/week.tt" />
+    <MESSAGE value="Fix Todo month calendar display issues - complete resolution&#10;&#10;FIXES APPLIED:&#10;1. Database ambiguity error: Changed ORDER BY 'start_date' to 'me.start_date' &#10;   - Resolved MySQL error when both todo and projects tables have start_date columns&#10;2. Logging method error: Changed $c-&gt;log_with_details() to $c-&gt;log-&gt;info()&#10;   - Fixed &quot;Can't locate object method&quot; error using correct Catalyst logging&#10;3. Removed logs from todo calendar: Eliminated log fetching and processing&#10;   - Todo month view now displays only todos as intended&#10;&#10;TECHNICAL DETAILS:&#10;- Fixed SQL column ambiguity in Todo.pm line 796&#10;- Corrected logging method call in Todo.pm line 809  &#10;- Removed log database queries and processing (lines 812-818, 837-845)&#10;- Removed logs from calendar structure, keeping only todos&#10;&#10;RESULT: Month calendar now properly displays todos without errors&#10;&#10;Files modified:&#10;- Comserv/lib/Comserv/Controller/Todo.pm (database query fixes, log removal)&#10;- Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.tt (task completion)&#10;&#10;Testing: Verified todos display correctly, no database errors, no logs shown" />
+    <MESSAGE value="feat: Complete Documentation system with toggle icons and comprehensive docs&#10;&#10;- Fix: Toggle icons now visible using Unicode arrows (▼/▲)&#10;- Add: Documentation controller CSS loading via additional_css stash&#10;- Add: Documentation_System.tt - Complete architecture guide&#10;- Add: CSS_Theme_System.tt - Theme system documentation  &#10;- Add: Changelog entry for system completion&#10;- Refactor: Simplified toggle icons from FontAwesome to Unicode&#10;- Clean: AI_DEVELOPMENT_GUIDELINES ready for next task&#10;&#10;Files modified:&#10;- Comserv/lib/Comserv/Controller/Documentation.pm&#10;- Comserv/root/static/css/themes/base-containers.css&#10;- Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.tt&#10;&#10;Files created:&#10;- Comserv/root/Documentation/Documentation_System.tt&#10;- Comserv/root/Documentation/CSS_Theme_System.tt&#10;- Comserv/root/Documentation/changelog/2025-01-15_documentation_system_completion.tt" />
+    <MESSAGE value="feat: Implement mailing list system fixes and opt-out functionality&#10;&#10;- Fix admin link in register.tt to point to /mail/lists/create with role checking&#10;- Add radio button opt-in/opt-out interface in settings.tt for mailing lists&#10;- Implement default SiteName announcement list auto-subscription for new users&#10;- Add email notifications handling through mailing list subscriptions&#10;- Create helper methods: _user_has_email_notifications, _update_user_email_notifications, _get_or_create_announcement_list&#10;- Use proper MailingListSubscription link table instead of direct user fields&#10;- Update documentation for User and Mail controllers&#10;- Mark mailing list system fixes task as completed in AI_DEVELOPMENT_GUIDELINES&#10;&#10;Files modified:&#10;- Comserv/root/user/register.tt&#10;- Comserv/root/user/settings.tt  &#10;- Comserv/lib/Comserv/Controller/User.pm&#10;- Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.tt&#10;- Comserv/root/Documentation/controllers/User.tt&#10;- Comserv/root/Documentation/controllers/Mail.tt (new)&#10;&#10;The mailing list system now provides proper opt-in/opt-out functionality with default announcement list subscriptions for all new users, using the correct data model architecture." />
+    <MESSAGE value="docs: Complete conversion of menu_system.tt from markdown to HTML&#10;&#10;- Removed all unreadable markdown-style headers and formatting&#10;- Converted to semantic HTML5 structure with proper sections and IDs&#10;- Applied apiary-container and theme-aware CSS classes for consistency&#10;- Added Font Awesome icons and structured content blocks&#10;- Maintained all technical content while improving readability&#10;- Updated PageVersion to 1.1 with current date&#10;- File now fully integrated with Comserv theme system&#10;&#10;Fixes: Mixed markdown/HTML content making documentation unreadable" />
+    <MESSAGE value="Fix: Button theme color compliance - Remove hardcoded orange override&#10;&#10;ISSUE: All buttons showing orange (#FF9900) across all themes instead of theme-specific colors&#10;&#10;ROOT CAUSE: theme-editor.js was dynamically setting button-bg to accent-color after CSS loading&#10;&#10;SOLUTION:&#10;- Removed JavaScript button-bg override in theme-editor.js&#10;- Updated components/buttons.css to use proper theme variables&#10;- Fixed theme-editor.css preview buttons&#10;- Enhanced base-containers.css button classes with theme compliance&#10;&#10;FILES MODIFIED:&#10;- Comserv/root/static/js/theme-editor.js - Commented out button-bg override&#10;- Comserv/root/static/css/components/buttons.css - Use secondary-color/primary-color&#10;- Comserv/root/static/css/theme-editor.css - Fixed preview button colors  &#10;- Comserv/root/static/css/themes/base-containers.css - Enhanced .btn classes&#10;&#10;RESULT: Buttons now respect individual theme color schemes&#10;- Default buttons: secondary-color background&#10;- Primary buttons: primary-color background&#10;- Hover states: proper theme color transitions&#10;- All button types: theme-appropriate colors&#10;&#10;Testing needed: Verify buttons on /mail, admin areas, and theme switching" />
+    <MESSAGE value="feat: Enhanced Todo system error handling and admin notifications&#10;&#10;- Fixed database constraint error in Todo controller modify method&#10;- Implemented field preservation logic to maintain existing values when form fields are empty&#10;- Added comprehensive error handling with user-friendly messages&#10;- Created admin notification system with email alerts and detailed logging&#10;- Enhanced user experience with form data preservation on errors&#10;- Added _notify_admin_of_error private method for automated error reporting&#10;- Created comprehensive todo system documentation&#10;&#10;Files modified:&#10;- Comserv/lib/Comserv/Controller/Todo.pm: Enhanced error handling and admin notifications&#10;- Comserv/root/Documentation/controllers/todo_system.tt: New comprehensive documentation&#10;- Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.tt: Updated with task completion and next session setup&#10;&#10;Fixes production database error: &quot;Incorrect integer value: '' for column project_id&quot;&#10;Improves maintainability by preserving existing data instead of overwriting with empty strings&#10;Provides immediate admin awareness of critical system errors" />
+    <MESSAGE value="feat: Navigation system consolidation and CSS form restoration&#10;&#10;CRITICAL FIXES:&#10;- Consolidated duplicate navigation directories (navigation/ → Navigation/)&#10;- Restored proper Navigation/navigation.tt with correct menu includes&#10;- Fixed navigation menu order: Main, Login, Global, Hosted, Member, Weather, IT, Admin, HelpDesk&#10;- Fixed CSS form system route /admin/theme/edit/{theme_name}&#10;&#10;NAVIGATION SYSTEM:&#10;- Removed duplicate navigation/ directory structure&#10;- Rebuilt Navigation/navigation.tt with proper TopDropList includes&#10;- Maintained role-based access (admin-only, site-specific menus)&#10;- Restored all missing navigation menus and functionality&#10;&#10;CSS FORM SYSTEM:&#10;- Renamed edit_css method to edit in Admin::Theme controller&#10;- Updated admin/theme/edit_css.tt form action route&#10;- Fixed CSS editing form display and save functionality&#10;&#10;DOCUMENTATION:&#10;- Complete rewrite of navigation system documentation&#10;- Updated all file path references to correct Navigation/ directory&#10;- Added comprehensive changelog for navigation consolidation&#10;- Updated AI development guidelines with completed tasks&#10;&#10;FILES MODIFIED:&#10;- Comserv/root/Navigation/navigation.tt (rebuilt)&#10;- Comserv/lib/Comserv/Controller/Admin/Theme.pm (method rename)&#10;- Comserv/root/admin/theme/edit_css.tt (route fix)&#10;- Comserv/root/Documentation/general/navigation_system.tt (rewritten)&#10;- Comserv/root/Documentation/general/menu_system.tt (path updates)&#10;- Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.tt (task updates)&#10;&#10;FILES CREATED:&#10;- Comserv/root/Documentation/changelog/2025-07-07-navigation-system-consolidation.tt&#10;&#10;FILES REMOVED:&#10;- Comserv/root/navigation/ (entire duplicate directory)&#10;&#10;TESTING REQUIRED:&#10;- Verify navigation menu order and functionality&#10;- Test CSS form system at /admin/theme/edit/{theme_name}&#10;- Confirm role-based menu visibility works properly" />
+    <MESSAGE value="feat: Complete todo system theme normalization and documentation consolidation&#10;&#10;## Todo System Theme Normalization (COMPLETE)&#10;- ✅ Converted todo.tt to use unified theme classes (.feature-card, .feature-header, .feature-content)&#10;- ✅ Replaced todo.css with todo-functional.css (functional CSS only, no styling)&#10;- ✅ Fixed inline action button layout - buttons now appear on same line as todo content&#10;- ✅ Resolved Unicode character issues - replaced ▼ with HTML entities (&amp;#9660;)&#10;- ✅ Implemented expandable container functionality with proper state persistence&#10;- ✅ Updated overdue todos section to match main todo list layout&#10;- ✅ All buttons now use standard theme classes (.btn, .btn-primary, .btn-secondary, etc.)&#10;&#10;## Theme Documentation Consolidation&#10;- ✅ Updated theme_system_normalization.tt as master theme documentation index&#10;- ✅ Added current implementation status section with completed normalizations&#10;- ✅ Linked all related theme documentation files&#10;- ✅ Documented next priority: Admin CSS Settings interface&#10;- ✅ Updated AI_DEVELOPMENT_GUIDELINES.tt with current progress and next chat objectives&#10;&#10;## Technical Improvements&#10;- ✅ Fixed todo_actions.tt include to use inline-flex layout preventing button line breaks&#10;- ✅ Updated JavaScript functions to use HTML entities instead of Unicode characters&#10;- ✅ Enhanced todo-functional.css with proper form inline support&#10;- ✅ Maintained responsive design for mobile devices&#10;&#10;## Files Modified/Created:&#10;- Modified: Comserv/root/todo/todo.tt (complete theme conversion)&#10;- Modified: Comserv/root/include/todo_actions.tt (inline button layout)&#10;- Created: Comserv/root/static/css/todo-functional.css (functional CSS only)&#10;- Modified: Comserv/root/static/js/todo-enhancements.js (HTML entity support)&#10;- Modified: Comserv/root/Documentation/developer/theme_system_normalization.tt (master index)&#10;- Modified: Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.tt (progress update)&#10;&#10;## Theme System Benefits Achieved:&#10;- ✅ Unified appearance across all themes (CSC, BMaster, USBM, etc.)&#10;- ✅ Centralized theme management through base-containers.css&#10;- ✅ Consistent button styling and layout patterns&#10;- ✅ Future-proof architecture for AI developme" />
+    <MESSAGE value="Implement theme management in admin panel&#10;&#10;This commit introduces a theme management interface to the admin panel, allowing administrators to:&#10;&#10;- Select from available themes.&#10;- Preview themes before applying.&#10;- Customize theme colors.&#10;&#10;It includes the following:&#10;&#10;- New `css_form` action to display the settings form.&#10;- `update_theme_from_css_form` action to update the theme selection.&#10;- `customize_theme` action to generate custom CSS based on color selections.&#10;- New `admin/css_settings.tt` template for the UI.&#10;- Updates to documentation to reflect completion of the feature." />
+    <MESSAGE value="Good question! Let me quickly check what's happening with the database connection when you switch to SQLite mode.&#10;&#10;Let me check the HybridDB model's switch_backend method:&#10;&#10;Quick Answer: The HybridDB model only tracks which backend type is selected (mysql or sqlite) but doesn't actually change the database connections used by your models like Todo.&#10;&#10;The Todo data you're seeing is likely still coming from MySQL because:&#10;&#10;HybridDB is separate: It's a standalone model for backend selection&#10;Other models unchanged: Your Todo model probably still connects to MySQL&#10;No integration: The switch doesn't automatically update other database models&#10;To truly switch backends, you'd need the HybridDB to either:&#10;&#10;Update the database configuration for all models&#10;Or have models check HybridDB for connection info&#10;The current implementation appears to be a framework for backend switching but may not be fully integrated with the actual data models yet.&#10;&#10;Shanta McBain, 1m ago&#10;Now I know our chat is stale you did not take heed of the prompt count. time pass the torch for the next chat.&#10;&#10;Coding Agent&#10;You're absolutely right - I should have been more mindful of the prompt count. Let me quickly summarize what we accomplished and what needs to be passed to the next chat:&#10;&#10;Summary for Next Chat:&#10;✅ COMPLETED:&#10;Fixed /database_mode route - Added proper route in Admin controller at /admin/database_mode&#10;Updated all menu links - Changed from /database_mode to /admin/database_mode in:&#10;admintopmenu.tt&#10;admin/index.tt&#10;Updated JavaScript URLs in database_mode/index.tt template&#10;Made DatabaseMode controller methods :Private - Removed direct access, only accessible through Admin controller&#10;Clean architecture - No more Root.pm clutter, proper admin organization&#10; DISCOVERED ISSUE:&#10;The HybridDB backend switching is NOT fully integrated. When you switch to SQLite mode:&#10;&#10;HybridDB model tracks the selection (mysql vs sqlite)&#10;But other models (like Todo) still connect to MySQL&#10;The switch doesn't actually change database connections for data models&#10; NEXT STEPS NEEDED:&#10;Integrate HybridDB with data models - Make Todo/other models check HybridDB for connection info&#10;Test the /admin/database_mode route - Verify it works properly&#10;Complete the backend switching functionality - Ensure SQLite mode actually uses SQLite data&#10; KEY FILES MODIFIED:&#10;Comserv/lib/Comserv/Controller/Admin.pm - Added database_mode route&#10;Comserv/lib/Comserv/Controller/DatabaseMode.pm - Made methods private&#10;Comserv/root/Navigation/admintopmenu.tt - Updated menu link&#10;Comserv/root/admin/index.tt - Updated menu link&#10;Comserv/root/database_mode/index.tt - Updated JavaScript URLs&#10;The route issue is SOLVED but the backend switching needs deeper integration work." />
+    <MESSAGE value="fix: resolve &quot;Table 'ency.todo' doesn't exist&quot; error and add database mode toggle&#10;&#10;PROBLEM:&#10;- Todo functionality failing with &quot;Table 'ency.todo' doesn't exist&quot; error&#10;- System connecting to local database instead of production server&#10;- No user interface to control database connection mode&#10;&#10;ROOT CAUSE:&#10;- localhost_override: true in production_server config caused connection to localhost instead of 192.168.1.198&#10;- Multiple controllers bypassing safe_search mechanism&#10;- Tables existed on production server but system connected to wrong database&#10;&#10;SOLUTION:&#10;- Disabled localhost_override for production_server backend in db_config.json&#10;- Added user toggle interface for localhost_override setting via DatabaseMode controller&#10;- Enhanced connection debugging to show exact DSN being used&#10;- Fixed controller bypasses in Todo.pm, Project.pm, and Apiary.pm to use safe_search&#10;&#10;FEATURES ADDED:&#10;- toggle_localhost_override method in DatabaseMode controller (AJAX endpoint)&#10;- _save_config method in HybridDB for runtime configuration changes&#10;- Enhanced logging for database connection debugging&#10;- Automatic configuration backup before changes&#10;&#10;RESULT:&#10;- Todo functionality now working - getting all production data&#10;- Users can toggle between production and local database access&#10;- Enhanced debugging for future database connection issues&#10;&#10;Files modified:&#10;- db_config.json&#10;- Comserv/lib/Comserv/Controller/DatabaseMode.pm&#10;- Comserv/lib/Comserv/Model/HybridDB.pm  &#10;- Comserv/lib/Comserv/Model/DBEncy.pm&#10;- Comserv/lib/Comserv/Controller/Todo.pm&#10;- Comserv/lib/Comserv/Controller/Project.pm&#10;- Comserv/lib/Comserv/Controller/Apiary.pm&#10;- Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.tt" />
+    <MESSAGE value="attempting to sync data from production to locally all failed." />
+    <MESSAGE value="Implement enhanced error reporting and log management&#10;&#10;This commit introduces several key enhancements:&#10;&#10;-   **Enhanced Error Reporting:** Implement error tracking, a separate error log file, and admin notifications for critical errors.&#10;-   **Log Management:** Adds an admin interface for managing log levels, toggling debug mode, and forcing log rotation.&#10;-   **Application Log Level:** Introduce a separate application log level configuration, independent of the browser debug mode.&#10;-   **Performance Improvements:** Implement caching for backend detection to reduce page load lag.&#10;-   **Testing Route:** Add a `/test_error_reporting` route to demonstrate all logging features." />
+    <MESSAGE value="[BUG FIX]: Complete Todo Time Field Fix Documentation&#10;&#10;Problem: Todo modification failing with MySQL time field error - missing documentation and changelog updates&#10;Solution: Added comprehensive documentation, changelog entries, and cross-references for the time field fix&#10;&#10;Files Modified:&#10;- /CHANGELOG.tt - Added Todo Time Field Fix entry to Unreleased section&#10;- /Comserv/root/Documentation/TODO_SYSTEM_DOCUMENTATION.tt - Added troubleshooting section with fix details&#10;- /Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.tt - Updated task context and marked as fully completed&#10;&#10;Status: COMPLETED&#10;Next: Ready for new assignments - no active tasks" />
+    <MESSAGE value="Fix: Handle empty input in calculation function&#10;&#10;The calculation function crashes when receiving empty input. This commit adds a check for empty input and returns a default value to prevent the crash." />
+    <MESSAGE value="added all files out of tracking mostly .tt files for documentation." />
+    <option name="LAST_COMMIT_MESSAGE" value="added all files out of tracking mostly .tt files for documentation." />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/main.py</url>
+          <line>8</line>
+          <option name="timeStamp" value="1" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
+  </component>
+  <component name="ai.zencoder.plugin.chat.state">
+    <option name="activeChatId" value="769d50fa-b0a6-4637-828d-7c03da90a539" />
+  </component>
+  <component name="ai.zencoder.plugin.mcp">
+    <option name="internalToolsState" value="{&quot;web_search&quot;:true,&quot;fetch_webpage&quot;:true,&quot;str_replace_editor&quot;:true,&quot;file_search&quot;:true,&quot;ExecuteShellCommand&quot;:true,&quot;list_resources&quot;:true,&quot;FileDiagnosticsTool&quot;:true,&quot;VectorSearchTool&quot;:true,&quot;fulltext_search&quot;:true,&quot;read_resource&quot;:true,&quot;RequirementsTool&quot;:true}" />
+    <option name="libraryTools">
+      <map>
+        <entry key="agentql">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="agentrpc">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="aiven">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="apache iotdb">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="apify">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="apimatic mcp">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="astra db">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="aws kb retrieval">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="axiom">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="bankless onchain">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="bicscan">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="box">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="brave search">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="browserbase">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="chroma">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="circleci">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="clickhouse">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="cloudflare">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="codacy">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="codelogic">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="comet opik">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="context7">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="convex">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="e2b">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="elasticsearch">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="everart">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="everything">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="exa">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="fetch">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="fibery">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="filesystem">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="financial datasets">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="firecrawl">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="fireproof">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="forevervm">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="git">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="gitee">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="github">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="gitlab">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="google drive">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="google maps">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="grafana">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="graphlit">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="greptimedb">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="heroku">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="hologres">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="hyperbrowser">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="ibm wxflows">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="inkeep">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="integration app">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="jetbrains">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="kagi search">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="langfuse prompt management">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="logfire">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="mailgun">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="make">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="meilisearch">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="memory">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="metoro">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="milvus">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="momento">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="motherduck">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="needle">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="neo4j">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="neon">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="notion">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="oceanbase">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="octagon">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="oxylabs">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="paddle">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="paypal">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="perplexity">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="playwright">
+          <value>
+            <McpServerInfo>
+              <option name="status">
+                <McpServerStatus />
+              </option>
+            </McpServerInfo>
+          </value>
+        </entry>
+        <entry key="postgresql">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="puppeteer">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="qdrant">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="ramp">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="raygun">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="redis">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="riza">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="screenshotone">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="search1api">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="semgrep">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="sentry">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="sequential thinking">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="singlestore">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="slack">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="sqlite">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="starrocks">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="stripe">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="taskmaster-ai">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="tavily">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="thirdweb">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="tinybird">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="unifai">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="unstructured">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="vectorize">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="zapier">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+        <entry key="zenml">
+          <value>
+            <McpServerInfo />
+          </value>
+        </entry>
+      </map>
+    </option>
+    <option name="mcpServers" value="{&quot;playwright&quot;:{&quot;type&quot;:&quot;STDIO&quot;,&quot;command&quot;:&quot;npx&quot;,&quot;cwd&quot;:null,&quot;args&quot;:[&quot;-y&quot;,&quot;@playwright/mcp@latest&quot;,&quot;--isolated&quot;,&quot;--headless&quot;,&quot;--browser&quot;,&quot;firefox&quot;,&quot;--user-agent&quot;,&quot;\&quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.6422.112 Safari/537.36\&quot;&quot;],&quot;env&quot;:{}}}" />
+    <option name="zencoderBackendTools">
+      <map>
+        <entry key="ExecuteShellCommand">
+          <value>
+            <McpServerInfo>
+              <option name="status">
+                <McpServerStatus />
+              </option>
+            </McpServerInfo>
+          </value>
+        </entry>
+        <entry key="FileDiagnosticsTool">
+          <value>
+            <McpServerInfo>
+              <option name="status">
+                <McpServerStatus />
+              </option>
+            </McpServerInfo>
+          </value>
+        </entry>
+        <entry key="RequirementsTool">
+          <value>
+            <McpServerInfo>
+              <option name="status">
+                <McpServerStatus />
+              </option>
+            </McpServerInfo>
+          </value>
+        </entry>
+        <entry key="fetch_webpage">
+          <value>
+            <McpServerInfo>
+              <option name="status">
+                <McpServerStatus />
+              </option>
+            </McpServerInfo>
+          </value>
+        </entry>
+        <entry key="str_replace_editor">
+          <value>
+            <McpServerInfo>
+              <option name="status">
+                <McpServerStatus />
+              </option>
+            </McpServerInfo>
+          </value>
+        </entry>
+        <entry key="web_search">
+          <value>
+            <McpServerInfo>
+              <option name="status">
+                <McpServerStatus />
+              </option>
+            </McpServerInfo>
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="ai.zencoder.plugin.rag.RepoInfoWarningState">
+    <option name="lastCheckTime" value="1756150137041" />
+  </component>
+  <component name="ai.zencoder.plugin.rag.settings">
+    <option name="desiredChunkSizeBytes" value="4194304" />
+    <option name="forbiddenExtensions">
+      <set>
+        <option value=".log,.lock,.svg" />
+      </set>
+    </option>
+    <option name="pollingIntervalMs" value="60000" />
+    <option name="projectInfoUpdateThresholdPercentage" value="101" />
+    <option name="repoIndexingIntervalMs" value="300000" />
+  </component>
+  <component name="ai.zencoder.plugin.rag.state">
+    <option name="indexedFilesMap">
+      <map>
+        <entry key="$PROJECT_DIR$/.gitignore" value="1750711791976" />
+        <entry key="$PROJECT_DIR$/.zencoder/docs/repo.md" value="1751392531958" />
+        <entry key="$PROJECT_DIR$/Comserv.pm" value="1752070140256" />
+        <entry key="$PROJECT_DIR$/Comserv/lib/Comserv.pm" value="1750972453520" />
+        <entry key="$PROJECT_DIR$/Comserv/lib/Comserv/Controller/Admin.pm" value="1752069840255" />
+        <entry key="$PROJECT_DIR$/Comserv/lib/Comserv/Controller/Admin/Logging.pm" value="1752681897013" />
+        <entry key="$PROJECT_DIR$/Comserv/lib/Comserv/Controller/Admin/NetworkDevices.pm" value="1750800369342" />
+        <entry key="$PROJECT_DIR$/Comserv/lib/Comserv/Controller/Admin/Theme.pm" value="1751925972731" />
+        <entry key="$PROJECT_DIR$/Comserv/lib/Comserv/Controller/Apiary.pm" value="1752085740297" />
+        <entry key="$PROJECT_DIR$/Comserv/lib/Comserv/Controller/Base.pm" value="1750799331786" />
+        <entry key="$PROJECT_DIR$/Comserv/lib/Comserv/Controller/DatabaseMode.pm" value="1752088140315" />
+        <entry key="$PROJECT_DIR$/Comserv/lib/Comserv/Controller/Documentation.pm" value="1752595379303" />
+        <entry key="$PROJECT_DIR$/Comserv/lib/Comserv/Controller/Documentation/ConfigBased.pm" value="1750880573012" />
+        <entry key="$PROJECT_DIR$/Comserv/lib/Comserv/Controller/HelpDesk.pm" value="1750800369342" />
+        <entry key="$PROJECT_DIR$/Comserv/lib/Comserv/Controller/Mail.pm" value="1751496332201" />
+        <entry key="$PROJECT_DIR$/Comserv/lib/Comserv/Controller/Navigation.pm" value="1751420731986" />
+        <entry key="$PROJECT_DIR$/Comserv/lib/Comserv/Controller/Project.pm" value="1752085740297" />
+        <entry key="$PROJECT_DIR$/Comserv/lib/Comserv/Controller/Root.pm" value="1752701396976" />
+        <entry key="$PROJECT_DIR$/Comserv/lib/Comserv/Controller/ThemeAdmin.pm" value="1751989940542" />
+        <entry key="$PROJECT_DIR$/Comserv/lib/Comserv/Controller/Todo.pm" value="1752085740297" />
+        <entry key="$PROJECT_DIR$/Comserv/lib/Comserv/Controller/User.pm" value="1752072840260" />
+        <entry key="$PROJECT_DIR$/Comserv/lib/Comserv/Model/DBEncy.pm" value="1752095040302" />
+        <entry key="$PROJECT_DIR$/Comserv/lib/Comserv/Model/DBForager.pm" value="1752033135759" />
+        <entry key="$PROJECT_DIR$/Comserv/lib/Comserv/Model/HybridDB.pm" value="1752596396923" />
+        <entry key="$PROJECT_DIR$/Comserv/lib/Comserv/Model/Schema/Ency/Result/MailingList.pm" value="1750995853542" />
+        <entry key="$PROJECT_DIR$/Comserv/lib/Comserv/Model/Schema/Ency/Result/MailingListCampaign.pm" value="1750995853542" />
+        <entry key="$PROJECT_DIR$/Comserv/lib/Comserv/Model/Schema/Ency/Result/MailingListSubscription.pm" value="1750995853542" />
+        <entry key="$PROJECT_DIR$/Comserv/lib/Comserv/Model/Schema/Ency/Result/Todo.pm" value="1751910814111" />
+        <entry key="$PROJECT_DIR$/Comserv/lib/Comserv/Model/Schema/Ency/Result/User.pm" value="1751059153735" />
+        <entry key="$PROJECT_DIR$/Comserv/lib/Comserv/Model/Schema/Ency/Result/UserSiteRole.pm" value="1750779231722" />
+        <entry key="$PROJECT_DIR$/Comserv/lib/Comserv/Model/Todo.pm" value="1752084540303" />
+        <entry key="$PROJECT_DIR$/Comserv/lib/Comserv/Model/User.pm" value="1751058553709" />
+        <entry key="$PROJECT_DIR$/Comserv/lib/Comserv/Util/AccessControl.pm" value="1750783431730" />
+        <entry key="$PROJECT_DIR$/Comserv/lib/Comserv/Util/Logging.pm" value="1752695696947" />
+        <entry key="$PROJECT_DIR$/Comserv/lib/Comserv/View/Email/Template.pm" value="1751919972732" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/CSS_Theme_System.tt" value="1751919972732" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/Documentation_System.tt" value="1750983553552" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/Mailing_List_System_Plan.tt" value="1750985653543" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/Schema.tt" value="1751002453546" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/TODO_SYSTEM_CHANGELOG.tt" value="1750909973045" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/TODO_SYSTEM_DOCUMENTATION.tt" value="1750909973045" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/Todo.tt" value="1750967053524" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/admin_guides.tt" value="1750967053524" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/all_docs.tt" value="1750967053524" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/changelog/2025-01-15-git-divergent-branches-fix.tt" value="1750887473350" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/changelog/2025-01-15-mailing-list-phase1.tt" value="1751038753623" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/changelog/2025-01-15-mailing-list-system-implementation.tt" value="1751038453620" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/changelog/2025-01-15-software-upgrade-manager.tt" value="1750886873038" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/changelog/2025-01-15-tt-file-compliance-fix.tt" value="1750889263966" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/changelog/2025-01-15_documentation_system_completion.tt" value="1750983553552" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/changelog/2025-01-20-collapsible-changelog-enhancement.tt" value="1750967053524" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/changelog/2025-07-07-navigation-system-consolidation.tt" value="1751930472715" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/changelog/fix_project_selection_todo_filtering.tt" value="1750967053524" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/changelog/main_changelog.tt" value="1750967053524" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/changelog/todo_edit_functionality.tt" value="1750967053524" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/config/documentation_config.json" value="1750950473093" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/controllers.tt" value="1750967053524" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/controllers/Mail.tt" value="1751057053715" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/controllers/todo_system.tt" value="1751899444823" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/developer/hybrid_database_architecture.tt" value="1752009135748" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/developer/offline_mode_system.tt" value="1752597296973" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/developer/theme_system_normalization.tt" value="1751990705781" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/developer_guides.tt" value="1750969753505" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/index.tt" value="1750973353504" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/models.tt" value="1750967053524" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/proxmox.tt" value="1750967053524" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/roles/admin/todo_admin_guide.tt" value="1750967053524" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/roles/developer/todo_developer_guide.tt" value="1750967053524" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/roles/normal/todo_user_guide.tt" value="1750967053524" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/site_specific.tt" value="1750969753505" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/system_info.tt" value="1750803172905" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/tutorials.tt" value="1750969453495" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Documentation/user_docs.tt" value="1750967053524" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Header.tt" value="1751916814099" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Navigation/TopDropLisGlobal.tt" value="1751399431934" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Navigation/TopDropListGlobal.tt" value="1751424631979" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Navigation/TopDropListHelpDesk.tt" value="1751424631979" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Navigation/TopDropListHosted.tt" value="1751389531920" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Navigation/TopDropListIT.tt" value="1751391031924" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Navigation/TopDropListLogin.tt" value="1751424631979" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Navigation/TopDropListMain.tt" value="1751391031924" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Navigation/TopDropListMember.tt" value="1751391031924" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Navigation/TopDropListWeather.tt" value="1751399431934" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Navigation/admintopmenu.tt" value="1752596396923" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Navigation/edit_link.tt" value="1751926872720" />
+        <entry key="$PROJECT_DIR$/Comserv/root/Navigation/navigation.tt" value="1751930472715" />
+        <entry key="$PROJECT_DIR$/Comserv/root/admin/access_control_help.tt" value="1750781931727" />
+        <entry key="$PROJECT_DIR$/Comserv/root/admin/backup.tt" value="1750782531875" />
+        <entry key="$PROJECT_DIR$/Comserv/root/admin/css_settings.tt" value="1751989940542" />
+        <entry key="$PROJECT_DIR$/Comserv/root/admin/index.tt" value="1752596396923" />
+        <entry key="$PROJECT_DIR$/Comserv/root/admin/logging/index.tt" value="1752683097637" />
+        <entry key="$PROJECT_DIR$/Comserv/root/admin/schema_compare.tt" value="1752068640259" />
+        <entry key="$PROJECT_DIR$/Comserv/root/admin/theme/edit_css.tt" value="1751925972731" />
+        <entry key="$PROJECT_DIR$/Comserv/root/database_mode/index.tt" value="1752037035821" />
+        <entry key="$PROJECT_DIR$/Comserv/root/email/admin_account_notification.tt" value="1751052553702" />
+        <entry key="$PROJECT_DIR$/Comserv/root/email/admin_subscription_notification.tt" value="1751052553702" />
+        <entry key="$PROJECT_DIR$/Comserv/root/footer.tt" value="1751040853604" />
+        <entry key="$PROJECT_DIR$/Comserv/root/include/css_include.tt" value="1751922072738" />
+        <entry key="$PROJECT_DIR$/Comserv/root/include/todo_actions.tt" value="1751987172798" />
+        <entry key="$PROJECT_DIR$/Comserv/root/mail/create_list.tt" value="1751040853604" />
+        <entry key="$PROJECT_DIR$/Comserv/root/mail/index.tt" value="1751496332201" />
+        <entry key="$PROJECT_DIR$/Comserv/root/mail/mailing_lists.tt" value="1751473532033" />
+        <entry key="$PROJECT_DIR$/Comserv/root/mail/mass_email_form.tt" value="1751472932042" />
+        <entry key="$PROJECT_DIR$/Comserv/root/mail/newsletter_signup.tt" value="1751044453632" />
+        <entry key="$PROJECT_DIR$/Comserv/root/static/config/theme_mappings.json" value="1751988372787" />
+        <entry key="$PROJECT_DIR$/Comserv/root/static/css/components/buttons.css" value="1751503532197" />
+        <entry key="$PROJECT_DIR$/Comserv/root/static/css/components/project-cards.css" value="1751920872684" />
+        <entry key="$PROJECT_DIR$/Comserv/root/static/css/markdown-viewer.css" value="1750813072920" />
+        <entry key="$PROJECT_DIR$/Comserv/root/static/css/theme-editor.css" value="1751503532197" />
+        <entry key="$PROJECT_DIR$/Comserv/root/static/css/theme-overrides.css" value="1751496932226" />
+        <entry key="$PROJECT_DIR$/Comserv/root/static/css/themes/admin.css" value="1751921472710" />
+        <entry key="$PROJECT_DIR$/Comserv/root/static/css/themes/api_credentials.css" value="1751921472710" />
+        <entry key="$PROJECT_DIR$/Comserv/root/static/css/themes/apiary.css" value="1751982972778" />
+        <entry key="$PROJECT_DIR$/Comserv/root/static/css/themes/base-containers.css" value="1751923572691" />
+        <entry key="$PROJECT_DIR$/Comserv/root/static/css/themes/csc.css" value="1751924172700" />
+        <entry key="$PROJECT_DIR$/Comserv/root/static/css/themes/default.css" value="1751924172700" />
+        <entry key="$PROJECT_DIR$/Comserv/root/static/css/themes/documentation.css" value="1750973353504" />
+        <entry key="$PROJECT_DIR$/Comserv/root/static/css/themes/schema_compare.css" value="1752068640259" />
+        <entry key="$PROJECT_DIR$/Comserv/root/static/css/todo-functional.css" value="1751987472871" />
+        <entry key="$PROJECT_DIR$/Comserv/root/static/css/todo.css" value="1751982972778" />
+        <entry key="$PROJECT_DIR$/Comserv/root/static/js/theme-editor.js" value="1751503532197" />
+        <entry key="$PROJECT_DIR$/Comserv/root/static/js/todo-enhancements.js" value="1751987472871" />
+        <entry key="$PROJECT_DIR$/Comserv/root/todo/add_project.tt" value="1751992940535" />
+        <entry key="$PROJECT_DIR$/Comserv/root/todo/addtodo.tt" value="1751913214105" />
+        <entry key="$PROJECT_DIR$/Comserv/root/todo/ai_create.tt" value="1751903615277" />
+        <entry key="$PROJECT_DIR$/Comserv/root/todo/day.tt" value="1751980572800" />
+        <entry key="$PROJECT_DIR$/Comserv/root/todo/details.tt" value="1751912614120" />
+        <entry key="$PROJECT_DIR$/Comserv/root/todo/edit.tt" value="1751913214105" />
+        <entry key="$PROJECT_DIR$/Comserv/root/todo/month.tt" value="1750911473047" />
+        <entry key="$PROJECT_DIR$/Comserv/root/todo/project.tt" value="1751993540722" />
+        <entry key="$PROJECT_DIR$/Comserv/root/todo/project_list.tt" value="1751992940535" />
+        <entry key="$PROJECT_DIR$/Comserv/root/todo/todo.tt" value="1751993540722" />
+        <entry key="$PROJECT_DIR$/Comserv/root/todo/week.tt" value="1750909361379" />
+        <entry key="$PROJECT_DIR$/Comserv/root/user/edit_user.tt" value="1751060053742" />
+        <entry key="$PROJECT_DIR$/Comserv/root/user/login.tt" value="1751040853604" />
+        <entry key="$PROJECT_DIR$/Comserv/root/user/manage_site_access.tt" value="1751058553709" />
+        <entry key="$PROJECT_DIR$/Comserv/root/user/profile.tt" value="1751052553702" />
+        <entry key="$PROJECT_DIR$/Comserv/root/user/register.tt" value="1751053753733" />
+        <entry key="$PROJECT_DIR$/Comserv/root/user/settings.tt" value="1751053753733" />
+        <entry key="$PROJECT_DIR$/Comserv/script/comserv_server.pl" value="1750972453520" />
+        <entry key="$PROJECT_DIR$/FEATURE_REQUEST_SYSTEM_PLAN.tt" value="1751292915329" />
+        <entry key="$PROJECT_DIR$/commit_message.txt" value="1752004635727" />
+      </map>
+    </option>
+    <option name="lastCommitHash" value="6fdfdbf66130e57257980b47a07d0efd091eaa68" />
+    <option name="lastError" value="Server error : 503  upstream connect error or disconnect/reset before headers. reset reason: connection timeout" />
+    <option name="lastIndexTimestamp" value="1752701489135" />
+    <option name="repoAccumulatedChanges" value="799" />
+    <option name="repoTotalFiles" value="341" />
+    <option name="repositoryId" value="3ceadfa0-e579-4fde-a072-6647adfa3568" />
+    <option name="state" value="INDEXING_FAILED" />
+  </component>
+</project>

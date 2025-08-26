@@ -1,0 +1,620 @@
+Deleted old log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/archive/application.log_20250715_082339
+DEBUG: [2025-08-19 13:21:02] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:21:02] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+DEBUG: [2025-08-19 13:21:02] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:33] get_top_todos - Roles available for Todo: admin
+DEBUG: [2025-08-19 13:21:02] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:37] get_top_todos - User has admin privilege.
+INFO: [2025-08-19 13:21:02] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:45] get_top_todos - Site name: CSC
+INFO: [2025-08-19 13:21:02] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:57] get_top_todos - Visited the todo page
+DEBUG: [2025-08-19 13:21:03] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/week/2025-07-20
+DEBUG: [2025-08-19 13:21:03] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:21:03] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+DEBUG: [2025-08-19 13:21:03] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:33] get_top_todos - Roles available for Todo: admin
+DEBUG: [2025-08-19 13:21:03] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:37] get_top_todos - User has admin privilege.
+INFO: [2025-08-19 13:21:03] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:45] get_top_todos - Site name: CSC
+INFO: [2025-08-19 13:21:03] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:57] get_top_todos - Visited the todo page
+DEBUG: [2025-08-19 13:21:05] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/week/2025-07-13
+DEBUG: [2025-08-19 13:21:05] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:21:05] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+DEBUG: [2025-08-19 13:21:05] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:33] get_top_todos - Roles available for Todo: admin
+DEBUG: [2025-08-19 13:21:05] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:37] get_top_todos - User has admin privilege.
+INFO: [2025-08-19 13:21:05] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:45] get_top_todos - Site name: CSC
+INFO: [2025-08-19 13:21:05] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:57] get_top_todos - Visited the todo page
+DEBUG: [2025-08-19 13:21:06] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/week/2025-07-06
+DEBUG: [2025-08-19 13:21:06] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:21:06] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+DEBUG: [2025-08-19 13:21:06] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:33] get_top_todos - Roles available for Todo: admin
+DEBUG: [2025-08-19 13:21:06] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:37] get_top_todos - User has admin privilege.
+INFO: [2025-08-19 13:21:06] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:45] get_top_todos - Site name: CSC
+INFO: [2025-08-19 13:21:06] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:57] get_top_todos - Visited the todo page
+DEBUG: [2025-08-19 13:21:07] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/week/2025-06-29
+DEBUG: [2025-08-19 13:21:07] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:21:07] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+DEBUG: [2025-08-19 13:21:07] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:33] get_top_todos - Roles available for Todo: admin
+DEBUG: [2025-08-19 13:21:07] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:37] get_top_todos - User has admin privilege.
+INFO: [2025-08-19 13:21:07] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:45] get_top_todos - Site name: CSC
+INFO: [2025-08-19 13:21:07] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:57] get_top_todos - Visited the todo page
+DEBUG: [2025-08-19 13:21:08] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/week/2025-06-22
+DEBUG: [2025-08-19 13:21:08] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:21:08] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+DEBUG: [2025-08-19 13:21:08] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:33] get_top_todos - Roles available for Todo: admin
+DEBUG: [2025-08-19 13:21:08] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:37] get_top_todos - User has admin privilege.
+INFO: [2025-08-19 13:21:08] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:45] get_top_todos - Site name: CSC
+INFO: [2025-08-19 13:21:08] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:57] get_top_todos - Visited the todo page
+DEBUG: [2025-08-19 13:21:09] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/week/2025-06-15
+DEBUG: [2025-08-19 13:21:09] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:21:09] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+DEBUG: [2025-08-19 13:21:09] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:33] get_top_todos - Roles available for Todo: admin
+DEBUG: [2025-08-19 13:21:09] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:37] get_top_todos - User has admin privilege.
+INFO: [2025-08-19 13:21:09] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:45] get_top_todos - Site name: CSC
+INFO: [2025-08-19 13:21:09] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:57] get_top_todos - Visited the todo page
+DEBUG: [2025-08-19 13:21:10] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/week/2025-06-08
+DEBUG: [2025-08-19 13:21:10] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:21:10] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+DEBUG: [2025-08-19 13:21:10] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:33] get_top_todos - Roles available for Todo: admin
+DEBUG: [2025-08-19 13:21:10] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:37] get_top_todos - User has admin privilege.
+INFO: [2025-08-19 13:21:10] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:45] get_top_todos - Site name: CSC
+INFO: [2025-08-19 13:21:10] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:57] get_top_todos - Visited the todo page
+DEBUG: [2025-08-19 13:21:11] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/week/2025-06-01
+DEBUG: [2025-08-19 13:21:11] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:21:11] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+DEBUG: [2025-08-19 13:21:11] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:33] get_top_todos - Roles available for Todo: admin
+DEBUG: [2025-08-19 13:21:11] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:37] get_top_todos - User has admin privilege.
+INFO: [2025-08-19 13:21:11] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:45] get_top_todos - Site name: CSC
+INFO: [2025-08-19 13:21:11] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:57] get_top_todos - Visited the todo page
+DEBUG: [2025-08-19 13:21:12] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/week/2025-05-25
+DEBUG: [2025-08-19 13:21:12] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:21:12] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+DEBUG: [2025-08-19 13:21:12] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:33] get_top_todos - Roles available for Todo: admin
+DEBUG: [2025-08-19 13:21:12] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:37] get_top_todos - User has admin privilege.
+INFO: [2025-08-19 13:21:12] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:45] get_top_todos - Site name: CSC
+INFO: [2025-08-19 13:21:12] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:57] get_top_todos - Visited the todo page
+DEBUG: [2025-08-19 13:21:12] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/week/2025-05-18
+DEBUG: [2025-08-19 13:21:12] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:21:12] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+DEBUG: [2025-08-19 13:21:12] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:33] get_top_todos - Roles available for Todo: admin
+DEBUG: [2025-08-19 13:21:12] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:37] get_top_todos - User has admin privilege.
+INFO: [2025-08-19 13:21:12] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:45] get_top_todos - Site name: CSC
+INFO: [2025-08-19 13:21:13] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:57] get_top_todos - Visited the todo page
+DEBUG: [2025-08-19 13:21:23] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/details
+DEBUG: [2025-08-19 13:21:23] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:21:23] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+DEBUG: [2025-08-19 13:21:23] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:277] details - Using MySQL backend for database access
+DEBUG: [2025-08-19 13:21:58] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/edit/113
+DEBUG: [2025-08-19 13:21:58] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:21:58] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+INFO: [2025-08-19 13:21:58] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:428] edit - Entered edit action for record_id: 113
+INFO: [2025-08-19 13:21:58] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:316] fetch_projects_with_subprojects - Fetching parent projects with sub-projects
+INFO: [2025-08-19 13:21:58] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:326] fetch_projects_with_subprojects - Session SiteName: 'CSC'
+ERROR: [2025-08-19 13:21:58] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:367] fetch_projects_with_subprojects - Error fetching top-level projects: Can't locate object method "all" via package "17" (perhaps you forgot to load "17"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 351.
+
+INFO: [2025-08-19 13:21:58] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:501] edit - Successfully loaded edit form for record ID: 113
+DEBUG: [2025-08-19 13:22:33] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/modify/113
+DEBUG: [2025-08-19 13:22:33] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:22:33] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+INFO: [2025-08-19 13:22:33] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:513] modify - Entered modify action for record_id: 113
+DEBUG: [2025-08-19 13:22:33] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:567] modify.form_data - Form data received: developer: , user_id: 178, comments: , description: We need a system for users to request a change in password, Use email address to send a message., project_id: , subject: Add change Password to user fuctions., accumulative_time: 00:00, date_time_posted: , time_of_day: , sitename: CSC, username_of_poster: Shanta, start_date: 2025-08-27, estimated_man_hours: 12, priority: 1, owner: , due_date: 2025-09-18, reporter: , share: 0, status: 1, group_of_poster: admin
+INFO: [2025-08-19 13:22:33] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:600] modify.update - Updating todo item with record ID: 113.
+INFO: [2025-08-19 13:22:33] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:727] modify.success - Todo item successfully updated for record ID: 113.
+DEBUG: [2025-08-19 13:24:07] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/edit/113
+DEBUG: [2025-08-19 13:24:07] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:24:07] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+INFO: [2025-08-19 13:24:07] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:428] edit - Entered edit action for record_id: 113
+INFO: [2025-08-19 13:24:07] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:316] fetch_projects_with_subprojects - Fetching parent projects with sub-projects
+INFO: [2025-08-19 13:24:07] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:326] fetch_projects_with_subprojects - Session SiteName: 'CSC'
+ERROR: [2025-08-19 13:24:07] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:367] fetch_projects_with_subprojects - Error fetching top-level projects: Can't locate object method "all" via package "17" (perhaps you forgot to load "17"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 351.
+
+INFO: [2025-08-19 13:24:07] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:501] edit - Successfully loaded edit form for record ID: 113
+DEBUG: [2025-08-19 13:24:11] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/week
+DEBUG: [2025-08-19 13:24:11] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:24:11] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+DEBUG: [2025-08-19 13:24:11] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:33] get_top_todos - Roles available for Todo: admin
+DEBUG: [2025-08-19 13:24:11] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:37] get_top_todos - User has admin privilege.
+INFO: [2025-08-19 13:24:11] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:45] get_top_todos - Site name: CSC
+INFO: [2025-08-19 13:24:11] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:57] get_top_todos - Visited the todo page
+DEBUG: [2025-08-19 13:24:13] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/week/2025-08-10
+DEBUG: [2025-08-19 13:24:13] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:24:13] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+DEBUG: [2025-08-19 13:24:13] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:33] get_top_todos - Roles available for Todo: admin
+DEBUG: [2025-08-19 13:24:13] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:37] get_top_todos - User has admin privilege.
+INFO: [2025-08-19 13:24:13] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:45] get_top_todos - Site name: CSC
+INFO: [2025-08-19 13:24:13] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:57] get_top_todos - Visited the todo page
+DEBUG: [2025-08-19 13:24:14] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/week/2025-08-03
+DEBUG: [2025-08-19 13:24:14] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:24:14] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+DEBUG: [2025-08-19 13:24:14] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:33] get_top_todos - Roles available for Todo: admin
+DEBUG: [2025-08-19 13:24:14] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:37] get_top_todos - User has admin privilege.
+INFO: [2025-08-19 13:24:14] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:45] get_top_todos - Site name: CSC
+INFO: [2025-08-19 13:24:14] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:57] get_top_todos - Visited the todo page
+DEBUG: [2025-08-19 13:24:15] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/week/2025-07-27
+DEBUG: [2025-08-19 13:24:15] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:24:15] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+DEBUG: [2025-08-19 13:24:15] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:33] get_top_todos - Roles available for Todo: admin
+DEBUG: [2025-08-19 13:24:15] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:37] get_top_todos - User has admin privilege.
+INFO: [2025-08-19 13:24:15] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:45] get_top_todos - Site name: CSC
+INFO: [2025-08-19 13:24:15] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:57] get_top_todos - Visited the todo page
+DEBUG: [2025-08-19 13:24:16] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/week/2025-07-20
+DEBUG: [2025-08-19 13:24:16] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:24:16] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+DEBUG: [2025-08-19 13:24:16] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:33] get_top_todos - Roles available for Todo: admin
+DEBUG: [2025-08-19 13:24:16] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:37] get_top_todos - User has admin privilege.
+INFO: [2025-08-19 13:24:16] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:45] get_top_todos - Site name: CSC
+INFO: [2025-08-19 13:24:16] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:57] get_top_todos - Visited the todo page
+DEBUG: [2025-08-19 13:24:16] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/week/2025-07-13
+DEBUG: [2025-08-19 13:24:16] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:24:16] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+DEBUG: [2025-08-19 13:24:16] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:33] get_top_todos - Roles available for Todo: admin
+DEBUG: [2025-08-19 13:24:16] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:37] get_top_todos - User has admin privilege.
+INFO: [2025-08-19 13:24:16] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:45] get_top_todos - Site name: CSC
+INFO: [2025-08-19 13:24:16] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:57] get_top_todos - Visited the todo page
+DEBUG: [2025-08-19 13:24:17] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/week/2025-07-06
+DEBUG: [2025-08-19 13:24:17] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:24:17] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+DEBUG: [2025-08-19 13:24:17] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:33] get_top_todos - Roles available for Todo: admin
+DEBUG: [2025-08-19 13:24:17] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:37] get_top_todos - User has admin privilege.
+INFO: [2025-08-19 13:24:17] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:45] get_top_todos - Site name: CSC
+INFO: [2025-08-19 13:24:17] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:57] get_top_todos - Visited the todo page
+DEBUG: [2025-08-19 13:24:18] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/week/2025-06-29
+DEBUG: [2025-08-19 13:24:18] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:24:18] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+DEBUG: [2025-08-19 13:24:18] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:33] get_top_todos - Roles available for Todo: admin
+DEBUG: [2025-08-19 13:24:18] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:37] get_top_todos - User has admin privilege.
+INFO: [2025-08-19 13:24:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:45] get_top_todos - Site name: CSC
+INFO: [2025-08-19 13:24:18] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Todo.pm:57] get_top_todos - Visited the todo page
+DEBUG: [2025-08-19 13:24:21] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/month
+DEBUG: [2025-08-19 13:24:21] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:24:21] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+DEBUG: [2025-08-19 13:24:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/month/2025-07-01
+DEBUG: [2025-08-19 13:24:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:24:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+DEBUG: [2025-08-19 13:24:33] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/month/2025-06-01
+DEBUG: [2025-08-19 13:24:33] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:24:33] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+DEBUG: [2025-08-19 13:24:37] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/details?record_id=158
+DEBUG: [2025-08-19 13:24:37] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:24:37] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+DEBUG: [2025-08-19 13:24:37] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:277] details - Using MySQL backend for database access
+DEBUG: [2025-08-19 13:25:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/edit/158
+DEBUG: [2025-08-19 13:25:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:25:29] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+INFO: [2025-08-19 13:25:29] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:428] edit - Entered edit action for record_id: 158
+INFO: [2025-08-19 13:25:29] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:316] fetch_projects_with_subprojects - Fetching parent projects with sub-projects
+INFO: [2025-08-19 13:25:29] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:326] fetch_projects_with_subprojects - Session SiteName: 'CSC'
+ERROR: [2025-08-19 13:25:29] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:367] fetch_projects_with_subprojects - Error fetching top-level projects: Can't locate object method "all" via package "17" (perhaps you forgot to load "17"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 351.
+
+INFO: [2025-08-19 13:25:29] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:501] edit - Successfully loaded edit form for record ID: 158
+DEBUG: [2025-08-19 13:25:54] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/modify/158
+DEBUG: [2025-08-19 13:25:54] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:25:54] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+INFO: [2025-08-19 13:25:54] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:513] modify - Entered modify action for record_id: 158
+DEBUG: [2025-08-19 13:25:54] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:567] modify.form_data - Form data received: reporter: , due_date: 2025-09-27, status: 1, group_of_poster: ARRAY(0x5bca684e8448), share: 0, priority: 1, estimated_man_hours: 1, owner: , start_date: 2025-08-20, username_of_poster: Shanta, time_of_day: , sitename: CSC, accumulative_time: 00:00, date_time_posted: , description: Page not found: /admin/view_log, user_id: 178, comments: , developer: , subject: Page not found: /admin/view_log, project_id: 
+INFO: [2025-08-19 13:25:54] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:600] modify.update - Updating todo item with record ID: 158.
+INFO: [2025-08-19 13:25:54] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:727] modify.success - Todo item successfully updated for record ID: 158.
+DEBUG: [2025-08-19 13:26:09] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/month
+DEBUG: [2025-08-19 13:26:09] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:26:09] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+DEBUG: [2025-08-19 13:26:14] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/month/2025-07-01
+DEBUG: [2025-08-19 13:26:14] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:26:14] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+DEBUG: [2025-08-19 13:26:15] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/month/2025-06-01
+DEBUG: [2025-08-19 13:26:15] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:26:15] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+DEBUG: [2025-08-19 13:26:22] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/details?record_id=159
+DEBUG: [2025-08-19 13:26:22] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:26:22] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+DEBUG: [2025-08-19 13:26:22] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:277] details - Using MySQL backend for database access
+DEBUG: [2025-08-19 13:26:34] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/edit/159
+DEBUG: [2025-08-19 13:26:34] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:26:34] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+INFO: [2025-08-19 13:26:34] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:428] edit - Entered edit action for record_id: 159
+INFO: [2025-08-19 13:26:34] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:316] fetch_projects_with_subprojects - Fetching parent projects with sub-projects
+INFO: [2025-08-19 13:26:34] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:326] fetch_projects_with_subprojects - Session SiteName: 'CSC'
+ERROR: [2025-08-19 13:26:34] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:367] fetch_projects_with_subprojects - Error fetching top-level projects: Can't locate object method "all" via package "17" (perhaps you forgot to load "17"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 351.
+
+INFO: [2025-08-19 13:26:34] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:501] edit - Successfully loaded edit form for record ID: 159
+DEBUG: [2025-08-19 13:26:45] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/modify/159
+DEBUG: [2025-08-19 13:26:45] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:26:45] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+INFO: [2025-08-19 13:26:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:513] modify - Entered modify action for record_id: 159
+DEBUG: [2025-08-19 13:26:45] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:567] modify.form_data - Form data received: owner: , estimated_man_hours: 1, priority: 1, status: 3, group_of_poster: ARRAY(0x5bca67fbdea0), share: 0, reporter: , due_date: 2025-06-30, project_id: , subject: Page not found: /admin/schema_manager, user_id: 178, comments: , developer: , description: Page not found: /admin/schema_manager, sitename: CSC, time_of_day: , date_time_posted: , accumulative_time: 00:00, username_of_poster: Shanta, start_date: 2025-06-01
+INFO: [2025-08-19 13:26:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:600] modify.update - Updating todo item with record ID: 159.
+INFO: [2025-08-19 13:26:45] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:727] modify.success - Todo item successfully updated for record ID: 159.
+DEBUG: [2025-08-19 13:26:49] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo
+DEBUG: [2025-08-19 13:26:49] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:26:49] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+INFO: [2025-08-19 13:26:49] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:87] todo - Fetching todos for the todo page
+DEBUG: [2025-08-19 13:26:49] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:132] todo - Using MySQL backend for database access
+INFO: [2025-08-19 13:26:49] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:316] fetch_projects_with_subprojects - Fetching parent projects with sub-projects
+INFO: [2025-08-19 13:26:49] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:326] fetch_projects_with_subprojects - Session SiteName: 'CSC'
+ERROR: [2025-08-19 13:26:49] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:367] fetch_projects_with_subprojects - Error fetching top-level projects: Can't locate object method "all" via package "17" (perhaps you forgot to load "17"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 351.
+
+DEBUG: [2025-08-19 13:26:57] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/edit/143
+DEBUG: [2025-08-19 13:26:57] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:26:57] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+INFO: [2025-08-19 13:26:57] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:428] edit - Entered edit action for record_id: 143
+INFO: [2025-08-19 13:26:57] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:316] fetch_projects_with_subprojects - Fetching parent projects with sub-projects
+INFO: [2025-08-19 13:26:57] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:326] fetch_projects_with_subprojects - Session SiteName: 'CSC'
+ERROR: [2025-08-19 13:26:57] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:367] fetch_projects_with_subprojects - Error fetching top-level projects: Can't locate object method "all" via package "17" (perhaps you forgot to load "17"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 351.
+
+INFO: [2025-08-19 13:26:57] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:501] edit - Successfully loaded edit form for record ID: 143
+DEBUG: [2025-08-19 13:27:37] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/modify/143
+DEBUG: [2025-08-19 13:27:37] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:27:37] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+INFO: [2025-08-19 13:27:37] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:513] modify - Entered modify action for record_id: 143
+DEBUG: [2025-08-19 13:27:37] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:567] modify.form_data - Form data received: priority: 1, estimated_man_hours: 3, owner: , reporter: , due_date: 2025-09-26, group_of_poster: ARRAY(0x63cdc6ca7a90), status: 2, share: 0, description: Install database server in proxima, comments: , developer: , user_id: 178, subject: Install database server in proxima, project_id: , start_date: 2025-08-29, username_of_poster: Shanta, sitename: CSC, time_of_day: , date_time_posted: , accumulative_time: 03:51
+INFO: [2025-08-19 13:27:37] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:600] modify.update - Updating todo item with record ID: 143.
+INFO: [2025-08-19 13:27:37] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:727] modify.success - Todo item successfully updated for record ID: 143.
+DEBUG: [2025-08-19 13:28:24] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo
+DEBUG: [2025-08-19 13:28:24] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:28:24] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+INFO: [2025-08-19 13:28:24] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:87] todo - Fetching todos for the todo page
+DEBUG: [2025-08-19 13:28:24] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:132] todo - Using MySQL backend for database access
+INFO: [2025-08-19 13:28:24] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:316] fetch_projects_with_subprojects - Fetching parent projects with sub-projects
+INFO: [2025-08-19 13:28:24] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:326] fetch_projects_with_subprojects - Session SiteName: 'CSC'
+ERROR: [2025-08-19 13:28:24] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:367] fetch_projects_with_subprojects - Error fetching top-level projects: Can't locate object method "all" via package "17" (perhaps you forgot to load "17"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 351.
+
+DEBUG: [2025-08-19 13:28:30] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/edit/144
+DEBUG: [2025-08-19 13:28:30] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:28:30] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+INFO: [2025-08-19 13:28:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:428] edit - Entered edit action for record_id: 144
+INFO: [2025-08-19 13:28:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:316] fetch_projects_with_subprojects - Fetching parent projects with sub-projects
+INFO: [2025-08-19 13:28:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:326] fetch_projects_with_subprojects - Session SiteName: 'CSC'
+ERROR: [2025-08-19 13:28:30] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:367] fetch_projects_with_subprojects - Error fetching top-level projects: Can't locate object method "all" via package "17" (perhaps you forgot to load "17"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 351.
+
+INFO: [2025-08-19 13:28:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:501] edit - Successfully loaded edit form for record ID: 144
+DEBUG: [2025-08-19 13:28:40] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/modify/144
+DEBUG: [2025-08-19 13:28:40] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:28:40] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+INFO: [2025-08-19 13:28:40] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:513] modify - Entered modify action for record_id: 144
+DEBUG: [2025-08-19 13:28:40] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:567] modify.form_data - Form data received: date_time_posted: , accumulative_time: 04:33, sitename: CSC, time_of_day: , start_date: 2025-03-26, username_of_poster: Shanta, project_id: , subject: Install mailserver into proxmox, user_id: 178, comments: , developer: , description: Install mailserver in proxmox, share: 0, group_of_poster: ARRAY(0x63cdc6c6f0c8), status: 3, due_date: 2025-03-26, reporter: , owner: , estimated_man_hours: 1, priority: 1
+INFO: [2025-08-19 13:28:40] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:600] modify.update - Updating todo item with record ID: 144.
+INFO: [2025-08-19 13:28:40] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:727] modify.success - Todo item successfully updated for record ID: 144.
+DEBUG: [2025-08-19 13:28:46] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo
+DEBUG: [2025-08-19 13:28:46] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:28:46] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+INFO: [2025-08-19 13:28:46] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:87] todo - Fetching todos for the todo page
+DEBUG: [2025-08-19 13:28:46] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:132] todo - Using MySQL backend for database access
+INFO: [2025-08-19 13:28:46] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:316] fetch_projects_with_subprojects - Fetching parent projects with sub-projects
+INFO: [2025-08-19 13:28:46] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:326] fetch_projects_with_subprojects - Session SiteName: 'CSC'
+ERROR: [2025-08-19 13:28:46] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:367] fetch_projects_with_subprojects - Error fetching top-level projects: Can't locate object method "all" via package "17" (perhaps you forgot to load "17"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 351.
+
+DEBUG: [2025-08-19 13:29:16] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/edit/79
+DEBUG: [2025-08-19 13:29:16] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+DEBUG: [2025-08-19 13:29:16] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+INFO: [2025-08-19 13:29:16] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:428] edit - Entered edit action for record_id: 79
+INFO: [2025-08-19 13:29:16] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:316] fetch_projects_with_subprojects - Fetching parent projects with sub-projects
+INFO: [2025-08-19 13:29:16] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:326] fetch_projects_with_subprojects - Session SiteName: 'CSC'
+ERROR: [2025-08-19 13:29:16] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:367] fetch_projects_with_subprojects - Error fetching top-level projects: Can't locate object method "all" via package "17" (perhaps you forgot to load "17"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 351.
+
+INFO: [2025-08-19 13:29:16] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:501] edit - Successfully loaded edit form for record ID: 79
+INFO: [2025-08-19 13:53:06] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:21] documentation_base - Captured lowercase documentation route
+INFO: [2025-08-19 13:53:06] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:28] documentation_index - Handling lowercase documentation index route
+INFO: [2025-08-19 13:53:06] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:184] index - Accessing documentation index
+DEBUG: [2025-08-19 13:53:06] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:193] index - Session roles: admin
+DEBUG: [2025-08-19 13:53:06] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:204] index - User role determined from session: admin, is_admin: 1
+DEBUG: [2025-08-19 13:53:06] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:253] index - Documentation index loaded with 32 pages for role: admin
+WARN: [2025-08-19 13:53:25] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1509] default - Page not found: /Documentation/all_docs
+WARN: [2025-08-19 13:53:45] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1509] default - Page not found: /Documentation/search
+INFO: [2025-08-19 13:57:31] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:21] documentation_base - Captured lowercase documentation route
+INFO: [2025-08-19 13:57:31] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:28] documentation_index - Handling lowercase documentation index route
+INFO: [2025-08-19 13:57:31] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:184] index - Accessing documentation index
+DEBUG: [2025-08-19 13:57:31] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:193] index - Session roles: admin
+DEBUG: [2025-08-19 13:57:31] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:204] index - User role determined from session: admin, is_admin: 1
+DEBUG: [2025-08-19 13:57:31] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:253] index - Documentation index loaded with 32 pages for role: admin
+INFO: [2025-08-19 13:58:10] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:21] documentation_base - Captured lowercase documentation route
+INFO: [2025-08-19 13:58:10] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:28] documentation_index - Handling lowercase documentation index route
+INFO: [2025-08-19 13:58:10] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:184] index - Accessing documentation index
+DEBUG: [2025-08-19 13:58:10] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:193] index - Session roles: admin
+DEBUG: [2025-08-19 13:58:10] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:204] index - User role determined from session: admin, is_admin: 1
+DEBUG: [2025-08-19 13:58:10] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:253] index - Documentation index loaded with 32 pages for role: admin
+INFO: [2025-08-19 14:00:05] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:262] view - Accessing documentation page: admin_guide, Username: Shanta, Site: CSC, Session roles: admin
+DEBUG: [2025-08-19 14:00:05] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:311] view - Displaying documentation page: admin_guide (template: Documentation/roles/admin/admin_guide.tt) for role: admin
+INFO: [2025-08-19 14:02:07] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:184] index - Accessing documentation index
+DEBUG: [2025-08-19 14:02:07] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:193] index - Session roles: admin
+DEBUG: [2025-08-19 14:02:07] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:204] index - User role determined from session: admin, is_admin: 1
+DEBUG: [2025-08-19 14:02:07] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:253] index - Documentation index loaded with 32 pages for role: admin
+WARN: [2025-08-19 14:02:40] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1509] default - Page not found: /Documentation/search
+INFO: [2025-08-19 14:06:52] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:184] index - Accessing documentation index
+DEBUG: [2025-08-19 14:06:52] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:253] index - Documentation index loaded with 12 pages for role: normal
+WARN: [2025-08-19 14:09:14] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1509] default - Page not found: /Documentation/all_docs
+WARN: [2025-08-19 14:09:15] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1509] default - Page not found: /static/images/icons/link.svg
+INFO: [2025-08-19 14:20:16] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:184] index - Accessing documentation index
+DEBUG: [2025-08-19 14:20:16] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:193] index - Session roles: admin
+DEBUG: [2025-08-19 14:20:16] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:204] index - User role determined from session: admin, is_admin: 1
+DEBUG: [2025-08-19 14:20:16] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:253] index - Documentation index loaded with 32 pages for role: admin
+INFO: [2025-08-19 15:41:22] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:184] index - Accessing documentation index
+DEBUG: [2025-08-19 15:41:22] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:253] index - Documentation index loaded with 12 pages for role: normal
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-08-19 15:41:34] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [197:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+INFO: [2025-08-19 15:41:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/NPM.pm:36] BUILD - NPM Controller initialized
+INFO: Starting Documentation controller initialization with hybrid approach (directory scan + config overrides)
+INFO: Loaded documentation configuration: 11 categories, 4 pages
+INFO: Step 1: Auto-discovering documentation files via directory scan
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-08-19 15:47:08] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [197:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+INFO: [2025-08-19 15:47:09] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/NPM.pm:36] BUILD - NPM Controller initialized
+INFO: Starting Documentation controller initialization with hybrid approach (directory scan + config overrides)
+INFO: Loaded documentation configuration: 11 categories, 4 pages
+INFO: Step 1: Auto-discovering documentation files via directory scan
+INFO: Starting directory scan for documentation files
+INFO: Processing file: root/Documentation/admin_guides.tt, key: admin_guides, path: Documentation/admin_guides.tt
+INFO: Processing file: root/Documentation/ComservDocumentation.tt, key: ComservDocumentation, path: Documentation/ComservDocumentation.tt
+INFO: Processing file: root/Documentation/theme_system.tt, key: theme_system, path: Documentation/theme_system.tt
+INFO: Processing file: root/Documentation/proxmox.tt, key: proxmox, path: Documentation/proxmox.tt
+INFO: Processing file: root/Documentation/cloudflare_api_authentication.tt, key: cloudflare_api_authentication, path: Documentation/cloudflare_api_authentication.tt
+INFO: Processing file: root/Documentation/models.tt.bak, key: models, path: Documentation/models.tt.bak
+INFO: Processing file: root/Documentation/AI_DEVELOPMENT_GUIDELINES.tt, key: AI_DEVELOPMENT_GUIDELINES, path: Documentation/AI_DEVELOPMENT_GUIDELINES.tt
+INFO: Processing file: root/Documentation/account_management.tt, key: account_management, path: Documentation/account_management.tt
+INFO: Processing file: root/Documentation/project_selection_log_creation.tt, key: project_selection_log_creation, path: Documentation/project_selection_log_creation.tt
+INFO: Processing file: root/Documentation/Documentation_Workflow.tt, key: Documentation_Workflow, path: Documentation/Documentation_Workflow.tt
+INFO: Processing file: root/Documentation/cloudflare_api_token_guide.tt, key: cloudflare_api_token_guide, path: Documentation/cloudflare_api_token_guide.tt
+INFO: Processing file: root/Documentation/Installation.tt, key: Installation, path: Documentation/Installation.tt
+INFO: Processing file: root/Documentation/system_overview.tt, key: system_overview, path: Documentation/system_overview.tt
+INFO: Processing file: root/Documentation/usbm.tt, key: usbm, path: Documentation/usbm.tt
+INFO: Processing file: root/Documentation/Root.tt, key: Root, path: Documentation/Root.tt
+INFO: Processing file: root/Documentation/api.tt, key: api, path: Documentation/api.tt
+INFO: Processing file: root/Documentation/Queens.tt, key: Queens, path: Documentation/Queens.tt
+INFO: Processing file: root/Documentation/markdown_viewer.tt, key: markdown_viewer, path: Documentation/markdown_viewer.tt
+INFO: Processing file: root/Documentation/fix_project_edit_button.tt, key: fix_project_edit_button, path: Documentation/fix_project_edit_button.tt
+INFO: Processing file: root/Documentation/DocumentManagement.tt, key: DocumentManagement, path: Documentation/DocumentManagement.tt
+INFO: Processing file: root/Documentation/todo_system.tt, key: todo_system, path: Documentation/todo_system.tt
+INFO: Processing file: root/Documentation/mail_system.tt, key: mail_system, path: Documentation/mail_system.tt
+INFO: Processing file: root/Documentation/Forager.tt, key: Forager, path: Documentation/Forager.tt
+INFO: Processing file: root/Documentation/mail_configuration_guide.tt, key: mail_configuration_guide, path: Documentation/mail_configuration_guide.tt
+INFO: Processing file: root/Documentation/Documentation_System.tt, key: Documentation_System, path: Documentation/Documentation_System.tt
+INFO: Processing file: root/Documentation/models.tt, key: models, path: Documentation/models.tt
+INFO: Processing file: root/Documentation/controller_routing_guidelines.tt, key: controller_routing_guidelines, path: Documentation/controller_routing_guidelines.tt
+INFO: Processing file: root/Documentation/HelpDeskSystem.tt, key: HelpDeskSystem, path: Documentation/HelpDeskSystem.tt
+INFO: Processing file: root/Documentation/Files.tt, key: Files, path: Documentation/Files.tt
+INFO: Processing file: root/Documentation/BMaserModel.tt, key: BMaserModel, path: Documentation/BMaserModel.tt
+INFO: Processing file: root/Documentation/all_docs.tt, key: all_docs, path: Documentation/all_docs.tt
+INFO: Processing file: root/Documentation/document_management.tt, key: document_management, path: Documentation/document_management.tt
+INFO: Processing file: root/Documentation/Virtualmin_Integration.tt, key: Virtualmin_Integration, path: Documentation/Virtualmin_Integration.tt
+INFO: Processing file: root/Documentation/project_management_system.tt, key: project_management_system, path: Documentation/project_management_system.tt
+INFO: Processing file: root/Documentation/controllers.tt.bak, key: controllers, path: Documentation/controllers.tt.bak
+INFO: Processing file: root/Documentation/user_docs.tt, key: user_docs, path: Documentation/user_docs.tt
+INFO: Processing file: root/Documentation/Projects.tt, key: Projects, path: Documentation/Projects.tt
+INFO: Processing file: root/Documentation/documentation_tt_template.tt, key: documentation_tt_template, path: Documentation/documentation_tt_template.tt
+INFO: Processing file: root/Documentation/documentation_migration_to_tt.tt, key: documentation_migration_to_tt, path: Documentation/documentation_migration_to_tt.tt
+INFO: Processing file: root/Documentation/BMasterController.tt, key: BMasterController, path: Documentation/BMasterController.tt
+INFO: Processing file: root/Documentation/AI_DEVELOPMENT_GUIDELINES.TT, key: AI_DEVELOPMENT_GUIDELINES, path: Documentation/AI_DEVELOPMENT_GUIDELINES.TT
+INFO: Processing file: root/Documentation/documentation_system.tt, key: documentation_system, path: Documentation/documentation_system.tt
+INFO: Processing file: root/Documentation/ENCYModel.tt, key: ENCYModel, path: Documentation/ENCYModel.tt
+INFO: Processing file: root/Documentation/cloudflare_integration.tt, key: cloudflare_integration, path: Documentation/cloudflare_integration.tt
+INFO: Processing file: root/Documentation/user_manual.tt, key: user_manual, path: Documentation/user_manual.tt
+INFO: Processing file: root/Documentation/sessionplan.tt, key: sessionplan, path: Documentation/sessionplan.tt
+INFO: Processing file: root/Documentation/site_specific.tt.bak, key: site_specific, path: Documentation/site_specific.tt.bak
+INFO: Processing file: root/Documentation/documentation_filename_issue.tt, key: documentation_filename_issue, path: Documentation/documentation_filename_issue.tt
+INFO: Processing file: root/Documentation/Login.tt, key: Login, path: Documentation/Login.tt
+INFO: Processing file: root/Documentation/site_domain_resolution.tt, key: site_domain_resolution, path: Documentation/site_domain_resolution.tt
+INFO: Processing file: root/Documentation/documentation_system_overview.tt, key: documentation_system_overview, path: Documentation/documentation_system_overview.tt
+INFO: Processing file: root/Documentation/logging_best_practices.tt, key: logging_best_practices, path: Documentation/logging_best_practices.tt
+INFO: Processing file: root/Documentation/admin_guides.tt.bak, key: admin_guides, path: Documentation/admin_guides.tt.bak
+INFO: Processing file: root/Documentation/enhanced_todo_navigation.tt, key: enhanced_todo_navigation, path: Documentation/enhanced_todo_navigation.tt
+INFO: Processing file: root/Documentation/error.tt, key: error, path: Documentation/error.tt
+INFO: Processing file: root/Documentation/network_diagnostics.tt, key: network_diagnostics, path: Documentation/network_diagnostics.tt
+INFO: Processing file: root/Documentation/AI_Guidelines.tt, key: AI_Guidelines, path: Documentation/AI_Guidelines.tt
+INFO: Processing file: root/Documentation/Todo.tt, key: Todo, path: Documentation/Todo.tt
+INFO: Processing file: root/Documentation/MailSystem.tt, key: MailSystem, path: Documentation/MailSystem.tt
+INFO: Processing file: root/Documentation/ENCY.tt, key: ENCY, path: Documentation/ENCY.tt
+INFO: Processing file: root/Documentation/CSS_Theme_System.tt, key: CSS_Theme_System, path: Documentation/CSS_Theme_System.tt
+INFO: Processing file: root/Documentation/system_info.tt, key: system_info, path: Documentation/system_info.tt
+INFO: Processing file: root/Documentation/documentation_update_summary.tt, key: documentation_update_summary, path: Documentation/documentation_update_summary.tt
+INFO: Processing file: root/Documentation/tutorials.tt.bak, key: tutorials, path: Documentation/tutorials.tt.bak
+INFO: Processing file: root/Documentation/completed_items.json.new, key: completed_items, path: Documentation/completed_items.json.new
+INFO: Processing file: root/Documentation/admin.tt, key: admin, path: Documentation/admin.tt
+INFO: Processing file: root/Documentation/cloudflare.tt, key: cloudflare, path: Documentation/cloudflare.tt
+INFO: Processing file: root/Documentation/recent_updates.tt, key: recent_updates, path: Documentation/recent_updates.tt
+INFO: Processing file: root/Documentation/completed_items.json, key: completed_items, path: Documentation/completed_items.json
+INFO: Processing file: root/Documentation/index.tt, key: index, path: Documentation/index.tt
+INFO: Processing file: root/Documentation/mcoop_module.tt.bak, key: mcoop_module, path: Documentation/mcoop_module.tt.bak
+INFO: Processing file: root/Documentation/Mailing_List_System_Plan.tt, key: Mailing_List_System_Plan, path: Documentation/Mailing_List_System_Plan.tt
+INFO: Processing file: root/Documentation/DBIDocument.tt, key: DBIDocument, path: Documentation/DBIDocument.tt
+INFO: Processing file: root/Documentation/proxmox_commands.tt, key: proxmox_commands, path: Documentation/proxmox_commands.tt
+INFO: Processing file: root/Documentation/setupcontorller.tt, key: setupcontorller, path: Documentation/setupcontorller.tt
+INFO: Processing file: root/Documentation/TODO_SYSTEM_DOCUMENTATION.tt, key: TODO_SYSTEM_DOCUMENTATION, path: Documentation/TODO_SYSTEM_DOCUMENTATION.tt
+INFO: Processing file: root/Documentation/Documentation_Workflow.tt.bak, key: Documentation_Workflow, path: Documentation/Documentation_Workflow.tt.bak
+INFO: Processing file: root/Documentation/mail_troubleshooting.tt, key: mail_troubleshooting, path: Documentation/mail_troubleshooting.tt
+INFO: Processing file: root/Documentation/Git.tt, key: Git, path: Documentation/Git.tt
+INFO: Processing file: root/Documentation/setup.tt, key: setup, path: Documentation/setup.tt
+INFO: Processing file: root/Documentation/WorkShops.tt, key: WorkShops, path: Documentation/WorkShops.tt
+INFO: Processing file: root/Documentation/Overview.tt, key: Overview, path: Documentation/Overview.tt
+INFO: Processing file: root/Documentation/Schema.tt, key: Schema, path: Documentation/Schema.tt
+INFO: Processing file: root/Documentation/Logging.tt, key: Logging, path: Documentation/Logging.tt
+INFO: Processing file: root/Documentation/mail_documentation_update.tt, key: mail_documentation_update, path: Documentation/mail_documentation_update.tt
+INFO: Processing file: root/Documentation/Inventory.tt, key: Inventory, path: Documentation/Inventory.tt
+INFO: Processing file: root/Documentation/architecture.tt, key: architecture, path: Documentation/architecture.tt
+INFO: Processing file: root/Documentation/RestartStarman.tt, key: RestartStarman, path: Documentation/RestartStarman.tt
+INFO: Processing file: root/Documentation/proxy_troubleshooting.tt, key: proxy_troubleshooting, path: Documentation/proxy_troubleshooting.tt
+INFO: Processing file: root/Documentation/developer_guides.tt, key: developer_guides, path: Documentation/developer_guides.tt
+INFO: Processing file: root/Documentation/AIAssistants.tt, key: AIAssistants, path: Documentation/AIAssistants.tt
+INFO: Processing file: root/Documentation/linux_commands_reference.tt, key: linux_commands_reference, path: Documentation/linux_commands_reference.tt
+INFO: Processing file: root/Documentation/documentation_tt_template.tt.bak, key: documentation_tt_template, path: Documentation/documentation_tt_template.tt.bak
+INFO: Processing file: root/Documentation/documentation_config_guide.tt, key: documentation_config_guide, path: Documentation/documentation_config_guide.tt
+INFO: Processing file: root/Documentation/documentation_organization.tt, key: documentation_organization, path: Documentation/documentation_organization.tt
+INFO: Processing file: root/Documentation/config.tt, key: config, path: Documentation/config.tt
+INFO: Processing file: root/Documentation/AI_DOCUMENTATION_GUIDELINES.tt, key: AI_DOCUMENTATION_GUIDELINES, path: Documentation/AI_DOCUMENTATION_GUIDELINES.tt
+INFO: Processing file: root/Documentation/ENCYController.tt, key: ENCYController, path: Documentation/ENCYController.tt
+INFO: Processing file: root/Documentation/completed_items.json.backup, key: completed_items, path: Documentation/completed_items.json.backup
+INFO: Processing file: root/Documentation/Sites.tt, key: Sites, path: Documentation/Sites.tt
+INFO: Processing file: root/Documentation/Mail.tt, key: Mail, path: Documentation/Mail.tt
+INFO: Processing file: root/Documentation/User.tt, key: User, path: Documentation/User.tt
+INFO: Processing file: root/Documentation/menu_system.tt, key: menu_system, path: Documentation/menu_system.tt
+INFO: Processing file: root/Documentation/site_specific.tt, key: site_specific, path: Documentation/site_specific.tt
+INFO: Processing file: root/Documentation/fix_project_edit_form.tt, key: fix_project_edit_form, path: Documentation/fix_project_edit_form.tt
+INFO: Processing file: root/Documentation/guidelines.tt, key: guidelines, path: Documentation/guidelines.tt
+INFO: Processing file: root/Documentation/mcoop_module.tt, key: mcoop_module, path: Documentation/mcoop_module.tt
+INFO: Processing file: root/Documentation/Starman.tt, key: Starman, path: Documentation/Starman.tt
+INFO: Processing file: root/Documentation/config.tt.bak, key: config, path: Documentation/config.tt.bak
+INFO: Processing file: root/Documentation/tutorials.tt, key: tutorials, path: Documentation/tutorials.tt
+INFO: Processing file: root/Documentation/developer_guides.tt.bak, key: developer_guides, path: Documentation/developer_guides.tt.bak
+INFO: Processing file: root/Documentation/Calendar.tt, key: Calendar, path: Documentation/Calendar.tt
+INFO: Processing file: root/Documentation/proxmox_integration.tt, key: proxmox_integration, path: Documentation/proxmox_integration.tt
+INFO: Processing file: root/Documentation/Api.tt, key: Api, path: Documentation/Api.tt
+INFO: Processing file: root/Documentation/Ve7tit.tt, key: Ve7tit, path: Documentation/Ve7tit.tt
+INFO: Processing file: root/Documentation/controllers.tt, key: controllers, path: Documentation/controllers.tt
+INFO: Processing file: root/Documentation/FAQ.tt, key: FAQ, path: Documentation/FAQ.tt
+INFO: Processing file: root/Documentation/BMaster.tt, key: BMaster, path: Documentation/BMaster.tt
+INFO: Processing file: root/Documentation/documentation_workflow.tt, key: documentation_workflow, path: Documentation/documentation_workflow.tt
+INFO: Processing file: root/Documentation/getting_started.tt, key: getting_started, path: Documentation/getting_started.tt
+INFO: Processing file: root/Documentation/documentation_template.tt, key: documentation_template, path: Documentation/documentation_template.tt
+INFO: Processing file: root/Documentation/AI.tt, key: AI, path: Documentation/AI.tt
+INFO: Processing file: root/Documentation/todo_filtering_and_views.tt, key: todo_filtering_and_views, path: Documentation/todo_filtering_and_views.tt
+INFO: Processing file: root/Documentation/api_credentials.tt, key: api_credentials, path: Documentation/api_credentials.tt
+INFO: Processing file: root/Documentation/proxmox/Proxmox_CD_Visibility.tt, key: Proxmox_CD_Visibility, path: Documentation/proxmox/Proxmox_CD_Visibility.tt
+INFO: Processing file: root/Documentation/proxmox/api.tt, key: api, path: Documentation/proxmox/api.tt
+INFO: Processing file: root/Documentation/proxmox/authentication.tt, key: authentication, path: Documentation/proxmox/authentication.tt
+INFO: Processing file: root/Documentation/proxmox/ip_configuration.tt, key: ip_configuration, path: Documentation/proxmox/ip_configuration.tt
+INFO: Processing file: root/Documentation/proxmox/integration.tt, key: integration, path: Documentation/proxmox/integration.tt
+INFO: Processing file: root/Documentation/proxmox/index.tt, key: index, path: Documentation/proxmox/index.tt
+INFO: Processing file: root/Documentation/proxmox/commands.tt, key: commands, path: Documentation/proxmox/commands.tt
+INFO: Processing file: root/Documentation/features/back_to_top.tt, key: back_to_top, path: Documentation/features/back_to_top.tt
+INFO: Processing file: root/Documentation/docs/admin/git_merge_conflicts.tt, key: git_merge_conflicts, path: Documentation/docs/admin/git_merge_conflicts.tt
+INFO: Processing file: root/Documentation/models/README.tt, key: README, path: Documentation/models/README.tt
+INFO: Processing file: root/Documentation/models/model_list.tt, key: model_list, path: Documentation/models/model_list.tt
+INFO: Processing file: root/Documentation/models/index.tt, key: index, path: Documentation/models/index.tt
+INFO: Processing file: root/Documentation/models/Site.tt, key: Site, path: Documentation/models/Site.tt
+INFO: Processing file: root/Documentation/models/User.tt, key: User, path: Documentation/models/User.tt
+INFO: Processing file: root/Documentation/models/ThemeConfig.tt, key: ThemeConfig, path: Documentation/models/ThemeConfig.tt
+INFO: Processing file: root/Documentation/general/documentation_guide.tt, key: documentation_guide, path: Documentation/general/documentation_guide.tt
+INFO: Processing file: root/Documentation/general/NEW_THEME_SYSTEM_README.tt, key: NEW_THEME_SYSTEM_README, path: Documentation/general/NEW_THEME_SYSTEM_README.tt
+INFO: Processing file: root/Documentation/general/AI_DEVELOPMENT_GUIDELINES.tt, key: AI_DEVELOPMENT_GUIDELINES, path: Documentation/general/AI_DEVELOPMENT_GUIDELINES.tt
+INFO: Processing file: root/Documentation/general/user_management.tt, key: user_management, path: Documentation/general/user_management.tt
+INFO: Processing file: root/Documentation/general/account_management.tt, key: account_management, path: Documentation/general/account_management.tt
+INFO: Processing file: root/Documentation/general/EMAIL_MODULE_FIX.tt, key: EMAIL_MODULE_FIX, path: Documentation/general/EMAIL_MODULE_FIX.tt
+INFO: Processing file: root/Documentation/general/2025-09-15-sudo-password-configuration.tt, key: 2025-09-15-sudo-password-configuration, path: Documentation/general/2025-09-15-sudo-password-configuration.tt
+INFO: Processing file: root/Documentation/general/documentation_migration_guide.tt, key: documentation_migration_guide, path: Documentation/general/documentation_migration_guide.tt
+INFO: Processing file: root/Documentation/general/project_selection_log_creation.tt, key: project_selection_log_creation, path: Documentation/general/project_selection_log_creation.tt
+INFO: Processing file: root/Documentation/general/api_reference.tt, key: api_reference, path: Documentation/general/api_reference.tt
+INFO: Processing file: root/Documentation/general/2024-06-15-login-redirect-fix.tt, key: 2024-06-15-login-redirect-fix, path: Documentation/general/2024-06-15-login-redirect-fix.tt
+INFO: Processing file: root/Documentation/general/2025-04-18-helpdesk-controller-implementation.tt, key: 2025-04-18-helpdesk-controller-implementation, path: Documentation/general/2025-04-18-helpdesk-controller-implementation.tt
+INFO: Processing file: root/Documentation/general/Documentation_Workflow.tt, key: Documentation_Workflow, path: Documentation/general/Documentation_Workflow.tt
+INFO: Processing file: root/Documentation/general/Documentation_Management.tt, key: Documentation_Management, path: Documentation/general/Documentation_Management.tt
+INFO: Processing file: root/Documentation/general/starman_restart_card.tt, key: starman_restart_card, path: Documentation/general/starman_restart_card.tt
+INFO: Processing file: root/Documentation/general/Root.tt, key: Root, path: Documentation/general/Root.tt
+INFO: Processing file: root/Documentation/general/2025-05-25-documentation-organization.tt, key: 2025-05-25-documentation-organization, path: Documentation/general/2025-05-25-documentation-organization.tt
+INFO: Processing file: root/Documentation/general/mcoop_user_guide.tt, key: mcoop_user_guide, path: Documentation/general/mcoop_user_guide.tt
+INFO: Processing file: root/Documentation/general/member_resources.tt, key: member_resources, path: Documentation/general/member_resources.tt
+INFO: Processing file: root/Documentation/general/fix_project_edit_button.tt, key: fix_project_edit_button, path: Documentation/general/fix_project_edit_button.tt
+INFO: Processing file: root/Documentation/general/customizing_profile.tt, key: customizing_profile, path: Documentation/general/customizing_profile.tt
+INFO: Processing file: root/Documentation/general/admintopmenu_guide.tt, key: admintopmenu_guide, path: Documentation/general/admintopmenu_guide.tt
+INFO: Processing file: root/Documentation/general/templates.tt, key: templates, path: Documentation/general/templates.tt
+INFO: Processing file: root/Documentation/general/mail_admin_guide.tt, key: mail_admin_guide, path: Documentation/general/mail_admin_guide.tt
+INFO: Processing file: root/Documentation/general/todo_system.tt, key: todo_system, path: Documentation/general/todo_system.tt
+INFO: Processing file: root/Documentation/general/mail_system.tt, key: mail_system, path: Documentation/general/mail_system.tt
+INFO: Processing file: root/Documentation/general/mail_configuration_guide.tt, key: mail_configuration_guide, path: Documentation/general/mail_configuration_guide.tt
+INFO: Processing file: root/Documentation/general/Documentation_System.tt, key: Documentation_System, path: Documentation/general/Documentation_System.tt
+INFO: Processing file: root/Documentation/general/2025-04-git-pull-functionality.tt, key: 2025-04-git-pull-functionality, path: Documentation/general/2025-04-git-pull-functionality.tt
+INFO: Processing file: root/Documentation/general/controller_routing_guidelines.tt, key: controller_routing_guidelines, path: Documentation/general/controller_routing_guidelines.tt
+INFO: Processing file: root/Documentation/general/HelpDeskSystem.tt, key: HelpDeskSystem, path: Documentation/general/HelpDeskSystem.tt
+INFO: Processing file: root/Documentation/general/2025-05-31-server-ip-display.tt, key: 2025-05-31-server-ip-display, path: Documentation/general/2025-05-31-server-ip-display.tt
+INFO: Processing file: root/Documentation/general/authentication_system.tt, key: authentication_system, path: Documentation/general/authentication_system.tt
+INFO: Processing file: root/Documentation/general/THEME_SYSTEM_CONSOLIDATION.tt, key: THEME_SYSTEM_CONSOLIDATION, path: Documentation/general/THEME_SYSTEM_CONSOLIDATION.tt
+INFO: Processing file: root/Documentation/general/README.tt, key: README, path: Documentation/general/README.tt
+INFO: Processing file: root/Documentation/general/THEME_SYSTEM_FIXES.tt, key: THEME_SYSTEM_FIXES, path: Documentation/general/THEME_SYSTEM_FIXES.tt
+INFO: Processing file: root/Documentation/general/2024-06-21-linux-commands-documentation.tt, key: 2024-06-21-linux-commands-documentation, path: Documentation/general/2024-06-21-linux-commands-documentation.tt
+INFO: Processing file: root/Documentation/general/2025-04-navigation-improvements.tt, key: 2025-04-navigation-improvements, path: Documentation/general/2025-04-navigation-improvements.tt
+INFO: Processing file: root/Documentation/general/project_management_system.tt, key: project_management_system, path: Documentation/general/project_management_system.tt
+INFO: Processing file: root/Documentation/general/2025-08-30-hosting-signup-enhancements.tt, key: 2025-08-30-hosting-signup-enhancements, path: Documentation/general/2025-08-30-hosting-signup-enhancements.tt
+INFO: Processing file: root/Documentation/general/2024-06-project-edit-fix.tt, key: 2024-06-project-edit-fix, path: Documentation/general/2024-06-project-edit-fix.tt
+INFO: Processing file: root/Documentation/general/fix_project_selection_todo_filtering.tt, key: fix_project_selection_todo_filtering, path: Documentation/general/fix_project_selection_todo_filtering.tt
+INFO: Processing file: root/Documentation/general/navigation_system.tt, key: navigation_system, path: Documentation/general/navigation_system.tt
+INFO: Processing file: root/Documentation/general/documentation_system.tt, key: documentation_system, path: Documentation/general/documentation_system.tt
+INFO: Processing file: root/Documentation/general/2025-05-30-documentation-structure-simplification.tt, key: 2025-05-30-documentation-structure-simplification, path: Documentation/general/2025-05-30-documentation-structure-simplification.tt
+INFO: Processing file: root/Documentation/general/model_list.tt, key: model_list, path: Documentation/general/model_list.tt
+INFO: Processing file: root/Documentation/general/git_pull_guide.tt, key: git_pull_guide, path: Documentation/general/git_pull_guide.tt
+INFO: Processing file: root/Documentation/general/documentation_filename_issue.tt, key: documentation_filename_issue, path: Documentation/general/documentation_filename_issue.tt
+INFO: Processing file: root/Documentation/general/site_domain_resolution.tt, key: site_domain_resolution, path: Documentation/general/site_domain_resolution.tt
+INFO: Processing file: root/Documentation/general/login_authentication.tt, key: login_authentication, path: Documentation/general/login_authentication.tt
+INFO: Processing file: root/Documentation/general/documentation_system_overview.tt, key: documentation_system_overview, path: Documentation/general/documentation_system_overview.tt
+INFO: Processing file: root/Documentation/general/2025-04-13-mcoop-url-case-fix.tt, key: 2025-04-13-mcoop-url-case-fix, path: Documentation/general/2025-04-13-mcoop-url-case-fix.tt
+INFO: Processing file: root/Documentation/general/2025-04-documentation-template-refactoring.tt, key: 2025-04-documentation-template-refactoring, path: Documentation/general/2025-04-documentation-template-refactoring.tt
+INFO: Processing file: root/Documentation/general/theme_mappings_handling.tt, key: theme_mappings_handling, path: Documentation/general/theme_mappings_handling.tt
+INFO: Processing file: root/Documentation/general/logging_best_practices.tt, key: logging_best_practices, path: Documentation/general/logging_best_practices.tt
+INFO: Processing file: root/Documentation/general/2025-04-documentation-admin-visibility-fix.tt, key: 2025-04-documentation-admin-visibility-fix, path: Documentation/general/2025-04-documentation-admin-visibility-fix.tt
+INFO: Processing file: root/Documentation/general/2025-08-25-project-filtering-and-display.tt, key: 2025-08-25-project-filtering-and-display, path: Documentation/general/2025-08-25-project-filtering-and-display.tt
+INFO: Processing file: root/Documentation/general/enhanced_todo_navigation.tt, key: enhanced_todo_navigation, path: Documentation/general/enhanced_todo_navigation.tt
+INFO: Processing file: root/Documentation/general/network_diagnostics.tt, key: network_diagnostics, path: Documentation/general/network_diagnostics.tt
+INFO: Processing file: root/Documentation/general/AI_Guidelines.tt, key: AI_Guidelines, path: Documentation/general/AI_Guidelines.tt
+INFO: Processing file: root/Documentation/general/MailSystem.tt, key: MailSystem, path: Documentation/general/MailSystem.tt
+INFO: Processing file: root/Documentation/general/linux_commands.tt, key: linux_commands, path: Documentation/general/linux_commands.tt
+INFO: Processing file: root/Documentation/general/2025-05-16-documentation-workflow-consolidation.tt, key: 2025-05-16-documentation-workflow-consolidation, path: Documentation/general/2025-05-16-documentation-workflow-consolidation.tt
+INFO: Processing file: root/Documentation/general/HostingSignup.tt, key: HostingSignup, path: Documentation/general/HostingSignup.tt
+INFO: Processing file: root/Documentation/general/troubleshooting.tt, key: troubleshooting, path: Documentation/general/troubleshooting.tt
+INFO: Processing file: root/Documentation/general/documentation_update_summary.tt, key: documentation_update_summary, path: Documentation/general/documentation_update_summary.tt
+INFO: Processing file: root/Documentation/general/2024-07-project-id-fix.tt, key: 2024-07-project-id-fix, path: Documentation/general/2024-07-project-id-fix.tt
+INFO: Processing file: root/Documentation/general/2025-04-pagetop-hostname-display.tt, key: 2025-04-pagetop-hostname-display, path: Documentation/general/2025-04-pagetop-hostname-display.tt
+INFO: Processing file: root/Documentation/general/2025-04-mcoop-admin-menu-restriction.tt, key: 2025-04-mcoop-admin-menu-restriction, path: Documentation/general/2025-04-mcoop-admin-menu-restriction.tt
+INFO: Processing file: root/Documentation/general/template_system.tt, key: template_system, path: Documentation/general/template_system.tt
+INFO: Processing file: root/Documentation/general/network_map_json_storage.tt, key: network_map_json_storage, path: Documentation/general/network_map_json_storage.tt
+INFO: Processing file: root/Documentation/general/2024-04-24-helpdesk-menu-enhancement.tt, key: 2024-04-24-helpdesk-menu-enhancement, path: Documentation/general/2024-04-24-helpdesk-menu-enhancement.tt
+INFO: Processing file: root/Documentation/general/index.tt, key: index, path: Documentation/general/index.tt
+INFO: Processing file: root/Documentation/general/site_guide.tt, key: site_guide, path: Documentation/general/site_guide.tt
+INFO: Processing file: root/Documentation/general/THEME_SYSTEM_README.tt, key: THEME_SYSTEM_README, path: Documentation/general/THEME_SYSTEM_README.tt
+INFO: Processing file: root/Documentation/general/documentation_index_adaptation.tt, key: documentation_index_adaptation, path: Documentation/general/documentation_index_adaptation.tt
+INFO: Processing file: root/Documentation/general/2025-04-documentation-display-fix.tt, key: 2025-04-documentation-display-fix, path: Documentation/general/2025-04-documentation-display-fix.tt
+INFO: Processing file: root/Documentation/general/Site.tt, key: Site, path: Documentation/general/Site.tt
+INFO: Processing file: root/Documentation/general/2025-08-18-project-cards-css-fix.tt, key: 2025-08-18-project-cards-css-fix, path: Documentation/general/2025-08-18-project-cards-css-fix.tt
+INFO: Processing file: root/Documentation/general/2025-09-starman-restart-fix.tt, key: 2025-09-starman-restart-fix, path: Documentation/general/2025-09-starman-restart-fix.tt
+INFO: Processing file: root/Documentation/general/mail_troubleshooting.tt, key: mail_troubleshooting, path: Documentation/general/mail_troubleshooting.tt
+INFO: Processing file: root/Documentation/general/ROUTING_FIXES.tt, key: ROUTING_FIXES, path: Documentation/general/ROUTING_FIXES.tt
+INFO: Processing file: root/Documentation/general/todo_edit_functionality.tt, key: todo_edit_functionality, path: Documentation/general/todo_edit_functionality.tt
+INFO: Processing file: root/Documentation/general/2025-05-31-linux-commands-reference.tt, key: 2025-05-31-linux-commands-reference, path: Documentation/general/2025-05-31-linux-commands-reference.tt
+INFO: Processing file: root/Documentation/general/controller_list.tt, key: controller_list, path: Documentation/general/controller_list.tt
+INFO: Processing file: root/Documentation/general/mail_documentation_update.tt, key: mail_documentation_update, path: Documentation/general/mail_documentation_update.tt
+INFO: Processing file: root/Documentation/general/documentation_role_access.tt, key: documentation_role_access, path: Documentation/general/documentation_role_access.tt
+INFO: Processing file: root/Documentation/general/2025-04-12-hosting-signup-implementation.tt, key: 2025-04-12-hosting-signup-implementation, path: Documentation/general/2025-04-12-hosting-signup-implementation.tt
+INFO: Processing file: root/Documentation/general/menu_system_guide.tt, key: menu_system_guide, path: Documentation/general/menu_system_guide.tt
+INFO: Processing file: root/Documentation/general/2024-07-proxmox-controller-fixes.tt, key: 2024-07-proxmox-controller-fixes, path: Documentation/general/2024-07-proxmox-controller-fixes.tt
+INFO: Processing file: root/Documentation/general/proxy_troubleshooting.tt, key: proxy_troubleshooting, path: Documentation/general/proxy_troubleshooting.tt
+INFO: Processing file: root/Documentation/general/2025-05-25-fix-formatting-title-logs.tt, key: 2025-05-25-fix-formatting-title-logs, path: Documentation/general/2025-05-25-fix-formatting-title-logs.tt
+INFO: Processing file: root/Documentation/general/2024-08-controller-fixes.tt, key: 2024-08-controller-fixes, path: Documentation/general/2024-08-controller-fixes.tt
+INFO: Processing file: root/Documentation/general/main_changelog.tt, key: main_changelog, path: Documentation/general/main_changelog.tt
+INFO: Processing file: root/Documentation/general/linux_commands_reference.tt, key: linux_commands_reference, path: Documentation/general/linux_commands_reference.tt
+INFO: Processing file: root/Documentation/general/documentation_config_guide.tt, key: documentation_config_guide, path: Documentation/general/documentation_config_guide.tt
+INFO: Processing file: root/Documentation/general/workshop_system.tt, key: workshop_system, path: Documentation/general/workshop_system.tt
+INFO: Processing file: root/Documentation/general/admin_guide.tt, key: admin_guide, path: Documentation/general/admin_guide.tt
+INFO: Processing file: root/Documentation/general/2024-08-proxmox-debug-msg-fix.tt, key: 2024-08-proxmox-debug-msg-fix, path: Documentation/general/2024-08-proxmox-debug-msg-fix.tt
+INFO: Processing file: root/Documentation/general/SYSTEM_REQUIREMENTS.tt, key: SYSTEM_REQUIREMENTS, path: Documentation/general/SYSTEM_REQUIREMENTS.tt
+INFO: Processing file: root/Documentation/general/THEME_SYSTEM_CLEANUP.tt, key: THEME_SYSTEM_CLEANUP, path: Documentation/general/THEME_SYSTEM_CLEANUP.tt
+INFO: Processing file: root/Documentation/general/User.tt, key: User, path: Documentation/general/User.tt
+INFO: Processing file: root/Documentation/general/menu_system.tt, key: menu_system, path: Documentation/general/menu_system.tt
+INFO: Processing file: root/Documentation/general/fix_project_edit_form.tt, key: fix_project_edit_form, path: Documentation/general/fix_project_edit_form.tt
+INFO: Processing file: root/Documentation/general/mail_user_guide.tt, key: mail_user_guide, path: Documentation/general/mail_user_guide.tt
+INFO: Processing file: root/Documentation/general/ThemeConfig.tt, key: ThemeConfig, path: Documentation/general/ThemeConfig.tt
+INFO: Processing file: root/Documentation/general/mcoop_getting_started.tt, key: mcoop_getting_started, path: Documentation/general/mcoop_getting_started.tt
+INFO: Processing file: root/Documentation/general/mcoop_module.tt, key: mcoop_module, path: Documentation/general/mcoop_module.tt
+INFO: Processing file: root/Documentation/general/db_config_loading.tt, key: db_config_loading, path: Documentation/general/db_config_loading.tt
+INFO: Processing file: root/Documentation/general/hosting_signup_templates.tt, key: hosting_signup_templates, path: Documentation/general/hosting_signup_templates.tt
+INFO: Processing file: root/Documentation/general/Documentation_Controller.tt, key: Documentation_Controller, path: Documentation/general/Documentation_Controller.tt
+INFO: Processing file: root/Documentation/general/back_to_top.tt, key: back_to_top, path: Documentation/general/back_to_top.tt
+INFO: Processing file: root/Documentation/general/2025-04-documentation-workflow-update.tt, key: 2025-04-documentation-workflow-update, path: Documentation/general/2025-04-documentation-workflow-update.tt
+INFO: Processing file: root/Documentation/general/proxmox_integration.tt, key: proxmox_integration, path: Documentation/general/proxmox_integration.tt
+INFO: Processing file: root/Documentation/general/documentation_system_guide.tt, key: documentation_system_guide, path: Documentation/general/documentation_system_guide.tt
+INFO: Processing file: root/Documentation/general/starman_restart_guide.tt, key: starman_restart_guide, path: Documentation/general/starman_restart_guide.tt
+INFO: Processing file: root/Documentation/general/HelpDesk.tt, key: HelpDesk, path: Documentation/general/HelpDesk.tt
+INFO: Processing file: root/Documentation/general/FAQ.tt, key: FAQ, path: Documentation/general/FAQ.tt
+INFO: Processing file: root/Documentation/general/HostingSignup_Mail.tt, key: HostingSignup_Mail, path: Documentation/general/HostingSignup_Mail.tt
+INFO: Processing file: root/Documentation/general/documentation_editor_guide.tt, key: documentation_editor_guide, path: Documentation/general/documentation_editor_guide.tt
+INFO: Processing file: root/Documentation/general/2025-05-15-documentation-system-update.tt, key: 2025-05-15-documentation-system-update, path: Documentation/general/2025-05-15-documentation-system-update.tt
+INFO: Processing file: root/Documentation/general/getting_started.tt, key: getting_started, path: Documentation/general/getting_started.tt
+INFO: Processing file: root/Documentation/general/2024-08-pagetop-hostname-display.tt, key: 2024-08-pagetop-hostname-display, path: Documentation/general/2024-08-pagetop-hostname-display.tt
+INFO: Processing file: root/Documentation/general/2025-09-10-restart-starman-functionality.tt, key: 2025-09-10-restart-starman-functionality, path: Documentation/general/2025-09-10-restart-starman-functionality.tt
+INFO: Processing file: root/Documentation/general/2025-04-mcoop-server-room-plan.tt, key: 2025-04-mcoop-server-room-plan, path: Documentation/general/2025-04-mcoop-server-room-plan.tt
+INFO: Processing file: root/Documentation/general/documentation_template.tt, key: documentation_template, path: Documentation/general/documentation_template.tt
+INFO: Processing file: root/Documentation/general/db_config_loading_fix.tt, key: db_config_loading_fix, path: Documentation/general/db_config_loading_fix.tt
+INFO: Processing file: root/Documentation/general/todo_filtering_and_views.tt, key: todo_filtering_and_views, path: Documentation/general/todo_filtering_and_views.tt
+INFO: Processing file: root/Documentation/system/DB_CONFIG_README.tt, key: DB_CONFIG_README, path: Documentation/system/DB_CONFIG_README.tt
+INFO: Processing file: root/Documentation/cloudflare/domain_sync_feature.tt, key: domain_sync_feature, path: Documentation/cloudflare/domain_sync_feature.tt
+INFO: Processing file: root/Documentation/cloudflare/domain_sync.tt, key: domain_sync, path: Documentation/cloudflare/domain_sync.tt
+INFO: Processing file: root/Documentation/tutorials/customizing_profile.tt, key: customizing_profile, path: Documentation/tutorials/customizing_profile.tt
+INFO: Processing file: root/Documentation/tutorials/login_authentication.tt, key: login_authentication, path: Documentation/tutorials/login_authentication.tt
+INFO: Processing file: root/Documentation/tutorials/mcoop_getting_started.tt, key: mcoop_getting_started, path: Documentation/tutorials/mcoop_getting_started.tt
+INFO: Processing file: root/Documentation/changelog/2025-01-15-git-divergent-branches-fix.tt, key: 2025-01-15-git-divergent-branches-fix, path: Documentation/changelog/2025-01-15-git-divergent-branches-fix.tt
+INFO: Processing file: root/Documentation/changelog/2025-05-25-git-pull-routing-fix.tt, key: 2025-05-25-git-pull-routing-fix, path: Documentation/changelog/2025-05-25-git-pull-routing-fix.tt
+INFO: Processing file: root/Documentation/changelog/cloudflare_api_token_ip_restriction_fix.tt, key: cloudflare_api_token_ip_restriction_fix, path: Documentation/changelog/cloudflare_api_token_ip_restriction_fix.tt

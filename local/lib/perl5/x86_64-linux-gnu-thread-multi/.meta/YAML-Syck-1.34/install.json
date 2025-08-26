@@ -1,0 +1,1 @@
+{"name":"YAML::Syck","version":"1.34","target":"JSON::Syck","dist":"YAML-Syck-1.34","pathname":"T/TO/TODDR/YAML-Syck-1.34.tar.gz","provides":{"JSON::Syck":{"version":"1.34","file":"lib/JSON/Syck.pm"},"YAML::Dumper::Syck":{"file":"lib/YAML/Dumper/Syck.pm"},"YAML::Loader::Syck":{"file":"lib/YAML/Loader/Syck.pm"},"YAML::Syck":{"file":"lib/YAML/Syck.pm","version":"1.34"}}}

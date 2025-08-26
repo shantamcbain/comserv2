@@ -1,0 +1,798 @@
+Deleted old log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/archive/application.log_20250715_100634
+Log rotated: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/archive/application.log_20250826_074822
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: todo_system.md
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Todo System
+Failed to open file: Categorizing file: todo_system, path: Documentation/todo_system.md - No such file or directory
+ERROR: File path does not appear to be a valid path: Added todo_system to modules category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: todo_system (type: markdown, path: Documentation/todo_system.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/Queens.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Queens.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Queens
+Failed to open file: Categorizing file: Queens, path: Documentation/Queens.tt - No such file or directory
+Failed to open file: Found documentation: Queens (type: template, path: Documentation/Queens.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/Pages.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Pages.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Pages
+Failed to open file: Categorizing file: Pages, path: Documentation/Pages.tt - No such file or directory
+Failed to open file: Found documentation: Pages (type: template, path: Documentation/Pages.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/enhanced_todo_navigation.md - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: enhanced_todo_navigation.md
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Enhanced Todo Navigation
+Failed to open file: Categorizing file: enhanced_todo_navigation, path: Documentation/enhanced_todo_navigation.md - No such file or directory
+Failed to open file: Found documentation: enhanced_todo_navigation (type: markdown, path: Documentation/enhanced_todo_navigation.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/markdown_viewer.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: markdown_viewer.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Markdown Viewer
+Failed to open file: Categorizing file: markdown_viewer, path: Documentation/markdown_viewer.tt - No such file or directory
+Failed to open file: Found documentation: markdown_viewer (type: template, path: Documentation/markdown_viewer.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/DocumentManagement.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: DocumentManagement.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: DocumentManagement
+Failed to open file: Categorizing file: DocumentManagement, path: Documentation/DocumentManagement.tt - No such file or directory
+Failed to open file: Found documentation: DocumentManagement (type: template, path: Documentation/DocumentManagement.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/mail_troubleshooting.md - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: mail_troubleshooting.md
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Mail Troubleshooting
+Failed to open file: Categorizing file: mail_troubleshooting, path: Documentation/mail_troubleshooting.md - No such file or directory
+Failed to open file: Found documentation: mail_troubleshooting (type: markdown, path: Documentation/mail_troubleshooting.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/todo_system.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: todo_system.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Todo System
+Failed to open file: Found documentation: todo_system (type: template, path: Documentation/todo_system.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/menu_system.md - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: menu_system.md
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Menu System
+Failed to open file: Categorizing file: menu_system, path: Documentation/menu_system.md - No such file or directory
+Failed to open file: Found documentation: menu_system (type: markdown, path: Documentation/menu_system.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/Forager.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Forager.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Forager
+Failed to open file: Categorizing file: Forager, path: Documentation/Forager.tt - No such file or directory
+ERROR: File path does not appear to be a valid path: Categorized as controller: Forager
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+ERROR: File path does not appear to be a valid path: Added Forager to controllers category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: Forager (type: template, path: Documentation/Forager.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/models.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: models.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Models
+Failed to open file: Categorizing file: models, path: Documentation/models.tt - No such file or directory
+ERROR: File path does not appear to be a valid path: Categorized as model: models
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+ERROR: File path does not appear to be a valid path: Added models to models category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: models (type: template, path: Documentation/models.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/documentation_update_summary.md - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_update_summary.md
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Update Summary
+Failed to open file: Categorizing file: documentation_update_summary, path: Documentation/documentation_update_summary.md - No such file or directory
+Failed to open file: Found documentation: documentation_update_summary (type: markdown, path: Documentation/documentation_update_summary.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/Files.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Files.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Files
+Failed to open file: Categorizing file: Files, path: Documentation/Files.tt - No such file or directory
+Failed to open file: Found documentation: Files (type: template, path: Documentation/Files.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/project_selection_log_creation.md - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: project_selection_log_creation.md
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Project Selection Log Creation
+Failed to open file: Categorizing file: project_selection_log_creation, path: Documentation/project_selection_log_creation.md - No such file or directory
+ERROR: File path does not appear to be a valid path: Added project_selection_log_creation to modules category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: project_selection_log_creation (type: markdown, path: Documentation/project_selection_log_creation.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/BMaserModel.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: BMaserModel.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: BMaserModel
+Failed to open file: Categorizing file: BMaserModel, path: Documentation/BMaserModel.tt - No such file or directory
+ERROR: File path does not appear to be a valid path: Categorized as model: BMaserModel
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+ERROR: File path does not appear to be a valid path: Added BMaserModel to models category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: BMaserModel (type: template, path: Documentation/BMaserModel.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/all_docs.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: all_docs.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: All Docs
+Failed to open file: Categorizing file: all_docs, path: Documentation/all_docs.tt - No such file or directory
+Failed to open file: Found documentation: all_docs (type: template, path: Documentation/all_docs.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/document_management.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: document_management.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Document Management
+Failed to open file: Categorizing file: document_management, path: Documentation/document_management.tt - No such file or directory
+Failed to open file: Found documentation: document_management (type: template, path: Documentation/document_management.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/Virtualmin_Integration.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Virtualmin_Integration.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Virtualmin Integration
+Failed to open file: Categorizing file: Virtualmin_Integration, path: Documentation/Virtualmin_Integration.tt - No such file or directory
+Failed to open file: Found documentation: Virtualmin_Integration (type: template, path: Documentation/Virtualmin_Integration.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/proxmox.md - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: proxmox.md
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Proxmox
+Failed to open file: Found documentation: proxmox (type: markdown, path: Documentation/proxmox.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/user_docs.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: user_docs.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: User Docs
+Failed to open file: Categorizing file: user_docs, path: Documentation/user_docs.tt - No such file or directory
+Failed to open file: Found documentation: user_docs (type: template, path: Documentation/user_docs.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/Projects.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Projects.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Projects
+Failed to open file: Categorizing file: Projects, path: Documentation/Projects.tt - No such file or directory
+ERROR: File path does not appear to be a valid path: Added Projects to modules category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: Projects (type: template, path: Documentation/Projects.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/documentation_tt_template.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_tt_template.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Tt Template
+Failed to open file: Categorizing file: documentation_tt_template, path: Documentation/documentation_tt_template.tt - No such file or directory
+Failed to open file: Found documentation: documentation_tt_template (type: template, path: Documentation/documentation_tt_template.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/documentation_migration_to_tt.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_migration_to_tt.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Migration To Tt
+Failed to open file: Categorizing file: documentation_migration_to_tt, path: Documentation/documentation_migration_to_tt.tt - No such file or directory
+Failed to open file: Found documentation: documentation_migration_to_tt (type: template, path: Documentation/documentation_migration_to_tt.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/HelpDeskSystem.md - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: HelpDeskSystem.md
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: HelpDeskSystem
+Failed to open file: Categorizing file: HelpDeskSystem, path: Documentation/HelpDeskSystem.md - No such file or directory
+Failed to open file: Found documentation: HelpDeskSystem (type: markdown, path: Documentation/HelpDeskSystem.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/BMasterController.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: BMasterController.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: BMasterController
+Failed to open file: Categorizing file: BMasterController, path: Documentation/BMasterController.tt - No such file or directory
+ERROR: File path does not appear to be a valid path: Categorized as controller: BMasterController
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+ERROR: File path does not appear to be a valid path: Added BMasterController to controllers category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: BMasterController (type: template, path: Documentation/BMasterController.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/fix_project_edit_form.md - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: fix_project_edit_form.md
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Fix Project Edit Form
+Failed to open file: Categorizing file: fix_project_edit_form, path: Documentation/fix_project_edit_form.md - No such file or directory
+Failed to open file: Found documentation: fix_project_edit_form (type: markdown, path: Documentation/fix_project_edit_form.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/mail_configuration_guide.md - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: mail_configuration_guide.md
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Mail Configuration Guide
+Failed to open file: Categorizing file: mail_configuration_guide, path: Documentation/mail_configuration_guide.md - No such file or directory
+Failed to open file: Found documentation: mail_configuration_guide (type: markdown, path: Documentation/mail_configuration_guide.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/ENCYModel.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: ENCYModel.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: ENCYModel
+Failed to open file: Categorizing file: ENCYModel, path: Documentation/ENCYModel.tt - No such file or directory
+ERROR: File path does not appear to be a valid path: Categorized as model: ENCYModel
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+ERROR: File path does not appear to be a valid path: Added ENCYModel to models category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: ENCYModel (type: template, path: Documentation/ENCYModel.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/fix_project_selection_todo_filtering.md - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: fix_project_selection_todo_filtering.md
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Fix Project Selection Todo Filtering
+Failed to open file: Categorizing file: fix_project_selection_todo_filtering, path: Documentation/fix_project_selection_todo_filtering.md - No such file or directory
+Failed to open file: Found documentation: fix_project_selection_todo_filtering (type: markdown, path: Documentation/fix_project_selection_todo_filtering.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/cloudflare_integration.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: cloudflare_integration.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Cloudflare Integration
+Failed to open file: Categorizing file: cloudflare_integration, path: Documentation/cloudflare_integration.tt - No such file or directory
+Failed to open file: Found documentation: cloudflare_integration (type: template, path: Documentation/cloudflare_integration.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/network_diagnostics.md - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: network_diagnostics.md
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Network Diagnostics
+Failed to open file: Categorizing file: network_diagnostics, path: Documentation/network_diagnostics.md - No such file or directory
+Failed to open file: Found documentation: network_diagnostics (type: markdown, path: Documentation/network_diagnostics.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/user_manual.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: user_manual.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: User Manual
+Failed to open file: Categorizing file: user_manual, path: Documentation/user_manual.tt - No such file or directory
+Failed to open file: Found documentation: user_manual (type: template, path: Documentation/user_manual.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/sessionplan.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: sessionplan.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Sessionplan
+Failed to open file: Categorizing file: sessionplan, path: Documentation/sessionplan.tt - No such file or directory
+Failed to open file: Found documentation: sessionplan (type: template, path: Documentation/sessionplan.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/Login.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Login.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Login
+Failed to open file: Categorizing file: Login, path: Documentation/Login.tt - No such file or directory
+Failed to open file: Found documentation: Login (type: template, path: Documentation/Login.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/project_management_system.md - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: project_management_system.md
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Project Management System
+Failed to open file: Categorizing file: project_management_system, path: Documentation/project_management_system.md - No such file or directory
+ERROR: File path does not appear to be a valid path: Added project_management_system to modules category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: project_management_system (type: markdown, path: Documentation/project_management_system.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/main_changelog.md - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: main_changelog.md
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Main Changelog
+Failed to open file: Categorizing file: main_changelog, path: Documentation/main_changelog.md - No such file or directory
+Failed to open file: Found documentation: main_changelog (type: markdown, path: Documentation/main_changelog.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/error.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: error.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Error
+Failed to open file: Categorizing file: error, path: Documentation/error.tt - No such file or directory
+Failed to open file: Found documentation: error (type: template, path: Documentation/error.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/todo_filtering_and_views.md - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: todo_filtering_and_views.md
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Todo Filtering And Views
+Failed to open file: Categorizing file: todo_filtering_and_views, path: Documentation/todo_filtering_and_views.md - No such file or directory
+ERROR: File path does not appear to be a valid path: Added todo_filtering_and_views to modules category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: todo_filtering_and_views (type: markdown, path: Documentation/todo_filtering_and_views.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/Todo.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Todo.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Todo
+Failed to open file: Categorizing file: Todo, path: Documentation/Todo.tt - No such file or directory
+ERROR: File path does not appear to be a valid path: Categorized as controller: Todo
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+ERROR: File path does not appear to be a valid path: Added Todo to controllers category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: Todo (type: template, path: Documentation/Todo.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/controller_routing_guidelines.md - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: controller_routing_guidelines.md
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Controller Routing Guidelines
+Failed to open file: Categorizing file: controller_routing_guidelines, path: Documentation/controller_routing_guidelines.md - No such file or directory
+ERROR: File path does not appear to be a valid path: Categorized as controller: controller_routing_guidelines
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+ERROR: File path does not appear to be a valid path: Added controller_routing_guidelines to controllers category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: controller_routing_guidelines (type: markdown, path: Documentation/controller_routing_guidelines.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/MailSystem.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: MailSystem.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: MailSystem
+Failed to open file: Categorizing file: MailSystem, path: Documentation/MailSystem.tt - No such file or directory
+Failed to open file: Found documentation: MailSystem (type: template, path: Documentation/MailSystem.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/ENCY.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: ENCY.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: ENCY
+Failed to open file: Categorizing file: ENCY, path: Documentation/ENCY.tt - No such file or directory
+ERROR: File path does not appear to be a valid path: Categorized as controller: ENCY
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+ERROR: File path does not appear to be a valid path: Added ENCY to controllers category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: ENCY (type: template, path: Documentation/ENCY.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/system_info.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: system_info.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: System Info
+Failed to open file: Categorizing file: system_info, path: Documentation/system_info.tt - No such file or directory
+ERROR: File path does not appear to be a valid path: Added system_info to admin_guides category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: system_info (type: template, path: Documentation/system_info.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/admin.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: admin.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Admin
+Failed to open file: Categorizing file: admin, path: Documentation/admin.tt - No such file or directory
+ERROR: File path does not appear to be a valid path: Categorized as controller: admin
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+ERROR: File path does not appear to be a valid path: Added admin to controllers category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: admin (type: template, path: Documentation/admin.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/cloudflare.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: cloudflare.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Cloudflare
+Failed to open file: Categorizing file: cloudflare, path: Documentation/cloudflare.tt - No such file or directory
+Failed to open file: Found documentation: cloudflare (type: template, path: Documentation/cloudflare.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/proxy_troubleshooting.md - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: proxy_troubleshooting.md
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Proxy Troubleshooting
+Failed to open file: Categorizing file: proxy_troubleshooting, path: Documentation/proxy_troubleshooting.md - No such file or directory
+Failed to open file: Found documentation: proxy_troubleshooting (type: markdown, path: Documentation/proxy_troubleshooting.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/MailSystem.md - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: MailSystem.md
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: MailSystem
+Failed to open file: Categorizing file: MailSystem, path: Documentation/MailSystem.md - No such file or directory
+Failed to open file: Found documentation: MailSystem (type: markdown, path: Documentation/MailSystem.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/recent_updates.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: recent_updates.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Recent Updates
+Failed to open file: Categorizing file: recent_updates, path: Documentation/recent_updates.tt - No such file or directory
+Failed to open file: Found documentation: recent_updates (type: template, path: Documentation/recent_updates.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/index.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: index.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Index
+Failed to open file: Categorizing file: index, path: Documentation/index.tt - No such file or directory
+Failed to open file: Found documentation: index (type: template, path: Documentation/index.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/mail_system.md - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: mail_system.md
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Mail System
+Failed to open file: Categorizing file: mail_system, path: Documentation/mail_system.md - No such file or directory
+Failed to open file: Found documentation: mail_system (type: markdown, path: Documentation/mail_system.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/ContentManagement.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: ContentManagement.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: ContentManagement
+Failed to open file: Categorizing file: ContentManagement, path: Documentation/ContentManagement.tt - No such file or directory
+Failed to open file: Found documentation: ContentManagement (type: template, path: Documentation/ContentManagement.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/todo_edit_functionality.md - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: todo_edit_functionality.md
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Todo Edit Functionality
+Failed to open file: Categorizing file: todo_edit_functionality, path: Documentation/todo_edit_functionality.md - No such file or directory
+ERROR: File path does not appear to be a valid path: Added todo_edit_functionality to modules category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: todo_edit_functionality (type: markdown, path: Documentation/todo_edit_functionality.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/Admin.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Admin.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Admin
+Failed to open file: Categorizing file: Admin, path: Documentation/Admin.tt - No such file or directory
+ERROR: File path does not appear to be a valid path: Categorized as controller: Admin
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+ERROR: File path does not appear to be a valid path: Added Admin to controllers category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: Admin (type: template, path: Documentation/Admin.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/DBIDocument.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: DBIDocument.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: DBIDocument
+Failed to open file: Categorizing file: DBIDocument, path: Documentation/DBIDocument.tt - No such file or directory
+Failed to open file: Found documentation: DBIDocument (type: template, path: Documentation/DBIDocument.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/proxmox_commands.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: proxmox_commands.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Proxmox Commands
+Failed to open file: Categorizing file: proxmox_commands, path: Documentation/proxmox_commands.tt - No such file or directory
+ERROR: File path does not appear to be a valid path: Categorized as proxmox: proxmox_commands
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+ERROR: File path does not appear to be a valid path: Added proxmox_commands to proxmox category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: proxmox_commands (type: template, path: Documentation/proxmox_commands.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/AI_Guidelines.md - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: AI_Guidelines.md
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: AI Guidelines
+Failed to open file: Categorizing file: AI_Guidelines, path: Documentation/AI_Guidelines.md - No such file or directory
+Failed to open file: Found documentation: AI_Guidelines (type: markdown, path: Documentation/AI_Guidelines.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/setupcontorller.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: setupcontorller.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Setupcontorller
+Failed to open file: Categorizing file: setupcontorller, path: Documentation/setupcontorller.tt - No such file or directory
+Failed to open file: Found documentation: setupcontorller (type: template, path: Documentation/setupcontorller.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/mcoop_module.md - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: mcoop_module.md
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Mcoop Module
+Failed to open file: Categorizing file: mcoop_module, path: Documentation/mcoop_module.md - No such file or directory
+Failed to open file: Found documentation: mcoop_module (type: markdown, path: Documentation/mcoop_module.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/documentation_organization.md - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_organization.md
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Organization
+Failed to open file: Categorizing file: documentation_organization, path: Documentation/documentation_organization.md - No such file or directory
+Failed to open file: Found documentation: documentation_organization (type: markdown, path: Documentation/documentation_organization.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/Git.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Git.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Git
+Failed to open file: Categorizing file: Git, path: Documentation/Git.tt - No such file or directory
+Failed to open file: Found documentation: Git (type: template, path: Documentation/Git.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/setup.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: setup.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Setup
+Failed to open file: Categorizing file: setup, path: Documentation/setup.tt - No such file or directory
+Failed to open file: Found documentation: setup (type: template, path: Documentation/setup.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/all_changelog.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: all_changelog.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: All Changelog
+Failed to open file: Categorizing file: all_changelog, path: Documentation/all_changelog.tt - No such file or directory
+Failed to open file: Found documentation: all_changelog (type: template, path: Documentation/all_changelog.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/site_domain_resolution.md - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: site_domain_resolution.md
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Site Domain Resolution
+Failed to open file: Categorizing file: site_domain_resolution, path: Documentation/site_domain_resolution.md - No such file or directory
+Failed to open file: Found documentation: site_domain_resolution (type: markdown, path: Documentation/site_domain_resolution.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/WorkShops.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: WorkShops.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: WorkShops
+Failed to open file: Categorizing file: WorkShops, path: Documentation/WorkShops.tt - No such file or directory
+Failed to open file: Found documentation: WorkShops (type: template, path: Documentation/WorkShops.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/Overview.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Overview.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Overview
+Failed to open file: Categorizing file: Overview, path: Documentation/Overview.tt - No such file or directory
+Failed to open file: Found documentation: Overview (type: template, path: Documentation/Overview.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/linux_commands_reference.md - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: linux_commands_reference.md
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Linux Commands Reference
+Failed to open file: Categorizing file: linux_commands_reference, path: Documentation/linux_commands_reference.md - No such file or directory
+Failed to open file: Found documentation: linux_commands_reference (type: markdown, path: Documentation/linux_commands_reference.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/Schema.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Schema.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Schema
+Failed to open file: Categorizing file: Schema, path: Documentation/Schema.tt - No such file or directory
+Failed to open file: Found documentation: Schema (type: template, path: Documentation/Schema.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/Logging.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Logging.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Logging
+Failed to open file: Categorizing file: Logging, path: Documentation/Logging.tt - No such file or directory
+Failed to open file: Found documentation: Logging (type: template, path: Documentation/Logging.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/Inventory.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Inventory.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Inventory
+Failed to open file: Categorizing file: Inventory, path: Documentation/Inventory.tt - No such file or directory
+Failed to open file: Found documentation: Inventory (type: template, path: Documentation/Inventory.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/architecture.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: architecture.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Architecture
+Failed to open file: Categorizing file: architecture, path: Documentation/architecture.tt - No such file or directory
+Failed to open file: Found documentation: architecture (type: template, path: Documentation/architecture.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/RestartStarman.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: RestartStarman.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: RestartStarman
+Failed to open file: Categorizing file: RestartStarman, path: Documentation/RestartStarman.tt - No such file or directory
+Failed to open file: Found documentation: RestartStarman (type: template, path: Documentation/RestartStarman.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/changelog.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: changelog.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Changelog
+Failed to open file: Categorizing file: changelog, path: Documentation/changelog.tt - No such file or directory
+Failed to open file: Found documentation: changelog (type: template, path: Documentation/changelog.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/developer_guides.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: developer_guides.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Developer Guides
+Failed to open file: Categorizing file: developer_guides, path: Documentation/developer_guides.tt - No such file or directory
+Failed to open file: Found documentation: developer_guides (type: template, path: Documentation/developer_guides.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/AIAssistants.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: AIAssistants.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: AIAssistants
+Failed to open file: Categorizing file: AIAssistants, path: Documentation/AIAssistants.tt - No such file or directory
+Failed to open file: Found documentation: AIAssistants (type: template, path: Documentation/AIAssistants.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/documentation_system.md - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_system.md
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation System
+Failed to open file: Categorizing file: documentation_system, path: Documentation/documentation_system.md - No such file or directory
+Failed to open file: Found documentation: documentation_system (type: markdown, path: Documentation/documentation_system.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/proxmox_integration.md - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: proxmox_integration.md
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Proxmox Integration
+Failed to open file: Categorizing file: proxmox_integration, path: Documentation/proxmox_integration.md - No such file or directory
+ERROR: File path does not appear to be a valid path: Categorized as proxmox: proxmox_integration
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+ERROR: File path does not appear to be a valid path: Added proxmox_integration to proxmox category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: proxmox_integration (type: markdown, path: Documentation/proxmox_integration.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/AI_DOCUMENTATION_GUIDELINES.md - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: AI_DOCUMENTATION_GUIDELINES.md
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: AI DOCUMENTATION GUIDELINES
+Failed to open file: Categorizing file: AI_DOCUMENTATION_GUIDELINES, path: Documentation/AI_DOCUMENTATION_GUIDELINES.md - No such file or directory
+Failed to open file: Found documentation: AI_DOCUMENTATION_GUIDELINES (type: markdown, path: Documentation/AI_DOCUMENTATION_GUIDELINES.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/fix_project_edit_button.md - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: fix_project_edit_button.md
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Fix Project Edit Button
+Failed to open file: Categorizing file: fix_project_edit_button, path: Documentation/fix_project_edit_button.md - No such file or directory
+Failed to open file: Found documentation: fix_project_edit_button (type: markdown, path: Documentation/fix_project_edit_button.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/config.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: config.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Config
+Failed to open file: Categorizing file: config, path: Documentation/config.tt - No such file or directory
+Failed to open file: Found documentation: config (type: template, path: Documentation/config.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/ENCYController.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: ENCYController.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: ENCYController
+Failed to open file: Categorizing file: ENCYController, path: Documentation/ENCYController.tt - No such file or directory
+ERROR: File path does not appear to be a valid path: Categorized as controller: ENCYController
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+ERROR: File path does not appear to be a valid path: Added ENCYController to controllers category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: ENCYController (type: template, path: Documentation/ENCYController.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/changelog_system.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: changelog_system.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Changelog System
+Failed to open file: Categorizing file: changelog_system, path: Documentation/changelog_system.tt - No such file or directory
+Failed to open file: Found documentation: changelog_system (type: template, path: Documentation/changelog_system.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/Sites.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Sites.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Sites
+Failed to open file: Categorizing file: Sites, path: Documentation/Sites.tt - No such file or directory
+Failed to open file: Found documentation: Sites (type: template, path: Documentation/Sites.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/Mail.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Mail.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Mail
+Failed to open file: Categorizing file: Mail, path: Documentation/Mail.tt - No such file or directory
+ERROR: File path does not appear to be a valid path: Categorized as controller: Mail
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+ERROR: File path does not appear to be a valid path: Added Mail to controllers category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: Mail (type: template, path: Documentation/Mail.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/User.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: User.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: User
+Failed to open file: Categorizing file: User, path: Documentation/User.tt - No such file or directory
+ERROR: File path does not appear to be a valid path: Categorized as controller: User
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+ERROR: File path does not appear to be a valid path: Added User to controllers category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: User (type: template, path: Documentation/User.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/site_specific.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: site_specific.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Site Specific
+Failed to open file: Categorizing file: site_specific, path: Documentation/site_specific.tt - No such file or directory
+Failed to open file: Found documentation: site_specific (type: template, path: Documentation/site_specific.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/guidelines.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: guidelines.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Guidelines
+Failed to open file: Categorizing file: guidelines, path: Documentation/guidelines.tt - No such file or directory
+Failed to open file: Found documentation: guidelines (type: template, path: Documentation/guidelines.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/AI_DEVELOPMENT_GUIDELINES.md - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: AI_DEVELOPMENT_GUIDELINES.md
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: AI DEVELOPMENT GUIDELINES
+Failed to open file: Categorizing file: AI_DEVELOPMENT_GUIDELINES, path: Documentation/AI_DEVELOPMENT_GUIDELINES.md - No such file or directory
+Failed to open file: Found documentation: AI_DEVELOPMENT_GUIDELINES (type: markdown, path: Documentation/AI_DEVELOPMENT_GUIDELINES.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/Starman.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Starman.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Starman
+Failed to open file: Categorizing file: Starman, path: Documentation/Starman.tt - No such file or directory
+Failed to open file: Found documentation: Starman (type: template, path: Documentation/Starman.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/tutorials.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: tutorials.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Tutorials
+Failed to open file: Categorizing file: tutorials, path: Documentation/tutorials.tt - No such file or directory
+Failed to open file: Found documentation: tutorials (type: template, path: Documentation/tutorials.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/Calendar.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Calendar.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Calendar
+Failed to open file: Categorizing file: Calendar, path: Documentation/Calendar.tt - No such file or directory
+ERROR: File path does not appear to be a valid path: Categorized as model: Calendar
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+ERROR: File path does not appear to be a valid path: Added Calendar to models category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: Calendar (type: template, path: Documentation/Calendar.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/Api.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Api.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: API
+Failed to open file: Categorizing file: Api, path: Documentation/Api.tt - No such file or directory
+Failed to open file: Found documentation: Api (type: template, path: Documentation/Api.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/Ve7tit.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Ve7tit.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Ve7tit
+Failed to open file: Categorizing file: Ve7tit, path: Documentation/Ve7tit.tt - No such file or directory
+ERROR: File path does not appear to be a valid path: Categorized as controller: Ve7tit
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+ERROR: File path does not appear to be a valid path: Added Ve7tit to controllers category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: Ve7tit (type: template, path: Documentation/Ve7tit.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/controllers.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: controllers.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Controllers
+Failed to open file: Categorizing file: controllers, path: Documentation/controllers.tt - No such file or directory
+ERROR: File path does not appear to be a valid path: Categorized as controller: controllers
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+ERROR: File path does not appear to be a valid path: Added controllers to controllers category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: controllers (type: template, path: Documentation/controllers.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/BMaster.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: BMaster.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: BMaster
+Failed to open file: Categorizing file: BMaster, path: Documentation/BMaster.tt - No such file or directory
+ERROR: File path does not appear to be a valid path: Categorized as controller: BMaster
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+ERROR: File path does not appear to be a valid path: Added BMaster to controllers category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: BMaster (type: template, path: Documentation/BMaster.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/Documentation_Workflow.md - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Documentation_Workflow.md
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Workflow
+Failed to open file: Categorizing file: Documentation_Workflow, path: Documentation/Documentation_Workflow.md - No such file or directory
+Failed to open file: Found documentation: Documentation_Workflow (type: markdown, path: Documentation/Documentation_Workflow.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/documentation_workflow.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_workflow.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Workflow
+Failed to open file: Categorizing file: documentation_workflow, path: Documentation/documentation_workflow.tt - No such file or directory
+Failed to open file: Found documentation: documentation_workflow (type: template, path: Documentation/documentation_workflow.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/documentation_system_overview.md - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_system_overview.md
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation System Overview
+Failed to open file: Categorizing file: documentation_system_overview, path: Documentation/documentation_system_overview.md - No such file or directory
+Failed to open file: Found documentation: documentation_system_overview (type: markdown, path: Documentation/documentation_system_overview.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/getting_started.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: getting_started.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Getting Started
+Failed to open file: Categorizing file: getting_started, path: Documentation/getting_started.tt - No such file or directory
+ERROR: File path does not appear to be a valid path: Added getting_started to user_guides category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: getting_started (type: template, path: Documentation/getting_started.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/AI.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: AI.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: AI
+Failed to open file: Categorizing file: AI, path: Documentation/AI.tt - No such file or directory
+Failed to open file: Found documentation: AI (type: template, path: Documentation/AI.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/api_credentials.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: api_credentials.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: API Credentials
+Failed to open file: Categorizing file: api_credentials, path: Documentation/api_credentials.tt - No such file or directory
+Failed to open file: Found documentation: api_credentials (type: template, path: Documentation/api_credentials.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/config_based/view.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: view.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: View
+Failed to open file: Categorizing file: view, path: Documentation/config_based/view.tt - No such file or directory
+Failed to open file: Found documentation: view (type: template, path: Documentation/config_based/view.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/config_based/index.tt - No such file or directory
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: index.tt
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Index
+Failed to open file: Categorizing file: index, path: Documentation/config_based/index.tt - No such file or directory
+Failed to open file: Found documentation: index (type: template, path: Documentation/config_based/index.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/proxmox/index.md - No such file or directory
+Pre-emptive log rotation triggered: 82222 bytes >= 81920 bytes
+Current log file size: 82285 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: index.md
+Pre-emptive log rotation triggered: 82523 bytes >= 81920 bytes
+Current log file size: 82586 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Index
+Failed to open file: Categorizing file: index, path: Documentation/proxmox/index.md - No such file or directory
+ERROR: File path does not appear to be a valid path: Added index to proxmox category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: index (type: markdown, path: Documentation/proxmox/index.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/proxmox/Proxmox_CD_Visibility.tt - No such file or directory
+Pre-emptive log rotation triggered: 83322 bytes >= 81920 bytes
+Current log file size: 83385 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Proxmox_CD_Visibility.tt
+Pre-emptive log rotation triggered: 83639 bytes >= 81920 bytes
+Current log file size: 83702 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Proxmox CD Visibility
+Failed to open file: Categorizing file: Proxmox_CD_Visibility, path: Documentation/proxmox/Proxmox_CD_Visibility.tt - No such file or directory
+ERROR: File path does not appear to be a valid path: Added Proxmox_CD_Visibility to proxmox category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: Proxmox_CD_Visibility (type: template, path: Documentation/proxmox/Proxmox_CD_Visibility.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/proxmox/api.tt - No such file or directory
+Pre-emptive log rotation triggered: 84516 bytes >= 81920 bytes
+Current log file size: 84579 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: api.tt
+Pre-emptive log rotation triggered: 84815 bytes >= 81920 bytes
+Current log file size: 84878 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: API
+Failed to open file: Categorizing file: api, path: Documentation/proxmox/api.tt - No such file or directory
+ERROR: File path does not appear to be a valid path: Added api to proxmox category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: api (type: template, path: Documentation/proxmox/api.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/proxmox/commands.tt - No such file or directory
+Pre-emptive log rotation triggered: 85589 bytes >= 81920 bytes
+Current log file size: 85652 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: commands.tt
+Pre-emptive log rotation triggered: 85893 bytes >= 81920 bytes
+Current log file size: 85956 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Commands
+Failed to open file: Categorizing file: commands, path: Documentation/proxmox/commands.tt - No such file or directory
+ERROR: File path does not appear to be a valid path: Added commands to proxmox category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: commands (type: template, path: Documentation/proxmox/commands.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/features/back_to_top.md - No such file or directory
+Pre-emptive log rotation triggered: 86701 bytes >= 81920 bytes
+Current log file size: 86764 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: back_to_top.md
+Pre-emptive log rotation triggered: 87008 bytes >= 81920 bytes
+Current log file size: 87071 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Back To Top
+Failed to open file: Categorizing file: back_to_top, path: Documentation/features/back_to_top.md - No such file or directory
+Failed to open file: Found documentation: back_to_top (type: markdown, path: Documentation/features/back_to_top.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/docs/admin/git_merge_conflicts.md - No such file or directory
+Pre-emptive log rotation triggered: 87705 bytes >= 81920 bytes
+Current log file size: 87768 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: git_merge_conflicts.md
+Pre-emptive log rotation triggered: 88020 bytes >= 81920 bytes
+Current log file size: 88083 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Git Merge Conflicts
+Failed to open file: Categorizing file: git_merge_conflicts, path: Documentation/docs/admin/git_merge_conflicts.md - No such file or directory
+Failed to open file: Found documentation: git_merge_conflicts (type: markdown, path: Documentation/docs/admin/git_merge_conflicts.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/models/model_list.md - No such file or directory
+Pre-emptive log rotation triggered: 88748 bytes >= 81920 bytes
+Current log file size: 88811 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: model_list.md
+Pre-emptive log rotation triggered: 89054 bytes >= 81920 bytes
+Current log file size: 89117 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Model List
+Failed to open file: Categorizing file: model_list, path: Documentation/models/model_list.md - No such file or directory
+ERROR: File path does not appear to be a valid path: Categorized as model: model_list
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+ERROR: File path does not appear to be a valid path: Added model_list to models category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: model_list (type: markdown, path: Documentation/models/model_list.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/models/Site.md - No such file or directory
+Pre-emptive log rotation triggered: 89998 bytes >= 81920 bytes
+Current log file size: 90061 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Site.md
+Pre-emptive log rotation triggered: 90298 bytes >= 81920 bytes
+Current log file size: 90361 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Site
+Failed to open file: Categorizing file: Site, path: Documentation/models/Site.md - No such file or directory
+ERROR: File path does not appear to be a valid path: Categorized as controller: Site
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+ERROR: File path does not appear to be a valid path: Added Site to controllers category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: Site (type: markdown, path: Documentation/models/Site.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/models/User.md - No such file or directory
+Pre-emptive log rotation triggered: 91210 bytes >= 81920 bytes
+Current log file size: 91273 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: User.md
+Pre-emptive log rotation triggered: 91510 bytes >= 81920 bytes
+Current log file size: 91573 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: User
+Failed to open file: Found documentation: User (type: markdown, path: Documentation/models/User.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/models/README.md - No such file or directory
+Pre-emptive log rotation triggered: 92042 bytes >= 81920 bytes
+Current log file size: 92105 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: README.md
+Pre-emptive log rotation triggered: 92344 bytes >= 81920 bytes
+Current log file size: 92407 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: README
+Failed to open file: Categorizing file: README, path: Documentation/models/README.md - No such file or directory
+ERROR: File path does not appear to be a valid path: Categorized as model: README
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+ERROR: File path does not appear to be a valid path: Added README to models category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: README (type: markdown, path: Documentation/models/README.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/models/ThemeConfig.md - No such file or directory
+Pre-emptive log rotation triggered: 93267 bytes >= 81920 bytes
+Current log file size: 93330 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: ThemeConfig.md
+Pre-emptive log rotation triggered: 93574 bytes >= 81920 bytes
+Current log file size: 93637 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: ThemeConfig
+Failed to open file: Categorizing file: ThemeConfig, path: Documentation/models/ThemeConfig.md - No such file or directory
+ERROR: File path does not appear to be a valid path: Categorized as model: ThemeConfig
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+ERROR: File path does not appear to be a valid path: Added ThemeConfig to models category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: ThemeConfig (type: markdown, path: Documentation/models/ThemeConfig.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/models/index.tt - No such file or directory
+Pre-emptive log rotation triggered: 94526 bytes >= 81920 bytes
+Current log file size: 94589 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: index.tt
+Pre-emptive log rotation triggered: 94827 bytes >= 81920 bytes
+Current log file size: 94890 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Index
+Failed to open file: Found documentation: index (type: template, path: Documentation/models/index.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/general/documentation_editor_guide.md - No such file or directory
+Pre-emptive log rotation triggered: 95383 bytes >= 81920 bytes
+Current log file size: 95446 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_editor_guide.md
+Pre-emptive log rotation triggered: 95705 bytes >= 81920 bytes
+Current log file size: 95768 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Editor Guide
+Failed to open file: Categorizing file: documentation_editor_guide, path: Documentation/general/documentation_editor_guide.md - No such file or directory
+Failed to open file: Found documentation: documentation_editor_guide (type: markdown, path: Documentation/general/documentation_editor_guide.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/cloudflare/domain_sync_feature.tt - No such file or directory
+Pre-emptive log rotation triggered: 96475 bytes >= 81920 bytes
+Current log file size: 96538 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: domain_sync_feature.tt
+Pre-emptive log rotation triggered: 96790 bytes >= 81920 bytes
+Current log file size: 96853 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Domain Sync Feature
+Failed to open file: Categorizing file: domain_sync_feature, path: Documentation/cloudflare/domain_sync_feature.tt - No such file or directory
+Failed to open file: Found documentation: domain_sync_feature (type: template, path: Documentation/cloudflare/domain_sync_feature.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/cloudflare/domain_sync.tt - No such file or directory
+Pre-emptive log rotation triggered: 97523 bytes >= 81920 bytes
+Current log file size: 97586 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: domain_sync.tt
+Pre-emptive log rotation triggered: 97830 bytes >= 81920 bytes
+Current log file size: 97893 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Domain Sync
+Failed to open file: Categorizing file: domain_sync, path: Documentation/cloudflare/domain_sync.tt - No such file or directory
+Failed to open file: Found documentation: domain_sync (type: template, path: Documentation/cloudflare/domain_sync.tt) - No such file or directory
+Failed to open file: Found documentation file: Documentation/tutorials/mcoop_getting_started.md - No such file or directory
+Pre-emptive log rotation triggered: 98532 bytes >= 81920 bytes
+Current log file size: 98595 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: mcoop_getting_started.md
+Pre-emptive log rotation triggered: 98849 bytes >= 81920 bytes
+Current log file size: 98912 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Mcoop Getting Started
+Failed to open file: Categorizing file: mcoop_getting_started, path: Documentation/tutorials/mcoop_getting_started.md - No such file or directory
+ERROR: File path does not appear to be a valid path: Added mcoop_getting_started to tutorials category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: mcoop_getting_started (type: markdown, path: Documentation/tutorials/mcoop_getting_started.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/tutorials/customizing_profile.md - No such file or directory
+Pre-emptive log rotation triggered: 99750 bytes >= 81920 bytes
+Current log file size: 99813 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: customizing_profile.md
+Pre-emptive log rotation triggered: 100065 bytes >= 81920 bytes
+Current log file size: 100129 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Customizing Profile
+Failed to open file: Categorizing file: customizing_profile, path: Documentation/tutorials/customizing_profile.md - No such file or directory
+ERROR: File path does not appear to be a valid path: Added customizing_profile to tutorials category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: customizing_profile (type: markdown, path: Documentation/tutorials/customizing_profile.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/tutorials/login_authentication.md - No such file or directory
+Pre-emptive log rotation triggered: 100957 bytes >= 81920 bytes
+Current log file size: 101021 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: login_authentication.md
+Pre-emptive log rotation triggered: 101275 bytes >= 81920 bytes
+Current log file size: 101339 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Login Authentication
+Failed to open file: Categorizing file: login_authentication, path: Documentation/tutorials/login_authentication.md - No such file or directory
+ERROR: File path does not appear to be a valid path: Added login_authentication to tutorials category
+INFO: Comserv::Util::Logging=HASH(0x563033bbac48)
+Failed to open file: Found documentation: login_authentication (type: markdown, path: Documentation/tutorials/login_authentication.md) - No such file or directory
+Failed to open file: Found documentation file: Documentation/changelog/2025-04-13-mcoop-url-case-fix-details.md - No such file or directory
+Pre-emptive log rotation triggered: 102190 bytes >= 81920 bytes
+Current log file size: 102254 bytes, max size: 102400 bytes
+debug: [2025-08-26 07:48:22] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: 2025-04-13-mcoop-url-case-fix-details.md
+Pre-emptive log rotation triggered: 102525 bytes >= 81920 bytes
+Current log file size: 102589 bytes, max size: 102400 bytes
+Log file size (102589 bytes) exceeds maximum size (102400 bytes). Rotating log file.
