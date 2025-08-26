@@ -1,0 +1,63 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2025-04-documentation-workflow-update.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Documentation Workflow Update' %]
+
+<!-- Documentation page for 2025-04-documentation-workflow-update -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**Date:** 2025-04-08
+
+**Type:** [UPDATE]
+
+**Author:** Development Team
+
+
+
+<h2>Changes</h2>
+
+
+
+<ul><li>Updated the Documentation_Workflow.md file to include a comprehensive development workflow</li></ul>
+
+<ul><li>Added detailed steps for creating, testing, and maintaining documentation</li></ul>
+
+<ul><li>Included guidelines for changelog updates and Git commit messages</li></ul>
+
+<ul><li>Added new sections on logging, debugging, and maintenance</li></ul>
+
+<ul><li>Improved troubleshooting section with additional checks</li></ul>
+
+
+
+<h2>Motivation</h2>
+
+
+
+The previous documentation workflow lacked clear guidance on how developers should work with the documentation system. This update provides a structured approach to documentation development, ensuring consistency and quality across all documentation.
+
+
+
+<h2>Impact</h2>
+
+
+
+<ul><li>Improved developer experience when working with documentation</li></ul>
+
+<ul><li>More consistent documentation quality and structure</li></ul>
+
+<ul><li>Better tracking of documentation changes through standardized changelog entries</li></ul>
+
+<ul><li>Clearer troubleshooting steps for documentation issues</li></ul>
+
+</div>

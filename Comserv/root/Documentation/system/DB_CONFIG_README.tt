@@ -1,0 +1,111 @@
+[% PageVersion = 'Comserv/root/Documentation/system/DB_CONFIG_README.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Database Configuration' %]
+
+<!-- Documentation page for DB_CONFIG_README -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Quick Setup</h2>
+
+
+
+<ol><li>Place <code>db_config.json</code> in the Comserv application root directory</li></ol>
+
+<ol><li>OR set environment variable: <code>export COMSERV_CONFIG_PATH=/path/to/config/dir</code></li></ol>
+
+
+
+<h2>Configuration File Location</h2>
+
+
+
+The system will look for <code>db_config.json</code> in:
+
+<ol><li>Directory specified by <code>COMSERV_CONFIG_PATH</code> environment variable (if set)</li></ol>
+
+<ol><li>Comserv application root directory (default fallback)</li></ol>
+
+
+
+<h2>Example Configuration</h2>
+
+
+
+<code></code>`json
+
+{
+
+  "shanta_ency": {
+
+    "database": "ency_db_name",
+
+    "host": "db_host",
+
+    "port": 3306,
+
+    "username": "db_user",
+
+    "password": "db_password"
+
+  },
+
+  "shanta_forager": {
+
+    "database": "forager_db_name",
+
+    "host": "db_host",
+
+    "port": 3306,
+
+    "username": "db_user",
+
+    "password": "db_password"
+
+  }
+
+}
+
+<code></code>`
+
+
+
+<h2>Important Notes</h2>
+
+
+
+<ul><li>NEVER use hardcoded absolute paths to <code>db_config.json</code></li></ul>
+
+<ul><li>Keep database credentials secure</li></ul>
+
+<ul><li>Do not commit <code>db_config.json</code> to version control</li></ul>
+
+<ul><li>Ensure proper file permissions</li></ul>
+
+
+
+<h2>Running the Application</h2>
+
+
+
+Use the provided script to automatically set up the environment:
+
+<code></code>`
+
+cd /path/to/Comserv
+
+./run_app.sh
+
+<code></code>`
+
+</div>

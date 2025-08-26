@@ -1,0 +1,103 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2025-09-10-restart-starman-functionality.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Restart Starman Functionality' %]
+
+<!-- Documentation page for 2025-09-10-restart-starman-functionality -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**Date:** September 10, 2025  
+
+**Author:** Shanta  
+
+**Status:** Implemented
+
+
+
+<h2>Overview</h2>
+
+
+
+Added functionality to the Admin controller to allow administrators to restart the Starman server from the web interface. This feature complements the existing Git Pull functionality, allowing administrators to apply code changes and restart the server in a controlled manner.
+
+
+
+<h2>Changes Made</h2>
+
+
+
+<ol><li>Added a new <code>restart_starman</code> method to the Admin controller</li></ol>
+
+<ol><li>Created a new template file <code>admin/restart_starman.tt</code> for the restart confirmation and status display</li></ol>
+
+<ol><li>Updated the Admin dashboard to include a link to the new functionality</li></ol>
+
+<ol><li>Implemented proper logging and error handling for the restart process</li></ol>
+
+
+
+<h2>Technical Details</h2>
+
+
+
+The implementation uses the system's <code>systemctl</code> command to restart the Starman service. The feature:
+
+
+
+<ul><li>Requires admin privileges to access</li></ul>
+
+<ul><li>Provides a confirmation page before executing the restart</li></ul>
+
+<ul><li>Shows detailed command output after the restart attempt</li></ul>
+
+<ul><li>Verifies the service status after restart</li></ul>
+
+<ul><li>Logs all actions with <code>log_with_details</code> for audit purposes</li></ul>
+
+
+
+<h2>Security Considerations</h2>
+
+
+
+<ul><li>Only users with the 'admin' role can access this functionality</li></ul>
+
+<ul><li>The system uses sudo to execute the systemctl command, which requires proper sudo configuration</li></ul>
+
+<ul><li>All restart attempts are logged with user information for accountability</li></ul>
+
+
+
+<h2>Usage</h2>
+
+
+
+<ol><li>Navigate to the Admin Dashboard</li></ol>
+
+<ol><li>Click on "Restart Starman Server" under System Management</li></ol>
+
+<ol><li>Review the warning and confirm the restart</li></ol>
+
+<ol><li>After restart, review the command output and service status</li></ol>
+
+
+
+<h2>Related Documentation</h2>
+
+
+
+<ul><li><a href="/Documentation/Starman">Starman Server Documentation</a></li></ul>
+
+<ul><li><a href="/Documentation/admin_guide">Admin Guide</a></li></ul>
+
+</div>

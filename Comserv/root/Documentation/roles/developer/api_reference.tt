@@ -1,0 +1,583 @@
+[% PageVersion = 'Comserv/root/Documentation/roles/developer/api_reference.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'API Reference' %]
+
+<!-- Documentation page for api_reference -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+This comprehensive API reference is intended for developers working with the Comserv platform.
+
+
+
+<h2>API Overview</h2>
+
+
+
+The Comserv API provides programmatic access to system functionality, allowing developers to:
+
+
+
+<ul><li>Retrieve and manipulate data</li></ul>
+
+<ul><li>Integrate with external systems</li></ul>
+
+<ul><li>Extend platform functionality</li></ul>
+
+<ul><li>Automate workflows</li></ul>
+
+<ul><li>Build custom interfaces</li></ul>
+
+
+
+<h2>Authentication</h2>
+
+
+
+<h3>Obtaining API Credentials</h3>
+
+
+
+<ol><li>Navigate to Admin > Developer > API Credentials</li></ol>
+
+<ol><li>Click "Generate New API Key"</li></ol>
+
+<ol><li>Name your application and select appropriate scopes</li></ol>
+
+<ol><li>Store the generated client_id and client_secret securely</li></ol>
+
+
+
+<h3>Authentication Methods</h3>
+
+
+
+The API supports two authentication methods:
+
+
+
+<h4>OAuth 2.0 (Recommended)</h4>
+
+
+
+<code></code>`
+
+POST /api/v1/oauth/token
+
+Content-Type: application/x-www-form-urlencoded
+
+
+
+grant_type=client_credentials&
+
+client_id=YOUR_CLIENT_ID&
+
+client_secret=YOUR_CLIENT_SECRET
+
+<code></code>`
+
+
+
+Response:
+
+<code></code>`json
+
+{
+
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+
+  "token_type": "Bearer",
+
+  "expires_in": 3600,
+
+  "scope": "read write"
+
+}
+
+<code></code>`
+
+
+
+Use the access token in subsequent requests:
+
+<code></code>`
+
+GET /api/v1/users
+
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+<code></code>`
+
+
+
+<h4>API Key (Simple)</h4>
+
+
+
+Include your API key in the request header:
+
+<code></code>`
+
+GET /api/v1/users
+
+X-API-Key: YOUR_API_KEY
+
+<code></code>`
+
+
+
+<h2>Core Endpoints</h2>
+
+
+
+<h3>Users</h3>
+
+
+
+<h4>List Users</h4>
+
+
+
+<code></code>`
+
+GET /api/v1/users
+
+<code></code>`
+
+
+
+Query parameters:
+
+<ul><li><code>page</code>: Page number (default: 1)</li></ul>
+
+<ul><li><code>limit</code>: Results per page (default: 20, max: 100)</li></ul>
+
+<ul><li><code>role</code>: Filter by role (optional)</li></ul>
+
+<ul><li><code>status</code>: Filter by status (optional)</li></ul>
+
+
+
+Response:
+
+<code></code>`json
+
+{
+
+  "data": [
+
+    {
+
+      "id": 1,
+
+      "username": "johndoe",
+
+      "email": "john@example.com",
+
+      "role": "editor",
+
+      "status": "active",
+
+      "created_at": "2023-01-15T08:30:00Z",
+
+      "last_login": "2023-05-20T14:22:10Z"
+
+    },
+
+    ...
+
+  ],
+
+  "meta": {
+
+    "current_page": 1,
+
+    "total_pages": 5,
+
+    "total_count": 98
+
+  }
+
+}
+
+<code></code>`
+
+
+
+<h4>Get User</h4>
+
+
+
+<code></code>`
+
+GET /api/v1/users/{id}
+
+<code></code>`
+
+
+
+Response:
+
+<code></code>`json
+
+{
+
+  "id": 1,
+
+  "username": "johndoe",
+
+  "email": "john@example.com",
+
+  "role": "editor",
+
+  "status": "active",
+
+  "created_at": "2023-01-15T08:30:00Z",
+
+  "last_login": "2023-05-20T14:22:10Z",
+
+  "profile": {
+
+    "first_name": "John",
+
+    "last_name": "Doe",
+
+    "phone": "+1234567890",
+
+    "bio": "System editor and content manager"
+
+  }
+
+}
+
+<code></code>`
+
+
+
+<h4>Create User</h4>
+
+
+
+<code></code>`
+
+POST /api/v1/users
+
+Content-Type: application/json
+
+
+
+{
+
+  "username": "newuser",
+
+  "email": "newuser@example.com",
+
+  "password": "securepassword",
+
+  "role": "normal",
+
+  "profile": {
+
+    "first_name": "New",
+
+    "last_name": "User"
+
+  }
+
+}
+
+<code></code>`
+
+
+
+Response:
+
+<code></code>`json
+
+{
+
+  "id": 99,
+
+  "username": "newuser",
+
+  "email": "newuser@example.com",
+
+  "role": "normal",
+
+  "status": "active",
+
+  "created_at": "2023-05-21T10:15:30Z"
+
+}
+
+<code></code>`
+
+
+
+<h3>Documents</h3>
+
+
+
+<h4>List Documents</h4>
+
+
+
+<code></code>`
+
+GET /api/v1/documents
+
+<code></code>`
+
+
+
+Query parameters:
+
+<ul><li><code>page</code>: Page number (default: 1)</li></ul>
+
+<ul><li><code>limit</code>: Results per page (default: 20, max: 100)</li></ul>
+
+<ul><li><code>category</code>: Filter by category (optional)</li></ul>
+
+<ul><li><code>status</code>: Filter by status (optional)</li></ul>
+
+
+
+Response:
+
+<code></code>`json
+
+{
+
+  "data": [
+
+    {
+
+      "id": 1,
+
+      "title": "Annual Report 2023",
+
+      "category": "reports",
+
+      "status": "published",
+
+      "created_at": "2023-03-15T08:30:00Z",
+
+      "updated_at": "2023-03-16T14:22:10Z",
+
+      "author_id": 5
+
+    },
+
+    ...
+
+  ],
+
+  "meta": {
+
+    "current_page": 1,
+
+    "total_pages": 8,
+
+    "total_count": 156
+
+  }
+
+}
+
+<code></code>`
+
+
+
+<h2>Error Handling</h2>
+
+
+
+The API uses standard HTTP status codes and returns detailed error information:
+
+
+
+<code></code>`json
+
+{
+
+  "error": {
+
+    "code": "invalid_request",
+
+    "message": "The request is missing a required parameter",
+
+    "details": "The 'email' field is required"
+
+  }
+
+}
+
+<code></code>`
+
+
+
+Common error codes:
+
+<ul><li><code>invalid_request</code>: Missing or invalid parameters</li></ul>
+
+<ul><li><code>authentication_failed</code>: Invalid credentials</li></ul>
+
+<ul><li><code>permission_denied</code>: Insufficient permissions</li></ul>
+
+<ul><li><code>resource_not_found</code>: Requested resource doesn't exist</li></ul>
+
+<ul><li><code>rate_limit_exceeded</code>: Too many requests</li></ul>
+
+
+
+<h2>Rate Limiting</h2>
+
+
+
+API requests are subject to rate limiting:
+
+<ul><li>100 requests per minute for standard API keys</li></ul>
+
+<ul><li>300 requests per minute for premium API keys</li></ul>
+
+
+
+Rate limit headers are included in all responses:
+
+<code></code>`
+
+X-RateLimit-Limit: 100
+
+X-RateLimit-Remaining: 95
+
+X-RateLimit-Reset: 1621612345
+
+<code></code>`
+
+
+
+<h2>Webhooks</h2>
+
+
+
+<h3>Configuring Webhooks</h3>
+
+
+
+<ol><li>Go to Admin > Developer > Webhooks</li></ol>
+
+<ol><li>Click "Add Webhook"</li></ol>
+
+<ol><li>Enter the destination URL</li></ol>
+
+<ol><li>Select events to subscribe to</li></ol>
+
+<ol><li>Set a secret key for signature verification</li></ol>
+
+
+
+<h3>Event Types</h3>
+
+
+
+<ul><li><code>user.created</code>: New user registration</li></ul>
+
+<ul><li><code>user.updated</code>: User profile update</li></ul>
+
+<ul><li><code>document.created</code>: New document created</li></ul>
+
+<ul><li><code>document.updated</code>: Document updated</li></ul>
+
+<ul><li><code>document.published</code>: Document published</li></ul>
+
+
+
+<h3>Webhook Payload</h3>
+
+
+
+<code></code>`json
+
+{
+
+  "event": "document.published",
+
+  "timestamp": "2023-05-21T15:32:10Z",
+
+  "data": {
+
+    "id": 42,
+
+    "title": "New Policy Document",
+
+    "category": "policies",
+
+    "status": "published",
+
+    "author_id": 5
+
+  }
+
+}
+
+<code></code>`
+
+
+
+<h3>Signature Verification</h3>
+
+
+
+Each webhook includes an <code>X-Webhook-Signature</code> header containing an HMAC-SHA256 signature. Verify this signature using your webhook secret to ensure the request is authentic.
+
+
+
+<h2>SDKs and Libraries</h2>
+
+
+
+Official client libraries:
+
+<ul><li><a href="https://github.com/comserv/comserv-js">JavaScript SDK</a></li></ul>
+
+<ul><li><a href="https://github.com/comserv/comserv-python">Python SDK</a></li></ul>
+
+<ul><li><a href="https://github.com/comserv/comserv-php">PHP SDK</a></li></ul>
+
+
+
+<h2>API Versioning</h2>
+
+
+
+The API uses versioning in the URL path (e.g., <code>/api/v1/</code>). When breaking changes are introduced, a new version will be released. We maintain backward compatibility for at least 12 months after a new version is released.
+
+
+
+<h2>Support and Feedback</h2>
+
+
+
+For API support:
+
+<ul><li>Check the developer forums</li></ul>
+
+<ul><li>Submit issues on GitHub</li></ul>
+
+<ul><li>Contact api-support@comserv.example.com</li></ul>
+
+
+
+We welcome feedback and feature requests for the API.
+
+</div>

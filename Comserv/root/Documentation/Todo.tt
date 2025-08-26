@@ -1,4 +1,3 @@
-
 [% PageVersion = 'Comserv/root/Documentation/Todo.tt,v 0.03 2025/01/15 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
@@ -18,27 +17,12 @@ The Todo system in Comserv provides comprehensive task management capabilities i
 ## Key Features
 
 ### Task Management
-- **Create, Edit, Delete** todos with detailed information
-- **Project Integration** - Associate todos with specific projects and subprojects
-- **Status Tracking** - New, In Progress, Completed status management
-- **Due Date Management** - Set and track due dates with overdue detection
-- **Priority Levels** - Organize tasks by importance
 
 ### Calendar Integration
-- **Month View** - Visual calendar display of todos and related logs
-- **Week View** - Detailed weekly task planning
-- **Day View** - Daily task scheduling and management
-- **Date-based Filtering** - View todos by specific date ranges
 
 ### Project Integration
-- **Project Association** - Link todos to specific projects
-- **Hierarchical Projects** - Support for projects and subprojects
-- **Project-based Filtering** - Filter todos by project selection
 
 ### Logging Integration
-- **Activity Logs** - Track time and activities related to todos
-- **Integrated Display** - View todos and logs together in calendar views
-- **Time Tracking** - Accumulative time calculation for tasks
 
 ## Calendar Functionality
 
@@ -51,8 +35,6 @@ Shows all tasks scheduled for a specific day. Each task is represented as an eve
 Provide overview of tasks for the respective time periods. Each day contains a summary of scheduled tasks including count and total time.
 
 ### Date Management Systems
-- **DateTime::Format::ISO8601** - Used for day and calendar functionalities (ISO 8601 standard)
-- **DateTime::Format::Strptime** - Used for flexible date/time handling in project logs
 
 ## Adding a Log: Step-by-Step Process
 1. Click the log button (passes todo record ID and sitename to log_form)
@@ -74,107 +56,46 @@ Provide overview of tasks for the respective time periods. Each day contains a s
 ### Controller (Comserv::Controller::Todo)
 The Todo controller handles routing and logic for todo-related actions:
 
-- **Index** - Fetches all todo records and stores them in the stash
-- **Todo** - Fetches todos for the site, ordered by priority and start date, excluding completed (status 3)
-- **Details** - Fetches specific todo by record ID and calculates accumulative time
-- **Add Todo** - Prepares data for adding new todo, including fetching projects and sub-projects
-- **Modify** - Updates todo record with new data, calculates total log time, and updates accumulative time
-- **Create** - Creates new todo record with form data, handles project code, and validates user ID
-- **Edit** - Provides edit interface with pre-populated form data
-- **Day** - Fetches todos for specific day, excluding completed, calculates previous and next dates
-- **Week** - Fetches todos for specific week, excluding completed, calculates start and end of week
-- **Month** - Provides monthly calendar view with todos and logs integration
 
 ### Model (Comserv::Model::Todo)
 The Todo model provides methods for interacting with todo data:
 
-- **Get Top Todos** - Retrieves top 10 todos for site, ordered by priority and start date, excluding completed
-- **Get Todos for Date** - Retrieves todos for specific date, ordered by priority and start date, excluding completed
-- **Fetch Todo Record** - Retrieves specific todo record by ID
-- **Project Integration** - Handles hierarchical project relationships
-- **Status Management** - Manages todo status transitions
 
 ## Recent Enhancements (2025-01-15)
 
 ### Month Calendar Display Fix
-- **Fixed Database Ambiguity** - Resolved MySQL "Column 'start_date' in ORDER BY is ambiguous" error
-- **Enhanced Visual Hierarchy** - Todos prominently displayed over logs in month view
-- **Improved Template Structure** - Separate sections for todos and logs with better organization
-- **Added CSS Styling** - Enhanced visual prominence with pulse animations for due todos
 
 ### Project Selection Fix
-- **Resolved Primary Key Issues** - Fixed DBIx::Class constraint errors in project fetching
-- **Improved Error Handling** - Better error management and logging throughout system
-- **Enhanced Template Robustness** - Defensive coding against undefined values
 
 ### Edit Functionality Enhancement
-- **Complete Edit Interface** - Full todo editing capabilities with user-friendly forms
-- **Form Pre-population** - Current data properly displayed in edit forms
-- **Project Dropdowns** - Easy project selection in edit mode with hierarchical display
 
 ## Critical Database Schema Fix (2025-07-30)
 
 ### Project ID Null Constraint Issue
-- **Problem**: Todo creation failing with "Column 'project_id' cannot be null" error
-- **Root Cause**: Todo table requires project_id (NOT NULL) but code was passing undef when no project selected
-- **Schema Mismatch**: Projects table uses 'id' as primary key, but code was referencing 'project_id'
 
 ### Solution Implemented
-- **Default Project Logic** - System now automatically finds or creates a default project when none selected
-- **Schema Alignment** - Fixed references to use projects.id instead of non-existent project_id column
-- **Error Prevention** - Added validation to ensure project_id is never null before database insertion
 
 ### Key Lessons for Future Development
-- **Always verify column names** against actual database schema files before writing queries
-- **Check NOT NULL constraints** in schema definitions when handling optional form fields
-- **Use application logs** to identify exact SQL errors and parameter values
-- **Test with empty/null form submissions** to catch constraint violations early
 
 ## Critical Time Field Fix (2025-07-30)
 
 ### Time Field Empty String Issue
-- **Problem**: Todo modification failing with "Incorrect time value: '' for column time_of_day" error
-- **Root Cause**: Form submissions sending empty strings to MySQL time columns instead of NULL values
-- **Database Behavior**: MySQL time columns reject empty strings but accept NULL for nullable fields
 
 ### Solution Implemented
-- **Empty String to NULL Conversion** - Added validation to convert empty time_of_day strings to undef
-- **Proper Form Field Handling** - Enhanced modify action to process time fields before database update
-- **Error Prevention** - Added defensive coding to handle nullable time field submissions
 
 ### Technical Details
-- **File Modified**: `/Comserv/lib/Comserv/Controller/Todo.pm` - modify action
-- **Fix Applied**: `if (defined $time_of_day && $time_of_day eq '') { $time_of_day = undef; }`
-- **Database Impact**: Prevents "Incorrect time value" MySQL errors on todo updates
 
 ### Key Lessons for Time Field Handling
-- **Always convert empty strings to NULL** for nullable time/date fields in MySQL
-- **Check application logs** for exact SQL parameter values when debugging database errors
-- **Test form submissions with empty optional fields** to catch MySQL constraint issues
-- **Use undef instead of empty strings** for nullable database columns in DBIx::Class
 
 **Related Changelog**: [See /Documentation/changelog/2025-07-30-todo-time-field-fix.tt]
 
 ## Usage Guidelines
 
 ### For All Users
-- Use main todo page for daily task management
-- Utilize project filtering to focus on specific work areas
-- Check overdue section regularly for missed deadlines
-- Use calendar views for planning and overview
 
 ### For Administrators
-- Monitor system usage through integrated logging
-- Manage project hierarchies for better organization
-- Review overdue tasks across all users
-- Configure project structures for optimal workflow
 
 ### For Developers
-- Follow existing patterns when extending functionality
-- Use proper error handling and logging methods
-- Maintain theme system compliance for styling
-- Test calendar views thoroughly for date edge cases
-- Reference technical documentation for implementation details
 
 </div>
 </div>

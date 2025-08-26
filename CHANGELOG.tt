@@ -1,0 +1,181 @@
+[% PageVersion = '/home/shanta/PycharmProjects/comserv2/CHANGELOG.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Changelog' %]
+
+<!-- Include documentation CSS -->
+<link rel="stylesheet" href="/static/css/documentation.css">
+
+<div class="markdown-content">
+
+
+All notable changes to the Comserv project will be documented in this file.
+
+
+
+## [Unreleased]
+
+### Fixed
+
+- **Todo Time Field Fix** (2025-07-30)
+  
+  - **CRITICAL**: Fixed "Incorrect time value: '' for column time_of_day" error in todo modification
+    - Root cause: Form submissions sending empty strings to MySQL time columns
+    - Solution: Convert empty time_of_day strings to undef (NULL) for database compatibility
+    - Impact: Todo modification now works correctly with empty time fields
+  
+  - **ENHANCEMENT**: Added comprehensive field validation for todo modify action
+    - Enhanced integer field validation for project_id, user_id, estimated_man_hours, and priority
+    - Added default project creation logic when no project is selected
+    - Improved error handling and logging throughout the modify action
+  
+  - **FILES MODIFIED**:
+    - `/Comserv/lib/Comserv/Controller/Todo.pm` - Fixed modify action time field handling and validation
+
+- **Documentation System - Complete Overhaul** (2025-01-15)
+  
+  - **CRITICAL**: Fixed dash removal bug that caused 404 errors for documentation files with dashes in names
+    - Root cause: Regex `s/[^a-zA-Z0-9_\.]//g` was stripping dashes from filenames
+    - Solution: Changed to `s/[^a-zA-Z0-9_\.\-]//g` to preserve dashes
+    - Impact: Files like `2024-05-documentation-system-fixes.tt` now accessible
+  
+  - **MAJOR**: Fixed missing documentation directories - system was only scanning 76 files instead of 376
+    - Root cause: Only scanning specific subdirectories (roles/, sites/, controllers/, models/)
+    - Solution: Added comprehensive scanning for all subdirectories:
+      - general/ (128 files), changelog/ (59 files), proxmox/ (7 files)
+      - features/, docs/, migration/, system/, cloudflare/, themes/, tutorials/, scripts/, admin/
+    - Added proper categorization and role permissions for each directory type
+  
+  - **PERFORMANCE**: Increased search result limit from 20 to 100 for comprehensive search
+  
+  - **ARCHITECTURE**: Made documentation attributes writable to allow force rebuild
+    - Added `/Documentation/force_rebuild` endpoint for testing and maintenance
+    - Fixed lazy loading issues with cached documentation pages
+  
+  - **CLEANUP**: Removed extensive debugging code from failed previous thread
+  
+  - **FILES MODIFIED**:
+    - `/Comserv/lib/Comserv/Controller/Documentation.pm` - Core fixes and comprehensive scanning
+    - `/Comserv/lib/Comserv/Controller/Documentation/ConfigBased.pm` - Routing conflict fix
+    - `/Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.tt` - Updated workflow
+
+- MCoop URL case sensitivity issue
+
+  - Fixed "page not found" error when accessing `/mcoop/server-room-plan`
+
+  - Updated links in admin home page to use correct case (`/MCoop/server-room-plan`)
+
+  - Added route handlers for lowercase URLs in MCoop controller
+
+  - Updated documentation to reflect URL case sensitivity requirements
+
+  - Created detailed changelog entry for the fix
+
+- Documentation display and markdown rendering
+
+  - Fixed markdown content display in documentation viewer
+
+  - Added dedicated CSS for markdown viewer (markdown-viewer.css)
+
+  - Modified JavaScript to properly display section content
+
+  - Set sections to be expanded by default
+
+  - Fixed toggle functionality for collapsible sections
+
+- Template error in pagetop.tt
+
+  - Fixed "Argument isn't numeric in numeric gt (>)" error
+
+  - Added proper checks for session roles before using grep method
+
+  - Improved template stability for guest users and incomplete sessions
+
+
+
+### Added
+
+- Enhanced Documentation_Workflow.md with comprehensive development workflow
+
+  - Added detailed steps for creating, testing, and maintaining documentation
+
+  - Included guidelines for changelog updates and Git commit messages
+
+  - Added new sections on logging, debugging, and maintenance
+
+  - Improved troubleshooting section with additional checks
+
+- Documentation organization script
+
+  - Created script to move markdown files from root to docs directory
+
+  - Implemented intelligent file categorization and naming preservation
+
+  - Added logging for file operations
+
+
+
+## [2025-04-08]
+
+
+
+### Fixed
+
+- Documentation display and markdown rendering issues
+
+  - Fixed CSS path references in the markdown viewer template
+
+  - Improved section display and collapsible content
+
+  - Enhanced overall user experience when viewing documentation
+
+
+
+### Added
+
+- Comprehensive documentation workflow guidelines
+
+  - Step-by-step process for documentation development
+
+  - Testing procedures for documentation changes
+
+  - Changelog update guidelines
+
+  - Git commit message standards for documentation
+
+
+
+## [2025-04-02]
+
+
+
+### Changed
+
+- Documentation template refactoring
+
+- Documentation admin visibility improvements
+
+
+
+## [2024-07-15]
+
+
+
+### Fixed
+
+- Project ID handling in forms
+
+- Proxmox controller issues
+
+
+
+## [2024-06-20]
+
+
+
+### Fixed
+
+- Project edit functionality
+</div>

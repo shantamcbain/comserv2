@@ -1,0 +1,129 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2024-04-24-helpdesk-menu-enhancement.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'HelpDesk Menu Enhancement and FAQ Implementation' %]
+
+<!-- Documentation page for 2024-04-24-helpdesk-menu-enhancement -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**Date:** 2024-04-24  
+
+**Type:** [ENHANCEMENT]  
+
+**Author:** Shanta
+
+
+
+<h2>Changes</h2>
+
+
+
+<ul><li>Fixed all links in the HelpDesk dropdown menu to point to valid internal routes</li></ul>
+
+<ul><li>Added HelpDesk Admin interface for managing the HelpDesk system</li></ul>
+
+<ul><li>Implemented a dedicated FAQ system with category support</li></ul>
+
+<ul><li>Created comprehensive documentation for the HelpDesk system</li></ul>
+
+<ul><li>Updated existing HelpDesk controller documentation</li></ul>
+
+
+
+<h2>Motivation</h2>
+
+
+
+The HelpDesk menu contained several dead links that pointed to non-existent resources, including an external support ticket system that is no longer in use. This update ensures all links point to valid internal routes, providing a seamless user experience and keeping support requests within the Comserv system.
+
+
+
+<h2>Implementation Details</h2>
+
+
+
+<h3>Menu Updates</h3>
+
+<ul><li>Updated <code>TopDropListHelpDesk.tt</code> to use correct internal routes</li></ul>
+
+<ul><li>Added proper icons for better visual identification</li></ul>
+
+<ul><li>Improved role-based access control for admin features</li></ul>
+
+<ul><li>Ensured all links point to valid controllers and actions</li></ul>
+
+
+
+<h3>New Features</h3>
+
+<ul><li>Added HelpDesk Admin interface with role-based access control</li></ul>
+
+<ul><li>Implemented a dedicated FAQ controller and templates</li></ul>
+
+<ul><li>Created comprehensive documentation for the HelpDesk system</li></ul>
+
+<ul><li>Enhanced Linux Commands reference with copy-to-clipboard functionality</li></ul>
+
+
+
+<h3>Documentation</h3>
+
+<ul><li>Created a new HelpDesk System documentation file</li></ul>
+
+<ul><li>Updated the HelpDesk controller documentation</li></ul>
+
+<ul><li>Created documentation for the new FAQ controller</li></ul>
+
+<ul><li>Added a changelog entry for the updates</li></ul>
+
+
+
+<h2>Impact</h2>
+
+
+
+<ul><li>Improved user experience with working links and consistent navigation</li></ul>
+
+<ul><li>Enhanced support workflow with dedicated pages for different support functions</li></ul>
+
+<ul><li>Provided self-service options through the FAQ system</li></ul>
+
+<ul><li>Maintained backward compatibility with existing HelpDesk content</li></ul>
+
+<ul><li>Ensured proper logging and debugging throughout the system</li></ul>
+
+
+
+<h2>Related Files</h2>
+
+
+
+<ul><li><code>/root/Navigation/TopDropListHelpDesk.tt</code> - Updated HelpDesk menu</li></ul>
+
+<ul><li><code>/lib/Comserv/Controller/HelpDesk.pm</code> - Added admin method</li></ul>
+
+<ul><li><code>/lib/Comserv/Controller/FAQ.pm</code> - New FAQ controller</li></ul>
+
+<ul><li><code>/root/CSC/HelpDesk/admin.tt</code> - New HelpDesk admin template</li></ul>
+
+<ul><li><code>/root/CSC/FAQ/index.tt</code> - New FAQ index template</li></ul>
+
+<ul><li><code>/root/CSC/FAQ/category.tt</code> - New FAQ category template</li></ul>
+
+<ul><li><code>/root/Documentation/HelpDeskSystem.md</code> - New HelpDesk system documentation</li></ul>
+
+<ul><li><code>/root/Documentation/controllers/HelpDesk.md</code> - Updated controller documentation</li></ul>
+
+<ul><li><code>/root/Documentation/controllers/FAQ.md</code> - New FAQ controller documentation</li></ul>
+
+</div>

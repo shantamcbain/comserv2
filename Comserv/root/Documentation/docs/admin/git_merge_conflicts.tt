@@ -1,0 +1,219 @@
+[% PageVersion = 'Comserv/root/Documentation/docs/admin/git_merge_conflicts.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Handling Git Merge Conflicts on Production Servers' %]
+
+<!-- Documentation page for git_merge_conflicts -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Overview</h2>
+
+
+
+This guide explains how to handle Git merge conflicts on production servers where you don't have direct commit access to the GitHub repository.
+
+
+
+<h2>Problem</h2>
+
+
+
+When running <code>git pull</code> on a production server, you might encounter an error like:
+
+
+
+<code></code>`
+
+error: Your local changes to the following files would be overwritten by merge:
+
+    Comserv/root/static/config/theme_mappings.json
+
+Please commit your changes or stash them before you merge.
+
+Aborting
+
+<code></code>`
+
+
+
+This happens when:
+
+<ol><li>Local changes have been made to files on the production server</li></ol>
+
+<ol><li>Those same files have been modified in the remote repository</li></ol>
+
+<ol><li>Git cannot automatically merge the changes</li></ol>
+
+
+
+<h2>Solutions</h2>
+
+
+
+<h3>Option 1: Stash Local Changes and Apply After Pull (Recommended)</h3>
+
+
+
+This approach temporarily saves your local changes, pulls the remote changes, and then reapplies your local changes.
+
+
+
+<code></code>`bash
+
+<h1>Save local changes to stash with a descriptive message</h1>
+
+git stash save "Local changes to theme_mappings.json"
+
+
+
+<h1>Pull the remote changes</h1>
+
+git pull
+
+
+
+<h1>View the stashed changes</h1>
+
+git stash show -p
+
+
+
+<h1>Apply the stashed changes back</h1>
+
+git stash apply
+
+
+
+<h1>If there are conflicts, resolve them manually</h1>
+
+<h1>Then remove the stash when done</h1>
+
+git stash drop
+
+<code></code>`
+
+
+
+<h3>Option 2: Create a Backup and Force Pull</h3>
+
+
+
+If you're comfortable with manual merging:
+
+
+
+<code></code>`bash
+
+<h1>Create a backup of the file</h1>
+
+cp Comserv/root/static/config/theme_mappings.json Comserv/root/static/config/theme_mappings.json.bak
+
+
+
+<h1>Discard local changes and pull</h1>
+
+git checkout -- Comserv/root/static/config/theme_mappings.json
+
+git pull
+
+
+
+<h1>Manually merge your changes from the backup</h1>
+
+<h1>Use a diff tool or text editor to compare and merge</h1>
+
+<code></code>`
+
+
+
+<h3>Option 3: Use Git's Merge Tool</h3>
+
+
+
+If you need more sophisticated merging:
+
+
+
+<code></code>`bash
+
+<h1>Tell Git to attempt a merge even with local changes</h1>
+
+git pull --no-commit
+
+
+
+<h1>If conflicts occur, use a merge tool</h1>
+
+git mergetool
+
+
+
+<h1>After resolving conflicts</h1>
+
+git commit -m "Merged remote changes with local modifications"
+
+<code></code>`
+
+
+
+<h2>Best Practices for Production Servers</h2>
+
+
+
+<ol><li>**Avoid making direct changes to production files** - Instead, make changes in development and push through Git</li></ol>
+
+<ol><li>**Document all local changes** - Keep a log of any emergency fixes made directly on production</li></ol>
+
+<ol><li>**Set up proper deployment workflows** - Use CI/CD pipelines when possible</li></ol>
+
+<ol><li>**Regular backups** - Always back up critical configuration files before updates</li></ol>
+
+<ol><li>**Use environment-specific configuration** - Consider using environment variables or separate config files for production-specific settings</li></ol>
+
+
+
+<h2>Logging Changes</h2>
+
+
+
+When making emergency changes on production, always:
+
+
+
+<ol><li>Document what was changed and why</li></ol>
+
+<ol><li>Create a ticket or issue to implement the same change properly through Git</li></ol>
+
+<ol><li>Add detailed comments in the code about the emergency change</li></ol>
+
+<ol><li>Use the application's logging system to record the change:</li></ol>
+
+
+
+<code></code>`perl
+
+$c->log->info("Emergency fix applied to theme_mappings.json: [details of change]");
+
+push @{$c->stash->{debug_msg}}, "Applied emergency configuration fix to theme mappings";
+
+<code></code>`
+
+
+
+<h2>Getting Help</h2>
+
+
+
+If you encounter complex merge conflicts that you're unsure how to resolve, contact the development team for assistance rather than risking data loss or application instability.
+
+</div>

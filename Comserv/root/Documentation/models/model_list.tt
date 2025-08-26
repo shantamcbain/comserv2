@@ -1,0 +1,155 @@
+[% PageVersion = 'Comserv/root/Documentation/models/model_list.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Model Documentation Status' %]
+
+<!-- Documentation page for model_list -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+This document lists all models in the Comserv application and their documentation status.
+
+
+
+<h2>Models</h2>
+
+
+
+| Model | Documentation Status | Path |
+
+|-------|---------------------|------|
+
+| ApiaryModel | ❌ Missing | <code>/lib/Comserv/Model/ApiaryModel.pm</code> |
+
+| BMaster | ❌ Missing | <code>/lib/Comserv/Model/BMaster.pm</code> |
+
+| BMasterModel | ❌ Missing | <code>/lib/Comserv/Model/BMasterModel.pm</code> |
+
+| Calendar | ❌ Missing | <code>/lib/Comserv/Model/Calendar.pm</code> |
+
+| DBEncy | ❌ Missing | <code>/lib/Comserv/Model/DBEncy.pm</code> |
+
+| DBForager | ❌ Missing | <code>/lib/Comserv/Model/DBForager.pm</code> |
+
+| DBSchemaManager | ❌ Missing | <code>/lib/Comserv/Model/DBSchemaManager.pm</code> |
+
+| ENCYModel | ❌ Missing | <code>/lib/Comserv/Model/ENCYModel.pm</code> |
+
+| File | ❌ Missing | <code>/lib/Comserv/Model/File.pm</code> |
+
+| Log | ❌ Missing | <code>/lib/Comserv/Model/Log.pm</code> |
+
+| Mail | ❌ Missing | <code>/lib/Comserv/Model/Mail.pm</code> |
+
+| Project | ❌ Missing | <code>/lib/Comserv/Model/Project.pm</code> |
+
+| Proxmox | ❌ Missing | <code>/lib/Comserv/Model/Proxmox.pm</code> |
+
+| Schema/Ency | ❌ Missing | <code>/lib/Comserv/Model/Schema/Ency.pm</code> |
+
+| Schema/Forager | ❌ Missing | <code>/lib/Comserv/Model/Schema/Forager.pm</code> |
+
+| Site | ✅ Documented | <code>/lib/Comserv/Model/Site.pm</code> |
+
+| Theme | ❌ Missing | <code>/lib/Comserv/Model/Theme.pm</code> |
+
+| ThemeConfig | ✅ Documented | <code>/lib/Comserv/Model/ThemeConfig.pm</code> |
+
+| Todo | ❌ Missing | <code>/lib/Comserv/Model/Todo.pm</code> |
+
+| User | ✅ Documented | <code>/lib/Comserv/Model/User.pm</code> |
+
+| WorkShop | ❌ Missing | <code>/lib/Comserv/Model/WorkShop.pm</code> |
+
+
+
+<h2>How to Add Documentation</h2>
+
+
+
+To add documentation for a model:
+
+
+
+<ol><li>Create a Markdown file in the <code>/root/Documentation/models/</code> directory</li></ol>
+
+<ol><li>Name the file after the model (e.g., <code>User.md</code> for the User model)</li></ol>
+
+<ol><li>Include the following sections:</li></ol>
+
+   - Overview
+
+   - Key Features
+
+   - Methods
+
+   - Database Interactions
+
+   - Related Files
+
+
+
+<h2>Documentation Template</h2>
+
+
+
+<code></code>`markdown
+
+<h1>[Model Name] Model</h1>
+
+
+
+<h2>Overview</h2>
+
+Brief description of the model's purpose.
+
+
+
+<h2>Key Features</h2>
+
+<ul><li>Feature 1</li></ul>
+
+<ul><li>Feature 2</li></ul>
+
+<ul><li>Feature 3</li></ul>
+
+
+
+<h2>Methods</h2>
+
+<ul><li><code>method1</code>: Description</li></ul>
+
+<ul><li><code>method2</code>: Description</li></ul>
+
+<ul><li><code>method3</code>: Description</li></ul>
+
+
+
+<h2>Database Interactions</h2>
+
+This model interacts with the following database tables:
+
+<ul><li>table1</li></ul>
+
+<ul><li>table2</li></ul>
+
+
+
+<h2>Related Files</h2>
+
+<ul><li>Related file 1</li></ul>
+
+<ul><li>Related file 2</li></ul>
+
+<code></code>`
+
+</div>

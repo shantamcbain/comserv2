@@ -1,0 +1,295 @@
+[% PageVersion = 'Comserv/root/Documentation/tutorials/mcoop_getting_started.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Getting Started with Monashee Cooperative Online Resources' %]
+
+<!-- Documentation page for mcoop_getting_started -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**Last Updated:** April 1, 2025  
+
+**Status:** Active
+
+
+
+This tutorial will guide you through the process of getting started with the Monashee Cooperative's online resources and features.
+
+
+
+<h2>Step 1: Creating Your Account</h2>
+
+
+
+Before you can access member features, you'll need to create an account:
+
+
+
+<ol><li>Visit the Monashee Cooperative website at <a href="https://monasheecoop.ca">https://monasheecoop.ca</a></li></ol>
+
+<ol><li>Click on the "Join" or "Sign Up" button in the top right corner</li></ol>
+
+<ol><li>Fill out the registration form with your:</li></ol>
+
+   - Full name
+
+   - Email address
+
+   - Preferred username
+
+   - Secure password
+
+<ol><li>Check the box to agree to the terms of service</li></ol>
+
+<ol><li>Click "Create Account"</li></ol>
+
+<ol><li>Check your email for a verification link</li></ol>
+
+<ol><li>Click the verification link to activate your account</li></ol>
+
+
+
+<h2>Step 2: Completing Your Member Profile</h2>
+
+
+
+After creating your account, you should complete your member profile:
+
+
+
+<ol><li>Log in to your newly created account</li></ol>
+
+<ol><li>Navigate to "My Profile" in the user menu</li></ol>
+
+<ol><li>Click "Edit Profile"</li></ol>
+
+<ol><li>Add your:</li></ol>
+
+   - Profile picture (optional)
+
+   - Contact information
+
+   - Skills and interests
+
+   - Preferred communication methods
+
+   - Emergency contact (for in-person activities)
+
+<ol><li>Set your privacy preferences</li></ol>
+
+<ol><li>Click "Save Profile"</li></ol>
+
+
+
+<h2>Step 3: Exploring the Member Dashboard</h2>
+
+
+
+The Member Dashboard is your central hub for cooperative activities:
+
+
+
+<ol><li>Log in to your account</li></ol>
+
+<ol><li>Click on "Member Dashboard" in the main navigation</li></ol>
+
+<ol><li>Familiarize yourself with the dashboard sections:</li></ol>
+
+   - Announcements
+
+   - Upcoming Events
+
+   - My Resources
+
+   - Recent Forum Activity
+
+   - My Tasks
+
+<ol><li>Customize your dashboard by clicking "Customize" in the top right corner</li></ol>
+
+
+
+<h2>Step 4: Joining Your First Discussion</h2>
+
+
+
+The Member Forum is where cooperative discussions happen:
+
+
+
+<ol><li>From the Member Dashboard, click "Forum" in the sidebar</li></ol>
+
+<ol><li>Browse the available discussion categories</li></ol>
+
+<ol><li>Select a topic that interests you</li></ol>
+
+<ol><li>Read existing posts to understand the conversation</li></ol>
+
+<ol><li>Click "Reply" to add your thoughts</li></ol>
+
+<ol><li>Compose your message using the text editor</li></ol>
+
+<ol><li>Click "Post Reply" to share your contribution</li></ol>
+
+
+
+<h2>Step 5: Reserving a Cooperative Resource</h2>
+
+
+
+Many cooperative resources can be reserved online:
+
+
+
+<ol><li>From the Member Dashboard, click "Resources" in the sidebar</li></ol>
+
+<ol><li>Browse the resource categories or use the search function</li></ol>
+
+<ol><li>Select a resource you'd like to use</li></ol>
+
+<ol><li>Check the availability calendar</li></ol>
+
+<ol><li>Select your desired date and time</li></ol>
+
+<ol><li>Click "Reserve"</li></ol>
+
+<ol><li>Fill out the reservation form with:</li></ol>
+
+   - Purpose of use
+
+   - Duration needed
+
+   - Number of people (if applicable)
+
+<ol><li>Review the resource usage guidelines</li></ol>
+
+<ol><li>Click "Confirm Reservation"</li></ol>
+
+10. Check your email for reservation confirmation
+
+
+
+<h2>Step 6: Registering for an Event</h2>
+
+
+
+Cooperative events are a great way to get involved:
+
+
+
+<ol><li>From the Member Dashboard, click "Events" in the sidebar</li></ol>
+
+<ol><li>Browse upcoming events or filter by category</li></ol>
+
+<ol><li>Click on an event that interests you</li></ol>
+
+<ol><li>Read the event details, including:</li></ol>
+
+   - Date and time
+
+   - Location
+
+   - Description
+
+   - Requirements or prerequisites
+
+<ol><li>Click "Register" if you'd like to attend</li></ol>
+
+<ol><li>Complete any event-specific registration questions</li></ol>
+
+<ol><li>Click "Complete Registration"</li></ol>
+
+<ol><li>Add the event to your calendar using the provided link</li></ol>
+
+<ol><li>Check your email for registration confirmation</li></ol>
+
+
+
+<h2>Step 7: Setting Up Notifications</h2>
+
+
+
+Stay informed about cooperative activities:
+
+
+
+<ol><li>From the Member Dashboard, click on your username in the top right</li></ol>
+
+<ol><li>Select "Notification Settings" from the dropdown menu</li></ol>
+
+<ol><li>Choose which types of notifications you want to receive:</li></ol>
+
+   - Email notifications
+
+   - Browser notifications
+
+   - SMS notifications (if available)
+
+<ol><li>Set the frequency of digest emails</li></ol>
+
+<ol><li>Select which activities trigger notifications</li></ol>
+
+<ol><li>Click "Save Preferences"</li></ol>
+
+
+
+<h2>Step 8: Finding Help When You Need It</h2>
+
+
+
+If you encounter any issues or have questions:
+
+
+
+<ol><li>Check the FAQ section by clicking "Help" in the footer</li></ol>
+
+<ol><li>Use the search function to find specific topics</li></ol>
+
+<ol><li>Post in the "Technical Support" forum for community assistance</li></ol>
+
+<ol><li>Contact support directly using the "Contact Support" link</li></ol>
+
+<ol><li>Attend a monthly "Tech Help" session (check the Events calendar)</li></ol>
+
+
+
+<h2>Next Steps</h2>
+
+
+
+Now that you're set up, consider these next steps:
+
+
+
+<ol><li>**Join a Committee**: Explore the "Committees" section to find groups that match your interests</li></ol>
+
+<ol><li>**Volunteer**: Check the "Volunteer Opportunities" section for ways to contribute</li></ol>
+
+<ol><li>**Attend an Orientation**: Register for an upcoming "New Member Orientation" session</li></ol>
+
+<ol><li>**Explore Learning Resources**: Visit the "Learning Center" for tutorials and guides</li></ol>
+
+<ol><li>**Connect with Members**: Use the Member Directory to find others with similar interests</li></ol>
+
+
+
+<h2>Related Documentation</h2>
+
+
+
+<ul><li><a href="/Documentation/roles/normal/mcoop_user_guide.md">MCoop User Guide</a></li></ul>
+
+<ul><li><a href="/Documentation/roles/normal/account_management.md">Account Management</a></li></ul>
+
+<ul><li><a href="/Documentation/sites/mcoop/site_guide.md">MCoop Site Guide</a></li></ul>
+
+</div>

@@ -1,0 +1,345 @@
+[% PageVersion = 'Comserv/root/Documentation/controllers/HostingSignup.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'HostingSignup Controller' %]
+
+<!-- Documentation page for HostingSignup -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**Last Updated:** August 30, 2025  
+
+**Author:** Shanta  
+
+**Status:** Active
+
+
+
+<h2>Overview</h2>
+
+
+
+The HostingSignup controller manages the process of signing up for hosting services. It handles the display of the signup form, validation of user input, creation of user and site records, and display of the success page. The system now includes duplicate site prevention and a complete site deletion feature.
+
+
+
+<h2>Key Features</h2>
+
+
+
+<ul><li>Displays the hosting signup form</li></ul>
+
+<ul><li>Validates user input for required fields and format</li></ul>
+
+<ul><li>Creates user accounts for new hosting customers</li></ul>
+
+<ul><li>Creates site records for new hosting customers</li></ul>
+
+<ul><li>Associates domains with sites</li></ul>
+
+<ul><li>Prevents duplicate site creation</li></ul>
+
+<ul><li>Handles error conditions gracefully</li></ul>
+
+<ul><li>Provides detailed logging for troubleshooting</li></ul>
+
+
+
+<h2>Controller Structure</h2>
+
+
+
+<h3>Attributes</h3>
+
+
+
+<ul><li><code>logging</code>: Logging utility instance for detailed logging</li></ul>
+
+
+
+<h3>Methods</h3>
+
+
+
+<h4><code>auto</code></h4>
+
+
+
+Private method that runs before any action. It logs controller activity and initializes the debug_errors array.
+
+
+
+<h4><code>index</code></h4>
+
+
+
+Main entry point that displays the hosting signup form. Sets up the form with the appropriate action URL.
+
+
+
+<h4><code>process_signup</code></h4>
+
+
+
+Processes the form submission:
+
+<ol><li>Validates required fields (full name, email, username, password, domain name, site name)</li></ol>
+
+<ol><li>Validates format of email, username, password, and domain name</li></ol>
+
+<ol><li>Creates a user account if validation passes</li></ol>
+
+<ol><li>Creates a site record associated with the user</li></ol>
+
+<ol><li>Creates a domain record associated with the site</li></ol>
+
+<ol><li>Displays success page or error messages as appropriate</li></ol>
+
+
+
+<h4><code>success</code></h4>
+
+
+
+Displays the success page after a successful signup. This page is normally reached via a redirect from process_signup.
+
+
+
+<h2>Form Validation</h2>
+
+
+
+The controller performs the following validations:
+
+
+
+<ol><li>**Required Fields**:</li></ol>
+
+   - Full name
+
+   - Email address
+
+   - Username
+
+   - Password
+
+   - Domain name
+
+   - Site name
+
+
+
+<ol><li>**Format Validation**:</li></ol>
+
+   - Email: Must be a valid email format
+
+   - Username: Alphanumeric and underscore characters only
+
+   - Password: Minimum 8 characters
+
+   - Domain name: Valid domain name format
+
+
+
+<h2>Error Handling</h2>
+
+
+
+The controller handles errors at multiple levels:
+
+
+
+<ol><li>**Validation Errors**: Redisplays the form with error messages</li></ol>
+
+<ol><li>**User Creation Errors**: Displays specific error messages about user creation failures</li></ol>
+
+<ol><li>**Site Creation Errors**: Displays specific error messages about site creation failures</li></ol>
+
+<ol><li>**Exception Handling**: Uses Try::Tiny to catch and handle any exceptions during processing</li></ol>
+
+
+
+<h2>Logging</h2>
+
+
+
+The controller uses the Comserv::Util::Logging module to log detailed information:
+
+
+
+<ol><li>**Request Information**: Logs request path, method, and controller name</li></ol>
+
+<ol><li>**Form Processing**: Logs when form processing begins</li></ol>
+
+<ol><li>**Validation Errors**: Logs specific validation errors</li></ol>
+
+<ol><li>**User Creation**: Logs success or failure of user creation</li></ol>
+
+<ol><li>**Site Creation**: Logs success or failure of site creation</li></ol>
+
+<ol><li>**Domain Association**: Logs domain association with site</li></ol>
+
+<ol><li>**Exceptions**: Logs any exceptions that occur during processing</li></ol>
+
+
+
+<h2>Templates</h2>
+
+
+
+The controller uses the following templates:
+
+
+
+<ol><li>**signup_form.tt**: Displays the hosting signup form</li></ol>
+
+<ol><li>**signup_success.tt**: Displays the success page after signup</li></ol>
+
+
+
+<h2>Related Files</h2>
+
+
+
+<ul><li>**Controller**: <code>/lib/Comserv/Controller/HostingSignup.pm</code></li></ul>
+
+<ul><li>**Form Template**: <code>/root/hosting/signup_form.tt</code></li></ul>
+
+<ul><li>**Success Template**: <code>/root/hosting/signup_success.tt</code></li></ul>
+
+<ul><li>**Model**: <code>/lib/Comserv/Model/User.pm</code> (for user creation)</li></ul>
+
+<ul><li>**Model**: <code>/lib/Comserv/Model/Site.pm</code> (for site creation)</li></ul>
+
+<ul><li>**Model**: <code>/lib/Comserv/Model/DBEncy/SiteDomain.pm</code> (for domain association)</li></ul>
+
+
+
+<h2>Usage Flow</h2>
+
+
+
+<ol><li>User clicks "Sign Up Now" on the hosting page</li></ol>
+
+<ol><li>User is presented with the signup form</li></ol>
+
+<ol><li>User fills out the form and submits</li></ol>
+
+<ol><li>Controller validates the input</li></ol>
+
+<ol><li>If validation fails, user is shown errors</li></ol>
+
+<ol><li>If validation passes, controller creates user, site, and domain records</li></ol>
+
+<ol><li>User is shown the success page with account details</li></ol>
+
+
+
+<h2>Debug Information</h2>
+
+
+
+When debug mode is enabled, the controller:
+
+<ol><li>Logs detailed information about each step of the process</li></ol>
+
+<ol><li>Adds debug messages to the stash for display in the template</li></ol>
+
+<ol><li>Pushes error messages to the debug_errors array for troubleshooting</li></ol>
+
+
+
+<h2>Duplicate Site Prevention</h2>
+
+
+
+The system now includes robust duplicate site prevention:
+
+
+
+<ol><li>**Proactive Checking**: The <code>add_site</code> method in Site.pm checks for existing sites with the same name before attempting to create a new site.</li></ol>
+
+<ol><li>**Error Handling**: If a site with the same name already exists, the system returns a descriptive error message.</li></ol>
+
+<ol><li>**Detailed Logging**: The system logs all duplicate site detection events for troubleshooting.</li></ol>
+
+<ol><li>**User Feedback**: Clear error messages are displayed to the user when a duplicate site is detected.</li></ol>
+
+
+
+<h2>Site Deletion Feature</h2>
+
+
+
+A complete site deletion system has been implemented and is accessible via <code>/site/delete</code>. This feature:
+
+
+
+<ol><li>**Access Methods**:</li></ol>
+
+   - By ID: <code>/site/delete?id=X</code> (where X is the site ID)
+
+   - By name: <code>/site/delete?name=sitename</code> (where sitename is the site name)
+
+
+
+<ol><li>**Confirmation Process**:</li></ol>
+
+   - Shows a confirmation page with site details
+
+   - Requires explicit confirmation via checkbox to prevent accidental deletions
+
+   - Provides clear warnings about the irreversible nature of the action
+
+
+
+<ol><li>**Complete Cleanup**:</li></ol>
+
+   - Removes all database records related to the site
+
+   - Deletes all associated domains
+
+   - Removes controller files
+
+   - Cleans up template directories
+
+
+
+<ol><li>**User Feedback**:</li></ol>
+
+   - Provides detailed error handling
+
+   - Shows success messages after deletion
+
+   - Redirects to the site list after successful deletion
+
+
+
+<h2>Future Enhancements</h2>
+
+
+
+Potential future enhancements for this controller include:
+
+<ol><li>Integration with payment processing</li></ol>
+
+<ol><li>Support for additional hosting plans</li></ol>
+
+<ol><li>Email confirmation of signup</li></ol>
+
+<ol><li>Automatic provisioning of hosting resources</li></ol>
+
+<ol><li>Integration with domain registration services</li></ol>
+
+<ol><li>Batch site management operations</li></ol>
+
+</div>

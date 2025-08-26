@@ -1,0 +1,133 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2025-05-15-documentation-system-update.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Documentation System Update' %]
+
+<!-- Documentation page for 2025-05-15-documentation-system-update -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**Date:** May 15, 2025  
+
+**Author:** Shanta  
+
+**Status:** Completed
+
+
+
+<h2>Overview</h2>
+
+
+
+This update improves the documentation system by updating existing documentation files to reflect the current state of the application, adding new documentation about the configuration system, and ensuring all documentation paths are correctly configured in the documentation_config.json file.
+
+
+
+<h2>Changes Made</h2>
+
+
+
+<h3>1. Updated Core Documentation Files</h3>
+
+
+
+<ul><li>Updated <code>documentation_system.md</code> with the latest information about the documentation system structure, configuration, and debugging features</li></ul>
+
+<ul><li>Updated <code>Documentation_Workflow.md</code> to include information about the configuration file and template files</li></ul>
+
+<ul><li>Updated <code>Documentation_Controller.md</code> with detailed information about the controller structure and configuration</li></ul>
+
+
+
+<h3>2. Added New Documentation</h3>
+
+
+
+<ul><li>Created <code>documentation_config_guide.md</code> to explain the structure and usage of the documentation_config.json file</li></ul>
+
+<ul><li>Added the new documentation to the documentation_config.json file</li></ul>
+
+
+
+<h3>3. Updated Configuration File</h3>
+
+
+
+<ul><li>Updated the documentation_config.json file to include all current documentation files</li></ul>
+
+<ul><li>Fixed paths for files that have been moved</li></ul>
+
+<ul><li>Added missing files to appropriate categories</li></ul>
+
+<ul><li>Removed references to non-existent files</li></ul>
+
+
+
+<h3>4. Template Files</h3>
+
+
+
+<ul><li>Updated documentation about template files to include information about debug message handling</li></ul>
+
+<ul><li>Added examples of proper debug information sections in templates</li></ul>
+
+<ul><li>Added guidance on role-based access control in templates</li></ul>
+
+
+
+<h2>Technical Details</h2>
+
+
+
+The documentation system now uses a central configuration file (<code>documentation_config.json</code>) to manage documentation categories and file paths. This file has two main sections:
+
+
+
+<ol><li>**Categories**: Defines all documentation categories and their properties</li></ol>
+
+<ol><li>**Default Paths**: Maps documentation keys to file paths</li></ol>
+
+
+
+The Documentation controller loads this configuration file during initialization and uses it to organize and display documentation.
+
+
+
+<h2>Benefits</h2>
+
+
+
+<ul><li>Improved documentation accuracy</li></ul>
+
+<ul><li>Better organization of documentation files</li></ul>
+
+<ul><li>Clearer guidance for developers adding new documentation</li></ul>
+
+<ul><li>More consistent documentation structure</li></ul>
+
+<ul><li>Better debugging information for troubleshooting documentation issues</li></ul>
+
+
+
+<h2>Future Considerations</h2>
+
+
+
+<ul><li>Implement a validation system for the documentation_config.json file</li></ul>
+
+<ul><li>Add automated testing for documentation visibility</li></ul>
+
+<ul><li>Create a web interface for managing documentation configuration</li></ul>
+
+<ul><li>Implement version control for documentation files</li></ul>
+
+</div>

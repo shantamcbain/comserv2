@@ -1,0 +1,239 @@
+[% PageVersion = 'Comserv/root/Documentation/controllers/Ve7tit.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Ve7tit Controller Documentation' %]
+
+<!-- Documentation page for Ve7tit -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Overview</h2>
+
+The Ve7tit controller manages the VE7TIT amateur radio station section of the application. It provides information about radio equipment, operating modes, and amateur radio activities.
+
+
+
+<h2>URL Structure</h2>
+
+<ul><li><code>/ve7tit</code> - Main landing page (lowercase URL)</li></ul>
+
+<ul><li><code>/Ve7tit</code> - Alternative access with mixed case (redirects to main page)</li></ul>
+
+<ul><li><code>/ve7tit/equipment/{equipment-id}</code> - Individual equipment pages</li></ul>
+
+<ul><li><code>/Ve7tit/{equipment-id}</code> - Alternative access to equipment with mixed case</li></ul>
+
+
+
+<h2>Controller Methods</h2>
+
+
+
+<h3>Base Method</h3>
+
+<code></code>`perl
+
+sub base :Chained('/') :PathPart('ve7tit') :CaptureArgs(0)
+
+<code></code>`
+
+<ul><li>Sets up the base chain for all Ve7tit actions</li></ul>
+
+<ul><li>Sets the mail server to "http://webmail.ve7tit.com"</li></ul>
+
+
+
+<h3>Index Method</h3>
+
+<code></code>`perl
+
+sub index :Chained('base') :PathPart('') :Args(0)
+
+<code></code>`
+
+<ul><li>Renders the main landing page</li></ul>
+
+<ul><li>Uses template: <code>ve7tit/index.tt</code></li></ul>
+
+
+
+<h3>Direct Index Method</h3>
+
+<code></code>`perl
+
+sub direct_index :Path('/Ve7tit') :Args(0)
+
+<code></code>`
+
+<ul><li>Handles mixed case URL access to the landing page</li></ul>
+
+<ul><li>Forwards to the index method</li></ul>
+
+
+
+<h3>Equipment Method</h3>
+
+<code></code>`perl
+
+sub equipment :Chained('base') :PathPart('equipment') :Args(1)
+
+<code></code>`
+
+<ul><li>Handles equipment pages with the URL pattern <code>/ve7tit/equipment/{equipment-id}</code></li></ul>
+
+<ul><li>Checks if the requested equipment template exists</li></ul>
+
+<ul><li>If found, renders the template</li></ul>
+
+<ul><li>If not found, shows a helpful error page with available equipment</li></ul>
+
+
+
+<h3>Direct Equipment Method</h3>
+
+<code></code>`perl
+
+sub direct_equipment :Chained('base') :PathPart('') :Args(1)
+
+<code></code>`
+
+<ul><li>Handles direct access to equipment pages without the <code>/equipment/</code> path</li></ul>
+
+<ul><li>Checks if the template exists or if it looks like equipment</li></ul>
+
+<ul><li>Forwards to the equipment action if appropriate</li></ul>
+
+
+
+<h3>Mixed Case Direct Equipment Method</h3>
+
+<code></code>`perl
+
+sub mixed_case_direct_equipment :Path('/Ve7tit') :Args(1)
+
+<code></code>`
+
+<ul><li>Handles mixed case URLs for equipment pages</li></ul>
+
+<ul><li>Forwards to the direct_equipment method</li></ul>
+
+
+
+<h3>Default Method</h3>
+
+<code></code>`perl
+
+sub default :Private
+
+<code></code>`
+
+<ul><li>Catch-all for any other paths</li></ul>
+
+<ul><li>Forwards to the index method</li></ul>
+
+
+
+<h3>Helper Method: _get_available_equipment</h3>
+
+<code></code>`perl
+
+sub _get_available_equipment
+
+<code></code>`
+
+<ul><li>Internal helper method to list all available equipment templates</li></ul>
+
+<ul><li>Used for error handling to show available options</li></ul>
+
+
+
+<h2>Templates</h2>
+
+
+
+<h3>Main Template</h3>
+
+<ul><li><code>ve7tit/index.tt</code> - Main landing page with equipment categories</li></ul>
+
+
+
+<h3>Equipment Templates</h3>
+
+<ul><li><code>ve7tit/FT-897.tt</code> - Yaesu FT-897 HF/VHF/UHF All Mode Transceiver</li></ul>
+
+<ul><li><code>ve7tit/FT-891.tt</code> - Yaesu FT-891 HF/50MHz Transceiver</li></ul>
+
+
+
+<h2>Error Handling</h2>
+
+When a user attempts to access a non-existent equipment page, the system displays a helpful error message with a list of available equipment pages.
+
+
+
+<h2>Recent Fixes</h2>
+
+
+
+<h3>Mixed Case URL Handling</h3>
+
+<ul><li>Added support for mixed case URLs (<code>/Ve7tit</code> and <code>/Ve7tit/{equipment-id}</code>)</li></ul>
+
+<ul><li>Ensures consistent user experience regardless of URL capitalization</li></ul>
+
+
+
+<h3>Equipment Page Error Handling</h3>
+
+<ul><li>Improved error messages for non-existent equipment pages</li></ul>
+
+<ul><li>Added display of available equipment options when a page is not found</li></ul>
+
+<ul><li>Enhanced logging for better debugging</li></ul>
+
+
+
+<h3>Template Creation</h3>
+
+<ul><li>Added detailed equipment templates with consistent structure</li></ul>
+
+<ul><li>Each template includes specifications, description, setup details, and resources</li></ul>
+
+
+
+<h2>Adding New Equipment Pages</h2>
+
+To add a new equipment page:
+
+
+
+<ol><li>Create a new template file in <code>/Comserv/root/ve7tit/</code> with the name <code>{equipment-id}.tt</code></li></ol>
+
+<ol><li>Follow the standard template structure with specifications, description, etc.</li></ol>
+
+<ol><li>Add a link to the new equipment page in the <code>index.tt</code> file under the appropriate category</li></ol>
+
+
+
+<h2>Related Files</h2>
+
+<ul><li><code>/Comserv/lib/Comserv/Controller/Ve7tit.pm</code> - Controller file</li></ul>
+
+<ul><li><code>/Comserv/root/ve7tit/index.tt</code> - Main landing page template</li></ul>
+
+<ul><li><code>/Comserv/root/ve7tit/FT-897.tt</code> - Equipment template example</li></ul>
+
+<ul><li><code>/Comserv/root/ve7tit/FT-891.tt</code> - Equipment template example</li></ul>
+
+<ul><li><code>/Comserv/root/error.tt</code> - Error template used for not-found equipment</li></ul>
+
+</div>

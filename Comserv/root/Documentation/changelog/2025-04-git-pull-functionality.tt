@@ -1,0 +1,484 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2025-04-git-pull-functionality.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Git Pull Functionality for Administrators' %]
+
+<!-- Documentation page for 2025-04-git-pull-functionality -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**File:** /home/shanta/PycharmProjects/comserv/Comserv/root/Documentation/changelog/2025-04-git-pull-functionality.md  
+
+**Date:** April 10, 2025  
+
+**Author:** Shanta  
+
+**Status:** Completed  
+
+**Version:** 1.1
+
+
+
+<h2>Overview</h2>
+
+
+
+This document outlines the implementation of a new feature that allows administrators to pull the latest changes from the Git repository directly through the admin interface. This feature simplifies the deployment process and allows administrators to update the application without requiring command-line access.
+
+
+
+<h2>Changes Made</h2>
+
+
+
+<h3>1. Admin Controller Enhancement</h3>
+
+
+
+Added a new <code>git_pull</code> method to the Admin controller that:
+
+<ul><li>Verifies the user has admin privileges</li></ul>
+
+<ul><li>Handles both GET and POST requests</li></ul>
+
+<ul><li>Executes the Git pull command when confirmed</li></ul>
+
+<ul><li>Captures and displays the command output</li></ul>
+
+<ul><li>Logs all actions and errors</li></ul>
+
+
+
+<code></code>`perl
+
+<h1>Git pull functionality for admins</h1>
+
+<h1>Using absolute Path to ensure the route is /admin/git_pull</h1>
+
+sub git_pull :Path('/admin/git_pull') :Args(0) {
+
+    my ($self, $c) = @_;
+
+    
+
+    # Debug logging for git_pull action
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', "Starting git_pull action");
+
+    
+
+    # Log user information for debugging
+
+    my $username = $c->user_exists ? $c->user->username : 'Guest';
+
+    my $roles = $c->session->{roles} || [];
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
+
+        "User: $username, Roles: " . Dumper($roles));
+
+    
+
+    # The begin method already checks for admin role
+
+    # Just add a check to display a message if somehow a non-admin got here
+
+    unless ($c->user_exists && defined $roles && ref $roles eq 'ARRAY' && grep { $_ eq 'admin' } @$roles) {
+
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_pull', 
+
+            "Non-admin user accessing git_pull: $username");
+
+        $c->stash->{error_msg} = "You must be an admin to perform this action. Please contact your administrator.";
+
+        $c->stash->{template} = 'admin/git_pull.tt';
+
+        $c->forward($c->view('TT'));
+
+        return;
+
+    }
+
+    
+
+    # Check if this is a POST request with confirmation
+
+    if ($c->req->method eq 'POST' && $c->req->param('confirm')) {
+
+        # Execute git pull command
+
+        eval {
+
+            # Get the repository root directory
+
+            my $repo_dir = $c->path_to()->stringify;
+
+            
+
+            # Change to the repository directory
+
+            chdir($repo_dir) or die "Cannot change to directory $repo_dir: $!";
+
+            
+
+            # Execute git pull and capture output
+
+            $output = <code>git pull 2>&1</code>;
+
+            
+
+            # Check if the command was successful
+
+            if ($? != 0) {
+
+                $error = "Git pull failed with exit code: " . ($? >> 8);
+
+            }
+
+        };
+
+    }
+
+    
+
+    # Set the template
+
+    $c->stash->{template} = 'admin/git_pull.tt';
+
+}
+
+<code></code>`
+
+
+
+<h3>2. Template Updates</h3>
+
+
+
+Enhanced the existing Git pull template to:
+
+<ul><li>Display a confirmation screen before executing the pull</li></ul>
+
+<ul><li>Show the command output after execution</li></ul>
+
+<ul><li>Provide clear error messages if the pull fails</li></ul>
+
+<ul><li>Include debug information when debug mode is enabled</li></ul>
+
+<ul><li>Offer options to pull again or return to the admin dashboard</li></ul>
+
+
+
+<h3>3. Menu Integration</h3>
+
+
+
+The Git pull functionality is accessible from multiple locations for administrator convenience:
+
+
+
+<h4>Admin Dashboard</h4>
+
+
+
+The functionality is linked from the admin dashboard under the "System Management" section:
+
+
+
+<code></code>`html
+
+<div class="admin-section">
+
+  <h3>System Management</h3>
+
+  <ul>
+
+    <li><a href="[% c.uri_for('/admin/theme') %]">Theme Management</a></li>
+
+    <li><a href="[% c.uri_for('/admin/view_log') %]">View Application Log</a></li>
+
+    <li><a href="[% c.uri_for('/admin/git_pull') %]">Pull from Git Repository</a></li>
+
+  </ul>
+
+
+<code></code>`
+
+
+
+<h4>Admin Top Menu</h4>
+
+
+
+The functionality is also accessible from the admin top menu in two locations:
+
+
+
+<ol><li>Under the "System Links" section:</li></ol>
+
+<code></code>`html
+
+<div class="submenu-section">
+
+    <span class="submenu-section-title">System Management</span>
+
+    <a href="/admin/git_pull"><i class="icon-git"></i>Pull from Git Repository</a>
+
+    <a href="/admin/view_log"><i class="icon-log"></i>View Application Log</a>
+
+    <a href="/admin/theme"><i class="icon-theme"></i>Theme Management</a>
+
+
+<code></code>`
+
+
+
+<ol><li>Under the "Logging" section for quick access:</li></ol>
+
+<code></code>`html
+
+<div class="submenu">
+
+    <a href="/log"><i class="icon-log"></i>Logging System</a>
+
+    <a href="/admin/view_log"><i class="icon-view"></i>View Application Log</a>
+
+    <a href="/admin/git_pull"><i class="icon-git"></i>Pull from Git Repository</a>
+
+
+<code></code>`
+
+
+
+<h2>Security Considerations</h2>
+
+
+
+The implementation includes several security measures:
+
+
+
+<ol><li>**Role-Based Access Control**: Only users with the admin role can access the Git pull functionality</li></ol>
+
+<ol><li>**Confirmation Required**: A confirmation step prevents accidental execution</li></ol>
+
+<ol><li>**Detailed Logging**: All actions are logged for audit purposes</li></ol>
+
+<ol><li>**Error Handling**: Comprehensive error handling prevents security issues from failed commands</li></ol>
+
+<ol><li>**Proper Route Definition**: Using absolute path routing to ensure proper authorization checks</li></ol>
+
+
+
+<h3>Route Implementation Details</h3>
+
+
+
+The Git pull functionality is implemented using an absolute path route to ensure proper URL matching:
+
+
+
+<code></code>`perl
+
+<h1>Git pull functionality for admins</h1>
+
+<h1>Using absolute Path to ensure the route is /admin/git_pull</h1>
+
+sub git_pull :Path('/admin/git_pull') :Args(0) {
+
+    my ($self, $c) = @_;
+
+    
+
+    # Debug logging for git_pull action
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
+
+        "Starting git_pull action");
+
+    
+
+    # Log user information for debugging
+
+    my $username = $c->user_exists ? $c->user->username : 'Guest';
+
+    my $roles = $c->session->{roles} || [];
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
+
+        "User: $username, Roles: " . Dumper($roles));
+
+    
+
+    # Perform admin role check
+
+    unless ($c->user_exists && defined $roles && ref $roles eq 'ARRAY' 
+
+            && grep { $_ eq 'admin' } @$roles) {
+
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_pull', 
+
+            "Non-admin user accessing git_pull: $username");
+
+        $c->stash->{error_msg} = "You must be an admin to perform this action.";
+
+        $c->stash->{template} = 'admin/git_pull.tt';
+
+        $c->forward($c->view('TT'));
+
+        return;
+
+    }
+
+    
+
+    # Rest of the implementation...
+
+}
+
+<code></code>`
+
+
+
+<h2>Benefits</h2>
+
+
+
+<ul><li>**Simplified Deployment**: Administrators can update the application without command-line access</li></ul>
+
+<ul><li>**Improved Workflow**: Faster and more convenient updates to the production environment</li></ul>
+
+<ul><li>**Better Visibility**: Clear display of Git command output helps troubleshoot issues</li></ul>
+
+<ul><li>**Enhanced Security**: Role-based access control ensures only authorized users can update the code</li></ul>
+
+
+
+<h2>Future Enhancements</h2>
+
+
+
+Potential future enhancements to this feature could include:
+
+
+
+<ol><li>**Branch Selection**: Allow administrators to select which branch to pull from</li></ol>
+
+<ol><li>**Commit Information**: Display recent commit information before pulling</li></ol>
+
+<ol><li>**Automatic Backup**: Create a backup before pulling changes</li></ol>
+
+<ol><li>**Deployment Hooks**: Run additional commands after a successful pull (e.g., restart services)</li></ol>
+
+<ol><li>**Conflict Resolution**: Provide a simple interface for resolving merge conflicts</li></ol>
+
+
+
+<h2>Troubleshooting</h2>
+
+
+
+If you encounter issues with the Git pull functionality, check the following:
+
+
+
+<ol><li>**User Permissions**: Ensure the user has the 'admin' role in their session</li></ol>
+
+<ol><li>**URL Routing**: Verify that the URL is correctly set to <code>/admin/git_pull</code></li></ol>
+
+<ol><li>**Application Logs**: Check the application logs for detailed error messages</li></ol>
+
+<ol><li>**Debug Mode**: Enable debug mode to see additional information on the page</li></ol>
+
+<ol><li>**Git Repository**: Ensure the Git repository is properly configured</li></ol>
+
+
+
+<h3>Common Issues and Solutions</h3>
+
+
+
+| Issue | Possible Cause | Solution |
+
+|-------|----------------|----------|
+
+| Redirect to home page | User not authenticated as admin | Check user roles in session |
+
+| "Page not found" error | Incorrect route definition | Verify route uses <code>:Path('/admin/git_pull')</code> |
+
+| Git pull fails | Git repository issues | Check Git configuration and permissions |
+
+| No output displayed | Template rendering issue | Verify template variables are correctly passed |
+
+
+
+<h3>Debugging Tips</h3>
+
+
+
+<ol><li>Enable debug mode to see detailed information about the user session and roles</li></ol>
+
+<ol><li>Check the application logs for detailed error messages</li></ol>
+
+<ol><li>Use the quick navigation link to return to the admin dashboard if needed</li></ol>
+
+<ol><li>Verify that the Git repository is accessible and properly configured</li></ol>
+
+
+
+<h2>Testing</h2>
+
+
+
+The feature was tested with various scenarios:
+
+
+
+<ol><li>**Successful Pull**: Verified that changes are correctly pulled and output is displayed</li></ol>
+
+<ol><li>**Failed Pull**: Confirmed that error messages are properly shown when the pull fails</li></ol>
+
+<ol><li>**Access Control**: Ensured that non-admin users cannot access the functionality</li></ol>
+
+<ol><li>**Edge Cases**: Tested with various Git repository states (clean, dirty, detached HEAD)</li></ol>
+
+
+
+<h2>Changelog</h2>
+
+
+
+<h3>Version 1.1 (April 10, 2025)</h3>
+
+<ul><li>Fixed routing issues that caused admin users to be redirected incorrectly</li></ul>
+
+<ul><li>Added enhanced debugging information to help troubleshoot authentication issues</li></ul>
+
+<ul><li>Improved template with quick navigation links</li></ul>
+
+<ul><li>Added comprehensive troubleshooting documentation</li></ul>
+
+<ul><li>Enhanced logging throughout the code</li></ul>
+
+
+
+<h3>Version 1.0 (April 5, 2025)</h3>
+
+<ul><li>Initial implementation of Git pull functionality</li></ul>
+
+<ul><li>Added confirmation step to prevent accidental execution</li></ul>
+
+<ul><li>Implemented role-based access control</li></ul>
+
+<ul><li>Created template for displaying Git command output</li></ul>
+
+</div>

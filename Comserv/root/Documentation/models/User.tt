@@ -1,0 +1,77 @@
+[% PageVersion = 'Comserv/root/Documentation/models/User.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'User Model' %]
+
+<!-- Documentation page for User -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Overview</h2>
+
+The User model manages user data and authentication in the Comserv application. It provides methods for creating, retrieving, updating, and authenticating users.
+
+
+
+<h2>Key Features</h2>
+
+<ul><li>User authentication and validation</li></ul>
+
+<ul><li>User data storage and retrieval</li></ul>
+
+<ul><li>Role-based access control</li></ul>
+
+<ul><li>Password hashing and verification</li></ul>
+
+<ul><li>Session management</li></ul>
+
+
+
+<h2>Methods</h2>
+
+<ul><li><code>get_user</code>: Retrieves a user by ID or username</li></ul>
+
+<ul><li><code>create_user</code>: Creates a new user</li></ul>
+
+<ul><li><code>update_user</code>: Updates user information</li></ul>
+
+<ul><li><code>authenticate</code>: Authenticates a user with username and password</li></ul>
+
+<ul><li><code>check_password</code>: Verifies a password against the stored hash</li></ul>
+
+<ul><li><code>get_roles</code>: Gets the roles assigned to a user</li></ul>
+
+
+
+<h2>Database Interactions</h2>
+
+This model interacts with the following database tables:
+
+<ul><li>users</li></ul>
+
+<ul><li>user_roles</li></ul>
+
+<ul><li>user_profiles</li></ul>
+
+<ul><li>user_sessions</li></ul>
+
+
+
+<h2>Related Files</h2>
+
+<ul><li>User controller in <code>/lib/Comserv/Controller/User.pm</code></li></ul>
+
+<ul><li>User templates in <code>/root/templates/user/</code></li></ul>
+
+<ul><li>Authentication configuration</li></ul>
+
+</div>

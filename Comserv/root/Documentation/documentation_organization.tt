@@ -1,0 +1,159 @@
+[% PageVersion = 'Comserv/root/Documentation/documentation_organization.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Documentation Organization' %]
+
+<!-- Documentation page for documentation_organization -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Overview</h2>
+
+This document explains the organization of documentation in the Comserv2 project. All documentation is centralized in the <code>/Comserv/root/Documentation</code> directory to maintain consistency and ease of access.
+
+
+
+<h2>Directory Structure</h2>
+
+
+
+<ul><li><code>/Comserv/root/Documentation/</code> - Main documentation directory</li></ul>
+
+<ul><li style="margin-left: 20px"><code>/changelog/</code> - Documentation of changes and fixes</li></ul>
+
+<ul><li style="margin-left: 20px"><code>/controllers/</code> - Controller-specific documentation</li></ul>
+
+<ul><li style="margin-left: 20px"><code>/models/</code> - Model-specific documentation</li></ul>
+
+<ul><li style="margin-left: 20px"><code>/deployment/</code> - Deployment and server setup guides</li></ul>
+
+<ul><li style="margin-left: 20px"><code>/system/</code> - System-level documentation</li></ul>
+
+<ul><li style="margin-left: 20px"><code>/themes/</code> - Theme system documentation</li></ul>
+
+<ul><li style="margin-left: 20px"><code>/tutorials/</code> - User and developer tutorials</li></ul>
+
+<ul><li style="margin-left: 20px"><code>/general/</code> - General documentation</li></ul>
+
+<ul><li style="margin-left: 20px"><code>/scripts/</code> - Documentation-related scripts</li></ul>
+
+
+
+<h2>Documentation Standards</h2>
+
+
+
+<ol><li>**File Location**: All documentation files should be placed in the appropriate subdirectory of <code>/Comserv/root/Documentation/</code>.</li></ol>
+
+
+
+<ol><li>**File Format**: Documentation files should be written in Markdown format with the <code>.md</code> extension.</li></ol>
+
+
+
+<ol><li>**File Naming**:</li></ol>
+
+   - Use lowercase with underscores for spaces
+
+   - For changelog entries, use the format: <code>YYYY-MM-description.md</code>
+
+   - For controller documentation, use the controller name: <code>ControllerName.md</code>
+
+
+
+<ol><li>**Documentation Structure**:</li></ol>
+
+   - Start with a clear title using <code># Title</code>
+
+   - Include an overview section
+
+   - Use appropriate headings for sections
+
+   - Include code examples where relevant
+
+   - Link to related documentation
+
+
+
+<h2>Documentation Migration</h2>
+
+
+
+A script has been created to help migrate documentation files from the application root to the proper documentation directory structure:
+
+
+
+<code></code>`
+
+/Comserv/root/Documentation/scripts/move_docs_to_proper_location.pl
+
+<code></code>`
+
+
+
+This script:
+
+<ol><li>Identifies documentation files in the application root</li></ol>
+
+<ol><li>Determines the appropriate destination based on file content and name</li></ol>
+
+<ol><li>Moves the files to the correct location in the documentation directory structure</li></ol>
+
+<ol><li>Removes the "Formatting title from: " prefix from filenames</li></ol>
+
+
+
+<h2>Accessing Documentation</h2>
+
+
+
+Documentation can be accessed through:
+
+
+
+<ol><li>The Documentation controller in the web interface</li></ol>
+
+<ol><li>Direct file access in the codebase</li></ol>
+
+<ol><li>Version control system (e.g., Git)</li></ol>
+
+
+
+<h2>Maintaining Documentation</h2>
+
+
+
+When updating the system:
+
+
+
+<ol><li>Update relevant documentation files</li></ol>
+
+<ol><li>Create changelog entries for significant changes</li></ol>
+
+<ol><li>Ensure documentation is placed in the correct location</li></ol>
+
+<ol><li>Keep the documentation structure consistent</li></ol>
+
+
+
+<h2>Related Files</h2>
+
+
+
+<ul><li><code>/Comserv/root/Documentation/scripts/move_docs_to_proper_location.pl</code> - Script for migrating documentation</li></ul>
+
+<ul><li><code>/Comserv/lib/Comserv/Controller/Documentation.pm</code> - Documentation controller</li></ul>
+
+<ul><li><code>/Comserv/root/Documentation/controllers/Documentation_Controller.md</code> - Documentation controller documentation</li></ul>
+
+</div>

@@ -1,0 +1,554 @@
+[% PageVersion = 'Comserv/root/Documentation/roles/admin/mail_admin_guide.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Mail System Administration Guide' %]
+
+<!-- Documentation page for mail_admin_guide -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Overview</h2>
+
+
+
+This guide provides comprehensive instructions for administrators to configure, manage, and troubleshoot the Comserv Mail System. It covers SMTP configuration, email templates, monitoring, and best practices for maintaining reliable email functionality.
+
+
+
+<h2>System Architecture</h2>
+
+
+
+The mail system consists of:
+
+
+
+<ol><li>**Mail Controller** (<code>Comserv::Controller::Mail</code>): Handles mail-related routes and actions</li></ol>
+
+<ol><li>**Mail Model** (<code>Comserv::Model::Mail</code>): Provides email sending functionality</li></ol>
+
+<ol><li>**Configuration Storage**: Stores SMTP settings in the database</li></ol>
+
+<ol><li>**Templates**: Email templates and configuration forms</li></ol>
+
+<ol><li>**Fallback Mechanism**: Alternative email sending method when primary method fails</li></ol>
+
+
+
+<h2>Initial Setup</h2>
+
+
+
+<h3>Installing Required Modules</h3>
+
+
+
+Ensure all required email modules are installed:
+
+
+
+<code></code>`bash
+
+cd /home/shanta/PycharmProjects/comserv2/Comserv/script
+
+./install_email_only.pl
+
+<code></code>`
+
+
+
+This script installs:
+
+<ul><li>Email::Simple</li></ul>
+
+<ul><li>Email::Sender::Simple</li></ul>
+
+<ul><li>Email::Sender::Transport::SMTP</li></ul>
+
+<ul><li>Email::MIME</li></ul>
+
+<ul><li>Email::MIME::Creator</li></ul>
+
+
+
+<h3>Testing Module Installation</h3>
+
+
+
+Verify that the modules are correctly installed:
+
+
+
+<code></code>`bash
+
+cd /home/shanta/PycharmProjects/comserv2/Comserv/script
+
+./test_email_modules.pl
+
+<code></code>`
+
+
+
+<h2>SMTP Configuration</h2>
+
+
+
+<h3>Adding SMTP Configuration</h3>
+
+
+
+<ol><li>Navigate to <code>/mail/add_mail_config_form</code></li></ol>
+
+<ol><li>Enter the following information:</li></ol>
+
+   - **Site ID**: The ID of the site for which you're configuring mail
+
+   - **SMTP Host**: The hostname of your SMTP server
+
+   - **SMTP Port**: The port number (typically 587 for TLS)
+
+   - **SMTP Username**: Your SMTP authentication username
+
+   - **SMTP Password**: Your SMTP authentication password
+
+<ol><li>Click "Add Configuration"</li></ol>
+
+
+
+<h3>Configuration Storage</h3>
+
+
+
+SMTP settings are stored in the <code>site_config</code> table with the following structure:
+
+
+
+| site_id | config_key    | config_value        |
+
+|---------|---------------|---------------------|
+
+| 1       | smtp_host     | smtp.example.com    |
+
+| 1       | smtp_port     | 587                 |
+
+| 1       | smtp_username | user@example.com    |
+
+| 1       | smtp_password | (encrypted password) |
+
+| 1       | smtp_from     | noreply@example.com |
+
+
+
+<h3>Updating Configuration</h3>
+
+
+
+To update existing configuration:
+
+
+
+<ol><li>Use the same form at <code>/mail/add_mail_config_form</code></li></ol>
+
+<ol><li>Enter the site ID and new values</li></ol>
+
+<ol><li>The system will update existing records or create new ones</li></ol>
+
+
+
+<h3>Multiple Site Configuration</h3>
+
+
+
+For multi-site installations:
+
+
+
+<ol><li>Configure each site separately using its site ID</li></ol>
+
+<ol><li>Each site can have different SMTP settings</li></ol>
+
+<ol><li>Ensure the <code>site_id</code> in the session matches the configured site</li></ol>
+
+
+
+<h2>Email Templates</h2>
+
+
+
+<h3>Default Templates</h3>
+
+
+
+The system includes several default email templates:
+
+
+
+<ol><li>**Welcome Email**: Sent to new users</li></ol>
+
+<ol><li>**Password Reset**: Sent for password recovery</li></ol>
+
+<ol><li>**Account Notification**: Sent when account details change</li></ol>
+
+
+
+<h3>Customizing Templates</h3>
+
+
+
+To customize email templates:
+
+
+
+<ol><li>Locate the template files in <code>/root/email/</code></li></ol>
+
+<ol><li>Edit the templates using Template Toolkit syntax</li></ol>
+
+<ol><li>Templates support both HTML and plain text formats</li></ol>
+
+<ol><li>Variables are passed from the controller to the template</li></ol>
+
+
+
+Example template structure:
+
+
+
+<code></code>`
+
+[% WRAPPER email/layouts/default.tt %]
+
+<h1>Welcome to [% site_name %]</h1>
+
+<p>Hello [% user.first_name %],</p>
+
+<p>Your account has been created successfully.</p>
+
+<p>Username: [% user.username %]</p>
+
+
+<code></code>`
+
+
+
+<h2>Monitoring and Maintenance</h2>
+
+
+
+<h3>Logging</h3>
+
+
+
+The mail system logs all email activity:
+
+
+
+<code></code>`perl
+
+$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'method_name',
+
+    "Detailed message with relevant information");
+
+<code></code>`
+
+
+
+Check the application log for email-related entries:
+
+
+
+<code></code>`bash
+
+cat /home/shanta/PycharmProjects/comserv2/Comserv/script/logs/application.log
+
+<code></code>`
+
+
+
+<h3>Testing Email Functionality</h3>
+
+
+
+To test if emails are being sent correctly:
+
+
+
+<ol><li>Navigate to the user management section</li></ol>
+
+<ol><li>Create a test user with your email address</li></ol>
+
+<ol><li>The system should send a welcome email</li></ol>
+
+<ol><li>Check your inbox and the application logs</li></ol>
+
+
+
+<h3>Monitoring Email Queue</h3>
+
+
+
+If using a queuing system:
+
+
+
+<ol><li>Check the queue status regularly</li></ol>
+
+<ol><li>Monitor for stuck or failed emails</li></ol>
+
+<ol><li>Implement alerts for queue issues</li></ol>
+
+
+
+<h2>Security Considerations</h2>
+
+
+
+<h3>SMTP Authentication</h3>
+
+
+
+<ol><li>Use strong, unique passwords for SMTP authentication</li></ol>
+
+<ol><li>Rotate credentials regularly</li></ol>
+
+<ol><li>Consider using app-specific passwords for services like Gmail</li></ol>
+
+
+
+<h3>TLS/SSL</h3>
+
+
+
+<ol><li>Always use TLS/SSL for SMTP connections</li></ol>
+
+<ol><li>Verify certificate validity</li></ol>
+
+<ol><li>Keep SSL libraries updated</li></ol>
+
+
+
+<h3>Access Control</h3>
+
+
+
+<ol><li>Restrict access to mail configuration pages</li></ol>
+
+<ol><li>Audit configuration changes</li></ol>
+
+<ol><li>Implement IP-based restrictions for sensitive operations</li></ol>
+
+
+
+<h2>Troubleshooting</h2>
+
+
+
+<h3>Common Issues</h3>
+
+
+
+<ol><li>**Authentication Failures**</li></ol>
+
+   - Verify SMTP username and password
+
+   - Check if the account has 2FA enabled
+
+   - For Gmail, ensure you're using an App Password
+
+
+
+<ol><li>**Connection Issues**</li></ol>
+
+   - Verify the SMTP host is correct
+
+   - Check if the SMTP port is open and accessible
+
+   - Test connectivity from the server
+
+
+
+<ol><li>**Rate Limiting**</li></ol>
+
+   - Check if your email provider has sending limits
+
+   - Implement a queue system for high-volume sending
+
+   - Consider using a dedicated email service provider
+
+
+
+<h3>Debugging Techniques</h3>
+
+
+
+<ol><li>**Enable Debug Logging**</li></ol>
+
+   - Increase log verbosity
+
+   - Check logs for detailed error messages
+
+
+
+<ol><li>**Test Direct SMTP Connection**</li></ol>
+
+   - Use command-line tools to test SMTP connectivity
+
+   - Verify authentication works outside the application
+
+
+
+<ol><li>**Check Email Modules**</li></ol>
+
+   - Verify all required modules are installed
+
+   - Check for version conflicts
+
+
+
+<h2>Advanced Configuration</h2>
+
+
+
+<h3>Fallback SMTP Servers</h3>
+
+
+
+Configure fallback SMTP servers in case the primary server fails:
+
+
+
+<ol><li>Edit the <code>send_email</code> method in <code>Root.pm</code></li></ol>
+
+<ol><li>Update the fallback SMTP configuration</li></ol>
+
+<ol><li>Test the fallback mechanism</li></ol>
+
+
+
+<code></code>`perl
+
+<h1>Example fallback configuration</h1>
+
+my $transport = Email::Sender::Transport::SMTP->new({
+
+    host => 'backup-smtp.example.com',
+
+    port => 587,
+
+    ssl => 'starttls',
+
+    sasl_username => 'backup-user',
+
+    sasl_password => 'backup-password',
+
+});
+
+<code></code>`
+
+
+
+<h3>Email Throttling</h3>
+
+
+
+Implement email throttling to prevent rate limiting:
+
+
+
+<ol><li>Add a delay between emails</li></ol>
+
+<ol><li>Batch emails for bulk sending</li></ol>
+
+<ol><li>Implement a proper queuing system for high volume</li></ol>
+
+
+
+<h3>Custom Transport</h3>
+
+
+
+For advanced needs, implement a custom transport:
+
+
+
+<code></code>`perl
+
+package MyApp::EmailTransport;
+
+use Moose;
+
+extends 'Email::Sender::Transport::SMTP';
+
+
+
+<h1>Override methods as needed</h1>
+
+<code></code>`
+
+
+
+<h2>Best Practices</h2>
+
+
+
+<ol><li>**Configuration Management**</li></ol>
+
+   - Document all SMTP configurations
+
+   - Use environment variables for sensitive data
+
+   - Maintain backups of working configurations
+
+
+
+<ol><li>**Testing**</li></ol>
+
+   - Test email functionality after configuration changes
+
+   - Implement regular automated tests
+
+   - Test with different email clients and providers
+
+
+
+<ol><li>**Monitoring**</li></ol>
+
+   - Monitor email sending success rates
+
+   - Set up alerts for persistent failures
+
+   - Track delivery metrics
+
+
+
+<ol><li>**Documentation**</li></ol>
+
+   - Maintain up-to-date documentation
+
+   - Document troubleshooting procedures
+
+   - Create guides for common tasks
+
+
+
+<h2>Related Documentation</h2>
+
+
+
+<ul><li><a href="/Documentation/mail_system.md">Mail System Documentation</a></li></ul>
+
+<ul><li><a href="/Documentation/mail_configuration_guide.md">Mail Configuration Guide</a></li></ul>
+
+<ul><li><a href="/Documentation/mail_troubleshooting.md">Mail Troubleshooting Guide</a></li></ul>
+
+<ul><li><a href="/EMAIL_MODULE_FIX.md">Email Module Fix</a></li></ul>
+
+</div>

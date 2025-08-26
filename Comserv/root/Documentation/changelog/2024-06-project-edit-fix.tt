@@ -1,0 +1,139 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2024-06-project-edit-fix.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Project Edit Functionality Fix - June 2024' %]
+
+<!-- Documentation page for 2024-06-project-edit-fix -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Issue Description</h2>
+
+
+
+Two issues were identified in the project editing functionality:
+
+
+
+<ol><li>Error message when clicking the Edit button on the project details page:</li></ol>
+
+   <code></code>`
+
+   Project with ID ARRAY(0x63cdc68e7090) not found
+
+   <code></code>`
+
+
+
+<ol><li>Parent project changes were not being saved when updating a project.</li></ol>
+
+
+
+<h2>Changes Made</h2>
+
+
+
+<ol><li>**Fixed Edit Project button in projectdetails.tt**:</li></ol>
+
+   - Replaced the form with a direct link using an anchor tag
+
+   - Added the project_id as a query parameter in the URL
+
+   - Added CSS to style the button link properly
+
+
+
+<ol><li>**Fixed the project_list.tt template**:</li></ol>
+
+   - Changed the dropdown name from <code>project_id</code> to <code>parent_id</code> to avoid conflict with the project being edited
+
+   - This ensures the parent project selection is properly submitted
+
+
+
+<ol><li>**Enhanced the <code>update_project</code> method in Project.pm**:</li></ol>
+
+   - Added handling for the case where project_id is an array reference
+
+   - Added parent_id to the list of fields to update
+
+   - Added proper handling for empty parent_id values
+
+   - Added comprehensive error handling and logging
+
+   - Improved success message and redirect to project details page
+
+
+
+<ol><li>**Added success and error message display**:</li></ol>
+
+   - Added message containers to projectdetails.tt
+
+   - Added CSS styling for success and error messages
+
+
+
+<h2>Files Modified</h2>
+
+
+
+<ul><li><code>/Comserv/root/todo/projectdetails.tt</code></li></ul>
+
+<ul><li><code>/Comserv/root/todo/project_list.tt</code></li></ul>
+
+<ul><li><code>/Comserv/lib/Comserv/Controller/Project.pm</code></li></ul>
+
+<ul><li><code>/Comserv/root/Documentation/fix_project_edit_button.md</code></li></ul>
+
+
+
+<h2>Benefits</h2>
+
+
+
+<ul><li>More robust project editing</li></ul>
+
+<ul><li>Parent project changes are now properly saved</li></ul>
+
+<ul><li>Better error handling and logging</li></ul>
+
+<ul><li>Improved user experience with success and error messages</li></ul>
+
+<ul><li>Fixed security issues with form methods</li></ul>
+
+
+
+<h2>Testing</h2>
+
+
+
+The fix has been tested by:
+
+<ol><li>Editing a project and changing its parent project</li></ol>
+
+<ol><li>Verifying that the parent project change is saved correctly</li></ol>
+
+<ol><li>Confirming that success messages are displayed after updates</li></ol>
+
+<ol><li>Ensuring the user is redirected to the project details page after update</li></ol>
+
+
+
+<h2>Related Documentation</h2>
+
+
+
+For more detailed technical information about this fix, see:
+
+<code>/Comserv/root/Documentation/fix_project_edit_button.md</code>
+
+</div>

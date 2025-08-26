@@ -1,0 +1,311 @@
+[% PageVersion = 'Comserv/root/Documentation/sites/mcoop/documentation_guide.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'MCoop Documentation Guide' %]
+
+<!-- Documentation page for documentation_guide -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**Last Updated:** April 1, 2025  
+
+**Author:** Shanta  
+
+**Status:** Active
+
+
+
+<h2>Overview</h2>
+
+
+
+This guide explains how to access and use documentation within the Monashee Coop (MCoop) site. As an MCoop user, you have access to both general application documentation and MCoop-specific documentation.
+
+
+
+<h2>Available Documentation</h2>
+
+
+
+As an MCoop user, you can access:
+
+
+
+<ol><li>**General Application Documentation**</li></ol>
+
+   - Common features like login, profile customization, etc.
+
+   - Available to all users regardless of site
+
+
+
+<ol><li>**MCoop-Specific Documentation**</li></ol>
+
+   - Documentation specific to the MCoop site
+
+   - Only visible to MCoop users
+
+   - Includes MCoop templates, features, and workflows
+
+
+
+<ol><li>**Role-Based Documentation**</li></ol>
+
+   - Documentation specific to your user role
+
+   - Administrators see more documentation than regular users
+
+
+
+<h2>Accessing Documentation</h2>
+
+
+
+<h3>Documentation Index</h3>
+
+
+
+The main documentation index is available at:
+
+<code></code>`
+
+/documentation
+
+<code></code>`
+
+
+
+This page shows all documentation that you have permission to view, organized by category.
+
+
+
+<h3>MCoop-Specific Documentation</h3>
+
+
+
+MCoop-specific documentation is available in the "Site-Specific Documentation" category on the documentation index page. This includes:
+
+
+
+<ul><li>**MCoop Templates Documentation** - Information about the templates used in the MCoop site</li></ul>
+
+<ul><li>**MCoop Site Guide** - General guide to using the MCoop site</li></ul>
+
+<ul><li>**Server Room Plan Documentation** - Details about the server room planning feature</li></ul>
+
+
+
+<h3>Role-Based Documentation</h3>
+
+
+
+Depending on your role, you may see additional documentation:
+
+
+
+<ul><li>**Normal Users** - Basic usage guides and tutorials</li></ul>
+
+<ul><li>**Editors** - Content management documentation</li></ul>
+
+<ul><li>**Administrators** - System configuration and management documentation</li></ul>
+
+<ul><li>**Developers** - Technical implementation details and API documentation</li></ul>
+
+
+
+<h2>MCoop Documentation Structure</h2>
+
+
+
+The MCoop documentation is organized as follows:
+
+
+
+<h3>1. User Guides</h3>
+
+
+
+Basic guides for using the MCoop site:
+
+
+
+<ul><li>**Getting Started** - Introduction to the MCoop site</li></ul>
+
+<ul><li>**Member Services** - How to use member-specific features</li></ul>
+
+<ul><li>**Support System** - How to get technical support</li></ul>
+
+
+
+<h3>2. Administrator Guides</h3>
+
+
+
+For MCoop administrators:
+
+
+
+<ul><li>**Server Infrastructure** - Managing the server infrastructure</li></ul>
+
+<ul><li>**User Management** - Managing MCoop users and permissions</li></ul>
+
+<ul><li>**Site Configuration** - Configuring the MCoop site</li></ul>
+
+
+
+<h3>3. Technical Documentation</h3>
+
+
+
+For technical users:
+
+
+
+<ul><li>**MCoop Templates** - Documentation of the Template Toolkit templates</li></ul>
+
+<ul><li>**Theme Customization** - How to customize the MCoop theme</li></ul>
+
+<ul><li>**Integration Points** - How MCoop integrates with other systems</li></ul>
+
+
+
+<h2>Key Documentation Files</h2>
+
+
+
+Here are some important documentation files for MCoop users:
+
+
+
+<ol><li>**mcoop_module.md** - Overview of the MCoop module and its features</li></ol>
+
+<ol><li>**site_guide.md** - General guide to using the MCoop site</li></ol>
+
+<ol><li>**templates.md** - Documentation of the MCoop templates</li></ol>
+
+<ol><li>**server_room_plan.md** - Documentation of the server room planning feature</li></ol>
+
+
+
+<h2>Documentation Best Practices</h2>
+
+
+
+When using the documentation system:
+
+
+
+<ol><li>**Start with the Basics**</li></ol>
+
+   - Begin with the general user guides if you're new to the system
+
+   - Progress to more advanced documentation as needed
+
+
+
+<ol><li>**Check for Updates**</li></ol>
+
+   - Documentation is regularly updated
+
+   - Check the "Last Updated" date at the top of each document
+
+
+
+<ol><li>**Use the Search Function**</li></ol>
+
+   - The search function can help you find specific information
+
+   - Search results are filtered based on your permissions
+
+
+
+<ol><li>**Request Missing Documentation**</li></ol>
+
+   - If you can't find documentation for a specific feature
+
+   - Contact the MCoop administrator to request additional documentation
+
+
+
+<h2>Contributing to Documentation</h2>
+
+
+
+If you have administrator or developer access, you can contribute to the MCoop documentation:
+
+
+
+<ol><li>**Identify Gaps**</li></ol>
+
+   - Identify areas where documentation is missing or incomplete
+
+
+
+<ol><li>**Create New Documentation**</li></ol>
+
+   - Create new documentation files in the appropriate location
+
+   - Follow the documentation system guidelines
+
+
+
+<ol><li>**Update Existing Documentation**</li></ol>
+
+   - Update existing documentation to reflect current features
+
+   - Maintain the same structure and formatting
+
+
+
+<ol><li>**Submit for Review**</li></ol>
+
+   - Submit your documentation for review by the documentation team
+
+   - Incorporate feedback before finalizing
+
+
+
+<h2>Getting Help</h2>
+
+
+
+If you need assistance with the documentation system:
+
+
+
+<ul><li>**Technical Support** - Contact technical support for help with accessing documentation</li></ul>
+
+<ul><li>**Documentation Team** - Contact the documentation team for help with content</li></ul>
+
+<ul><li>**Administrators** - Contact MCoop administrators for site-specific documentation questions</li></ul>
+
+
+
+<h2>Future Documentation Plans</h2>
+
+
+
+The MCoop documentation will be expanded to include:
+
+
+
+<ol><li>**Member Directory Documentation** - How to use the member directory feature</li></ol>
+
+<ol><li>**Resource Scheduling Documentation** - How to schedule and manage shared resources</li></ol>
+
+<ol><li>**Financial Reporting Documentation** - How to use financial reporting features</li></ol>
+
+<ol><li>**Document Repository Documentation** - How to use the document repository</li></ol>
+
+<ol><li>**Meeting Management Documentation** - How to schedule and document meetings</li></ol>
+
+</div>

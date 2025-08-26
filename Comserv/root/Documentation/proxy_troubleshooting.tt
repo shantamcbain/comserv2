@@ -1,0 +1,191 @@
+[% PageVersion = 'Comserv/root/Documentation/proxy_troubleshooting.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Proxy Troubleshooting Guide' %]
+
+<!-- Documentation page for proxy_troubleshooting -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**Last Updated:** April 9, 2025  
+
+**Author:** Shanta  
+
+**Status:** Active
+
+
+
+<h2>Overview</h2>
+
+
+
+This guide provides information on how to troubleshoot proxy-related issues in the Comserv application, particularly when dealing with connections to production servers through proxy configurations.
+
+
+
+<h2>Server Information Display</h2>
+
+
+
+As of version 0.023.0 of the pagetop.tt template, administrators can now see server information at the top of every page. This information includes:
+
+
+
+<ol><li>The hostname from the request URI</li></ol>
+
+<ol><li>The client's IP address</li></ol>
+
+
+
+This feature is only visible to administrators and users with debug mode enabled.
+
+
+
+<h2>How to Use the Server Information Display</h2>
+
+
+
+<h3>Identifying Connection Paths</h3>
+
+
+
+The server information display helps you identify which path your connection is taking:
+
+
+
+<h4>When accessing through the proxy:</h4>
+
+<ul><li>**Server:** helpdesk.computersystemconsulting.ca</li></ul>
+
+<ul><li>**IP:** [Your external client IP]</li></ul>
+
+
+
+<h4>When accessing directly:</h4>
+
+<ul><li>**Server:** 172.30.131.126:3000</li></ul>
+
+<ul><li>**IP:** [Your internal network IP]</li></ul>
+
+
+
+This difference makes it immediately clear which path the connection is taking.
+
+
+
+<h3>Common Proxy Issues and Solutions</h3>
+
+
+
+<h4>Issue: Unable to access the application through the proxy</h4>
+
+
+
+**Symptoms:**
+
+<ul><li>The application works when accessed directly via IP but not through the domain name</li></ul>
+
+<ul><li>You see connection timeout errors</li></ul>
+
+
+
+**Troubleshooting steps:**
+
+<ol><li>Check the server information display to confirm you're attempting to connect through the proxy</li></ol>
+
+<ol><li>Verify the proxy configuration in your web server (Apache/Nginx)</li></ol>
+
+<ol><li>Check firewall rules to ensure the proxy server can reach the application server</li></ol>
+
+<ol><li>Verify DNS settings to ensure the domain resolves to the correct proxy server</li></ol>
+
+
+
+<h4>Issue: Authentication problems when using the proxy</h4>
+
+
+
+**Symptoms:**
+
+<ul><li>You can log in when accessing directly but not through the proxy</li></ul>
+
+<ul><li>Session appears to be lost when navigating between pages</li></ul>
+
+
+
+**Troubleshooting steps:**
+
+<ol><li>Check session cookie settings to ensure they work with the proxy domain</li></ol>
+
+<ol><li>Verify that the proxy is correctly forwarding authentication headers</li></ol>
+
+<ol><li>Check for any IP-based restrictions in the application configuration</li></ol>
+
+
+
+<h2>Proxy Configuration Example</h2>
+
+
+
+The current production setup uses the following proxy configuration:
+
+
+
+<ul><li>**Public URL:** helpdesk.computersystemconsulting.ca</li></ul>
+
+<ul><li>**Internal Application Server:** http://172.30.131.126:3000/</li></ul>
+
+
+
+<h3>Apache Proxy Configuration Example</h3>
+
+
+
+<code></code>`apache
+
+<VirtualHost *:80>
+
+    ServerName helpdesk.computersystemconsulting.ca
+
+    
+
+    ProxyPreserveHost On
+
+    ProxyPass / http://172.30.131.126:3000/
+
+    ProxyPassReverse / http://172.30.131.126:3000/
+
+    
+
+    # Forward real client IP
+
+    RequestHeader set X-Forwarded-For %{REMOTE_ADDR}s
+
+    RequestHeader set X-Forwarded-Proto http
+
+</VirtualHost>
+
+<code></code>`
+
+
+
+<h2>Related Documentation</h2>
+
+
+
+<ul><li><a href="admin_guide.md">Server Administration Guide</a></li></ul>
+
+<ul><li><a href="network_configuration.md">Network Configuration Guide</a></li></ul>
+
+<ul><li><a href="changelog/2025-04-pagetop-hostname-display.md">Pagetop Server Information Display Changelog</a></li></ul>
+
+</div>

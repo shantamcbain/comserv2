@@ -1,0 +1,449 @@
+[% PageVersion = 'Comserv/root/Documentation/roles/developer/Documentation_Controller.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Documentation Controller Technical Reference' %]
+
+<!-- Documentation page for Documentation_Controller -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Overview</h2>
+
+
+
+The Documentation Controller (<code>Comserv::Controller::Documentation</code>) is responsible for scanning, organizing, and displaying documentation files in the Comserv system. This document provides technical details about how the controller works and how to modify or extend it.
+
+
+
+<h2>Controller Structure</h2>
+
+
+
+The Documentation controller is implemented as a Catalyst controller with the following key components:
+
+
+
+<ol><li>**Attributes**: Stores documentation pages, categories, and other metadata</li></ol>
+
+<ol><li>**Initialization**: Scans directories for documentation files during startup</li></ol>
+
+<ol><li>**Request Handling**: Processes requests to view documentation</li></ol>
+
+<ol><li>**Helper Methods**: Provides utility functions for formatting and categorization</li></ol>
+
+
+
+<h2>Key Methods</h2>
+
+
+
+<h3><code>BUILD</code></h3>
+
+
+
+The <code>BUILD</code> method is called when the controller is initialized. It:
+
+
+
+<ol><li>Sets up logging</li></ol>
+
+<ol><li>Defines helper functions for key generation</li></ol>
+
+<ol><li>Initializes documentation categories</li></ol>
+
+<ol><li>Scans documentation directories</li></ol>
+
+<ol><li>Processes and categorizes documentation files</li></ol>
+
+
+
+<h3><code>index</code></h3>
+
+
+
+The <code>index</code> method handles requests to the main documentation page. It:
+
+
+
+<ol><li>Gets the current user's role and site</li></ol>
+
+<ol><li>Filters documentation based on user role and site</li></ol>
+
+<ol><li>Sorts documentation alphabetically by title</li></ol>
+
+<ol><li>Creates a structured list of documentation pages</li></ol>
+
+<ol><li>Passes data to the template for rendering</li></ol>
+
+
+
+<h3><code>view</code></h3>
+
+
+
+The <code>view</code> method handles requests to view specific documentation files. It:
+
+
+
+<ol><li>Checks if the requested page exists</li></ol>
+
+<ol><li>Verifies the user has permission to view the page</li></ol>
+
+<ol><li>Renders the documentation content</li></ol>
+
+<ol><li>Handles different file types (Markdown, Template Toolkit, etc.)</li></ol>
+
+
+
+<h3><code>_format_title</code></h3>
+
+
+
+The <code>_format_title</code> method formats page names into readable titles. It:
+
+
+
+<ol><li>Converts underscores and hyphens to spaces</li></ol>
+
+<ol><li>Removes file extensions</li></ol>
+
+<ol><li>Capitalizes each word</li></ol>
+
+<ol><li>Handles special cases for acronyms (API, KVM, etc.)</li></ol>
+
+
+
+<h2>Documentation Categories</h2>
+
+
+
+The controller defines several documentation categories:
+
+
+
+<code></code>`perl
+
+has documentation_categories => (
+
+    is      => 'rw',
+
+    default => sub {
+
+        {
+
+            user_guides => {
+
+                title => 'User Documentation',
+
+                description => 'Documentation for end users of the Comserv system.',
+
+                roles => ['normal', 'editor', 'admin', 'developer'],
+
+                pages => [],
+
+            },
+
+            tutorials => {
+
+                title => 'Tutorials',
+
+                description => 'Step-by-step guides for common tasks.',
+
+                roles => ['normal', 'editor', 'admin', 'developer'],
+
+                pages => [],
+
+            },
+
+            site_specific => {
+
+                title => 'Site-Specific Documentation',
+
+                description => 'Documentation specific to this site.',
+
+                roles => ['normal', 'editor', 'admin', 'developer'],
+
+                site_specific => 1,
+
+                pages => [],
+
+            },
+
+            admin_guides => {
+
+                title => 'Administrator Guides',
+
+                description => 'Documentation for system administrators.',
+
+                roles => ['admin'],
+
+                pages => [],
+
+            },
+
+            proxmox => {
+
+                title => 'Proxmox Documentation',
+
+                description => 'Documentation for Proxmox virtualization.',
+
+                roles => ['admin'],
+
+                pages => [],
+
+            },
+
+            controllers => {
+
+                title => 'Controller Documentation',
+
+                description => 'Documentation for system controllers.',
+
+                roles => ['admin', 'developer'],
+
+                pages => [],
+
+            },
+
+            changelog => {
+
+                title => 'Changelog',
+
+                description => 'System changes and updates.',
+
+                roles => ['admin', 'developer'],
+
+                pages => [],
+
+            },
+
+            general => {
+
+                title => 'All Documentation',
+
+                description => 'Complete list of all documentation files.',
+
+                roles => ['admin'],
+
+                pages => [],
+
+            },
+
+        }
+
+    },
+
+    lazy => 1,
+
+);
+
+<code></code>`
+
+
+
+<h2>File Scanning Process</h2>
+
+
+
+The controller scans documentation files using the following process:
+
+
+
+<ol><li>Starts with the main documentation directory (<code>root/Documentation</code>)</li></ol>
+
+<ol><li>Uses <code>File::Find</code> to recursively scan all subdirectories</li></ol>
+
+<ol><li>Processes each file with a supported extension (.md, .tt, .html, .txt)</li></ol>
+
+<ol><li>Generates a unique key for each file</li></ol>
+
+<ol><li>Extracts metadata from the file (title, description, etc.)</li></ol>
+
+<ol><li>Categorizes the file based on its path and content</li></ol>
+
+<ol><li>Adds the file to the appropriate categories</li></ol>
+
+
+
+<h2>Categorization Logic</h2>
+
+
+
+Files are categorized based on:
+
+
+
+<ol><li>**Path**: Files in specific directories (e.g., <code>/roles/admin/</code>) are automatically categorized</li></ol>
+
+<ol><li>**Filename**: Files with specific patterns in their names are categorized accordingly</li></ol>
+
+<ol><li>**Content**: Files can be categorized based on their content (not currently implemented)</li></ol>
+
+
+
+<h2>Sorting Logic</h2>
+
+
+
+Documentation is sorted alphabetically by title using:
+
+
+
+<code></code>`perl
+
+<h1>Sort pages alphabetically by title</h1>
+
+my @sorted_pages = sort { 
+
+    lc($self->_format_title($a)) cmp lc($self->_format_title($b)) 
+
+} keys %filtered_pages;
+
+<code></code>`
+
+
+
+<h2>Template Integration</h2>
+
+
+
+The controller passes the following data to the template:
+
+
+
+<code></code>`perl
+
+$c->stash(
+
+    documentation_pages => \%filtered_pages,
+
+    structured_pages => $structured_pages,
+
+    sorted_page_names => \@sorted_pages,
+
+    completed_items => $completed_items,
+
+    categories => \%filtered_categories,
+
+    user_role => $user_role,
+
+    site_name => $site_name,
+
+    template => 'Documentation/index.tt'
+
+);
+
+<code></code>`
+
+
+
+<h2>Extending the Controller</h2>
+
+
+
+<h3>Adding a New Category</h3>
+
+
+
+To add a new category:
+
+
+
+<ol><li>Add the category to the <code>documentation_categories</code> attribute</li></ol>
+
+<ol><li>Update the categorization logic in the <code>scan_dirs</code> function</li></ol>
+
+<ol><li>Update the template to display the new category</li></ol>
+
+
+
+<h3>Supporting a New File Type</h3>
+
+
+
+To support a new file type:
+
+
+
+<ol><li>Update the file scanning regex to include the new extension</li></ol>
+
+<ol><li>Add handling for the new file type in the <code>generate_key</code> function</li></ol>
+
+<ol><li>Update the <code>view</code> method to properly render the new file type</li></ol>
+
+
+
+<h3>Modifying Sorting Behavior</h3>
+
+
+
+To change how documentation is sorted:
+
+
+
+<ol><li>Update the sorting logic in the <code>index</code> method</li></ol>
+
+<ol><li>Update the <code>_format_title</code> method if needed</li></ol>
+
+<ol><li>Consider adding client-side sorting in the template</li></ol>
+
+
+
+<h2>Troubleshooting</h2>
+
+
+
+<h3>Common Issues</h3>
+
+
+
+<ol><li>**Missing Documentation**: Check that the file exists and has a supported extension</li></ol>
+
+<ol><li>**Incorrect Categorization**: Verify the file path and name match the categorization rules</li></ol>
+
+<ol><li>**Permission Issues**: Ensure the user has the appropriate role to view the documentation</li></ol>
+
+<ol><li>**Sorting Problems**: Check the <code>_format_title</code> method and sorting logic</li></ol>
+
+
+
+<h3>Debugging</h3>
+
+
+
+The controller includes extensive logging. To debug issues:
+
+
+
+<ol><li>Enable debug mode in the application</li></ol>
+
+<ol><li>Check the logs for messages from the Documentation controller</li></ol>
+
+<ol><li>Look for errors in the file scanning and categorization process</li></ol>
+
+
+
+<h2>Performance Considerations</h2>
+
+
+
+The Documentation controller scans all files during initialization, which can impact startup time for large documentation sets. Consider:
+
+
+
+<ol><li>Implementing caching for documentation metadata</li></ol>
+
+<ol><li>Lazy-loading documentation content</li></ol>
+
+<ol><li>Optimizing the file scanning process for large directories</li></ol>
+
+</div>

@@ -1,0 +1,215 @@
+[% PageVersion = 'Comserv/root/Documentation/sites/mcoop/site_guide.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'MCOOP Site Guide' %]
+
+<!-- Documentation page for site_guide -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+This guide is specific to the MCOOP (Mountain Co-op) implementation of the Comserv system.
+
+
+
+<h2>MCOOP Overview</h2>
+
+
+
+Mountain Co-op (MCOOP) is a community cooperative organization that uses the Comserv platform to manage:
+
+
+
+<ul><li>Member information and accounts</li></ul>
+
+<ul><li>Co-op events and workshops</li></ul>
+
+<ul><li>Community resources and sharing</li></ul>
+
+<ul><li>Project coordination and volunteering</li></ul>
+
+<ul><li>Local marketplace and trading</li></ul>
+
+
+
+<h2>Site-Specific Features</h2>
+
+
+
+<h3>Member Directory</h3>
+
+
+
+The MCOOP implementation includes a specialized member directory with:
+
+
+
+<ul><li>Skills and resource sharing information</li></ul>
+
+<ul><li>Volunteer availability calendar</li></ul>
+
+<ul><li>Member-to-member messaging</li></ul>
+
+<ul><li>Reputation and contribution tracking</li></ul>
+
+
+
+To access the member directory:
+
+
+
+<ol><li>Click on "Members" in the main navigation</li></ol>
+
+<ol><li>Use filters to find members with specific skills or resources</li></ol>
+
+<ol><li>Click on a member profile to view details and contact options</li></ol>
+
+
+
+<h3>Local Marketplace</h3>
+
+
+
+The marketplace feature allows members to:
+
+
+
+<ul><li>List items for sale, trade, or donation</li></ul>
+
+<ul><li>Search for needed items or services</li></ul>
+
+<ul><li>Arrange exchanges through the messaging system</li></ul>
+
+<ul><li>Track transaction history</li></ul>
+
+
+
+<h3>Workshop Management</h3>
+
+
+
+MCOOP offers specialized workshop management tools:
+
+
+
+<ul><li>Workshop calendar with registration</li></ul>
+
+<ul><li>Attendance tracking</li></ul>
+
+<ul><li>Resource allocation for workshops</li></ul>
+
+<ul><li>Feedback collection and reporting</li></ul>
+
+
+
+<h2>MCOOP-Specific Settings</h2>
+
+
+
+<h3>Profile Configuration</h3>
+
+
+
+MCOOP members should configure these additional profile settings:
+
+
+
+<ol><li>Go to "My Account" > "Edit Profile"</li></ol>
+
+<ol><li>Complete the "Skills & Resources" section</li></ol>
+
+<ol><li>Set your volunteer availability</li></ol>
+
+<ol><li>Configure privacy settings for your profile information</li></ol>
+
+
+
+<h3>Notification Preferences</h3>
+
+
+
+Configure MCOOP-specific notifications:
+
+
+
+<ol><li>Navigate to "My Account" > "Notifications"</li></ol>
+
+<ol><li>Enable/disable notifications for:</li></ol>
+
+   - New marketplace listings
+
+   - Workshop announcements
+
+   - Volunteer opportunities
+
+   - Community events
+
+
+
+<h2>Community Guidelines</h2>
+
+
+
+As a MCOOP member, please follow these community guidelines:
+
+
+
+<ul><li>Respond to messages and requests within 3 business days</li></ul>
+
+<ul><li>Honor all commitments for trades, sales, and volunteer activities</li></ul>
+
+<ul><li>Provide accurate information about items in the marketplace</li></ul>
+
+<ul><li>Participate respectfully in all community discussions</li></ul>
+
+<ul><li>Report any issues to the community coordinators</li></ul>
+
+
+
+<h2>MCOOP Support Contacts</h2>
+
+
+
+For issues specific to the MCOOP implementation:
+
+
+
+<ul><li>**Technical Support**: support@mcoop.org</li></ul>
+
+<ul><li>**Membership Questions**: members@mcoop.org</li></ul>
+
+<ul><li>**Workshop Coordination**: workshops@mcoop.org</li></ul>
+
+<ul><li>**Community Coordinator**: coordinator@mcoop.org</li></ul>
+
+
+
+<h2>Upcoming MCOOP Features</h2>
+
+
+
+The following features are planned for future releases:
+
+
+
+<ul><li>Time banking system for service exchange</li></ul>
+
+<ul><li>Community project funding and voting</li></ul>
+
+<ul><li>Resource reservation calendar</li></ul>
+
+<ul><li>Mobile app for marketplace and messaging</li></ul>
+
+
+
+We hope you enjoy being part of the Mountain Co-op community!
+
+</div>

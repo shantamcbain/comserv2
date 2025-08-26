@@ -1,0 +1,113 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2024-08-ve7tit-controller-fixes.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Ve7tit Controller Fixes - August 2024' %]
+
+<!-- Documentation page for 2024-08-ve7tit-controller-fixes -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Issue</h2>
+
+The Ve7tit controller was experiencing two main issues:
+
+<ol><li>Mixed case URLs (<code>/Ve7tit</code>) were resulting in 404 errors</li></ol>
+
+<ol><li>Equipment pages (<code>/ve7tit/equipment/FT-897</code>) were not being found properly</li></ol>
+
+
+
+<h2>Solution</h2>
+
+The controller has been updated to:
+
+
+
+<ol><li>Handle mixed case URLs properly</li></ol>
+
+<ol><li>Improve equipment page routing and error handling</li></ol>
+
+<ol><li>Create missing equipment templates</li></ol>
+
+<ol><li>Add comprehensive documentation</li></ol>
+
+
+
+<h2>Implementation Details</h2>
+
+
+
+<h3>Controller Changes</h3>
+
+<ul><li>Added <code>direct_index</code> method with <code>:Path('/Ve7tit')</code> to handle mixed case URLs</li></ul>
+
+<ul><li>Added <code>mixed_case_direct_equipment</code> method for equipment pages with mixed case URLs</li></ul>
+
+<ul><li>Added helper method <code>_get_available_equipment</code> to list available equipment templates</li></ul>
+
+<ul><li>Improved error messages to be more user-friendly</li></ul>
+
+<ul><li>Enhanced logging for better debugging</li></ul>
+
+
+
+<h3>Template Changes</h3>
+
+<ul><li>Created detailed equipment templates for FT-897 and FT-891</li></ul>
+
+<ul><li>Updated the error template to display available equipment when a page is not found</li></ul>
+
+<ul><li>Added proper styling for equipment pages</li></ul>
+
+
+
+<h3>Documentation</h3>
+
+<ul><li>Added comprehensive documentation in the standard location</li></ul>
+
+<ul><li>Documented controller methods, templates, and URL structure</li></ul>
+
+<ul><li>Added instructions for creating new equipment pages</li></ul>
+
+
+
+<h2>Testing</h2>
+
+The following URLs now work correctly:
+
+<ul><li><code>/ve7tit</code> - Main landing page</li></ul>
+
+<ul><li><code>/Ve7tit</code> - Mixed case URL for landing page</li></ul>
+
+<ul><li><code>/ve7tit/equipment/FT-897</code> - Equipment page</li></ul>
+
+<ul><li><code>/Ve7tit/FT-897</code> - Mixed case URL for equipment page</li></ul>
+
+
+
+Non-existent equipment pages now show a helpful error with available options.
+
+
+
+<h2>Related Files</h2>
+
+<ul><li><code>/Comserv/lib/Comserv/Controller/Ve7tit.pm</code> - Controller file</li></ul>
+
+<ul><li><code>/Comserv/root/ve7tit/FT-897.tt</code> - Equipment template</li></ul>
+
+<ul><li><code>/Comserv/root/ve7tit/FT-891.tt</code> - Equipment template</li></ul>
+
+<ul><li><code>/Comserv/root/error.tt</code> - Error template</li></ul>
+
+<ul><li><code>/Comserv/root/Documentation/controllers/Ve7tit.md</code> - Controller documentation</li></ul>
+
+</div>

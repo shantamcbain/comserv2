@@ -1,0 +1,239 @@
+[% PageVersion = 'Comserv/root/Documentation/roles/admin/documentation_system_guide.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Documentation System Administrator Guide' %]
+
+<!-- Documentation page for documentation_system_guide -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**Last Updated:** April 10, 2025  
+
+**Author:** Shanta
+
+
+
+<h2>Overview</h2>
+
+
+
+This guide provides information for administrators about the Documentation system in Comserv. As an administrator, you have access to all documentation categories and pages, including admin-specific documentation.
+
+
+
+<h2>Admin Documentation Categories</h2>
+
+
+
+As an administrator, you have access to the following special documentation categories:
+
+
+
+<ol><li>**Administrator Guides**: Documentation specifically for system administrators</li></ol>
+
+<ol><li>**Proxmox Documentation**: Documentation related to the Proxmox virtualization environment</li></ol>
+
+<ol><li>**Controller Documentation**: Technical documentation about system controllers</li></ol>
+
+<ol><li>**Changelog**: Documentation about system changes and updates</li></ol>
+
+<ol><li>**All Documentation Files**: A complete alphabetical list of all documentation files</li></ol>
+
+
+
+<h2>Role-Based Access</h2>
+
+
+
+The Documentation system uses role-based access control to determine which documentation categories and pages a user can see:
+
+
+
+<ul><li>**Admin users** can see all documentation categories and pages</li></ul>
+
+<ul><li>**Developer users** can see developer documentation and some admin documentation</li></ul>
+
+<ul><li>**Editor users** can see editor documentation and user documentation</li></ul>
+
+<ul><li>**Normal users** can see only user documentation and tutorials</li></ul>
+
+
+
+<h2>Troubleshooting Access Issues</h2>
+
+
+
+If you or your users are experiencing issues with documentation access:
+
+
+
+<ol><li>**Check user roles**: Make sure the user has the appropriate role assigned</li></ol>
+
+<ol><li>**Check session roles**: The system uses session roles to determine access</li></ol>
+
+<ol><li>**Enable debug mode**: Set <code>debug_mode = 1</code> in the user's session to see detailed role information</li></ol>
+
+<ol><li>**Check logs**: Look for role-related messages in the application logs</li></ol>
+
+
+
+<h2>Adding New Documentation</h2>
+
+
+
+To add new documentation:
+
+
+
+<ol><li>Create a new markdown (.md) or template (.tt) file in the appropriate directory:</li></ol>
+
+   - <code>/Documentation/roles/admin/</code> for admin-specific documentation
+
+   - <code>/Documentation/roles/developer/</code> for developer documentation
+
+   - <code>/Documentation/roles/normal/</code> for user documentation
+
+   - <code>/Documentation/changelog/</code> for changelog entries
+
+   - <code>/Documentation/tutorials/</code> for tutorials
+
+   - <code>/Documentation/sites/{site_name}/</code> for site-specific documentation
+
+
+
+<ol><li>Use the following format for changelog entries:</li></ol>
+
+   <code></code>`
+
+   # Title of Change
+
+   
+
+   **Date:** Month Day, Year  
+
+   **Author:** Your Name  
+
+   **Status:** Completed/In Progress
+
+   
+
+   ## Overview
+
+   
+
+   Brief description of the change
+
+   
+
+   ## Changes Made
+
+   
+
+   ### 1. First Change
+
+   
+
+   Details about the first change
+
+   
+
+   ### 2. Second Change
+
+   
+
+   Details about the second change
+
+   
+
+   ## Technical Details
+
+   
+
+   Code examples and technical information
+
+   
+
+   ## Benefits
+
+   
+
+   List of benefits from this change
+
+   
+
+   ## Future Considerations
+
+   
+
+   Ideas for future improvements
+
+   <code></code>`
+
+
+
+<h2>Documentation Organization</h2>
+
+
+
+The Documentation system organizes documentation into the following categories:
+
+
+
+<ol><li>**User Guides**: Documentation for end users</li></ol>
+
+<ol><li>**Administrator Guides**: Documentation for system administrators</li></ol>
+
+<ol><li>**Developer Documentation**: Documentation for developers</li></ol>
+
+<ol><li>**Tutorials**: Step-by-step guides for common tasks</li></ol>
+
+<ol><li>**Site-Specific Documentation**: Documentation specific to a particular site</li></ol>
+
+<ol><li>**Module Documentation**: Documentation for specific system modules</li></ol>
+
+<ol><li>**Proxmox Documentation**: Documentation for Proxmox virtualization</li></ol>
+
+<ol><li>**Controller Documentation**: Documentation for system controllers</li></ol>
+
+<ol><li>**Changelog**: System changes and updates</li></ol>
+
+10. **All Documentation**: Complete list of all documentation files
+
+
+
+<h2>Best Practices</h2>
+
+
+
+<ol><li>**Keep documentation up-to-date**: Update documentation when making system changes</li></ol>
+
+<ol><li>**Use markdown formatting**: Use markdown for better readability</li></ol>
+
+<ol><li>**Include code examples**: Provide code examples where appropriate</li></ol>
+
+<ol><li>**Add metadata**: Include date, author, and status information</li></ol>
+
+<ol><li>**Categorize properly**: Place documentation in the appropriate category</li></ol>
+
+<ol><li>**Use clear titles**: Make titles descriptive and clear</li></ol>
+
+<ol><li>**Include troubleshooting**: Add troubleshooting sections for common issues</li></ol>
+
+
+
+<h2>Getting Help</h2>
+
+
+
+If you need help with the Documentation system, contact the system administrator or refer to the developer documentation for more technical details.
+
+</div>

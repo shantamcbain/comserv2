@@ -1,0 +1,261 @@
+[% PageVersion = 'Comserv/root/Documentation/roles/normal/Documentation_System.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Documentation System User Guide' %]
+
+<!-- Documentation page for Documentation_System -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Introduction</h2>
+
+
+
+The Comserv Documentation System provides access to all system documentation in an organized, easy-to-navigate format. This guide explains how to use the documentation system to find the information you need.
+
+
+
+<h2>Accessing Documentation</h2>
+
+
+
+To access the documentation system:
+
+
+
+<ol><li>Log in to your Comserv account</li></ol>
+
+<ol><li>Click on the "Documentation" link in the main navigation menu</li></ol>
+
+<ol><li>You will be taken to the main documentation page</li></ol>
+
+
+
+<h2>Documentation Organization</h2>
+
+
+
+The documentation is organized into several sections:
+
+
+
+<h3>User Documentation</h3>
+
+
+
+This section contains guides and information for regular users of the system. It includes:
+
+
+
+<ul><li>Account management</li></ul>
+
+<ul><li>Getting started guides</li></ul>
+
+<ul><li>Feature usage instructions</li></ul>
+
+<ul><li>Frequently asked questions</li></ul>
+
+
+
+<h3>Tutorials</h3>
+
+
+
+Step-by-step guides for common tasks, including:
+
+
+
+<ul><li>Login and authentication</li></ul>
+
+<ul><li>Customizing your profile</li></ul>
+
+<ul><li>Using specific features</li></ul>
+
+<ul><li>Troubleshooting common issues</li></ul>
+
+
+
+<h3>Site-Specific Documentation</h3>
+
+
+
+Documentation specific to the current site you are using. This section only appears if there is documentation specific to your site.
+
+
+
+<h2>Documentation Cards</h2>
+
+
+
+Each piece of documentation is displayed as a "card" with:
+
+
+
+<ul><li>**Title**: The name of the documentation</li></ul>
+
+<ul><li>**Description**: A brief summary of what the documentation covers</li></ul>
+
+<ul><li>**File Type Badge**: Indicates whether the document is a Markdown file, Template file, or other format</li></ul>
+
+<ul><li>**Site Badge**: If the documentation is specific to a particular site</li></ul>
+
+
+
+Click on any card to view the full documentation.
+
+
+
+<h2>Searching for Documentation</h2>
+
+
+
+While there is no dedicated search function, you can use your browser's search function (usually Ctrl+F or Cmd+F) to find specific terms on the documentation page.
+
+
+
+<h2>File Types</h2>
+
+
+
+The documentation system supports several file types, indicated by badges:
+
+
+
+<ul><li>**Markdown (.md)**: Text-based documentation with formatting</li></ul>
+
+<ul><li>**Template (.tt)**: Template Toolkit files that may include dynamic content</li></ul>
+
+<ul><li>**Other**: Other file types such as HTML or plain text</li></ul>
+
+
+
+<h2>Administrator View</h2>
+
+
+
+If you have administrator privileges, you will see additional sections:
+
+
+
+<h3>Administrator Guides</h3>
+
+
+
+Documentation specifically for system administrators, including:
+
+
+
+<ul><li>User management</li></ul>
+
+<ul><li>System configuration</li></ul>
+
+<ul><li>Security settings</li></ul>
+
+<ul><li>Backup and recovery</li></ul>
+
+
+
+<h3>Proxmox Documentation</h3>
+
+
+
+Documentation related to the Proxmox virtualization environment.
+
+
+
+<h3>Controller Documentation</h3>
+
+
+
+Technical documentation about system controllers.
+
+
+
+<h3>Changelog</h3>
+
+
+
+Information about system changes and updates.
+
+
+
+<h3>All Documentation Files</h3>
+
+
+
+A complete alphabetical list of all documentation files in the system.
+
+
+
+<h2>Recent Updates</h2>
+
+
+
+The main documentation page also displays recent updates to the system, showing:
+
+
+
+<ul><li>The date of the update</li></ul>
+
+<ul><li>A brief title describing the update</li></ul>
+
+<ul><li>A description of what was changed or added</li></ul>
+
+
+
+<h2>Tips for Using Documentation</h2>
+
+
+
+<ol><li>**Start with Getting Started**: If you're new to the system, begin with the Getting Started guide</li></ol>
+
+<ol><li>**Use Tutorials**: For step-by-step instructions on specific tasks, check the Tutorials section</li></ol>
+
+<ol><li>**Check Site-Specific Docs**: If you're using a specific site, check the site-specific documentation</li></ol>
+
+<ol><li>**Look for File Type Badges**: Different file types may contain different kinds of information</li></ol>
+
+<ol><li>**Ask for Help**: If you can't find what you need, contact your system administrator</li></ol>
+
+
+
+<h2>Feedback and Contributions</h2>
+
+
+
+If you find errors in the documentation or have suggestions for improvement, please contact your system administrator or the documentation team.
+
+
+
+<h2>Troubleshooting</h2>
+
+
+
+<h3>Documentation Not Displaying</h3>
+
+
+
+If you can't see certain documentation:
+
+
+
+<ol><li>Check that you are logged in</li></ol>
+
+<ol><li>Verify that you have the appropriate role to view the documentation</li></ol>
+
+<ol><li>Try refreshing the page</li></ol>
+
+<ol><li>Clear your browser cache</li></ol>
+
+<ol><li>Contact your system administrator if the problem persists</li></ol>
+
+</div>

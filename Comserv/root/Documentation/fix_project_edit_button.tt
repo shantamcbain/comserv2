@@ -1,0 +1,135 @@
+[% PageVersion = 'Comserv/root/Documentation/fix_project_edit_button.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Fix for Project Edit Button and Parent Project Update' %]
+
+<!-- Documentation page for fix_project_edit_button -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Issue Description</h2>
+
+
+
+Two issues were encountered when trying to edit a project from the project details page:
+
+
+
+<ol><li>Error message when clicking the Edit button:</li></ol>
+
+<code></code>`
+
+Project with ID ARRAY(0x63cdc68e7090) not found
+
+<code></code>`
+
+
+
+<ol><li>Parent project changes were not being saved when updating a project.</li></ol>
+
+
+
+<h2>Solution</h2>
+
+
+
+The solution involved several changes:
+
+
+
+<ol><li>**Changed the Edit Project button in projectdetails.tt**:</li></ol>
+
+   - Replaced the form with a direct link using an anchor tag
+
+   - Added the project_id as a query parameter in the URL
+
+   - Added CSS to style the button link properly
+
+
+
+<ol><li>**Fixed the project_list.tt template**:</li></ol>
+
+   - Changed the dropdown name from <code>project_id</code> to <code>parent_id</code> to avoid conflict with the project being edited
+
+   - This ensures the parent project selection is properly submitted
+
+
+
+<ol><li>**Enhanced the <code>update_project</code> method in Project.pm**:</li></ol>
+
+   - Added handling for the case where project_id is an array reference
+
+   - Added parent_id to the list of fields to update
+
+   - Added proper handling for empty parent_id values
+
+   - Added comprehensive error handling and logging
+
+   - Improved success message and redirect
+
+
+
+<ol><li>**Added success and error message display**:</li></ol>
+
+   - Added message containers to projectdetails.tt
+
+   - Added CSS styling for success and error messages
+
+
+
+<h2>Technical Details</h2>
+
+
+
+There were two main issues:
+
+
+
+<ol><li>When using a form with method="GET" and a hidden input field, the project_id was being sent as an array reference instead of a scalar value. This was causing the error when trying to find the project in the database.</li></ol>
+
+
+
+<ol><li>The parent_id was not being included in the update operation, and there was a naming conflict between the project being edited and the parent project selection.</li></ol>
+
+
+
+The solution was to:
+
+<ol><li>Replace the form with a direct link using an anchor tag</li></ol>
+
+<ol><li>Change the parent project dropdown name to avoid conflicts</li></ol>
+
+<ol><li>Add parent_id handling in the update_project method</li></ol>
+
+<ol><li>Add proper success and error message display</li></ol>
+
+
+
+<h2>Benefits</h2>
+
+
+
+<ul><li>More robust project editing</li></ul>
+
+<ul><li>Parent project changes are now properly saved</li></ul>
+
+<ul><li>Better error handling and logging</li></ul>
+
+<ul><li>Improved user experience with success and error messages</li></ul>
+
+<ul><li>Fixed security issues with form methods</li></ul>
+
+
+
+This fix ensures that users can edit projects and change parent projects without encountering errors.
+
+</div>

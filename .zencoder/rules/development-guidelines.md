@@ -8,13 +8,45 @@ alwaysApply: true
 
 ## Core Interaction Constraints
 
-### 4-Prompt Limitation System - STRICTLY ENFORCED
-- **Maximum Prompts:** 4 prompts per chat session - NO EXCEPTIONS
+### 5-Prompt Limitation System - STRICTLY ENFORCED
+- **Maximum Prompts:** 5 prompts per chat session - NO EXCEPTIONS
 - **Current Prompt Counter:** AI must track and announce prompt count at start of each response
 - **Reason 1:** Zencoder cost management - additional prompts incur higher charges
 - **Reason 2:** AI confusion prevention - performance degrades with extended conversations
-- **Action on 4th Prompt:** Automatically update documentation and prepare handoff
-- **Enforcement:** AI must refuse to continue beyond 4 prompts and provide handoff
+- **Action on 5th Prompt:** Automatically update documentation and prepare handoff
+- **Enforcement:** AI must refuse to continue beyond 5 prompts and provide handoff
+
+## SYSTEMATIC DEBUGGING WORKFLOW
+
+### Phase 1: Analysis (Prompt 1-2)
+1. **Read AI Guidelines:** Review current zencoder rules and standards
+2. **Read Documentation:** Study relevant documentation for affected components
+3. **Read Codebase:** Examine all related controllers, models, templates (.tt files)
+4. **Compare State:** Note discrepancies between documentation and actual code
+5. **Read Application Logs:** Verify errors and trace execution path through application
+6. **Document Discrepancies:** List all differences found between docs and code
+
+### Phase 2: Planning (Prompt 2-3)
+1. **Create Comprehensive Plan:** Include both bug fix and documentation updates
+2. **Prioritize Tasks:** 
+   - Fix critical documentation discrepancies
+   - Implement bug fix
+   - Update documentation to reflect new state
+3. **Define Success Criteria:** Clear metrics for completion
+
+### Phase 3: Implementation (Prompt 3-4)
+1. **Execute Plan:** Implement changes in logical order
+2. **Fix Documentation First:** Align docs with current code state
+3. **Implement Bug Fix:** Apply necessary code changes
+4. **Update Documentation:** Reflect new code functionality
+5. **Test Changes:** Verify fix works as expected
+
+### Phase 4: Review & Commit (Prompt 4-5)
+1. **Present All Changes:** Show complete diff of all modifications
+2. **Document Fix:** Record what was changed and why
+3. **Update Plan Status:** Show completed vs remaining tasks
+4. **Commit Changes:** Prepare for version control
+5. **Handoff Preparation:** If tasks remain, prepare next session context
 
 ### 4th Prompt Protocol
 When reaching the 4th prompt, the AI must:

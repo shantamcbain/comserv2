@@ -1,0 +1,331 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2024-07-proxmox-controller-fixes.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Proxmox Controller Syntax Fixes - July 2024' %]
+
+<!-- Documentation page for 2024-07-proxmox-controller-fixes -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Issue Description</h2>
+
+
+
+Several syntax errors were identified in the Proxmox controller file (<code>Comserv/lib/Comserv/Controller/Proxmox.pm</code>) that were causing the application to fail when accessing Proxmox VM management functionality. The issues included:
+
+
+
+<ol><li>Malformed code blocks with extra closing braces</li></ol>
+
+<ol><li>Duplicate code sections</li></ol>
+
+<ol><li>Incorrect variable references</li></ol>
+
+<ol><li>Malformed hash structures in stash and flash assignments</li></ol>
+
+<ol><li>Duplicate admin role checks</li></ol>
+
+
+
+<h2>Changes Made</h2>
+
+
+
+<ol><li>**Fixed duplicate admin role check and malformed code in the index function (lines 38-54)**:</li></ol>
+
+   - Removed duplicate admin role check code
+
+   - Fixed the server_id variable assignment
+
+   - Properly formatted the code structure
+
+
+
+<ol><li>**Fixed malformed eval block with extra closing braces (lines 155-156)**:</li></ol>
+
+   - Removed extra closing braces that were causing syntax errors
+
+   - Properly closed the eval block
+
+
+
+<ol><li>**Fixed duplicate error handling code (lines 157-163)**:</li></ol>
+
+   - Removed redundant error handling code that was duplicated
+
+
+
+<ol><li>**Fixed malformed stash hash with duplicate server_id key (lines 187-196)**:</li></ol>
+
+   - Removed the duplicate server_id key in the stash hash
+
+   - Properly formatted the stash hash structure
+
+
+
+<ol><li>**Fixed malformed flash hash for templates (lines 267-274)**:</li></ol>
+
+   - Changed the incorrect flash hash to a proper stash hash for templates
+
+   - Fixed the template variable assignment
+
+
+
+<ol><li>**Fixed malformed server_id variable reference (line 361)**:</li></ol>
+
+   - Corrected the server_id variable reference from <code>$cserver_id}</code> to <code>$c->session->{proxmox_server_id}</code>
+
+
+
+<h2>Files Modified</h2>
+
+
+
+<ul><li><code>/Comserv/lib/Comserv/Controller/Proxmox.pm</code></li></ul>
+
+
+
+<h2>Benefits</h2>
+
+
+
+<ul><li>Fixed critical syntax errors that were preventing the Proxmox VM management functionality from working</li></ul>
+
+<ul><li>Improved code readability and maintainability</li></ul>
+
+<ul><li>Eliminated duplicate code sections</li></ul>
+
+<ul><li>Ensured proper variable references and hash structures</li></ul>
+
+
+
+<h2>Testing</h2>
+
+
+
+The fixes have been tested by:
+
+<ol><li>Verifying that the Proxmox controller loads without syntax errors</li></ol>
+
+<ol><li>Confirming that the Proxmox VM management page loads correctly</li></ol>
+
+<ol><li>Testing the authentication with Proxmox servers</li></ol>
+
+<ol><li>Verifying that VM creation forms work properly</li></ol>
+
+
+
+<h2>Technical Details</h2>
+
+
+
+<h3>Original Issues</h3>
+
+
+
+The controller had several syntax issues that were causing it to fail:
+
+
+
+<ol><li>Extra closing braces in the eval block:</li></ol>
+
+   <code></code>`perl
+
+   # Before
+
+   };
+
+   if ($@) {
+
+       $auth_error = "Error connecting to Proxmox server: $@";
+
+       $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index', $auth_error);
+
+   if ($@) {
+
+       $auth_error = "Error connecting to Proxmox server: $@";
+
+       $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index', $auth_error);
+
+   }
+
+   <code></code>`
+
+
+
+<ol><li>Duplicate server_id key in stash:</li></ol>
+
+   <code></code>`perl
+
+   # Before
+
+   $c->stash(
+
+       template => 'proxmox/index.tt',
+
+       vms => $vms,
+
+       auth_success => $auth_success,
+
+       auth_error => $auth_error,
+
+       server_id => $server_id,
+
+       servers => $servers,
+
+       credentials => $credentials
+
+       server_id => $server_id,
+
+   );
+
+   <code></code>`
+
+
+
+<ol><li>Malformed flash hash:</li></ol>
+
+   <code></code>`perl
+
+   # Before
+
+   $c->flash->{emplates => $templates,
+
+       cpu_options => \@cpu_options,
+
+       memory_options => \@memory_options,
+
+       disk_options => \@disk_options,
+
+       server_id => $server_id,
+
+   };
+
+   <code></code>`
+
+
+
+<ol><li>Incorrect variable reference:</li></ol>
+
+   <code></code>`perl
+
+   # Before
+
+   my $server_id = $cserver_id} || 'default';
+
+   <code></code>`
+
+
+
+<h3>Fixed Code</h3>
+
+
+
+<ol><li>Fixed eval block:</li></ol>
+
+   <code></code>`perl
+
+   # After
+
+   };
+
+   if ($@) {
+
+       $auth_error = "Error connecting to Proxmox server: $@";
+
+       $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index', $auth_error);
+
+   }
+
+   <code></code>`
+
+
+
+<ol><li>Fixed stash hash:</li></ol>
+
+   <code></code>`perl
+
+   # After
+
+   $c->stash(
+
+       template => 'proxmox/index.tt',
+
+       vms => $vms,
+
+       auth_success => $auth_success,
+
+       auth_error => $auth_error,
+
+       server_id => $server_id,
+
+       servers => $servers,
+
+       credentials => $credentials
+
+   );
+
+   <code></code>`
+
+
+
+<ol><li>Fixed template stash:</li></ol>
+
+   <code></code>`perl
+
+   # After
+
+   $c->stash(
+
+       template => 'proxmox/create_vm.tt',
+
+       templates => $templates,
+
+       cpu_options => \@cpu_options,
+
+       memory_options => \@memory_options,
+
+       disk_options => \@disk_options,
+
+       server_id => $server_id,
+
+   );
+
+   <code></code>`
+
+
+
+<ol><li>Fixed variable reference:</li></ol>
+
+   <code></code>`perl
+
+   # After
+
+   my $server_id = $c->session->{proxmox_server_id} || 'default';
+
+   <code></code>`
+
+
+
+<h2>Related Documentation</h2>
+
+
+
+For more information about the Proxmox integration in Comserv, see:
+
+<ul><li>Proxmox API documentation</li></ul>
+
+<ul><li>Comserv::Model::Proxmox module documentation</li></ul>
+
+<ul><li>Comserv::Util::ProxmoxCredentials module documentation</li></ul>
+
+</div>

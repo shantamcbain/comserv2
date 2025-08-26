@@ -1,0 +1,61 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2025-04-documentation-display-fix.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Documentation Display Fix' %]
+
+<!-- Documentation page for 2025-04-documentation-display-fix -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**Date:** 2025-04-08
+
+**Type:** [FIX]
+
+**Author:** Development Team
+
+
+
+<h2>Changes</h2>
+
+
+
+<ul><li>Fixed markdown rendering in the documentation viewer</li></ul>
+
+<ul><li>Added dedicated CSS for the markdown viewer</li></ul>
+
+<ul><li>Improved section display and collapsible content</li></ul>
+
+<ul><li>Fixed CSS path references in the markdown viewer template</li></ul>
+
+
+
+<h2>Motivation</h2>
+
+
+
+The documentation system was not correctly displaying markdown content, particularly for the Documentation_Workflow.md file. The content was visible but sections were not properly formatted and details were not accessible through button clicks.
+
+
+
+<h2>Impact</h2>
+
+
+
+<ul><li>Improved readability of documentation pages</li></ul>
+
+<ul><li>Fixed section collapsing/expanding functionality</li></ul>
+
+<ul><li>Enhanced overall user experience when viewing documentation</li></ul>
+
+<ul><li>Ensured all documentation content is properly displayed and accessible</li></ul>
+
+</div>

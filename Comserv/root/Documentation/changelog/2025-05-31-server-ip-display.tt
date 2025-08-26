@@ -1,0 +1,111 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2025-05-31-server-ip-display.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Server IP Display Enhancement' %]
+
+<!-- Documentation page for 2025-05-31-server-ip-display -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**Date:** May 31, 2025  
+
+**Author:** Shanta  
+
+**Status:** Completed
+
+
+
+<h2>Overview</h2>
+
+
+
+This update adds the server's hostname and IP address to the page header for admin users. This information helps administrators verify which server is handling the request, which is particularly useful in proxy environments.
+
+
+
+<h2>Changes</h2>
+
+
+
+<ol><li>Created a new utility module <code>Comserv::Util::SystemInfo</code> with functions to retrieve server information:</li></ol>
+
+   - <code>get_server_hostname()</code> - Returns the server's hostname
+
+   - <code>get_server_ip()</code> - Returns the server's IP address using multiple fallback methods
+
+   - <code>get_system_info()</code> - Returns a hash with hostname, IP, OS, and Perl version
+
+
+
+<ol><li>Modified the Root controller's <code>auto</code> method to:</li></ol>
+
+   - Load the server information
+
+   - Add the server hostname and IP to the stash
+
+
+
+<ol><li>Updated the <code>pagetop.tt</code> template to display:</li></ol>
+
+   - Domain (the domain in the request URL)
+
+   - Client IP (the IP address of the client making the request)
+
+   - Server hostname (the hostname of the server running the application)
+
+   - Server IP (the IP address of the server running the application)
+
+
+
+<h2>Technical Details</h2>
+
+
+
+The server IP detection uses multiple methods to ensure reliability:
+
+<ol><li>First tries resolving the hostname via <code>Socket</code></li></ol>
+
+<ol><li>If that fails, parses the output of <code>ifconfig</code> or <code>ip addr</code> to find non-loopback interfaces</li></ol>
+
+<ol><li>As a last resort, creates a UDP socket connection to a public DNS server (8.8.8.8) and determines the local IP from the socket information</li></ol>
+
+
+
+<h2>Testing</h2>
+
+
+
+This change has been tested in the following environments:
+
+<ul><li>Direct access to the application server</li></ul>
+
+<ul><li>Access through a proxy server</li></ul>
+
+<ul><li>Multiple browsers and client devices</li></ul>
+
+
+
+<h2>Benefits</h2>
+
+
+
+This enhancement helps administrators:
+
+<ul><li>Verify that requests are being routed to the correct server</li></ul>
+
+<ul><li>Diagnose proxy configuration issues</li></ul>
+
+<ul><li>Confirm load balancing is working correctly</li></ul>
+
+<ul><li>Identify which physical or virtual server is handling a request</li></ul>
+
+</div>

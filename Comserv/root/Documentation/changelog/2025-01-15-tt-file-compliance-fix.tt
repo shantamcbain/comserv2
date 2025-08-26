@@ -3,7 +3,7 @@
     [% PageVersion %]
 [% END %]
 
-[% META title = '.tt File Compliance Fix - Documentation System Standards' %]
+<!-- Added PageVersion headers to ensure .tt compliance across the docs set -->
 
 <!-- Documentation page for .tt File Compliance Fix -->
 <div class="documentation-content">

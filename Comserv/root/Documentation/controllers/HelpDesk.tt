@@ -1,0 +1,223 @@
+[% PageVersion = 'Comserv/root/Documentation/controllers/HelpDesk.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'HelpDesk Controller' %]
+
+<!-- Documentation page for HelpDesk -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**Last Updated:** April 24, 2024  
+
+**Author:** Shanta  
+
+**Status:** Active
+
+
+
+<h2>Overview</h2>
+
+The HelpDesk controller manages the support ticketing system and knowledge base for Computer System Consulting. It provides a centralized interface for users to submit support tickets, check ticket status, browse the knowledge base, and contact support directly.
+
+
+
+<h2>Key Features</h2>
+
+<ul><li>Support ticket submission and management</li></ul>
+
+<ul><li>Ticket status tracking</li></ul>
+
+<ul><li>Knowledge base access with Linux commands reference</li></ul>
+
+<ul><li>Administrative interface for HelpDesk management</li></ul>
+
+<ul><li>Direct contact with support team</li></ul>
+
+<ul><li>Chained dispatch system for consistent URL structure</li></ul>
+
+<ul><li>Debug message handling for troubleshooting</li></ul>
+
+<ul><li>Integration with Documentation and FAQ systems</li></ul>
+
+
+
+<h2>Methods</h2>
+
+
+
+<h3>Base Methods</h3>
+
+<ul><li><code>auto</code>: Common setup for all HelpDesk actions, initializes debug messages</li></ul>
+
+<ul><li><code>base</code>: Base method for chained actions, sets up common stash variables</li></ul>
+
+<ul><li><code>default</code>: Fallback for HelpDesk URLs that don't match any actions</li></ul>
+
+
+
+<h3>Page Methods</h3>
+
+<ul><li><code>index</code>: Main HelpDesk landing page with support options</li></ul>
+
+<ul><li><code>kb</code>: Knowledge Base page with categorized support articles</li></ul>
+
+<ul><li><code>contact</code>: Contact Support page with various contact methods</li></ul>
+
+<ul><li><code>admin</code>: Administrative interface for managing the HelpDesk system (admin-only)</li></ul>
+
+<ul><li><code>linux_commands</code>: Reference page for common Linux commands (admin-only)</li></ul>
+
+
+
+<h3>Ticket Methods</h3>
+
+<ul><li><code>ticket_base</code>: Base method for all ticket-related actions</li></ul>
+
+<ul><li><code>ticket_new</code>: Form for creating new support tickets</li></ul>
+
+<ul><li><code>ticket_status</code>: Page for viewing existing ticket status</li></ul>
+
+
+
+<h2>URL Structure</h2>
+
+<ul><li><code>/HelpDesk</code> - Main HelpDesk landing page</li></ul>
+
+<ul><li><code>/HelpDesk/admin</code> - HelpDesk administration (admin-only)</li></ul>
+
+<ul><li><code>/HelpDesk/ticket/new</code> - Create new support ticket</li></ul>
+
+<ul><li><code>/HelpDesk/ticket/status</code> - View ticket status</li></ul>
+
+<ul><li><code>/HelpDesk/kb</code> - Knowledge base</li></ul>
+
+<ul><li><code>/HelpDesk/kb/linux_commands</code> - Linux commands reference</li></ul>
+
+<ul><li><code>/HelpDesk/contact</code> - Contact support</li></ul>
+
+
+
+<h2>Access Control</h2>
+
+This controller implements role-based access control:
+
+<ul><li>Anonymous users can view the HelpDesk and submit tickets</li></ul>
+
+<ul><li>Authenticated users see personalized content and their ticket history</li></ul>
+
+<ul><li>Admin users have additional management capabilities through the admin interface</li></ul>
+
+
+
+<h2>Navigation Integration</h2>
+
+The HelpDesk system is integrated into the main navigation through the <code>TopDropListHelpDesk.tt</code> template, providing easy access to all HelpDesk components:
+
+<ul><li>HelpDesk Home</li></ul>
+
+<ul><li>Submit a Ticket</li></ul>
+
+<ul><li>Check Ticket Status</li></ul>
+
+<ul><li>Documentation</li></ul>
+
+<ul><li>Knowledge Base</li></ul>
+
+<ul><li>Linux Commands (admin-only)</li></ul>
+
+<ul><li>FAQ</li></ul>
+
+<ul><li>Contact Support</li></ul>
+
+
+
+<h2>Related Files</h2>
+
+<ul><li>Template files:</li></ul>
+
+<ul><li style="margin-left: 20px"><code>/root/CSC/HelpDesk.tt</code> - Main HelpDesk template</li></ul>
+
+<ul><li style="margin-left: 20px"><code>/root/CSC/HelpDesk/admin.tt</code> - HelpDesk administration interface</li></ul>
+
+<ul><li style="margin-left: 20px"><code>/root/CSC/HelpDesk/new_ticket.tt</code> - New ticket form</li></ul>
+
+<ul><li style="margin-left: 20px"><code>/root/CSC/HelpDesk/ticket_status.tt</code> - Ticket status page</li></ul>
+
+<ul><li style="margin-left: 20px"><code>/root/CSC/HelpDesk/kb.tt</code> - Knowledge base</li></ul>
+
+<ul><li style="margin-left: 20px"><code>/root/CSC/HelpDesk/linux_commands.tt</code> - Linux commands reference</li></ul>
+
+<ul><li style="margin-left: 20px"><code>/root/CSC/HelpDesk/contact.tt</code> - Contact page</li></ul>
+
+<ul><li>Support content:</li></ul>
+
+<ul><li style="margin-left: 20px"><code>/root/CSC/HelpdeskContents.tt</code> - Shared content included in the main template</li></ul>
+
+<ul><li style="margin-left: 20px"><code>/root/CSC/HelpDeskHomePagesql.tt</code> - SQL-based dynamic content</li></ul>
+
+<ul><li>Navigation:</li></ul>
+
+<ul><li style="margin-left: 20px"><code>/root/Navigation/TopDropListHelpDesk.tt</code> - HelpDesk dropdown menu</li></ul>
+
+
+
+<h2>Logging and Debugging</h2>
+
+The HelpDesk controller uses comprehensive logging with <code>log_with_details</code>:
+
+
+
+<code></code>`perl
+
+$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'method_name', 
+
+    "Detailed message with relevant information");
+
+<code></code>`
+
+
+
+Debug messages are stored in the stash for display in templates when debug mode is enabled:
+
+
+
+<code></code>`perl
+
+push @{$c->stash->{debug_msg}}, "Debug message";
+
+<code></code>`
+
+
+
+<h2>Implementation Notes</h2>
+
+<ul><li>Uses the chained dispatch system for consistent URL structure</li></ul>
+
+<ul><li>Explicitly forwards to the TT view to ensure template rendering</li></ul>
+
+<ul><li>Maintains debug messages in an array for troubleshooting</li></ul>
+
+<ul><li>Designed to work without explicit loading in Comserv.pm</li></ul>
+
+<ul><li>Integrates with the Documentation and FAQ systems for comprehensive support</li></ul>
+
+
+
+<h2>Related Documentation</h2>
+
+<ul><li><a href="/Documentation/HelpDeskSystem">HelpDesk System Documentation</a></li></ul>
+
+<ul><li><a href="/Documentation/controllers/FAQ">FAQ Controller Documentation</a></li></ul>
+
+<ul><li><a href="/Documentation/documentation_config_guide">Documentation System Guide</a></li></ul>
+
+</div>

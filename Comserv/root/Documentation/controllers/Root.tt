@@ -1,0 +1,67 @@
+[% PageVersion = 'Comserv/root/Documentation/controllers/Root.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Root Controller' %]
+
+<!-- Documentation page for Root -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Overview</h2>
+
+The Root controller is the main entry point for the Comserv application. It handles routing, authentication, and site setup.
+
+
+
+<h2>Key Features</h2>
+
+<ul><li>Manages application routing</li></ul>
+
+<ul><li>Handles user authentication and session management</li></ul>
+
+<ul><li>Sets up site-specific configurations</li></ul>
+
+<ul><li>Provides error handling and debugging</li></ul>
+
+
+
+<h2>Methods</h2>
+
+<ul><li><code>index</code>: Main entry point for the application</li></ul>
+
+<ul><li><code>auto</code>: Runs before every action to set up common variables</li></ul>
+
+<ul><li><code>setup_site</code>: Sets up site-specific configurations</li></ul>
+
+<ul><li><code>set_theme</code>: Sets the theme for the current site</li></ul>
+
+<ul><li><code>default</code>: Handles 404 errors</li></ul>
+
+<ul><li><code>end</code>: Finalizes the response</li></ul>
+
+
+
+<h2>Access Control</h2>
+
+This controller is accessible to all users, but certain actions may require specific roles.
+
+
+
+<h2>Related Files</h2>
+
+<ul><li>Site configuration in the database</li></ul>
+
+<ul><li>Theme configuration in the database</li></ul>
+
+<ul><li>Templates in <code>/root/templates/</code></li></ul>
+
+</div>

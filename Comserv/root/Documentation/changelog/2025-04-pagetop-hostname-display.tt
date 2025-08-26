@@ -1,0 +1,191 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2025-04-pagetop-hostname-display.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Pagetop Server Information Display - April 2025' %]
+
+<!-- Documentation page for 2025-04-pagetop-hostname-display -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**Date:** April 9, 2025  
+
+**Author:** Shanta  
+
+**Status:** Completed  
+
+**File:** <code>/Comserv/root/pagetop.tt</code>
+
+
+
+<h2>Overview</h2>
+
+
+
+Added server information display to the pagetop.tt template to help administrators identify which server they are currently connected to. This is particularly useful for troubleshooting proxy system issues on production servers.
+
+
+
+<h2>Changes Made</h2>
+
+
+
+<h3>1. Added Server Information Display</h3>
+
+
+
+<ul><li>Added a new server information bar at the top of the page that displays:</li></ul>
+
+<ul><li style="margin-left: 20px">The current server's hostname (from request URI)</li></ul>
+
+<ul><li style="margin-left: 20px">The client's IP address</li></ul>
+
+<ul><li>Made the server info display visible only to administrators and users with debug mode enabled</li></ul>
+
+<ul><li>Used built-in Catalyst request variables to ensure compatibility across all environments</li></ul>
+
+
+
+<h3>2. Improved Role Checking Logic</h3>
+
+
+
+<ul><li>Consolidated duplicate role checking code</li></ul>
+
+<ul><li>Moved the admin role check to the top of the file</li></ul>
+
+<ul><li>Reused the is_admin variable throughout the template</li></ul>
+
+<ul><li>Removed redundant role checking code at the bottom of the file</li></ul>
+
+
+
+<h3>3. Updated Template Version</h3>
+
+
+
+<ul><li>Updated the PageVersion to 0.023.0</li></ul>
+
+<ul><li>Added the current date to the version information</li></ul>
+
+
+
+<h2>Files Modified</h2>
+
+
+
+<ul><li><code>/Comserv/root/pagetop.tt</code></li></ul>
+
+
+
+<h2>Benefits</h2>
+
+
+
+<ul><li>Administrators can now easily identify which server they are connected to</li></ul>
+
+<ul><li>Shows both hostname and IP address to help distinguish between production and proxy servers</li></ul>
+
+<ul><li>Helps with troubleshooting proxy system issues on production servers</li></ul>
+
+<ul><li>Improves the efficiency of the template by eliminating duplicate role checks</li></ul>
+
+<ul><li>Maintains clean separation between admin-only and public content</li></ul>
+
+<ul><li>Uses only built-in Template Toolkit variables for maximum compatibility</li></ul>
+
+
+
+<h2>Technical Details</h2>
+
+
+
+<h3>Server Information Bar</h3>
+
+
+
+Added a new div with server information that only appears for administrators:
+
+
+
+<code></code>`html
+
+<div class="server-info" style="background-color: #e9ecef; border-bottom: 1px solid #dee2e6; padding: 5px 10px; font-size: 12px; text-align: right; color: #495057;">
+
+    Server: <strong>[% c.req.uri.host %]</strong> | 
+
+    IP: <strong>[% c.req.address %]</strong>
+
+
+
+<code></code>`
+
+
+
+This implementation specifically helps with the proxy configuration where helpdesk.computersystemconsulting.ca is proxied to http://172.30.131.126:3000/. When administrators access the site, they can now see whether they're connecting directly to the internal IP or through the proxy domain, which helps diagnose connection issues.
+
+
+
+<h3>Proxy Troubleshooting Example</h3>
+
+
+
+When accessing through the proxy:
+
+<ul><li>Server: helpdesk.computersystemconsulting.ca</li></ul>
+
+<ul><li>IP: [External client IP]</li></ul>
+
+
+
+When accessing directly:
+
+<ul><li>Server: 172.30.131.126:3000</li></ul>
+
+<ul><li>IP: [Internal network IP]</li></ul>
+
+
+
+This difference makes it immediately clear which path the connection is taking.
+
+
+
+<h3>Role Checking Optimization</h3>
+
+
+
+Consolidated role checking to a single location at the top of the file:
+
+
+
+<code></code>`perl
+
+[% SET roles = c.session.roles || [] %]
+
+[% SET is_admin = roles.grep('admin').size > 0 ? 1 : 0 %]
+
+<code></code>`
+
+
+
+<h2>Related Documentation</h2>
+
+
+
+For more information about the template system and debugging in Comserv, see:
+
+<ul><li>Template System Documentation</li></ul>
+
+<ul><li>Debugging Guide</li></ul>
+
+<ul><li>Administrator Guide</li></ul>
+
+</div>

@@ -1,0 +1,885 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2025-05-30-documentation-structure-simplification.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Documentation Structure Simplification Plan' %]
+
+<!-- Documentation page for 2025-05-30-documentation-structure-simplification -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**Date:** May 30, 2025  
+
+**Author:** System Administrator  
+
+**Status:** Planned
+
+
+
+<h2>Overview</h2>
+
+
+
+This document outlines a comprehensive plan to simplify the Comserv documentation directory structure while maintaining the ability to filter documents by role, site name, and other criteria. The current documentation system has become complex with nested directories and redundant organization methods, making it difficult to manage and maintain. This plan proposes a metadata-driven approach that will streamline documentation management while preserving all existing functionality.
+
+
+
+<h2>Current Issues</h2>
+
+
+
+<ol><li>**Complex Directory Hierarchy**: The current structure has many nested directories (roles/admin, roles/normal, sites/mcoop, etc.) which makes file management difficult.</li></ol>
+
+
+
+<ol><li>**Redundant Organization**: Files are organized both by directory structure and by configuration in <code>documentation_config.json</code>, creating redundancy.</li></ol>
+
+
+
+<ol><li>**Maintenance Overhead**: Adding new documentation requires updating both the file structure and the configuration file.</li></ol>
+
+
+
+<ol><li>**Inconsistent Categorization**: Some files are categorized by directory location, others by filename patterns.</li></ol>
+
+
+
+<ol><li>**Scattered Documentation**: Documentation files are spread across multiple directories, making it hard to find specific documents.</li></ol>
+
+
+
+<h2>Proposed Solution</h2>
+
+
+
+We will implement a simplified directory structure that relies on metadata in the files themselves rather than complex directory hierarchies, while maintaining the ability to filter by role, site, and other criteria.
+
+
+
+<h3>1. Simplified Directory Structure</h3>
+
+
+
+<code></code>`
+
+/root/Documentation/
+
+  ├── docs/                  # All documentation files in one directory
+
+  │   ├── user/              # User-related documentation
+
+  │   ├── admin/             # Admin-related documentation
+
+  │   ├── developer/         # Developer-related documentation
+
+  │   ├── site/              # Site-specific documentation
+
+  │   │   ├── mcoop/         # MCOOP site documentation
+
+  │   │   └── other-sites/   # Other site-specific documentation
+
+  │   ├── module/            # Module-specific documentation
+
+  │   └── changelog/         # Changelog entries
+
+  ├── templates/             # Template files (.tt) for documentation display
+
+  │   ├── components/        # Reusable template components
+
+  │   └── categories/        # Category-specific templates
+
+  ├── config/                # Configuration files
+
+  │   └── documentation_config.json  # Main configuration file
+
+  └── assets/                # Documentation assets (images, etc.)
+
+<code></code>`
+
+
+
+<h3>2. Enhanced Metadata in Documentation Files</h3>
+
+
+
+Each documentation file will include enhanced metadata at the top in YAML-style format:
+
+
+
+<code></code>`markdown
+
+---
+
+title: "Document Title"
+
+description: "Brief description of the document"
+
+author: "Author Name"
+
+date: "YYYY-MM-DD"
+
+status: "Active/Draft/Deprecated"
+
+roles: ["normal", "admin", "developer"]
+
+sites: ["all", "MCOOP"]
+
+categories: ["user_guides", "tutorials"]
+
+tags: ["login", "authentication", "security"]
+
+---
+
+
+
+<h1>Document Title</h1>
+
+
+
+Content starts here...
+
+<code></code>`
+
+
+
+<h3>3. Simplified Configuration File</h3>
+
+
+
+The <code>documentation_config.json</code> file will be simplified to focus on category definitions rather than individual file mappings:
+
+
+
+<code></code>`json
+
+{
+
+  "categories": {
+
+    "user_guides": {
+
+      "title": "User Guides",
+
+      "description": "Documentation for end users of the system",
+
+      "icon": "fas fa-users",
+
+      "display_order": 1
+
+    },
+
+    "admin_guides": {
+
+      "title": "Administrator Guides",
+
+      "description": "Documentation for system administrators",
+
+      "icon": "fas fa-shield-alt",
+
+      "display_order": 2
+
+    },
+
+    "developer_guides": {
+
+      "title": "Developer Documentation",
+
+      "description": "Documentation for developers",
+
+      "icon": "fas fa-code",
+
+      "display_order": 3
+
+    },
+
+    "tutorials": {
+
+      "title": "Tutorials",
+
+      "description": "Step-by-step guides for common tasks",
+
+      "icon": "fas fa-graduation-cap",
+
+      "display_order": 4
+
+    },
+
+    "site_specific": {
+
+      "title": "Site-Specific Documentation",
+
+      "description": "Documentation specific to this site",
+
+      "icon": "fas fa-building",
+
+      "display_order": 5
+
+    },
+
+    "modules": {
+
+      "title": "Module Documentation",
+
+      "description": "Documentation for specific system modules",
+
+      "icon": "fas fa-puzzle-piece",
+
+      "display_order": 6
+
+    },
+
+    "changelog": {
+
+      "title": "Changelog",
+
+      "description": "System changes and updates",
+
+      "icon": "fas fa-history",
+
+      "display_order": 7
+
+    }
+
+  },
+
+  "tags": {
+
+    "login": {
+
+      "title": "Login",
+
+      "description": "Documentation related to login functionality"
+
+    },
+
+    "authentication": {
+
+      "title": "Authentication",
+
+      "description": "Documentation related to authentication"
+
+    }
+
+  }
+
+}
+
+<code></code>`
+
+
+
+<h3>4. Enhanced Documentation Controller</h3>
+
+
+
+The Documentation controller will be enhanced to:
+
+
+
+<ol><li>**Scan for Metadata**: Parse the YAML-style metadata at the top of each document</li></ol>
+
+<ol><li>**Build Index**: Create an in-memory index of all documentation with their metadata</li></ol>
+
+<ol><li>**Filter by Criteria**: Filter documentation based on role, site, category, and tags</li></ol>
+
+<ol><li>**Cache Results**: Cache the documentation index for better performance</li></ol>
+
+
+
+<h2>Implementation Plan</h2>
+
+
+
+<h3>Phase 1: Preparation (June 2025)</h3>
+
+
+
+<ol><li>**Create New Directory Structure**</li></ol>
+
+   - Create the new directory structure in the Documentation directory
+
+   - Set up the templates, config, and assets directories
+
+
+
+<ol><li>**Develop Metadata Parser**</li></ol>
+
+   - Create a utility to parse YAML-style metadata from documentation files
+
+   - Implement caching for parsed metadata
+
+
+
+<ol><li>**Update Configuration File**</li></ol>
+
+   - Create the new simplified configuration file structure
+
+   - Define all categories and tags
+
+
+
+<h3>Phase 2: Migration Tool Development (July 2025)</h3>
+
+
+
+<ol><li>**Create Migration Script**</li></ol>
+
+   - Develop a script that reads existing documentation files
+
+   - Extract metadata from file content and directory location
+
+   - Generate new files with proper metadata in the new structure
+
+
+
+<ol><li>**Test Migration Script**</li></ol>
+
+   - Test the migration script on a subset of documentation
+
+   - Verify that metadata is correctly extracted and applied
+
+
+
+<ol><li>**Develop Documentation Controller Updates**</li></ol>
+
+   - Modify the Documentation controller to work with the new structure
+
+   - Implement the new filtering logic based on metadata
+
+
+
+<h3>Phase 3: Gradual Migration (August-September 2025)</h3>
+
+
+
+<ol><li>**Migrate Changelog Documentation**</li></ol>
+
+   - Start with changelog documentation as a test case
+
+   - Verify that the migrated documentation is accessible and properly categorized
+
+
+
+<ol><li>**Migrate User Documentation**</li></ol>
+
+   - Migrate user-related documentation
+
+   - Update links and references
+
+
+
+<ol><li>**Migrate Admin Documentation**</li></ol>
+
+   - Migrate admin-related documentation
+
+   - Update links and references
+
+
+
+<ol><li>**Migrate Developer Documentation**</li></ol>
+
+   - Migrate developer-related documentation
+
+   - Update links and references
+
+
+
+<ol><li>**Migrate Site-Specific Documentation**</li></ol>
+
+   - Migrate site-specific documentation
+
+   - Update links and references
+
+
+
+<h3>Phase 4: Template Updates (October 2025)</h3>
+
+
+
+<ol><li>**Update Documentation Templates**</li></ol>
+
+   - Update templates to work with the new structure
+
+   - Implement new filtering and search functionality in the UI
+
+
+
+<ol><li>**Create New Template Components**</li></ol>
+
+   - Develop reusable template components for documentation display
+
+   - Implement category-specific templates
+
+
+
+<h3>Phase 5: Testing and Deployment (November 2025)</h3>
+
+
+
+<ol><li>**Comprehensive Testing**</li></ol>
+
+   - Test the new system with various roles and sites
+
+   - Verify that all documentation is accessible and properly categorized
+
+
+
+<ol><li>**User Acceptance Testing**</li></ol>
+
+   - Have users from different roles test the new documentation system
+
+   - Gather feedback and make adjustments
+
+
+
+<ol><li>**Final Deployment**</li></ol>
+
+   - Deploy the changes to production
+
+   - Monitor for any issues
+
+
+
+<h3>Phase 6: Cleanup and Optimization (December 2025)</h3>
+
+
+
+<ol><li>**Remove Old Structure**</li></ol>
+
+   - Once the new system is stable, remove the old directory structure
+
+   - Update any remaining references to the old structure
+
+
+
+<ol><li>**Optimize Performance**</li></ol>
+
+   - Implement additional caching mechanisms
+
+   - Optimize search functionality
+
+
+
+<ol><li>**Document the New System**</li></ol>
+
+   - Create documentation about the new documentation system
+
+   - Provide guidelines for creating and managing documentation
+
+
+
+<h2>Guidelines for Creating New Documentation During Migration</h2>
+
+
+
+During the migration period, new documentation should be created using the new metadata-driven approach to ensure a smooth transition. Follow these guidelines when creating new documentation:
+
+
+
+<h3>1. File Location</h3>
+
+
+
+Place new documentation files in the appropriate directory under the new structure:
+
+
+
+<code></code>`
+
+/root/Documentation/docs/{category}/{filename}.md
+
+<code></code>`
+
+
+
+For example:
+
+<ul><li>User documentation: <code>/root/Documentation/docs/user/new_feature_guide.md</code></li></ul>
+
+<ul><li>Admin documentation: <code>/root/Documentation/docs/admin/system_configuration.md</code></li></ul>
+
+<ul><li>Site-specific documentation: <code>/root/Documentation/docs/site/mcoop/member_management.md</code></li></ul>
+
+
+
+<h3>2. Metadata Format</h3>
+
+
+
+Include the following metadata at the top of each new documentation file:
+
+
+
+<code></code>`markdown
+
+---
+
+title: "Document Title"
+
+description: "Brief description of the document"
+
+author: "Your Name"
+
+date: "YYYY-MM-DD"
+
+status: "Active"
+
+roles: ["normal", "admin", "developer"]
+
+sites: ["all", "MCOOP"]
+
+categories: ["user_guides", "tutorials"]
+
+tags: ["feature1", "feature2"]
+
+---
+
+
+
+<h1>Document Title</h1>
+
+
+
+Content starts here...
+
+<code></code>`
+
+
+
+<h4>Required Metadata Fields:</h4>
+
+
+
+<ul><li>**title**: The title of the document (should match the H1 heading)</li></ul>
+
+<ul><li>**description**: A brief description of the document content</li></ul>
+
+<ul><li>**author**: Your name or username</li></ul>
+
+<ul><li>**date**: The creation date in YYYY-MM-DD format</li></ul>
+
+<ul><li>**status**: One of "Active", "Draft", or "Deprecated"</li></ul>
+
+<ul><li>**roles**: Array of roles that can access this document (normal, editor, admin, developer)</li></ul>
+
+<ul><li>**sites**: Array of sites this document applies to ("all" for all sites, or specific site names)</li></ul>
+
+<ul><li>**categories**: Array of categories this document belongs to (from the configuration file)</li></ul>
+
+
+
+<h4>Optional Metadata Fields:</h4>
+
+
+
+<ul><li>**tags**: Array of tags for additional categorization</li></ul>
+
+<ul><li>**version**: Document version number</li></ul>
+
+<ul><li>**related**: Array of related document filenames</li></ul>
+
+
+
+<h3>3. Content Guidelines</h3>
+
+
+
+<ul><li>Start with a level 1 heading (# Title) that matches the title in the metadata</li></ul>
+
+<ul><li>Use level 2 headings (## Heading) for main sections</li></ul>
+
+<ul><li>Use level 3 headings (### Subheading) for subsections</li></ul>
+
+<ul><li>Include an Overview section at the beginning</li></ul>
+
+<ul><li>Use code blocks with language specification for code examples</li></ul>
+
+<ul><li>Include screenshots or diagrams where appropriate</li></ul>
+
+<ul><li>End with a Related Documentation section if applicable</li></ul>
+
+
+
+<h3>4. Temporary Configuration Update</h3>
+
+
+
+Until the new controller is fully implemented, also add the document to the current <code>documentation_config.json</code> file:
+
+
+
+<ol><li>Add the document key to the appropriate category in the "categories" section</li></ol>
+
+<ol><li>Add the document path to the "default_paths" section</li></ol>
+
+
+
+This ensures the document is accessible through both the old and new systems during the transition period.
+
+
+
+<h2>Benefits of the New Structure</h2>
+
+
+
+<ol><li>**Simplified Management**: All documentation is in a more logical, flatter structure</li></ol>
+
+<ol><li>**Metadata-Driven**: Filtering is based on file metadata rather than directory location</li></ol>
+
+<ol><li>**Easier Maintenance**: Adding new documentation only requires adding a file with proper metadata</li></ol>
+
+<ol><li>**Better Categorization**: Documents can belong to multiple categories through metadata</li></ol>
+
+<ol><li>**Improved Searchability**: Tags provide additional ways to find documentation</li></ol>
+
+<ol><li>**Consistent Organization**: All documentation follows the same structure and format</li></ol>
+
+<ol><li>**Reduced Redundancy**: No need to update both directory structure and configuration file</li></ol>
+
+
+
+<h2>Technical Implementation Details</h2>
+
+
+
+<h3>Metadata Parser</h3>
+
+
+
+The metadata parser will:
+
+<ol><li>Read the file content</li></ol>
+
+<ol><li>Extract the YAML-style metadata between <code>---</code> markers</li></ol>
+
+<ol><li>Parse the metadata into a structured format</li></ol>
+
+<ol><li>Cache the results for better performance</li></ol>
+
+
+
+<code></code>`perl
+
+sub parse_metadata {
+
+    my ($self, $file_path) = @_;
+
+    
+
+    # Read the file content
+
+    open my $fh, '<:encoding(UTF-8)', $file_path or die "Cannot open $file_path: $!";
+
+    my $content = do { local $/; <$fh> };
+
+    close $fh;
+
+    
+
+    # Extract metadata
+
+    my $metadata = {};
+
+    if ($content =~ /^---\s*$(.*?)^---\s*$/ms) {
+
+        my $yaml_content = $1;
+
+        
+
+        # Parse YAML-style metadata
+
+        foreach my $line (split /\n/, $yaml_content) {
+
+            if ($line =~ /^\s*(\w+)\s*:\s*"?([^"]*)"?\s*$/) {
+
+                my ($key, $value) = ($1, $2);
+
+                $metadata->{$key} = $value;
+
+            }
+
+            elsif ($line =~ /^\s*(\w+)\s*:\s*\[(.*)\]\s*$/) {
+
+                my ($key, $value_list) = ($1, $2);
+
+                my @values = map { s/^\s*"?//; s/"?\s*$//; $_ } split /,/, $value_list;
+
+                $metadata->{$key} = \@values;
+
+            }
+
+        }
+
+    }
+
+    
+
+    return $metadata;
+
+}
+
+<code></code>`
+
+
+
+<h3>Documentation Controller Updates</h3>
+
+
+
+The Documentation controller will be updated to:
+
+<ol><li>Scan the new directory structure for documentation files</li></ol>
+
+<ol><li>Parse metadata from each file</li></ol>
+
+<ol><li>Build an in-memory index of all documentation</li></ol>
+
+<ol><li>Filter documentation based on user role, site, and other criteria</li></ol>
+
+
+
+<code></code>`perl
+
+sub build_documentation_index {
+
+    my ($self) = @_;
+
+    
+
+    my $docs_dir = $self->path_to('root', 'Documentation', 'docs');
+
+    my $index = {};
+
+    
+
+    find(
+
+        {
+
+            wanted => sub {
+
+                my $file = $_;
+
+                return if -d $file;
+
+                return unless $file =~ /\.(md|tt)$/;
+
+                
+
+                my $metadata = $self->parse_metadata($file);
+
+                my $relative_path = File::Spec->abs2rel($file, $docs_dir);
+
+                
+
+                $index->{$relative_path} = {
+
+                    path => $file,
+
+                    metadata => $metadata
+
+                };
+
+            },
+
+            no_chdir => 1
+
+        },
+
+        $docs_dir
+
+    );
+
+    
+
+    return $index;
+
+}
+
+
+
+sub filter_documentation {
+
+    my ($self, $index, $user_role, $site_name) = @_;
+
+    
+
+    my $filtered = {};
+
+    
+
+    foreach my $path (keys %$index) {
+
+        my $doc = $index->{$path};
+
+        my $metadata = $doc->{metadata};
+
+        
+
+        # Check role access
+
+        my $has_role_access = 0;
+
+        if (grep { $_ eq $user_role } @{$metadata->{roles}}) {
+
+            $has_role_access = 1;
+
+        }
+
+        
+
+        # Check site access
+
+        my $has_site_access = 0;
+
+        if (grep { $_ eq 'all' || $_ eq $site_name } @{$metadata->{sites}}) {
+
+            $has_site_access = 1;
+
+        }
+
+        
+
+        # Add to filtered list if user has access
+
+        if ($has_role_access && $has_site_access) {
+
+            $filtered->{$path} = $doc;
+
+        }
+
+    }
+
+    
+
+    return $filtered;
+
+}
+
+<code></code>`
+
+
+
+<h2>Conclusion</h2>
+
+
+
+This documentation structure simplification plan provides a clear roadmap for transitioning from the current complex directory structure to a more manageable, metadata-driven approach. By implementing this plan in phases over the next several months, we can ensure a smooth transition while maintaining all existing functionality.
+
+
+
+The new structure will make documentation management easier, improve searchability, and provide a more consistent experience for both documentation creators and users. The metadata-driven approach allows for more flexible categorization and filtering, making it easier to find relevant documentation based on role, site, category, and tags.
+
+
+
+During the migration period, following the guidelines for creating new documentation will ensure that all new content is compatible with both the current and new systems, facilitating a gradual transition without disruption to users.
+
+</div>

@@ -1,0 +1,363 @@
+[% PageVersion = 'Comserv/root/Documentation/roles/admin/Documentation_Management.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Documentation System Management Guide' %]
+
+<!-- Documentation page for Documentation_Management -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Overview</h2>
+
+
+
+As an administrator, you have full access to the Comserv Documentation System and are responsible for maintaining and organizing the documentation. This guide explains how to manage the documentation system effectively.
+
+
+
+<h2>Administrator Privileges</h2>
+
+
+
+As an administrator, you can:
+
+
+
+<ul><li>View all documentation in the system</li></ul>
+
+<ul><li>Add, edit, and remove documentation files</li></ul>
+
+<ul><li>Organize documentation into categories</li></ul>
+
+<ul><li>Manage site-specific documentation</li></ul>
+
+<ul><li>View technical documentation not available to regular users</li></ul>
+
+
+
+<h2>Documentation Structure</h2>
+
+
+
+The documentation is stored in the following directory structure:
+
+
+
+<code></code>`
+
+/root/Documentation/
+
+  ├── roles/
+
+  │   ├── admin/         # Admin-only documentation
+
+  │   ├── normal/        # Regular user documentation
+
+  │   └── developer/     # Developer documentation
+
+  ├── tutorials/         # Step-by-step guides
+
+  ├── modules/           # Module-specific documentation
+
+  ├── proxmox/           # Proxmox-related documentation
+
+  ├── changelog/         # System changes and updates
+
+  └── controllers/       # Controller documentation
+
+<code></code>`
+
+
+
+<h2>Adding New Documentation</h2>
+
+
+
+To add new documentation:
+
+
+
+<ol><li>Create a new file in the appropriate directory with a <code>.md</code> or <code>.tt</code> extension</li></ol>
+
+<ol><li>Use a descriptive filename with underscores for spaces (e.g., <code>user_management.md</code>)</li></ol>
+
+<ol><li>Follow the standard Markdown or Template Toolkit format</li></ol>
+
+<ol><li>Place the file in the appropriate directory based on its content and intended audience</li></ol>
+
+
+
+<h3>Example Markdown Structure</h3>
+
+
+
+<code></code>`markdown
+
+<h1>Title of Documentation</h1>
+
+
+
+<h2>Overview</h2>
+
+Brief description of the topic.
+
+
+
+<h2>Features</h2>
+
+<ul><li>Feature 1</li></ul>
+
+<ul><li>Feature 2</li></ul>
+
+
+
+<h2>Usage</h2>
+
+Instructions for using the feature.
+
+
+
+<h2>Examples</h2>
+
+Code examples or usage examples.
+
+<code></code>`
+
+
+
+<h2>Categorization Rules</h2>
+
+
+
+The system automatically categorizes documentation based on:
+
+
+
+<ol><li>**Directory Location**:</li></ol>
+
+   - Files in <code>/roles/admin/</code> are categorized as Administrator Guides
+
+   - Files in <code>/roles/normal/</code> are categorized as User Documentation
+
+   - Files in <code>/roles/developer/</code> are categorized as Developer Guides
+
+   - Files in <code>/tutorials/</code> are categorized as Tutorials
+
+   - Files in <code>/proxmox/</code> are categorized as Proxmox Documentation
+
+   - Files in <code>/controllers/</code> are categorized as Controller Documentation
+
+   - Files in <code>/changelog/</code> are categorized as Changelog
+
+
+
+<ol><li>**Filename Patterns**:</li></ol>
+
+   - Files starting with <code>installation</code>, <code>configuration</code>, <code>system</code>, <code>admin</code>, or <code>user_management</code> are categorized as Administrator Guides
+
+   - Files starting with <code>getting_started</code>, <code>account_management</code>, <code>user_guide</code>, or <code>faq</code> are categorized as User Documentation
+
+   - Files starting with <code>todo</code>, <code>project</code>, or <code>task</code> are categorized as Module Documentation
+
+   - Files starting with <code>proxmox</code> are categorized as Proxmox Documentation
+
+
+
+<h2>Site-Specific Documentation</h2>
+
+
+
+To create site-specific documentation:
+
+
+
+<ol><li>Add a site identifier to the metadata of the file</li></ol>
+
+<ol><li>The documentation will only be shown when viewing that specific site</li></ol>
+
+
+
+<h2>Managing Recent Updates</h2>
+
+
+
+The system displays recent updates from the <code>completed_items.json</code> file. To update this:
+
+
+
+<ol><li>Edit the <code>root/Documentation/completed_items.json</code> file</li></ol>
+
+<ol><li>Add new entries in the following format:</li></ol>
+
+
+
+<code></code>`json
+
+{
+
+  "completed_items": [
+
+    {
+
+      "date_created": "2024-05-31",
+
+      "title": "Authentication System Updates",
+
+      "description": "Fixed logout functionality and improved user profile management."
+
+    },
+
+    {
+
+      "date_created": "2024-05-31",
+
+      "title": "Template System Improvements",
+
+      "description": "Enhanced footer display and error handling in templates."
+
+    }
+
+  ]
+
+}
+
+<code></code>`
+
+
+
+<h2>Best Practices</h2>
+
+
+
+<h3>File Naming</h3>
+
+
+
+<ul><li>Use descriptive names that clearly indicate the content</li></ul>
+
+<ul><li>Use underscores instead of spaces</li></ul>
+
+<ul><li>Keep filenames relatively short</li></ul>
+
+<ul><li>Use lowercase letters</li></ul>
+
+
+
+<h3>Content Organization</h3>
+
+
+
+<ul><li>Start with a clear title (# Title)</li></ul>
+
+<ul><li>Include an overview or introduction</li></ul>
+
+<ul><li>Use headings (## Heading) to organize content</li></ul>
+
+<ul><li>Include examples where appropriate</li></ul>
+
+<ul><li>Use lists for steps or features</li></ul>
+
+<ul><li>Include screenshots for complex UI elements</li></ul>
+
+
+
+<h3>Maintenance</h3>
+
+
+
+<ul><li>Regularly review and update documentation</li></ul>
+
+<ul><li>Remove outdated information</li></ul>
+
+<ul><li>Update documentation when features change</li></ul>
+
+<ul><li>Check for broken links or references</li></ul>
+
+<ul><li>Ensure consistent formatting across documents</li></ul>
+
+
+
+<h2>Troubleshooting</h2>
+
+
+
+<h3>Documentation Not Appearing</h3>
+
+
+
+If documentation is not appearing as expected:
+
+
+
+<ol><li>Check that the file is in the correct directory</li></ol>
+
+<ol><li>Verify that the file has a supported extension (.md, .tt, .html, .txt)</li></ol>
+
+<ol><li>Check the logs for any errors in the documentation scanning process</li></ol>
+
+<ol><li>Restart the application to force a rescan of the documentation</li></ol>
+
+
+
+<h3>Incorrect Categorization</h3>
+
+
+
+If documentation is appearing in the wrong category:
+
+
+
+<ol><li>Check the file path to ensure it's in the correct directory</li></ol>
+
+<ol><li>Review the filename to ensure it follows the categorization patterns</li></ol>
+
+<ol><li>Move the file to the appropriate directory if needed</li></ol>
+
+
+
+<h3>Permission Issues</h3>
+
+
+
+If users report they cannot see certain documentation:
+
+
+
+<ol><li>Verify that the documentation is in the correct directory for their role</li></ol>
+
+<ol><li>Check that the user has the appropriate role assigned</li></ol>
+
+<ol><li>Review the categorization rules to ensure they're working as expected</li></ol>
+
+
+
+<h2>Technical Details</h2>
+
+
+
+The Documentation system is implemented using:
+
+
+
+<ul><li>**Controller**: <code>Comserv::Controller::Documentation</code></li></ul>
+
+<ul><li>**Template**: <code>Documentation/index.tt</code></li></ul>
+
+<ul><li>**JavaScript**: Client-side sorting and tab switching</li></ul>
+
+<ul><li>**CSS**: Styling for documentation cards, tabs, and badges</li></ul>
+
+
+
+For more technical details, see the <a href="/Documentation/roles/developer/Documentation_Controller">Documentation Controller Technical Reference</a>.
+
+</div>

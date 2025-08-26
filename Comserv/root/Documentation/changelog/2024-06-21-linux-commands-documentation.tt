@@ -1,0 +1,121 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2024-06-21-linux-commands-documentation.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Linux Commands Documentation Addition' %]
+
+<!-- Documentation page for 2024-06-21-linux-commands-documentation -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**Date:** June 21, 2024  
+
+**Author:** Shanta  
+
+**Status:** Completed
+
+
+
+<h2>Overview</h2>
+
+
+
+Added a comprehensive Linux commands reference guide for administrators. This documentation provides a collection of common commands for Ubuntu, Debian, and Proxmox systems that administrators may need for day-to-day operations, troubleshooting, and system maintenance.
+
+
+
+<h2>Changes Made</h2>
+
+
+
+<h3>1. Created Linux Commands Reference Documentation</h3>
+
+
+
+Created a new documentation file (<code>linux_commands.md</code>) in the admin roles directory that includes:
+
+
+
+<ul><li>System information commands</li></ul>
+
+<ul><li>File system operations</li></ul>
+
+<ul><li>Process management</li></ul>
+
+<ul><li>Package management (APT and DPKG)</li></ul>
+
+<ul><li>Network commands</li></ul>
+
+<ul><li>Service management (systemd)</li></ul>
+
+<ul><li>User management</li></ul>
+
+<ul><li>File searching</li></ul>
+
+<ul><li>Disk management</li></ul>
+
+<ul><li>Proxmox-specific commands</li></ul>
+
+<ul><li>Log file locations and viewing</li></ul>
+
+<ul><li>Compression and archiving</li></ul>
+
+<ul><li>System monitoring</li></ul>
+
+<ul><li>Firewall management (UFW)</li></ul>
+
+<ul><li>Troubleshooting commands</li></ul>
+
+<ul><li>Best practices</li></ul>
+
+
+
+<h3>2. Updated Documentation Configuration</h3>
+
+
+
+<ul><li>Added the Linux commands documentation to the "admin_guides" category</li></ul>
+
+<ul><li>Added the file path to the default_paths section in the documentation configuration</li></ul>
+
+
+
+<h2>Benefits</h2>
+
+
+
+<ol><li>**Improved Administrator Efficiency**: Provides quick access to commonly used commands without having to search online</li></ol>
+
+<ol><li>**Standardized Command Reference**: Ensures all administrators use consistent commands and approaches</li></ol>
+
+<ol><li>**Reduced Learning Curve**: Helps new administrators quickly learn essential commands</li></ol>
+
+<ol><li>**Proxmox-Specific Commands**: Includes specialized commands for Proxmox virtualization management</li></ol>
+
+<ol><li>**Troubleshooting Assistance**: Provides commands specifically for troubleshooting common issues</li></ol>
+
+
+
+<h2>Future Considerations</h2>
+
+
+
+<ol><li>**Command Examples**: Add more specific examples for each command</li></ol>
+
+<ol><li>**Server-Specific Commands**: Add commands specific to our server configurations</li></ol>
+
+<ol><li>**Automation Scripts**: Include sample scripts for automating common tasks</li></ol>
+
+<ol><li>**Interactive Elements**: Consider adding interactive elements to the documentation for command testing</li></ol>
+
+<ol><li>**Regular Updates**: Establish a process for regularly updating the command reference as new tools and commands become relevant</li></ol>
+
+</div>

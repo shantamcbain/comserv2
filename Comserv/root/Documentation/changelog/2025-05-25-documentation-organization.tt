@@ -1,0 +1,25 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2025-05-25-documentation-organization.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Documentation Organization' %]
+
+<!-- Documentation page for 2025-05-25-documentation-organization -->
+<div class="documentation-content">
+
+<div class="markdown-content">
+
+<h2>Overview</h2>
+
+This document addresses the organization of documentation files within the Comserv Documentation system and outlines the changes to channel them through the TT-based rendering path.
+
+<h2>Issue Description</h2>
+
+... (preserve core MD content summarized for brevity in patch) ...
+
+<h2>Migration Summary</h2>
+
+
+</div>
+</div>

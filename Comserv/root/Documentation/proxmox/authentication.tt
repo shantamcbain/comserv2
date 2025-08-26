@@ -1,0 +1,217 @@
+[% PageVersion = 'Comserv/root/Documentation/proxmox/authentication.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Proxmox Authentication Changes' %]
+
+<!-- Documentation page for authentication -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Overview</h2>
+
+
+
+This document outlines the changes made to remove the login requirement from the Proxmox functionality in the Comserv application. The Proxmox integration now uses API token authentication exclusively, eliminating the need for users to log in to access Proxmox VM management features.
+
+
+
+**Date of Implementation:** [Current Date]
+
+
+
+<h2>Problem Statement</h2>
+
+
+
+The Proxmox controller was requiring users to log in and have admin role privileges to access VM management functionality, despite the fact that all Proxmox API interactions are handled via API tokens. This created an unnecessary barrier to accessing the Proxmox features.
+
+
+
+<h2>Changes Implemented</h2>
+
+
+
+<h3>1. Controller Changes (Proxmox.pm)</h3>
+
+
+
+Removed role-based access checks from all Proxmox controller methods:
+
+
+
+<ul><li><code>index</code> method: Removed admin role check</li></ul>
+
+<ul><li><code>create_vm_form</code> method: Removed admin role check</li></ul>
+
+<ul><li><code>create_vm_action</code> method: Removed admin role check</li></ul>
+
+
+
+Instead of checking for user roles, the controller now logs the roles for debugging purposes only but does not enforce any role-based restrictions.
+
+
+
+<h3>2. Template Changes</h3>
+
+
+
+<h4>index.tt</h4>
+
+
+
+<ul><li>Removed the conditional check for <code>c.session.proxmox_token_user</code></li></ul>
+
+<ul><li>Removed the login prompt that was displayed when not logged in</li></ul>
+
+<ul><li>Made VM list and action buttons always visible</li></ul>
+
+
+
+<h4>create_vm.tt</h4>
+
+
+
+<ul><li>Removed the <code>UNLESS auth_error</code> conditional that was preventing the form from displaying</li></ul>
+
+<ul><li>Removed the corresponding closing tag at the end of the form</li></ul>
+
+
+
+<h3>3. Authentication Flow Changes</h3>
+
+
+
+<ul><li>The application now relies solely on API token authentication for Proxmox API interactions</li></ul>
+
+<ul><li>Improved token handling and deobfuscation in the Proxmox model</li></ul>
+
+<ul><li>Added better error handling and logging for authentication issues</li></ul>
+
+
+
+<h2>API Token Authentication</h2>
+
+
+
+The Proxmox integration uses API tokens stored in the <code>proxmox_credentials.json</code> file. These tokens are:
+
+
+
+<ol><li>Loaded by the <code>Comserv::Util::ProxmoxCredentials</code> module</li></ol>
+
+<ol><li>Deobfuscated and provided to the Proxmox model</li></ol>
+
+<ol><li>Used in the HTTP Authorization header for all API requests</li></ol>
+
+
+
+<h2>Guidelines to Prevent Future Issues</h2>
+
+
+
+To prevent similar issues in the future, follow these guidelines:
+
+
+
+<h3>1. Separate Authentication Concerns</h3>
+
+
+
+<ul><li>**API Authentication**: Use API tokens for service-to-service communication (like Proxmox API)</li></ul>
+
+<ul><li>**User Authentication**: Use user login only when user-specific actions or permissions are required</li></ul>
+
+
+
+<h3>2. Template Design</h3>
+
+
+
+<ul><li>Avoid using session-based conditionals in templates for API-driven features</li></ul>
+
+<ul><li>Design templates to gracefully handle authentication failures without blocking the entire UI</li></ul>
+
+
+
+<h3>3. Controller Design</h3>
+
+
+
+<ul><li>Use role checks only when necessary for sensitive operations</li></ul>
+
+<ul><li>Log authentication attempts and failures for debugging</li></ul>
+
+<ul><li>Provide clear error messages when authentication fails</li></ul>
+
+
+
+<h3>4. Code Review Checklist</h3>
+
+
+
+When reviewing Proxmox-related code changes, check for:
+
+
+
+<ul><li>[ ] Unnecessary role or authentication checks</li></ul>
+
+<ul><li>[ ] Template conditionals that might block content based on session state</li></ul>
+
+<ul><li>[ ] Proper error handling for API authentication failures</li></ul>
+
+<ul><li>[ ] Clear separation between API authentication and user authentication</li></ul>
+
+
+
+<h2>Testing Authentication Changes</h2>
+
+
+
+After making changes to authentication logic, test the following scenarios:
+
+
+
+<ol><li>Access Proxmox dashboard without logging in</li></ol>
+
+<ol><li>Create a VM without logging in</li></ol>
+
+<ol><li>Verify API token authentication works correctly</li></ol>
+
+<ol><li>Check error handling when API authentication fails</li></ol>
+
+
+
+<h2>Related Files</h2>
+
+
+
+<ul><li><code>/home/shanta/PycharmProjects/comserv/Comserv/lib/Comserv/Controller/Proxmox.pm</code></li></ul>
+
+<ul><li><code>/home/shanta/PycharmProjects/comserv/Comserv/lib/Comserv/Model/Proxmox.pm</code></li></ul>
+
+<ul><li><code>/home/shanta/PycharmProjects/comserv/Comserv/lib/Comserv/Util/ProxmoxCredentials.pm</code></li></ul>
+
+<ul><li><code>/home/shanta/PycharmProjects/comserv/Comserv/root/proxmox/index.tt</code></li></ul>
+
+<ul><li><code>/home/shanta/PycharmProjects/comserv/Comserv/root/proxmox/create_vm.tt</code></li></ul>
+
+<ul><li><code>/home/shanta/PycharmProjects/comserv/Comserv/config/proxmox_credentials.json</code></li></ul>
+
+
+
+<h2>Conclusion</h2>
+
+
+
+These changes have successfully removed the login requirement from the Proxmox functionality while maintaining all existing features. The application now uses API token authentication exclusively for Proxmox API interactions, providing a more streamlined user experience.
+
+</div>

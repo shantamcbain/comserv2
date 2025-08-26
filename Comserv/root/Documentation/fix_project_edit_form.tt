@@ -1,0 +1,117 @@
+[% PageVersion = 'Comserv/root/Documentation/fix_project_edit_form.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Fix for Project Edit Form' %]
+
+<!-- Documentation page for fix_project_edit_form -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Issue Description</h2>
+
+
+
+When trying to edit a project, the following error was encountered:
+
+
+
+<code></code>`
+
+Project with ID ARRAY(0x63cdc68e1d18) not found Please check the application.log for more Details. We are trying to modify a project
+
+<code></code>`
+
+
+
+This error occurred due to several issues:
+
+
+
+<ol><li>The editproject.tt template had duplicate <code><form></code> tags, causing the form to be improperly submitted</li></ol>
+
+<ol><li>The <code>editproject</code> method in the Project controller was not properly handling the project ID, especially when it was an array reference</li></ol>
+
+<ol><li>The form in projectdetails.tt was using POST method to submit to the <code>editproject</code> action, but the action was only looking for the project_id in the body parameters</li></ol>
+
+
+
+<h2>Solution</h2>
+
+
+
+The solution involved several changes:
+
+
+
+<ol><li>**Fixed the editproject.tt template**:</li></ol>
+
+   - Removed the duplicate <code><form></code> tag that was pointing to the create_project action
+
+   - Ensured the form properly submits the project_id
+
+
+
+<ol><li>**Enhanced the <code>editproject</code> method in Project.pm**:</li></ol>
+
+   - Added support for both GET and POST requests
+
+   - Added handling for the case where project_id is an array reference
+
+   - Added comprehensive error handling and logging
+
+   - Improved validation of the project_id parameter
+
+
+
+<ol><li>**Updated the projectdetails.tt template**:</li></ol>
+
+   - Changed the form method from POST to GET for the Edit Project button
+
+   - This ensures the project_id is properly passed to the editproject action
+
+
+
+<h2>Technical Details</h2>
+
+
+
+The main issue was that the form in projectdetails.tt was using POST to submit to the editproject action, but the editproject action was only looking for the project_id in the body parameters. Additionally, the editproject.tt template had duplicate form tags, which was causing the form to be improperly submitted.
+
+
+
+The solution was to:
+
+<ol><li>Fix the editproject.tt template to remove the duplicate form tag</li></ol>
+
+<ol><li>Update the editproject action to handle both GET and POST requests</li></ol>
+
+<ol><li>Update the projectdetails.tt template to use GET instead of POST for the Edit Project button</li></ol>
+
+
+
+<h2>Benefits</h2>
+
+
+
+<ul><li>More robust project editing</li></ul>
+
+<ul><li>Better error handling and logging</li></ul>
+
+<ul><li>Improved user experience with clearer error messages</li></ul>
+
+<ul><li>Fixed security issues with form methods</li></ul>
+
+
+
+This fix ensures that users can edit projects without encountering errors related to the project ID.
+
+</div>

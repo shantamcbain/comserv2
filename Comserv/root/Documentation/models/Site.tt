@@ -1,0 +1,75 @@
+[% PageVersion = 'Comserv/root/Documentation/models/Site.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Site Model' %]
+
+<!-- Documentation page for Site -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Overview</h2>
+
+The Site model manages site-specific data and configurations in the Comserv application. It provides methods for retrieving and updating site information.
+
+
+
+<h2>Key Features</h2>
+
+<ul><li>Site configuration management</li></ul>
+
+<ul><li>Multi-site support</li></ul>
+
+<ul><li>Site-specific settings and preferences</li></ul>
+
+<ul><li>Domain mapping and routing</li></ul>
+
+
+
+<h2>Methods</h2>
+
+<ul><li><code>get_site_details_by_name</code>: Retrieves site details by site name</li></ul>
+
+<ul><li><code>get_site_details_by_domain</code>: Retrieves site details by domain name</li></ul>
+
+<ul><li><code>update_site</code>: Updates site information</li></ul>
+
+<ul><li><code>create_site</code>: Creates a new site</li></ul>
+
+<ul><li><code>get_all_sites</code>: Retrieves all sites</li></ul>
+
+<ul><li><code>get_site_settings</code>: Gets settings for a specific site</li></ul>
+
+
+
+<h2>Database Interactions</h2>
+
+This model interacts with the following database tables:
+
+<ul><li>sites</li></ul>
+
+<ul><li>site_settings</li></ul>
+
+<ul><li>site_domains</li></ul>
+
+<ul><li>site_themes</li></ul>
+
+
+
+<h2>Related Files</h2>
+
+<ul><li>Site controller in <code>/lib/Comserv/Controller/Site.pm</code></li></ul>
+
+<ul><li>Site templates in <code>/root/templates/site/</code></li></ul>
+
+<ul><li>Theme configuration in <code>/lib/Comserv/Model/ThemeConfig.pm</code></li></ul>
+
+</div>

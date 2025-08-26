@@ -1,0 +1,191 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2025-04-mcoop-server-room-plan.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'MCoop Server Room Plan Implementation' %]
+
+<!-- Documentation page for 2025-04-mcoop-server-room-plan -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**Date:** April 1, 2025  
+
+**Author:** Shanta  
+
+**Status:** Completed
+
+
+
+<h2>Overview</h2>
+
+
+
+This document outlines the implementation of the Monashee Coop Server Room Plan feature and the subsequent menu restructuring to improve security and organization.
+
+
+
+<h2>Changes Made</h2>
+
+
+
+<h3>1. Server Room Plan Implementation</h3>
+
+
+
+The server room plan feature was implemented with the following components:
+
+
+
+<ul><li>**Controller Method**: Added <code>server_room_plan</code> method in the MCoop controller</li></ul>
+
+<ul><li>**Template**: Created <code>coop/server_room_plan.tt</code> template with detailed server room proposal</li></ul>
+
+<ul><li>**URL Structure**: Accessible at <code>/mcoop/server_room_plan</code> and <code>/mcoop/server-room-plan</code> (for backward compatibility)</li></ul>
+
+
+
+<h3>2. Menu Restructuring</h3>
+
+
+
+To improve security and organization, the following menu changes were made:
+
+
+
+<ul><li>**Removed MCoop Menu**: The standalone MCoop menu item was removed from the top navigation</li></ul>
+
+<ul><li>**Admin Integration**: MCoop links were moved to the Admin menu and made accessible only to users with admin privileges</li></ul>
+
+<ul><li>**Conditional Display**: All MCoop-related links are now conditionally displayed based on user roles</li></ul>
+
+
+
+<h3>3. Code Cleanup</h3>
+
+
+
+Several code improvements were made:
+
+
+
+<ul><li>**Removed Duplicate Routes**: Eliminated duplicate route definitions in the Root controller</li></ul>
+
+<ul><li>**Simplified Controller Logic**: Streamlined the MCoop controller to focus on core functionality</li></ul>
+
+<ul><li>**Enhanced Security**: Restricted access to MCoop features to administrators only</li></ul>
+
+<ul><li>**Improved Template**: Removed redundant menu from the server room plan template</li></ul>
+
+
+
+<h2>Technical Details</h2>
+
+
+
+<h3>Controller Changes</h3>
+
+
+
+The MCoop controller now has two methods for handling server room plan requests:
+
+
+
+<code></code>`perl
+
+<h1>Main method for server room plan</h1>
+
+sub server_room_plan :Path('server_room_plan') :Args(0) {
+
+    my ( $self, $c ) = @_;
+
+    # Implementation details...
+
+    $c->stash(template => 'coop/server_room_plan.tt');
+
+    $c->forward($c->view('TT'));
+
+}
+
+
+
+<h1>Compatibility method for hyphenated URLs</h1>
+
+sub server_room_plan_hyphen :Path('server-room-plan') :Args(0) {
+
+    my ( $self, $c ) = @_;
+
+    $c->forward('server_room_plan');
+
+}
+
+<code></code>`
+
+
+
+<h3>Template Structure</h3>
+
+
+
+The server room plan template (<code>coop/server_room_plan.tt</code>) provides a detailed proposal including:
+
+
+
+<ul><li>Equipment requirements with pricing</li></ul>
+
+<ul><li>Options analysis for different server room configurations</li></ul>
+
+<ul><li>Common practices in server room implementation</li></ul>
+
+<ul><li>Recommendations for short-term and long-term solutions</li></ul>
+
+
+
+<h3>Menu Changes</h3>
+
+
+
+The navigation menu was restructured by:
+
+
+
+<ol><li>Removing the MCoop menu from <code>TopDropListCoop.tt</code></li></ol>
+
+<ol><li>Adding MCoop links to the Admin menu in <code>admintopmenu.tt</code></li></ol>
+
+<ol><li>Making the MCoop section in the Admin menu visible only to administrators</li></ol>
+
+
+
+<h2>Benefits</h2>
+
+
+
+<ul><li>**Improved Security**: MCoop administrative features are now properly restricted</li></ul>
+
+<ul><li>**Better Organization**: Related functionality is grouped together in the Admin menu</li></ul>
+
+<ul><li>**Simplified Navigation**: Reduced menu clutter by consolidating related items</li></ul>
+
+<ul><li>**Consistent URL Structure**: Support for both underscore and hyphen formats</li></ul>
+
+
+
+<h2>Future Considerations</h2>
+
+
+
+<ul><li>Consider implementing role-based access control for specific MCoop features</li></ul>
+
+<ul><li>Develop additional server infrastructure documentation</li></ul>
+
+<ul><li>Create a visual diagram of the server room layout</li></ul>
+
+</div>

@@ -1,0 +1,137 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2025-08-18-project-cards-css-fix.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Project Cards CSS Fix' %]
+
+<!-- Documentation page for 2025-08-18-project-cards-css-fix -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**Last Updated:** August 18, 2025  
+
+**Author:** Shanta  
+
+**Status:** Active
+
+
+
+<h2>Overview</h2>
+
+
+
+This update addresses issues with the project cards display in the Projects module. The cards were previously displaying as a list rather than in the intended card-based grid layout due to CSS loading and styling issues.
+
+
+
+<h2>Changes Made</h2>
+
+
+
+<h3>CSS Implementation</h3>
+
+
+
+<ol><li>**Inline Critical CSS**</li></ol>
+
+   - Added inline critical CSS directly in the project.tt template
+
+   - Ensures core styles are applied even if external CSS files fail to load
+
+   - Includes styles for cards, badges, buttons, and utility classes
+
+
+
+<ol><li>**External CSS Improvements**</li></ol>
+
+   - Enhanced the project-cards.css file with missing classes
+
+   - Added responsive design improvements
+
+   - Ensured compatibility with Bootstrap class naming conventions
+
+
+
+<ol><li>**Controller Updates**</li></ol>
+
+   - Added cache-busting timestamp to CSS URL to force browser cache refresh
+
+   - Set use_fluid_container flag for better card layout
+
+   - Added debug mode to help with troubleshooting
+
+
+
+<h3>Documentation Updates</h3>
+
+
+
+<ol><li>**Updated Projects Documentation**</li></ol>
+
+   - Added detailed information about the card-based UI
+
+   - Included troubleshooting section for CSS display issues
+
+   - Added code examples for controller configuration
+
+
+
+<ol><li>**Added to Documentation System**</li></ol>
+
+   - Registered Projects documentation in the documentation_config.json
+
+   - Added to the Module Documentation category
+
+
+
+<h2>Technical Details</h2>
+
+
+
+The fix uses a combination of:
+
+<ul><li>Inline CSS for critical rendering path</li></ul>
+
+<ul><li>External CSS for complete styling</li></ul>
+
+<ul><li>Cache-busting techniques to ensure fresh CSS is loaded</li></ul>
+
+<ul><li>Debug mode for easier troubleshooting</li></ul>
+
+
+
+<h2>Testing</h2>
+
+
+
+The fix has been tested in:
+
+<ul><li>Chrome (latest)</li></ul>
+
+<ul><li>Firefox (latest)</li></ul>
+
+<ul><li>Mobile view (responsive design)</li></ul>
+
+
+
+<h2>Related Files</h2>
+
+
+
+<ul><li><code>/todo/project.tt</code> - Main template with inline CSS</li></ul>
+
+<ul><li><code>/static/css/components/project-cards.css</code> - External CSS file</li></ul>
+
+<ul><li><code>Comserv::Controller::Project</code> - Controller with CSS loading configuration</li></ul>
+
+<ul><li><code>/Documentation/Projects.tt</code> - Updated documentation</li></ul>
+
+</div>

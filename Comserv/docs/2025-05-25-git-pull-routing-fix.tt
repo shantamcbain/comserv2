@@ -1,0 +1,163 @@
+[% PageVersion = 'Comserv/docs/2025-05-25-git-pull-routing-fix.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Git Pull Routing Fix' %]
+
+<!-- Include documentation CSS -->
+<link rel="stylesheet" href="/static/css/documentation.css">
+
+<div class="markdown-content">
+
+
+**File:** /home/shanta/PycharmProjects/comserv/Comserv/docs/2025-05-25-git-pull-routing-fix.md  
+
+**Date:** May 25, 2025  
+
+**Author:** System Administrator  
+
+**Status:** Implemented
+
+
+
+## Overview
+
+
+
+This document outlines the fix for an issue where the Git pull functionality in the admin interface was not working correctly. The problem was caused by duplicate route definitions in the Admin controller, which resulted in the Git pull page redirecting back to the main page instead of displaying the confirmation screen.
+
+
+
+## Issue Description
+
+
+
+The Admin controller had two `git_pull` methods defined with different path attributes:
+
+
+
+1. First method: `:Path('admin/git_pull')` - This was a relative path
+
+2. Second method: `:Path('/admin/git_pull')` - This was an absolute path
+
+
+
+The links in the templates were pointing to `/admin/git_pull` (absolute path), but the first method was using a relative path, which caused confusion in the routing system. This resulted in the Git pull functionality being inaccessible to administrators.
+
+
+
+## Changes Made
+
+
+
+### 1. Removed Duplicate Method
+
+
+
+The first `git_pull` method with the relative path was removed and replaced with a comment indicating that it has been moved:
+
+
+
+```perl
+
+# This method has been moved to Path('/admin/git_pull')
+
+```
+
+
+
+### 2. Enhanced Remaining Method
+
+
+
+The second `git_pull` method with the absolute path was enhanced to:
+
+
+
+- Initialize the debug messages array in the stash
+
+- Add more detailed debug information
+
+- Improve error handling
+
+- Ensure consistent use of stash variables instead of flash variables
+
+- Keep users on the Git pull page when errors occur instead of redirecting
+
+
+
+### 3. Improved Debug Information
+
+
+
+The updated method now adds more detailed debug information to the stash:
+
+
+
+```perl
+
+# Initialize debug messages array
+
+$c->stash->{debug_msg} = [] unless defined $c->stash->{debug_msg};
+
+
+
+# Add debug messages to the stash
+
+push @{$c->stash->{debug_msg}}, "User: $username";
+
+push @{$c->stash->{debug_msg}}, "Roles: " . Dumper($roles);
+
+```
+
+
+
+## Benefits
+
+
+
+1. **Fixed Routing**: The Git pull functionality now works correctly for administrators
+
+2. **Improved Debugging**: More detailed debug information is available when issues occur
+
+3. **Better Error Handling**: Errors are displayed on the Git pull page instead of redirecting
+
+4. **Consistent User Experience**: Users stay on the Git pull page throughout the process
+
+
+
+## Testing
+
+
+
+The fix was tested to ensure:
+
+
+
+1. Administrators can access the Git pull functionality from both the admin dashboard and the admin top menu
+
+2. The Git pull confirmation page displays correctly
+
+3. The Git pull operation works when confirmed
+
+4. Error messages are displayed correctly when issues occur
+
+5. Debug information is available when debug mode is enabled
+
+
+
+## Affected Files
+
+
+
+- `/home/shanta/PycharmProjects/comserv/Comserv/lib/Comserv/Controller/Admin.pm`
+
+
+
+## Related Documentation
+
+
+
+- [Git Pull Functionality for Administrators](/home/shanta/PycharmProjects/comserv/Comserv/root/Documentation/changelog/2025-04-git-pull-functionality.md)
+</div>

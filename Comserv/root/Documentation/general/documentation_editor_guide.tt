@@ -1,0 +1,179 @@
+[% PageVersion = 'Comserv/root/Documentation/general/documentation_editor_guide.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Documentation Editor Guide' %]
+
+<!-- Documentation page for documentation_editor_guide -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Overview</h2>
+
+
+
+The Documentation Editor is a new feature that allows administrators and editors to create, edit, and manage documentation files directly within the Comserv application. This guide explains how to use the Documentation Editor and how it helps prevent documentation files from being created in the wrong location.
+
+
+
+<h2>Accessing the Documentation Editor</h2>
+
+
+
+<ol><li>Log in with an administrator or editor account</li></ol>
+
+<ol><li>Navigate to <code>/documentation_editor</code> in your browser</li></ol>
+
+<ol><li>You will see a list of all existing documentation files</li></ol>
+
+
+
+<h2>Creating New Documentation</h2>
+
+
+
+<ol><li>Click the "Create New Documentation" button</li></ol>
+
+<ol><li>Fill in the following fields:</li></ol>
+
+   - **Title**: The title of the documentation page
+
+   - **Category**: Select the appropriate category for the documentation
+
+   - **Roles**: Select which user roles can access this documentation
+
+   - **Site**: Select which site this documentation is for (or "All Sites")
+
+   - **Content**: Write your documentation content using Markdown syntax
+
+<ol><li>Click "Create Documentation" to save the file</li></ol>
+
+
+
+<h2>Editing Existing Documentation</h2>
+
+
+
+<ol><li>Find the documentation file you want to edit in the list</li></ol>
+
+<ol><li>Click the "Edit" button next to the file</li></ol>
+
+<ol><li>Make your changes to the content or metadata</li></ol>
+
+<ol><li>Click "Update Documentation" to save your changes</li></ol>
+
+
+
+<h2>Viewing Documentation</h2>
+
+
+
+<ol><li>Find the documentation file you want to view in the list</li></ol>
+
+<ol><li>Click the "View" button next to the file</li></ol>
+
+<ol><li>The documentation will open in a new tab using the standard Documentation viewer</li></ol>
+
+
+
+<h2>Deleting Documentation</h2>
+
+
+
+<ol><li>Find the documentation file you want to delete in the list</li></ol>
+
+<ol><li>Click the "Delete" button next to the file</li></ol>
+
+<ol><li>Confirm the deletion when prompted</li></ol>
+
+
+
+<h2>Preventing Documentation Files in the Application Root</h2>
+
+
+
+The system now includes automatic cleanup scripts that run when the server starts to prevent documentation files from accumulating in the application root. These scripts:
+
+
+
+<ol><li>Identify files with patterns like "Formatting title from: filename.md" in the application root</li></ol>
+
+<ol><li>Move these files to the appropriate location in the Documentation directory structure</li></ol>
+
+<ol><li>Clean up any temporary or categorization files</li></ol>
+
+
+
+<h2>Best Practices</h2>
+
+
+
+<ol><li>**Always use the Documentation Editor**: Create and edit documentation files using the Documentation Editor rather than creating them manually or through external tools.</li></ol>
+
+
+
+<ol><li>**Choose the right category**: Select the appropriate category for your documentation to ensure it appears in the right section of the Documentation system.</li></ol>
+
+
+
+<ol><li>**Set appropriate roles**: Make sure to set the correct roles for your documentation to ensure it's visible to the right users.</li></ol>
+
+
+
+<ol><li>**Use Markdown formatting**: The Documentation Editor supports Markdown syntax for formatting your content. Use headings, lists, links, and other Markdown features to make your documentation more readable.</li></ol>
+
+
+
+<ol><li>**Preview before saving**: Use the Preview button to see how your documentation will look before saving it.</li></ol>
+
+
+
+<h2>Troubleshooting</h2>
+
+
+
+If you encounter any issues with the Documentation Editor:
+
+
+
+<ol><li>**File not saving**: Make sure you have filled in all required fields (Title and Content).</li></ol>
+
+
+
+<ol><li>**File not appearing in the list**: Try refreshing the page. If the file still doesn't appear, check if you have the necessary permissions.</li></ol>
+
+
+
+<ol><li>**Files still appearing in application root**: The cleanup scripts run when the server starts. If you notice files in the application root, try restarting the server or manually running the cleanup scripts:</li></ol>
+
+   <code></code>`
+
+   cd /home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/scripts
+
+   ./cleanup_categorization_files.pl
+
+   ./move_docs_to_proper_location.pl
+
+   <code></code>`
+
+
+
+<h2>Related Documentation</h2>
+
+
+
+<ul><li><a href="/Documentation/documentation_system_overview">Documentation System Overview</a></li></ul>
+
+<ul><li><a href="/Documentation/documentation_filename_issue">Documentation Filename Issue</a></li></ul>
+
+<ul><li><a href="/Documentation/markdown_syntax_guide">Markdown Syntax Guide</a></li></ul>
+
+</div>

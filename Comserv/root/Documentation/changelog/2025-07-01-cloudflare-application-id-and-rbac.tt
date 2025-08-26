@@ -1,0 +1,123 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2025-07-01-cloudflare-application-id-and-rbac.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Cloudflare API Integration Enhancement' %]
+
+<!-- Documentation page for 2025-07-01-cloudflare-application-id-and-rbac -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**Date:** July 1, 2025  
+
+**Author:** System Administrator  
+
+**Type:** Feature Enhancement  
+
+
+
+<h2>Overview</h2>
+
+
+
+This update enhances the Cloudflare API integration by adding support for the Application ID and implementing role-based access control (RBAC) for Cloudflare API operations. These changes improve security and allow for more granular control over who can access and modify Cloudflare settings for different domains.
+
+
+
+<h2>Changes</h2>
+
+
+
+<h3>1. Added Application ID Support</h3>
+
+
+
+<ul><li>Added a new <code>application_id</code> field to the Cloudflare section of the API credentials configuration</li></ul>
+
+<ul><li>Updated the CloudflareManager to use the Application ID when making API requests</li></ul>
+
+<ul><li>Modified the zone ID lookup process to use the Application ID for better authentication</li></ul>
+
+<ul><li>Updated the API Credentials management interface to include the Application ID field</li></ul>
+
+
+
+<h3>2. Implemented Role-Based Access Control</h3>
+
+
+
+<ul><li>CSC (Computer System Consulting) admins now have unlimited access to all Cloudflare API functions</li></ul>
+
+<ul><li>SiteName admins only have access to domains associated with their SiteName</li></ul>
+
+<ul><li>Added domain-user association checking to enforce access restrictions</li></ul>
+
+<ul><li>Enhanced permission checking to support different levels of access based on user roles</li></ul>
+
+
+
+<h3>3. Technical Implementation Details</h3>
+
+
+
+<ul><li>Created a new template for the API Credentials management interface</li></ul>
+
+<ul><li>Updated the CloudflareManager utility to support the new RBAC model</li></ul>
+
+<ul><li>Added methods to check domain-user associations</li></ul>
+
+<ul><li>Improved error handling and logging for better troubleshooting</li></ul>
+
+
+
+<h2>How to Use</h2>
+
+
+
+<h3>Setting Up Application ID</h3>
+
+
+
+<ol><li>Log in as an administrator</li></ol>
+
+<ol><li>Navigate to API Credentials Management</li></ol>
+
+<ol><li>Enter your Cloudflare Application ID in the appropriate field</li></ol>
+
+<ol><li>Save the changes</li></ol>
+
+
+
+<h3>Understanding Access Control</h3>
+
+
+
+<ul><li>**CSC Admins**: Have full access to all Cloudflare functions for all domains</li></ul>
+
+<ul><li>**SiteName Admins**: Can only manage DNS and cache for domains associated with their SiteName</li></ul>
+
+<ul><li>**Editors**: Can only edit DNS records for domains they have access to</li></ul>
+
+<ul><li>**Viewers**: Can only view DNS records without making changes</li></ul>
+
+
+
+<h2>Technical Notes</h2>
+
+
+
+The Application ID is used in API requests to Cloudflare to identify the application making the request. This is different from the API token, which is used for authentication. The Application ID helps with rate limiting and provides better tracking of API usage.
+
+
+
+The zone ID for each domain is now retrieved dynamically from the Cloudflare API using the domain name and Application ID, rather than being stored in the configuration file.
+
+</div>

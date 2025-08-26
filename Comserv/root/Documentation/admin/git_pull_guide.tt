@@ -1,0 +1,157 @@
+[% PageVersion = 'Comserv/root/Documentation/admin/git_pull_guide.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Git Pull Guide for Administrators' %]
+
+<!-- Documentation page for git_pull_guide -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Overview</h2>
+
+
+
+The Git Pull feature allows administrators to update the application with the latest code from the Git repository. This guide explains how to use this feature and understand its special handling of configuration files.
+
+
+
+<h2>Accessing the Git Pull Feature</h2>
+
+
+
+<ol><li>Log in with an administrator account</li></ol>
+
+<ol><li>Navigate to the Admin Dashboard</li></ol>
+
+<ol><li>Click on the "Git Pull" button</li></ol>
+
+
+
+<h2>Using Git Pull</h2>
+
+
+
+The Git Pull page provides:
+
+
+
+<ol><li>A confirmation screen with information about the operation</li></ol>
+
+<ol><li>Details about how configuration files will be handled</li></ol>
+
+<ol><li>A button to execute the pull operation</li></ol>
+
+<ol><li>Detailed output of the Git commands</li></ol>
+
+
+
+<h2>Special Handling of theme_mappings.json</h2>
+
+
+
+The system automatically handles changes to the <code>theme_mappings.json</code> file:
+
+
+
+<ol><li>Local changes are detected and backed up</li></ol>
+
+<ol><li>Changes are stashed before pulling</li></ol>
+
+<ol><li>After pulling, local changes are reapplied</li></ol>
+
+<ol><li>If conflicts occur, you can restore from the backup</li></ol>
+
+
+
+This special handling ensures that your local theme configurations are preserved while still getting the latest code updates.
+
+
+
+<h2>Understanding the Output</h2>
+
+
+
+After executing a Git pull, you'll see:
+
+
+
+<ul><li>**Success Message**: Confirms the pull was successful</li></ul>
+
+<ul><li>**Warning Message**: Indicates if there were conflicts or issues</li></ul>
+
+<ul><li>**Git Command Output**: Shows the detailed output from Git</li></ul>
+
+<ul><li>**Debug Information**: (When in debug mode) Shows additional technical details</li></ul>
+
+
+
+<h2>Handling Conflicts</h2>
+
+
+
+If conflicts occur during the pull:
+
+
+
+<ol><li>A warning message will be displayed</li></ol>
+
+<ol><li>Check the backup file at <code>Comserv/root/static/config/theme_mappings.json.bak</code></li></ol>
+
+<ol><li>Manually resolve conflicts if needed</li></ol>
+
+<ol><li>Consider documenting production-specific configurations</li></ol>
+
+
+
+<h2>Best Practices</h2>
+
+
+
+<ol><li>**Regular Updates**: Pull regularly to avoid large divergences</li></ol>
+
+<ol><li>**Backup First**: Consider backing up the entire application before major updates</li></ol>
+
+<ol><li>**Test After Pull**: Verify the application works correctly after pulling</li></ol>
+
+<ol><li>**Check Logs**: Review application logs for any errors after updating</li></ol>
+
+
+
+<h2>Troubleshooting</h2>
+
+
+
+If you encounter issues:
+
+
+
+<ol><li>**Permission Errors**: Ensure the web server has write permissions to the repository</li></ol>
+
+<ol><li>**Merge Conflicts**: Use the backup files to restore or manually resolve conflicts</li></ol>
+
+<ol><li>**Application Errors**: Check the application logs for errors after pulling</li></ol>
+
+<ol><li>**Stash Issues**: Use <code>git stash list</code> and <code>git stash apply</code> to manage stashed changes manually</li></ol>
+
+
+
+<h2>Related Documentation</h2>
+
+
+
+<ul><li><a href="theme_mappings_handling.md">Theme Mappings Handling</a></li></ul>
+
+<ul><li><a href="starman_restart_guide.md">Server Restart Guide</a></li></ul>
+
+<ul><li><a href="system_overview.md">Configuration Management</a></li></ul>
+
+</div>

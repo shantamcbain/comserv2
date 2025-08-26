@@ -1,0 +1,121 @@
+[% PageVersion = 'Comserv/root/Documentation/project_selection_log_creation.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Project Selection and Log Creation' %]
+
+<!-- Documentation page for project_selection_log_creation -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Overview</h2>
+
+
+
+This document describes the recent fixes made to the project selection and log creation functionality in the Comserv application.
+
+
+
+<h2>Changes Made</h2>
+
+
+
+<h3>1. Project List Template</h3>
+
+
+
+The <code>project_list.tt</code> template was updated to use consistent field names:
+
+
+
+<ul><li>Changed select element's id and name from "parent_id" to "project_id"</li></ul>
+
+<ul><li>Updated the condition for the "None" option to use selected_project_id</li></ul>
+
+<ul><li>This ensures that the project selection dropdown works correctly in all contexts</li></ul>
+
+
+
+<h3>2. Add Project Template</h3>
+
+
+
+The <code>add_project.tt</code> template was updated to properly include the project_list.tt template:
+
+
+
+<ul><li>Added proper parameters when including project_list.tt</li></ul>
+
+<ul><li>Now passes projects and selected_project_id to ensure correct project selection</li></ul>
+
+<ul><li>This fixes the sub-project creation functionality</li></ul>
+
+
+
+<h3>3. Log Form Template</h3>
+
+
+
+The <code>log_form.tt</code> template was updated to properly handle project selection:
+
+
+
+<ul><li>Updated to use selected_project_id instead of form_data.parent_id</li></ul>
+
+<ul><li>Now properly passes projects and selected_project_id to project_list.tt</li></ul>
+
+<ul><li>This ensures that the correct project is selected when creating a log entry</li></ul>
+
+
+
+<h3>4. Log Controller</h3>
+
+
+
+The Log controller was updated to use the correct field names:
+
+
+
+<ul><li>Changed to use project_id instead of parent_id when retrieving form parameters</li></ul>
+
+<ul><li>Added default value for project_id to prevent NULL values in project_code column</li></ul>
+
+<ul><li>This fixes the error "Column 'project_code' cannot be null" when creating log entries</li></ul>
+
+
+
+<h2>Impact</h2>
+
+
+
+These changes ensure that:
+
+
+
+<ol><li>Projects can be properly selected when creating a new todo</li></ol>
+
+<ol><li>Sub-projects can be properly created</li></ol>
+
+<ol><li>Log entries can be created with the correct project_code value</li></ol>
+
+
+
+<h2>Technical Details</h2>
+
+
+
+The key issue was inconsistent field naming between templates and controllers. The project_list.tt template was using "parent_id" as the field name, but the Todo and Log controllers were expecting "project_id". This caused issues when creating todos, sub-projects, and log entries.
+
+
+
+By standardizing on "project_id" as the field name and ensuring that all templates pass the correct parameters, we've fixed these issues and improved the overall reliability of the system.
+
+</div>

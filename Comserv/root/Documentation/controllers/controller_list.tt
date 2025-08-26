@@ -1,0 +1,183 @@
+[% PageVersion = 'Comserv/root/Documentation/controllers/controller_list.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Controller Documentation Status' %]
+
+<!-- Documentation page for controller_list -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+This document lists all controllers in the Comserv application and their documentation status.
+
+
+
+<h2>Controllers</h2>
+
+
+
+| Controller | Documentation Status | Path |
+
+|------------|---------------------|------|
+
+| 3d | ❌ Missing | <code>/lib/Comserv/Controller/3d.pm</code> |
+
+| Admin | ❌ Missing | <code>/lib/Comserv/Controller/Admin.pm</code> |
+
+| Admin/Theme | ❌ Missing | <code>/lib/Comserv/Controller/Admin/Theme.pm</code> |
+
+| Apiary | ❌ Missing | <code>/lib/Comserv/Controller/Apiary.pm</code> |
+
+| Base | ❌ Missing | <code>/lib/Comserv/Controller/Base.pm</code> |
+
+| BMaster | ❌ Missing | <code>/lib/Comserv/Controller/BMaster.pm</code> |
+
+| CSC | ❌ Missing | <code>/lib/Comserv/Controller/CSC.pm</code> |
+
+| Documentation | ✅ Documented | <code>/lib/Comserv/Controller/Documentation.pm</code> |
+
+| Documentation/Config | ❌ Missing | <code>/lib/Comserv/Controller/Documentation/Config.pm</code> |
+
+| Documentation/ConfigBased | ❌ Missing | <code>/lib/Comserv/Controller/Documentation/ConfigBased.pm</code> |
+
+| Documentation/ScanMethods | ❌ Missing | <code>/lib/Comserv/Controller/Documentation/ScanMethods.pm</code> |
+
+| ENCY | ❌ Missing | <code>/lib/Comserv/Controller/ENCY.pm</code> |
+
+| File | ❌ Missing | <code>/lib/Comserv/Controller/File.pm</code> |
+
+| Forager | ❌ Missing | <code>/lib/Comserv/Controller/Forager.pm</code> |
+
+| HelpDesk | ✅ Documented | <code>/lib/Comserv/Controller/HelpDesk.pm</code> |
+
+| Hosting | ❌ Missing | <code>/lib/Comserv/Controller/Hosting.pm</code> |
+
+| Log | ❌ Missing | <code>/lib/Comserv/Controller/Log.pm</code> |
+
+| Mail | ❌ Missing | <code>/lib/Comserv/Controller/Mail.pm</code> |
+
+| MCoop | ❌ Missing | <code>/lib/Comserv/Controller/MCoop.pm</code> |
+
+| Project | ❌ Missing | <code>/lib/Comserv/Controller/Project.pm</code> |
+
+| Proxmox | ❌ Missing | <code>/lib/Comserv/Controller/Proxmox.pm</code> |
+
+| ProxmoxServers | ❌ Missing | <code>/lib/Comserv/Controller/ProxmoxServers.pm</code> |
+
+| Root | ✅ Documented | <code>/lib/Comserv/Controller/Root.pm</code> |
+
+| Site | ❌ Missing | <code>/lib/Comserv/Controller/Site.pm</code> |
+
+| TestRoute | ❌ Missing | <code>/lib/Comserv/Controller/TestRoute.pm</code> |
+
+| ThemeAdmin | ❌ Missing | <code>/lib/Comserv/Controller/ThemeAdmin.pm</code> |
+
+| ThemeAdmin/update_theme_with_variables | ❌ Missing | <code>/lib/Comserv/Controller/ThemeAdmin/update_theme_with_variables.pm</code> |
+
+| ThemeEditor | ❌ Missing | <code>/lib/Comserv/Controller/ThemeEditor.pm</code> |
+
+| ThemeTest | ❌ Missing | <code>/lib/Comserv/Controller/ThemeTest.pm</code> |
+
+| Todo | ❌ Missing | <code>/lib/Comserv/Controller/Todo.pm</code> |
+
+| USBM | ❌ Missing | <code>/lib/Comserv/Controller/USBM.pm</code> |
+
+| User | ✅ Documented | <code>/lib/Comserv/Controller/User.pm</code> |
+
+| Ve7tit | ✅ Documented | <code>/lib/Comserv/Controller/Ve7tit.pm</code> |
+
+| Voip | ❌ Missing | <code>/lib/Comserv/Controller/Voip.pm</code> |
+
+| WorkShop | ❌ Missing | <code>/lib/Comserv/Controller/WorkShop.pm</code> |
+
+
+
+<h2>How to Add Documentation</h2>
+
+
+
+To add documentation for a controller:
+
+
+
+<ol><li>Create a Markdown file in the <code>/root/Documentation/controllers/</code> directory</li></ol>
+
+<ol><li>Name the file after the controller (e.g., <code>Root.md</code> for the Root controller)</li></ol>
+
+<ol><li>Include the following sections:</li></ol>
+
+   - Overview
+
+   - Key Features
+
+   - Methods
+
+   - Access Control
+
+   - Related Files
+
+
+
+<h2>Documentation Template</h2>
+
+
+
+<code></code>`markdown
+
+<h1>[Controller Name] Controller</h1>
+
+
+
+<h2>Overview</h2>
+
+Brief description of the controller's purpose.
+
+
+
+<h2>Key Features</h2>
+
+<ul><li>Feature 1</li></ul>
+
+<ul><li>Feature 2</li></ul>
+
+<ul><li>Feature 3</li></ul>
+
+
+
+<h2>Methods</h2>
+
+<ul><li><code>method1</code>: Description</li></ul>
+
+<ul><li><code>method2</code>: Description</li></ul>
+
+<ul><li><code>method3</code>: Description</li></ul>
+
+
+
+<h2>Access Control</h2>
+
+This controller is accessible to users with the following roles:
+
+<ul><li>role1</li></ul>
+
+<ul><li>role2</li></ul>
+
+
+
+<h2>Related Files</h2>
+
+<ul><li>Related file 1</li></ul>
+
+<ul><li>Related file 2</li></ul>
+
+<code></code>`
+
+</div>

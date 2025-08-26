@@ -1,0 +1,153 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2025-08-30-hosting-signup-enhancements.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Hosting Signup Enhancements' %]
+
+<!-- Documentation page for 2025-08-30-hosting-signup-enhancements -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**Date:** August 30, 2025  
+
+**Author:** Shanta  
+
+**Status:** Completed
+
+
+
+<h2>Overview</h2>
+
+
+
+This update enhances the Comserv hosting signup system with two critical improvements: duplicate site prevention and a complete site deletion feature.
+
+
+
+<h2>Changes</h2>
+
+
+
+<h3>Duplicate Site Prevention</h3>
+
+
+
+<ol><li>**Implementation Details**:</li></ol>
+
+   - Modified the <code>add_site</code> method in Site.pm to check for existing sites with the same name
+
+   - Added both proactive checking and error handling for duplicates
+
+   - Implemented detailed logging for duplicate detection events
+
+   - Added user feedback mechanisms for duplicate site attempts
+
+
+
+<ol><li>**Benefits**:</li></ol>
+
+   - Prevents database integrity issues from duplicate site names
+
+   - Provides clear feedback to users when a site name is already taken
+
+   - Preserves form data when a duplicate is detected, allowing easy correction
+
+   - Improves system reliability and user experience
+
+
+
+<h3>Site Deletion Feature</h3>
+
+
+
+<ol><li>**Implementation Details**:</li></ol>
+
+   - Created a complete site deletion system accessible via <code>/site/delete</code>
+
+   - Added support for deletion by either site ID or site name
+
+   - Implemented a confirmation page to prevent accidental deletions
+
+   - Developed thorough cleanup processes for all site components:
+
+     - Database records
+
+     - Associated domains
+
+     - Controller files
+
+     - Template directories
+
+   - Added detailed error handling and user feedback
+
+
+
+<ol><li>**Access Methods**:</li></ol>
+
+   - By ID: <code>/site/delete?id=X</code> (where X is the site ID)
+
+   - By name: <code>/site/delete?name=sitename</code> (where sitename is the site name)
+
+
+
+<ol><li>**User Experience**:</li></ol>
+
+   - Shows a confirmation page with site details
+
+   - Requires explicit confirmation via checkbox
+
+   - Performs complete cleanup of all site components
+
+   - Redirects to the site list with a success message
+
+
+
+<h2>Documentation Updates</h2>
+
+
+
+<ol><li>Updated the HostingSignup controller documentation</li></ol>
+
+<ol><li>Updated the hosting signup templates documentation</li></ol>
+
+<ol><li>Added detailed information about the site deletion process</li></ol>
+
+<ol><li>Added information about duplicate site prevention</li></ol>
+
+
+
+<h2>Technical Notes</h2>
+
+
+
+<ul><li>The site deletion feature is fully operational</li></ul>
+
+<ul><li>Templates are correctly placed in the <code>/home/shanta/PycharmProjects/comserv/Comserv/root/site/</code> directory</li></ul>
+
+<ul><li>All changes maintain the existing logging and debug message system</li></ul>
+
+<ul><li>No new files were added except where absolutely necessary</li></ul>
+
+
+
+<h2>Future Considerations</h2>
+
+
+
+<ul><li>Consider adding batch site management operations</li></ul>
+
+<ul><li>Explore site cloning functionality</li></ul>
+
+<ul><li>Implement site backup and restore options</li></ul>
+
+<ul><li>Add site suspension/reactivation features</li></ul>
+
+</div>

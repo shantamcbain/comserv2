@@ -1,0 +1,273 @@
+[% PageVersion = 'Comserv/root/Documentation/roles/normal/mcoop_user_guide.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Monashee Cooperative (MCoop) User Guide' %]
+
+<!-- Documentation page for mcoop_user_guide -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**Last Updated:** April 1, 2025  
+
+**Status:** Active
+
+
+
+<h2>Overview</h2>
+
+
+
+Welcome to the Monashee Cooperative (MCoop) user guide. This document provides information about the MCoop module and how to use its features as a regular member of the cooperative. The MCoop module is designed to help members access cooperative resources, participate in community activities, and stay informed about cooperative operations.
+
+
+
+<h2>Accessing MCoop Features</h2>
+
+
+
+The MCoop module is accessible when you're viewing the site with the MCoop theme. You can access MCoop features through:
+
+
+
+<ol><li>The main navigation menu</li></ol>
+
+<ol><li>The MCoop dashboard</li></ol>
+
+<ol><li>Direct links to specific features</li></ol>
+
+
+
+<h2>Member Features</h2>
+
+
+
+<h3>Member Dashboard</h3>
+
+
+
+The Member Dashboard provides a personalized view of your cooperative membership, including:
+
+
+
+<ul><li>Your membership status and details</li></ul>
+
+<ul><li>Upcoming events and meetings</li></ul>
+
+<ul><li>Recent cooperative announcements</li></ul>
+
+<ul><li>Your participation in cooperative activities</li></ul>
+
+<ul><li>Access to member-only resources</li></ul>
+
+
+
+**Access URL:** <code>/mcoop/member</code> or through the main navigation menu
+
+
+
+<h3>Resource Directory</h3>
+
+
+
+The Resource Directory provides information about cooperative resources available to members, including:
+
+
+
+<ul><li>Shared equipment and tools</li></ul>
+
+<ul><li>Community spaces</li></ul>
+
+<ul><li>Educational resources</li></ul>
+
+<ul><li>Technical support services</li></ul>
+
+<ul><li>Cooperative infrastructure</li></ul>
+
+
+
+**Access URL:** <code>/mcoop/resources</code> or through the Member Dashboard
+
+
+
+<h3>Event Calendar</h3>
+
+
+
+The Event Calendar shows upcoming cooperative events, including:
+
+
+
+<ul><li>General meetings</li></ul>
+
+<ul><li>Committee meetings</li></ul>
+
+<ul><li>Workshops and training sessions</li></ul>
+
+<ul><li>Community events</li></ul>
+
+<ul><li>Volunteer opportunities</li></ul>
+
+
+
+**Access URL:** <code>/mcoop/events</code> or through the Member Dashboard
+
+
+
+<h3>Member Forum</h3>
+
+
+
+The Member Forum allows you to communicate with other cooperative members, including:
+
+
+
+<ul><li>Discussion boards for various topics</li></ul>
+
+<ul><li>Announcements from cooperative leadership</li></ul>
+
+<ul><li>Project collaboration spaces</li></ul>
+
+<ul><li>Question and answer sections</li></ul>
+
+<ul><li>Resource sharing</li></ul>
+
+
+
+**Access URL:** <code>/mcoop/forum</code> or through the Member Dashboard
+
+
+
+<h2>How to Use MCoop Features</h2>
+
+
+
+<h3>Updating Your Member Profile</h3>
+
+
+
+<ol><li>Log in to your account</li></ol>
+
+<ol><li>Navigate to the Member Dashboard</li></ol>
+
+<ol><li>Click on "My Profile" in the sidebar</li></ol>
+
+<ol><li>Update your information as needed</li></ol>
+
+<ol><li>Click "Save Changes" to apply your updates</li></ol>
+
+
+
+<h3>Reserving Cooperative Resources</h3>
+
+
+
+<ol><li>Navigate to the Resource Directory</li></ol>
+
+<ol><li>Browse or search for the resource you need</li></ol>
+
+<ol><li>Check availability on the calendar</li></ol>
+
+<ol><li>Click "Reserve" to book the resource</li></ol>
+
+<ol><li>Complete the reservation form with your details</li></ol>
+
+<ol><li>Submit your reservation request</li></ol>
+
+<ol><li>Wait for confirmation (automatic for most resources)</li></ol>
+
+
+
+<h3>Participating in Discussions</h3>
+
+
+
+<ol><li>Navigate to the Member Forum</li></ol>
+
+<ol><li>Browse topics or use the search function</li></ol>
+
+<ol><li>Click on a discussion thread to read posts</li></ol>
+
+<ol><li>Use the reply form at the bottom to add your contribution</li></ol>
+
+<ol><li>Follow forum guidelines for respectful communication</li></ol>
+
+
+
+<h3>Registering for Events</h3>
+
+
+
+<ol><li>Navigate to the Event Calendar</li></ol>
+
+<ol><li>Browse upcoming events or use filters to find specific types</li></ol>
+
+<ol><li>Click on an event for more details</li></ol>
+
+<ol><li>Click "Register" if you wish to attend</li></ol>
+
+<ol><li>Complete the registration form</li></ol>
+
+<ol><li>Submit your registration</li></ol>
+
+<ol><li>Check your email for confirmation</li></ol>
+
+
+
+<h2>Member Responsibilities</h2>
+
+
+
+As a MCoop member using the system, you are responsible for:
+
+
+
+<ol><li>**Keeping your information current** - Update your profile when your contact information changes</li></ol>
+
+<ol><li>**Respecting resource reservations** - Honor your bookings and cancel if you can't use a resource</li></ol>
+
+<ol><li>**Following forum guidelines** - Communicate respectfully and constructively</li></ol>
+
+<ol><li>**Protecting your account** - Use a strong password and don't share your login credentials</li></ol>
+
+<ol><li>**Reporting issues** - Alert administrators about technical problems or concerns</li></ol>
+
+
+
+<h2>Getting Help</h2>
+
+
+
+If you need assistance with the MCoop module:
+
+
+
+<ol><li>**Check the FAQ** - Many common questions are answered in the Frequently Asked Questions section</li></ol>
+
+<ol><li>**Contact Support** - Use the "Help" link in the footer to submit a support request</li></ol>
+
+<ol><li>**Ask in the Forum** - Post in the "Technical Support" section of the Member Forum</li></ol>
+
+<ol><li>**Contact an Administrator** - Reach out to a cooperative administrator during office hours</li></ol>
+
+
+
+<h2>Related Documentation</h2>
+
+
+
+<ul><li><a href="getting_started.md">Getting Started Guide</a></li></ul>
+
+<ul><li><a href="account_management.md">Account Management</a></li></ul>
+
+<ul><li><a href="/Documentation/sites/mcoop/site_guide.md">MCoop Site Guide</a></li></ul>
+
+</div>

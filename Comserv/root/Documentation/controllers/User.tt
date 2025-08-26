@@ -1,0 +1,148 @@
+[% PageVersion = 'Comserv/root/Documentation/controllers/User.tt,v 0.02 2025/01/15 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'User Controller' %]
+
+<!-- Documentation page for User -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Overview</h2>
+
+The User controller manages user accounts, authentication, and profile management in the Comserv application. It handles login/logout functionality, user registration, profile management, and password operations.
+
+<h3>Recent Updates (2025-01-15)</h3>
+
+<ul>
+<li><strong>Mailing List Integration</strong>: Email notifications now handled through mailing list subscriptions</li>
+<li><strong>Default Announcement List</strong>: All new users automatically subscribed to "{SiteName} Announcements" list</li>
+<li><strong>Helper Methods</strong>: Added three new private methods for mailing list integration</li>
+<li><strong>Settings Enhancement</strong>: Radio button interface for mailing list opt-in/opt-out</li>
+</ul>
+
+
+
+<h2>Key Features</h2>
+
+<ul><li>User registration and account creation</li></ul>
+
+<ul><li>User authentication and login with return-to-origin functionality</li></ul>
+
+<ul><li>Profile management and updates</li></ul>
+
+<ul><li>Password reset and recovery</li></ul>
+
+<ul><li>Role-based access control</li></ul>
+
+<ul><li>Session management</li></ul>
+
+
+
+<h2>Methods</h2>
+
+
+
+<h3>Authentication Methods</h3>
+
+<ul><li><code>login</code>: Displays the login form and stores the referring page for post-login redirection</li></ul>
+
+<ul><li><code>do_login</code>: Processes login form submissions and authenticates users</li></ul>
+
+<ul><li><code>process_login</code>: Internal method that handles the core login logic</li></ul>
+
+<ul><li><code>logout</code>: Handles user logout while preserving site context</li></ul>
+
+
+
+<h3>User Management Methods</h3>
+
+<ul><li><code>register</code>: Handles new user registration</li></ul>
+
+<ul><li><code>create_account</code>: Processes account creation form submissions</li></ul>
+
+<ul><li><code>profile</code>: Displays and updates user profiles</li></ul>
+
+<ul><li><code>change_password</code>: Allows users to change their password</li></ul>
+
+<ul><li><code>reset_password</code>: Handles password reset requests</li></ul>
+
+<ul><li><code>hash_password</code>: Internal method for secure password hashing</li></ul>
+
+
+
+<h2>Login Flow</h2>
+
+<ol><li>When a user accesses a restricted page, they are redirected to the login page</li></ol>
+
+<ol><li>The original page URL is stored in the session as <code>referer</code></li></ol>
+
+<ol><li>After successful authentication, the user is redirected back to the original page</li></ol>
+
+<ol><li>The system supports explicit redirection through the <code>return_to</code> parameter</li></ol>
+
+
+
+<h2>Access Control</h2>
+
+<ul><li>Most actions are accessible to all users</li></ul>
+
+<ul><li>Profile management requires authentication</li></ul>
+
+<ul><li>Administrative functions require admin role</li></ul>
+
+<ul><li>Role-based access is enforced through session data</li></ul>
+
+
+
+<h2>Mailing List Helper Methods (New)</h2>
+
+<h3>_user_has_email_notifications($user, $site_id)</h3>
+<ul>
+<li><strong>Purpose</strong>: Check if user has email notifications enabled</li>
+<li><strong>Implementation</strong>: Checks subscription to default announcement list</li>
+<li><strong>Returns</strong>: 1 if subscribed, 0 if not</li>
+</ul>
+
+<h3>_update_user_email_notifications($user, $enable, $site_id)</h3>
+<ul>
+<li><strong>Purpose</strong>: Enable/disable email notifications via mailing list subscription</li>
+<li><strong>Implementation</strong>: Creates/activates or deactivates announcement list subscription</li>
+<li><strong>Parameters</strong>: User object, Boolean enable flag, Site identifier</li>
+</ul>
+
+<h3>_get_or_create_announcement_list($user, $site_id)</h3>
+<ul>
+<li><strong>Purpose</strong>: Ensure default announcement list exists for site</li>
+<li><strong>Implementation</strong>: Uses find_or_create to get/create "{SiteName} Announcements" list</li>
+<li><strong>Returns</strong>: MailingList object or undef</li>
+</ul>
+
+<h2>Data Model Integration</h2>
+
+<h3>User-Mailing List Relationship</h3>
+<ul>
+<li><strong>Subscriptions</strong>: $user->mailing_list_subscriptions</li>
+<li><strong>Many-to-many</strong>: $user->subscribed_mailing_lists</li>
+<li><strong>Subscription Sources</strong>: registration, registration_default_announcement, email_notifications, profile_update</li>
+</ul>
+
+<h2>Related Files</h2>
+
+<ul><li>User model in <code>/lib/Comserv/Model/User.pm</code></li></ul>
+
+<ul><li>User templates in <code>/root/templates/user/</code></li></ul>
+
+<ul><li>Authentication configuration in Catalyst configuration</li></ul>
+
+<ul><li>Login template at <code>/root/templates/user/login.tt</code></li></ul>
+
+</div>

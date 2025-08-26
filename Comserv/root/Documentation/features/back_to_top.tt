@@ -1,0 +1,243 @@
+[% PageVersion = 'Comserv/root/Documentation/features/back_to_top.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Back to Top Feature' %]
+
+<!-- Documentation page for back_to_top -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**Last Updated:** August 20, 2024  
+
+**Author:** Shanta  
+
+**Status:** Active
+
+
+
+<h2>Overview</h2>
+
+
+
+The "Back to Top" feature adds a floating button to all pages in the application that allows users to quickly scroll back to the top of the page. This is especially useful for long pages with a lot of content.
+
+
+
+<h2>Implementation</h2>
+
+
+
+The feature is implemented using HTML, CSS, and JavaScript:
+
+
+
+<ol><li>**HTML**: A button element with the ID <code>back-to-top</code> is added to the main wrapper template.</li></ol>
+
+<ol><li>**CSS**: Styles for the button are defined in <code>/static/css/back-to-top.css</code>.</li></ol>
+
+<ol><li>**JavaScript**: Functionality for the button is implemented in <code>/static/js/back-to-top.js</code>.</li></ol>
+
+
+
+<h2>Features</h2>
+
+
+
+<ul><li>**Responsive Design**: The button adapts to different screen sizes.</li></ul>
+
+<ul><li>**Smooth Scrolling**: The page scrolls smoothly to the top when the button is clicked.</li></ul>
+
+<ul><li>**Automatic Show/Hide**: The button only appears when the user has scrolled down the page.</li></ul>
+
+<ul><li>**Theme Integration**: The button's appearance adapts to the current site theme.</li></ul>
+
+<ul><li>**Accessibility**: The button includes ARIA attributes for screen readers and keyboard navigation support.</li></ul>
+
+
+
+<h2>Code Details</h2>
+
+
+
+<h3>HTML</h3>
+
+
+
+<code></code>`html
+
+<!-- Back to Top Button -->
+
+<button id="back-to-top" title="Back to Top" aria-label="Back to Top">
+
+    <i class="fas fa-arrow-up" aria-hidden="true"></i>
+
+</button>
+
+<code></code>`
+
+
+
+<h3>CSS</h3>
+
+
+
+The CSS for the button is defined in <code>/static/css/back-to-top.css</code>. Key styles include:
+
+
+
+<ul><li>Fixed positioning in the bottom-right corner of the viewport</li></ul>
+
+<ul><li>Circular shape with a background color that matches the site theme</li></ul>
+
+<ul><li>Hover effects for better user interaction</li></ul>
+
+<ul><li>Responsive adjustments for mobile devices</li></ul>
+
+
+
+<h3>JavaScript</h3>
+
+
+
+The JavaScript functionality is defined in <code>/static/js/back-to-top.js</code>. Key features include:
+
+
+
+<ul><li>Show the button when the user scrolls down more than 300 pixels</li></ul>
+
+<ul><li>Hide the button when the user is near the top of the page</li></ul>
+
+<ul><li>Smooth scrolling animation when the button is clicked</li></ul>
+
+<ul><li>Keyboard shortcut (Alt + Home) for accessibility</li></ul>
+
+
+
+<h2>Keyboard Shortcuts</h2>
+
+
+
+<ul><li>**Alt + Home**: Scroll to the top of the page</li></ul>
+
+
+
+<h2>Browser Compatibility</h2>
+
+
+
+The "Back to Top" feature is compatible with all modern browsers:
+
+
+
+<ul><li>Chrome 60+</li></ul>
+
+<ul><li>Firefox 60+</li></ul>
+
+<ul><li>Safari 12+</li></ul>
+
+<ul><li>Edge 16+</li></ul>
+
+<ul><li>Opera 50+</li></ul>
+
+
+
+<h2>Customization</h2>
+
+
+
+The appearance of the button can be customized by modifying the CSS file. The following aspects can be changed:
+
+
+
+<ul><li>Button size</li></ul>
+
+<ul><li>Button position</li></ul>
+
+<ul><li>Button colors</li></ul>
+
+<ul><li>Animation speed</li></ul>
+
+<ul><li>Scroll threshold</li></ul>
+
+
+
+<h2>Accessibility</h2>
+
+
+
+The "Back to Top" button includes the following accessibility features:
+
+
+
+<ul><li>ARIA label for screen readers</li></ul>
+
+<ul><li>Keyboard navigation support</li></ul>
+
+<ul><li>High contrast colors</li></ul>
+
+<ul><li>Adequate button size for touch targets</li></ul>
+
+
+
+<h2>Integration with Themes</h2>
+
+
+
+The button's appearance automatically adapts to the current site theme:
+
+
+
+<ul><li>**Default Theme**: Blue button</li></ul>
+
+<ul><li>**CSC Theme**: Green button</li></ul>
+
+<ul><li>**APIS Theme**: Red button</li></ul>
+
+<ul><li>**USBM Theme**: Purple button</li></ul>
+
+
+
+<h2>Troubleshooting</h2>
+
+
+
+If the "Back to Top" button is not appearing or functioning correctly:
+
+
+
+<ol><li>Check if jQuery is loaded before the back-to-top.js script</li></ol>
+
+<ol><li>Verify that the CSS file is correctly linked in the head section</li></ol>
+
+<ol><li>Check the browser console for any JavaScript errors</li></ol>
+
+<ol><li>Ensure that the button HTML is present in the page source</li></ol>
+
+
+
+<h2>Future Enhancements</h2>
+
+
+
+Potential future enhancements for the "Back to Top" feature:
+
+
+
+<ol><li>Add animation to the button icon</li></ol>
+
+<ol><li>Add a progress indicator showing scroll position</li></ol>
+
+<ol><li>Allow users to customize the button position in their profile settings</li></ol>
+
+<ol><li>Add analytics to track button usage</li></ol>
+
+</div>

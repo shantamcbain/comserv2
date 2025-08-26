@@ -1,0 +1,353 @@
+[% PageVersion = 'Comserv/root/Documentation/HelpDeskSystem.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Comserv HelpDesk System Documentation' %]
+
+<!-- Documentation page for HelpDeskSystem -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**Last Updated:** April 24, 2024  
+
+**Author:** Shanta  
+
+**Status:** Active
+
+
+
+<h2>Overview</h2>
+
+
+
+The Comserv HelpDesk system provides a comprehensive support infrastructure for users, combining ticketing, knowledge base, documentation, and direct contact options. The system is designed to be user-friendly while providing powerful tools for support staff to manage and resolve user issues efficiently.
+
+
+
+<h2>System Components</h2>
+
+
+
+<h3>1. HelpDesk Controller</h3>
+
+
+
+The HelpDesk controller (<code>Comserv::Controller::HelpDesk</code>) manages the core functionality of the HelpDesk system using Catalyst's chained dispatch system for consistent URL structure.
+
+
+
+<h4>Key Methods:</h4>
+
+
+
+<ul><li>**Base Methods**:</li></ul>
+
+<ul><li style="margin-left: 20px"><code>auto</code>: Common setup for all HelpDesk actions, initializes debug messages</li></ul>
+
+<ul><li style="margin-left: 20px"><code>base</code>: Base method for chained actions, sets up common stash variables</li></ul>
+
+<ul><li style="margin-left: 20px"><code>default</code>: Fallback for HelpDesk URLs that don't match any actions</li></ul>
+
+
+
+<ul><li>**Page Methods**:</li></ul>
+
+<ul><li style="margin-left: 20px"><code>index</code>: Main HelpDesk landing page with support options</li></ul>
+
+<ul><li style="margin-left: 20px"><code>kb</code>: Knowledge Base page with categorized support articles</li></ul>
+
+<ul><li style="margin-left: 20px"><code>contact</code>: Contact Support page with various contact methods</li></ul>
+
+<ul><li style="margin-left: 20px"><code>admin</code>: Administrative interface for managing the HelpDesk system (admin-only)</li></ul>
+
+<ul><li style="margin-left: 20px"><code>linux_commands</code>: Reference page for common Linux commands (admin-only)</li></ul>
+
+
+
+<ul><li>**Ticket Methods**:</li></ul>
+
+<ul><li style="margin-left: 20px"><code>ticket_base</code>: Base method for all ticket-related actions</li></ul>
+
+<ul><li style="margin-left: 20px"><code>ticket_new</code>: Form for creating new support tickets</li></ul>
+
+<ul><li style="margin-left: 20px"><code>ticket_status</code>: Page for viewing existing ticket status</li></ul>
+
+
+
+<h4>URL Structure:</h4>
+
+
+
+<ul><li><code>/HelpDesk</code> - Main HelpDesk landing page</li></ul>
+
+<ul><li><code>/HelpDesk/admin</code> - HelpDesk administration (admin-only)</li></ul>
+
+<ul><li><code>/HelpDesk/ticket/new</code> - Create new support ticket</li></ul>
+
+<ul><li><code>/HelpDesk/ticket/status</code> - View ticket status</li></ul>
+
+<ul><li><code>/HelpDesk/kb</code> - Knowledge base</li></ul>
+
+<ul><li><code>/HelpDesk/kb/linux_commands</code> - Linux commands reference</li></ul>
+
+<ul><li><code>/HelpDesk/contact</code> - Contact support</li></ul>
+
+
+
+<h3>2. FAQ Controller</h3>
+
+
+
+The FAQ controller (<code>Comserv::Controller::FAQ</code>) provides a dedicated system for frequently asked questions, organized by categories.
+
+
+
+<h4>Key Methods:</h4>
+
+
+
+<ul><li><code>index</code>: Main FAQ page with category listings and popular questions</li></ul>
+
+<ul><li><code>category</code>: Category-specific FAQ pages</li></ul>
+
+
+
+<h4>URL Structure:</h4>
+
+
+
+<ul><li><code>/faq</code> - Main FAQ page</li></ul>
+
+<ul><li><code>/faq/category/{id}</code> - Category-specific FAQ pages</li></ul>
+
+
+
+<h3>3. Documentation System</h3>
+
+
+
+The Documentation system (<code>Comserv::Controller::Documentation</code>) provides comprehensive documentation for all aspects of the Comserv system, including user guides, admin guides, and technical documentation.
+
+
+
+<h4>URL Structure:</h4>
+
+
+
+<ul><li><code>/Documentation</code> - Main documentation page</li></ul>
+
+<ul><li><code>/Documentation/{page}</code> - Specific documentation pages</li></ul>
+
+
+
+<h3>4. Navigation Integration</h3>
+
+
+
+The HelpDesk system is integrated into the main navigation through the <code>TopDropListHelpDesk.tt</code> template, providing easy access to all HelpDesk components:
+
+
+
+<ul><li>HelpDesk Home</li></ul>
+
+<ul><li>Submit a Ticket</li></ul>
+
+<ul><li>Check Ticket Status</li></ul>
+
+<ul><li>Documentation</li></ul>
+
+<ul><li>Knowledge Base</li></ul>
+
+<ul><li>Linux Commands (admin-only)</li></ul>
+
+<ul><li>FAQ</li></ul>
+
+<ul><li>Contact Support</li></ul>
+
+
+
+<h2>Template Structure</h2>
+
+
+
+<h3>HelpDesk Templates:</h3>
+
+
+
+<ul><li><code>CSC/HelpDesk.tt</code> - Main HelpDesk template</li></ul>
+
+<ul><li><code>CSC/HelpDesk/admin.tt</code> - HelpDesk administration interface</li></ul>
+
+<ul><li><code>CSC/HelpDesk/new_ticket.tt</code> - New ticket form</li></ul>
+
+<ul><li><code>CSC/HelpDesk/ticket_status.tt</code> - Ticket status page</li></ul>
+
+<ul><li><code>CSC/HelpDesk/kb.tt</code> - Knowledge base</li></ul>
+
+<ul><li><code>CSC/HelpDesk/linux_commands.tt</code> - Linux commands reference</li></ul>
+
+<ul><li><code>CSC/HelpDesk/contact.tt</code> - Contact page</li></ul>
+
+
+
+<h3>FAQ Templates:</h3>
+
+
+
+<ul><li><code>CSC/FAQ/index.tt</code> - Main FAQ template</li></ul>
+
+<ul><li><code>CSC/FAQ/category.tt</code> - Category-specific FAQ template</li></ul>
+
+
+
+<h3>Support Content:</h3>
+
+
+
+<ul><li><code>CSC/HelpdeskContents.tt</code> - Shared content included in the main template</li></ul>
+
+<ul><li><code>CSC/HelpDeskHomePagesql.tt</code> - SQL-based dynamic content</li></ul>
+
+
+
+<h2>Access Control</h2>
+
+
+
+The HelpDesk system implements role-based access control:
+
+
+
+<ul><li>**Anonymous Users**: Can view the HelpDesk, FAQ, and submit tickets</li></ul>
+
+<ul><li>**Authenticated Users**: See personalized content and their ticket history</li></ul>
+
+<ul><li>**Admin Users**: Have additional management capabilities through the admin interface</li></ul>
+
+
+
+<h2>Logging and Debugging</h2>
+
+
+
+The HelpDesk system uses comprehensive logging with <code>log_with_details</code>:
+
+
+
+<code></code>`perl
+
+$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'method_name', 
+
+    "Detailed message with relevant information");
+
+<code></code>`
+
+
+
+Debug messages are stored in the stash for display in templates when debug mode is enabled:
+
+
+
+<code></code>`perl
+
+push @{$c->stash->{debug_msg}}, "Debug message";
+
+<code></code>`
+
+
+
+<h2>Recent Enhancements</h2>
+
+
+
+<h3>April 24, 2024 Update:</h3>
+
+
+
+<ol><li>**Menu Integration**:</li></ol>
+
+   - Fixed all links in the HelpDesk dropdown menu
+
+   - Ensured all links point to valid internal routes
+
+   - Added proper icons for better visual identification
+
+   - Improved role-based access control for admin features
+
+
+
+<ol><li>**New Features**:</li></ol>
+
+   - Added HelpDesk Admin interface for managing the HelpDesk system
+
+   - Implemented a dedicated FAQ system with category support
+
+   - Enhanced Linux Commands reference with copy-to-clipboard functionality
+
+
+
+<ol><li>**Bug Fixes**:</li></ol>
+
+   - Fixed external links that pointed to non-existent resources
+
+   - Corrected the Knowledge Base link to use the proper internal route
+
+   - Improved error handling and logging throughout the system
+
+
+
+<h2>Future Plans</h2>
+
+
+
+<ol><li>**Ticket System Enhancement**:</li></ol>
+
+   - Implement ticket categories and priorities
+
+   - Add email notifications for ticket updates
+
+   - Create a ticket assignment system for support staff
+
+
+
+<ol><li>**Knowledge Base Expansion**:</li></ol>
+
+   - Implement a search function for the knowledge base
+
+   - Add category filtering and tagging
+
+   - Create a rating system for articles
+
+
+
+<ol><li>**Admin Tools**:</li></ol>
+
+   - Develop reporting and analytics for support tickets
+
+   - Create user management tools for support staff
+
+   - Implement customizable email templates for notifications
+
+
+
+<h2>Related Documentation</h2>
+
+
+
+<ul><li><a href="controllers/HelpDesk.md">HelpDesk Controller Documentation</a></li></ul>
+
+<ul><li><a href="controllers/FAQ.md">FAQ Controller Documentation</a></li></ul>
+
+<ul><li><a href="documentation_config_guide.md">Documentation System Guide</a></li></ul>
+
+<ul><li><a href="MailSystem.tt">Mail System Documentation</a></li></ul>
+
+</div>

@@ -1,0 +1,187 @@
+[% PageVersion = 'Comserv/root/Documentation/controllers/HostingSignup_Mail.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'HostingSignup Mail Integration' %]
+
+<!-- Documentation page for HostingSignup_Mail -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**Last Updated:** August 20, 2024  
+
+**Author:** Shanta  
+
+**Status:** Active
+
+
+
+<h2>Overview</h2>
+
+
+
+The HostingSignup controller integrates with the Mail system to create mail accounts on the Virtualmin server during the hosting signup process. This document explains how this integration works and how to configure it.
+
+
+
+<h2>Mail Account Creation Process</h2>
+
+
+
+When a user signs up for hosting through the HostingSignup controller, the following mail-related actions occur:
+
+
+
+<ol><li>User provides their email address, password, and domain name in the signup form</li></ol>
+
+<ol><li>After successful user and site creation, the system attempts to create a mail account</li></ol>
+
+<ol><li>The Mail model's <code>create_mail_account</code> method is called with the user's email, password, and domain</li></ol>
+
+<ol><li>The Virtualmin API is used to create the mail account on the mail server</li></ol>
+
+<ol><li>A welcome email is sent to the user if mail account creation is successful</li></ol>
+
+
+
+<h2>Code Flow</h2>
+
+
+
+<code></code>`perl
+
+<h1>In HostingSignup.pm</h1>
+
+try {
+
+    # Create mail account using Virtualmin API
+
+    my $mail_result = $c->model('Mail')->create_mail_account(
+
+        $c, 
+
+        $params->{email}, 
+
+        $params->{password}, 
+
+        $params->{domain_name}
+
+    );
+
+    
+
+    if ($mail_result) {
+
+        # Send welcome email
+
+        $c->forward('Mail', 'send_welcome_email', [$user]);
+
+    }
+
+} catch {
+
+    # Log error and continue with signup process
+
+}
+
+<code></code>`
+
+
+
+<h2>Configuration</h2>
+
+
+
+The mail integration requires the following configuration in <code>comserv.conf</code>:
+
+
+
+<code></code>`
+
+<Virtualmin>
+
+    host        192.168.1.129
+
+    username    admin
+
+    password    your_secure_password
+
+</Virtualmin>
+
+<code></code>`
+
+
+
+<h2>Error Handling</h2>
+
+
+
+<ul><li>If mail account creation fails, the signup process continues</li></ul>
+
+<ul><li>Errors are logged using <code>log_with_details</code></li></ul>
+
+<ul><li>Error messages are added to <code>debug_msg</code> for display in the UI</li></ul>
+
+<ul><li>The user is still created and can access the site even if mail account creation fails</li></ul>
+
+
+
+<h2>Logging</h2>
+
+
+
+The mail integration uses comprehensive logging:
+
+
+
+<code></code>`perl
+
+$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process_signup', 
+
+    "Creating mail account for " . $params->{email} . " on domain " . $params->{domain_name});
+
+<code></code>`
+
+
+
+<h2>Troubleshooting</h2>
+
+
+
+If mail account creation fails:
+
+
+
+<ol><li>Check the application logs for detailed error messages</li></ol>
+
+<ol><li>Verify Virtualmin API credentials in <code>comserv.conf</code></li></ol>
+
+<ol><li>Ensure the Virtualmin server is accessible from the application server</li></ol>
+
+<ol><li>Verify that the domain exists on the Virtualmin server</li></ol>
+
+<ol><li>Check that the email format is valid</li></ol>
+
+
+
+<h2>Related Components</h2>
+
+
+
+<ul><li>**Mail Model**: Provides the <code>create_mail_account</code> method</li></ul>
+
+<ul><li>**Mail Controller**: Provides the <code>send_welcome_email</code> method</li></ul>
+
+<ul><li>**Virtualmin API**: Used to create mail accounts on the mail server</li></ul>
+
+<ul><li>**Root Controller**: Provides fallback email sending functionality</li></ul>
+
+</div>

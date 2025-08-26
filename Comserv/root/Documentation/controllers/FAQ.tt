@@ -1,0 +1,165 @@
+[% PageVersion = 'Comserv/root/Documentation/controllers/FAQ.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'FAQ Controller' %]
+
+<!-- Documentation page for FAQ -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**Last Updated:** April 24, 2024  
+
+**Author:** Shanta  
+
+**Status:** Active
+
+
+
+<h2>Overview</h2>
+
+The FAQ controller manages the Frequently Asked Questions system for Computer System Consulting. It provides a categorized interface for users to find answers to common questions without needing to submit a support ticket.
+
+
+
+<h2>Key Features</h2>
+
+<ul><li>Categorized FAQ organization</li></ul>
+
+<ul><li>Interactive question and answer display</li></ul>
+
+<ul><li>Integration with the HelpDesk system</li></ul>
+
+<ul><li>Debug message handling for troubleshooting</li></ul>
+
+<ul><li>Responsive design for all devices</li></ul>
+
+
+
+<h2>Methods</h2>
+
+
+
+<h3>Base Methods</h3>
+
+<ul><li><code>auto</code>: Common setup for all FAQ actions, initializes debug messages</li></ul>
+
+
+
+<h3>Page Methods</h3>
+
+<ul><li><code>index</code>: Main FAQ page with category listings and popular questions</li></ul>
+
+<ul><li><code>category</code>: Category-specific FAQ pages with relevant questions and answers</li></ul>
+
+
+
+<h2>URL Structure</h2>
+
+<ul><li><code>/faq</code> - Main FAQ page with all categories and popular questions</li></ul>
+
+<ul><li><code>/faq/category/{id}</code> - Category-specific FAQ pages</li></ul>
+
+
+
+<h2>Access Control</h2>
+
+This controller is accessible to all users:
+
+<ul><li>Anonymous users can view all FAQ content</li></ul>
+
+<ul><li>No special permissions are required</li></ul>
+
+
+
+<h2>Navigation Integration</h2>
+
+The FAQ system is integrated into the HelpDesk dropdown menu in the main navigation through the <code>TopDropListHelpDesk.tt</code> template, providing easy access to the FAQ system.
+
+
+
+<h2>Related Files</h2>
+
+<ul><li>Template files:</li></ul>
+
+<ul><li style="margin-left: 20px"><code>/root/CSC/FAQ/index.tt</code> - Main FAQ template with categories and popular questions</li></ul>
+
+<ul><li style="margin-left: 20px"><code>/root/CSC/FAQ/category.tt</code> - Category-specific FAQ template</li></ul>
+
+<ul><li>Navigation:</li></ul>
+
+<ul><li style="margin-left: 20px"><code>/root/Navigation/TopDropListHelpDesk.tt</code> - HelpDesk dropdown menu with FAQ link</li></ul>
+
+
+
+<h2>Logging and Debugging</h2>
+
+The FAQ controller uses comprehensive logging with <code>log_with_details</code>:
+
+
+
+<code></code>`perl
+
+$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'method_name', 
+
+    "Detailed message with relevant information");
+
+<code></code>`
+
+
+
+Debug messages are stored in the stash for display in templates when debug mode is enabled:
+
+
+
+<code></code>`perl
+
+push @{$c->stash->{debug_msg}}, "Debug message";
+
+<code></code>`
+
+
+
+<h2>Implementation Notes</h2>
+
+<ul><li>Uses JavaScript for interactive question and answer display</li></ul>
+
+<ul><li>Implements responsive design for all devices</li></ul>
+
+<ul><li>Maintains debug messages in an array for troubleshooting</li></ul>
+
+<ul><li>Designed to work without explicit loading in Comserv.pm</li></ul>
+
+<ul><li>Integrates with the HelpDesk system for comprehensive support</li></ul>
+
+
+
+<h2>Future Enhancements</h2>
+
+<ul><li>Search functionality for finding specific questions</li></ul>
+
+<ul><li>User feedback system for FAQ usefulness</li></ul>
+
+<ul><li>Admin interface for managing FAQ content</li></ul>
+
+<ul><li>Integration with the Knowledge Base for more detailed answers</li></ul>
+
+
+
+<h2>Related Documentation</h2>
+
+<ul><li><a href="/Documentation/HelpDeskSystem">HelpDesk System Documentation</a></li></ul>
+
+<ul><li><a href="/Documentation/controllers/HelpDesk">HelpDesk Controller Documentation</a></li></ul>
+
+<ul><li><a href="/Documentation/documentation_config_guide">Documentation System Guide</a></li></ul>
+
+</div>

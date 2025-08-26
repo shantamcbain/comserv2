@@ -1,0 +1,217 @@
+[% PageVersion = 'Comserv/root/Documentation/tutorials/customizing_profile.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Customizing Your Profile' %]
+
+<!-- Documentation page for customizing_profile -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+This guide will help you personalize your user profile and settings in the Comserv system.
+
+
+
+<h2>Accessing Your Profile</h2>
+
+
+
+<ol><li>Log in to your Comserv account</li></ol>
+
+<ol><li>Click on your username in the top-right corner of the screen</li></ol>
+
+<ol><li>Select "Profile" from the dropdown menu</li></ol>
+
+
+
+<h2>Basic Profile Information</h2>
+
+
+
+<h3>Updating Personal Details</h3>
+
+
+
+<ol><li>Navigate to the "Personal Information" section</li></ol>
+
+<ol><li>Update the following fields as needed:</li></ol>
+
+   - Full Name
+
+   - Email Address
+
+   - Phone Number
+
+   - Job Title
+
+   - Department
+
+<ol><li>Click "Save Changes" when finished</li></ol>
+
+
+
+<h3>Profile Picture</h3>
+
+
+
+<ol><li>In the "Profile Picture" section, click "Change Picture"</li></ol>
+
+<ol><li>Choose one of the following options:</li></ol>
+
+   - Upload a new image from your computer
+
+   - Select from available avatars
+
+   - Take a photo using your webcam (if available)
+
+<ol><li>Crop and adjust the image as needed</li></ol>
+
+<ol><li>Click "Save" to update your profile picture</li></ol>
+
+
+
+<h2>Notification Preferences</h2>
+
+
+
+<h3>Email Notifications</h3>
+
+
+
+<ol><li>Navigate to the "Notifications" tab</li></ol>
+
+<ol><li>Toggle on/off the following notification types:</li></ol>
+
+   - System announcements
+
+   - Task assignments
+
+   - Comment notifications
+
+   - Project updates
+
+   - Deadline reminders
+
+<ol><li>Set your preferred notification frequency:</li></ol>
+
+   - Immediate
+
+   - Daily digest
+
+   - Weekly summary
+
+<ol><li>Click "Save Preferences" when finished</li></ol>
+
+
+
+<h3>In-App Notifications</h3>
+
+
+
+<ol><li>In the "In-App Notifications" section</li></ol>
+
+<ol><li>Choose which events should trigger notifications</li></ol>
+
+<ol><li>Set notification display duration</li></ol>
+
+<ol><li>Enable or disable sound alerts</li></ol>
+
+<ol><li>Click "Save" to update your preferences</li></ol>
+
+
+
+<h2>Display Preferences</h2>
+
+
+
+<h3>Theme Selection</h3>
+
+
+
+<ol><li>Navigate to the "Display" tab</li></ol>
+
+<ol><li>Choose from available themes:</li></ol>
+
+   - Light Mode
+
+   - Dark Mode
+
+   - High Contrast
+
+   - Custom (if available)
+
+<ol><li>Preview the selected theme</li></ol>
+
+<ol><li>Click "Apply Theme" to save your selection</li></ol>
+
+
+
+<h3>Layout Customization</h3>
+
+
+
+<ol><li>In the "Layout" section</li></ol>
+
+<ol><li>Customize the dashboard layout:</li></ol>
+
+   - Rearrange widgets by drag and drop
+
+   - Show/hide specific widgets
+
+   - Adjust widget size
+
+<ol><li>Set your preferred default view for projects and tasks</li></ol>
+
+<ol><li>Click "Save Layout" when finished</li></ol>
+
+
+
+<h2>Privacy Settings</h2>
+
+
+
+<ol><li>Navigate to the "Privacy" tab</li></ol>
+
+<ol><li>Configure who can see your:</li></ol>
+
+   - Profile information
+
+   - Activity history
+
+   - Contact details
+
+<ol><li>Manage third-party application access</li></ol>
+
+<ol><li>Review and update data sharing preferences</li></ol>
+
+<ol><li>Click "Save Privacy Settings" when finished</li></ol>
+
+
+
+<h2>Advanced Settings</h2>
+
+
+
+<ol><li>Navigate to the "Advanced" tab</li></ol>
+
+<ol><li>Configure:</li></ol>
+
+   - Language preferences
+
+   - Time zone settings
+
+   - Date and time format
+
+   - Keyboard shortcuts
+
+<ol><li>Click "Save Advanced Settings" when finished</li></ol>
+
+</div>

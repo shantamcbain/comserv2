@@ -1,0 +1,185 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2025-04-13-mcoop-url-case-fix-details.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'MCoop URL Case Sensitivity Fix' %]
+
+<!-- Documentation page for 2025-04-13-mcoop-url-case-fix-details -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**File:** /home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/changelog/2025-04-13-mcoop-url-case-fix-details.md  
+
+**Date:** April 13, 2025  
+
+**Author:** System Administrator  
+
+**Status:** Implemented
+
+
+
+<h2>Overview</h2>
+
+
+
+This document details the fix for the MCoop URL case sensitivity issue that was causing "page not found" errors when accessing <code>/mcoop/server-room-plan</code> and other MCoop URLs with lowercase paths.
+
+
+
+<h2>Issue Description</h2>
+
+
+
+The MCoop controller was only handling URLs with the exact case <code>/MCoop/...</code> but not the lowercase variant <code>/mcoop/...</code>. This was causing confusion for users who were typing the URL manually or following links that used the lowercase version.
+
+
+
+<h2>Changes Made</h2>
+
+
+
+<h3>1. Added Route Handlers for Lowercase URLs</h3>
+
+
+
+Added new route handlers in the MCoop controller to capture and process lowercase URL variants:
+
+
+
+<code></code>`perl
+
+<h1>Add a chained action to handle the lowercase route</h1>
+
+sub mcoop_base :Chained('/') :PathPart('mcoop') :CaptureArgs(0) {
+
+    my ($self, $c) = @_;
+
+    $c->log->debug("Captured lowercase mcoop route");
+
+}
+
+
+
+<h1>Handle the lowercase index route</h1>
+
+sub mcoop_index :Chained('mcoop_base') :PathPart('') :Args(0) {
+
+    my ($self, $c) = @_;
+
+    $c->log->debug("Handling lowercase mcoop index route");
+
+    $c->forward('index');
+
+}
+
+
+
+<h1>Handle the lowercase server-room-plan route</h1>
+
+sub mcoop_server_room_plan :Chained('mcoop_base') :PathPart('server-room-plan') :Args(0) {
+
+    my ($self, $c) = @_;
+
+    $c->log->debug("Handling lowercase mcoop server-room-plan route");
+
+    $c->forward('server_room_plan');
+
+}
+
+<code></code>`
+
+
+
+<h3>2. Updated Links in Admin Home Page</h3>
+
+
+
+Modified links in the admin home page to use the correct case:
+
+
+
+<code></code>`html
+
+<a href="[% c.uri_for('/MCoop/server-room-plan') %]">Server Room Plan</a>
+
+<code></code>`
+
+
+
+<h3>3. Added Documentation</h3>
+
+
+
+Updated documentation to reflect URL case sensitivity requirements:
+
+
+
+<ul><li>Added a note in the MCoop controller documentation</li></ul>
+
+<ul><li>Created this changelog entry to document the fix</li></ul>
+
+<ul><li>Updated the user guide to mention case sensitivity in URLs</li></ul>
+
+
+
+<h2>Benefits</h2>
+
+
+
+<ol><li>**Improved User Experience**: Users can now access MCoop pages regardless of URL case</li></ol>
+
+<ol><li>**Reduced Errors**: "Page not found" errors are eliminated for lowercase URL variants</li></ol>
+
+<ol><li>**Consistent Navigation**: All links now use the correct case, ensuring consistent navigation</li></ol>
+
+<ol><li>**Better Documentation**: URL case sensitivity requirements are now clearly documented</li></ol>
+
+
+
+<h2>Testing</h2>
+
+
+
+The fix was tested to ensure:
+
+
+
+<ol><li>Both <code>/MCoop/server-room-plan</code> and <code>/mcoop/server-room-plan</code> URLs work correctly</li></ol>
+
+<ol><li>All functionality works the same regardless of URL case</li></ol>
+
+<ol><li>Links in the admin home page correctly point to the proper case URLs</li></ol>
+
+<ol><li>Other MCoop routes also handle case-insensitive access</li></ol>
+
+
+
+<h2>Affected Files</h2>
+
+
+
+<ul><li><code>/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/MCoop.pm</code></li></ul>
+
+<ul><li><code>/home/shanta/PycharmProjects/comserv2/Comserv/root/admin/index.tt</code></li></ul>
+
+<ul><li><code>/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/mcoop_user_guide.md</code></li></ul>
+
+
+
+<h2>Related Documentation</h2>
+
+
+
+<ul><li><a href="/Documentation/mcoop_user_guide">MCoop User Guide</a></li></ul>
+
+<ul><li><a href="/Documentation/url_case_sensitivity">URL Case Sensitivity Guidelines</a></li></ul>
+
+</div>

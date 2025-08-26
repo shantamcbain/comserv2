@@ -1,0 +1,133 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2025-08-25-project-filtering-and-display.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Project Filtering and Display Enhancement' %]
+
+<!-- Documentation page for 2025-08-25-project-filtering-and-display -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Overview</h2>
+
+
+
+This update enhances the project management interface by implementing a vertical card-based display with filtering capabilities. The new interface allows users to filter projects by project/sub-project and priority, making it easier to manage and navigate large project hierarchies.
+
+
+
+<h2>Changes Implemented</h2>
+
+
+
+<h3>1. Vertical Card Layout</h3>
+
+
+
+<ul><li>Changed the project display from a grid layout to a vertical card layout</li></ul>
+
+<ul><li>Each project is now displayed as a collapsible card that is closed by default</li></ul>
+
+<ul><li>Projects can be expanded/collapsed by clicking on the card header</li></ul>
+
+<ul><li>Sub-projects are nested within their parent project cards with proper visual hierarchy</li></ul>
+
+
+
+<h3>2. Filtering Capabilities</h3>
+
+
+
+<ul><li>Added a filter panel at the top of the project list page with:</li></ul>
+
+<ul><li style="margin-left: 20px">Project/sub-project dropdown (showing the full hierarchy)</li></ul>
+
+<ul><li style="margin-left: 20px">Priority filter (High, Medium, Low)</li></ul>
+
+<ul><li style="margin-left: 20px">Apply Filters and Clear Filters buttons</li></ul>
+
+<ul><li>Implemented filtering logic to show only projects that match the selected criteria</li></ul>
+
+<ul><li>When filtering by a specific project or sub-project, the relevant parent project card is automatically expanded</li></ul>
+
+
+
+<h3>3. Improved Visual Hierarchy</h3>
+
+
+
+<ul><li>Sub-projects are now displayed within their parent project cards</li></ul>
+
+<ul><li>Added visual indicators (indentation and left border) to clearly show the project hierarchy</li></ul>
+
+<ul><li>Maintained consistent styling for priority badges and status indicators</li></ul>
+
+<ul><li>Improved spacing and alignment for better readability</li></ul>
+
+
+
+<h3>4. Technical Improvements</h3>
+
+
+
+<ul><li>Added JavaScript functionality for collapsible cards</li></ul>
+
+<ul><li>Implemented helper functions to determine parent-child relationships for filtering</li></ul>
+
+<ul><li>Added CSS classes for filter panel, collapsible cards, and sub-project containers</li></ul>
+
+<ul><li>Updated the template version to reflect the changes</li></ul>
+
+
+
+<h2>Benefits</h2>
+
+
+
+<ul><li>**Improved Organization**: The vertical card layout provides a clearer view of the project hierarchy</li></ul>
+
+<ul><li>**Enhanced Filtering**: Users can quickly find specific projects or groups of projects</li></ul>
+
+<ul><li>**Better Space Utilization**: The collapsible design allows users to focus on relevant projects</li></ul>
+
+<ul><li>**Consistent Experience**: Maintained the same styling and functionality for project cards</li></ul>
+
+<ul><li>**Intuitive Navigation**: Clear visual cues for project relationships and hierarchy</li></ul>
+
+
+
+<h2>Implementation Details</h2>
+
+
+
+The implementation involved updating the <code>project.tt</code> template file to:
+
+
+
+<ol><li>Add the filter panel with dropdowns for project and priority filtering</li></ol>
+
+<ol><li>Create new template macros for displaying the project hierarchy</li></ol>
+
+<ol><li>Implement collapsible card functionality with JavaScript</li></ol>
+
+<ol><li>Add helper functions for filtering logic</li></ol>
+
+<ol><li>Update CSS styles for the new layout</li></ol>
+
+
+
+<h2>Date Implemented</h2>
+
+
+
+August 25, 2025
+
+</div>

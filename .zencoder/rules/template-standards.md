@@ -36,6 +36,18 @@ When working with navigation templates:
 - **Content Priority:** Always improve existing files rather than creating new ones
 - **Role-Based Access:** Respect existing Documentation/index.tt role-based structure
 - **Directory Consolidation:** Use established directory structure - don't create new directories
+- **MANDATORY SYNC:** Always verify documentation matches actual code functionality
+- **DISCREPANCY TRACKING:** Document all differences between docs and code
+- **UPDATE PRIORITY:** Fix documentation discrepancies before implementing new features
+
+## Documentation Synchronization Protocol
+1. **Read Current Documentation:** Understand documented behavior
+2. **Read Actual Code:** Understand actual implementation
+3. **Compare States:** Identify discrepancies
+4. **Fix Documentation:** Update docs to match current code state
+5. **Implement Changes:** Make code modifications
+6. **Update Documentation:** Reflect new functionality
+7. **Verify Consistency:** Ensure docs and code align
 
 ## File Creation Protocol
 1. **Search First:** Use file search tools to find existing similar files

@@ -1,0 +1,205 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/db_config_loading_fix.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Database Configuration Loading Fix' %]
+
+<!-- Documentation page for db_config_loading_fix -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+title: Database Configuration Loading Fix
+
+description: Improved the database configuration file loading mechanism to work consistently across different execution environments.
+
+date: 2024-08-15
+
+author: AI Assistant
+
+category: changelog
+
+tags: database, configuration, fix
+
+---
+
+
+
+<h1>Database Configuration Loading Fix</h1>
+
+
+
+<h2>Issue</h2>
+
+The application was experiencing inconsistent behavior when accessing the <code>db_config.json</code> file from different execution environments. Specifically, when running the application using Starman versus comserv_server.pl, the file path resolution would sometimes fail because the application was being started from different directories.
+
+
+
+<h2>Solution</h2>
+
+We've implemented a more robust configuration file loading mechanism that uses a two-step approach:
+
+
+
+<ol><li>First, it attempts to load the configuration file using <code>Catalyst::Utils::path_to</code>, which resolves paths relative to the application root directory regardless of the current working directory.</li></ol>
+
+<ol><li>If that fails (which can happen during application initialization), it falls back to using a smart detection algorithm to locate the application root directory and find the configuration file.</li></ol>
+
+
+
+This approach ensures that the configuration file can be found regardless of which directory the application is started from, without relying on hard-coded relative paths.
+
+
+
+<h2>Implementation Details</h2>
+
+
+
+The following files were updated:
+
+
+
+<ol><li><code>Comserv/lib/Comserv/Model/DBEncy.pm</code></li></ol>
+
+<ol><li><code>Comserv/lib/Comserv/Model/DBForager.pm</code></li></ol>
+
+<ol><li><code>Comserv/lib/Comserv/Model/DBSchemaManager.pm</code></li></ol>
+
+<ol><li><code>Comserv/lib/Comserv/Model/RemoteDB.pm</code></li></ol>
+
+<ol><li><code>Comserv/lib/Comserv/Controller/RemoteDB.pm</code></li></ol>
+
+
+
+The core of the change involves replacing the direct use of <code>FindBin</code> with a more robust approach:
+
+
+
+<code></code>`perl
+
+<h1>Try to load the config file using Catalyst::Utils if the application is initialized</h1>
+
+eval {
+
+    $config_file = Catalyst::Utils::path_to('db_config.json');
+
+};
+
+
+
+<h1>Fallback to smart detection if Catalyst::Utils fails (during application initialization)</h1>
+
+if ($@ || !defined $config_file) {
+
+    use FindBin;
+
+    use File::Basename;
+
+    
+
+    # Get the application root directory (one level up from script or lib)
+
+    my $bin_dir = $FindBin::Bin;
+
+    my $app_root;
+
+    
+
+    # If we're in a script directory, go up one level to find app root
+
+    if ($bin_dir =~ /\/script$/) {
+
+        $app_root = dirname($bin_dir);
+
+    }
+
+    # If we're somewhere else, try to find the app root
+
+    else {
+
+        # Check if we're already in the app root
+
+        if (-f "$bin_dir/db_config.json") {
+
+            $app_root = $bin_dir;
+
+        }
+
+        # Otherwise, try one level up
+
+        elsif (-f dirname($bin_dir) . "/db_config.json") {
+
+            $app_root = dirname($bin_dir);
+
+        }
+
+        # If all else fails, assume we're in lib and need to go up one level
+
+        else {
+
+            $app_root = dirname($bin_dir);
+
+        }
+
+    }
+
+    
+
+    $config_file = "$app_root/db_config.json";
+
+    warn "Using FindBin fallback for config file: $config_file";
+
+}
+
+
+
+<h1>Load the configuration file</h1>
+
+eval {
+
+    local $/; # Enable 'slurp' mode
+
+    open my $fh, "<", $config_file or die "Could not open $config_file: $!";
+
+    $json_text = <$fh>;
+
+    close $fh;
+
+};
+
+
+
+if ($@) {
+
+    die "Error loading config file $config_file: $@";
+
+}
+
+<code></code>`
+
+
+
+<h2>Benefits</h2>
+
+
+
+<ol><li>**Consistency**: The application now behaves consistently regardless of how it's started.</li></ol>
+
+<ol><li>**Robustness**: The fallback mechanism ensures that the configuration file can always be found.</li></ol>
+
+<ol><li>**Better Error Reporting**: Enhanced error handling provides more detailed information when issues occur.</li></ol>
+
+
+
+<h2>Documentation</h2>
+
+
+
+The <code>DBIDocument.tt</code> documentation file has been updated to reflect these changes, providing guidance for developers on how the configuration file loading mechanism works.
+
+</div>

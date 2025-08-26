@@ -1,376 +1,60 @@
 {
+   "_comment": "This configuration file contains ONLY overrides for auto-discovered documentation files. Most files are automatically discovered by directory scanning.",
    "pages" : [
       {
-         "site" : "all",
-         "roles" : [
-            "normal",
-            "editor",
-            "admin",
-            "developer"
-         ],
-         "title" : "User Guide",
-         "format" : "template",
-         "categories" : [
-            "user_guides"
-         ],
-         "description" : "Complete guide for using the system",
-         "path" : "Documentation/roles/normal/user_guide.tt",
-         "id" : "user_guide"
-      },
-      {
-         "site" : "all",
-         "format" : "template",
-         "categories" : [
-            "user_guides",
-            "tutorials"
-         ],
-         "description" : "Quick start guide for new users",
-         "id" : "getting_started",
-         "path" : "Documentation/roles/normal/getting_started.tt",
-         "title" : "Getting Started",
-         "roles" : [
-            "normal",
-            "editor",
-            "admin",
-            "developer"
-         ]
-      },
-      {
-         "title" : "Account Management",
-         "roles" : [
-            "normal",
-            "editor",
-            "admin",
-            "developer"
-         ],
-         "description" : "How to manage your account settings",
-         "id" : "account_management",
-         "path" : "Documentation/roles/normal/account_management.tt",
-         "format" : "template",
-         "categories" : [
-            "user_guides"
-         ],
-         "site" : "all"
-      },
-      {
-         "title" : "Administrator Guide",
-         "roles" : [
-            "admin",
-            "developer"
-         ],
-         "id" : "admin_guide",
-         "path" : "Documentation/roles/admin/admin_guide.tt",
-         "description" : "Complete guide for system administrators",
-         "categories" : [
-            "admin_guides"
-         ],
-         "format" : "template",
-         "site" : "all"
-      },
-      {
-         "roles" : [
-            "admin",
-            "developer"
-         ],
-         "title" : "Installation Guide",
-         "format" : "template",
-         "categories" : [
-            "admin_guides"
-         ],
-         "description" : "How to install and configure the system",
-         "path" : "Documentation/roles/admin/installation.tt",
-         "id" : "installation",
-         "site" : "all"
-      },
-      {
-         "site" : "all",
-         "format" : "template",
-         "categories" : [
-            "developer_guides"
-         ],
-         "description" : "Complete API documentation for developers",
-         "id" : "api_reference",
-         "path" : "Documentation/roles/developer/api_reference.tt",
-         "title" : "API Reference",
-         "roles" : [
-            "developer"
-         ]
-      },
-      {
-         "site" : "all",
-         "id" : "database_schema",
-         "path" : "Documentation/roles/developer/database_schema.tt",
-         "description" : "Database structure and relationships",
-         "categories" : [
-            "developer_guides"
-         ],
-         "format" : "template",
-         "roles" : [
-            "developer"
-         ],
-         "title" : "Database Schema"
-      },
-      {
-         "id" : "login_authentication",
-         "path" : "Documentation/tutorials/login_authentication.tt",
-         "description" : "How to log in and manage authentication",
-         "categories" : [
-            "tutorials"
-         ],
-         "format" : "template",
-         "title" : "Login and Authentication",
-         "roles" : [
-            "normal",
-            "editor",
-            "admin",
-            "developer"
-         ],
-         "site" : "all"
-      },
-      {
          "site" : "MCOOP",
-         "roles" : [
-            "normal",
-            "editor",
-            "admin",
-            "developer"
-         ],
-         "title" : "MCOOP User Guide",
-         "path" : "Documentation/sites/mcoop/mcoop_user_guide.tt",
-         "id" : "mcoop_user_guide",
-         "description" : "User guide specific to MCOOP site",
-         "categories" : [
-            "user_guides",
-            "site_specific"
-         ],
-         "format" : "template"
-      },
-      {
-         "description" : "Quick start guide for MCOOP users",
-         "path" : "Documentation/tutorials/mcoop_getting_started.tt",
-         "id" : "mcoop_getting_started",
+         "title" : "MCOOP Todo Guide",
+         "path" : "Documentation/roles/admin/todo_admin_guide.tt",
+         "id" : "todo_admin_guide",
+         "description" : "Admin Todo guide for MCOOP",
+         "categories" : ["admin_guides", "documentation"],
          "format" : "template",
-         "categories" : [
-            "tutorials",
-            "site_specific"
-         ],
-         "roles" : [
-            "normal",
-            "editor",
-            "admin",
-            "developer"
-         ],
-         "title" : "Getting Started with MCOOP",
+         "roles" : ["admin", "developer"],
          "site" : "MCOOP"
       },
       {
-         "site" : "all",
-         "categories" : [
-            "developer_guides",
-            "modules"
-         ],
+         "note": "Patch-based incremental addition: this entry demonstrates patch review workflow",
+         "site" : "MCOOP",
+         "title" : "MCOOP User Guide (Preview Patch)",
+         "path" : "Documentation/sites/mcoop/mcoop_user_guide.tt",
+         "id" : "mcoop_user_guide_preview",
+         "description" : "Preview patch for user guide",
+         "categories" : ["user_guides", "site_specific"],
          "format" : "template",
-         "id" : "documentation_system",
-         "path" : "Documentation/documentation_system.tt",
-         "description" : "How the documentation system works",
-         "title" : "Documentation System",
-         "roles" : [
-            "developer"
-         ]
+         "roles" : ["normal", "editor", "admin", "developer"]
       },
       {
-         "site" : "all",
-         "description" : "Documentation for the User module",
-         "path" : "Documentation/modules/user_module.tt",
-         "id" : "user_module",
+         "id" : "documentation_organization",
+         "title" : "Documentation Organization",
+         "path" : "Documentation/changelog/2025-05-25-documentation-organization.tt",
+         "description" : "Migrated changelog entry about documentation organization, converted from Markdown to Template Toolkit.",
+         "categories" : ["changelog", "documentation"],
          "format" : "template",
-         "categories" : [
-            "modules"
-         ],
-         "roles" : [
-            "admin",
-            "developer"
-         ],
-         "title" : "User Module"
+         "roles" : ["admin", "developer", "normal", "editor"]
       },
       {
+         "id" : "documentation_update_summary",
+         "title" : "Documentation Update Summary Template",
+         "path" : "Documentation/documentation_update_summary.tt",
+         "description" : "Template for AI agents to document code changes and maintain documentation synchronization",
+         "categories" : ["documentation", "developer_guides"],
          "format" : "template",
-         "categories" : [
-            "modules"
-         ],
-         "description" : "Complete Todo system documentation",
-         "path" : "Documentation/Todo.tt",
-         "id" : "todo_system",
-         "site" : "all",
-         "roles" : [
-            "admin",
-            "developer"
-         ],
-         "title" : "Todo System Overview"
+         "roles" : ["developer", "admin"]
       },
       {
-         "title" : "Todo User Guide",
-         "roles" : [
-            "normal",
-            "editor",
-            "admin",
-            "developer"
-         ],
-         "description" : "How to use the Todo system effectively",
-         "path" : "Documentation/roles/normal/todo_user_guide.tt",
-         "id" : "todo_user_guide",
+         "id" : "code_change_documentation",
+         "title" : "Code Change Documentation Analysis",
+         "path" : "Documentation/code_change_documentation.tt",
+         "description" : "Analysis of recent code changes and required documentation updates based on git diff",
+         "categories" : ["changelog", "documentation", "developer_guides"],
          "format" : "template",
-         "categories" : [
-            "user_guides",
-            "tutorials"
-         ],
-         "site" : "all"
-      },
-      {
-         "site" : "all",
-         "title" : "Todo Administrator Guide",
-         "roles" : [
-            "admin",
-            "developer"
-         ],
-         "categories" : [
-            "admin_guides"
-         ],
-         "format" : "template",
-         "id" : "todo_admin_guide",
-         "path" : "Documentation/roles/admin/todo_admin_guide.tt",
-         "description" : "Administrative guide for Todo system management"
-      },
-      {
-         "roles" : [
-            "developer",
-            "admin"
-         ],
-         "title" : "Inventory and Accounting System Implementation Guideline",
-         "site" : "all",
-         "id" : "inventory_accounting_system_guideline",
-         "path" : "Documentation/developer/inventory-accounting-system-guideline.tt",
-         "description" : "Guide development team to implement hybrid inventory/accounting system with LedgerSMB + Catalyst integration",
-         "categories" : [
-            "developer_guides"
-         ],
-         "format" : "template"
-      },
-      {
-         "title" : "Todo Developer Guide",
-         "roles" : [
-            "developer"
-         ],
-         "categories" : [
-            "developer_guides",
-            "modules"
-         ],
-         "format" : "template",
-         "path" : "Documentation/roles/developer/todo_developer_guide.tt",
-         "id" : "todo_developer_guide",
-         "description" : "Technical documentation for Todo system development",
-         "site" : "all"
-      },
-      {
-         "site" : "all",
-         "path" : "Documentation/DBIDocument.tt",
-         "id" : "dbidocument",
-         "description" : "Documentation for DBIDocument",
-         "categories" : [
-            "user_guides"
-         ],
-         "format" : "template",
-         "roles" : [
-            "admin",
-            "developer"
-         ],
-         "title" : "DBIDocument"
-      },
-      {
-         "roles" : [
-            "admin",
-            "developer"
-         ],
-         "title" : "RestartStarman",
-         "format" : "template",
-         "categories" : [
-            "user_guides"
-         ],
-         "description" : "Documentation for RestartStarman",
-         "id" : "restartstarman",
-         "path" : "Documentation/RestartStarman.tt",
-         "site" : "all"
-      },
-      {
-         "categories" : [
-            "user_guides"
-         ],
-         "format" : "template",
-         "id" : "markdown_viewer",
-         "path" : "Documentation/markdown_viewer.tt",
-         "description" : "Documentation for Markdown Viewer",
-         "site" : "all",
-         "title" : "Markdown Viewer",
-         "roles" : [
-            "developer"
-         ]
-      },
-      {
-         "format" : "template",
-         "categories" : [
-            "user_guides"
-         ],
-         "description" : "Documentation for DocumentManagement",
-         "id" : "documentmanagement",
-         "path" : "Documentation/DocumentManagement.tt",
-         "title" : "DocumentManagement",
-         "roles" : [
-            "editor",
-            "admin"
-         ],
-         "site" : "all"
-      },
-      {
-         "site" : "all",
-         "path" : "Documentation/documentation_workflow.tt",
-         "id" : "documentation_workflow",
-         "description" : "Documentation for Documentation Workflow",
-         "categories" : [
-            "user_guides"
-         ],
-         "format" : "template",
-         "roles" : [
-            "editor",
-            "admin",
-            "developer"
-         ],
-         "title" : "Documentation Workflow"
-      },
-      {
-         "format" : "template",
-         "categories" : [
-            "user_guides"
-         ],
-         "description" : "Documentation for Overview",
-         "id" : "overview",
-         "path" : "Documentation/Overview.tt",
-         "roles" : [
-            "normal"
-         ],
-         "title" : "Overview",
-         "site" : "all"
+         "roles" : ["developer", "admin"]
       }
    ],
    "categories" : {
       "modules" : {
          "description" : "Documentation for specific system modules",
          "display_order" : "6",
-         "pages" : [
-            "documentation_system",
-            "todo_developer_guide",
-            "todo_system",
-            "user_module"
-         ],
          "title" : "Module Documentation",
          "roles" : [
             "admin",
@@ -383,11 +67,6 @@
          "icon" : "fas fa-shield-alt",
          "description" : "Documentation for system administrators",
          "display_order" : "2",
-         "pages" : [
-            "admin_guide",
-            "installation",
-            "todo_admin_guide"
-         ],
          "site_specific" : false,
          "title" : "Administrator Guides",
          "roles" : [
@@ -406,43 +85,35 @@
             "admin",
             "developer"
          ],
-         "site_specific" : false,
-         "pages" : [
-            "account_management",
-            "dbidocument",
-            "documentation_workflow",
-            "documentmanagement",
-            "getting_started",
-            "markdown_viewer",
-            "mcoop_user_guide",
-            "restartstarman",
-            "todo_user_guide",
-            "user_guide"
-         ]
+         "site_specific" : false
       },
       "developer_guides" : {
          "site_specific" : false,
          "icon" : "fas fa-code",
-         "pages" : [
-            "api_reference",
-            "database_schema",
-            "documentation_system",
-            "inventory_accounting_system_guideline",
-            "todo_developer_guide"
-         ],
          "title" : "Developer Documentation",
          "roles" : [
             "developer"
          ],
-         "description" : "Documentation for developers",
-         "display_order" : "3"
+         "display_order" : "3",
+         "description" : "Technical documentation for developers"
+      },
+      "tutorials" : {
+         "display_order" : "4",
+         "description" : "Step-by-step tutorials and guides",
+         "icon" : "fas fa-graduation-cap",
+         "title" : "Tutorials",
+         "roles" : [
+            "normal",
+            "editor",
+            "admin",
+            "developer"
+         ],
+         "site_specific" : false
       },
       "site_specific" : {
-         "site_specific" : true,
-         "pages" : [
-            "mcoop_getting_started",
-            "mcoop_user_guide"
-         ],
+         "display_order" : "7",
+         "description" : "Documentation specific to individual sites",
+         "icon" : "fas fa-building",
          "title" : "Site-Specific Documentation",
          "roles" : [
             "normal",
@@ -450,28 +121,60 @@
             "admin",
             "developer"
          ],
-         "icon" : "fas fa-building",
-         "display_order" : "5",
-         "description" : "Documentation specific to this site"
+         "site_specific" : true
       },
-      "tutorials" : {
-         "icon" : "fas fa-graduation-cap",
-         "description" : "Step-by-step guides for common tasks",
-         "display_order" : "4",
-         "pages" : [
-            "getting_started",
-            "mcoop_getting_started",
-            "login_authentication",
-            "todo_user_guide"
-         ],
-         "site_specific" : false,
+      "proxmox" : {
+         "display_order" : "8",
+         "description" : "Proxmox VE integration and management",
+         "icon" : "fas fa-server",
+         "title" : "Proxmox Documentation",
          "roles" : [
-            "normal",
-            "editor",
             "admin",
             "developer"
          ],
-         "title" : "Tutorials"
+         "site_specific" : false
+      },
+      "changelog" : {
+         "display_order" : "9",
+         "description" : "System changes and version history",
+         "icon" : "fas fa-history",
+         "title" : "Changelog",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site_specific" : false
+      },
+      "controllers" : {
+         "display_order" : "10",
+         "description" : "Controller documentation",
+         "icon" : "fas fa-cogs",
+         "title" : "Controllers",
+         "roles" : [
+            "developer"
+         ],
+         "site_specific" : false
+      },
+      "models" : {
+         "display_order" : "11",
+         "description" : "Model and database documentation",
+         "icon" : "fas fa-database",
+         "title" : "Models",
+         "roles" : [
+            "developer"
+         ],
+         "site_specific" : false
+      },
+      "documentation" : {
+         "display_order" : "12",
+         "description" : "Documentation system and meta-documentation",
+         "icon" : "fas fa-book",
+         "title" : "Documentation System",
+         "roles" : [
+            "developer",
+            "admin"
+         ],
+         "site_specific" : false
       }
    }
 }

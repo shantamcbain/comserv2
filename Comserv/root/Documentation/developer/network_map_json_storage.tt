@@ -1,0 +1,341 @@
+[% PageVersion = 'Comserv/root/Documentation/developer/network_map_json_storage.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'NetworkMap JSON Storage Pattern' %]
+
+<!-- Documentation page for network_map_json_storage -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**File:** /home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/developer/network_map_json_storage.md  
+
+**Version:** 1.0  
+
+**Last Updated:** 2025-09-20  
+
+**Author:** Development Team
+
+
+
+<h2>Overview</h2>
+
+
+
+The NetworkMap module uses JSON file storage as an intermediate solution before implementing a full database-backed model. This document explains the pattern used and how to apply it to other modules.
+
+
+
+<h2>JSON Storage Implementation</h2>
+
+
+
+<h3>File Location</h3>
+
+
+
+The NetworkMap module stores its data in:
+
+<code></code>`
+
+/home/shanta/PycharmProjects/comserv2/Comserv/config/network_map.json
+
+<code></code>`
+
+
+
+<h3>Data Structure</h3>
+
+
+
+The JSON file contains two main sections:
+
+<ol><li><code>networks</code> - A collection of network definitions</li></ol>
+
+<ol><li><code>devices</code> - A collection of device definitions</li></ol>
+
+
+
+Example structure:
+
+<code></code>`json
+
+{
+
+  "networks": {
+
+    "lan": {
+
+      "name": "Local Area Network",
+
+      "cidr": "192.168.1.0/24",
+
+      "description": "Main office network"
+
+    }
+
+  },
+
+  "devices": {
+
+    "router1": {
+
+      "ip": "192.168.1.1",
+
+      "network": "lan",
+
+      "type": "router",
+
+      "description": "Main router",
+
+      "services": ["DHCP", "DNS"],
+
+      "added_date": "Fri Sep 20 14:30:45 2025"
+
+    }
+
+  }
+
+}
+
+<code></code>`
+
+
+
+<h3>Code Implementation</h3>
+
+
+
+The NetworkMap utility (<code>Comserv/lib/Comserv/Util/NetworkMap.pm</code>) implements:
+
+
+
+<ol><li>**Configuration Loading**:</li></ol>
+
+   <code></code>`perl
+
+   sub _load_config {
+
+       my ($self) = @_;
+
+       my $config = {};
+
+       
+
+       eval {
+
+           if (-e $self->_config_file) {
+
+               my $json_text = read_file($self->_config_file);
+
+               $config = decode_json($json_text);
+
+           }
+
+       };
+
+       
+
+       if ($@) {
+
+           $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, '_load_config', "Error loading network map config: $@");
+
+           $config = { networks => {}, devices => {} };
+
+       }
+
+       
+
+       return $config;
+
+   }
+
+   <code></code>`
+
+
+
+<ol><li>**Configuration Saving**:</li></ol>
+
+   <code></code>`perl
+
+   sub _save_config {
+
+       my ($self) = @_;
+
+       
+
+       eval {
+
+           my $json_text = JSON->new->pretty->encode($self->_config);
+
+           write_file($self->_config_file, $json_text);
+
+       };
+
+       
+
+       if ($@) {
+
+           $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, '_save_config', "Error saving network map config: $@");
+
+           return 0;
+
+       }
+
+       
+
+       return 1;
+
+   }
+
+   <code></code>`
+
+
+
+<ol><li>**Data Access Methods**:</li></ol>
+
+   - <code>get_networks()</code> - Returns all networks
+
+   - <code>get_devices()</code> - Returns all devices
+
+   - <code>get_device($device_name)</code> - Returns a specific device
+
+   - <code>get_device_by_ip($ip)</code> - Finds a device by IP address
+
+
+
+<ol><li>**Data Modification Methods**:</li></ol>
+
+   - <code>add_network($network_id, $name, $cidr, $description)</code> - Adds a network
+
+   - <code>add_device($device_name, $ip, $network, $type, $description, $services)</code> - Adds a device
+
+   - <code>remove_device($device_name)</code> - Removes a device
+
+
+
+<h2>Controller Integration</h2>
+
+
+
+The NetworkMap controller (<code>Comserv/lib/Comserv/Controller/NetworkMap.pm</code>) integrates with the utility:
+
+
+
+<code></code>`perl
+
+sub index :Chained('base') :PathPart('') :Args(0) {
+
+    my ($self, $c) = @_;
+
+    
+
+    my $network_map = Comserv::Util::NetworkMap->new();
+
+    
+
+    # Get network and device information
+
+    my $networks = $network_map->get_networks();
+
+    my $devices = $network_map->get_devices();
+
+    
+
+    # Set up the template variables
+
+    $c->stash(
+
+        template => 'NetworkMap/index.tt',
+
+        networks => $networks,
+
+        devices => $devices,
+
+        network_map_html => $network_map->format_network_map_html(),
+
+        title => 'Network Map'
+
+    );
+
+}
+
+<code></code>`
+
+
+
+<h2>Advantages of This Approach</h2>
+
+
+
+<ol><li>**Rapid Development**: No need to set up database tables initially</li></ol>
+
+<ol><li>**Simple Data Structure**: JSON naturally maps to Perl data structures</li></ol>
+
+<ol><li>**Self-Contained**: Module works without database dependencies</li></ol>
+
+<ol><li>**Easy Debugging**: JSON file can be inspected directly</li></ol>
+
+<ol><li>**Transition Path**: Can be migrated to a database model later</li></ol>
+
+
+
+<h2>Future Database Migration</h2>
+
+
+
+When migrating to a database model:
+
+
+
+<ol><li>Create database tables for networks and devices</li></ol>
+
+<ol><li>Create DBIx::Class models in <code>Comserv/lib/Comserv/Model/</code></li></ol>
+
+<ol><li>Modify the NetworkMap utility to use the database models</li></ol>
+
+<ol><li>Implement a migration script to transfer data from JSON to the database</li></ol>
+
+
+
+<h2>Applying This Pattern</h2>
+
+
+
+When implementing new features that may eventually need database storage:
+
+
+
+<ol><li>Create a utility class in <code>Comserv/lib/Comserv/Util/</code></li></ol>
+
+<ol><li>Implement JSON file storage following the NetworkMap pattern</li></ol>
+
+<ol><li>Create a controller that uses the utility</li></ol>
+
+<ol><li>Document the JSON structure and planned database migration</li></ol>
+
+
+
+<h2>Best Practices</h2>
+
+
+
+<ol><li>**Error Handling**: Always use eval blocks when reading/writing JSON</li></ol>
+
+<ol><li>**Default Values**: Provide sensible defaults if the JSON file doesn't exist</li></ol>
+
+<ol><li>**Logging**: Log all errors with detailed information</li></ol>
+
+<ol><li>**Validation**: Validate data before saving to JSON</li></ol>
+
+<ol><li>**Atomic Updates**: Ensure the JSON file is updated atomically to prevent corruption</li></ol>
+
+</div>

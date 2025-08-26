@@ -1,0 +1,15 @@
+[% PageVersion = 'Comserv/root/Documentation/controllers/README.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Controller Documentation' %]
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+This directory contains documentation for all Comserv controllers.
+</div>

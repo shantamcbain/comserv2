@@ -1,0 +1,503 @@
+[% PageVersion = 'Comserv/root/Documentation/developer/documentation_migration_guide.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Documentation Migration Guide' %]
+
+<!-- Documentation page for documentation_migration_guide -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+title: "Documentation Migration Guide"
+
+description: "Guide for developers on using the new documentation system during migration"
+
+author: "System Administrator"
+
+date: "2025-05-30"
+
+status: "Active"
+
+roles: ["admin", "developer"]
+
+sites: ["all"]
+
+categories: ["developer_guides", "admin_guides"]
+
+tags: ["documentation", "migration", "metadata"]
+
+---
+
+
+
+<h1>Documentation Migration Guide</h1>
+
+
+
+<h2>Overview</h2>
+
+
+
+This guide explains how to work with the Comserv documentation system during the migration from the old directory-based structure to the new metadata-driven approach. It provides instructions for creating new documentation, updating existing documentation, and understanding the migration process.
+
+
+
+<h2>Migration Timeline</h2>
+
+
+
+The documentation system migration will occur in phases over several months:
+
+
+
+<ol><li>**Phase 1: Preparation** (June 2025)</li></ol>
+
+   - Create new directory structure
+
+   - Develop metadata parser
+
+   - Update configuration file
+
+
+
+<ol><li>**Phase 2: Migration Tool Development** (July 2025)</li></ol>
+
+   - Create migration script
+
+   - Test migration script
+
+   - Develop Documentation controller updates
+
+
+
+<ol><li>**Phase 3: Gradual Migration** (August-September 2025)</li></ol>
+
+   - Migrate changelog documentation
+
+   - Migrate user documentation
+
+   - Migrate admin documentation
+
+   - Migrate developer documentation
+
+   - Migrate site-specific documentation
+
+
+
+<ol><li>**Phase 4: Template Updates** (October 2025)</li></ol>
+
+   - Update documentation templates
+
+   - Create new template components
+
+
+
+<ol><li>**Phase 5: Testing and Deployment** (November 2025)</li></ol>
+
+   - Comprehensive testing
+
+   - User acceptance testing
+
+   - Final deployment
+
+
+
+<ol><li>**Phase 6: Cleanup and Optimization** (December 2025)</li></ol>
+
+   - Remove old structure
+
+   - Optimize performance
+
+   - Document the new system
+
+
+
+<h2>Creating New Documentation During Migration</h2>
+
+
+
+During the migration period, new documentation should be created using the new metadata-driven approach to ensure a smooth transition.
+
+
+
+<h3>Step 1: Choose the Appropriate Location</h3>
+
+
+
+Place new documentation files in the appropriate directory under the new structure:
+
+
+
+<code></code>`
+
+/root/Documentation/docs/{category}/{filename}.md
+
+<code></code>`
+
+
+
+For example:
+
+<ul><li>User documentation: <code>/root/Documentation/docs/user/new_feature_guide.md</code></li></ul>
+
+<ul><li>Admin documentation: <code>/root/Documentation/docs/admin/system_configuration.md</code></li></ul>
+
+<ul><li>Site-specific documentation: <code>/root/Documentation/docs/site/mcoop/member_management.md</code></li></ul>
+
+
+
+<h3>Step 2: Include Metadata</h3>
+
+
+
+Add the following metadata section at the top of your documentation file:
+
+
+
+<code></code>`markdown
+
+---
+
+title: "Document Title"
+
+description: "Brief description of the document"
+
+author: "Your Name"
+
+date: "YYYY-MM-DD"
+
+status: "Active"
+
+roles: ["normal", "admin", "developer"]
+
+sites: ["all", "MCOOP"]
+
+categories: ["user_guides", "tutorials"]
+
+tags: ["feature1", "feature2"]
+
+---
+
+<code></code>`
+
+
+
+<h4>Required Metadata Fields:</h4>
+
+
+
+<ul><li>**title**: The title of the document (should match the H1 heading)</li></ul>
+
+<ul><li>**description**: A brief description of the document content</li></ul>
+
+<ul><li>**author**: Your name or username</li></ul>
+
+<ul><li>**date**: The creation date in YYYY-MM-DD format</li></ul>
+
+<ul><li>**status**: One of "Active", "Draft", or "Deprecated"</li></ul>
+
+<ul><li>**roles**: Array of roles that can access this document (normal, editor, admin, developer)</li></ul>
+
+<ul><li>**sites**: Array of sites this document applies to ("all" for all sites, or specific site names)</li></ul>
+
+<ul><li>**categories**: Array of categories this document belongs to (from the configuration file)</li></ul>
+
+
+
+<h4>Optional Metadata Fields:</h4>
+
+
+
+<ul><li>**tags**: Array of tags for additional categorization</li></ul>
+
+<ul><li>**version**: Document version number</li></ul>
+
+<ul><li>**related**: Array of related document filenames</li></ul>
+
+
+
+<h3>Step 3: Write Content</h3>
+
+
+
+Follow the standard documentation format:
+
+
+
+<ol><li>Start with a level 1 heading (# Title) that matches the title in the metadata</li></ol>
+
+<ol><li>Include an Overview section</li></ol>
+
+<ol><li>Use level 2 headings (## Heading) for main sections</li></ol>
+
+<ol><li>Use level 3 headings (### Subheading) for subsections</li></ol>
+
+<ol><li>Include code examples, screenshots, and diagrams as needed</li></ol>
+
+<ol><li>End with a Related Documentation section if applicable</li></ol>
+
+
+
+<h3>Step 4: Update Current Configuration</h3>
+
+
+
+Until the new controller is fully implemented, also add the document to the current <code>documentation_config.json</code> file:
+
+
+
+<ol><li>Add the document key to the appropriate category in the "categories" section</li></ol>
+
+<ol><li>Add the document path to the "default_paths" section</li></ol>
+
+
+
+Example:
+
+
+
+<code></code>`json
+
+{
+
+  "categories": {
+
+    "developer_guides": {
+
+      "pages": ["existing_page_1", "your_new_document"]
+
+    }
+
+  },
+
+  "default_paths": {
+
+    "your_new_document": "Documentation/docs/developer/your_new_document.md"
+
+  }
+
+}
+
+<code></code>`
+
+
+
+This ensures the document is accessible through both the old and new systems during the transition period.
+
+
+
+<h2>Updating Existing Documentation</h2>
+
+
+
+When updating existing documentation, follow these guidelines:
+
+
+
+<h3>For Documentation Not Yet Migrated</h3>
+
+
+
+<ol><li>Update the file in its current location</li></ol>
+
+<ol><li>When the file is migrated, the changes will be preserved</li></ol>
+
+
+
+<h3>For Already Migrated Documentation</h3>
+
+
+
+<ol><li>Update the file in the new location (<code>/root/Documentation/docs/...</code>)</li></ol>
+
+<ol><li>Ensure the metadata section is preserved</li></ol>
+
+<ol><li>Update the metadata if necessary (e.g., change status, add tags)</li></ol>
+
+
+
+<h2>Using the Documentation Template</h2>
+
+
+
+A template for new documentation is available at:
+
+
+
+<code></code>`
+
+/root/Documentation/docs/templates/documentation_template.md
+
+<code></code>`
+
+
+
+This template includes:
+
+<ul><li>Properly formatted metadata section</li></ul>
+
+<ul><li>Standard document structure</li></ul>
+
+<ul><li>Examples of formatting (code blocks, lists, tables, etc.)</li></ul>
+
+<ul><li>Example user and admin guides</li></ul>
+
+
+
+Copy this template when creating new documentation to ensure consistency.
+
+
+
+<h2>Migration Script</h2>
+
+
+
+A migration script is available to help migrate existing documentation to the new structure:
+
+
+
+<code></code>`
+
+/root/Documentation/scripts/migrate_documentation.pl
+
+<code></code>`
+
+
+
+This script:
+
+<ol><li>Reads existing documentation files</li></ol>
+
+<ol><li>Extracts metadata from file content and directory location</li></ol>
+
+<ol><li>Generates new files with proper metadata in the new structure</li></ol>
+
+
+
+**Note:** This script is intended for use by the documentation team during the migration process. Do not run it on your own unless instructed to do so.
+
+
+
+<h2>Accessing Documentation During Migration</h2>
+
+
+
+During the migration period, documentation will be accessible through both the old and new systems:
+
+
+
+<h3>Old System</h3>
+
+
+
+<ul><li>Access via <code>/documentation</code> URL</li></ul>
+
+<ul><li>Uses the current directory structure and configuration</li></ul>
+
+<ul><li>All existing documentation remains accessible</li></ul>
+
+
+
+<h3>New System (When Available)</h3>
+
+
+
+<ul><li>Access via <code>/documentation/new</code> URL</li></ul>
+
+<ul><li>Uses the new metadata-driven approach</li></ul>
+
+<ul><li>Only migrated and new documentation will be available</li></ul>
+
+
+
+<h2>Testing the New System</h2>
+
+
+
+When the new system becomes available for testing:
+
+
+
+<ol><li>Access it via <code>/documentation/new</code></li></ol>
+
+<ol><li>Test that your documentation is properly categorized and accessible</li></ol>
+
+<ol><li>Verify that role-based access control works correctly</li></ol>
+
+<ol><li>Report any issues to the documentation team</li></ol>
+
+
+
+<h2>Reporting Issues</h2>
+
+
+
+If you encounter issues with the documentation system during migration:
+
+
+
+<ol><li>Check the application logs for error messages</li></ol>
+
+<ol><li>Report the issue to the documentation team with:</li></ol>
+
+   - Description of the issue
+
+   - Steps to reproduce
+
+   - Expected vs. actual behavior
+
+   - Any error messages from the logs
+
+
+
+<h2>Best Practices During Migration</h2>
+
+
+
+<ol><li>**Follow the New Format**: Always use the new metadata format for new documentation</li></ol>
+
+<ol><li>**Update Both Systems**: Update both the new file and the configuration file</li></ol>
+
+<ol><li>**Test Visibility**: Verify that your documentation is visible to the intended audience</li></ol>
+
+<ol><li>**Use the Template**: Use the provided template for consistency</li></ol>
+
+<ol><li>**Ask for Help**: Contact the documentation team if you're unsure about anything</li></ol>
+
+
+
+<h2>After Migration</h2>
+
+
+
+Once the migration is complete:
+
+
+
+<ol><li>All documentation will be in the new structure</li></ol>
+
+<ol><li>The old directory structure will be removed</li></ol>
+
+<ol><li>The documentation system will use the metadata-driven approach exclusively</li></ol>
+
+<ol><li>The configuration file will be simplified to focus on category definitions</li></ol>
+
+
+
+<h2>Related Documentation</h2>
+
+
+
+<ul><li><a href="/Documentation/changelog/2025-05-30-documentation-structure-simplification.md">Documentation Structure Simplification Plan</a></li></ul>
+
+<ul><li><a href="/Documentation/docs/templates/documentation_template.md">Documentation Template</a></li></ul>
+
+<ul><li><a href="/Documentation/documentation_system.md">Documentation System Overview</a></li></ul>
+
+</div>

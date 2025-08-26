@@ -1,0 +1,101 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2024-06-15-login-redirect-fix.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Login Redirect Fix' %]
+
+<!-- Documentation page for 2024-06-15-login-redirect-fix -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**Date:** June 15, 2024  
+
+**Type:** [FIX]  
+
+**Author:** Development Team
+
+
+
+<h2>Overview</h2>
+
+
+
+This update fixes issues with the login system's redirect functionality and improves the overall authentication process.
+
+
+
+<h2>Changes</h2>
+
+
+
+<ol><li>Fixed template rendering issues in the login process</li></ol>
+
+   - Replaced direct template rendering with proper redirects
+
+   - Used flash messages instead of stash for error messages
+
+
+
+<ol><li>Enhanced return-to-origin functionality</li></ol>
+
+   - Improved handling of the referring page URL
+
+   - Added support for explicit <code>return_to</code> parameter
+
+   - Prevented redirects back to login-related pages
+
+
+
+<ol><li>Updated documentation</li></ol>
+
+   - Updated User controller documentation
+
+   - Enhanced login authentication tutorial
+
+   - Updated developer authentication system documentation
+
+
+
+<h2>Technical Details</h2>
+
+
+
+The main issue was in the error handling of the login process, where the system was trying to render a non-existent template (<code>user/do_login.tt</code>) when authentication failed. This has been fixed by using redirects with flash messages instead.
+
+
+
+Additionally, the login system now better preserves the original referring page and supports explicit redirection through the <code>return_to</code> parameter, making it more flexible for different use cases.
+
+
+
+<h2>Affected Files</h2>
+
+
+
+<ul><li><code>Comserv/lib/Comserv/Controller/User.pm</code></li></ul>
+
+<ul><li><code>Comserv/root/Documentation/controllers/User.md</code></li></ul>
+
+<ul><li><code>Comserv/root/Documentation/tutorials/login_authentication.md</code></li></ul>
+
+<ul><li><code>Comserv/root/Documentation/developer/authentication_system.md</code></li></ul>
+
+
+
+<h2>Related Issues</h2>
+
+
+
+<ul><li>Fixed "Couldn't render template 'user/do_login.tt: file error - user/do_login.tt: not found'" error</li></ul>
+
+<ul><li>Improved user experience by returning to the original page after login</li></ul>
+
+</div>

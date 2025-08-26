@@ -1,0 +1,159 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2025-04-13-mcoop-url-case-fix.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'MCoop URL Case Sensitivity Fix' %]
+
+<!-- Documentation page for 2025-04-13-mcoop-url-case-fix -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**Date:** April 13, 2025  
+
+**Author:** Shanta  
+
+**Status:** Implemented  
+
+**Issue:** "The page you requested could not be found: /mcoop/server-room-plan"
+
+
+
+<h2>Overview</h2>
+
+
+
+This update addresses an issue with the MCoop module's server room plan page, where the URL was case-sensitive and causing "page not found" errors when accessed from the admin home page. The link on the admin home page was using lowercase <code>/mcoop/server-room-plan</code> while the controller was only handling uppercase <code>/MCoop/server-room-plan</code> routes.
+
+
+
+<h2>Changes Made</h2>
+
+
+
+<ol><li>**Updated links in admin home page**:</li></ol>
+
+   - Modified links in <code>coop/index.tt</code> to use the correct case: <code>/MCoop/server-room-plan</code> instead of <code>/mcoop/server-room-plan</code>
+
+   - Changed two instances:
+
+     - Line 67: Main quick access link
+
+     - Line 77: Infrastructure section link
+
+
+
+<ol><li>**Added case-insensitive route handlers**:</li></ol>
+
+   - Added route handlers in <code>MCoop.pm</code> to support lowercase URLs:
+
+     <code></code>`perl
+
+     # Handle lowercase mcoop URLs with hyphen
+
+     sub server_room_plan_hyphen_lowercase :Path('/mcoop/server-room-plan') :Args(0) {
+
+         my ($self, $c) = @_;
+
+         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+
+             'server_room_plan_hyphen_lowercase', 'Lowercase mcoop URL accessed');
+
+         $c->forward('server_room_plan');
+
+     }
+
+
+
+     # Handle lowercase mcoop URLs with underscore
+
+     sub server_room_plan_underscore_lowercase :Path('/mcoop/server_room_plan') :Args(0) {
+
+         my ($self, $c) = @_;
+
+         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+
+             'server_room_plan_underscore_lowercase', 'Lowercase mcoop URL with underscore accessed');
+
+         $c->forward('server_room_plan');
+
+     }
+
+     <code></code>`
+
+   - These handlers follow the existing naming convention and forward to the main handler
+
+
+
+<ol><li>**Updated documentation**:</li></ol>
+
+   - Updated <code>mcoop_module.md</code> with:
+
+     - Current date (April 13, 2025)
+
+     - Added information about URL case sensitivity
+
+     - Updated code examples to match the current implementation
+
+     - Added reference to this changelog entry
+
+   - Created this changelog entry to document the fix
+
+
+
+<h2>Technical Details</h2>
+
+
+
+The issue was caused by a case mismatch between:
+
+<ul><li>The controller routes (which use uppercase "MCoop" in the URL path)</li></ul>
+
+<ul><li>The links in the admin home page (which used lowercase "mcoop")</li></ul>
+
+
+
+The solution maintains the existing controller structure while adding compatibility routes that forward to the main handler. This approach:
+
+<ol><li>Preserves the existing code structure and naming conventions</li></ol>
+
+<ol><li>Maintains logging consistency with the rest of the application</li></ol>
+
+<ol><li>Avoids redirects that would cause additional page loads</li></ol>
+
+<ol><li>Provides backward compatibility for any bookmarked lowercase URLs</li></ol>
+
+
+
+<h2>Testing</h2>
+
+
+
+The following URLs now all correctly display the server room plan page:
+
+<ul><li><code>/MCoop/server_room_plan</code> (original uppercase with underscore)</li></ul>
+
+<ul><li><code>/MCoop/server-room-plan</code> (original uppercase with hyphen)</li></ul>
+
+<ul><li><code>/mcoop/server_room_plan</code> (lowercase with underscore)</li></ul>
+
+<ul><li><code>/mcoop/server-room-plan</code> (lowercase with hyphen)</li></ul>
+
+
+
+<h2>Related Documentation</h2>
+
+
+
+<ul><li><a href="/Documentation/mcoop_module.md">MCoop Module Documentation</a></li></ul>
+
+<ul><li><a href="/Documentation/changelog/2025-04-mcoop-server-room-plan.md">MCoop Server Room Plan Implementation</a></li></ul>
+
+</div>

@@ -1,0 +1,433 @@
+[% PageVersion = 'Comserv/root/Documentation/roles/admin/user_management.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'User Management Guide for Administrators' %]
+
+<!-- Documentation page for user_management -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**Version:** 1.0  
+
+**Last Updated:** May 31, 2024  
+
+**Author:** Admin Team
+
+
+
+<h2>Overview</h2>
+
+
+
+This guide provides administrators with detailed information on managing users in the Comserv system. As an administrator, you have access to advanced user management features that allow you to create, modify, and manage user accounts.
+
+
+
+<h2>User Management Dashboard</h2>
+
+
+
+The User Management Dashboard is your central hub for all user-related administrative tasks. Access it by navigating to:
+
+
+
+**Admin > User Management**
+
+
+
+From this dashboard, you can:
+
+<ul><li>View all users in the system</li></ul>
+
+<ul><li>Create new user accounts</li></ul>
+
+<ul><li>Edit existing user information</li></ul>
+
+<ul><li>Manage user roles and permissions</li></ul>
+
+<ul><li>Deactivate or reactivate accounts</li></ul>
+
+
+
+<h2>Creating New Users</h2>
+
+
+
+<h3>Standard User Creation</h3>
+
+
+
+<ol><li>Navigate to **Admin > User Management > New User**</li></ol>
+
+<ol><li>Fill in the required fields:</li></ol>
+
+   - Username (must be unique)
+
+   - First Name
+
+   - Last Name
+
+   - Email Address
+
+   - Password (must meet complexity requirements)
+
+<ol><li>Assign appropriate roles (see Role Management section)</li></ol>
+
+<ol><li>Click "Create User"</li></ol>
+
+
+
+<h3>Bulk User Import</h3>
+
+
+
+For adding multiple users at once:
+
+
+
+<ol><li>Navigate to **Admin > User Management > Bulk Import**</li></ol>
+
+<ol><li>Download the template CSV file</li></ol>
+
+<ol><li>Fill in user information following the template format</li></ol>
+
+<ol><li>Upload the completed CSV file</li></ol>
+
+<ol><li>Review the import preview for any errors</li></ol>
+
+<ol><li>Confirm the import</li></ol>
+
+
+
+<h2>Managing Existing Users</h2>
+
+
+
+<h3>Editing User Information</h3>
+
+
+
+<ol><li>Navigate to **Admin > User Management**</li></ol>
+
+<ol><li>Find the user in the list (use the search function if needed)</li></ol>
+
+<ol><li>Click "Edit" next to the user's name</li></ol>
+
+<ol><li>Modify the necessary information</li></ol>
+
+<ol><li>Click "Save Changes"</li></ol>
+
+
+
+<h3>Resetting Passwords</h3>
+
+
+
+<ol><li>Navigate to **Admin > User Management**</li></ol>
+
+<ol><li>Find the user in the list</li></ol>
+
+<ol><li>Click "Reset Password"</li></ol>
+
+<ol><li>Choose one of the following options:</li></ol>
+
+   - Generate a temporary password (will be emailed to the user)
+
+   - Set a specific password manually
+
+<ol><li>Click "Confirm Reset"</li></ol>
+
+
+
+<h3>Deactivating Accounts</h3>
+
+
+
+To temporarily disable a user's access:
+
+
+
+<ol><li>Navigate to **Admin > User Management**</li></ol>
+
+<ol><li>Find the user in the list</li></ol>
+
+<ol><li>Click "Deactivate"</li></ol>
+
+<ol><li>Confirm the deactivation</li></ol>
+
+
+
+Deactivated accounts remain in the system but cannot log in. They can be reactivated at any time.
+
+
+
+<h3>Deleting Accounts</h3>
+
+
+
+**Warning:** Account deletion is permanent and cannot be undone.
+
+
+
+<ol><li>Navigate to **Admin > User Management**</li></ol>
+
+<ol><li>Find the user in the list</li></ol>
+
+<ol><li>Click "Delete"</li></ol>
+
+<ol><li>Read the warning message</li></ol>
+
+<ol><li>Type the username to confirm</li></ol>
+
+<ol><li>Click "Permanently Delete"</li></ol>
+
+
+
+<h2>Role Management</h2>
+
+
+
+<h3>Available Roles</h3>
+
+
+
+The system includes the following standard roles:
+
+
+
+| Role | Description | Default Permissions |
+
+|------|-------------|---------------------|
+
+| user | Basic access | View public content, manage own profile |
+
+| editor | Content management | Create/edit content, moderate comments |
+
+| admin | System administration | Full system access, user management |
+
+| developer | Technical access | API access, debugging tools |
+
+
+
+<h3>Assigning Roles</h3>
+
+
+
+<ol><li>Navigate to **Admin > User Management**</li></ol>
+
+<ol><li>Find the user in the list</li></ol>
+
+<ol><li>Click "Edit Roles"</li></ol>
+
+<ol><li>Check the boxes for the roles you want to assign</li></ol>
+
+<ol><li>Click "Save Roles"</li></ol>
+
+
+
+Users can have multiple roles simultaneously. The system will grant the highest level of access from all assigned roles.
+
+
+
+<h3>Custom Roles</h3>
+
+
+
+To create custom roles with specific permissions:
+
+
+
+<ol><li>Navigate to **Admin > System > Roles**</li></ol>
+
+<ol><li>Click "Create New Role"</li></ol>
+
+<ol><li>Provide a role name and description</li></ol>
+
+<ol><li>Select the permissions to include</li></ol>
+
+<ol><li>Click "Create Role"</li></ol>
+
+
+
+<h2>User Activity Monitoring</h2>
+
+
+
+<h3>Viewing Login History</h3>
+
+
+
+<ol><li>Navigate to **Admin > User Management**</li></ol>
+
+<ol><li>Find the user in the list</li></ol>
+
+<ol><li>Click "Activity Log"</li></ol>
+
+<ol><li>View the login history, including:</li></ol>
+
+   - Login timestamps
+
+   - IP addresses
+
+   - Session durations
+
+   - Failed login attempts
+
+
+
+<h3>System-Wide Activity</h3>
+
+
+
+To view activity across all users:
+
+
+
+<ol><li>Navigate to **Admin > Reports > User Activity**</li></ol>
+
+<ol><li>Set the date range for the report</li></ol>
+
+<ol><li>Filter by activity type if needed</li></ol>
+
+<ol><li>Click "Generate Report"</li></ol>
+
+
+
+<h2>Security Settings</h2>
+
+
+
+<h3>Password Policies</h3>
+
+
+
+Configure system-wide password requirements:
+
+
+
+<ol><li>Navigate to **Admin > System > Security**</li></ol>
+
+<ol><li>Under "Password Policy," set:</li></ol>
+
+   - Minimum password length
+
+   - Character requirements (uppercase, lowercase, numbers, symbols)
+
+   - Password expiration period
+
+   - Password history restrictions
+
+<ol><li>Click "Save Settings"</li></ol>
+
+
+
+<h3>Account Lockout</h3>
+
+
+
+Configure account lockout settings to prevent brute force attacks:
+
+
+
+<ol><li>Navigate to **Admin > System > Security**</li></ol>
+
+<ol><li>Under "Account Lockout," set:</li></ol>
+
+   - Failed login attempt threshold
+
+   - Lockout duration
+
+   - Notification settings
+
+<ol><li>Click "Save Settings"</li></ol>
+
+
+
+<h2>Troubleshooting User Issues</h2>
+
+
+
+<h3>Common Issues and Solutions</h3>
+
+
+
+| Issue | Possible Causes | Solutions |
+
+|-------|----------------|-----------|
+
+| User cannot log in | Incorrect credentials, account locked, account deactivated | Verify username, reset password, check account status |
+
+| Missing permissions | Incorrect role assignment, permission conflict | Review assigned roles, check for role conflicts |
+
+| Session timeouts | Short session duration, browser issues | Adjust session timeout settings, clear browser cache |
+
+| Profile update errors | Validation issues, database constraints | Check input validation, verify database integrity |
+
+
+
+<h3>Accessing User Session Data</h3>
+
+
+
+For advanced troubleshooting:
+
+
+
+<ol><li>Navigate to **Admin > User Management**</li></ol>
+
+<ol><li>Find the user in the list</li></ol>
+
+<ol><li>Click "Debug"</li></ol>
+
+<ol><li>View current session information, including:</li></ol>
+
+   - Session ID
+
+   - Session variables
+
+   - Cookie information
+
+   - Last activity timestamp
+
+
+
+<h2>Best Practices</h2>
+
+
+
+<ol><li>**Regular Audits**: Review user accounts and permissions quarterly</li></ol>
+
+<ol><li>**Principle of Least Privilege**: Assign only the minimum necessary permissions</li></ol>
+
+<ol><li>**Documentation**: Keep records of significant account changes</li></ol>
+
+<ol><li>**Training**: Ensure users understand security policies</li></ol>
+
+<ol><li>**Monitoring**: Regularly review login and activity logs for unusual patterns</li></ol>
+
+
+
+<h2>Getting Help</h2>
+
+
+
+If you encounter issues not covered in this guide:
+
+
+
+<ol><li>Check the administrator forums for similar issues</li></ol>
+
+<ol><li>Contact technical support at admin-support@comserv.example.com</li></ol>
+
+<ol><li>Submit a detailed support ticket through the admin portal</li></ol>
+
+</div>

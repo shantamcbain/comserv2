@@ -1,0 +1,161 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2025-05-25-fix-formatting-title-logs.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Fix for Formatting Title Log Files' %]
+
+<!-- Documentation page for 2025-05-25-fix-formatting-title-logs -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**File:** /home/shanta/PycharmProjects/comserv/Comserv/root/Documentation/changelog/2025-05-25-fix-formatting-title-logs.md  
+
+**Date:** May 25, 2025  
+
+**Author:** System Administrator  
+
+**Status:** Implemented
+
+
+
+<h2>Overview</h2>
+
+
+
+This document addresses the issue of "Formatting title from" files being created in the project root directory. These files are debug log outputs from the Documentation controller's <code>_format_title</code> method that were accidentally being written to the file system instead of the application log.
+
+
+
+<h2>Issue Description</h2>
+
+
+
+The Documentation controller includes a method called <code>_format_title</code> that formats page names into readable titles. This method contains a debug logging statement:
+
+
+
+<code></code>`perl
+
+<h1>Log the input for debugging</h1>
+
+$self->logging->log_to_file("Formatting title from: $page_name", undef, 'DEBUG');
+
+<code></code>`
+
+
+
+However, due to an issue with the logging configuration, these debug messages were being written as individual files in the project root directory instead of being appended to the application log file. This resulted in numerous files with names like "Formatting title from: README.md" cluttering the project root directory.
+
+
+
+<h2>Solution</h2>
+
+
+
+A two-part solution has been implemented:
+
+
+
+<ol><li>**Immediate Cleanup**: A script (<code>cleanup_formatting_title_files.sh</code>) has been created to remove all the existing "Formatting title from" files from the project root directory.</li></ol>
+
+
+
+<ol><li>**Fix for the Logging Method**: The <code>log_to_file</code> method in the <code>Comserv::Util::Logging</code> module has been modified to ensure that all log messages are properly written to the application log file, not to individual files in the project root.</li></ol>
+
+
+
+<h2>Implementation Details</h2>
+
+
+
+<h3>Cleanup Script</h3>
+
+
+
+The cleanup script performs the following actions:
+
+
+
+<ol><li>Finds all files in the project root directory that start with "Formatting title from"</li></ol>
+
+<ol><li>Logs the list of files to be removed</li></ol>
+
+<ol><li>Deletes the files</li></ol>
+
+<ol><li>Creates a log file with details of the operation</li></ol>
+
+
+
+<h3>Logging Fix</h3>
+
+
+
+The <code>log_to_file</code> method in the <code>Comserv::Util::Logging</code> module has been modified to:
+
+
+
+<ol><li>Always use the application log file path if no specific log file is provided</li></ol>
+
+<ol><li>Ensure the log directory exists before writing to it</li></ol>
+
+<ol><li>Properly append to the log file instead of creating a new file</li></ol>
+
+<ol><li>Include proper timestamps and log levels in the log entries</li></ol>
+
+
+
+<h2>Benefits</h2>
+
+
+
+This solution provides several benefits:
+
+
+
+<ol><li>**Cleaner Project Root**: The project root directory is no longer cluttered with debug log files</li></ol>
+
+<ol><li>**Proper Logging**: Debug messages are now properly written to the application log file</li></ol>
+
+<ol><li>**Better Debugging**: All debug messages are now in one place, making it easier to debug issues</li></ol>
+
+<ol><li>**Improved Performance**: The system no longer creates unnecessary files, improving performance</li></ol>
+
+
+
+<h2>Next Steps</h2>
+
+
+
+After implementing this fix, the following steps should be taken:
+
+
+
+<ol><li>**Review Other Logging Calls**: Review other calls to <code>log_to_file</code> to ensure they are using the method correctly</li></ol>
+
+<ol><li>**Update Logging Documentation**: Update the documentation for the logging system to clarify how to use it properly</li></ol>
+
+<ol><li>**Consider Log Rotation**: Implement or review log rotation to prevent the application log from growing too large</li></ol>
+
+<ol><li>**Add Logging Tests**: Add tests to verify that logging works correctly in different scenarios</li></ol>
+
+
+
+<h2>Related Documentation</h2>
+
+
+
+<ul><li><a href="/home/shanta/PycharmProjects/comserv/Comserv/root/Documentation/controllers/Documentation.md">Documentation Controller</a></li></ul>
+
+<ul><li><a href="/home/shanta/PycharmProjects/comserv/Comserv/root/Documentation/developer/logging_system.md">Logging System</a></li></ul>
+
+<ul><li><a href="/home/shanta/PycharmProjects/comserv/Comserv/root/Documentation/documentation_system.md">Documentation System</a></li></ul>
+
+</div>

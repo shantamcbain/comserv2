@@ -1,0 +1,393 @@
+[% PageVersion = 'Comserv/root/Documentation/documentation_config_guide.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Documentation Configuration Guide' %]
+
+<!-- Documentation page for documentation_config_guide -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**Last Updated:** May 15, 2025  
+
+**Author:** Shanta  
+
+**Status:** Active
+
+
+
+<h2>Overview</h2>
+
+
+
+The documentation system in Comserv uses a central configuration file (<code>documentation_config.json</code>) to manage documentation categories and file paths. This document explains the structure and usage of this configuration file.
+
+
+
+<h2>File Location</h2>
+
+
+
+The configuration file is located at:
+
+<code></code>`
+
+/root/Documentation/documentation_config.json
+
+<code></code>`
+
+
+
+<h2>Configuration Structure</h2>
+
+
+
+The configuration file has two main sections:
+
+
+
+<ol><li>**Categories**: Defines all documentation categories and their properties</li></ol>
+
+<ol><li>**Default Paths**: Maps documentation keys to file paths</li></ol>
+
+
+
+<h3>Categories Section</h3>
+
+
+
+The categories section defines all documentation categories and their properties:
+
+
+
+<code></code>`json
+
+"categories": {
+
+  "user_guides": {
+
+    "title": "User Guides",
+
+    "description": "Documentation for end users of the system",
+
+    "roles": ["normal", "editor", "admin", "developer"],
+
+    "site_specific": false,
+
+    "pages": ["getting_started", "account_management", "customizing_profile"]
+
+  },
+
+  "admin_guides": {
+
+    "title": "Administrator Guides",
+
+    "description": "Documentation for system administrators",
+
+    "roles": ["admin", "developer"],
+
+    "site_specific": false,
+
+    "pages": ["admin_guide", "user_management", "documentation_role_access"]
+
+  }
+
+}
+
+<code></code>`
+
+
+
+Each category has the following properties:
+
+
+
+<ul><li>**title**: The display title for the category</li></ul>
+
+<ul><li>**description**: A brief description of the category</li></ul>
+
+<ul><li>**roles**: An array of roles that can access this category</li></ul>
+
+<ul><li>**site_specific**: Boolean indicating if the category is site-specific</li></ul>
+
+<ul><li>**pages**: An array of documentation keys that belong to this category</li></ul>
+
+
+
+<h3>Default Paths Section</h3>
+
+
+
+The default paths section maps documentation keys to file paths:
+
+
+
+<code></code>`json
+
+"default_paths": {
+
+  "getting_started": "Documentation/roles/normal/getting_started.md",
+
+  "account_management": "Documentation/roles/normal/account_management.md",
+
+  "customizing_profile": "Documentation/tutorials/customizing_profile.md",
+
+  "admin_guide": "Documentation/roles/admin/admin_guide.md",
+
+  "user_management": "Documentation/roles/admin/user_management.md"
+
+}
+
+<code></code>`
+
+
+
+Each entry maps a documentation key to its file path relative to the <code>root</code> directory.
+
+
+
+<h2>Usage</h2>
+
+
+
+<h3>Adding a New Documentation File</h3>
+
+
+
+To add a new documentation file to the system:
+
+
+
+<ol><li>Create the documentation file in the appropriate directory</li></ol>
+
+<ol><li>Add an entry to the default_paths section:</li></ol>
+
+   <code></code>`json
+
+   "new_document": "Documentation/path/to/new_document.md"
+
+   <code></code>`
+
+<ol><li>Add the document key to the appropriate category's pages array:</li></ol>
+
+   <code></code>`json
+
+   "categories": {
+
+     "category_name": {
+
+       "pages": ["existing_page_1", "existing_page_2", "new_document"]
+
+     }
+
+   }
+
+   <code></code>`
+
+
+
+<h3>Moving a Documentation File</h3>
+
+
+
+To move a documentation file:
+
+
+
+<ol><li>Move the file to the new location</li></ol>
+
+<ol><li>Update the path in the default_paths section:</li></ol>
+
+   <code></code>`json
+
+   "document_key": "Documentation/new/path/to/document.md"
+
+   <code></code>`
+
+
+
+<h3>Creating a New Category</h3>
+
+
+
+To create a new documentation category:
+
+
+
+<ol><li>Add a new entry to the categories section:</li></ol>
+
+   <code></code>`json
+
+   "new_category": {
+
+     "title": "New Category Title",
+
+     "description": "Description of the new category",
+
+     "roles": ["role1", "role2"],
+
+     "site_specific": false,
+
+     "pages": ["document_key_1", "document_key_2"]
+
+   }
+
+   <code></code>`
+
+<ol><li>Ensure all document keys in the pages array have corresponding entries in the default_paths section</li></ol>
+
+
+
+<h2>Best Practices</h2>
+
+
+
+<ol><li>**Consistent Naming**: Use consistent naming conventions for documentation keys</li></ol>
+
+<ol><li>**Correct Paths**: Ensure all paths in the default_paths section are correct</li></ol>
+
+<ol><li>**Role Assignment**: Assign appropriate roles to each category</li></ol>
+
+<ol><li>**Category Organization**: Organize documentation into logical categories</li></ol>
+
+<ol><li>**Regular Updates**: Update the configuration file when adding, moving, or removing documentation</li></ol>
+
+<ol><li>**Testing**: Test documentation visibility after making changes to the configuration</li></ol>
+
+
+
+<h2>Troubleshooting</h2>
+
+
+
+If documentation is not appearing as expected:
+
+
+
+<ol><li>Check that the document key is in the appropriate category's pages array</li></ol>
+
+<ol><li>Verify that the path in the default_paths section is correct</li></ol>
+
+<ol><li>Ensure the file exists at the specified path</li></ol>
+
+<ol><li>Check that the user has the appropriate role to view the category</li></ol>
+
+<ol><li>Enable debug mode to see more detailed information about documentation loading</li></ol>
+
+
+
+<h2>Example Configuration</h2>
+
+
+
+Here's a complete example of a documentation_config.json file:
+
+
+
+<code></code>`json
+
+{
+
+  "categories": {
+
+    "user_guides": {
+
+      "title": "User Guides",
+
+      "description": "Documentation for end users of the system",
+
+      "roles": ["normal", "editor", "admin", "developer"],
+
+      "site_specific": false,
+
+      "pages": ["getting_started", "account_management", "customizing_profile"]
+
+    },
+
+    "admin_guides": {
+
+      "title": "Administrator Guides",
+
+      "description": "Documentation for system administrators",
+
+      "roles": ["admin", "developer"],
+
+      "site_specific": false,
+
+      "pages": ["admin_guide", "user_management", "documentation_role_access"]
+
+    },
+
+    "developer_guides": {
+
+      "title": "Developer Documentation",
+
+      "description": "Documentation for developers",
+
+      "roles": ["developer"],
+
+      "site_specific": false,
+
+      "pages": ["api_reference", "authentication_system", "template_system"]
+
+    }
+
+  },
+
+  "default_paths": {
+
+    "getting_started": "Documentation/roles/normal/getting_started.md",
+
+    "account_management": "Documentation/roles/normal/account_management.md",
+
+    "customizing_profile": "Documentation/tutorials/customizing_profile.md",
+
+    "admin_guide": "Documentation/roles/admin/admin_guide.md",
+
+    "user_management": "Documentation/roles/admin/user_management.md",
+
+    "documentation_role_access": "Documentation/developer/documentation_role_access.md",
+
+    "api_reference": "Documentation/roles/developer/api_reference.md",
+
+    "authentication_system": "Documentation/developer/authentication_system.md",
+
+    "template_system": "Documentation/developer/template_system.md"
+
+  }
+
+}
+
+<code></code>`
+
+
+
+<h2>Technical Implementation</h2>
+
+
+
+The documentation system loads this configuration file during initialization and uses it to:
+
+
+
+<ol><li>Define documentation categories and their properties</li></ol>
+
+<ol><li>Map documentation keys to file paths</li></ol>
+
+<ol><li>Determine which documentation is visible to which users</li></ol>
+
+<ol><li>Organize documentation into logical categories</li></ol>
+
+
+
+The configuration is loaded by the <code>_load_config</code> method in the Documentation controller.
+
+</div>

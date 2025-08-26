@@ -1,0 +1,260 @@
+[% META title = 'AI Assistant Guidelines for Comserv System' %]
+[% PageVersion = 'Comserv/root/Documentation/AI_Guidelines.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+
+<!-- Documentation page for AI_Guidelines -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>IMPORTANT: File Modification Guidelines</h2>
+
+
+
+**WARNING TO ALL AI ASSISTANTS**: Never replace or modify existing files without explicit permission from the user. Always ask for confirmation before making changes to the codebase.
+
+
+
+<h2>Development Guidelines</h2>
+
+
+
+For comprehensive development guidelines specific to the Comserv2 system, refer to:
+
+<ul><li><a href="/Documentation/AI_DEVELOPMENT_GUIDELINES.md">AI Development Guidelines</a></li></ul>
+
+
+
+These guidelines cover:
+
+<ul><li>Following existing code patterns</li></ul>
+
+<ul><li>Reusing existing components</li></ul>
+
+<ul><li>Respecting directory structure</li></ul>
+
+<ul><li>Maintaining naming conventions</li></ul>
+
+<ul><li>Proper workflow for limited-prompt sessions</li></ul>
+
+
+
+<h2>Filename and Package Consistency</h2>
+
+
+
+When working with Perl modules in the Comserv system, ensure that filenames match their package declarations:
+
+
+
+<ul><li>**Correct**: A file named <code>Documentation.pm</code> should contain the package <code>Comserv::Controller::Documentation</code></li></ul>
+
+<ul><li>**Incorrect**: A file named <code>Documantation.pm</code> containing the package <code>Comserv::Controller::Documentation</code></li></ul>
+
+
+
+<h3>Known Issue Example</h3>
+
+
+
+The system previously had an issue where:
+
+<ul><li>The controller file was named <code>Documantation.pm</code> (with an 'a')</li></ul>
+
+<ul><li>But the package inside was declared as <code>Comserv::Controller::Documentation</code> (with an 'o')</li></ul>
+
+
+
+This mismatch caused both the <code>/documentation</code> and <code>/Documentation</code> routes to fail.
+
+
+
+<h2>Logging Best Practices</h2>
+
+
+
+Always use the <code>log_with_details</code> method for comprehensive logging:
+
+
+
+<code></code>`perl
+
+$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'method_name',
+
+    "Detailed message with relevant information");
+
+<code></code>`
+
+
+
+This ensures that:
+
+<ol><li>The log level is properly set</li></ol>
+
+<ol><li>File and line information is captured</li></ol>
+
+<ol><li>The method name is recorded</li></ol>
+
+<ol><li>A detailed message is provided</li></ol>
+
+
+
+<h2>Error Handling</h2>
+
+
+
+When encountering errors:
+
+
+
+<ol><li>Log the error with appropriate details</li></ol>
+
+<ol><li>Add the error message to the stash for display to the user</li></ol>
+
+<ol><li>Use debug messages for additional context</li></ol>
+
+
+
+Example:
+
+<code></code>`perl
+
+<h1>Log the error</h1>
+
+$self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'method_name', 
+
+    "Error occurred: $error_message");
+
+
+
+<h1>Add to stash for display</h1>
+
+$c->stash(
+
+    error_msg => "An error occurred: $error_message",
+
+    debug_msg => "Technical details: $technical_details" # Only shown in debug mode
+
+);
+
+<code></code>`
+
+
+
+<h2>Documentation System Structure</h2>
+
+
+
+The documentation system is organized into categories:
+
+<ul><li>User guides</li></ul>
+
+<ul><li>Admin guides</li></ul>
+
+<ul><li>Developer guides</li></ul>
+
+<ul><li>Tutorials</li></ul>
+
+<ul><li>Site-specific documentation</li></ul>
+
+<ul><li>Module documentation</li></ul>
+
+<ul><li>Controller documentation</li></ul>
+
+<ul><li>Model documentation</li></ul>
+
+<ul><li>Changelog</li></ul>
+
+
+
+Each category has role-based access control to ensure users only see relevant documentation.
+
+
+
+For more details, see:
+
+<ul><li><a href="/Documentation/documentation_system_overview">Documentation System Overview</a></li></ul>
+
+<ul><li><a href="/Documentation/documentation_filename_issue">Documentation Filename Issue</a></li></ul>
+
+<ul><li><a href="/Documentation/controller_routing_guidelines">Controller Routing Guidelines</a></li></ul>
+
+<ul><li><a href="/Documentation/controllers">Controllers Documentation</a></li></ul>
+
+
+
+<h2>File Naming Conventions</h2>
+
+
+
+Follow these conventions for documentation files:
+
+<ul><li>Use lowercase with underscores for filenames</li></ul>
+
+<ul><li>Use <code>.md</code> for Markdown files</li></ul>
+
+<ul><li>Use <code>.tt</code> for Template Toolkit files</li></ul>
+
+<ul><li>Include the category in the filename when appropriate</li></ul>
+
+
+
+Example: <code>user_guide_login.md</code>, <code>admin_installation.tt</code>
+
+
+
+<h2>Data Storage Patterns</h2>
+
+
+
+<h3>JSON to MySQL Transition Pattern</h3>
+
+
+
+The Comserv2 system uses a development pattern where:
+
+
+
+<ol><li>**Initial Implementation**: New features often start with JSON file storage</li></ol>
+
+   - Example: <code>NetworkMap.pm</code> uses JSON for storing network device information
+
+   - JSON files are typically stored in <code>Comserv/config/</code> directory
+
+   - This allows for rapid prototyping and iteration
+
+
+
+<ol><li>**Database Migration**: As features mature, data is migrated to MySQL</li></ol>
+
+   - Database models are created in <code>Comserv/lib/Comserv/Model/</code>
+
+   - Database configuration is managed via <code>db_config.json</code>
+
+   - The application supports multiple database connections
+
+
+
+When implementing new features:
+
+<ul><li>Follow this pattern of starting with JSON if appropriate</li></ul>
+
+<ul><li>Reuse existing JSON handling code (see <code>NetworkMap.pm</code> as an example)</li></ul>
+
+<ul><li>Document the planned transition to database storage</li></ul>
+
+### DIFF LOG TEMPLATE (Proposed addition)
+To support reproducible gap-fixing work, introduce a lightweight "Diff Log" TT template and a minimal migration workflow:
+
+This template will be populated during tasks to ensure traceability across sessions.
+
+### Documentation Synchronization Protocol

@@ -1,0 +1,205 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2024-08-proxmox-debug-msg-fix.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Proxmox Controller Debug Message Fix - August 2024' %]
+
+<!-- Documentation page for 2024-08-proxmox-debug-msg-fix -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**Date:** August 9, 2024  
+
+**Author:** Shanta  
+
+**Status:** Completed
+
+
+
+<h2>Overview</h2>
+
+
+
+Fixed an issue in the Proxmox controller where the <code>debug_msg</code> stash variable was being used inconsistently, causing errors when it was set as a string in one controller but accessed as an array in another.
+
+
+
+<h2>Changes Made</h2>
+
+
+
+<h3>1. Added Type Checking for debug_msg</h3>
+
+
+
+Added robust type checking for the <code>debug_msg</code> stash variable in multiple locations within the Proxmox controller:
+
+
+
+<ul><li>Added checks to ensure <code>debug_msg</code> exists in the stash</li></ul>
+
+<ul><li>Added checks to verify if <code>debug_msg</code> is an array reference</li></ul>
+
+<ul><li>Added conversion logic to transform string values into array references when needed</li></ul>
+
+<ul><li>Implemented consistent handling of <code>debug_msg</code> throughout the controller</li></ul>
+
+
+
+<h3>2. Specific Locations Fixed</h3>
+
+
+
+<ol><li>**API Endpoint Tests Section (lines 175-195)**:</li></ol>
+
+   - Added type checking before pushing to <code>debug_msg</code>
+
+   - Converted string values to arrays when necessary
+
+
+
+<ol><li>**Authentication Failure Handling (lines 129-142)**:</li></ol>
+
+   - Added type checking before pushing error messages to <code>debug_msg</code>
+
+   - Ensured consistent array structure
+
+
+
+<ol><li>**Debug Information Section (lines 257-267)**:</li></ol>
+
+   - Added type checking before adding debug information
+
+   - Maintained backward compatibility with existing code
+
+
+
+<h2>Files Modified</h2>
+
+
+
+<ul><li><code>/Comserv/lib/Comserv/Controller/Proxmox.pm</code></li></ul>
+
+
+
+<h2>Benefits</h2>
+
+
+
+<ul><li>Fixed errors that occurred when <code>debug_msg</code> was set as a string in one controller but accessed as an array in another</li></ul>
+
+<ul><li>Improved robustness of the debug message system</li></ul>
+
+<ul><li>Enhanced error handling and debugging capabilities</li></ul>
+
+<ul><li>Maintained backward compatibility with existing code</li></ul>
+
+<ul><li>Prevented application crashes due to type mismatches</li></ul>
+
+
+
+<h2>Testing</h2>
+
+
+
+The fixes have been tested by:
+
+<ol><li>Verifying that the Proxmox controller loads without errors</li></ol>
+
+<ol><li>Confirming that debug messages display correctly in the UI</li></ol>
+
+<ol><li>Testing the interaction between different controllers that use <code>debug_msg</code></li></ol>
+
+<ol><li>Verifying that both string and array values for <code>debug_msg</code> are handled correctly</li></ol>
+
+
+
+<h2>Technical Details</h2>
+
+
+
+<h3>Original Issue</h3>
+
+
+
+The controller was inconsistently handling the <code>debug_msg</code> stash variable:
+
+
+
+<code></code>`perl
+
+<h1>In some controllers, debug_msg was set as a string</h1>
+
+$c->stash->{debug_msg} = "Apiary Management System - Main Dashboard";
+
+
+
+<h1>But in the Proxmox controller, it was used as an array</h1>
+
+push @{$c->stash->{debug_msg}}, "API Endpoint Tests";
+
+<code></code>`
+
+
+
+This inconsistency caused errors when a string value was accessed as an array.
+
+
+
+<h3>Fixed Code</h3>
+
+
+
+Added type checking and conversion logic:
+
+
+
+<code></code>`perl
+
+<h1>Make sure debug_msg exists in the stash and is an array reference</h1>
+
+if (!defined $c->stash->{debug_msg}) {
+
+    $c->stash->{debug_msg} = [];
+
+} elsif (ref($c->stash->{debug_msg}) ne 'ARRAY') {
+
+    # If debug_msg is a string, convert it to an array with the string as the first element
+
+    my $original_msg = $c->stash->{debug_msg};
+
+    $c->stash->{debug_msg} = [$original_msg];
+
+}
+
+
+
+<h1>Now it's safe to push to the array</h1>
+
+push @{$c->stash->{debug_msg}}, "New debug message";
+
+<code></code>`
+
+
+
+<h2>Related Documentation</h2>
+
+
+
+For more information about the Proxmox integration and debugging in Comserv, see:
+
+<ul><li>Proxmox Integration Documentation</li></ul>
+
+<ul><li>Comserv Debugging Guide</li></ul>
+
+<ul><li>Comserv::Util::Logging module documentation</li></ul>
+
+</div>

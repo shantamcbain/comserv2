@@ -1,0 +1,4757 @@
+[% PageVersion = 'Comserv/root/Documentation/roles/admin/linux_commands.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Linux Commands Reference' %]
+
+<!-- Documentation page for linux_commands -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**Last Updated:** June 21, 2024  
+
+**Author:** Shanta  
+
+**Status:** Active
+
+
+
+<h2>Overview</h2>
+
+
+
+This document provides a reference guide for common Linux commands that administrators may need when managing Ubuntu, Debian, and Proxmox systems. These commands are useful for day-to-day administration tasks, troubleshooting, and system maintenance.
+
+
+
+<h2>Table of Contents</h2>
+
+
+
+<ul><li><a href="#system-information">System Information</a></li></ul>
+
+<ul><li><a href="#hardware-information">Hardware Information</a></li></ul>
+
+<ul><li><a href="#file-system-operations">File System Operations</a></li></ul>
+
+<ul><li><a href="#process-management">Process Management</a></li></ul>
+
+<ul><li><a href="#package-management">Package Management</a></li></ul>
+
+<ul><li><a href="#network-commands">Network Commands</a></li></ul>
+
+<ul><li><a href="#service-management">Service Management</a></li></ul>
+
+<ul><li><a href="#user-management">User Management</a></li></ul>
+
+<ul><li><a href="#file-searching">File Searching</a></li></ul>
+
+<ul><li><a href="#disk-management">Disk Management</a></li></ul>
+
+<ul><li><a href="#proxmox-management">Proxmox Management</a></li></ul>
+
+<ul><li><a href="#log-files">Log Files</a></li></ul>
+
+<ul><li><a href="#compression-and-archiving">Compression and Archiving</a></li></ul>
+
+<ul><li><a href="#system-monitoring">System Monitoring</a></li></ul>
+
+<ul><li><a href="#firewall-management">Firewall Management</a></li></ul>
+
+<ul><li><a href="#troubleshooting">Troubleshooting</a></li></ul>
+
+<ul><li><a href="#server-room-management">Server Room Management</a></li></ul>
+
+<ul><li><a href="#best-practices">Best Practices</a></li></ul>
+
+
+
+<h2>System Information</h2>
+
+
+
+<details>
+
+<summary><strong>System and Kernel Information</strong> (Click to expand)</summary>
+
+
+
+<div class="command-card">
+
+<h4>uname - Print system information</h4>
+
+
+
+<code></code>`bash
+
+<h1>Display all system information (kernel name, hostname, kernel version, etc.)</h1>
+
+uname -a
+
+<code></code>`
+
+
+
+**Example output:**
+
+<code></code>`
+
+Linux workstation 6.11.0-24-generic #24-Ubuntu SMP PREEMPT_DYNAMIC Tue Jun 4 17:42:05 UTC 2024 x86_64 x86_64 x86_64 GNU/Linux
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li><code>-a</code> shows all information</li></ul>
+
+<ul><li><code>-r</code> shows only kernel release</li></ul>
+
+<ul><li><code>-n</code> shows only hostname</li></ul>
+
+<ul><li><code>-m</code> shows only machine hardware name</li></ul>
+
+<ul><li>Available on all Linux distributions</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>lsb_release - Display Linux Standard Base information</h4>
+
+
+
+<code></code>`bash
+
+<h1>Show distribution information</h1>
+
+lsb_release -a
+
+<code></code>`
+
+
+
+**Example output:**
+
+<code></code>`
+
+No LSB modules are available.
+
+Distributor ID: Ubuntu
+
+Description:    Ubuntu 24.04 LTS
+
+Release:        24.04
+
+Codename:       noble
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li><code>-a</code> shows all information</li></ul>
+
+<ul><li><code>-d</code> shows only description</li></ul>
+
+<ul><li><code>-r</code> shows only release number</li></ul>
+
+<ul><li>May not be installed by default on minimal installations</li></ul>
+
+<ul><li>Install with: <code>sudo apt install lsb-release</code></li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>cat /etc/os-release - Show OS information</h4>
+
+
+
+<code></code>`bash
+
+<h1>Show detailed OS version information</h1>
+
+cat /etc/os-release
+
+<code></code>`
+
+
+
+**Example output:**
+
+<code></code>`
+
+PRETTY_NAME="Ubuntu 24.04 LTS"
+
+NAME="Ubuntu"
+
+VERSION_ID="24.04"
+
+VERSION="24.04 LTS (Noble Numbat)"
+
+VERSION_CODENAME=noble
+
+ID=ubuntu
+
+ID_LIKE=debian
+
+HOME_URL="https://www.ubuntu.com/"
+
+SUPPORT_URL="https://help.ubuntu.com/"
+
+BUG_REPORT_URL="https://bugs.launchpad.net/ubuntu/"
+
+PRIVACY_POLICY_URL="https://www.ubuntu.com/legal/terms-and-policies/privacy-policy"
+
+UBUNTU_CODENAME=noble
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>Available on all modern Linux distributions</li></ul>
+
+<ul><li>More reliable than <code>lsb_release</code> as it's always present</li></ul>
+
+<ul><li>Contains detailed information about the OS</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>hostname - Show or set system hostname</h4>
+
+
+
+<code></code>`bash
+
+<h1>Display the system hostname</h1>
+
+hostname
+
+
+
+<h1>Display the FQDN (Fully Qualified Domain Name)</h1>
+
+hostname -f
+
+
+
+<h1>Set a new hostname (temporary, until reboot)</h1>
+
+sudo hostname new-hostname
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>To permanently change hostname, edit <code>/etc/hostname</code></li></ul>
+
+<ul><li>After editing, run: <code>sudo systemctl restart systemd-hostnamed</code></li></ul>
+
+<ul><li>Available on all Linux distributions</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>uptime - Show system uptime</h4>
+
+
+
+<code></code>`bash
+
+<h1>Show how long the system has been running</h1>
+
+uptime
+
+<code></code>`
+
+
+
+**Example output:**
+
+<code></code>`
+
+ 14:23:32 up 3 days, 2:57, 5 users, load average: 0.52, 0.58, 0.59
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>Shows current time, uptime, number of users, and load averages</li></ul>
+
+<ul><li>Load averages represent system load over 1, 5, and 15 minutes</li></ul>
+
+<ul><li>Available on all Linux distributions</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>w - Show who is logged on and what they are doing</h4>
+
+
+
+<code></code>`bash
+
+<h1>Display information about currently logged-in users</h1>
+
+w
+
+<code></code>`
+
+
+
+**Example output:**
+
+<code></code>`
+
+ 14:25:02 up 3 days,  2:59,  5 users,  load average: 0.35, 0.54, 0.57
+
+USER     TTY      FROM             LOGIN@   IDLE   JCPU   PCPU WHAT
+
+shanta   tty7     :0               Mon08   3days  1:23m  0.05s /usr/libexec/gnome-session-binary
+
+shanta   pts/0    :0               14:20    0.00s  0.05s  0.00s w
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>Shows detailed information about logged-in users</li></ul>
+
+<ul><li>Displays login time, idle time, and current activity</li></ul>
+
+<ul><li>Available on all Linux distributions</li></ul>
+
+
+</details>
+
+
+
+<h2>Hardware Information</h2>
+
+
+
+<details>
+
+<summary><strong>CPU, Memory, and Device Information</strong> (Click to expand)</summary>
+
+
+
+<div class="command-card">
+
+<h4>lscpu - Display CPU information</h4>
+
+
+
+<code></code>`bash
+
+<h1>Display detailed CPU information</h1>
+
+lscpu
+
+<code></code>`
+
+
+
+**Example output:**
+
+<code></code>`
+
+Architecture:            x86_64
+
+  CPU op-mode(s):        32-bit, 64-bit
+
+  Address sizes:         39 bits physical, 48 bits virtual
+
+  Byte Order:            Little Endian
+
+CPU(s):                  8
+
+  On-line CPU(s) list:   0-7
+
+Vendor ID:               GenuineIntel
+
+  Model name:            Intel(R) Core(TM) i7-10700 CPU @ 2.90GHz
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>Shows CPU architecture, cores, model, cache sizes, etc.</li></ul>
+
+<ul><li>Part of the <code>util-linux</code> package, available on all distributions</li></ul>
+
+<ul><li>For a summary, use: <code>lscpu | grep -E '^CPU\(s\)|^Model name'</code></li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>free - Display memory usage</h4>
+
+
+
+<code></code>`bash
+
+<h1>Display memory usage in human-readable format</h1>
+
+free -h
+
+
+
+<h1>Update continuously every 2 seconds</h1>
+
+free -h -s 2
+
+<code></code>`
+
+
+
+**Example output:**
+
+<code></code>`
+
+               total        used        free      shared  buff/cache   available
+
+Mem:            15Gi       4.8Gi       5.9Gi       264Mi       4.8Gi        10Gi
+
+Swap:          2.0Gi          0B       2.0Gi
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li><code>-h</code> shows sizes in human-readable format (GB, MB)</li></ul>
+
+<ul><li><code>-s</code> followed by seconds will update continuously</li></ul>
+
+<ul><li><code>available</code> column shows memory available for new applications</li></ul>
+
+<ul><li>Available on all Linux distributions</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>df - Report file system disk space usage</h4>
+
+
+
+<code></code>`bash
+
+<h1>Display disk usage in human-readable format</h1>
+
+df -h
+
+
+
+<h1>Display disk usage including file system type</h1>
+
+df -hT
+
+<code></code>`
+
+
+
+**Example output:**
+
+<code></code>`
+
+Filesystem      Size  Used Avail Use% Mounted on
+
+/dev/nvme0n1p2  457G  112G  322G  26% /
+
+/dev/nvme0n1p1  511M  5.3M  506M   2% /boot/efi
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li><code>-h</code> shows sizes in human-readable format</li></ul>
+
+<ul><li><code>-T</code> shows file system type (ext4, xfs, etc.)</li></ul>
+
+<ul><li><code>-i</code> shows inode usage instead of block usage</li></ul>
+
+<ul><li>Available on all Linux distributions</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>lsblk - List block devices</h4>
+
+
+
+<code></code>`bash
+
+<h1>List information about all block devices</h1>
+
+lsblk
+
+
+
+<h1>Show more detailed information</h1>
+
+lsblk -f
+
+<code></code>`
+
+
+
+**Example output:**
+
+<code></code>`
+
+NAME        MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+
+nvme0n1     259:0    0 476.9G  0 disk 
+
+├─nvme0n1p1 259:1    0   512M  0 part /boot/efi
+
+└─nvme0n1p2 259:2    0 476.4G  0 part /
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>Shows disk partitions, sizes, and mount points</li></ul>
+
+<ul><li><code>-f</code> shows file system type, UUID, and label</li></ul>
+
+<ul><li>Part of the <code>util-linux</code> package, available on all distributions</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>lspci - List PCI devices</h4>
+
+
+
+<code></code>`bash
+
+<h1>List all PCI devices</h1>
+
+lspci
+
+
+
+<h1>Show detailed information</h1>
+
+lspci -v
+
+<code></code>`
+
+
+
+**Example output:**
+
+<code></code>`
+
+00:00.0 Host bridge: Intel Corporation Device 9b43 (rev 05)
+
+00:02.0 VGA compatible controller: Intel Corporation CometLake-S GT2 [UHD Graphics 630] (rev 05)
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>Shows graphics cards, network adapters, and other PCI devices</li></ul>
+
+<ul><li><code>-v</code> shows more detailed information</li></ul>
+
+<ul><li><code>-k</code> shows kernel drivers handling each device</li></ul>
+
+<ul><li>Install with: <code>sudo apt install pciutils</code> if not available</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>lsusb - List USB devices</h4>
+
+
+
+<code></code>`bash
+
+<h1>List all USB devices</h1>
+
+lsusb
+
+
+
+<h1>Show detailed information</h1>
+
+lsusb -v
+
+<code></code>`
+
+
+
+**Example output:**
+
+<code></code>`
+
+Bus 002 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+
+Bus 001 Device 003: ID 046d:c52b Logitech, Inc. Unifying Receiver
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>Shows USB devices like keyboards, mice, webcams, etc.</li></ul>
+
+<ul><li><code>-v</code> shows detailed information (verbose)</li></ul>
+
+<ul><li><code>-t</code> shows devices in a tree format</li></ul>
+
+<ul><li>Install with: <code>sudo apt install usbutils</code> if not available</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>lshw - List hardware</h4>
+
+
+
+<code></code>`bash
+
+<h1>Display detailed hardware information</h1>
+
+sudo lshw
+
+
+
+<h1>Display information in a more readable format</h1>
+
+sudo lshw -short
+
+
+
+<h1>Display information about a specific hardware class</h1>
+
+sudo lshw -C network
+
+<code></code>`
+
+
+
+**Example output (short format):**
+
+<code></code>`
+
+H/W path         Device      Class       Description
+
+=================================================
+
+                             system      Computer
+
+/0                           bus         Motherboard
+
+/0/0                         processor   Intel(R) Core(TM) i7-10700 CPU @ 2.90GHz
+
+/0/0/0                       memory      128KiB L1 cache
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>Provides comprehensive hardware information</li></ul>
+
+<ul><li>Requires sudo for complete information</li></ul>
+
+<ul><li><code>-C</code> followed by class name shows specific hardware (network, disk, etc.)</li></ul>
+
+<ul><li>May not be installed by default, install with: <code>sudo apt install lshw</code></li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>inxi - System information script</h4>
+
+
+
+<code></code>`bash
+
+<h1>Display system information</h1>
+
+inxi -F
+
+
+
+<h1>Display only CPU information</h1>
+
+inxi -C
+
+<code></code>`
+
+
+
+**Example output:**
+
+<code></code>`
+
+CPU: 8-core Intel Core i7-10700 (-MT MCP-) speed/min/max: 2900/800/4800 MHz
+
+Graphics: Device-1: Intel CometLake-S GT2 [UHD Graphics 630] driver: i915 v: kernel
+
+Display: x11 server: X.Org v: 21.1.8 driver: X: loaded: modesetting dri: iris
+
+Network: Device-1: Intel Ethernet I219-V driver: e1000e
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>Provides a comprehensive system summary</li></ul>
+
+<ul><li>Not installed by default, install with: <code>sudo apt install inxi</code></li></ul>
+
+<ul><li><code>-F</code> shows full information</li></ul>
+
+<ul><li>Has specific flags for different hardware components (-C for CPU, -G for graphics, etc.)</li></ul>
+
+
+</details>
+
+
+
+<h2>File System Operations</h2>
+
+
+
+<h3>Navigation and File Management</h3>
+
+
+
+<code></code>`bash
+
+<h1>List files and directories</h1>
+
+ls -la
+
+
+
+<h1>Change directory</h1>
+
+cd /path/to/directory
+
+
+
+<h1>Print working directory</h1>
+
+pwd
+
+
+
+<h1>Create a directory</h1>
+
+mkdir directory_name
+
+
+
+<h1>Create nested directories</h1>
+
+mkdir -p parent/child/grandchild
+
+
+
+<h1>Remove a file</h1>
+
+rm filename
+
+
+
+<h1>Remove a directory</h1>
+
+rmdir directory_name
+
+
+
+<h1>Remove a directory and its contents</h1>
+
+rm -rf directory_name
+
+
+
+<h1>Copy a file</h1>
+
+cp source destination
+
+
+
+<h1>Copy a directory and its contents</h1>
+
+cp -r source_directory destination_directory
+
+
+
+<h1>Move/rename a file or directory</h1>
+
+mv source destination
+
+
+
+<h1>Create a symbolic link</h1>
+
+ln -s target_path link_name
+
+<code></code>`
+
+
+
+<h3>File Viewing and Editing</h3>
+
+
+
+<code></code>`bash
+
+<h1>View file contents</h1>
+
+cat filename
+
+
+
+<h1>View file with pagination</h1>
+
+less filename
+
+
+
+<h1>View the beginning of a file</h1>
+
+head filename
+
+
+
+<h1>View the end of a file</h1>
+
+tail filename
+
+
+
+<h1>Follow the end of a file (useful for logs)</h1>
+
+tail -f /var/log/syslog
+
+
+
+<h1>Edit a file with nano (beginner-friendly)</h1>
+
+nano filename
+
+
+
+<h1>Edit a file with vim</h1>
+
+vim filename
+
+<code></code>`
+
+
+
+<h3>File Permissions</h3>
+
+
+
+<code></code>`bash
+
+<h1>Change file permissions</h1>
+
+chmod 755 filename
+
+
+
+<h1>Change file owner</h1>
+
+chown user:group filename
+
+
+
+<h1>Change ownership recursively</h1>
+
+chown -R user:group directory
+
+
+
+<h1>Set default permissions for new files</h1>
+
+umask 022
+
+<code></code>`
+
+
+
+<h2>Process Management</h2>
+
+
+
+<code></code>`bash
+
+<h1>Display running processes</h1>
+
+ps aux
+
+
+
+<h1>Display process tree</h1>
+
+pstree
+
+
+
+<h1>Interactive process viewer</h1>
+
+top
+
+
+
+<h1>Enhanced interactive process viewer</h1>
+
+htop
+
+
+
+<h1>Kill a process by ID</h1>
+
+kill PID
+
+
+
+<h1>Kill a process by name</h1>
+
+pkill process_name
+
+
+
+<h1>Force kill a process</h1>
+
+kill -9 PID
+
+
+
+<h1>Run a process in the background</h1>
+
+command &
+
+
+
+<h1>List background jobs</h1>
+
+jobs
+
+
+
+<h1>Bring a background job to the foreground</h1>
+
+fg %job_number
+
+<code></code>`
+
+
+
+<h2>Package Management</h2>
+
+
+
+<h3>APT (Ubuntu/Debian)</h3>
+
+
+
+<code></code>`bash
+
+<h1>Update package lists</h1>
+
+sudo apt update
+
+
+
+<h1>Upgrade installed packages</h1>
+
+sudo apt upgrade
+
+
+
+<h1>Update package lists and upgrade installed packages</h1>
+
+sudo apt update && sudo apt upgrade -y
+
+
+
+<h1>Install a package</h1>
+
+sudo apt install package_name
+
+
+
+<h1>Remove a package</h1>
+
+sudo apt remove package_name
+
+
+
+<h1>Remove a package and its configuration files</h1>
+
+sudo apt purge package_name
+
+
+
+<h1>Search for a package</h1>
+
+apt search keyword
+
+
+
+<h1>Show package information</h1>
+
+apt show package_name
+
+
+
+<h1>List installed packages</h1>
+
+apt list --installed
+
+
+
+<h1>Clean up package cache</h1>
+
+sudo apt clean
+
+
+
+<h1>Remove unused dependencies</h1>
+
+sudo apt autoremove
+
+<code></code>`
+
+
+
+<h3>DPKG (Debian Package Manager)</h3>
+
+
+
+<code></code>`bash
+
+<h1>Install a .deb package file</h1>
+
+sudo dpkg -i package.deb
+
+
+
+<h1>List installed packages</h1>
+
+dpkg -l
+
+
+
+<h1>Show information about an installed package</h1>
+
+dpkg -s package_name
+
+
+
+<h1>List files installed by a package</h1>
+
+dpkg -L package_name
+
+<code></code>`
+
+
+
+<h2>Network Commands</h2>
+
+
+
+<details>
+
+<summary><strong>Network Interface Commands</strong> (Click to expand)</summary>
+
+
+
+<div class="command-card">
+
+<h4>ip - Show/manipulate routing, network devices, interfaces and tunnels</h4>
+
+
+
+<code></code>`bash
+
+<h1>Display all network interfaces with addresses</h1>
+
+ip a
+
+
+
+<h1>Display specific interface information</h1>
+
+ip a show eth0
+
+
+
+<h1>Display link status of interfaces</h1>
+
+ip link
+
+
+
+<h1>Set interface up/down</h1>
+
+sudo ip link set eth0 up
+
+sudo ip link set eth0 down
+
+
+
+<h1>Add/remove IP address to interface</h1>
+
+sudo ip addr add 192.168.1.10/24 dev eth0
+
+sudo ip addr del 192.168.1.10/24 dev eth0
+
+<code></code>`
+
+
+
+**Example output:**
+
+<code></code>`
+
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+
+    inet 127.0.0.1/8 scope host lo
+
+       valid_lft forever preferred_lft forever
+
+2: enp0s31f6: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+
+    link/ether 00:1f:c6:9c:7a:b2 brd ff:ff:ff:ff:ff:ff
+
+    inet 192.168.1.100/24 brd 192.168.1.255 scope global dynamic noprefixroute enp0s31f6
+
+       valid_lft 86389sec preferred_lft 86389sec
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>Modern replacement for <code>ifconfig</code></li></ul>
+
+<ul><li>Available on all current Linux distributions</li></ul>
+
+<ul><li>More powerful and flexible than <code>ifconfig</code></li></ul>
+
+<ul><li>Part of the <code>iproute2</code> package</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>ifconfig - Configure network interface (legacy command)</h4>
+
+
+
+<code></code>`bash
+
+<h1>Display all network interfaces</h1>
+
+ifconfig
+
+
+
+<h1>Display specific interface</h1>
+
+ifconfig eth0
+
+
+
+<h1>Set interface up/down</h1>
+
+sudo ifconfig eth0 up
+
+sudo ifconfig eth0 down
+
+
+
+<h1>Assign IP address to interface</h1>
+
+sudo ifconfig eth0 192.168.1.10 netmask 255.255.255.0
+
+<code></code>`
+
+
+
+**Example output:**
+
+<code></code>`
+
+enp0s31f6: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+
+        inet 192.168.1.100  netmask 255.255.255.0  broadcast 192.168.1.255
+
+        inet6 fe80::21f:c6ff:fe9c:7ab2  prefixlen 64  scopeid 0x20<link>
+
+        ether 00:1f:c6:9c:7a:b2  txqueuelen 1000  (Ethernet)
+
+        RX packets 8935762  bytes 12874892886 (12.8 GB)
+
+        RX errors 0  dropped 0  overruns 0  frame 0
+
+        TX packets 4543051  bytes 601736092 (601.7 MB)
+
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>Legacy command, not installed by default on newer systems</li></ul>
+
+<ul><li>Install with: <code>sudo apt install net-tools</code></li></ul>
+
+<ul><li>Use <code>ip</code> command instead on modern systems</li></ul>
+
+<ul><li>Still commonly used in scripts and documentation</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>nmcli - NetworkManager command-line tool</h4>
+
+
+
+<code></code>`bash
+
+<h1>Show all connections</h1>
+
+nmcli connection show
+
+
+
+<h1>Show active connections</h1>
+
+nmcli connection show --active
+
+
+
+<h1>Show device status</h1>
+
+nmcli device status
+
+
+
+<h1>Connect to a WiFi network</h1>
+
+nmcli device wifi connect SSID_NAME password PASSWORD
+
+
+
+<h1>Create a new connection</h1>
+
+nmcli connection add type ethernet con-name "My Connection" ifname eth0
+
+<code></code>`
+
+
+
+**Example output:**
+
+<code></code>`
+
+NAME                UUID                                  TYPE      DEVICE    
+
+Wired connection 1  8a7e034f-6a50-3c7b-9123-0d0ff8c5f503  ethernet  enp0s31f6 
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>Modern tool for managing NetworkManager connections</li></ul>
+
+<ul><li>Available on most desktop Linux distributions</li></ul>
+
+<ul><li>More user-friendly than direct configuration files</li></ul>
+
+<ul><li>Handles WiFi, Ethernet, VPN, and other connection types</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>netplan - Network configuration tool for Ubuntu</h4>
+
+
+
+<code></code>`bash
+
+<h1>Apply network configuration</h1>
+
+sudo netplan apply
+
+
+
+<h1>Generate configuration from /etc/netplan/*.yaml</h1>
+
+sudo netplan generate
+
+
+
+<h1>Try configuration without applying</h1>
+
+sudo netplan try
+
+<code></code>`
+
+
+
+**Configuration example (/etc/netplan/01-netcfg.yaml):**
+
+<code></code>`yaml
+
+network:
+
+  version: 2
+
+  renderer: networkd
+
+  ethernets:
+
+    enp0s31f6:
+
+      dhcp4: true
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>Default network configuration system on Ubuntu 18.04+</li></ul>
+
+<ul><li>Uses YAML configuration files in <code>/etc/netplan/</code></li></ul>
+
+<ul><li>Generates either systemd-networkd or NetworkManager configuration</li></ul>
+
+<ul><li>Not available on non-Ubuntu systems</li></ul>
+
+
+</details>
+
+
+
+<details>
+
+<summary><strong>Routing and Connectivity</strong> (Click to expand)</summary>
+
+
+
+<div class="command-card">
+
+<h4>ip route - Show/manipulate routing table</h4>
+
+
+
+<code></code>`bash
+
+<h1>Display routing table</h1>
+
+ip route
+
+
+
+<h1>Add static route</h1>
+
+sudo ip route add 192.168.2.0/24 via 192.168.1.1
+
+
+
+<h1>Delete route</h1>
+
+sudo ip route del 192.168.2.0/24
+
+
+
+<h1>Add default gateway</h1>
+
+sudo ip route add default via 192.168.1.1
+
+<code></code>`
+
+
+
+**Example output:**
+
+<code></code>`
+
+default via 192.168.1.1 dev enp0s31f6 proto dhcp metric 100 
+
+169.254.0.0/16 dev enp0s31f6 scope link metric 1000 
+
+192.168.1.0/24 dev enp0s31f6 proto kernel scope link src 192.168.1.100 metric 100 
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>Modern replacement for <code>route</code> command</li></ul>
+
+<ul><li>Available on all current Linux distributions</li></ul>
+
+<ul><li>Part of the <code>iproute2</code> package</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>route - Show/manipulate IP routing table (legacy command)</h4>
+
+
+
+<code></code>`bash
+
+<h1>Display routing table</h1>
+
+route -n
+
+
+
+<h1>Add static route</h1>
+
+sudo route add -net 192.168.2.0 netmask 255.255.255.0 gw 192.168.1.1
+
+
+
+<h1>Delete route</h1>
+
+sudo route del -net 192.168.2.0 netmask 255.255.255.0
+
+
+
+<h1>Add default gateway</h1>
+
+sudo route add default gw 192.168.1.1
+
+<code></code>`
+
+
+
+**Example output:**
+
+<code></code>`
+
+Kernel IP routing table
+
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+
+0.0.0.0         192.168.1.1     0.0.0.0         UG    100    0        0 enp0s31f6
+
+169.254.0.0     0.0.0.0         255.255.0.0     U     1000   0        0 enp0s31f6
+
+192.168.1.0     0.0.0.0         255.255.255.0   U     100    0        0 enp0s31f6
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>Legacy command, not installed by default on newer systems</li></ul>
+
+<ul><li>Install with: <code>sudo apt install net-tools</code></li></ul>
+
+<ul><li>Use <code>ip route</code> instead on modern systems</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>ping - Send ICMP ECHO_REQUEST to network hosts</h4>
+
+
+
+<code></code>`bash
+
+<h1>Basic ping</h1>
+
+ping google.com
+
+
+
+<h1>Limit to specific number of packets</h1>
+
+ping -c 4 google.com
+
+
+
+<h1>Specify interval between packets (in seconds)</h1>
+
+ping -i 2 google.com
+
+
+
+<h1>Ping with larger packet size</h1>
+
+ping -s 1500 google.com
+
+<code></code>`
+
+
+
+**Example output:**
+
+<code></code>`
+
+PING google.com (142.250.185.78) 56(84) bytes of data.
+
+64 bytes from muc11s18-in-f14.1e100.net (142.250.185.78): icmp_seq=1 ttl=118 time=10.8 ms
+
+64 bytes from muc11s18-in-f14.1e100.net (142.250.185.78): icmp_seq=2 ttl=118 time=10.7 ms
+
+64 bytes from muc11s18-in-f14.1e100.net (142.250.185.78): icmp_seq=3 ttl=118 time=10.9 ms
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>Available on all Linux distributions</li></ul>
+
+<ul><li>Useful for testing basic network connectivity</li></ul>
+
+<ul><li>Press Ctrl+C to stop continuous pinging</li></ul>
+
+<ul><li>Some networks block ICMP packets, so ping may not work everywhere</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>traceroute - Print the route packets trace to network host</h4>
+
+
+
+<code></code>`bash
+
+<h1>Trace route to host</h1>
+
+traceroute google.com
+
+
+
+<h1>Use TCP SYN for probes</h1>
+
+traceroute -T google.com
+
+
+
+<h1>Specify number of probes per hop</h1>
+
+traceroute -q 1 google.com
+
+<code></code>`
+
+
+
+**Example output:**
+
+<code></code>`
+
+traceroute to google.com (142.250.185.78), 30 hops max, 60 byte packets
+
+ 1  _gateway (192.168.1.1)  0.226 ms  0.271 ms  0.305 ms
+
+ 2  10.0.0.1 (10.0.0.1)  10.432 ms  10.468 ms  10.501 ms
+
+ 3  * * *
+
+ 4  * * *
+
+ 5  142.250.185.78 (142.250.185.78)  10.765 ms  10.798 ms  10.830 ms
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>May not be installed by default, install with: <code>sudo apt install traceroute</code></li></ul>
+
+<ul><li>Alternative: <code>mtr</code> (My Traceroute) combines ping and traceroute</li></ul>
+
+<ul><li>Some networks block traceroute packets</li></ul>
+
+<ul><li>Asterisks (*) indicate no response from that hop</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>mtr - Network diagnostic tool combining ping and traceroute</h4>
+
+
+
+<code></code>`bash
+
+<h1>Run mtr in terminal mode</h1>
+
+mtr google.com
+
+
+
+<h1>Generate a report (10 packets per hop)</h1>
+
+mtr --report -c 10 google.com
+
+
+
+<h1>Use TCP instead of ICMP</h1>
+
+mtr --tcp google.com
+
+<code></code>`
+
+
+
+**Example output:**
+
+<code></code>`
+
+                                       My traceroute  [v0.95]
+
+workstation (192.168.1.100)                                   2024-06-21T15:12:32+0200
+
+Keys:  Help   Display mode   Restart statistics   Order of fields   quit
+
+                                           Packets               Pings
+
+ Host                                    Loss%   Snt   Last   Avg  Best  Wrst StDev
+
+ 1. _gateway                              0.0%    10    0.3   0.3   0.3   0.4   0.0
+
+ 2. 10.0.0.1                              0.0%    10   10.4  10.5  10.3  10.7   0.1
+
+ 3. ???                                  100.0    10    0.0   0.0   0.0   0.0   0.0
+
+ 4. ???                                  100.0    10    0.0   0.0   0.0   0.0   0.0
+
+ 5. muc11s18-in-f14.1e100.net             0.0%    10   10.8  10.8  10.7  11.0   0.1
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>May not be installed by default, install with: <code>sudo apt install mtr</code></li></ul>
+
+<ul><li>More informative than traceroute alone</li></ul>
+
+<ul><li>Shows packet loss and latency statistics</li></ul>
+
+<ul><li>Run with sudo for more accurate results</li></ul>
+
+
+</details>
+
+
+
+<details>
+
+<summary><strong>Network Diagnostics and DNS</strong> (Click to expand)</summary>
+
+
+
+<div class="command-card">
+
+<h4>netstat - Network statistics (legacy command)</h4>
+
+
+
+<code></code>`bash
+
+<h1>Display all listening TCP and UDP ports</h1>
+
+netstat -tuln
+
+
+
+<h1>Display all connections with process information</h1>
+
+sudo netstat -tulpn
+
+
+
+<h1>Display routing table</h1>
+
+netstat -r
+
+
+
+<h1>Display network interface statistics</h1>
+
+netstat -i
+
+<code></code>`
+
+
+
+**Example output:**
+
+<code></code>`
+
+Active Internet connections (only servers)
+
+Proto Recv-Q Send-Q Local Address           Foreign Address         State      
+
+tcp        0      0 127.0.0.1:631           0.0.0.0:*               LISTEN     
+
+tcp        0      0 127.0.0.1:5432          0.0.0.0:*               LISTEN     
+
+tcp6       0      0 ::1:631                 :::*                    LISTEN     
+
+udp        0      0 0.0.0.0:5353            0.0.0.0:*                          
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>Legacy command, not installed by default on newer systems</li></ul>
+
+<ul><li>Install with: <code>sudo apt install net-tools</code></li></ul>
+
+<ul><li>Use <code>ss</code> instead on modern systems</li></ul>
+
+<ul><li>Options: <code>-t</code> (TCP), <code>-u</code> (UDP), <code>-l</code> (listening), <code>-n</code> (numeric), <code>-p</code> (processes)</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>ss - Socket statistics</h4>
+
+
+
+<code></code>`bash
+
+<h1>Display all listening TCP and UDP ports</h1>
+
+ss -tuln
+
+
+
+<h1>Display all connections with process information</h1>
+
+sudo ss -tulpn
+
+
+
+<h1>Display detailed socket information</h1>
+
+ss -i
+
+
+
+<h1>Display summary statistics</h1>
+
+ss -s
+
+<code></code>`
+
+
+
+**Example output:**
+
+<code></code>`
+
+Netid  State   Recv-Q  Send-Q   Local Address:Port    Peer Address:Port  Process                                                  
+
+udp    UNCONN  0       0            0.0.0.0:5353         0.0.0.0:*                                                                
+
+udp    UNCONN  0       0            0.0.0.0:323          0.0.0.0:*                                                                
+
+tcp    LISTEN  0       4096       127.0.0.1:631          0.0.0.0:*                                                                
+
+tcp    LISTEN  0       128        127.0.0.1:5432         0.0.0.0:*                                                                
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>Modern replacement for <code>netstat</code></li></ul>
+
+<ul><li>Available on all current Linux distributions</li></ul>
+
+<ul><li>Faster and more feature-rich than <code>netstat</code></li></ul>
+
+<ul><li>Same basic options as <code>netstat</code>: <code>-t</code> (TCP), <code>-u</code> (UDP), <code>-l</code> (listening), etc.</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>nslookup - Query DNS records</h4>
+
+
+
+<code></code>`bash
+
+<h1>Basic DNS lookup</h1>
+
+nslookup example.com
+
+
+
+<h1>Query specific DNS server</h1>
+
+nslookup example.com 8.8.8.8
+
+
+
+<h1>Lookup specific record type</h1>
+
+nslookup -type=MX example.com
+
+
+
+<h1>Reverse DNS lookup</h1>
+
+nslookup 8.8.8.8
+
+<code></code>`
+
+
+
+**Example output:**
+
+<code></code>`
+
+Server:		127.0.0.53
+
+Address:	127.0.0.53#53
+
+
+
+Non-authoritative answer:
+
+Name:	example.com
+
+Address: 93.184.216.34
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>Available on most Linux distributions</li></ul>
+
+<ul><li>Simple tool for basic DNS queries</li></ul>
+
+<ul><li>Interactive mode available by running <code>nslookup</code> without arguments</li></ul>
+
+<ul><li>Being replaced by <code>dig</code> in many contexts</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>dig - DNS lookup utility</h4>
+
+
+
+<code></code>`bash
+
+<h1>Basic DNS lookup</h1>
+
+dig example.com
+
+
+
+<h1>Query specific DNS server</h1>
+
+dig @8.8.8.8 example.com
+
+
+
+<h1>Lookup specific record type</h1>
+
+dig example.com MX
+
+
+
+<h1>Reverse DNS lookup</h1>
+
+dig -x 8.8.8.8
+
+
+
+<h1>Short answer format</h1>
+
+dig example.com +short
+
+<code></code>`
+
+
+
+**Example output:**
+
+<code></code>`
+
+; <<>> DiG 9.18.18-0ubuntu0.24.04.1 <<>> example.com
+
+;; global options: +cmd
+
+;; Got answer:
+
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 39772
+
+;; flags: qr rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1
+
+
+
+;; OPT PSEUDOSECTION:
+
+; EDNS: version: 0, flags:; udp: 65494
+
+;; QUESTION SECTION:
+
+;example.com.			IN	A
+
+
+
+;; ANSWER SECTION:
+
+example.com.		86400	IN	A	93.184.216.34
+
+
+
+;; Query time: 0 msec
+
+;; SERVER: 127.0.0.53#53(127.0.0.53) (UDP)
+
+;; WHEN: Fri Jun 21 15:20:45 CEST 2024
+
+;; MSG SIZE  rcvd: 56
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>May not be installed by default, install with: <code>sudo apt install dnsutils</code></li></ul>
+
+<ul><li>More powerful and flexible than <code>nslookup</code></li></ul>
+
+<ul><li>Provides detailed information about DNS queries</li></ul>
+
+<ul><li>Preferred tool for DNS troubleshooting</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>host - DNS lookup utility</h4>
+
+
+
+<code></code>`bash
+
+<h1>Basic DNS lookup</h1>
+
+host example.com
+
+
+
+<h1>Lookup specific record type</h1>
+
+host -t MX example.com
+
+
+
+<h1>Reverse DNS lookup</h1>
+
+host 8.8.8.8
+
+
+
+<h1>Verbose output</h1>
+
+host -v example.com
+
+<code></code>`
+
+
+
+**Example output:**
+
+<code></code>`
+
+example.com has address 93.184.216.34
+
+example.com has IPv6 address 2606:2800:220:1:248:1893:25c8:1946
+
+example.com mail is handled by 0 .
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>May not be installed by default, install with: <code>sudo apt install dnsutils</code></li></ul>
+
+<ul><li>Simpler output format than <code>dig</code></li></ul>
+
+<ul><li>Good middle ground between <code>nslookup</code> and <code>dig</code></li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>hostname - Show or set system hostname</h4>
+
+
+
+<code></code>`bash
+
+<h1>Display hostname</h1>
+
+hostname
+
+
+
+<h1>Display all IP addresses</h1>
+
+hostname -I
+
+
+
+<h1>Display FQDN (Fully Qualified Domain Name)</h1>
+
+hostname -f
+
+
+
+<h1>Display domain name</h1>
+
+hostname -d
+
+<code></code>`
+
+
+
+**Example output:**
+
+<code></code>`
+
+workstation
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>Available on all Linux distributions</li></ul>
+
+<ul><li><code>-I</code> option is particularly useful for getting all IP addresses</li></ul>
+
+<ul><li>To permanently change hostname, edit <code>/etc/hostname</code></li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>ip neighbor - Manage ARP cache</h4>
+
+
+
+<code></code>`bash
+
+<h1>Show ARP cache (neighbor table)</h1>
+
+ip neighbor show
+
+
+
+<h1>Add static ARP entry</h1>
+
+sudo ip neighbor add 192.168.1.5 lladdr 00:11:22:33:44:55 dev eth0
+
+
+
+<h1>Delete ARP entry</h1>
+
+sudo ip neighbor del 192.168.1.5 dev eth0
+
+<code></code>`
+
+
+
+**Example output:**
+
+<code></code>`
+
+192.168.1.1 dev enp0s31f6 lladdr 00:11:22:33:44:55 REACHABLE
+
+192.168.1.5 dev enp0s31f6 lladdr 00:1a:2b:3c:4d:5e STALE
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>Modern replacement for <code>arp</code> command</li></ul>
+
+<ul><li>Available on all current Linux distributions</li></ul>
+
+<ul><li>Part of the <code>iproute2</code> package</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>arp - Manipulate ARP cache (legacy command)</h4>
+
+
+
+<code></code>`bash
+
+<h1>Display ARP cache</h1>
+
+arp -n
+
+
+
+<h1>Add static ARP entry</h1>
+
+sudo arp -s 192.168.1.5 00:11:22:33:44:55
+
+
+
+<h1>Delete ARP entry</h1>
+
+sudo arp -d 192.168.1.5
+
+<code></code>`
+
+
+
+**Example output:**
+
+<code></code>`
+
+Address                  HWtype  HWaddress           Flags Mask            Iface
+
+192.168.1.1              ether   00:11:22:33:44:55   C                     enp0s31f6
+
+192.168.1.5              ether   00:1a:2b:3c:4d:5e   C                     enp0s31f6
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>Legacy command, not installed by default on newer systems</li></ul>
+
+<ul><li>Install with: <code>sudo apt install net-tools</code></li></ul>
+
+<ul><li>Use <code>ip neighbor</code> instead on modern systems</li></ul>
+
+
+</details>
+
+
+
+<details>
+
+<summary><strong>Network Configuration</strong> (Click to expand)</summary>
+
+
+
+<div class="command-card">
+
+<h4>Network Configuration Files</h4>
+
+
+
+**Ubuntu 18.04+ (Netplan):**
+
+<code></code>`bash
+
+<h1>Edit Netplan configuration</h1>
+
+sudo nano /etc/netplan/01-netcfg.yaml
+
+
+
+<h1>Apply changes</h1>
+
+sudo netplan apply
+
+<code></code>`
+
+
+
+**Example configuration:**
+
+<code></code>`yaml
+
+network:
+
+  version: 2
+
+  renderer: networkd
+
+  ethernets:
+
+    enp0s31f6:
+
+      dhcp4: no
+
+      addresses: [192.168.1.100/24]
+
+      gateway4: 192.168.1.1
+
+      nameservers:
+
+        addresses: [8.8.8.8, 8.8.4.4]
+
+<code></code>`
+
+
+
+**Older Ubuntu/Debian:**
+
+<code></code>`bash
+
+<h1>Edit interfaces file</h1>
+
+sudo nano /etc/network/interfaces
+
+
+
+<h1>Restart networking</h1>
+
+sudo systemctl restart networking
+
+<code></code>`
+
+
+
+**Example configuration:**
+
+<code></code>`
+
+auto eth0
+
+iface eth0 inet static
+
+    address 192.168.1.100
+
+    netmask 255.255.255.0
+
+    gateway 192.168.1.1
+
+    dns-nameservers 8.8.8.8 8.8.4.4
+
+<code></code>`
+
+
+
+**DNS Configuration:**
+
+<code></code>`bash
+
+<h1>Edit resolv.conf (may be overwritten by network manager)</h1>
+
+sudo nano /etc/resolv.conf
+
+
+
+<h1>For persistent DNS on Ubuntu/Debian</h1>
+
+sudo nano /etc/systemd/resolved.conf
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>Configuration methods vary by distribution and version</li></ul>
+
+<ul><li>Netplan is used on Ubuntu 18.04 and newer</li></ul>
+
+<ul><li>Traditional <code>/etc/network/interfaces</code> on older systems</li></ul>
+
+<ul><li>NetworkManager is often used on desktop systems</li></ul>
+
+<ul><li>systemd-networkd is often used on server systems</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>Network Restart Commands</h4>
+
+
+
+<code></code>`bash
+
+<h1>Restart networking with systemd</h1>
+
+sudo systemctl restart networking
+
+
+
+<h1>Restart NetworkManager</h1>
+
+sudo systemctl restart NetworkManager
+
+
+
+<h1>Restart specific interface</h1>
+
+sudo ip link set eth0 down
+
+sudo ip link set eth0 up
+
+
+
+<h1>Restart all interfaces (older method)</h1>
+
+sudo ifdown -a && sudo ifup -a
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>Method depends on your network configuration system</li></ul>
+
+<ul><li>For Netplan, use <code>sudo netplan apply</code></li></ul>
+
+<ul><li>For NetworkManager, use <code>sudo systemctl restart NetworkManager</code></li></ul>
+
+<ul><li>For systemd-networkd, use <code>sudo systemctl restart systemd-networkd</code></li></ul>
+
+<ul><li>Interface-specific restarts are often safer than restarting all networking</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>iwconfig - Configure wireless network interfaces (legacy command)</h4>
+
+
+
+<code></code>`bash
+
+<h1>Display wireless interfaces</h1>
+
+iwconfig
+
+
+
+<h1>Set wireless interface essid (network name)</h1>
+
+sudo iwconfig wlan0 essid "MyNetwork"
+
+
+
+<h1>Set wireless interface key (password)</h1>
+
+sudo iwconfig wlan0 key s:password
+
+
+
+<h1>Set wireless interface mode</h1>
+
+sudo iwconfig wlan0 mode Managed
+
+<code></code>`
+
+
+
+**Example output:**
+
+<code></code>`
+
+wlan0     IEEE 802.11  ESSID:"MyNetwork"  
+
+          Mode:Managed  Frequency:2.412 GHz  Access Point: 00:11:22:33:44:55   
+
+          Bit Rate=54 Mb/s   Tx-Power=15 dBm   
+
+          Retry short limit:7   RTS thr:off   Fragment thr:off
+
+          Power Management:on
+
+          Link Quality=70/70  Signal level=-38 dBm  
+
+          Rx invalid nwid:0  Rx invalid crypt:0  Rx invalid frag:0
+
+          Tx excessive retries:0  Invalid misc:0   Missed beacon:0
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>Legacy command, not installed by default on newer systems</li></ul>
+
+<ul><li>Install with: <code>sudo apt install wireless-tools</code></li></ul>
+
+<ul><li>Use <code>iw</code> or NetworkManager tools instead on modern systems</li></ul>
+
+<ul><li>Still useful for basic wireless diagnostics</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>iw - Configure wireless devices</h4>
+
+
+
+<code></code>`bash
+
+<h1>List wireless devices</h1>
+
+iw dev
+
+
+
+<h1>Scan for available networks</h1>
+
+sudo iw dev wlan0 scan | grep SSID
+
+
+
+<h1>Connect to network (WPA/WPA2 requires wpa_supplicant)</h1>
+
+sudo iw dev wlan0 connect "MyNetwork"
+
+
+
+<h1>Show link information</h1>
+
+iw dev wlan0 link
+
+<code></code>`
+
+
+
+**Example output:**
+
+<code></code>`
+
+Interface wlan0
+
+	ifindex 3
+
+	wdev 0x1
+
+	addr 00:11:22:33:44:55
+
+	type managed
+
+	channel 1 (2412 MHz), width: 20 MHz, center1: 2412 MHz
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>Modern replacement for <code>iwconfig</code></li></ul>
+
+<ul><li>May not be installed by default, install with: <code>sudo apt install iw</code></li></ul>
+
+<ul><li>Low-level tool, typically used with <code>wpa_supplicant</code></li></ul>
+
+<ul><li>For most users, NetworkManager is easier to use</li></ul>
+
+
+</details>
+
+
+
+<h2>Service Management (systemd)</h2>
+
+
+
+<code></code>`bash
+
+<h1>Start a service</h1>
+
+sudo systemctl start service_name
+
+
+
+<h1>Stop a service</h1>
+
+sudo systemctl stop service_name
+
+
+
+<h1>Restart a service</h1>
+
+sudo systemctl restart service_name
+
+
+
+<h1>Enable a service to start at boot</h1>
+
+sudo systemctl enable service_name
+
+
+
+<h1>Disable a service from starting at boot</h1>
+
+sudo systemctl disable service_name
+
+
+
+<h1>Check service status</h1>
+
+sudo systemctl status service_name
+
+
+
+<h1>List all services</h1>
+
+systemctl list-units --type=service
+
+
+
+<h1>View service logs</h1>
+
+sudo journalctl -u service_name
+
+
+
+<h1>View recent service logs</h1>
+
+sudo journalctl -u service_name -n 50
+
+
+
+<h1>Follow service logs</h1>
+
+sudo journalctl -u service_name -f
+
+<code></code>`
+
+
+
+<h2>User Management</h2>
+
+
+
+<code></code>`bash
+
+<h1>Add a new user</h1>
+
+sudo adduser username
+
+
+
+<h1>Add a user to a group</h1>
+
+sudo usermod -aG group username
+
+
+
+<h1>Change user password</h1>
+
+sudo passwd username
+
+
+
+<h1>Delete a user</h1>
+
+sudo deluser username
+
+
+
+<h1>Delete a user and their home directory</h1>
+
+sudo deluser --remove-home username
+
+
+
+<h1>Switch to another user</h1>
+
+su - username
+
+
+
+<h1>Run a command as another user</h1>
+
+sudo -u username command
+
+
+
+<h1>List all users</h1>
+
+cat /etc/passwd
+
+
+
+<h1>List all groups</h1>
+
+cat /etc/group
+
+<code></code>`
+
+
+
+<h2>File Searching</h2>
+
+
+
+<code></code>`bash
+
+<h1>Find files by name</h1>
+
+find /path/to/search -name "filename"
+
+
+
+<h1>Find files by type</h1>
+
+find /path/to/search -type f  # files
+
+find /path/to/search -type d  # directories
+
+
+
+<h1>Find files by size</h1>
+
+find /path/to/search -size +10M  # larger than 10MB
+
+find /path/to/search -size -10M  # smaller than 10MB
+
+
+
+<h1>Find files by modification time</h1>
+
+find /path/to/search -mtime -7  # modified in the last 7 days
+
+
+
+<h1>Find and execute a command on each file</h1>
+
+find /path/to/search -name "*.log" -exec rm {} \;
+
+
+
+<h1>Search for text in files</h1>
+
+grep "search_text" filename
+
+grep -r "search_text" /path/to/search  # recursive search
+
+<code></code>`
+
+
+
+<h2>Disk Management</h2>
+
+
+
+<code></code>`bash
+
+<h1>List block devices</h1>
+
+lsblk
+
+
+
+<h1>Display disk usage</h1>
+
+df -h
+
+
+
+<h1>Display directory space usage</h1>
+
+du -sh /path/to/directory
+
+
+
+<h1>Check disk for errors</h1>
+
+sudo fsck /dev/sdXY
+
+
+
+<h1>Mount a filesystem</h1>
+
+sudo mount /dev/sdXY /mnt/mountpoint
+
+
+
+<h1>Unmount a filesystem</h1>
+
+sudo umount /mnt/mountpoint
+
+
+
+<h1>Show mounted filesystems</h1>
+
+mount
+
+
+
+<h1>Create a partition table</h1>
+
+sudo fdisk /dev/sdX
+
+
+
+<h1>Format a partition</h1>
+
+sudo mkfs.ext4 /dev/sdXY  # ext4 filesystem
+
+sudo mkfs.xfs /dev/sdXY   # XFS filesystem
+
+
+
+<h1>Check SMART status of a disk</h1>
+
+sudo smartctl -a /dev/sdX
+
+<code></code>`
+
+
+
+<h2>Proxmox-Specific Commands</h2>
+
+
+
+<code></code>`bash
+
+<h1>List virtual machines</h1>
+
+qm list
+
+
+
+<h1>Start a virtual machine</h1>
+
+qm start VM_ID
+
+
+
+<h1>Stop a virtual machine</h1>
+
+qm stop VM_ID
+
+
+
+<h1>Shutdown a virtual machine (graceful)</h1>
+
+qm shutdown VM_ID
+
+
+
+<h1>Reset a virtual machine</h1>
+
+qm reset VM_ID
+
+
+
+<h1>Create a snapshot</h1>
+
+qm snapshot VM_ID SNAPSHOT_NAME
+
+
+
+<h1>List snapshots</h1>
+
+qm listsnapshot VM_ID
+
+
+
+<h1>Restore a snapshot</h1>
+
+qm rollback VM_ID SNAPSHOT_NAME
+
+
+
+<h1>List containers</h1>
+
+pct list
+
+
+
+<h1>Start a container</h1>
+
+pct start CT_ID
+
+
+
+<h1>Stop a container</h1>
+
+pct stop CT_ID
+
+
+
+<h1>Enter a container shell</h1>
+
+pct enter CT_ID
+
+
+
+<h1>Show Proxmox cluster status</h1>
+
+pvecm status
+
+
+
+<h1>Show storage information</h1>
+
+pvesm status
+
+
+
+<h1>Show node status</h1>
+
+pvenode status
+
+<code></code>`
+
+
+
+<h2>Log Files</h2>
+
+
+
+<code></code>`bash
+
+<h1>View system logs</h1>
+
+less /var/log/syslog
+
+
+
+<h1>View authentication logs</h1>
+
+less /var/log/auth.log
+
+
+
+<h1>View kernel logs</h1>
+
+dmesg | less
+
+
+
+<h1>View boot logs</h1>
+
+journalctl -b
+
+
+
+<h1>View service-specific logs</h1>
+
+journalctl -u service_name
+
+
+
+<h1>View Apache access logs</h1>
+
+less /var/log/apache2/access.log
+
+
+
+<h1>View Apache error logs</h1>
+
+less /var/log/apache2/error.log
+
+
+
+<h1>View Nginx access logs</h1>
+
+less /var/log/nginx/access.log
+
+
+
+<h1>View Nginx error logs</h1>
+
+less /var/log/nginx/error.log
+
+<code></code>`
+
+
+
+<h2>Compression and Archiving</h2>
+
+
+
+<code></code>`bash
+
+<h1>Create a tar archive</h1>
+
+tar -cvf archive.tar files_or_directories
+
+
+
+<h1>Create a compressed tar archive (gzip)</h1>
+
+tar -czvf archive.tar.gz files_or_directories
+
+
+
+<h1>Create a compressed tar archive (bzip2)</h1>
+
+tar -cjvf archive.tar.bz2 files_or_directories
+
+
+
+<h1>Extract a tar archive</h1>
+
+tar -xvf archive.tar
+
+
+
+<h1>Extract a compressed tar archive (gzip or bzip2)</h1>
+
+tar -xvf archive.tar.gz
+
+tar -xvf archive.tar.bz2
+
+
+
+<h1>Zip files</h1>
+
+zip -r archive.zip files_or_directories
+
+
+
+<h1>Unzip files</h1>
+
+unzip archive.zip
+
+<code></code>`
+
+
+
+<h2>System Monitoring</h2>
+
+
+
+<code></code>`bash
+
+<h1>Display system resource usage</h1>
+
+top
+
+
+
+<h1>Enhanced system monitor</h1>
+
+htop
+
+
+
+<h1>Display I/O statistics</h1>
+
+iostat
+
+
+
+<h1>Display CPU statistics</h1>
+
+mpstat
+
+
+
+<h1>Display memory statistics</h1>
+
+vmstat
+
+
+
+<h1>Display network statistics</h1>
+
+netstat -s
+
+
+
+<h1>Continuous monitoring of system resources</h1>
+
+sar
+
+
+
+<h1>Monitor file system events</h1>
+
+inotifywait -m /path/to/monitor
+
+<code></code>`
+
+
+
+<h2>Firewall Management (UFW)</h2>
+
+
+
+<code></code>`bash
+
+<h1>Check firewall status</h1>
+
+sudo ufw status
+
+
+
+<h1>Enable firewall</h1>
+
+sudo ufw enable
+
+
+
+<h1>Disable firewall</h1>
+
+sudo ufw disable
+
+
+
+<h1>Allow a port</h1>
+
+sudo ufw allow 22/tcp
+
+
+
+<h1>Allow a service by name</h1>
+
+sudo ufw allow ssh
+
+
+
+<h1>Deny a port</h1>
+
+sudo ufw deny 3306/tcp
+
+
+
+<h1>Delete a rule</h1>
+
+sudo ufw delete allow 22/tcp
+
+
+
+<h1>Allow from specific IP address</h1>
+
+sudo ufw allow from 192.168.1.100
+
+
+
+<h1>Allow from IP to specific port</h1>
+
+sudo ufw allow from 192.168.1.100 to any port 22
+
+<code></code>`
+
+
+
+<h2>Troubleshooting</h2>
+
+
+
+<code></code>`bash
+
+<h1>Check system resource usage</h1>
+
+htop
+
+
+
+<h1>Check disk space</h1>
+
+df -h
+
+
+
+<h1>Check memory usage</h1>
+
+free -h
+
+
+
+<h1>Check for errors in system logs</h1>
+
+grep -i error /var/log/syslog
+
+
+
+<h1>Check for failed services</h1>
+
+systemctl --failed
+
+
+
+<h1>Check network connectivity</h1>
+
+ping google.com
+
+
+
+<h1>Check DNS resolution</h1>
+
+nslookup example.com
+
+
+
+<h1>Check open ports</h1>
+
+sudo netstat -tulpn
+
+
+
+<h1>Check running processes</h1>
+
+ps aux | grep process_name
+
+
+
+<h1>Check system load</h1>
+
+uptime
+
+
+
+<h1>Check for zombie processes</h1>
+
+ps aux | grep Z
+
+<code></code>`
+
+
+
+<h2>Server Room Management</h2>
+
+
+
+<details>
+
+<summary><strong>Proxmox Server Room Management</strong> (Click to expand)</summary>
+
+
+
+<div class="command-card">
+
+<h4>Proxmox Cluster Management</h4>
+
+
+
+<code></code>`bash
+
+<h1>Display cluster status</h1>
+
+pvecm status
+
+
+
+<h1>List cluster nodes</h1>
+
+pvecm nodes
+
+
+
+<h1>Add a node to the cluster</h1>
+
+pvecm add IP_OF_CLUSTER_MASTER
+
+
+
+<h1>Remove a node from the cluster</h1>
+
+pvecm delnode NODENAME
+
+
+
+<h1>Check cluster configuration</h1>
+
+pvecm config
+
+<code></code>`
+
+
+
+**Example output (pvecm status):**
+
+<code></code>`
+
+Cluster information
+
+------------------
+
+Name:             proxmox-cluster
+
+Config Version:   3
+
+Transport:        knet
+
+Secure auth:      on
+
+
+
+Quorum information
+
+------------------
+
+Date:             Fri Jun 21 15:45:32 2024
+
+Quorum provider:  corosync_votequorum
+
+Nodes:            3
+
+Node ID:          0x00000001
+
+Ring ID:          1.345
+
+Quorate:          Yes
+
+
+
+Votequorum information
+
+----------------------
+
+Expected votes:   3
+
+Highest expected: 3
+
+Total votes:      3
+
+Quorum:           2
+
+Flags:            Quorate
+
+
+
+Membership information
+
+----------------------
+
+    Nodeid      Votes Name
+
+0x00000001          1 pve1 (local)
+
+0x00000002          1 pve2
+
+0x00000003          1 pve3
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li><code>pvecm</code> is the Proxmox Cluster Manager command</li></ul>
+
+<ul><li>Requires Proxmox VE installation</li></ul>
+
+<ul><li>Cluster setup requires at least 3 nodes for proper quorum</li></ul>
+
+<ul><li>Cluster communication uses a dedicated network interface</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>Proxmox Virtual Machine Management</h4>
+
+
+
+<code></code>`bash
+
+<h1>List all virtual machines</h1>
+
+qm list
+
+
+
+<h1>Start a virtual machine</h1>
+
+qm start VM_ID
+
+
+
+<h1>Stop a virtual machine (hard stop)</h1>
+
+qm stop VM_ID
+
+
+
+<h1>Shutdown a virtual machine (graceful)</h1>
+
+qm shutdown VM_ID
+
+
+
+<h1>Reset a virtual machine</h1>
+
+qm reset VM_ID
+
+
+
+<h1>Create a snapshot</h1>
+
+qm snapshot VM_ID SNAPSHOT_NAME
+
+
+
+<h1>List snapshots</h1>
+
+qm listsnapshot VM_ID
+
+
+
+<h1>Restore a snapshot</h1>
+
+qm rollback VM_ID SNAPSHOT_NAME
+
+
+
+<h1>Clone a virtual machine</h1>
+
+qm clone VM_ID NEW_VM_ID --name NEW_NAME
+
+
+
+<h1>Migrate a VM to another node</h1>
+
+qm migrate VM_ID TARGET_NODE
+
+<code></code>`
+
+
+
+**Example output (qm list):**
+
+<code></code>`
+
+VMID NAME                 STATUS     MEM(MB)    BOOTDISK(GB) PID       
+
+101  web-server           running    2048       32           1234      
+
+102  database-server      running    4096       64           5678      
+
+103  backup-server        stopped    2048       32           -         
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li><code>qm</code> is the QEMU/KVM virtual machine manager command</li></ul>
+
+<ul><li>VM_ID is a unique identifier for each virtual machine</li></ul>
+
+<ul><li>Snapshots are point-in-time copies of VM state</li></ul>
+
+<ul><li>Live migration requires shared storage between nodes</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>Proxmox Container Management</h4>
+
+
+
+<code></code>`bash
+
+<h1>List all containers</h1>
+
+pct list
+
+
+
+<h1>Start a container</h1>
+
+pct start CT_ID
+
+
+
+<h1>Stop a container</h1>
+
+pct stop CT_ID
+
+
+
+<h1>Create a container from template</h1>
+
+pct create CT_ID /var/lib/vz/template/cache/debian-11-standard_11.3-1_amd64.tar.zst \
+
+  -hostname container1 \
+
+  -net0 name=eth0,bridge=vmbr0,ip=dhcp \
+
+  -storage local-lvm
+
+
+
+<h1>Enter a container shell</h1>
+
+pct enter CT_ID
+
+
+
+<h1>Backup a container</h1>
+
+vzdump CT_ID
+
+
+
+<h1>Restore a container backup</h1>
+
+pzrestore /var/lib/vz/dump/vzdump-lxc-CT_ID.tar.gz NEW_CT_ID \
+
+  --storage local-lvm
+
+<code></code>`
+
+
+
+**Example output (pct list):**
+
+<code></code>`
+
+VMID       Status     Lock         Name                
+
+100        running                 container1          
+
+101        stopped                 container2          
+
+102        running                 container3          
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li><code>pct</code> is the Proxmox Container Toolkit command</li></ul>
+
+<ul><li>Containers are more lightweight than full VMs</li></ul>
+
+<ul><li>Container templates are available for various Linux distributions</li></ul>
+
+<ul><li>Containers share the host kernel but have isolated userspace</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>Proxmox Storage Management</h4>
+
+
+
+<code></code>`bash
+
+<h1>List storage pools</h1>
+
+pvesm status
+
+
+
+<h1>Show storage content</h1>
+
+pvesm content STORAGE_ID
+
+
+
+<h1>Allocate disk image</h1>
+
+pvesm alloc STORAGE_ID VM_ID disk-0 10G
+
+
+
+<h1>Import disk image</h1>
+
+pvesm import STORAGE_ID ISO_FILE
+
+
+
+<h1>Create a new storage pool (ZFS)</h1>
+
+pvesm add zfspool zfs-pool -pool rpool/data
+
+
+
+<h1>Create a new storage pool (LVM)</h1>
+
+pvesm add lvmthin lvm-thin -thinpool data -vgname pve
+
+<code></code>`
+
+
+
+**Example output (pvesm status):**
+
+<code></code>`
+
+Name             Type     Status       Total       Used    Available       %
+
+local             dir     active    458.64 GB  112.25 GB    346.39 GB  24.47%
+
+local-lvm       lvmthin   active    344.62 GB   44.87 GB    299.75 GB  13.02%
+
+local-zfs         zfs     active     1.36 TB   238.14 GB      1.13 TB  17.09%
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li><code>pvesm</code> is the Proxmox Storage Manager command</li></ul>
+
+<ul><li>Different storage types have different capabilities</li></ul>
+
+<ul><li>ZFS provides advanced features like snapshots and compression</li></ul>
+
+<ul><li>LVM thin provisioning allows overcommitting storage</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>Proxmox Network Management</h4>
+
+
+
+<code></code>`bash
+
+<h1>Show network configuration</h1>
+
+cat /etc/network/interfaces
+
+
+
+<h1>Create a bridge for VM networking</h1>
+
+cat >> /etc/network/interfaces << EOF
+
+auto vmbr1
+
+iface vmbr1 inet static
+
+    address 10.10.10.1/24
+
+    bridge_ports none
+
+    bridge_stp off
+
+    bridge_fd 0
+
+EOF
+
+
+
+<h1>Apply network changes</h1>
+
+systemctl restart networking
+
+
+
+<h1>Show bridge information</h1>
+
+brctl show
+
+
+
+<h1>Show bridge details</h1>
+
+ip -d link show vmbr0
+
+<code></code>`
+
+
+
+**Example configuration (/etc/network/interfaces):**
+
+<code></code>`
+
+auto lo
+
+iface lo inet loopback
+
+
+
+auto enp0s31f6
+
+iface enp0s31f6 inet manual
+
+
+
+auto vmbr0
+
+iface vmbr0 inet static
+
+    address 192.168.1.100/24
+
+    gateway 192.168.1.1
+
+    bridge_ports enp0s31f6
+
+    bridge_stp off
+
+    bridge_fd 0
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>Proxmox uses Linux bridges for VM networking</li></ul>
+
+<ul><li>Each bridge acts as a virtual switch</li></ul>
+
+<ul><li>Physical interfaces are typically bridged for VM access</li></ul>
+
+<ul><li>Multiple bridges can be used for network isolation</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>Proxmox Backup Management</h4>
+
+
+
+<code></code>`bash
+
+<h1>Create a backup of a VM</h1>
+
+vzdump VM_ID --compress zstd --mode snapshot
+
+
+
+<h1>Create a backup of all VMs</h1>
+
+vzdump --all --compress zstd --mode snapshot
+
+
+
+<h1>Schedule regular backups (edit /etc/cron.d/vzdump)</h1>
+
+echo "0 2 * * * root vzdump --all --compress zstd --mode snapshot --quiet 1" > /etc/cron.d/vzdump
+
+
+
+<h1>Restore a backup</h1>
+
+qmrestore /var/lib/vz/dump/vzdump-qemu-VM_ID.vma.zst NEW_VM_ID \
+
+  --storage local-lvm
+
+<code></code>`
+
+
+
+**Example output (vzdump):**
+
+<code></code>`
+
+Starting backup of VM 101 (qemu)
+
+Creating snapshot 'vzdump' on storage 'local-lvm'
+
+Backing up VM 101 ...
+
+Backup started at 2024-06-21 15:55:32
+
+Status: running
+
+Backup finished at 2024-06-21 15:56:45
+
+Backup successful
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li><code>vzdump</code> is the Proxmox backup tool</li></ul>
+
+<ul><li>Supports both VMs and containers</li></ul>
+
+<ul><li>Can use snapshots for consistent backups</li></ul>
+
+<ul><li>Compression reduces backup size</li></ul>
+
+<ul><li>Backups stored in <code>/var/lib/vz/dump/</code> by default</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>Proxmox System Monitoring</h4>
+
+
+
+<code></code>`bash
+
+<h1>Show system status</h1>
+
+pvestatd status
+
+
+
+<h1>Show resource usage</h1>
+
+pvesh get /nodes/$(hostname)/status
+
+
+
+<h1>Show running tasks</h1>
+
+pvesh get /nodes/$(hostname)/tasks
+
+
+
+<h1>Show cluster resources</h1>
+
+pvesh get /cluster/resources
+
+
+
+<h1>Monitor logs</h1>
+
+tail -f /var/log/pve/tasks/index
+
+<code></code>`
+
+
+
+**Example output (cluster resources):**
+
+<code></code>`
+
+[
+
+  {
+
+    "cpu": 0.01,
+
+    "disk": 238140,
+
+    "diskwrite": 0,
+
+    "id": "node/pve1",
+
+    "level": "",
+
+    "maxcpu": 8,
+
+    "maxdisk": 1474560,
+
+    "maxmem": 32768,
+
+    "mem": 3840,
+
+    "node": "pve1",
+
+    "status": "online",
+
+    "type": "node",
+
+    "uptime": 1234567
+
+  },
+
+  {
+
+    "cpu": 0.12,
+
+    "disk": 32768,
+
+    "diskwrite": 0,
+
+    "id": "qemu/101",
+
+    "name": "web-server",
+
+    "node": "pve1",
+
+    "status": "running",
+
+    "type": "qemu",
+
+    "uptime": 123456
+
+  }
+
+]
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>Proxmox provides various monitoring tools</li></ul>
+
+<ul><li>Web interface shows comprehensive statistics</li></ul>
+
+<ul><li>Command line tools provide detailed information</li></ul>
+
+<ul><li>Log files contain important system events</li></ul>
+
+<ul><li>Resource usage helps identify performance issues</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>Proxmox High Availability</h4>
+
+
+
+<code></code>`bash
+
+<h1>Enable HA for a VM</h1>
+
+ha-manager add vm:VM_ID --state started
+
+
+
+<h1>Disable HA for a VM</h1>
+
+ha-manager remove vm:VM_ID
+
+
+
+<h1>Show HA status</h1>
+
+ha-manager status
+
+
+
+<h1>Show HA resources</h1>
+
+pvesh get /cluster/ha/resources
+
+
+
+<h1>Configure HA group</h1>
+
+pvesh create /cluster/ha/groups -group ha_group1 -nodes "pve1,pve2,pve3"
+
+<code></code>`
+
+
+
+**Example output (ha-manager status):**
+
+<code></code>`
+
+quorum: OK
+
+master: pve1 (1)
+
+node pve1: active, resources: 2
+
+node pve2: active, resources: 1
+
+node pve3: active, resources: 1
+
+service vm:101: started on pve1
+
+service vm:102: started on pve2
+
+service vm:103: started on pve3
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>High Availability requires at least 3 nodes</li></ul>
+
+<ul><li>Requires shared storage for VM disks</li></ul>
+
+<ul><li>Automatically restarts VMs on node failure</li></ul>
+
+<ul><li>Can define preferred nodes for specific VMs</li></ul>
+
+<ul><li>Requires proper network redundancy</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>Proxmox Firewall Management</h4>
+
+
+
+<code></code>`bash
+
+<h1>Enable firewall</h1>
+
+pve-firewall enable
+
+
+
+<h1>Show firewall status</h1>
+
+pve-firewall status
+
+
+
+<h1>Show firewall rules</h1>
+
+cat /etc/pve/firewall/cluster.fw
+
+
+
+<h1>Add a firewall rule (allow SSH)</h1>
+
+echo "ACCEPT -p tcp -dport 22" >> /etc/pve/firewall/cluster.fw
+
+
+
+<h1>Apply firewall changes</h1>
+
+pve-firewall restart
+
+<code></code>`
+
+
+
+**Example configuration (/etc/pve/firewall/cluster.fw):**
+
+<code></code>`
+
+[OPTIONS]
+
+enable: 1
+
+policy_in: DROP
+
+policy_out: ACCEPT
+
+
+
+[RULES]
+
+ACCEPT -p tcp -dport 22
+
+ACCEPT -p tcp -dport 8006
+
+ACCEPT -p tcp -dport 3128
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>Proxmox has a built-in firewall system</li></ul>
+
+<ul><li>Rules can be applied at cluster, node, or VM level</li></ul>
+
+<ul><li>Default policy should be restrictive (DROP)</li></ul>
+
+<ul><li>Always ensure SSH access is allowed</li></ul>
+
+<ul><li>Web interface provides a GUI for firewall management</li></ul>
+
+
+
+
+<div class="command-card">
+
+<h4>Proxmox Maintenance Tasks</h4>
+
+
+
+<code></code>`bash
+
+<h1>Update Proxmox packages</h1>
+
+apt update && apt dist-upgrade
+
+
+
+<h1>Check for package updates</h1>
+
+apt list --upgradable
+
+
+
+<h1>Clean package cache</h1>
+
+apt clean
+
+
+
+<h1>Check disk health</h1>
+
+smartctl -a /dev/sda
+
+
+
+<h1>Check ZFS pool status</h1>
+
+zpool status
+
+
+
+<h1>Scrub ZFS pool</h1>
+
+zpool scrub rpool
+
+
+
+<h1>Check system logs</h1>
+
+journalctl -xef
+
+
+
+<h1>Check Proxmox logs</h1>
+
+tail -f /var/log/pveproxy/access.log
+
+<code></code>`
+
+
+
+**Example output (zpool status):**
+
+<code></code>`
+
+  pool: rpool
+
+ state: ONLINE
+
+  scan: scrub repaired 0B in 01:23:45 with 0 errors on Sun Jun 16 03:45:12 2024
+
+config:
+
+
+
+	NAME        STATE     READ WRITE CKSUM
+
+	rpool       ONLINE       0     0     0
+
+	  mirror-0  ONLINE       0     0     0
+
+	    sda2    ONLINE       0     0     0
+
+	    sdb2    ONLINE       0     0     0
+
+
+
+errors: No known data errors
+
+<code></code>`
+
+
+
+**Usage notes:**
+
+<ul><li>Regular maintenance is essential for system health</li></ul>
+
+<ul><li>Keep Proxmox updated for security and features</li></ul>
+
+<ul><li>Monitor disk health to prevent data loss</li></ul>
+
+<ul><li>ZFS scrubs help detect and repair data corruption</li></ul>
+
+<ul><li>Log monitoring helps identify issues early</li></ul>
+
+
+</details>
+
+
+
+<h2>Best Practices</h2>
+
+
+
+<details>
+
+<summary><strong>Linux System Administration Best Practices</strong> (Click to expand)</summary>
+
+
+
+<div class="command-card">
+
+<h4>Security Best Practices</h4>
+
+
+
+<ol><li>**Use sudo with caution**: Be careful when using sudo, especially with commands like <code>rm -rf</code>.</li></ol>
+
+
+
+<ol><li>**Use SSH keys instead of passwords**: SSH keys are more secure than passwords for remote access.</li></ol>
+
+   <code></code>`bash
+
+   # Generate SSH key
+
+   ssh-keygen -t ed25519 -C "your_email@example.com"
+
+   
+
+   # Copy key to server
+
+   ssh-copy-id user@server
+
+   
+
+   # Disable password authentication in /etc/ssh/sshd_config
+
+   PasswordAuthentication no
+
+   <code></code>`
+
+
+
+<ol><li>**Keep the system updated**: Regularly update packages to ensure security patches are applied.</li></ol>
+
+   <code></code>`bash
+
+   # Ubuntu/Debian
+
+   sudo apt update && sudo apt upgrade
+
+   
+
+   # Set up unattended upgrades for security patches
+
+   sudo apt install unattended-upgrades
+
+   sudo dpkg-reconfigure unattended-upgrades
+
+   <code></code>`
+
+
+
+<ol><li>**Use a firewall**: Configure and enable a firewall to restrict access.</li></ol>
+
+   <code></code>`bash
+
+   # Enable UFW with default rules
+
+   sudo ufw default deny incoming
+
+   sudo ufw default allow outgoing
+
+   sudo ufw allow ssh
+
+   sudo ufw enable
+
+   <code></code>`
+
+
+
+<ol><li>**Implement fail2ban**: Protect against brute force attacks.</li></ol>
+
+   <code></code>`bash
+
+   sudo apt install fail2ban
+
+   sudo systemctl enable fail2ban
+
+   sudo systemctl start fail2ban
+
+   <code></code>`
+
+
+
+
+<div class="command-card">
+
+<h4>System Maintenance Best Practices</h4>
+
+
+
+<ol><li>**Create backups before making changes**: Always back up important files before editing them.</li></ol>
+
+   <code></code>`bash
+
+   # Simple file backup
+
+   cp /path/to/file /path/to/file.bak
+
+   
+
+   # System backup with rsync
+
+   rsync -avz --delete /source/ /destination/
+
+   <code></code>`
+
+
+
+<ol><li>**Use version control for configuration files**: Track changes to important configuration files.</li></ol>
+
+   <code></code>`bash
+
+   # Initialize git repository for /etc
+
+   cd /etc
+
+   sudo git init
+
+   sudo git add .
+
+   sudo git commit -m "Initial commit"
+
+   <code></code>`
+
+
+
+<ol><li>**Monitor system resources regularly**: Keep an eye on disk space, memory usage, and CPU load.</li></ol>
+
+   <code></code>`bash
+
+   # Set up regular disk space checks
+
+   echo "0 * * * * root df -h | grep -vE '^Filesystem|tmpfs|cdrom' | awk '{ print \$5 \" \" \$1 }' | while read output; do used=\$(echo \$output | awk '{ print \$1 }' | cut -d'%' -f1); if [ \$used -ge 90 ]; then echo \"Disk space critical on \$(hostname) - \$output\" | mail -s \"Disk Space Alert\" admin@example.com; fi; done" > /etc/cron.d/disk_check
+
+   <code></code>`
+
+
+
+<ol><li>**Implement log rotation**: Prevent logs from filling up disk space.</li></ol>
+
+   <code></code>`bash
+
+   # Configure logrotate for application logs
+
+   cat > /etc/logrotate.d/myapp << EOF
+
+   /var/log/myapp/*.log {
+
+       weekly
+
+       rotate 4
+
+       compress
+
+       delaycompress
+
+       missingok
+
+       notifempty
+
+       create 0640 www-data www-data
+
+   }
+
+   EOF
+
+   <code></code>`
+
+
+
+<ol><li>**Document your changes**: Keep a record of system changes for future reference.</li></ol>
+
+   <code></code>`bash
+
+   # Create a change log
+
+   sudo mkdir -p /var/log/changes
+
+   sudo touch /var/log/changes/system_changes.log
+
+   sudo echo "$(date) - Updated network configuration" >> /var/log/changes/system_changes.log
+
+   <code></code>`
+
+
+
+
+<div class="command-card">
+
+<h4>Performance Best Practices</h4>
+
+
+
+<ol><li>**Use screen or tmux for long-running processes**: These tools allow you to detach from a session and reconnect later.</li></ol>
+
+   <code></code>`bash
+
+   # Start a new screen session
+
+   screen -S session_name
+
+   
+
+   # Detach from screen: Ctrl+A, D
+
+   # Reattach to screen
+
+   screen -r session_name
+
+   <code></code>`
+
+
+
+<ol><li>**Schedule resource-intensive tasks during off-hours**: Use cron to schedule tasks.</li></ol>
+
+   <code></code>`bash
+
+   # Run backup at 2 AM
+
+   echo "0 2 * * * root /usr/local/bin/backup.sh" > /etc/cron.d/backup
+
+   <code></code>`
+
+
+
+<ol><li>**Use appropriate filesystem for the workload**: Different filesystems have different strengths.</li></ol>
+
+   - **ext4**: Good general-purpose filesystem
+
+   - **XFS**: Good for large files and high-performance workloads
+
+   - **ZFS**: Advanced features like snapshots, compression, and data integrity
+
+   - **Btrfs**: Similar to ZFS with built-in RAID and snapshot capabilities
+
+
+
+<ol><li>**Optimize disk I/O**: Configure disk schedulers appropriately.</li></ol>
+
+   <code></code>`bash
+
+   # Check current scheduler
+
+   cat /sys/block/sda/queue/scheduler
+
+   
+
+   # Set scheduler (temporary)
+
+   echo mq-deadline > /sys/block/sda/queue/scheduler
+
+   
+
+   # Set scheduler permanently in /etc/default/grub
+
+   GRUB_CMDLINE_LINUX="... elevator=mq-deadline"
+
+   <code></code>`
+
+
+
+<ol><li>**Use appropriate swappiness**: Adjust how aggressively the system swaps memory.</li></ol>
+
+   <code></code>`bash
+
+   # Check current swappiness
+
+   cat /proc/sys/vm/swappiness
+
+   
+
+   # Set swappiness temporarily
+
+   sudo sysctl vm.swappiness=10
+
+   
+
+   # Set swappiness permanently in /etc/sysctl.conf
+
+   vm.swappiness=10
+
+   <code></code>`
+
+
+
+
+<div class="command-card">
+
+<h4>Testing and Deployment Best Practices</h4>
+
+
+
+<ol><li>**Test commands in a non-production environment first**: Whenever possible, test commands in a test environment before running them on production systems.</li></ol>
+
+
+
+<ol><li>**Use configuration management tools**: Tools like Ansible, Puppet, or Chef help maintain consistent configurations.</li></ol>
+
+   <code></code>`bash
+
+   # Example Ansible playbook execution
+
+   ansible-playbook -i inventory.ini playbook.yml
+
+   <code></code>`
+
+
+
+<ol><li>**Implement continuous integration/deployment**: Automate testing and deployment processes.</li></ol>
+
+   <code></code>`bash
+
+   # Example CI/CD pipeline script
+
+   #!/bin/bash
+
+   set -e
+
+   
+
+   # Run tests
+
+   ./run_tests.sh
+
+   
+
+   # If tests pass, deploy
+
+   if [ $? -eq 0 ]; then
+
+       ./deploy.sh
+
+   fi
+
+   <code></code>`
+
+
+
+<ol><li>**Use containers for application isolation**: Docker or LXC containers provide isolation and portability.</li></ol>
+
+   <code></code>`bash
+
+   # Run application in Docker container
+
+   docker run -d --name myapp -p 8080:80 myapp:latest
+
+   <code></code>`
+
+
+
+<ol><li>**Implement blue-green deployments**: Minimize downtime during updates.</li></ol>
+
+   <code></code>`bash
+
+   # Switch traffic from blue to green environment
+
+   sudo ln -sf /etc/nginx/sites-available/green.conf /etc/nginx/sites-enabled/app.conf
+
+   sudo systemctl reload nginx
+
+   <code></code>`
+
+
+
+
+<div class="command-card">
+
+<h4>Proxmox-Specific Best Practices</h4>
+
+
+
+<ol><li>**Use a dedicated storage network**: Separate VM traffic from storage traffic.</li></ol>
+
+   <code></code>`bash
+
+   # Example network configuration with separate storage network
+
+   auto enp1s0
+
+   iface enp1s0 inet manual
+
+   
+
+   auto enp2s0
+
+   iface enp2s0 inet manual
+
+   
+
+   auto vmbr0
+
+   iface vmbr0 inet static
+
+       address 192.168.1.100/24
+
+       gateway 192.168.1.1
+
+       bridge_ports enp1s0
+
+       bridge_stp off
+
+       bridge_fd 0
+
+   
+
+   auto vmbr1
+
+   iface vmbr1 inet static
+
+       address 10.10.10.100/24
+
+       bridge_ports enp2s0
+
+       bridge_stp off
+
+       bridge_fd 0
+
+   <code></code>`
+
+
+
+<ol><li>**Implement proper backup strategy**: Regular backups with retention policy.</li></ol>
+
+   <code></code>`bash
+
+   # Create backup configuration
+
+   cat > /etc/vzdump.conf << EOF
+
+   tmpdir: /mnt/backup/tmp
+
+   storage: backup
+
+   mode: snapshot
+
+   compress: zstd
+
+   maxfiles: 5
+
+   EOF
+
+   
+
+   # Schedule daily backups at 2 AM
+
+   echo "0 2 * * * root vzdump --all --quiet 1" > /etc/cron.d/vzdump
+
+   <code></code>`
+
+
+
+<ol><li>**Use resource limits for VMs and containers**: Prevent resource contention.</li></ol>
+
+   <code></code>`bash
+
+   # Set CPU and memory limits for a VM
+
+   qm set 101 --memory 4096 --cores 2 --cpulimit 0.5
+
+   
+
+   # Set limits for a container
+
+   pct set 100 --memory 2048 --cpulimit 0.25
+
+   <code></code>`
+
+
+
+<ol><li>**Implement high availability for critical VMs**: Ensure service continuity.</li></ol>
+
+   <code></code>`bash
+
+   # Enable HA for critical VM
+
+   ha-manager add vm:101 --state started
+
+   <code></code>`
+
+
+
+<ol><li>**Monitor Proxmox health regularly**: Check for issues proactively.</li></ol>
+
+   <code></code>`bash
+
+   # Create monitoring script
+
+   cat > /usr/local/bin/check_proxmox.sh << 'EOF'
+
+   #!/bin/bash
+
+   
+
+   # Check node status
+
+   node_status=$(pvesh get /nodes/$(hostname)/status)
+
+   
+
+   # Check storage status
+
+   storage_status=$(pvesm status)
+
+   
+
+   # Check cluster status
+
+   cluster_status=$(pvecm status)
+
+   
+
+   # Output results
+
+   echo "Node Status:"
+
+   echo "$node_status"
+
+   echo
+
+   echo "Storage Status:"
+
+   echo "$storage_status"
+
+   echo
+
+   echo "Cluster Status:"
+
+   echo "$cluster_status"
+
+   EOF
+
+   
+
+   chmod +x /usr/local/bin/check_proxmox.sh
+
+   
+
+   # Schedule daily health check
+
+   echo "0 7 * * * root /usr/local/bin/check_proxmox.sh | mail -s 'Proxmox Health Check' admin@example.com" > /etc/cron.d/proxmox_health
+
+   <code></code>`
+
+
+</details>
+
+
+
+<h2>Additional Resources</h2>
+
+
+
+<ul><li><a href="https://help.ubuntu.com/">Ubuntu Documentation</a></li></ul>
+
+<ul><li><a href="https://www.debian.org/doc/">Debian Documentation</a></li></ul>
+
+<ul><li><a href="https://pve.proxmox.com/wiki/Main_Page">Proxmox Documentation</a></li></ul>
+
+<ul><li><a href="https://linuxcommandlibrary.com/">Linux Command Library</a></li></ul>
+
+<ul><li><a href="https://linux.die.net/man/">Man Pages</a></li></ul>
+
+</div>

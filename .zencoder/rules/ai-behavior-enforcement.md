@@ -11,37 +11,53 @@ priority: 1
 **CURRENT PROMPT:** This is prompt #[X] of 5 maximum allowed prompts.
 
 ### Prompt Counter Protocol
-- **Start Each Response:** Begin every response with current prompt count
+- **Maximum Prompts:** 5 prompts per session - STRICTLY ENFORCED
 - **Track Internally:** Keep running count throughout conversation
 - **Warn at Prompt 4:** Alert user that next prompt will trigger handoff
 - **Stop at Prompt 5:** Refuse to continue, provide handoff documentation
 
-## MANDATORY APPROVAL WORKFLOW
+## APPROVAL-BASED CODE REVIEW WORKFLOW
 
-### Before ANY Code Changes
-1. **STOP:** Do not modify any files without explicit user approval
-2. **PRESENT:** Show exactly what will be changed using the standard format
-3. **WAIT:** Wait for explicit approval ("yes", "approved", "apply changes")
-4. **CONFIRM:** Acknowledge approval before proceeding
-5. **EXECUTE:** Apply changes only after confirmation
+### 4-Phase Implementation Protocol
+1. **ANALYZE:** Complete analysis phase first (read docs, code, logs)
+2. **PLAN:** Present comprehensive plan and get user approval
+3. **DIFF:** Show exact changes in diff format for user review/editing
+4. **APPLY:** Execute changes only after final user approval
 
-### Standard Change Presentation
+### Phase 1: Planning & Approval
+Present plan in this format:
 ```
-🔄 PROPOSED CHANGE TO: [filename]
-📝 CHANGE TYPE: [Addition/Modification/Deletion]
-📋 DESCRIPTION: [what this accomplishes]
+🔄 PROPOSED PLAN: [brief description]
+📋 FILES TO MODIFY: [list of files]
+📝 CHANGES OVERVIEW: [what will be accomplished]
+💡 REASON: [why this approach]
 
-❌ CURRENT CODE:
-[existing code or "N/A"]
-
-✅ NEW CODE:
-[proposed code or "DELETED"]
-
-💡 REASON: [why needed]
-
-⚠️  APPROVAL REQUIRED: Please confirm with "approved" or "yes"
-🔄 REVERT: Changes can be undone if needed
+⚠️ APPROVAL REQUIRED: Please confirm with "yes" or "approved"
 ```
+
+### Phase 2: Diff Presentation (After Approval)
+Show exact changes using +- diff format:
+```diff
+--- /path/to/file.ext
++++ /path/to/file.ext
+@@ -line,count +line,count @@
+-old code line
++new code line
+ unchanged line
+```
+
+### Phase 3: User Review & Edit Opportunity
+```
+📝 REVIEW REQUIRED: Please review the diff above
+✏️ EDIT OPTION: You can modify these changes before I apply them
+✅ APPLY: Say "apply" or "yes" to implement these exact changes
+🔄 REVERT: Changes can be undone after application if needed
+```
+
+### Phase 4: Application (Only After Final Approval)
+- Execute changes exactly as shown in approved diff
+- Confirm completion
+- Provide revert instructions if needed
 
 ## VIOLATION CONSEQUENCES
 - **Prompt Limit Exceeded:** Immediate session termination with handoff

@@ -1,0 +1,421 @@
+[% PageVersion = 'Comserv/docs/template_toolkit_guide.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Template Toolkit (.tt) Files Guide' %]
+
+<!-- Include documentation CSS -->
+<link rel="stylesheet" href="/static/css/documentation.css">
+
+<div class="markdown-content">
+
+
+## Overview
+
+
+
+Template Toolkit (.tt) files are a crucial part of the Comserv application's presentation layer. They separate the HTML/UI code from the Perl business logic, making the application more maintainable and easier to develop.
+
+
+
+## Key Template Files
+
+
+
+### Layout Templates
+
+
+
+1. **`wrapper.tt.notusedbyapplication`**
+
+   - The main layout template that wraps all pages
+
+   - Includes the HTML doctype, head section, and body structure
+
+   - Loads CSS and JavaScript resources
+
+
+
+2. **`pagetop.tt`**
+
+   - Included at the top of most pages
+
+   - Contains the header, navigation menu, and user information
+
+   - Implements role-based menu display
+
+   ```tt
+
+   [% SET roles = c.session.roles || [] %]
+
+   [% SET is_admin = roles.grep('admin').size > 0 ? 1 : 0 %]
+
+   
+
+   [% IF is_admin %]
+
+       [% INCLUDE 'Navigation/admintopmenu.tt' %]
+
+   [% END %]
+
+   ```
+
+
+
+3. **`pagebottom.tt`**
+
+   - Included at the bottom of most pages
+
+   - Contains the footer and any closing scripts
+
+
+
+### Navigation Templates
+
+
+
+1. **`Navigation/TopDropListMain.tt`**
+
+   - Main navigation dropdown menu
+
+   - Available to all users
+
+
+
+2. **`Navigation/admintopmenu.tt`**
+
+   - Admin navigation dropdown menu
+
+   - Only included for users with the 'admin' role
+
+   - Contains sections for various admin functions:
+
+     - User management
+
+     - System setup
+
+     - File management
+
+     - Documentation
+
+     - Project management
+
+   ```tt
+
+   <li class="horizontal-dropdown">
+
+       <a href="/admin" class="dropbtn"><i class="icon-admin"></i>Admin</a>
+
+       <div class="dropdown-content">
+
+           <!-- Admin menu items -->
+
+           
+
+           <!-- Documentation Section -->
+
+           <div class="submenu-item">
+
+               <span class="submenu-header">
+
+                   <a href="/documentation" class="dropbtn">
+
+                       <i class="icon-documentation"></i>Documentation
+
+                   </a>
+
+               </span>
+
+               <div class="submenu">
+
+                   <!-- Documentation submenu items -->
+
+                   [% IF c.session.roles.grep('admin').size || c.session.roles.grep('developer').size %]
+
+                       <div class="submenu-section">
+
+                           <span class="submenu-section-title">Admin Resources</span>
+
+                           <!-- Admin documentation resources -->
+
+                       </div>
+
+                   [% END %]
+
+               </div>
+
+           </div>
+
+           
+
+           <!-- Other admin sections -->
+
+       </div>
+
+   </li>
+
+   ```
+
+
+
+3. **`Navigation/TopDropListLogin.tt`**
+
+   - Login/logout dropdown menu
+
+   - Adapts based on user login status
+
+
+
+### Feature-Specific Templates
+
+
+
+1. **`user/login.tt`**
+
+   - Login form template
+
+   - Handles error messages and redirects
+
+
+
+2. **`admin/index.tt`**
+
+   - Admin dashboard template
+
+   - Only accessible to admin users
+
+
+
+3. **`project/details.tt`**
+
+   - Project details template
+
+   - Shows different options based on user roles
+
+
+
+## Template Toolkit Syntax
+
+
+
+### Variables and Expressions
+
+
+
+```tt
+
+[% variable_name %]                 <!-- Simple variable -->
+
+[% object.property %]               <!-- Object property -->
+
+[% hash.key %]                      <!-- Hash value -->
+
+[% array.0 %]                       <!-- Array element -->
+
+[% variable || 'default' %]         <!-- Default value -->
+
+[% IF condition %]...[% END %]      <!-- Conditional -->
+
+[% FOREACH item IN items %]...[% END %]  <!-- Loop -->
+
+```
+
+
+
+### Directives
+
+
+
+```tt
+
+[% INCLUDE 'template.tt' %]         <!-- Include another template -->
+
+[% PROCESS 'template.tt' %]         <!-- Process another template -->
+
+[% WRAPPER 'wrapper.tt' %]...[% END %]  <!-- Wrap content -->
+
+[% BLOCK name %]...[% END %]        <!-- Define a block -->
+
+[% MACRO name(param) BLOCK %]...[% END %]  <!-- Define a macro -->
+
+```
+
+
+
+### Role-Based Display
+
+
+
+```tt
+
+[% IF c.session.roles.grep('admin').size %]
+
+    <!-- Admin-only content -->
+
+[% ELSIF c.session.roles.grep('user').size %]
+
+    <!-- Regular user content -->
+
+[% ELSE %]
+
+    <!-- Guest content -->
+
+[% END %]
+
+```
+
+
+
+## Best Practices
+
+
+
+1. **Modularize Templates**
+
+   - Break templates into logical, reusable components
+
+   - Use INCLUDE, PROCESS, or WRAPPER to combine templates
+
+
+
+2. **Consistent Naming**
+
+   - Use consistent naming conventions for templates
+
+   - Group related templates in subdirectories
+
+
+
+3. **Role-Based Display**
+
+   - Check user roles before displaying restricted content
+
+   - Store role check results in variables for reuse
+
+
+
+4. **Error Handling**
+
+   - Display appropriate error messages
+
+   - Provide fallbacks for missing data
+
+   ```tt
+
+   [% IF error_msg %]
+
+       <div class="alert error">[% error_msg %]</div>
+
+   [% END %]
+
+   ```
+
+
+
+5. **CSS Integration**
+
+   - Keep CSS in theme files, not inline in templates
+
+   - Use consistent class names across templates
+
+
+
+6. **JavaScript Integration**
+
+   - Keep JavaScript in separate files
+
+   - Use data attributes to connect HTML and JavaScript
+
+
+
+## Template Variables
+
+
+
+Common variables available in templates:
+
+
+
+- `c` - The Catalyst context object
+
+- `c.session` - The user's session data
+
+- `c.session.roles` - The user's roles
+
+- `c.stash` - Template variables set by controllers
+
+- `c.req` - The request object
+
+- `c.uri_for('/path')` - Generate a URI for a path
+
+
+
+## Debugging Templates
+
+
+
+Add debug information to templates:
+
+
+
+```tt
+
+[% IF c.session.debug_mode == 1 %]
+
+    <div class="debug">
+
+        [% INCLUDE 'debug.tt' %]
+
+    </div>
+
+    
+
+    [% IF c.stash.debug_msg.defined && c.stash.debug_msg.size > 0 %]
+
+        <div class="debug-messages">
+
+            <h4>Debug Messages</h4>
+
+            [% FOREACH msg IN c.stash.debug_msg %]
+
+                <p class="debug">Debug [% loop.index %]: [% msg %]</p>
+
+            [% END %]
+
+        </div>
+
+    [% END %]
+
+[% END %]
+
+```
+
+
+
+## Theme System
+
+
+
+Templates interact with the theme system:
+
+
+
+```tt
+
+<!-- In wrapper.tt.notusedbyapplication -->
+
+<link rel="stylesheet" href="[% c.stash.default_css %]">
+
+
+
+<!-- In a controller -->
+
+$c->stash->{default_css} = $c->uri_for("/static/css/$theme_name/style.css");
+
+```
+
+
+
+All CSS should be part of the themes system rather than inline in the templates.
+</div>

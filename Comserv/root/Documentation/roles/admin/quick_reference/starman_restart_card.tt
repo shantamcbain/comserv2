@@ -1,0 +1,95 @@
+[% PageVersion = 'Comserv/root/Documentation/roles/admin/quick_reference/starman_restart_card.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Starman Restart Quick Reference' %]
+
+<!-- Documentation page for starman_restart_card -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>When to Restart Starman</h2>
+
+
+
+Restart the Starman server when:
+
+<ul><li>After significant configuration changes</li></ul>
+
+<ul><li>When experiencing performance issues</li></ul>
+
+<ul><li>After code updates via Git Pull</li></ul>
+
+<ul><li>When directed by technical support</li></ul>
+
+
+
+<h2>Restart Procedure</h2>
+
+
+
+<ol><li>**Access**: Admin > System > Restart Starman Server</li></ol>
+
+<ol><li>**Confirm**: Click "Yes, Restart Starman Server"</li></ol>
+
+<ol><li>**Authenticate**: Enter system username and password</li></ol>
+
+<ol><li>**Execute**: Click "Restart Starman Server" button</li></ol>
+
+<ol><li>**Verify**: Check success message and service status</li></ol>
+
+
+
+<h2>Required Credentials</h2>
+
+
+
+<ul><li>**Username**: System user with sudo privileges</li></ul>
+
+<ul><li>**Password**: Password for that system user</li></ul>
+
+
+
+<h2>Troubleshooting</h2>
+
+
+
+If restart fails:
+
+<ol><li>Check command output for specific errors</li></ol>
+
+<ol><li>Verify credentials are correct</li></ol>
+
+<ol><li>Ensure user has sudo privileges</li></ol>
+
+<ol><li>Check application logs for details</li></ol>
+
+
+
+<h2>Security Note</h2>
+
+
+
+<ul><li>Credentials are used only for the current restart operation</li></ul>
+
+<ul><li>Passwords are never stored in the application</li></ul>
+
+<ul><li>All restart attempts are logged for security auditing</li></ul>
+
+
+
+<h2>Need Help?</h2>
+
+
+
+Contact system administrator or technical support if you encounter issues with the restart process.
+
+</div>

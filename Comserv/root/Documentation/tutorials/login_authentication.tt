@@ -1,0 +1,203 @@
+[% PageVersion = 'Comserv/root/Documentation/tutorials/login_authentication.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Login and Authentication' %]
+
+<!-- Documentation page for login_authentication -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+This guide will walk you through the login, authentication, and account creation process in the Comserv system.
+
+
+
+<h2>Creating an Account</h2>
+
+
+
+Before you can log in, you need to create an account:
+
+
+
+<ol><li>Navigate to the Comserv registration page at <code>/user/register</code> or click "Create Account" on the login page</li></ol>
+
+<ol><li>Fill in the required information:</li></ol>
+
+   - Username (must be unique)
+
+   - Password (minimum 8 characters, including letters and numbers)
+
+   - Email address (used for password recovery)
+
+   - First and last name
+
+<ol><li>Select your role (if applicable, or default "user" role will be assigned)</li></ol>
+
+<ol><li>Click the "Create Account" button</li></ol>
+
+<ol><li>You'll receive a confirmation message and can now log in with your new credentials</li></ol>
+
+
+
+<h2>Logging In</h2>
+
+
+
+<ol><li>Navigate to the Comserv login page at <code>/user/login</code></li></ol>
+
+<ol><li>Enter your username and password</li></ol>
+
+<ol><li>Click the "Login" button</li></ol>
+
+<ol><li>After successful login, you'll be redirected to:</li></ol>
+
+   - The page you were trying to access before being redirected to login
+
+   - The page specified in the <code>return_to</code> parameter (if provided)
+
+   - The home page (if no specific redirect is available)
+
+
+
+<h2>Authentication Methods</h2>
+
+
+
+Comserv supports several authentication methods:
+
+
+
+<ul><li>Standard username/password authentication</li></ul>
+
+<ul><li>LDAP integration (for enterprise deployments)</li></ul>
+
+<ul><li>Single Sign-On (SSO) for integrated environments</li></ul>
+
+
+
+<h2>Password Management</h2>
+
+
+
+<h3>Changing Your Password</h3>
+
+
+
+<ol><li>Log in to your account</li></ol>
+
+<ol><li>Navigate to your profile settings</li></ol>
+
+<ol><li>Select "Change Password"</li></ol>
+
+<ol><li>Enter your current password and your new password twice</li></ol>
+
+<ol><li>Click "Save Changes"</li></ol>
+
+
+
+<h3>Password Recovery</h3>
+
+
+
+If you've forgotten your password:
+
+
+
+<ol><li>Click the "Forgot Password" link on the login page</li></ol>
+
+<ol><li>Enter your email address</li></ol>
+
+<ol><li>Check your email for password reset instructions</li></ol>
+
+<ol><li>Follow the link in the email to reset your password</li></ol>
+
+<ol><li>Create a new password and confirm it</li></ol>
+
+<ol><li>Click "Reset Password"</li></ol>
+
+
+
+<h2>Session Management</h2>
+
+
+
+<ul><li>Your session will automatically expire after 30 minutes of inactivity</li></ul>
+
+<ul><li>You can manually log out by clicking the "Logout" button in the top navigation bar</li></ul>
+
+<ul><li>When you log out, you'll be redirected to an appropriate page based on your current context</li></ul>
+
+<ul><li>The system preserves site-specific information even after logout</li></ul>
+
+
+
+<h2>Role-Based Access</h2>
+
+
+
+Comserv implements role-based access control:
+
+
+
+<ul><li>**User**: Basic access to general features</li></ul>
+
+<ul><li>**Admin**: Full administrative access to the system</li></ul>
+
+<ul><li>**Developer**: Access to development and debugging tools</li></ul>
+
+<ul><li>**Site-specific roles**: Access to specific site functionality</li></ul>
+
+
+
+Your available features and navigation options will depend on your assigned roles.
+
+
+
+<h2>Security Best Practices</h2>
+
+
+
+<ul><li>Use a strong, unique password with a mix of letters, numbers, and special characters</li></ul>
+
+<ul><li>Don't share your login credentials with others</li></ul>
+
+<ul><li>Log out when you're finished using the system, especially on shared computers</li></ul>
+
+<ul><li>Change your password regularly (recommended every 90 days)</li></ul>
+
+<ul><li>Be cautious when accessing the system from public networks</li></ul>
+
+<ul><li>Check that you're on the correct domain before entering credentials</li></ul>
+
+
+
+<h2>Troubleshooting Login Issues</h2>
+
+
+
+If you encounter problems logging in:
+
+
+
+<ol><li>Verify your username and password are correct</li></ol>
+
+<ol><li>Check if Caps Lock is enabled</li></ol>
+
+<ol><li>Clear your browser cache and cookies</li></ol>
+
+<ol><li>Try using a different browser</li></ol>
+
+<ol><li>If you still can't log in, use the password recovery option</li></ol>
+
+<ol><li>Contact your system administrator if problems persist</li></ol>
+
+</div>

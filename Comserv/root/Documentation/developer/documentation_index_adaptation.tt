@@ -1,0 +1,1622 @@
+[% PageVersion = 'Comserv/root/Documentation/developer/documentation_index_adaptation.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Documentation Index Adaptation Plan' %]
+
+<!-- Documentation page for documentation_index_adaptation -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+title: "Documentation Index Adaptation Plan"
+
+description: "Plan for adapting the documentation index to work with the new metadata-driven system"
+
+author: "System Administrator"
+
+date: "2025-05-30"
+
+status: "Active"
+
+roles: ["admin", "developer"]
+
+sites: ["all"]
+
+categories: ["developer_guides", "documentation"]
+
+tags: ["documentation", "index", "metadata", "migration"]
+
+---
+
+
+
+<h1>Documentation Index Adaptation Plan</h1>
+
+
+
+<h2>Overview</h2>
+
+
+
+This document outlines the plan for adapting the documentation index to work with the new metadata-driven documentation system. The index is a critical component that allows users to browse and search documentation based on various criteria. With the transition to a metadata-driven approach, the index needs to be redesigned to extract and utilize metadata from documentation files.
+
+
+
+<h2>Current Index Implementation</h2>
+
+
+
+The current documentation index relies on the directory structure and the <code>documentation_config.json</code> file to categorize and filter documentation. It has the following limitations:
+
+
+
+<ol><li>**Directory-Based Categorization**: Documentation is categorized based on its location in the directory structure.</li></ol>
+
+<ol><li>**Limited Filtering**: Filtering is primarily based on roles and site-specific flags.</li></ol>
+
+<ol><li>**Manual Configuration**: Each document must be manually added to the configuration file.</li></ol>
+
+<ol><li>**No Tag Support**: There's no support for tagging or additional metadata.</li></ol>
+
+
+
+<h2>New Index Requirements</h2>
+
+
+
+The new documentation index should:
+
+
+
+<ol><li>**Parse Metadata**: Extract metadata from documentation files.</li></ol>
+
+<ol><li>**Build Comprehensive Index**: Create an in-memory index of all documentation with their metadata.</li></ol>
+
+<ol><li>**Support Multiple Filtering Criteria**: Filter documentation based on roles, sites, categories, tags, and other metadata.</li></ol>
+
+<ol><li>**Implement Caching**: Cache the index for better performance.</li></ol>
+
+<ol><li>**Support Search**: Provide search functionality based on metadata and content.</li></ol>
+
+<ol><li>**Generate Navigation**: Generate navigation menus based on categories and tags.</li></ol>
+
+
+
+<h2>Implementation Plan</h2>
+
+
+
+<h3>Phase 1: Metadata Parser Development</h3>
+
+
+
+<ol><li>**Create Metadata Parser Module**</li></ol>
+
+   - Develop a module to parse YAML-style metadata from documentation files
+
+   - Handle various metadata types (strings, arrays, dates)
+
+   - Validate metadata against a schema
+
+
+
+<ol><li>**Implement File Scanner**</li></ol>
+
+   - Create a function to scan the documentation directory structure
+
+   - Identify documentation files based on file extensions (.md, .tt)
+
+   - Extract metadata from each file
+
+
+
+<ol><li>**Build In-Memory Index**</li></ol>
+
+   - Create a data structure to hold the documentation index
+
+   - Index documents by various criteria (path, category, role, site, tag)
+
+   - Store metadata and file paths
+
+
+
+<h3>Phase 2: Index API Development</h3>
+
+
+
+<ol><li>**Create Index API**</li></ol>
+
+   - Develop functions to query the index
+
+   - Support filtering by multiple criteria
+
+   - Implement sorting and pagination
+
+
+
+<ol><li>**Implement Caching**</li></ol>
+
+   - Cache the index in memory
+
+   - Implement cache invalidation when files change
+
+   - Add cache warming on application startup
+
+
+
+<ol><li>**Add Search Functionality**</li></ol>
+
+   - Implement full-text search across documentation
+
+   - Support searching by metadata fields
+
+   - Rank search results by relevance
+
+
+
+<h3>Phase 3: Controller and Template Updates</h3>
+
+
+
+<ol><li>**Update Documentation Controller**</li></ol>
+
+   - Modify the controller to use the new index
+
+   - Implement filtering based on user role and site
+
+   - Add support for category and tag filtering
+
+
+
+<ol><li>**Create New Index Templates**</li></ol>
+
+   - Develop templates for displaying the index
+
+   - Create category and tag browsing views
+
+   - Implement search results display
+
+
+
+<ol><li>**Generate Navigation Menus**</li></ol>
+
+   - Create functions to generate navigation menus based on categories
+
+   - Add tag cloud or tag list for additional navigation
+
+   - Implement breadcrumb navigation
+
+
+
+<h2>Technical Implementation Details</h2>
+
+
+
+<h3>Metadata Parser Module</h3>
+
+
+
+<code></code>`perl
+
+package Comserv::Modules::Documentation::MetadataParser;
+
+
+
+use strict;
+
+use warnings;
+
+use YAML::XS;
+
+use Carp;
+
+use File::Find;
+
+
+
+sub new {
+
+    my ($class, %args) = @_;
+
+    my $self = {
+
+        docs_dir => $args{docs_dir} || die "docs_dir is required",
+
+        cache => {},
+
+    };
+
+    return bless $self, $class;
+
+}
+
+
+
+sub parse_file {
+
+    my ($self, $file_path) = @_;
+
+    
+
+    # Check cache
+
+    return $self->{cache}{$file_path} if exists $self->{cache}{$file_path};
+
+    
+
+    # Read file
+
+    open my $fh, '<:encoding(UTF-8)', $file_path or croak "Cannot open $file_path: $!";
+
+    my $content = do { local $/; <$fh> };
+
+    close $fh;
+
+    
+
+    # Extract metadata
+
+    my $metadata = {};
+
+    if ($content =~ /^---\s*$(.*?)^---\s*$/ms) {
+
+        my $yaml_content = $1;
+
+        
+
+        # Parse YAML
+
+        eval {
+
+            $metadata = YAML::XS::Load($yaml_content);
+
+        };
+
+        if ($@) {
+
+            croak "Error parsing metadata in $file_path: $@";
+
+        }
+
+    }
+
+    
+
+    # Set defaults for required fields
+
+    $metadata->{title} ||= "Untitled Document";
+
+    $metadata->{description} ||= "No description provided";
+
+    $metadata->{author} ||= "Unknown";
+
+    $metadata->{date} ||= "Unknown";
+
+    $metadata->{status} ||= "Active";
+
+    $metadata->{roles} ||= ["developer"];
+
+    $metadata->{sites} ||= ["all"];
+
+    $metadata->{categories} ||= [];
+
+    $metadata->{tags} ||= [];
+
+    
+
+    # Cache result
+
+    $self->{cache}{$file_path} = $metadata;
+
+    
+
+    return $metadata;
+
+}
+
+
+
+sub scan_directory {
+
+    my ($self) = @_;
+
+    my $docs_dir = $self->{docs_dir};
+
+    my @files;
+
+    
+
+    find(
+
+        {
+
+            wanted => sub {
+
+                my $file = $_;
+
+                return if -d $file;
+
+                return unless $file =~ /\.(md|tt)$/;
+
+                push @files, $File::Find::name;
+
+            },
+
+            no_chdir => 1
+
+        },
+
+        $docs_dir
+
+    );
+
+    
+
+    return @files;
+
+}
+
+
+
+1;
+
+<code></code>`
+
+
+
+<h3>Documentation Index Module</h3>
+
+
+
+<code></code>`perl
+
+package Comserv::Modules::Documentation::Index;
+
+
+
+use strict;
+
+use warnings;
+
+use Comserv::Modules::Documentation::MetadataParser;
+
+use Storable qw(store retrieve);
+
+use File::Spec;
+
+use Carp;
+
+
+
+sub new {
+
+    my ($class, %args) = @_;
+
+    my $self = {
+
+        docs_dir => $args{docs_dir} || die "docs_dir is required",
+
+        cache_file => $args{cache_file} || File::Spec->catfile($args{docs_dir}, '..', 'cache', 'docs_index.cache'),
+
+        parser => Comserv::Modules::Documentation::MetadataParser->new(docs_dir => $args{docs_dir}),
+
+        index => {},
+
+        by_category => {},
+
+        by_role => {},
+
+        by_site => {},
+
+        by_tag => {},
+
+        initialized => 0,
+
+    };
+
+    return bless $self, $class;
+
+}
+
+
+
+sub initialize {
+
+    my ($self) = @_;
+
+    
+
+    # Try to load from cache
+
+    if (-f $self->{cache_file}) {
+
+        eval {
+
+            $self->{index} = retrieve($self->{cache_file});
+
+            $self->build_lookup_tables();
+
+            $self->{initialized} = 1;
+
+            return;
+
+        };
+
+    }
+
+    
+
+    # Build index from scratch
+
+    $self->build_index();
+
+    $self->build_lookup_tables();
+
+    $self->save_cache();
+
+    $self->{initialized} = 1;
+
+}
+
+
+
+sub build_index {
+
+    my ($self) = @_;
+
+    my $parser = $self->{parser};
+
+    my @files = $parser->scan_directory();
+
+    
+
+    foreach my $file (@files) {
+
+        my $metadata = $parser->parse_file($file);
+
+        my $relative_path = File::Spec->abs2rel($file, $self->{docs_dir});
+
+        
+
+        $self->{index}{$relative_path} = {
+
+            path => $file,
+
+            relative_path => $relative_path,
+
+            metadata => $metadata,
+
+        };
+
+    }
+
+}
+
+
+
+sub build_lookup_tables {
+
+    my ($self) = @_;
+
+    
+
+    # Clear lookup tables
+
+    $self->{by_category} = {};
+
+    $self->{by_role} = {};
+
+    $self->{by_site} = {};
+
+    $self->{by_tag} = {};
+
+    
+
+    # Build lookup tables
+
+    foreach my $path (keys %{$self->{index}}) {
+
+        my $doc = $self->{index}{$path};
+
+        my $metadata = $doc->{metadata};
+
+        
+
+        # Index by category
+
+        foreach my $category (@{$metadata->{categories}}) {
+
+            $self->{by_category}{$category} ||= [];
+
+            push @{$self->{by_category}{$category}}, $path;
+
+        }
+
+        
+
+        # Index by role
+
+        foreach my $role (@{$metadata->{roles}}) {
+
+            $self->{by_role}{$role} ||= [];
+
+            push @{$self->{by_role}{$role}}, $path;
+
+        }
+
+        
+
+        # Index by site
+
+        foreach my $site (@{$metadata->{sites}}) {
+
+            $self->{by_site}{$site} ||= [];
+
+            push @{$self->{by_site}{$site}}, $path;
+
+        }
+
+        
+
+        # Index by tag
+
+        foreach my $tag (@{$metadata->{tags}}) {
+
+            $self->{by_tag}{$tag} ||= [];
+
+            push @{$self->{by_tag}{$tag}}, $path;
+
+        }
+
+    }
+
+}
+
+
+
+sub save_cache {
+
+    my ($self) = @_;
+
+    
+
+    # Create cache directory if it doesn't exist
+
+    my $cache_dir = File::Spec->catdir($self->{docs_dir}, '..', 'cache');
+
+    mkdir $cache_dir unless -d $cache_dir;
+
+    
+
+    # Save index to cache
+
+    store($self->{index}, $self->{cache_file});
+
+}
+
+
+
+sub get_document {
+
+    my ($self, $path) = @_;
+
+    return $self->{index}{$path};
+
+}
+
+
+
+sub filter_by_role {
+
+    my ($self, $role) = @_;
+
+    return [] unless $self->{initialized};
+
+    
+
+    my $paths = $self->{by_role}{$role} || [];
+
+    return [map { $self->{index}{$_} } @$paths];
+
+}
+
+
+
+sub filter_by_site {
+
+    my ($self, $site) = @_;
+
+    return [] unless $self->{initialized};
+
+    
+
+    my $all_paths = $self->{by_site}{all} || [];
+
+    my $site_paths = $self->{by_site}{$site} || [];
+
+    
+
+    # Combine paths from 'all' and specific site
+
+    my %unique_paths = map { $_ => 1 } (@$all_paths, @$site_paths);
+
+    
+
+    return [map { $self->{index}{$_} } keys %unique_paths];
+
+}
+
+
+
+sub filter_by_category {
+
+    my ($self, $category) = @_;
+
+    return [] unless $self->{initialized};
+
+    
+
+    my $paths = $self->{by_category}{$category} || [];
+
+    return [map { $self->{index}{$_} } @$paths];
+
+}
+
+
+
+sub filter_by_tag {
+
+    my ($self, $tag) = @_;
+
+    return [] unless $self->{initialized};
+
+    
+
+    my $paths = $self->{by_tag}{$tag} || [];
+
+    return [map { $self->{index}{$_} } @$paths];
+
+}
+
+
+
+sub search {
+
+    my ($self, $query, %options) = @_;
+
+    return [] unless $self->{initialized};
+
+    
+
+    my $role = $options{role};
+
+    my $site = $options{site};
+
+    my $max_results = $options{max_results} || 50;
+
+    
+
+    # Start with all documents
+
+    my @candidates = values %{$self->{index}};
+
+    
+
+    # Filter by role if specified
+
+    if ($role) {
+
+        @candidates = grep {
+
+            my $doc = $_;
+
+            grep { $_ eq $role } @{$doc->{metadata}{roles}};
+
+        } @candidates;
+
+    }
+
+    
+
+    # Filter by site if specified
+
+    if ($site) {
+
+        @candidates = grep {
+
+            my $doc = $_;
+
+            grep { $_ eq 'all' || $_ eq $site } @{$doc->{metadata}{sites}};
+
+        } @candidates;
+
+    }
+
+    
+
+    # Search in title, description, and tags
+
+    my @results = grep {
+
+        my $doc = $_;
+
+        my $metadata = $doc->{metadata};
+
+        
+
+        $metadata->{title} =~ /$query/i ||
+
+        $metadata->{description} =~ /$query/i ||
+
+        grep { $_ =~ /$query/i } @{$metadata->{tags}};
+
+    } @candidates;
+
+    
+
+    # Sort by relevance (title match > tag match > description match)
+
+    @results = sort {
+
+        my $a_score = 0;
+
+        my $b_score = 0;
+
+        
+
+        $a_score += 3 if $a->{metadata}{title} =~ /$query/i;
+
+        $b_score += 3 if $b->{metadata}{title} =~ /$query/i;
+
+        
+
+        $a_score += 2 if grep { $_ =~ /$query/i } @{$a->{metadata}{tags}};
+
+        $b_score += 2 if grep { $_ =~ /$query/i } @{$b->{metadata}{tags}};
+
+        
+
+        $a_score += 1 if $a->{metadata}{description} =~ /$query/i;
+
+        $b_score += 1 if $b->{metadata}{description} =~ /$query/i;
+
+        
+
+        $b_score <=> $a_score;
+
+    } @results;
+
+    
+
+    # Limit results
+
+    if (@results > $max_results) {
+
+        @results = @results[0..($max_results-1)];
+
+    }
+
+    
+
+    return \@results;
+
+}
+
+
+
+sub get_categories {
+
+    my ($self) = @_;
+
+    return [] unless $self->{initialized};
+
+    
+
+    return [sort keys %{$self->{by_category}}];
+
+}
+
+
+
+sub get_tags {
+
+    my ($self) = @_;
+
+    return [] unless $self->{initialized};
+
+    
+
+    return [sort keys %{$self->{by_tag}}];
+
+}
+
+
+
+1;
+
+<code></code>`
+
+
+
+<h3>Documentation Controller Updates</h3>
+
+
+
+<code></code>`perl
+
+package Comserv::Controller::Documentation;
+
+
+
+use strict;
+
+use warnings;
+
+use base 'Catalyst::Controller';
+
+use Comserv::Modules::Documentation::Index;
+
+use File::Spec;
+
+
+
+<h1>Initialize documentation index</h1>
+
+sub BEGIN {
+
+    my $self = shift;
+
+    my $docs_dir = Comserv->path_to('root', 'Documentation', 'docs');
+
+    $self->{docs_index} = Comserv::Modules::Documentation::Index->new(docs_dir => $docs_dir);
+
+    $self->{docs_index}->initialize();
+
+}
+
+
+
+<h1>Main documentation index page</h1>
+
+sub index :Path :Args(0) {
+
+    my ($self, $c) = @_;
+
+    
+
+    # Get user role and site
+
+    my $user_role = $c->user_exists ? $c->user->role : 'normal';
+
+    my $site_name = $c->stash->{site_name} || 'all';
+
+    
+
+    # Get categories
+
+    my $categories = $self->{docs_index}->get_categories();
+
+    
+
+    # Get documents for each category
+
+    my $category_docs = {};
+
+    foreach my $category (@$categories) {
+
+        my $docs = $self->{docs_index}->filter_by_category($category);
+
+        
+
+        # Filter by role and site
+
+        $docs = [grep {
+
+            my $doc = $_;
+
+            my $metadata = $doc->{metadata};
+
+            
+
+            # Check role access
+
+            my $has_role_access = grep { $_ eq $user_role } @{$metadata->{roles}};
+
+            
+
+            # Check site access
+
+            my $has_site_access = grep { $_ eq 'all' || $_ eq $site_name } @{$metadata->{sites}};
+
+            
+
+            $has_role_access && $has_site_access;
+
+        } @$docs];
+
+        
+
+        # Sort by title
+
+        $docs = [sort { $a->{metadata}{title} cmp $b->{metadata}{title} } @$docs];
+
+        
+
+        $category_docs->{$category} = $docs;
+
+    }
+
+    
+
+    # Get configuration
+
+    my $config_file = Comserv->path_to('root', 'Documentation', 'config', 'documentation_config_new.json');
+
+    my $config = $self->_load_config($config_file);
+
+    
+
+    # Stash data for template
+
+    $c->stash->{categories} = $categories;
+
+    $c->stash->{category_docs} = $category_docs;
+
+    $c->stash->{config} = $config;
+
+    $c->stash->{template} = 'documentation/index.tt';
+
+}
+
+
+
+<h1>View a specific document</h1>
+
+sub view :Path('view') :Args(1) {
+
+    my ($self, $c, $path) = @_;
+
+    
+
+    # Get user role and site
+
+    my $user_role = $c->user_exists ? $c->user->role : 'normal';
+
+    my $site_name = $c->stash->{site_name} || 'all';
+
+    
+
+    # Get document
+
+    my $doc = $self->{docs_index}->get_document($path);
+
+    
+
+    # Check if document exists
+
+    unless ($doc) {
+
+        $c->stash->{error} = "Document not found: $path";
+
+        $c->stash->{template} = 'documentation/error.tt';
+
+        return;
+
+    }
+
+    
+
+    # Check role access
+
+    my $metadata = $doc->{metadata};
+
+    my $has_role_access = grep { $_ eq $user_role } @{$metadata->{roles}};
+
+    
+
+    # Check site access
+
+    my $has_site_access = grep { $_ eq 'all' || $_ eq $site_name } @{$metadata->{sites}};
+
+    
+
+    # If user doesn't have access, show error
+
+    unless ($has_role_access && $has_site_access) {
+
+        $c->stash->{error} = "You don't have permission to view this document";
+
+        $c->stash->{template} = 'documentation/error.tt';
+
+        return;
+
+    }
+
+    
+
+    # Read document content
+
+    my $content = $self->_read_document($doc->{path});
+
+    
+
+    # Remove metadata section
+
+    $content =~ s/^---\s*$(.*?)^---\s*$//ms;
+
+    
+
+    # Stash data for template
+
+    $c->stash->{doc} = $doc;
+
+    $c->stash->{content} = $content;
+
+    $c->stash->{template} = 'documentation/view.tt';
+
+}
+
+
+
+<h1>Search documentation</h1>
+
+sub search :Path('search') :Args(0) {
+
+    my ($self, $c) = @_;
+
+    
+
+    # Get search query
+
+    my $query = $c->req->param('q');
+
+    
+
+    # Get user role and site
+
+    my $user_role = $c->user_exists ? $c->user->role : 'normal';
+
+    my $site_name = $c->stash->{site_name} || 'all';
+
+    
+
+    # Search documents
+
+    my $results = $self->{docs_index}->search($query, role => $user_role, site => $site_name);
+
+    
+
+    # Stash data for template
+
+    $c->stash->{query} = $query;
+
+    $c->stash->{results} = $results;
+
+    $c->stash->{template} = 'documentation/search.tt';
+
+}
+
+
+
+<h1>Browse by category</h1>
+
+sub category :Path('category') :Args(1) {
+
+    my ($self, $c, $category) = @_;
+
+    
+
+    # Get user role and site
+
+    my $user_role = $c->user_exists ? $c->user->role : 'normal';
+
+    my $site_name = $c->stash->{site_name} || 'all';
+
+    
+
+    # Get documents for category
+
+    my $docs = $self->{docs_index}->filter_by_category($category);
+
+    
+
+    # Filter by role and site
+
+    $docs = [grep {
+
+        my $doc = $_;
+
+        my $metadata = $doc->{metadata};
+
+        
+
+        # Check role access
+
+        my $has_role_access = grep { $_ eq $user_role } @{$metadata->{roles}};
+
+        
+
+        # Check site access
+
+        my $has_site_access = grep { $_ eq 'all' || $_ eq $site_name } @{$metadata->{sites}};
+
+        
+
+        $has_role_access && $has_site_access;
+
+    } @$docs];
+
+    
+
+    # Sort by title
+
+    $docs = [sort { $a->{metadata}{title} cmp $b->{metadata}{title} } @$docs];
+
+    
+
+    # Get configuration
+
+    my $config_file = Comserv->path_to('root', 'Documentation', 'config', 'documentation_config_new.json');
+
+    my $config = $self->_load_config($config_file);
+
+    
+
+    # Stash data for template
+
+    $c->stash->{category} = $category;
+
+    $c->stash->{category_info} = $config->{categories}{$category};
+
+    $c->stash->{docs} = $docs;
+
+    $c->stash->{template} = 'documentation/category.tt';
+
+}
+
+
+
+<h1>Browse by tag</h1>
+
+sub tag :Path('tag') :Args(1) {
+
+    my ($self, $c, $tag) = @_;
+
+    
+
+    # Get user role and site
+
+    my $user_role = $c->user_exists ? $c->user->role : 'normal';
+
+    my $site_name = $c->stash->{site_name} || 'all';
+
+    
+
+    # Get documents for tag
+
+    my $docs = $self->{docs_index}->filter_by_tag($tag);
+
+    
+
+    # Filter by role and site
+
+    $docs = [grep {
+
+        my $doc = $_;
+
+        my $metadata = $doc->{metadata};
+
+        
+
+        # Check role access
+
+        my $has_role_access = grep { $_ eq $user_role } @{$metadata->{roles}};
+
+        
+
+        # Check site access
+
+        my $has_site_access = grep { $_ eq 'all' || $_ eq $site_name } @{$metadata->{sites}};
+
+        
+
+        $has_role_access && $has_site_access;
+
+    } @$docs];
+
+    
+
+    # Sort by title
+
+    $docs = [sort { $a->{metadata}{title} cmp $b->{metadata}{title} } @$docs];
+
+    
+
+    # Get configuration
+
+    my $config_file = Comserv->path_to('root', 'Documentation', 'config', 'documentation_config_new.json');
+
+    my $config = $self->_load_config($config_file);
+
+    
+
+    # Stash data for template
+
+    $c->stash->{tag} = $tag;
+
+    $c->stash->{tag_info} = $config->{tags}{$tag};
+
+    $c->stash->{docs} = $docs;
+
+    $c->stash->{template} = 'documentation/tag.tt';
+
+}
+
+
+
+<h1>Helper function to load configuration</h1>
+
+sub _load_config {
+
+    my ($self, $file) = @_;
+
+    
+
+    open my $fh, '<', $file or die "Cannot open $file: $!";
+
+    my $json = do { local $/; <$fh> };
+
+    close $fh;
+
+    
+
+    return JSON::decode_json($json);
+
+}
+
+
+
+<h1>Helper function to read document content</h1>
+
+sub _read_document {
+
+    my ($self, $file) = @_;
+
+    
+
+    open my $fh, '<:encoding(UTF-8)', $file or die "Cannot open $file: $!";
+
+    my $content = do { local $/; <$fh> };
+
+    close $fh;
+
+    
+
+    return $content;
+
+}
+
+
+
+1;
+
+<code></code>`
+
+
+
+<h2>Template Updates</h2>
+
+
+
+<h3>Index Template (documentation/index.tt)</h3>
+
+
+
+<code></code>`html
+
+[% WRAPPER site/wrapper.tt title="Documentation" %]
+
+
+
+<div class="documentation-index">
+
+    <h1>Documentation</h1>
+
+    
+
+    <div class="search-box">
+
+        <form action="[% c.uri_for('/documentation/search') %]" method="get">
+
+            <input type="text" name="q" placeholder="Search documentation..." />
+
+            <button type="submit">Search</button>
+
+        </form>
+
+
+    
+
+    <div class="categories">
+
+        [% FOREACH category IN categories %]
+
+            [% category_info = config.categories.$category %]
+
+            [% docs = category_docs.$category %]
+
+            [% IF docs.size > 0 %]
+
+                <div class="category">
+
+                    <h2>
+
+                        <i class="[% category_info.icon %]"></i>
+
+                        <a href="[% c.uri_for('/documentation/category', category) %]">[% category_info.title %]</a>
+
+                    </h2>
+
+                    <p>[% category_info.description %]</p>
+
+                    
+
+                    <ul class="document-list">
+
+                        [% FOREACH doc IN docs %]
+
+                            <li>
+
+                                <a href="[% c.uri_for('/documentation/view', doc.relative_path) %]">
+
+                                    [% doc.metadata.title %]
+
+                                </a>
+
+                                <span class="description">[% doc.metadata.description %]</span>
+
+                            </li>
+
+
+                    </ul>
+
+
+
+
+
+
+
+
+
+<code></code>`
+
+
+
+<h3>View Template (documentation/view.tt)</h3>
+
+
+
+<code></code>`html
+
+[% WRAPPER site/wrapper.tt title=doc.metadata.title %]
+
+
+
+<div class="documentation-view">
+
+    <div class="metadata">
+
+        <h1>[% doc.metadata.title %]</h1>
+
+        
+
+        <div class="meta-info">
+
+            <span class="author">Author: [% doc.metadata.author %]</span>
+
+            <span class="date">Date: [% doc.metadata.date %]</span>
+
+            <span class="status">Status: [% doc.metadata.status %]</span>
+
+
+        
+
+        <div class="tags">
+
+            [% FOREACH tag IN doc.metadata.tags %]
+
+                <a href="[% c.uri_for('/documentation/tag', tag) %]" class="tag">[% tag %]</a>
+
+
+
+
+    
+
+    <div class="content">
+
+        [% content | markdown %]
+
+
+    
+
+    <div class="navigation">
+
+        <div class="categories">
+
+            <h3>Categories:</h3>
+
+            <ul>
+
+                [% FOREACH category IN doc.metadata.categories %]
+
+                    <li><a href="[% c.uri_for('/documentation/category', category) %]">[% config.categories.$category.title %]</a></li>
+
+
+            </ul>
+
+
+
+
+
+
+
+<code></code>`
+
+
+
+<h3>Search Template (documentation/search.tt)</h3>
+
+
+
+<code></code>`html
+
+[% WRAPPER site/wrapper.tt title="Search Results" %]
+
+
+
+<div class="documentation-search">
+
+    <h1>Search Results for "[% query %]"</h1>
+
+    
+
+    <div class="search-box">
+
+        <form action="[% c.uri_for('/documentation/search') %]" method="get">
+
+            <input type="text" name="q" value="[% query %]" placeholder="Search documentation..." />
+
+            <button type="submit">Search</button>
+
+        </form>
+
+
+    
+
+    <div class="results">
+
+        [% IF results.size > 0 %]
+
+            <p>Found [% results.size %] results.</p>
+
+            
+
+            <ul class="document-list">
+
+                [% FOREACH doc IN results %]
+
+                    <li>
+
+                        <a href="[% c.uri_for('/documentation/view', doc.relative_path) %]">
+
+                            [% doc.metadata.title %]
+
+                        </a>
+
+                        <span class="description">[% doc.metadata.description %]</span>
+
+                        <div class="meta">
+
+                            <span class="categories">
+
+                                Categories:
+
+                                [% FOREACH category IN doc.metadata.categories %]
+
+                                    <a href="[% c.uri_for('/documentation/category', category) %]">[% config.categories.$category.title %]</a>
+
+
+                            </span>
+
+                            <span class="tags">
+
+                                Tags:
+
+                                [% FOREACH tag IN doc.metadata.tags %]
+
+                                    <a href="[% c.uri_for('/documentation/tag', tag) %]">[% tag %]</a>
+
+
+                            </span>
+
+
+                    </li>
+
+
+            </ul>
+
+        [% ELSE %]
+
+            <p>No results found for "[% query %]".</p>
+
+
+
+
+
+
+
+<code></code>`
+
+
+
+<h2>Conclusion</h2>
+
+
+
+Adapting the documentation index to work with the new metadata-driven system is a critical component of the documentation structure simplification plan. The new index will provide more flexible filtering and searching capabilities, making it easier for users to find the documentation they need.
+
+
+
+The implementation plan outlined in this document provides a roadmap for developing the necessary components:
+
+
+
+<ol><li>A metadata parser to extract metadata from documentation files</li></ol>
+
+<ol><li>An index module to build and query the documentation index</li></ol>
+
+<ol><li>Controller updates to use the new index for filtering and searching</li></ol>
+
+<ol><li>Template updates to display the index, search results, and document metadata</li></ol>
+
+
+
+By implementing these components, we can create a more powerful and flexible documentation system that leverages the metadata in documentation files to provide better organization and discoverability.
+
+
+
+<h2>Next Steps</h2>
+
+
+
+<ol><li>Implement the metadata parser module</li></ol>
+
+<ol><li>Develop the documentation index module</li></ol>
+
+<ol><li>Update the documentation controller to use the new index</li></ol>
+
+<ol><li>Create new templates for displaying the index and search results</li></ol>
+
+<ol><li>Test the new index with migrated documentation</li></ol>
+
+<ol><li>Deploy the new index to production</li></ol>
+
+
+
+<h2>Related Documentation</h2>
+
+
+
+<ul><li><a href="/Documentation/changelog/2025-05-30-documentation-structure-simplification.md">Documentation Structure Simplification Plan</a></li></ul>
+
+<ul><li><a href="/Documentation/docs/developer/documentation_migration_guide.md">Documentation Migration Guide</a></li></ul>
+
+<ul><li><a href="/Documentation/docs/templates/documentation_template.md">Documentation Template</a></li></ul>
+
+[% END %][% END %]</div>

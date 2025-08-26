@@ -1,0 +1,67 @@
+[% PageVersion = 'Comserv/root/Documentation/models/ThemeConfig.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'ThemeConfig Model' %]
+
+<!-- Documentation page for ThemeConfig -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Overview</h2>
+
+The ThemeConfig model manages theme configuration for the Comserv application. It handles loading, storing, and retrieving theme settings.
+
+
+
+<h2>Key Features</h2>
+
+<ul><li>Manages theme settings for different sites</li></ul>
+
+<ul><li>Provides methods to get and set theme configurations</li></ul>
+
+<ul><li>Handles theme inheritance and overrides</li></ul>
+
+<ul><li>Supports theme switching and customization</li></ul>
+
+
+
+<h2>Methods</h2>
+
+<ul><li><code>get_all_themes</code>: Returns a list of all available themes</li></ul>
+
+<ul><li><code>get_site_theme</code>: Gets the theme for a specific site</li></ul>
+
+<ul><li><code>set_site_theme</code>: Sets the theme for a specific site</li></ul>
+
+<ul><li><code>get_theme_config</code>: Gets the configuration for a specific theme</li></ul>
+
+
+
+<h2>Database Interactions</h2>
+
+This model interacts with the following database tables:
+
+<ul><li>site_themes</li></ul>
+
+<ul><li>theme_configs</li></ul>
+
+<ul><li>theme_variables</li></ul>
+
+
+
+<h2>Related Files</h2>
+
+<ul><li>Theme templates in <code>/root/static/themes/</code></li></ul>
+
+<ul><li>Theme CSS in <code>/root/static/css/themes/</code></li></ul>
+
+</div>

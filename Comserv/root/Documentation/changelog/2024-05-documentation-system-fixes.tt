@@ -1,0 +1,112 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2024-05-documentation-system-fixes.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Documentation System Fixes - May 2024' %]
+
+<!-- Documentation page for 2024-05-documentation-system-fixes -->
+<div class="documentation-content">
+
+<h1>Documentation System Fixes - May 2024</h1>
+
+<h2>Overview</h2>
+<p>This update addresses several issues with the documentation display system:</p>
+
+<ol>
+    <li>Fixed the "All Documentation" section being open by default when the page loads</li>
+    <li>Improved documentation categorization to ensure files appear in the appropriate sections</li>
+    <li>Enhanced the JavaScript toggle functionality to ensure proper section display</li>
+</ol>
+
+<h2>Details</h2>
+
+<h3>Issue 1: All Documentation Section Open by Default</h3>
+<ul>
+    <li>The "All Documentation" section was displaying as open by default, while all other sections were correctly closed</li>
+    <li>Fixed by removing the <code>expanded active</code> classes from the div in <code>all_docs.tt</code></li>
+</ul>
+
+<h3>Issue 2: Empty Categories </h3>
+<ul>
+    <li>Many documentation categories were displaying as empty</li>
+    <li>Fixed by enhancing the categorization logic in <code>ScanMethods.pm</code> to:
+        <ul>
+            <li>Include additional directory paths in category matches</li>
+            <li>Improve filename-based categorization</li>
+            <li>Add debugging output to log the categorization process</li>
+        </ul>
+    </li>
+</ul>
+
+<h3>Issue 3: Site-Specific Documentation Filtering</h3>
+<ul>
+    <li>Improved documentation visibility to follow the requirements:
+        <ul>
+            <li>CSC site name sees all documentation for all site names</li>
+            <li>Other site names only see their own documentation</li>
+            <li>Normal roles see only public documentation</li>
+            <li>Admin roles see admin and developer level documentation</li>
+        </ul>
+    </li>
+</ul>
+
+<h3>Issue 4: JavaScript Toggling</h3>
+<ul>
+    <li>Enhanced the <code>showFileType</code> function to properly:
+        <ul>
+            <li>Hide and remove the expanded class from all sections</li>
+            <li>Add the expanded class to the selected content</li>
+            <li>Handle potential null references</li>
+        </ul>
+    </li>
+</ul>
+
+<h3>Issue 5: Admin User Access Denied</h3>
+<ul>
+    <li>Fixed a critical issue where users with admin role in their session were incorrectly denied access to documentation</li>
+    <li>The error occurred because the code was using a hard-coded "user" role instead of checking the actual session roles</li>
+    <li>Modified the permission checking to:
+        <ul>
+            <li>Never use hardcoded role values</li>
+            <li>Properly check session roles for admin privileges</li>
+            <li>Added additional comments to prevent future issues</li>
+            <li>Updated error template to show accurate role information</li>
+        </ul>
+    </li>
+</ul>
+
+<h3>Issue 6: FAQ and Common Documentation Access</h3>
+<ul>
+    <li>Fixed access issues for common documentation pages like FAQ</li>
+    <li>Added special handling to ensure pages like FAQ are always accessible regardless of user role</li>
+    <li>Implemented auto-detection of FAQ pages in various locations</li>
+    <li>Added a fallback mechanism to check session roles directly for admin privileges</li>
+    <li>Enhanced the error template to clearly show both user_roles and session_roles</li>
+</ul>
+
+<h2>Files Modified</h2>
+<ul>
+    <li><code>/Comserv/root/Documentation/all_docs.tt</code></li>
+    <li><code>/Comserv/lib/Comserv/Controller/Documentation/ScanMethods.pm</code></li>
+    <li><code>/Comserv/root/Documentation/index.tt</code></li>
+    <li><code>/Comserv/lib/Comserv/Controller/Documentation.pm</code></li>
+    <li><code>/Comserv/root/Documentation/error.tt</code></li>
+</ul>
+
+<h2>Testing Instructions</h2>
+<ol>
+    <li>Load the documentation page with a non-admin user role</li>
+    <li>Verify all sections are closed by default</li>
+    <li>Verify clicking on section headers expands/collapses content</li>
+    <li>Log in as admin on CSC site to verify all categories are populated</li>
+    <li>Log in as admin on other sites to verify they only see site-specific content</li>
+</ol>
+
+<h2>Related Links</h2>
+<ul>
+    <li><a href="/Documentation/view/Documentation">Original Documentation Controller</a></li>
+    <li><a href="/Documentation/view/templates">Documentation Templates</a></li>
+</ul>
+
+</div>

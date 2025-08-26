@@ -1,0 +1,161 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2025-05-25-git-pull-debug-msg-fix.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Git Pull Debug Message Fix' %]
+
+<!-- Documentation page for 2025-05-25-git-pull-debug-msg-fix -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**File:** /home/shanta/PycharmProjects/comserv/Comserv/docs/2025-05-25-git-pull-debug-msg-fix.md  
+
+**Date:** May 25, 2025  
+
+**Author:** System Administrator  
+
+**Status:** Implemented
+
+
+
+<h2>Overview</h2>
+
+
+
+This document outlines the fix for an issue in the Git pull functionality where the application was throwing an error when trying to use <code>debug_msg</code> as an array reference. The error occurred because in some cases, <code>debug_msg</code> was being set as a string instead of an array reference.
+
+
+
+<h2>Issue Description</h2>
+
+
+
+The following error was occurring when accessing the Git pull functionality:
+
+
+
+<code></code>`
+
+Caught exception in Comserv::Controller::Admin->git_pull "Can't use string ("Using Catalyst's built-in proxy "...) as an ARRAY ref while "strict refs" in use at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm line 836."
+
+<code></code>`
+
+
+
+The issue was that the code was trying to push values to <code>$c->stash->{debug_msg}</code> assuming it was always an array reference, but in some cases it was being set as a string.
+
+
+
+<h2>Changes Made</h2>
+
+
+
+<h3>1. Added Type Checking for debug_msg</h3>
+
+
+
+Modified the code to check if <code>debug_msg</code> is an array reference before pushing to it, and to convert it to an array if it's not:
+
+
+
+<code></code>`perl
+
+<h1>Initialize debug messages array</h1>
+
+<h1>Make sure debug_msg is an array reference</h1>
+
+if (!defined $c->stash->{debug_msg}) {
+
+    $c->stash->{debug_msg} = [];
+
+} elsif (!ref($c->stash->{debug_msg}) || ref($c->stash->{debug_msg}) ne 'ARRAY') {
+
+    # If debug_msg exists but is not an array reference, convert it to an array
+
+    my $original_msg = $c->stash->{debug_msg};
+
+    $c->stash->{debug_msg} = [];
+
+    push @{$c->stash->{debug_msg}}, $original_msg if $original_msg;
+
+}
+
+<code></code>`
+
+
+
+<h3>2. Added Safety Checks Throughout the Method</h3>
+
+
+
+Added similar safety checks at all points in the method where values are pushed to <code>debug_msg</code>:
+
+
+
+<code></code>`perl
+
+<h1>Ensure debug_msg is an array reference before pushing</h1>
+
+$c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
+
+push @{$c->stash->{debug_msg}}, "Some debug message";
+
+<code></code>`
+
+
+
+<h2>Benefits</h2>
+
+
+
+<ol><li>**Improved Robustness**: The code now handles cases where <code>debug_msg</code> might be a string instead of an array reference</li></ol>
+
+<ol><li>**Better Error Handling**: Prevents the application from crashing when <code>debug_msg</code> is not of the expected type</li></ol>
+
+<ol><li>**Preserved Debug Information**: Converts existing string messages to array elements instead of losing them</li></ol>
+
+
+
+<h2>Testing</h2>
+
+
+
+The fix was tested to ensure:
+
+
+
+<ol><li>The Git pull functionality works correctly when <code>debug_msg</code> is not defined</li></ol>
+
+<ol><li>The Git pull functionality works correctly when <code>debug_msg</code> is a string</li></ol>
+
+<ol><li>The Git pull functionality works correctly when <code>debug_msg</code> is already an array reference</li></ol>
+
+<ol><li>Debug messages are properly displayed in the template</li></ol>
+
+
+
+<h2>Affected Files</h2>
+
+
+
+<ul><li><code>/home/shanta/PycharmProjects/comserv/Comserv/lib/Comserv/Controller/Admin.pm</code></li></ul>
+
+
+
+<h2>Related Documentation</h2>
+
+
+
+<ul><li><a href="/home/shanta/PycharmProjects/comserv/Comserv/root/Documentation/changelog/2025-04-git-pull-functionality.md">Git Pull Functionality for Administrators</a></li></ul>
+
+<ul><li><a href="/home/shanta/PycharmProjects/comserv/Comserv/docs/2025-05-25-git-pull-routing-fix.md">Git Pull Routing Fix</a></li></ul>
+
+</div>

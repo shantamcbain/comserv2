@@ -1,0 +1,352 @@
+[% PageVersion = 'Comserv/root/Documentation/developer/documentation_role_access.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Documentation System Role-Based Access Control' %]
+
+<!-- Documentation page for documentation_role_access -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**Last Updated:** April 10, 2025  
+
+**Author:** Shanta
+
+
+
+<h2>Overview</h2>
+
+
+
+This document explains how role-based access control works in the Documentation system. The Documentation system uses a combination of user roles and session roles to determine which documentation categories and pages a user can access.
+
+
+
+<h2>Role Detection</h2>
+
+
+
+The Documentation controller uses the following process to determine a user's role:
+
+
+
+<ol><li>First, it checks the session roles array (<code>$c->session->{roles}</code>)</li></ol>
+
+<ol><li>If the session roles array contains 'admin', the user is given admin access</li></ol>
+
+<ol><li>If no admin role is found but other roles exist, the first role is used</li></ol>
+
+<ol><li>If no session roles are found but the user is authenticated, it falls back to <code>$c->user->role</code></li></ol>
+
+<ol><li>If no role can be determined, the default role 'normal' is used</li></ol>
+
+
+
+<h3>Code Example</h3>
+
+
+
+<code></code>`perl
+
+<h1>Get the current user's role</h1>
+
+my $user_role = 'normal';  # Default to normal user
+
+
+
+<h1>First check session roles (this works even if user is not fully authenticated)</h1>
+
+if ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && @{$c->session->{roles}}) {
+
+    # If user has multiple roles, prioritize admin role
+
+    if (grep { $_ eq 'admin' } @{$c->session->{roles}}) {
+
+        $user_role = 'admin';
+
+    } else {
+
+        # Otherwise use the first role
+
+        $user_role = $c->session->{roles}->[0];
+
+    }
+
+}
+
+<h1>If no role found in session but user exists, try to get role from user object</h1>
+
+elsif ($c->user_exists) {
+
+    $user_role = $c->user->role || 'normal';
+
+}
+
+<code></code>`
+
+
+
+<h2>Category Access Control</h2>
+
+
+
+Each documentation category has a list of roles that are allowed to access it. The system uses the following process to determine if a user can access a category:
+
+
+
+<ol><li>If the user is an admin (either by <code>user_role</code> or session roles), they can access all categories</li></ol>
+
+<ol><li>Otherwise, the system checks if any of the user's roles match the roles allowed for the category</li></ol>
+
+<ol><li>There's a special case for the 'normal' role, which grants access to any authenticated user</li></ol>
+
+
+
+<h3>Code Example</h3>
+
+
+
+<code></code>`perl
+
+<h1>Skip if the user doesn't have the required role</h1>
+
+<h1>But always include for admins (check both user_role and session roles)</h1>
+
+my $has_role = ($user_role eq 'admin'); # Check if user_role is admin
+
+
+
+<h1>Also check if admin is in session roles</h1>
+
+if (!$has_role && $c->session->{roles} && ref $c->session->{roles} eq 'ARRAY') {
+
+    $has_role = grep { $_ eq 'admin' } @{$c->session->{roles}};
+
+}
+
+
+
+<h1>If still not admin, check for other matching roles</h1>
+
+unless ($has_role) {
+
+    foreach my $role (@{$category->{roles}}) {
+
+        # Check if role matches user_role or is in session roles
+
+        if ($role eq $user_role) {
+
+            $has_role = 1;
+
+            last;
+
+        }
+
+        # Check session roles
+
+        elsif ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY') {
+
+            if (grep { $_ eq $role } @{$c->session->{roles}}) {
+
+                $has_role = 1;
+
+                last;
+
+            }
+
+        }
+
+        # Special case for normal role
+
+        elsif ($role eq 'normal' && $user_role) {
+
+            $has_role = 1;
+
+            last;
+
+        }
+
+    }
+
+}
+
+<code></code>`
+
+
+
+<h2>Page Access Control</h2>
+
+
+
+Similar to categories, each documentation page has metadata that includes a list of roles that are allowed to access it. The system uses a similar process to determine if a user can access a page:
+
+
+
+<ol><li>If the user is an admin, they can access all pages</li></ol>
+
+<ol><li>Otherwise, the system checks if any of the user's roles match the roles allowed for the page</li></ol>
+
+<ol><li>There's also a site-specific check to ensure users only see pages relevant to their site (unless they're admins)</li></ol>
+
+
+
+<h3>Code Example</h3>
+
+
+
+<code></code>`perl
+
+<h1>Check if user is admin (either by user_role or session roles)</h1>
+
+my $is_admin = ($user_role eq 'admin');
+
+
+
+<h1>Also check if admin is in session roles</h1>
+
+if (!$is_admin && $c->session->{roles} && ref $c->session->{roles} eq 'ARRAY') {
+
+    $is_admin = grep { $_ eq 'admin' } @{$c->session->{roles}};
+
+}
+
+
+
+<h1>Skip if this is site-specific documentation for a different site</h1>
+
+<h1>But allow admins to see all site-specific documentation</h1>
+
+if ($metadata->{site} ne 'all' && $metadata->{site} ne $site_name) {
+
+    # Only skip for non-admins
+
+    next unless $is_admin;
+
+}
+
+
+
+<h1>Skip if the user doesn't have the required role</h1>
+
+<h1>But always include for admins</h1>
+
+my $has_role = $is_admin; # Admins can see everything
+
+
+
+unless ($has_role) {
+
+    foreach my $role (@{$metadata->{roles}}) {
+
+        # Check various role conditions...
+
+    }
+
+}
+
+<code></code>`
+
+
+
+<h2>Template Role Checking</h2>
+
+
+
+In the template, role-based access control is implemented using Template Toolkit conditionals:
+
+
+
+<code></code>`tt
+
+<!-- Admin Documentation Sections - Only visible to administrators -->
+
+[% IF user_role == 'admin' || c.session.roles.grep('admin').size %]
+
+    <!-- Admin-only content here -->
+
+
+<code></code>`
+
+
+
+<h2>Debugging Role Issues</h2>
+
+
+
+If you're experiencing issues with role-based access control, you can enable debug mode in the session:
+
+
+
+<code></code>`perl
+
+$c->session->{debug_mode} = 1;
+
+<code></code>`
+
+
+
+This will display detailed debug information on the documentation index page, including:
+
+
+
+<ul><li>User role from the controller</li></ul>
+
+<ul><li>Display role from the template</li></ul>
+
+<ul><li>Session roles</li></ul>
+
+<ul><li>Available admin categories</li></ul>
+
+<ul><li>Other role-related information</li></ul>
+
+
+
+<h2>Best Practices</h2>
+
+
+
+<ol><li>**Always check both user_role and session roles**: Some parts of the application may set only one of these</li></ol>
+
+<ol><li>**Prioritize admin role**: If a user has multiple roles including admin, always use the admin role</li></ol>
+
+<ol><li>**Log role decisions**: Add logging statements to help diagnose access control issues</li></ol>
+
+<ol><li>**Use consistent role checking**: Use the same approach to role checking across the application</li></ol>
+
+<ol><li>**Add debug information**: Include debug information to help diagnose role-related issues</li></ol>
+
+
+
+<h2>Common Issues</h2>
+
+
+
+<ol><li>**User has admin in session roles but can't see admin content**: Make sure the template is checking both <code>user_role</code> and <code>c.session.roles</code></li></ol>
+
+<ol><li>**Admin categories not appearing**: Check if the categories exist and if the filtering logic is correctly identifying admin users</li></ol>
+
+<ol><li>**Role detection inconsistency**: Ensure that role detection is consistent across the application</li></ol>
+
+
+
+<h2>Future Improvements</h2>
+
+
+
+<ol><li>Create a unified role management system</li></ol>
+
+<ol><li>Implement more granular permission controls</li></ol>
+
+<ol><li>Add a role management interface for administrators</li></ol>
+
+<ol><li>Improve logging and debugging for role-based access control</li></ol>
+
+[% END %]</div>

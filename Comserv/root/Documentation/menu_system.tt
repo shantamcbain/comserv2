@@ -1,0 +1,156 @@
+[% PageVersion = 'Comserv/root/Documentation/menu_system.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Menu System Documentation' %]
+
+<!-- Documentation page for menu_system -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Overview</h2>
+
+The menu system in Comserv provides navigation throughout the application. It uses a combination of CSS and JavaScript to create dropdown menus and submenus.
+
+
+
+<h2>Components</h2>
+
+
+
+<h3>CSS Files</h3>
+
+<ul><li><code>menu.css</code>: Contains all styling for menus, dropdowns, and submenus</li></ul>
+
+<ul><li><code>components/navigation.css</code>: Contains additional navigation-specific styling</li></ul>
+
+
+
+<h3>JavaScript Files</h3>
+
+<ul><li><code>menu.js</code>: Handles all menu functionality including dropdowns and submenus</li></ul>
+
+
+
+<h2>Recent Fixes</h2>
+
+
+
+<h3>Menu Dropdown Issues (October 2025)</h3>
+
+The admin top menu dropdown lists were not displaying properly. When hovering over menu items, the dropdown lists would appear as blank boxes with no items visible, and submenus were not functioning.
+
+
+
+<h4>Root Causes</h4>
+
+<ol><li>Event listeners not being properly reinitialized after page navigation</li></ol>
+
+<ol><li>CSS color variables not properly following the site's theme</li></ol>
+
+<ol><li>Submenu positioning issues on different screen sizes</li></ol>
+
+
+
+<h4>Solution</h4>
+
+<ol><li>Restructured the JavaScript to reinitialize menus after page loads and AJAX updates</li></ol>
+
+<ol><li>Updated CSS to use theme variables consistently</li></ol>
+
+<ol><li>Improved submenu positioning logic</li></ol>
+
+<ol><li>Added proper event handling for both mouse and touch interactions</li></ol>
+
+
+
+<h4>Implementation Details</h4>
+
+<ul><li>Consolidated all menu functionality into <code>menu.js</code></li></ul>
+
+<ul><li>Removed duplicate admin-specific menu files</li></ul>
+
+<ul><li>Updated CSS to use theme variables for colors</li></ul>
+
+<ul><li>Added event listeners that properly handle menu state across page navigations</li></ul>
+
+
+
+<h2>Usage</h2>
+
+To implement a menu in a template:
+
+
+
+<code></code>`html
+
+<link rel="stylesheet" href="/static/css/menu.css">
+
+<link rel="stylesheet" href="/static/css/components/navigation.css">
+
+<script src="/static/js/menu.js"></script>
+
+
+
+<ul class="horizontal-menu">
+
+    <li class="horizontal-dropdown">
+
+        <a href="/path" class="dropbtn">Menu Item</a>
+
+        <div class="dropdown-content">
+
+            <a href="/subpath">Dropdown Item</a>
+
+            
+
+            <!-- Submenu Example -->
+
+            <div class="submenu-item">
+
+                <span class="submenu-header">Submenu Title</span>
+
+                <div class="submenu">
+
+                    <a href="/submenu-item">Submenu Item</a>
+
+
+
+
+    </li>
+
+</ul>
+
+<code></code>`
+
+
+
+<h2>Theming</h2>
+
+The menu system uses CSS variables for theming:
+
+
+
+<ul><li><code>--nav-bg</code>: Background color for navigation elements</li></ul>
+
+<ul><li><code>--nav-text</code>: Text color for navigation elements</li></ul>
+
+<ul><li><code>--nav-hover-bg</code>: Background color for hover states</li></ul>
+
+<ul><li><code>--dropdown-bg</code>: Background color for dropdown menus</li></ul>
+
+<ul><li><code>--border-color</code>: Color for borders</li></ul>
+
+<ul><li><code>--text-color</code>: General text color</li></ul>
+
+<ul><li><code>--text-muted</code>: Color for less prominent text</li></ul>
+
+</div>

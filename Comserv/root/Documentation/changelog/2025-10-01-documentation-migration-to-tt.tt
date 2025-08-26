@@ -1,9 +1,9 @@
+[% META title = '    Documentation Migration to Template Toolkit (.tt) Files' %]
 [% PageVersion = 'Comserv/root/Documentation/changelog/2025-10-01-documentation-migration-to-tt.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
-[% META title = '    Documentation Migration to Template Toolkit (.tt) Files' %]
 
 <!-- Documentation page for     Documentation Migration to Template Toolkit (.tt) Files -->
 <div class="documentation-content">

@@ -1,0 +1,134 @@
+[% PageVersion = 'Comserv/root/Documentation/admin/theme_mappings_handling.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Theme Mappings Handling in Git Pull' %]
+
+<!-- Documentation page for theme_mappings_handling -->
+<div class="documentation-content">
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Overview</h2>
+
+
+
+The Comserv system has been enhanced to automatically handle changes to the <code>theme_mappings.json</code> file during Git pull operations. This feature is particularly useful for production servers where local theme configurations may differ from the repository version.
+
+
+
+<h2>How It Works</h2>
+
+
+
+When you use the Admin Git Pull feature, the system will:
+
+
+
+<ol><li>Detect if you have local changes to <code>theme_mappings.json</code></li></ol>
+
+<ol><li>Create a backup of your local version at <code>theme_mappings.json.bak</code></li></ol>
+
+<ol><li>Stash your changes using Git's stash functionality</li></ol>
+
+<ol><li>Pull the latest changes from the repository</li></ol>
+
+<ol><li>Attempt to reapply your local changes automatically</li></ol>
+
+<ol><li>Provide clear feedback about the process</li></ol>
+
+
+
+<h2>Benefits</h2>
+
+
+
+<ul><li>**Preserves Local Customizations**: Your site-specific theme mappings are preserved</li></ul>
+
+<ul><li>**Reduces Merge Conflicts**: Handles the common conflict scenario automatically</li></ul>
+
+<ul><li>**Provides Safety Nets**: Creates backups before any operations</li></ul>
+
+<ul><li>**Improves Workflow**: No need to manually stash/unstash or resolve conflicts</li></ul>
+
+
+
+<h2>Handling Conflicts</h2>
+
+
+
+If there are conflicts between your local changes and the repository version:
+
+
+
+<ol><li>The system will notify you with a warning message</li></ol>
+
+<ol><li>Your original file is preserved as <code>theme_mappings.json.bak</code></li></ol>
+
+<ol><li>You can manually resolve the conflict by:</li></ol>
+
+   - Editing the current file to merge changes
+
+   - Restoring from the backup if needed
+
+   - Using Git's conflict resolution tools
+
+
+
+<h2>Best Practices</h2>
+
+
+
+While this feature helps manage theme configuration conflicts, consider these best practices:
+
+
+
+<ol><li>**Database Storage**: For a more robust solution, consider moving theme mappings to the database</li></ol>
+
+<ol><li>**Environment Configuration**: Use environment-specific configuration files that are excluded from Git</li></ol>
+
+<ol><li>**Documentation**: Document any production-specific theme mappings for reference</li></ol>
+
+
+
+<h2>Troubleshooting</h2>
+
+
+
+If you encounter issues with the automatic handling:
+
+
+
+<ol><li>Check the backup file at <code>Comserv/root/static/config/theme_mappings.json.bak</code></li></ol>
+
+<ol><li>View the Git stash with <code>git stash list</code> to see if your changes were saved</li></ol>
+
+<ol><li>Apply the stash manually with <code>git stash apply</code> if needed</li></ol>
+
+<ol><li>Check the application logs for detailed error messages</li></ol>
+
+
+
+<h2>Future Enhancements</h2>
+
+
+
+Future versions may include:
+
+
+
+<ol><li>Database-driven theme configuration</li></ol>
+
+<ol><li>Environment-specific configuration files</li></ol>
+
+<ol><li>Web interface for managing theme mappings</li></ol>
+
+<ol><li>More sophisticated conflict resolution</li></ol>
+
+</div>
