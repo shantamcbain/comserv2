@@ -1,0 +1,60 @@
+{
+   "abstract" : "Template interface to the DBI module",
+   "author" : [
+      "Andy Wardley <abw@wardley.org>, Jens Rehsack <rehsack@cpan.org>"
+   ],
+   "dynamic_config" : 0,
+   "generated_by" : "ExtUtils::MakeMaker version 6.56, CPAN::Meta::Converter version 2.150010",
+   "license" : [
+      "perl_5"
+   ],
+   "meta-spec" : {
+      "url" : "http://search.cpan.org/perldoc?CPAN::Meta::Spec",
+      "version" : 2
+   },
+   "name" : "Template-DBI",
+   "no_index" : {
+      "directory" : [
+         "t",
+         "inc"
+      ]
+   },
+   "prereqs" : {
+      "build" : {
+         "requires" : {
+            "MLDBM" : "0",
+            "SQL::Statement" : "1.28"
+         }
+      },
+      "configure" : {
+         "requires" : {
+            "ExtUtils::MakeMaker" : "0"
+         }
+      },
+      "runtime" : {
+         "recommends" : {
+            "MLDBM" : "0",
+            "SQL::Statement" : "1.28",
+            "threads::variable::reap" : "0.05"
+         },
+         "requires" : {
+            "DBI" : "1.612",
+            "Template" : "2.22",
+            "perl" : "5.008"
+         }
+      }
+   },
+   "release_status" : "stable",
+   "resources" : {
+      "license" : [
+         "http://dev.perl.org/licenses/"
+      ],
+      "repository" : {
+         "type" : "svn",
+         "url" : "svn://svn.tt2.org/tt/Template-DBI/trunk/"
+      },
+      "x_MailingList" : "mailto:templates@template-toolkit.org"
+   },
+   "version" : "2.65",
+   "x_serialization_backend" : "JSON::PP version 4.16"
+}

@@ -1,0 +1,1 @@
+{"target":"PDF::TextBlock","dist":"PDF-TextBlock-0.13","name":"PDF::TextBlock","provides":{"PDF::TextBlock":{"version":"0.13","file":"lib/PDF/TextBlock.pm"},"PDF::TextBlock::Font":{"version":"0.04","file":"lib/PDF/TextBlock/Font.pm"}},"pathname":"J/JH/JHANNAH/PDF-TextBlock-0.13.tar.gz","version":"0.13"}

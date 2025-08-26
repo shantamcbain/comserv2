@@ -1,0 +1,734 @@
+Deleted old log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/archive/application.log_20250714_163145
+WARN: [2025-07-16 19:11:42] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/setup.svg
+WARN: [2025-07-16 19:11:57] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/domain.svg
+WARN: [2025-07-16 19:12:05] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/debug.svg
+WARN: [2025-07-16 19:12:20] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/add.svg
+WARN: [2025-07-18 12:39:53] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/dashboard.svg
+WARN: [2025-07-18 12:39:56] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/mail.svg
+WARN: [2025-07-18 12:43:38] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/documentation.svg
+WARN: [2025-07-18 12:43:44] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/log.svg
+WARN: [2025-07-18 12:43:49] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/setup.svg
+WARN: [2025-07-18 12:43:54] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/debug.svg
+WARN: [2025-07-18 12:43:59] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/domain.svg
+WARN: [2025-07-18 12:44:04] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/add.svg
+WARN: [2025-07-18 12:44:19] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/edit.svg
+WARN: [2025-07-18 12:44:24] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/day.svg
+WARN: [2025-07-18 12:44:29] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/week.svg
+WARN: [2025-07-18 12:44:34] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/month.svg
+WARN: [2025-07-18 12:44:39] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/tables.svg
+WARN: [2025-07-18 12:44:44] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/upload.svg
+WARN: [2025-07-18 12:44:54] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/settings.svg
+WARN: [2025-07-18 12:44:59] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/mail-config.svg
+WARN: [2025-07-18 12:45:04] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/user-list.svg
+WARN: [2025-07-18 12:45:10] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/css.svg
+WARN: [2025-07-18 12:45:15] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/schema.svg
+WARN: [2025-07-18 12:45:20] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/network.svg
+WARN: [2025-07-19 16:08:23] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:41] begin - Unauthorized access attempt by user: Guest
+WARN: [2025-07-19 16:08:38] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/dashboard.svg
+WARN: [2025-07-19 16:08:42] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/mail.svg
+WARN: [2025-07-19 16:09:17] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/setup.svg
+WARN: [2025-07-19 16:09:22] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/domain.svg
+WARN: [2025-07-19 16:09:27] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/documentation.svg
+WARN: [2025-07-19 16:09:32] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/debug.svg
+WARN: [2025-07-19 16:09:37] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/log.svg
+WARN: [2025-07-19 16:09:42] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/add.svg
+WARN: [2025-07-19 16:09:48] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/edit.svg
+WARN: [2025-07-19 16:10:07] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/day.svg
+WARN: [2025-07-19 16:10:37] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/week.svg
+WARN: [2025-07-19 16:10:42] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/month.svg
+WARN: [2025-07-19 16:10:47] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/tables.svg
+WARN: [2025-07-19 16:10:52] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/upload.svg
+ERROR: [2025-07-19 16:13:10] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:351] fetch_projects_with_subprojects - Error fetching top-level projects: Can't locate object method "all" via package "17" (perhaps you forgot to load "17"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 335.
+
+WARN: [2025-07-19 20:02:27] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:41] begin - Unauthorized access attempt by user: Guest
+WARN: [2025-07-20 07:07:22] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/dashboard.svg
+WARN: [2025-07-20 07:07:29] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/mail.svg
+WARN: [2025-07-20 07:09:01] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/documentation.svg
+WARN: [2025-07-20 07:09:06] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/log.svg
+WARN: [2025-07-20 07:09:11] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/domain.svg
+WARN: [2025-07-20 07:09:16] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/setup.svg
+WARN: [2025-07-20 07:09:31] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/debug.svg
+WARN: [2025-07-20 07:09:36] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/add.svg
+WARN: [2025-07-20 07:09:41] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/edit.svg
+WARN: [2025-07-20 07:09:47] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/day.svg
+WARN: [2025-07-20 07:09:52] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/week.svg
+WARN: [2025-07-20 07:10:12] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/month.svg
+WARN: [2025-07-20 07:10:17] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/tables.svg
+WARN: [2025-07-20 07:10:22] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/upload.svg
+WARN: [2025-07-20 07:10:27] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/settings.svg
+WARN: [2025-07-20 07:10:32] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/mail-config.svg
+WARN: [2025-07-20 07:10:37] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/register.svg
+WARN: [2025-07-20 08:15:53] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /mail/lists/1/edit
+WARN: [2025-07-20 08:15:58] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/home.svg
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-20 15:42:35] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-20 19:34:15] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+ERROR: [2025-07-21 16:47:42] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:355] track_application_start - Error parsing JSON: garbage after JSON object, at character offset 12687 (before "{"completed_items":[...") at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm line 352.
+
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-28 10:05:49] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-28 11:19:18] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+ERROR: [2025-07-28 14:11:27] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:355] track_application_start - Error parsing JSON: garbage after JSON object, at character offset 12687 (before "{"completed_items":[...") at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm line 352.
+
+WARN: [2025-07-28 14:12:11] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/dashboard.svg
+WARN: [2025-07-28 14:12:15] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/home.svg
+WARN: [2025-07-28 14:12:29] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/mail.svg
+WARN: [2025-07-28 14:13:05] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/workshop.svg
+WARN: [2025-07-28 14:16:56] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/documentation.svg
+WARN: [2025-07-28 14:17:02] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/log.svg
+WARN: [2025-07-28 14:17:08] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/setup.svg
+WARN: [2025-07-28 14:17:13] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/domain.svg
+WARN: [2025-07-28 14:17:18] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /static/images/icons/debug.svg
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-28 14:17:27] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-28 14:17:54] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-28 14:18:06] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+ERROR: [2025-07-28 14:18:18] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm:146] get_site_details_by_name - Error fetching site details: DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Table 'shanta_forager.sites' doesn't exist [for Statement "SELECT `me`.`id`, `me`.`name`, `me`.`description`, `me`.`affiliate`, `me`.`pid`, `me`.`auth_table`, `me`.`home_view`, `me`.`app_logo`, `me`.`app_logo_alt`, `me`.`app_logo_width`, `me`.`app_logo_height`, `me`.`css_view_name`, `me`.`mail_from`, `me`.`mail_to`, `me`.`mail_to_discussion`, `me`.`mail_to_admin`, `me`.`mail_to_user`, `me`.`mail_to_client`, `me`.`mail_replyto`, `me`.`site_display_name`, `me`.`document_root_url`, `me`.`link_target`, `me`.`http_header_params`, `me`.`image_root_url`, `me`.`global_datafiles_directory`, `me`.`templates_cache_directory`, `me`.`app_datafiles_directory`, `me`.`datasource_type`, `me`.`cal_table`, `me`.`http_header_description`, `me`.`http_header_keywords` FROM `sites` `me` WHERE ( `me`.`name` = ? )" with ParamValues: 1='CSC'] at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm line 129
+
+ERROR: [2025-07-28 14:18:18] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:996] site_setup - No site found for SiteName: CSC
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-28 14:18:20] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-28 14:23:37] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-28 14:30:49] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-28 14:35:00] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-28 14:52:53] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-28 15:01:59] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-29 08:46:19] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-29 09:13:52] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-29 09:15:08] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+WARN: [2025-07-29 09:15:55] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:1756] schema_compare - Access denied: User does not have admin role
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-29 09:53:03] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+ERROR: [2025-07-29 10:12:45] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:5662] create_table_from_result - Failed to create table from result 'Participant'
+WARN: [2025-07-29 12:40:41] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:1756] schema_compare - Access denied: User does not have admin role
+WARN: [2025-07-29 12:45:29] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /admin/schema_manager
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-29 14:09:09] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-29 14:18:16] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+WARN: [2025-07-29 14:18:30] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:1756] schema_compare - Access denied: User does not have admin role
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-29 14:36:08] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+ERROR: [2025-07-29 14:38:19] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:2661] get_database_comparison - Error connecting to ency database: Can't locate object method "create_field_comparison" via package "Comserv::Controller::Admin" at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm line 3029.
+
+ERROR: [2025-07-29 14:38:19] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:2715] get_database_comparison - Error connecting to forager database: Can't locate object method "create_field_comparison" via package "Comserv::Controller::Admin" at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm line 3029.
+
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-29 14:55:23] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+WARN: [2025-07-29 15:04:18] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:1756] schema_compare - Access denied: User does not have admin role
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-29 15:07:10] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+WARN: [2025-07-29 15:10:37] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:1756] schema_compare - Access denied: User does not have admin role
+WARN: [2025-07-29 15:11:30] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:1756] schema_compare - Access denied: User does not have admin role
+ERROR: [2025-07-29 16:28:59] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:2714] _read_file_content - File not found or not readable: /home/shanta/PycharmProjects/comserv2/Comserv/root/Ve7tit.tt (exists: NO, is_file: NO, readable: NO)
+ERROR: [2025-07-29 16:28:59] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:2714] _read_file_content - File not found or not readable: /home/shanta/PycharmProjects/comserv2/Comserv/root/Mail.tt (exists: NO, is_file: NO, readable: NO)
+ERROR: [2025-07-29 16:29:35] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:2714] _read_file_content - File not found or not readable: /home/shanta/PycharmProjects/comserv2/Comserv/root/Ve7tit.tt (exists: NO, is_file: NO, readable: NO)
+ERROR: [2025-07-29 16:29:35] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:2714] _read_file_content - File not found or not readable: /home/shanta/PycharmProjects/comserv2/Comserv/root/Mail.tt (exists: NO, is_file: NO, readable: NO)
+ERROR: [2025-07-29 16:29:40] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:2714] _read_file_content - File not found or not readable: /home/shanta/PycharmProjects/comserv2/Comserv/root/Ve7tit.tt (exists: NO, is_file: NO, readable: NO)
+ERROR: [2025-07-29 16:29:40] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:2714] _read_file_content - File not found or not readable: /home/shanta/PycharmProjects/comserv2/Comserv/root/Mail.tt (exists: NO, is_file: NO, readable: NO)
+WARN: [2025-07-29 19:43:09] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:1756] schema_compare - Access denied: User does not have admin role
+WARN: [2025-07-29 19:47:45] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:143] index - Access denied: User does not have admin role
+WARN: [2025-07-29 20:10:37] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1414] default - Page not found: /admin/sync_field_to_table
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-29 20:21:21] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+ERROR: [2025-07-29 20:26:08] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:5156] sync_field_to_result - Error syncing field to result: Result file not found for table 'internal_links_tb' at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm line 5539, <$fh> line 1.
+
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-29 20:29:13] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+ERROR: [2025-07-29 20:32:24] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:5241] sync_field_to_table - Error syncing field to table: Result file not found for table 'custom_menu' at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm line 5438, <$fh> line 1.
+
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-29 20:34:44] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+ERROR: [2025-07-29 20:36:50] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:5241] sync_field_to_table - Result file not found for table 'custom_menu' at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm line 5451, <$fh> line 1.
+
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-29 20:42:18] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+ERROR: [2025-07-29 20:46:14] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:5156] sync_field_to_result - Field 'icon_class' not found in table 'custom_menu' at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm line 5319, <$fh> line 1.
+
+ERROR: [2025-07-29 20:47:25] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:5241] sync_field_to_table - Result file not found for table 'custom_menu' at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm line 5451, <$fh> line 1.
+
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-29 21:03:02] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-29 21:12:14] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-29 21:20:42] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-30 06:58:55] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/CONTROLLER/PROJECT.PM: [2025-07-30 07:00:41] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/CONTROLLER/PROJECT.PM] [15:0] Starting index action - No message provided
+ERROR: [2025-07-30 07:19:36] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:788] todo.create.failed - Failed to create todo after 1 retries: DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Column 'project_id' cannot be null [for Statement "INSERT INTO `todo` ( `accumulative_time`, `comments`, `company_code`, `date_time_posted`, `description`, `developer`, `due_date`, `estimated_man_hours`, `group_of_poster`, `last_mod_by`, `last_mod_date`, `owner`, `parent_todo`, `priority`, `project_code`, `project_id`, `record_id`, `reporter`, `share`, `sitename`, `start_date`, `status`, `subject`, `time_of_day`, `user_id`, `username_of_poster`) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )" with ParamValues: 1=0, 2=undef, 3=undef, 4=undef, 5="work on getting the application to load the backend one uless not avaible. ", 6=undef, 7="2025-07-30", 8="1", 9=ARRAY(0x57c20adac620), 10='Shanta', 11='2025-07-30', 12=undef, 13=0, 14="1", 15='default_code', 16=undef, 17=undef, 18=undef, 19=0, 20="CSC", 21="2025-07-30", 22="2", 23="work on getting the application to load the backend one uless not avaible. ", 24="07:16", 25=178, 26='Shanta'] at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm line 736
+
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-30 07:24:20] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-30 07:31:40] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-30 07:37:16] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-30 07:39:49] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/CONTROLLER/PROJECT.PM: [2025-07-30 07:48:16] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/CONTROLLER/PROJECT.PM] [15:0] Starting index action - No message provided
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-30 08:47:04] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-30 08:51:37] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+WARN: [2025-07-30 11:02:11] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:41] begin - Unauthorized access attempt by user: Guest
+ERROR: [2025-07-30 11:03:08] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:632] modify.update_failure - Failed to update todo item for record ID: 131. Error: DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Incorrect time value: '' for column `ency`.`todo`.`time_of_day` at row 1 [for Statement "UPDATE `todo` SET `accumulative_time` = ?, `comments` = ?, `date_time_posted` = ?, `developer` = ?, `last_mod_date` = ?, `owner` = ?, `reporter` = ?, `status` = ?, `time_of_day` = ? WHERE ( `record_id` = ? )" with ParamValues: 1="00:00", 2="", 3="", 4="", 5='2025-07-30', 6="", 7="", 8="3", 9="", 10=131] at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm line 611
+
+ERROR: [2025-07-30 11:03:08] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:1338] create_todo_from_data.failure - Failed to create todo from error_system. Error: DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Field 'share' doesn't have a default value [for Statement "INSERT INTO `todo` ( `comments`, `date_time_posted`, `description`, `developer`, `due_date`, `estimated_man_hours`, `group_of_poster`, `last_mod_by`, `last_mod_date`, `owner`, `parent_todo`, `priority`, `project_code`, `reporter`, `sitename`, `start_date`, `status`, `subject`, `user_id`, `username_of_poster`) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )" with ParamValues: 1='Auto-generated from system error. Priority: Normal', 2='2025-07-30 18:03:08', 3="
+AUTOMATED TODO: System Error Detected
+
+Error Details:
+- Time: 2025-07-30 18:03:08
+- User: Shanta
+- Site: CSC
+- URL: http://comserv.local:3000/todo/modify/131
+- Record ID: 131
+
+Error Message:
+DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Incorrect time value: '' for column `ency`.`todo`.`time_of_day` at row 1 [for Statement "UPDATE `todo` SET `accumulative_time` = ?, `comments` = ?, `date_time_posted` = ?, `developer` = ?, `last_mod_date` = ?, `owner` = ?, `reporter` = ?, `status` = ?, `time_of_day` = ? WHERE ( `record_id` = ? )" with ParamValues: 1="00:00", 2="", 3="", 4="", 5='2025-07-30', 6="", 7="", 8="3", 9="", 10=131] at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm line 611
+
+
+This todo was automatically created by the error handling system.
+Please investigate and resolve this issue.
+        ", 4='admin', 5='2025-08-02', 6=2, 7='admin', 8='Error_System', 9='2025-07-30', 10='admin', 11='', 12=2, 13='default', 14='System', 15='CSC', 16='2025-07-30', 17=1, 18='System Error: DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Incorrect t', 19=1, 20='Error_System'] at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm line 1321
+
+WARN: [2025-07-30 11:03:08] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:1498] create_error_todo.failure - Failed to create error todo: Failed to create todo: DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Field 'share' doesn't have a default value [for Statement "INSERT INTO `todo` ( `comments`, `date_time_posted`, `description`, `developer`, `due_date`, `estimated_man_hours`, `group_of_poster`, `last_mod_by`, `last_mod_date`, `owner`, `parent_todo`, `priority`, `project_code`, `reporter`, `sitename`, `start_date`, `status`, `subject`, `user_id`, `username_of_poster`) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )" with ParamValues: 1='Auto-generated from system error. Priority: Normal', 2='2025-07-30 18:03:08', 3="
+AUTOMATED TODO: System Error Detected
+
+Error Details:
+- Time: 2025-07-30 18:03:08
+- User: Shanta
+- Site: CSC
+- URL: http://comserv.local:3000/todo/modify/131
+- Record ID: 131
+
+Error Message:
+DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Incorrect time value: '' for column `ency`.`todo`.`time_of_day` at row 1 [for Statement "UPDATE `todo` SET `accumulative_time` = ?, `comments` = ?, `date_time_posted` = ?, `developer` = ?, `last_mod_date` = ?, `owner` = ?, `reporter` = ?, `status` = ?, `time_of_day` = ? WHERE ( `record_id` = ? )" with ParamValues: 1="00:00", 2="", 3="", 4="", 5='2025-07-30', 6="", 7="", 8="3", 9="", 10=131] at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm line 611
+
+
+This todo was automatically created by the error handling system.
+Please investigate and resolve this issue.
+        ", 4='admin', 5='2025-08-02', 6=2, 7='admin', 8='Error_System', 9='2025-07-30', 10='admin', 11='', 12=2, 13='default', 14='System', 15='CSC', 16='2025-07-30', 17=1, 18='System Error: DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Incorrect t', 19=1, 20='Error_System'] at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm line 1321
+
+ERROR: [2025-07-30 11:03:08] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:1437] notify_admin.full_details - 
+Database Error in Todo System
+
+Time: 2025-07-30 18:03:08
+User: Shanta
+Site: CSC
+URL: http://comserv.local:3000/todo/modify/131
+Record ID: 131
+
+Error Message:
+DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Incorrect time value: '' for column `ency`.`todo`.`time_of_day` at row 1 [for Statement "UPDATE `todo` SET `accumulative_time` = ?, `comments` = ?, `date_time_posted` = ?, `developer` = ?, `last_mod_date` = ?, `owner` = ?, `reporter` = ?, `status` = ?, `time_of_day` = ? WHERE ( `record_id` = ? )" with ParamValues: 1="00:00", 2="", 3="", 4="", 5='2025-07-30', 6="", 7="", 8="3", 9="", 10=131] at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm line 611
+
+
+Form Data Submitted:
+  accumulative_time: 00:00
+  comments: 
+  date_time_posted: 
+  description: Error: Todo item with ID 122 has been successfully updated.
+  developer: 
+  due_date: 2025-03-15
+  estimated_man_hours: 1
+  group_of_poster: admin
+  owner: 
+  priority: 1
+  project_id: 2
+  reporter: 
+  share: 
+  sitename: CSC
+  start_date: 2025-03-08
+  status: 3
+  subject: change the error reporting of sucsefull change of print from eror: to sucess. 
+  time_of_day: 
+  user_id: 178
+  username_of_poster: Shanta
+
+
+This error has been logged and requires administrator attention.
+    
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-30 11:42:22] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+ERROR: [2025-07-30 11:42:38] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:678] modify.update_failure - Failed to update todo item for record ID: 131. Error: DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Incorrect time value: '' for column `ency`.`todo`.`time_of_day` at row 1 [for Statement "UPDATE `todo` SET `accumulative_time` = ?, `last_mod_date` = ?, `time_of_day` = ? WHERE ( `record_id` = ? )" with ParamValues: 1=0, 2='2025-07-30', 3="", 4=131] at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm line 657
+
+ERROR: [2025-07-30 11:42:38] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:1384] create_todo_from_data.failure - Failed to create todo from error_system. Error: DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Field 'share' doesn't have a default value [for Statement "INSERT INTO `todo` ( `comments`, `date_time_posted`, `description`, `developer`, `due_date`, `estimated_man_hours`, `group_of_poster`, `last_mod_by`, `last_mod_date`, `owner`, `parent_todo`, `priority`, `project_code`, `reporter`, `sitename`, `start_date`, `status`, `subject`, `user_id`, `username_of_poster`) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )" with ParamValues: 1='Auto-generated from system error. Priority: Normal', 2='2025-07-30 18:42:38', 3="
+AUTOMATED TODO: System Error Detected
+
+Error Details:
+- Time: 2025-07-30 18:42:38
+- User: Shanta
+- Site: CSC
+- URL: http://comserv.local:3000/todo/modify/131
+- Record ID: 131
+
+Error Message:
+DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Incorrect time value: '' for column `ency`.`todo`.`time_of_day` at row 1 [for Statement "UPDATE `todo` SET `accumulative_time` = ?, `last_mod_date` = ?, `time_of_day` = ? WHERE ( `record_id` = ? )" with ParamValues: 1=0, 2='2025-07-30', 3="", 4=131] at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm line 657
+
+
+This todo was automatically created by the error handling system.
+Please investigate and resolve this issue.
+        ", 4='admin', 5='2025-08-02', 6=2, 7='admin', 8='Error_System', 9='2025-07-30', 10='admin', 11='', 12=2, 13='default', 14='System', 15='CSC', 16='2025-07-30', 17=1, 18='System Error: DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Incorrect t', 19=1, 20='Error_System'] at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm line 1367
+
+WARN: [2025-07-30 11:42:38] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:1544] create_error_todo.failure - Failed to create error todo: Failed to create todo: DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Field 'share' doesn't have a default value [for Statement "INSERT INTO `todo` ( `comments`, `date_time_posted`, `description`, `developer`, `due_date`, `estimated_man_hours`, `group_of_poster`, `last_mod_by`, `last_mod_date`, `owner`, `parent_todo`, `priority`, `project_code`, `reporter`, `sitename`, `start_date`, `status`, `subject`, `user_id`, `username_of_poster`) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )" with ParamValues: 1='Auto-generated from system error. Priority: Normal', 2='2025-07-30 18:42:38', 3="
+AUTOMATED TODO: System Error Detected
+
+Error Details:
+- Time: 2025-07-30 18:42:38
+- User: Shanta
+- Site: CSC
+- URL: http://comserv.local:3000/todo/modify/131
+- Record ID: 131
+
+Error Message:
+DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Incorrect time value: '' for column `ency`.`todo`.`time_of_day` at row 1 [for Statement "UPDATE `todo` SET `accumulative_time` = ?, `last_mod_date` = ?, `time_of_day` = ? WHERE ( `record_id` = ? )" with ParamValues: 1=0, 2='2025-07-30', 3="", 4=131] at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm line 657
+
+
+This todo was automatically created by the error handling system.
+Please investigate and resolve this issue.
+        ", 4='admin', 5='2025-08-02', 6=2, 7='admin', 8='Error_System', 9='2025-07-30', 10='admin', 11='', 12=2, 13='default', 14='System', 15='CSC', 16='2025-07-30', 17=1, 18='System Error: DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Incorrect t', 19=1, 20='Error_System'] at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm line 1367
+
+ERROR: [2025-07-30 11:42:38] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:1483] notify_admin.full_details - 
+Database Error in Todo System
+
+Time: 2025-07-30 18:42:38
+User: Shanta
+Site: CSC
+URL: http://comserv.local:3000/todo/modify/131
+Record ID: 131
+
+Error Message:
+DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Incorrect time value: '' for column `ency`.`todo`.`time_of_day` at row 1 [for Statement "UPDATE `todo` SET `accumulative_time` = ?, `last_mod_date` = ?, `time_of_day` = ? WHERE ( `record_id` = ? )" with ParamValues: 1=0, 2='2025-07-30', 3="", 4=131] at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm line 657
+
+
+Form Data Submitted:
+  accumulative_time: 
+  description: Error: Todo item with ID 122 has been successfully updated.
+  due_date: 2025-03-15
+  estimated_man_hours: 1
+  group_of_poster: admin
+  last_mod_by: Shanta
+  last_mod_date: 2025-07-30
+  priority: 1
+  project_id: 2
+  sitename: CSC
+  start_date: 2025-03-08
+  status: 1
+  subject: change the error reporting of sucsefull change of print from eror: to sucess. 
+  time_of_day: 
+  user_id: 178
+
+
+This error has been logged and requires administrator attention.
+    
+ERROR: [2025-07-30 11:42:55] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:678] modify.update_failure - Failed to update todo item for record ID: 131. Error: DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Incorrect time value: '' for column `ency`.`todo`.`time_of_day` at row 1 [for Statement "UPDATE `todo` SET `accumulative_time` = ?, `comments` = ?, `date_time_posted` = ?, `developer` = ?, `last_mod_date` = ?, `owner` = ?, `reporter` = ?, `status` = ?, `time_of_day` = ? WHERE ( `record_id` = ? )" with ParamValues: 1="00:00", 2="", 3="", 4="", 5='2025-07-30', 6="", 7="", 8="3", 9="", 10=131] at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm line 657
+
+ERROR: [2025-07-30 11:42:55] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:1384] create_todo_from_data.failure - Failed to create todo from error_system. Error: DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Field 'share' doesn't have a default value [for Statement "INSERT INTO `todo` ( `comments`, `date_time_posted`, `description`, `developer`, `due_date`, `estimated_man_hours`, `group_of_poster`, `last_mod_by`, `last_mod_date`, `owner`, `parent_todo`, `priority`, `project_code`, `reporter`, `sitename`, `start_date`, `status`, `subject`, `user_id`, `username_of_poster`) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )" with ParamValues: 1='Auto-generated from system error. Priority: Normal', 2='2025-07-30 18:42:55', 3="
+AUTOMATED TODO: System Error Detected
+
+Error Details:
+- Time: 2025-07-30 18:42:55
+- User: Shanta
+- Site: CSC
+- URL: http://comserv.local:3000/todo/modify/131
+- Record ID: 131
+
+Error Message:
+DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Incorrect time value: '' for column `ency`.`todo`.`time_of_day` at row 1 [for Statement "UPDATE `todo` SET `accumulative_time` = ?, `comments` = ?, `date_time_posted` = ?, `developer` = ?, `last_mod_date` = ?, `owner` = ?, `reporter` = ?, `status` = ?, `time_of_day` = ? WHERE ( `record_id` = ? )" with ParamValues: 1="00:00", 2="", 3="", 4="", 5='2025-07-30', 6="", 7="", 8="3", 9="", 10=131] at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm line 657
+
+
+This todo was automatically created by the error handling system.
+Please investigate and resolve this issue.
+        ", 4='admin', 5='2025-08-02', 6=2, 7='admin', 8='Error_System', 9='2025-07-30', 10='admin', 11='', 12=2, 13='default', 14='System', 15='CSC', 16='2025-07-30', 17=1, 18='System Error: DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Incorrect t', 19=1, 20='Error_System'] at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm line 1367
+
+WARN: [2025-07-30 11:42:55] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:1544] create_error_todo.failure - Failed to create error todo: Failed to create todo: DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Field 'share' doesn't have a default value [for Statement "INSERT INTO `todo` ( `comments`, `date_time_posted`, `description`, `developer`, `due_date`, `estimated_man_hours`, `group_of_poster`, `last_mod_by`, `last_mod_date`, `owner`, `parent_todo`, `priority`, `project_code`, `reporter`, `sitename`, `start_date`, `status`, `subject`, `user_id`, `username_of_poster`) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )" with ParamValues: 1='Auto-generated from system error. Priority: Normal', 2='2025-07-30 18:42:55', 3="
+AUTOMATED TODO: System Error Detected
+
+Error Details:
+- Time: 2025-07-30 18:42:55
+- User: Shanta
+- Site: CSC
+- URL: http://comserv.local:3000/todo/modify/131
+- Record ID: 131
+
+Error Message:
+DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Incorrect time value: '' for column `ency`.`todo`.`time_of_day` at row 1 [for Statement "UPDATE `todo` SET `accumulative_time` = ?, `comments` = ?, `date_time_posted` = ?, `developer` = ?, `last_mod_date` = ?, `owner` = ?, `reporter` = ?, `status` = ?, `time_of_day` = ? WHERE ( `record_id` = ? )" with ParamValues: 1="00:00", 2="", 3="", 4="", 5='2025-07-30', 6="", 7="", 8="3", 9="", 10=131] at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm line 657
+
+
+This todo was automatically created by the error handling system.
+Please investigate and resolve this issue.
+        ", 4='admin', 5='2025-08-02', 6=2, 7='admin', 8='Error_System', 9='2025-07-30', 10='admin', 11='', 12=2, 13='default', 14='System', 15='CSC', 16='2025-07-30', 17=1, 18='System Error: DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Incorrect t', 19=1, 20='Error_System'] at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm line 1367
+
+ERROR: [2025-07-30 11:42:55] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:1483] notify_admin.full_details - 
+Database Error in Todo System
+
+Time: 2025-07-30 18:42:55
+User: Shanta
+Site: CSC
+URL: http://comserv.local:3000/todo/modify/131
+Record ID: 131
+
+Error Message:
+DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Incorrect time value: '' for column `ency`.`todo`.`time_of_day` at row 1 [for Statement "UPDATE `todo` SET `accumulative_time` = ?, `comments` = ?, `date_time_posted` = ?, `developer` = ?, `last_mod_date` = ?, `owner` = ?, `reporter` = ?, `status` = ?, `time_of_day` = ? WHERE ( `record_id` = ? )" with ParamValues: 1="00:00", 2="", 3="", 4="", 5='2025-07-30', 6="", 7="", 8="3", 9="", 10=131] at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm line 657
+
+
+Form Data Submitted:
+  accumulative_time: 00:00
+  comments: 
+  date_time_posted: 
+  description: Error: Todo item with ID 122 has been successfully updated.
+  developer: 
+  due_date: 2025-03-15
+  estimated_man_hours: 1
+  group_of_poster: admin
+  owner: 
+  priority: 1
+  project_id: 2
+  reporter: 
+  share: 
+  sitename: CSC
+  start_date: 2025-03-08
+  status: 3
+  subject: change the error reporting of sucsefull change of print from eror: to sucess. 
+  time_of_day: 
+  user_id: 178
+  username_of_poster: Shanta
+
+
+This error has been logged and requires administrator attention.
+    
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-30 11:48:18] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-30 12:21:46] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-30 12:23:40] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-30 12:23:44] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-30 12:26:04] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+ERROR: [2025-07-30 12:43:33] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:351] fetch_projects_with_subprojects - Error fetching top-level projects: Can't locate object method "all" via package "17" (perhaps you forgot to load "17"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 335.
+
+ERROR: [2025-07-30 12:43:52] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:351] fetch_projects_with_subprojects - Error fetching top-level projects: Can't locate object method "all" via package "17" (perhaps you forgot to load "17"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 335.
+
+ERROR: [2025-07-30 12:44:00] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:351] fetch_projects_with_subprojects - Error fetching top-level projects: Can't locate object method "all" via package "17" (perhaps you forgot to load "17"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 335.
+
+ERROR: [2025-07-30 12:58:05] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:351] fetch_projects_with_subprojects - Error fetching top-level projects: Can't locate object method "all" via package "17" (perhaps you forgot to load "17"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 335.
+
+ERROR: [2025-07-30 12:58:46] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:351] fetch_projects_with_subprojects - Error fetching top-level projects: Can't locate object method "all" via package "17" (perhaps you forgot to load "17"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 335.
+
+ERROR: [2025-07-30 12:59:03] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:351] fetch_projects_with_subprojects - Error fetching top-level projects: Can't locate object method "all" via package "17" (perhaps you forgot to load "17"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 335.
+
+ERROR: [2025-07-30 12:59:10] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:351] fetch_projects_with_subprojects - Error fetching top-level projects: Can't locate object method "all" via package "17" (perhaps you forgot to load "17"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 335.
+
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-07-30 13:01:03] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+ERROR: [2025-07-30 13:01:13] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:351] fetch_projects_with_subprojects - Error fetching top-level projects: Can't locate object method "all" via package "17" (perhaps you forgot to load "17"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 335.
+
+ERROR: [2025-07-30 13:04:28] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:351] fetch_projects_with_subprojects - Error fetching top-level projects: Can't locate object method "all" via package "17" (perhaps you forgot to load "17"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 335.
+
+ERROR: [2025-07-30 13:04:46] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:351] fetch_projects_with_subprojects - Error fetching top-level projects: Can't locate object method "all" via package "17" (perhaps you forgot to load "17"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 335.
+
+ERROR: [2025-07-30 13:04:53] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:351] fetch_projects_with_subprojects - Error fetching top-level projects: Can't locate object method "all" via package "17" (perhaps you forgot to load "17"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 335.
+
+WARN: [2025-08-02 07:55:36] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1304] default - Page not found: /Documentation/roles/normal/mail_user_guide
+ERROR: [2025-08-03 20:23:11] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:2714] _read_file_content - File not found or not readable: /home/shanta/PycharmProjects/comserv2/Comserv/root/Mail.tt (exists: NO, is_file: NO, readable: NO)
+ERROR: [2025-08-03 20:23:11] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:2714] _read_file_content - File not found or not readable: /home/shanta/PycharmProjects/comserv2/Comserv/root/Ve7tit.tt (exists: NO, is_file: NO, readable: NO)
+ERROR: [2025-08-03 20:23:11] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:2714] _read_file_content - File not found or not readable: /home/shanta/PycharmProjects/comserv2/Comserv/root/Project.tt (exists: NO, is_file: NO, readable: NO)
+ERROR: [2025-08-03 20:24:57] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:351] fetch_projects_with_subprojects - Error fetching top-level projects: Can't locate object method "all" via package "17" (perhaps you forgot to load "17"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 335.
+
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-08-05 06:48:31] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+WARN: [2025-08-06 06:21:36] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Admin.pm:1756] schema_compare - Access denied: User does not have admin role
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-08-11 06:37:15] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+ERROR: [2025-08-11 06:38:50] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm:211] get_site_domain - Error looking up domain: DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Table 'shanta_forager.sitedomain' doesn't exist [for Statement "SELECT COUNT( * ) FROM `sitedomain` `me` WHERE ( LOWER(domain) = ? )" with ParamValues: 1='workstation.local'] at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm line 186
+
+ERROR: [2025-08-11 06:38:50] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:766] setup_site - DOMAIN ERROR: 'workstation.local' not found in sitedomain table
+ERROR: [2025-08-11 06:38:50] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm:146] get_site_details_by_name - Error fetching site details: DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Table 'shanta_forager.sites' doesn't exist [for Statement "SELECT `me`.`id`, `me`.`name`, `me`.`description`, `me`.`affiliate`, `me`.`pid`, `me`.`auth_table`, `me`.`home_view`, `me`.`app_logo`, `me`.`app_logo_alt`, `me`.`app_logo_width`, `me`.`app_logo_height`, `me`.`css_view_name`, `me`.`mail_from`, `me`.`mail_to`, `me`.`mail_to_discussion`, `me`.`mail_to_admin`, `me`.`mail_to_user`, `me`.`mail_to_client`, `me`.`mail_replyto`, `me`.`site_display_name`, `me`.`document_root_url`, `me`.`link_target`, `me`.`http_header_params`, `me`.`image_root_url`, `me`.`global_datafiles_directory`, `me`.`templates_cache_directory`, `me`.`app_datafiles_directory`, `me`.`datasource_type`, `me`.`cal_table`, `me`.`http_header_description`, `me`.`http_header_keywords` FROM `sites` `me` WHERE ( `me`.`name` = ? )" with ParamValues: 1='CSC'] at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm line 129
+
+ERROR: [2025-08-11 06:38:50] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:886] site_setup - No site found for SiteName: CSC
+ERROR: [2025-08-11 06:38:50] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:812] setup_site - Email notification failed with error: DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Table 'shanta_forager.site_config' doesn't exist [for Statement "SELECT `me`.`id`, `me`.`site_id`, `me`.`config_key`, `me`.`config_value` FROM `site_config` `me` WHERE ( ( `me`.`config_key` = ? AND `me`.`site_id` IS NULL ) )" with ParamValues: 1='smtp_host'] at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Mail.pm line 149
+
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-08-11 07:02:21] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+ERROR: [2025-08-11 08:00:36] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm:211] get_site_domain - Error looking up domain: DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Table 'shanta_forager.sitedomain' doesn't exist [for Statement "SELECT COUNT( * ) FROM `sitedomain` `me` WHERE ( LOWER(domain) = ? )" with ParamValues: 1='workstation.local'] at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm line 186
+
+ERROR: [2025-08-11 08:00:36] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:766] setup_site - DOMAIN ERROR: 'workstation.local' not found in sitedomain table
+ERROR: [2025-08-11 08:00:36] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm:146] get_site_details_by_name - Error fetching site details: DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Table 'shanta_forager.sites' doesn't exist [for Statement "SELECT `me`.`id`, `me`.`name`, `me`.`description`, `me`.`affiliate`, `me`.`pid`, `me`.`auth_table`, `me`.`home_view`, `me`.`app_logo`, `me`.`app_logo_alt`, `me`.`app_logo_width`, `me`.`app_logo_height`, `me`.`css_view_name`, `me`.`mail_from`, `me`.`mail_to`, `me`.`mail_to_discussion`, `me`.`mail_to_admin`, `me`.`mail_to_user`, `me`.`mail_to_client`, `me`.`mail_replyto`, `me`.`site_display_name`, `me`.`document_root_url`, `me`.`link_target`, `me`.`http_header_params`, `me`.`image_root_url`, `me`.`global_datafiles_directory`, `me`.`templates_cache_directory`, `me`.`app_datafiles_directory`, `me`.`datasource_type`, `me`.`cal_table`, `me`.`http_header_description`, `me`.`http_header_keywords` FROM `sites` `me` WHERE ( `me`.`name` = ? )" with ParamValues: 1='CSC'] at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm line 129
+
+ERROR: [2025-08-11 08:00:36] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:886] site_setup - No site found for SiteName: CSC
+ERROR: [2025-08-11 08:00:36] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:812] setup_site - Email notification failed with error: DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Table 'shanta_forager.site_config' doesn't exist [for Statement "SELECT `me`.`id`, `me`.`site_id`, `me`.`config_key`, `me`.`config_value` FROM `site_config` `me` WHERE ( ( `me`.`config_key` = ? AND `me`.`site_id` IS NULL ) )" with ParamValues: 1='smtp_host'] at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Mail.pm line 149
+
+WARN: [2025-08-11 19:07:08] [WARN] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:41] begin - Unauthorized access attempt by user: Guest
+ERROR: [2025-08-11 19:07:08] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm:211] get_site_domain - Error looking up domain: DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Table 'shanta_forager.sitedomain' doesn't exist [for Statement "SELECT COUNT( * ) FROM `sitedomain` `me` WHERE ( LOWER(domain) = ? )" with ParamValues: 1='comserv.local'] at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm line 186
+
+ERROR: [2025-08-11 19:07:08] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:766] setup_site - DOMAIN ERROR: 'comserv.local' not found in sitedomain table
+ERROR: [2025-08-11 19:07:08] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm:146] get_site_details_by_name - Error fetching site details: DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Table 'shanta_forager.sites' doesn't exist [for Statement "SELECT `me`.`id`, `me`.`name`, `me`.`description`, `me`.`affiliate`, `me`.`pid`, `me`.`auth_table`, `me`.`home_view`, `me`.`app_logo`, `me`.`app_logo_alt`, `me`.`app_logo_width`, `me`.`app_logo_height`, `me`.`css_view_name`, `me`.`mail_from`, `me`.`mail_to`, `me`.`mail_to_discussion`, `me`.`mail_to_admin`, `me`.`mail_to_user`, `me`.`mail_to_client`, `me`.`mail_replyto`, `me`.`site_display_name`, `me`.`document_root_url`, `me`.`link_target`, `me`.`http_header_params`, `me`.`image_root_url`, `me`.`global_datafiles_directory`, `me`.`templates_cache_directory`, `me`.`app_datafiles_directory`, `me`.`datasource_type`, `me`.`cal_table`, `me`.`http_header_description`, `me`.`http_header_keywords` FROM `sites` `me` WHERE ( `me`.`name` = ? )" with ParamValues: 1='CSC'] at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm line 129
+
+ERROR: [2025-08-11 19:07:08] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:886] site_setup - No site found for SiteName: CSC
+ERROR: [2025-08-11 19:07:08] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:812] setup_site - Email notification failed with error: DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Table 'shanta_forager.site_config' doesn't exist [for Statement "SELECT `me`.`id`, `me`.`site_id`, `me`.`config_key`, `me`.`config_value` FROM `site_config` `me` WHERE ( ( `me`.`config_key` = ? AND `me`.`site_id` IS NULL ) )" with ParamValues: 1='smtp_host'] at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Mail.pm line 149
+
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-08-19 07:38:43] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-08-19 07:49:37] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-08-19 08:07:04] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-08-19 08:07:12] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [189:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+ERROR: [2025-08-19 08:08:20] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:351] fetch_projects_with_subprojects - Error fetching top-level projects: Can't locate object method "all" via package "17" (perhaps you forgot to load "17"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 335.
+
+ERROR: [2025-08-19 08:08:29] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:351] fetch_projects_with_subprojects - Error fetching top-level projects: Can't locate object method "all" via package "17" (perhaps you forgot to load "17"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 335.
+
+ERROR: [2025-08-19 08:09:37] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:351] fetch_projects_with_subprojects - Error fetching top-level projects: Can't locate object method "all" via package "17" (perhaps you forgot to load "17"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 335.
+
+ERROR: [2025-08-19 08:09:47] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:351] fetch_projects_with_subprojects - Error fetching top-level projects: Can't locate object method "all" via package "17" (perhaps you forgot to load "17"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 335.
+
+ERROR: [2025-08-19 08:10:33] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:351] fetch_projects_with_subprojects - Error fetching top-level projects: Can't locate object method "all" via package "17" (perhaps you forgot to load "17"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 335.
+
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-08-19 08:11:56] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [197:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+INFO: [2025-08-19 08:12:04] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/NPM.pm:36] BUILD - NPM Controller initialized
+INFO: Starting Documentation controller initialization with DocumentationConfig
+INFO: Loaded documentation configuration: 6 categories, 23 pages
+INFO: Documentation system initialized from config with 23 pages across 6 categories
+DEBUG: [2025-08-19 08:21:30] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/addtodo
+DEBUG: [2025-08-19 08:21:30] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:454] _perform_startup_operations - Performing one-time startup operations
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:334] track_application_start - Application started at 2025-08-19
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:363] generate_all_theme_css - Starting theme CSS generation
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: csc
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: usbm
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: dark
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: default
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:397] generate_all_theme_css - Adding special styles for theme: mcoop
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: mcoop
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:397] generate_all_theme_css - Adding special styles for theme: apis
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: apis
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:421] generate_all_theme_css - Completed theme CSS generation
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:477] _perform_startup_operations - Cached system info - Hostname: workstation.computersystemconsulting.ca, IP: 192.168.1.199
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:550] _test_database_connections - All database connections tested successfully
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:505] _perform_startup_operations - Startup operations completed successfully
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:560] _setup_site_cached - Setting up site for domain: workstation.local
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:799] setup_site - Starting setup_site action
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:809] setup_site - Extracted domain: workstation.local
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1038] site_setup - SiteName: CSC
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1054] site_setup - Using Catalyst's built-in proxy configuration for URLs without port
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1058] site_setup - Test URL: http://workstation.local:3000/test
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1065] site_setup - Set default HostName: http://workstation.local
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm:122] get_site_details_by_name - Getting site details for name: CSC
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm:133] get_site_details_by_name - Found site: ID=1, Name=CSC
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1106] site_setup - ControllerName set to: CSC
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:138] get_site_theme - Getting theme for site: CSC
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:162] get_site_theme - Using theme from session for CSC: csc
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1127] site_setup - Set theme_name in stash: csc
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1137] site_setup - Completed site_setup action with HostName: http://workstation.local
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1033] setup_site - Completed site setup
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:231] set_theme - Setting theme for site: CSC
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:54] get_all_themes - Getting all available themes
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:235] set_theme - Available themes: apis, csc, dark, default, mcoop, usbm
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:138] get_site_theme - Getting theme for site: CSC
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:162] get_site_theme - Using theme from session for CSC: csc
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:254] set_theme - Set theme for site CSC to csc
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:591] _setup_site_cached - Cached site setup for domain: workstation.local, SiteName: CSC
+DEBUG: [2025-08-19 08:21:30] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:80] auto - User authorized to access Todo controller
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:313] addtodo - Initiating addtodo subroutine
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:316] fetch_projects_with_subprojects - Fetching parent projects with sub-projects
+ERROR: [2025-08-19 08:21:30] [ERROR] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm:351] fetch_projects_with_subprojects - Error fetching top-level projects: Can't locate object method "all" via package "17" (perhaps you forgot to load "17"?) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Project.pm line 335.
+
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:379] addtodo - Fetched users to populate user_id dropdown
+INFO: [2025-08-19 08:21:30] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:393] addtodo - Completed addtodo subroutine
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-08-19 08:31:33] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [197:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+INFO: [2025-08-19 08:31:40] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/NPM.pm:36] BUILD - NPM Controller initialized
+INFO: Starting Documentation controller initialization with DocumentationConfig
+INFO: Loaded documentation configuration: 6 categories, 23 pages
+INFO: Documentation system initialized from config with 23 pages across 6 categories
+DEBUG: [2025-08-19 08:33:36] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:18] begin - User accessing path: http://workstation.local:3000/todo/addtodo
+DEBUG: [2025-08-19 08:33:36] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Todo.pm:54] begin - User authorized to access Todo: Shanta
+INFO: [2025-08-19 08:33:36] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:454] _perform_startup_operations - Performing one-time startup operations
+INFO: [2025-08-19 08:33:36] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:334] track_application_start - Application started at 2025-08-19
+INFO: [2025-08-19 08:33:36] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:363] generate_all_theme_css - Starting theme CSS generation
+INFO: [2025-08-19 08:33:36] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:397] generate_all_theme_css - Adding special styles for theme: apis
+INFO: [2025-08-19 08:33:36] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: apis
+INFO: [2025-08-19 08:33:36] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:397] generate_all_theme_css - Adding special styles for theme: mcoop
+INFO: [2025-08-19 08:33:36] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: mcoop
+INFO: [2025-08-19 08:33:36] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: default
+INFO: [2025-08-19 08:33:36] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: csc
+INFO: [2025-08-19 08:33:36] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: usbm
+INFO: [2025-08-19 08:33:36] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: dark
+INFO: [2025-08-19 08:33:36] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:421] generate_all_theme_css - Completed theme CSS generation
+INFO: [2025-08-19 08:33:36] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:477] _perform_startup_operations - Cached system info - Hostname: workstation.computersystemconsulting.ca, IP: 192.168.1.199
+INFO: [2025-08-19 08:33:36] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:550] _test_database_connections - All database connections tested successfully
+INFO: [2025-08-19 08:33:36] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:505] _perform_startup_operations - Startup operations completed successfully
+INFO: [2025-08-19 08:33:36] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:560] _setup_site_cached - Setting up site for domain: workstation.local
+INFO: [2025-08-19 08:33:36] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:799] setup_site - Starting setup_site action

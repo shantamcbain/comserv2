@@ -1,0 +1,159 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2025-04-mcoop-admin-menu-restriction.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'MCoop Admin Menu Restriction' %]
+
+<!-- Documentation page for 2025-04-mcoop-admin-menu-restriction -->
+<div class="documentation-content">
+
+
+
+<!-- Include documentation CSS -->
+<link rel="stylesheet" href="/static/css/documentation.css">
+
+<div class="markdown-content">
+
+
+**Date:** April 1, 2025  
+
+**Author:** Shanta  
+
+**Status:** Completed
+
+
+
+<h2>Overview</h2>
+
+
+
+This document outlines the implementation of a security enhancement to restrict the MCoop admin menu items to only appear when the current site is MCOOP. Previously, these menu items were visible to admin users on all sites, which could lead to confusion and potential security issues.
+
+
+
+<h2>Changes Made</h2>
+
+
+
+<h3>1. Menu Visibility Restriction</h3>
+
+
+
+The MCoop admin menu section in the admin top menu was modified to only display when:
+
+<ul><li>The user has the 'admin' role AND</li></ul>
+
+<ul><li>The current site is specifically 'MCOOP'</li></ul>
+
+
+
+This was implemented by updating the conditional check in the <code>admintopmenu.tt</code> template:
+
+
+
+<code></code>`tt
+
+[% IF c.session.roles && c.session.roles.grep('^admin$').size && (c.session.SiteName == 'MCOOP' || c.stash.SiteName == 'MCOOP') %]
+
+<code></code>`
+
+
+
+<h3>2. Site-Specific Menu Logic</h3>
+
+
+
+The implementation checks for the MCOOP site name in both the session and stash to ensure all cases are covered:
+
+<ul><li><code>c.session.SiteName == 'MCOOP'</code> - Checks if the site name is stored in the session</li></ul>
+
+<ul><li><code>c.stash.SiteName == 'MCOOP'</code> - Checks if the site name is stored in the stash</li></ul>
+
+
+
+This dual check ensures that the menu appears correctly regardless of how the site context was set.
+
+
+
+<h2>Technical Details</h2>
+
+
+
+<h3>Template Changes</h3>
+
+
+
+The change was made in the <code>admintopmenu.tt</code> template file located at:
+
+<code>Comserv/root/Navigation/admintopmenu.tt</code>
+
+
+
+**Before:**
+
+<code></code>`tt
+
+[% IF c.session.roles && c.session.roles.grep('^admin$').size %]
+
+<div class="submenu-item">
+
+    <span class="submenu-header">MCOOP Admin</span>
+
+    <div class="submenu">
+
+        <!-- MCOOP menu items -->
+
+
+
+
+<code></code>`
+
+
+
+**After:**
+
+<code></code>`tt
+
+[% IF c.session.roles && c.session.roles.grep('^admin$').size && (c.session.SiteName == 'MCOOP' || c.stash.SiteName == 'MCOOP') %]
+
+<div class="submenu-item">
+
+    <span class="submenu-header">MCOOP Admin</span>
+
+    <div class="submenu">
+
+        <!-- MCOOP menu items -->
+
+
+
+
+<code></code>`
+
+
+
+<h2>Benefits</h2>
+
+
+
+<ul><li>**Improved Security**: MCoop administrative features are now properly restricted to the MCOOP site context</li></ul>
+
+<ul><li>**Reduced Confusion**: Admin users on other sites no longer see irrelevant MCOOP menu items</li></ul>
+
+<ul><li>**Better Organization**: The admin menu now only shows relevant items based on the current site context</li></ul>
+
+<ul><li>**Consistent User Experience**: Users only see menu items that are applicable to their current context</li></ul>
+
+
+
+<h2>Future Considerations</h2>
+
+
+
+<ul><li>Consider implementing similar site-specific restrictions for other site-specific admin features</li></ul>
+
+<ul><li>Develop a more comprehensive role-based access control system that combines both user roles and site context</li></ul>
+
+<ul><li>Create a configuration interface that allows administrators to define which menu items should appear for which sites</li></ul>
+
+</div>

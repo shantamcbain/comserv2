@@ -1,0 +1,409 @@
+[% PageVersion = 'Comserv/root/Documentation/sites/mcoop/templates.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'MCOOP Templates Documentation' %]
+
+<!-- Documentation page for templates -->
+<div class="documentation-content">
+
+
+
+<!-- Include documentation CSS -->
+<link rel="stylesheet" href="/static/css/documentation.css">
+
+<div class="markdown-content">
+
+
+**Last Updated:** April 1, 2025  
+
+**Author:** Shanta  
+
+**Status:** Active
+
+
+
+This document provides detailed information about the Template Toolkit (TT) templates used in the MCOOP site implementation.
+
+
+
+<h2>Overview</h2>
+
+
+
+The MCOOP site uses several specialized templates to render its content. These templates are designed to work with the site's theme and provide a consistent user experience.
+
+
+
+<h2>Main Templates</h2>
+
+
+
+<h3>coop/index.tt</h3>
+
+
+
+The main landing page template for the MCOOP site.
+
+
+
+**Key Features:**
+
+<ul><li>Displays the Technical Support Center content</li></ul>
+
+<ul><li>Shows different content for administrators and regular users</li></ul>
+
+<ul><li>Uses site information from the site table via Root.pm</li></ul>
+
+<ul><li>Includes debug information when debug mode is enabled</li></ul>
+
+
+
+**Template Structure:**
+
+<code></code>`tt
+
+
+
+
+
+<!-- Debug information section -->
+
+[% IF debug_mode == 1 %]
+
+
+    [% # Use the standard debug message system %]
+
+    [% IF debug_msg.defined && debug_msg.size > 0 %]
+
+        <div class="debug-messages">
+
+            [% FOREACH msg IN debug_msg %]
+
+                <p class="debug">Debug: [% msg %]</p>
+
+
+
+
+
+
+
+<!-- Main container -->
+
+<div class="container">
+
+    <!-- Header is provided by layout.tt -->
+
+    
+
+    <!-- Info panel with help and account messages -->
+
+    <div class="info-panel">
+
+        <div class="help-message">
+
+            <p>This is the administrative portal for Monashee Coop technical support services.</p>
+
+
+        
+
+        <div class="account-message">
+
+            <p>Please create an account to access member services and support features.</p>
+
+
+
+    
+
+    <!-- Main content area -->
+
+    <main>
+
+        <!-- Content for non-admin users -->
+
+        [% IF !c.session.username || (c.session.roles && !c.session.roles.grep('^admin$').size) %]
+
+            <div class="public-view">
+
+                <h2>Technical Support Center</h2>
+
+                <div class="alert alert-info">
+
+                    <p>Welcome to the Monashee Coop technical support center. Our team is ready to assist you with any technical issues or questions.</p>
+
+
+                
+
+                <!-- Member services card -->
+
+                <div class="card mb-4">
+
+                    <!-- Card content with member services information -->
+
+
+
+
+        
+
+        <!-- Admin-only content -->
+
+        [% IF c.session.roles && c.session.roles.grep('^admin$').size %]
+
+            <h2>Administrator Dashboard</h2>
+
+            <!-- Admin dashboard content -->
+
+
+    </main>
+
+    
+
+    <!-- Footer -->
+
+    <footer>
+
+        <p>&copy; [% Date.format(Date.now, '%Y') %] Monashee Coop. All rights reserved.</p>
+
+    </footer>
+
+
+<code></code>`
+
+
+
+**Controller Integration:**
+
+The template is rendered by the <code>index</code> method in the MCoop controller, which sets up the necessary stash variables and theme configuration.
+
+
+
+<h3>coop/server_room_plan.tt</h3>
+
+
+
+Template for the Server Room Plan feature, showing a detailed proposal for server infrastructure.
+
+
+
+**Key Features:**
+
+<ul><li>Displays a comprehensive server room proposal</li></ul>
+
+<ul><li>Includes equipment requirements with pricing</li></ul>
+
+<ul><li>Shows options analysis for different configurations</li></ul>
+
+<ul><li>Provides recommendations for implementation</li></ul>
+
+
+
+**Template Structure:**
+
+<code></code>`tt
+
+
+
+
+
+<!-- Debug information section -->
+
+[% IF debug_mode == 1 %]
+
+    <!-- Debug content -->
+
+
+
+
+<!-- Main container -->
+
+<div class="container">
+
+    <header>
+
+        <div class="header-banner">
+
+            <h2 class="header-logo">MONASHEE COOP</h2>
+
+
+        <h1>Server Room Plan Proposal</h1>
+
+        <p>Date: [% Date.format(Date.now, '%Y-%m-%d') %]</p>
+
+    </header>
+
+    
+
+    <!-- Info panel -->
+
+    <div class="info-panel">
+
+        <!-- Help and account messages -->
+
+
+    
+
+    <!-- Main content with server room proposal -->
+
+    <main>
+
+        <h2>Transition Team: Server Infrastructure Plan</h2>
+
+        <!-- Detailed server room proposal content -->
+
+    </main>
+
+    
+
+    <!-- Footer -->
+
+    <footer>
+
+        <p>&copy; [% Date.format(Date.now, '%Y') %] Monashee Coop. All rights reserved.</p>
+
+    </footer>
+
+
+<code></code>`
+
+
+
+**Controller Integration:**
+
+The template is rendered by the <code>server_room_plan</code> method in the MCoop controller, which sets up the necessary stash variables including help and account messages.
+
+
+
+<h2>Navigation Templates</h2>
+
+
+
+<h3>Navigation/admintopmenu.tt</h3>
+
+
+
+Contains the admin menu structure, including the MCOOP-specific admin menu items.
+
+
+
+**Key Features:**
+
+<ul><li>Includes the MCOOP Admin section that's only visible to admin users on the MCOOP site</li></ul>
+
+<ul><li>Uses conditional logic to control menu visibility based on user role and site context</li></ul>
+
+
+
+**MCOOP-Specific Section:**
+
+<code></code>`tt
+
+<!-- MCOOP Admin Section -->
+
+[% IF c.session.roles && c.session.roles.grep('^admin$').size && (c.session.SiteName == 'MCOOP' || c.stash.SiteName == 'MCOOP') %]
+
+<div class="submenu-item">
+
+    <span class="submenu-header">MCOOP Admin</span>
+
+    <div class="submenu">
+
+        <a href="/mcoop">MCOOP Home</a>
+
+        <a href="/mcoop/server-room-plan">Server Room Plan</a>
+
+        <a href="/mcoop/network">Network Infrastructure</a>
+
+        <a href="/mcoop/services">COOP Services</a>
+
+        <a href="/mcoop/admin/infrastructure">Infrastructure Management</a>
+
+        <a href="/mcoop/admin/reports">COOP Reports</a>
+
+        <a href="/mcoop/admin/planning">Strategic Planning</a>
+
+
+
+
+<code></code>`
+
+
+
+<h2>Best Practices for MCOOP Templates</h2>
+
+
+
+<ol><li>**Site-Specific Checks**: Always include site-specific checks when adding MCOOP-specific functionality:</li></ol>
+
+   <code></code>`tt
+
+   [% IF c.session.SiteName == 'MCOOP' || c.stash.SiteName == 'MCOOP' %]
+
+       <!-- MCOOP-specific content -->
+
+
+   <code></code>`
+
+
+
+<ol><li>**Role-Based Access Control**: Combine role checks with site checks for admin features:</li></ol>
+
+   <code></code>`tt
+
+   [% IF c.session.roles && c.session.roles.grep('^admin$').size && (c.session.SiteName == 'MCOOP' || c.stash.SiteName == 'MCOOP') %]
+
+       <!-- MCOOP admin-only content -->
+
+
+   <code></code>`
+
+
+
+<ol><li>**Debug Information**: Include debug information sections in all templates:</li></ol>
+
+   <code></code>`tt
+
+   [% IF debug_mode == 1 %]
+
+
+       <!-- Other debug information -->
+
+
+   <code></code>`
+
+
+
+<ol><li>**Consistent Date Format**: Use the Date plugin consistently for date formatting:</li></ol>
+
+   <code></code>`tt
+
+   [% USE Date %]
+
+   [% Date.format(Date.now, '%Y-%m-%d') %]
+
+   <code></code>`
+
+
+
+<ol><li>**Version Control**: Maintain version information in all templates:</li></ol>
+
+   <code></code>`tt
+
+
+   <code></code>`
+
+
+
+<h2>Future Template Enhancements</h2>
+
+
+
+<ol><li>**Responsive Design**: Enhance templates with more responsive design elements for mobile users</li></ol>
+
+<ol><li>**Accessibility**: Improve accessibility features in all templates</li></ol>
+
+<ol><li>**Localization**: Add support for multiple languages</li></ol>
+
+<ol><li>**Theme Customization**: Allow more user-specific theme customization options</li></ol>
+
+</div>

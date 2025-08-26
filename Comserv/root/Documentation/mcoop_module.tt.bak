@@ -1,0 +1,402 @@
+[% PageVersion = 'Comserv/root/Documentation/mcoop_module.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'MCoop Module Documentation' %]
+
+<!-- Documentation page for mcoop_module -->
+<div class="documentation-content">
+
+
+
+<!-- Include documentation CSS -->
+<link rel="stylesheet" href="/static/css/documentation.css">
+
+<div class="markdown-content">
+
+
+**Last Updated:** April 17, 2025
+
+**Author:** Shanta
+
+**Status:** Active
+
+
+
+<h2>Overview</h2>
+
+
+
+The MCoop (Monashee Coop) module provides functionality for managing Monashee Cooperative operations within the Comserv system. This module is designed for administrators to manage cooperative resources, infrastructure, and planning. The module is accessible only to administrators when the current site is set to MCOOP.
+
+
+
+<h2>Features</h2>
+
+
+
+<h3>Server Room Plan</h3>
+
+
+
+The Server Room Plan feature provides a detailed proposal for the Monashee Coop's server infrastructure, including:
+
+
+
+<ul><li>Equipment requirements with pricing options</li></ul>
+
+<ul><li>Analysis of different server room configurations</li></ul>
+
+<ul><li>Common practices in server room implementation</li></ul>
+
+<ul><li>Recommendations for short-term and long-term solutions</li></ul>
+
+
+
+**Access URL:** <code>/MCoop/server_room_plan</code> or <code>/MCoop/server-room-plan</code> (case-sensitive)  
+
+**Alternative URLs:** <code>/mcoop/server_room_plan</code> or <code>/mcoop/server-room-plan</code> (lowercase also supported)  
+
+**Required Role:** Administrator  
+
+**Template:** <code>coop/server_room_plan.tt</code>
+
+
+
+<h3>Network Infrastructure</h3>
+
+
+
+The Network Infrastructure feature provides information and management tools for the coop's network setup.
+
+
+
+**Access URL:** <code>/mcoop/network</code>  
+
+**Required Role:** Administrator  
+
+**Template:** <code>coop/network.tt</code>
+
+
+
+<h3>COOP Services</h3>
+
+
+
+This feature provides an overview and management interface for services offered by the cooperative.
+
+
+
+**Access URL:** <code>/mcoop/services</code>  
+
+**Required Role:** Administrator  
+
+**Template:** <code>coop/services.tt</code>
+
+
+
+<h2>Technical Implementation</h2>
+
+
+
+<h3>Controller Structure</h3>
+
+
+
+The MCoop module is implemented in <code>Comserv/lib/Comserv/Controller/MCoop.pm</code> with the following key methods:
+
+
+
+<code></code>`perl
+
+<h1>Main index method - chained version</h1>
+
+sub index :Chained('base') :PathPart('') :Args(0) {
+
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 'Enter MCoop index method');
+
+
+
+    # Set mail server
+
+    $c->session->{MailServer} = "http://webmail.computersystemconsulting.ca";
+
+
+
+    # Generate theme CSS if needed
+
+    $c->model('ThemeConfig')->generate_all_theme_css($c);
+
+
+
+    # Make sure we're using the correct case for the site name
+
+    $c->model('ThemeConfig')->set_site_theme($c, "MCoop", "mcoop");
+
+
+
+    # Use the standard debug message system
+
+    if ($c->session->{debug_mode}) {
+
+        $c->stash->{debug_msg} = [] unless defined $c->stash->{debug_msg};
+
+        push @{$c->stash->{debug_msg}}, "MCoop controller index view - Using mcoop theme";
+
+    }
+
+
+
+    # Set template and forward to view
+
+    $c->stash(template => 'coop/index.tt');
+
+    $c->forward($c->view('TT'));
+
+}
+
+
+
+<h1>Server room plan base method (chained)</h1>
+
+sub server_room_plan_base :Chained('base') :PathPart('server_room_plan') :CaptureArgs(0) {
+
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'server_room_plan_base', 'Enter server_room_plan_base method');
+
+
+
+    # Set up common elements for server room plan pages
+
+    $c->stash->{help_message} = "This is the server room proposal for the Monashee Coop transition team.";
+
+    $c->stash->{account_message} = "For more information or to provide feedback, please contact the IT department.";
+
+}
+
+
+
+<h1>Main server room plan page (chained)</h1>
+
+sub server_room_plan :Chained('server_room_plan_base') :PathPart('') :Args(0) {
+
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'server_room_plan', 'Enter server_room_plan method');
+
+
+
+    # Use the standard debug message system
+
+    if ($c->session->{debug_mode}) {
+
+        $c->stash->{debug_msg} = [] unless defined $c->stash->{debug_msg};
+
+        push @{$c->stash->{debug_msg}}, "MCoop controller server_room_plan view - Template: coop/server_room_plan.tt";
+
+    }
+
+
+
+    # Set template and forward to view
+
+    $c->stash(template => 'coop/server_room_plan.tt');
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'server_room_plan', 'Set template to coop/server_room_plan.tt');
+
+    $c->forward($c->view('TT'));
+
+}
+
+
+
+<h1>Direct access to server_room_plan (non-chained)</h1>
+
+sub direct_server_room_plan :Path('/MCoop/server_room_plan') :Args(0) {
+
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'direct_server_room_plan', 'Direct server_room_plan method called');
+
+    $c->forward('server_room_plan');
+
+}
+
+
+
+<h1>Handle the hyphenated version (uppercase)</h1>
+
+sub server_room_plan_hyphen :Path('/MCoop/server-room-plan') :Args(0) {
+
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'server_room_plan_hyphen', 'Enter server_room_plan_hyphen method');
+
+    $c->forward('server_room_plan');
+
+}
+
+
+
+<h1>Handle lowercase mcoop URLs with hyphen</h1>
+
+sub server_room_plan_hyphen_lowercase :Path('/mcoop/server-room-plan') :Args(0) {
+
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'server_room_plan_hyphen_lowercase', 'Lowercase mcoop URL accessed');
+
+    $c->forward('server_room_plan');
+
+}
+
+
+
+<h1>Handle lowercase mcoop URLs with underscore</h1>
+
+sub server_room_plan_underscore_lowercase :Path('/mcoop/server_room_plan') :Args(0) {
+
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'server_room_plan_underscore_lowercase', 'Lowercase mcoop URL with underscore accessed');
+
+    $c->forward('server_room_plan');
+
+}
+
+<code></code>`
+
+
+
+<h3>Template Structure</h3>
+
+
+
+The MCoop module uses the following templates:
+
+
+
+<ul><li><code>coop/index.tt</code> - Main landing page for the MCoop module</li></ul>
+
+<ul><li style="margin-left: 20px">Contains the Technical Support Center content</li></ul>
+
+<ul><li style="margin-left: 20px">Displays different content for administrators and regular users</li></ul>
+
+<ul><li style="margin-left: 20px">Uses the site information from the site table via Root.pm</li></ul>
+
+<ul><li><code>coop/server_room_plan.tt</code> - Server room proposal template</li></ul>
+
+<ul><li style="margin-left: 20px">Contains detailed server infrastructure proposal</li></ul>
+
+<ul><li style="margin-left: 20px">Includes equipment requirements, options analysis, and recommendations</li></ul>
+
+<ul><li><code>coop/network.tt</code> - Network infrastructure template</li></ul>
+
+<ul><li><code>coop/services.tt</code> - COOP services template</li></ul>
+
+
+
+<h3>Access Control</h3>
+
+
+
+All MCoop features are restricted to administrators only. This is implemented through:
+
+
+
+<ol><li>Role-based menu visibility in <code>admintopmenu.tt</code></li></ol>
+
+<ol><li>Site-specific menu visibility (only shown when the current site is MCOOP)</li></ol>
+
+<ol><li>Controller-level checks for administrator privileges</li></ol>
+
+
+
+<h2>Navigation</h2>
+
+
+
+MCoop features are accessible through the Admin menu in the main navigation, but only when the current site is MCOOP. The menu structure is:
+
+
+
+<code></code>`
+
+Admin
+
+└── MCOOP Admin (only visible when current site is MCOOP)
+
+    ├── MCOOP Home
+
+    ├── Server Room Plan
+
+    ├── Network Infrastructure
+
+    ├── COOP Services
+
+    ├── Infrastructure Management
+
+    ├── COOP Reports
+
+    └── Strategic Planning
+
+<code></code>`
+
+
+
+This menu structure is implemented in the <code>admintopmenu.tt</code> template with the following conditional check:
+
+
+
+<code></code>`tt
+
+[% IF c.session.roles && c.session.roles.grep('^admin$').size && (c.session.SiteName == 'MCOOP' || c.stash.SiteName == 'MCOOP') %]
+
+    <!-- MCOOP Admin menu items -->
+
+
+<code></code>`
+
+
+
+This ensures that the MCOOP Admin menu is only visible to users with the admin role when they are viewing the MCOOP site.
+
+
+
+<h2>Future Development</h2>
+
+
+
+Planned enhancements for the MCoop module include:
+
+
+
+<ol><li>**Member Management** - Tools for managing cooperative membership</li></ol>
+
+<ol><li>**Resource Scheduling** - Calendar and booking system for shared resources</li></ol>
+
+<ol><li>**Financial Reporting** - Tools for tracking cooperative finances</li></ol>
+
+<ol><li>**Document Repository** - Secure storage for cooperative documents</li></ol>
+
+<ol><li>**Meeting Management** - Tools for scheduling and documenting meetings</li></ol>
+
+
+
+<h2>Related Documentation</h2>
+
+
+
+<ul><li><a href="changelog/2025-04-mcoop-admin-menu-restriction.md">MCoop Admin Menu Restriction</a></li></ul>
+
+<ul><li><a href="changelog/2025-04-mcoop-server-room-plan.md">MCoop Server Room Plan Implementation</a></li></ul>
+
+<ul><li><a href="changelog/2025-04-13-mcoop-url-case-fix.md">MCoop URL Case Sensitivity Fix</a></li></ul>
+
+<ul><li><a href="theme_system_implementation.md">Theme System Implementation</a></li></ul>
+
+</div>

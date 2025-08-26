@@ -1,0 +1,194 @@
+{
+    "checksum": "a91c6f97b8a8e319c5329bad0d56cde5d2e03236f4188efd57ee759ef8d3c391",
+    "data": {
+    "id": "7dc4b08d-a6ae-43cf-8ece-38d00dfb6966",
+    "createdAt": 1744830162317,
+    "updatedAt": 1744830176977,
+    "title": "Global log file path set to: /home/shanta/Pycha...",
+    "messages": [
+        {
+            "id": "5f80bb0a-e520-42a0-bf48-bda16db7e0d2",
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log"
+                },
+                {
+                    "type": "text",
+                    "text": "Pre-emptive log rotation triggered: 195117 bytes >= 81920 bytes"
+                },
+                {
+                    "type": "text",
+                    "text": "Current log file size: 195181 bytes, max size: 102400 bytes"
+                },
+                {
+                    "type": "text",
+                    "text": "Log file size (195181 bytes) exceeds maximum size (102400 bytes). Rotating log file."
+                },
+                {
+                    "type": "text",
+                    "text": "Log rotated: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/archive/application.log_20250416_120114"
+                },
+                {
+                    "type": "text",
+                    "text": "Can't locate Comserv/Controller/WeaverBeck.pm in @INC (you may need to install the Comserv::Controller::WeaverBeck module) (@INC entries checked: /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5 /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/5.38.2/x86_64-linux-gnu-thread-multi /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/5.38.2 /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/x86_64-linux-gnu-thread-multi /home/shanta/perl5/lib/perl5/5.38.2/x86_64-linux-gnu-thread-multi /home/shanta/perl5/lib/perl5/5.38.2 /home/shanta/perl5/lib/perl5/x86_64-linux-gnu-thread-multi /home/shanta/perl5/lib/perl5 /etc/perl /usr/local/lib/x86_64-linux-gnu/perl/5.38.2 /usr/local/share/perl/5.38.2 /usr/lib/x86_64-linux-gnu/perl5/5.38 /usr/share/perl5 /usr/lib/x86_64-linux-gnu/perl-base /usr/lib/x86_64-linux-gnu/perl/5.38 /usr/share/perl/5.38 /usr/local/lib/site_perl) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv.pm line 106."
+                },
+                {
+                    "type": "text",
+                    "text": "BEGIN failed--compilation aborted at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv.pm line 106."
+                },
+                {
+                    "type": "text",
+                    "text": "Compilation failed in require at /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/Catalyst/Utils.pm line 310."
+                }
+            ],
+            "context": {
+                "currentFile": {
+                    "path": "Comserv/lib/Comserv/Controller/Todo.pm",
+                    "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Todo.pm",
+                    "sources": [
+                        "opened_tab"
+                    ],
+                    "content": "\npackage Comserv::Controller::Todo;\nuse Moose;\nuse namespace::autoclean;\nuse DateTime::Format::ISO8601;\nuse Data::Dumper;\nuse Comserv::Util::Logging; # Import the logging utility\nBEGIN { extends 'Catalyst::Controller'; }\nhas 'logging' => (\n    is => 'ro',\n    default => sub { Comserv::Util::Logging->instance }\n);\n# Apply restrictions to the entire controller\n# Apply restrictions to the entire controller\nsub begin :Private {\n    my ($self, $c) = @_;\n\n    # Log the path the user is accessing\n    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', \"User accessing path: \" . $c->req->uri);\n\n    # Fetch the user's roles from the session\n    my $roles = $c->session->{roles} || [];\n\n    # Ensure roles are an array reference\n    if (ref $roles ne 'ARRAY') {\n        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'begin', \"Invalid or undefined roles in session for user: \" . ($c->session->{username} || 'Guest'));\n\n        # Stash the current path so it can be used for redirection after login\n        $c->stash->{template} = $c->req->uri;\n\n        # Set error message for session problems\n        $c->stash->{error_msg} = \"Session expired or invalid. Please log in again.\";\n\n        # Redirect to login\n        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', \"Redirecting to login page due to missing or invalid roles.\");\n        $c->res->redirect($c->uri_for('/login'));\n        $c->detach;\n    }\n\n    # Check if the user has the 'admin' role\n    unless (grep { $_ eq 'admin' } @$roles) {\n        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'begin', \"Unauthorized access attempt by user: \" . ($c->session->{username} || 'Guest'));\n\n        # Stash the current path for potential use\n        $c->stash->{redirect_to} = $c->req->uri;\n\n        # Redirect unauthorized users to the home page with an error message\n        $c->stash->{error_msg} = \"Unauthorized access. You do not have permission to view this page.\";\n        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', \"Redirecting unauthorized user to the home page.\");\n        $c->res->redirect($c->uri_for('/'));\n        $c->detach;\n    }\n\n    # If we get here, the user is authorized\n    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', \"User authorized to access Todo: \" . ($c->session->{username} || 'Guest'));\n}\n\nsub index :Path(/todo) :Args(0) {\n    my ( $self, $c ) = @_;\n\n    # Retrieve all of the todo records as todo model objects and store in the stash\n    $c->stash(todos => [$c->model('DB::Todo')->all]);\n\n    # Set the TT template to use.\n    $c->stash(template => 'todo/todo.tt');\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 'Fetched todos for the, todo page');\n    $c->forward($c->view('TT'));\n}\nsub auto :Private {\n    my ($self, $c) = @_;\n\n    # Check if the user is logged in and is an admin\n      unless (defined $c->session->{username} && grep { $_ eq 'admin' } @{$c->session->{roles}}) {\n        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto', \"Unauthorized access attempt to Todo controller\");\n        $c->response->redirect($c->uri_for('/'));\n        return 0;\n    }\n\n $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', \"User authorized to access Todo controller\");\n    return 1;\n}\n\n# You\nsub todo :Path('/todo') :Args(0) {\n    my ( $self, $c ) = @_;\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'todo', 'Fetching todos for the todo page');\n    # Get a DBIx::Class::Schema object\n    my $schema = $c->model('DBEncy');\n\n    # Get a DBIx::Class::ResultSet object\n    my $rs = $schema->resultset('Todo');\n\n    # Fetch todos for the site, ordered by start_date\n    my @todos = $rs->search(\n        {\n            sitename => $c->session->{SiteName},  # filter by site\n            status => { '!=' => 3 }  # status not equal to 3\n        },\n{ order_by => { -asc => ['priority', 'start_date'] } } # order by start_date\n    );\n\n    # Add the todos to the stash\n   $c->stash(\n        todos => \\@todos,\n        sitename => $c->session->{SiteName},\n        template => 'todo/todo.tt',\n\n    );\n\n    $c->forward($c->view('TT'));\n}\nsub details :Path('/todo/details') :Args {\n    my ( $self, $c ) = @_;\n\n    # Get the record_id from the request parameters\n    my $record_id = $c->request->parameters->{record_id};\n\n    # Get a DBIx::Class::Schema object\n    my $schema = $c->model('DBEncy');\n\n    # Get a DBIx::Class::ResultSet object\n    my $rs = $schema->resultset('Todo');\n\n    # Fetch the todo with the given record_id\n    my $todo = $rs->find($record_id);\n\n    # Check if the todo was found\n    if (defined $todo) {\n        # Calculate accumulative_time using the Log model\n        my $log_model = $c->model('Log');\n        my $accumulative_time_in_seconds = $log_model->calculate_accumulative_time($c, $record_id);\n\n        # Convert accumulative_time from seconds to hours and minutes\n        my $hours = int($accumulative_time_in_seconds / 3600);\n        my $minutes = int(($accumulative_time_in_seconds % 3600) / 60);\n\n        # Format the total time as 'HH:MM'\n        my $accumulative_time = sprintf(\"%02d:%02d\", $hours, $minutes);\n\n        # Add the todo and accumulative_time to the stash\n        $c->stash(record => $todo, accumulative_time => $accumulative_time);\n\n        # Set the template to 'todo/details.tt'\n        $c->stash(template => 'todo/details.tt');\n    } else {\n        # Handle the case where the todo is not found\n        $c->response->body('Todo not found');\n    }\n}\n\n\nsub addtodo :Path('/todo/addtodo') :Args(0) {\n    my ($self, $c) = @_;\n\n    # Logging the start of the addtodo method\n    $self->logging->log_with_details(\n        $c, 'info', __FILE__, __LINE__, 'addtodo', 'Initiating addtodo subroutine'\n    );\n\n    # Initialize schema\n    my $schema = $c->model('DBEncy');\n\n    # Get project resultset\n    my $project_rs = $schema->resultset('Project');\n\n    # Fetch project data from the Project Controller\n    my $project_controller = $c->controller('Project');\n    my $projects = $project_controller->fetch_projects_with_subprojects($c);\n\n    # Fetch the project_id from query parameters (if any)\n    my $project_id = $c->request->query_parameters->{project_id};\n    my $current_project;\n\n    # Attempt to locate the current project based on project_id\n    if ($project_id) {\n        $current_project = $project_rs->find($project_id);\n        if ($current_project) {\n            $self->logging->log_with_details(\n                $c, 'info', __FILE__, __LINE__, 'addtodo',\n                \"Located current project with ID: $project_id (\" . $current_project->name . \")\"\n            );\n        } else {\n            $self->logging->log_with_details(\n                $c, 'warn', __FILE__, __LINE__, 'addtodo',\n                \"Invalid project ID passed in query: $project_id\"\n            );\n        }\n    }\n\n    # Convert the resultset to an array of hashrefs for use in the template\n    my @projects = map {\n        {\n            id => $_->id,\n            name => $_->name,\n            sub_projects => [ map { { id => $_->id, name => $_->name } } $_->sub_projects->all ]\n        }\n    } $project_rs->all;\n\n    # Fetch all users to populate the user_id dropdown\n    my @users = $schema->resultset('User')->all;\n\n    # Log the list of user_ids\n    my @user_ids = map { $_->id } @users;\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'addtodo', 'User IDs: ' . join(', ', @user_ids));\n\n    # Add the projects, sitename, and user_id to the stash\n    $c->stash(\n        projects        => $projects,        # Parent projects with nested sub-projects\n        current_project => $current_project, # Selected project for the form (if any)\n        users          => \\@users,          # List of users to populate dropdown\n        template       => 'todo/addtodo.tt' # Template for rendering\n    );\n\n    # Log the end of the addtodo subroutine\n    $self->logging->log_with_details(\n        $c, 'info', __FILE__, __LINE__, 'addtodo', 'Completed addtodo subroutine'\n    );\n}\n\nsub debug :Local {\n    my ($self, $c) = @_;\n\n    # Print the @INC path\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'debug', \"INC: \" . join(\", \", @INC));\n\n    # Check if the DateTime plugin is installed\n    my $is_installed = eval {\n        require Template::Plugin::DateTime;\n        1;\n    };\n    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'debug', \"DateTime plugin is \" . ($is_installed ? \"\" : \"not \") . \"installed\");\n\n    $c->response->body(\"Debugging information has been logged\");\n}\nsub modify :Path('/todo/modify') :Args(1) {\n    my ($self, $c, $record_id) = @_;\n\n    # Log the entry into the modify action\n    $self->logging->log_with_details(\n        $c,\n        'info',\n        __FILE__,\n        __LINE__,\n        'modify',\n        \"Entered modify action for record_id: \" . ($record_id || 'undefined')\n    );\n\n    # Error handling for record_id\n    unless ($record_id) {\n        $self->logging->log_with_details(\n            $c,\n            'error',\n            __FILE__,\n            __LINE__,\n            'modify.record_id',\n            'Record ID is missing in the URL.'\n        );\n        $c->stash(\n            error_msg => 'Record ID is required but was not provided.',\n            form_data => $c->request->params,\n            template  => 'todo/details.tt',\n        );\n        return;\n    }\n\n    # Initialize the schema to fetch data\n    my $schema = $c->model('DBEncy');\n\n    # Fetch the todo item with the given record_id\n    my $todo = $schema->resultset('Todo')->find($record_id);\n\n    unless ($todo) {\n        $self->logging->log_with_details(\n            $c,\n            'error',\n            __FILE__,\n            __LINE__,\n            'modify.record_not_found',\n            \"Todo item not found for record ID: $record_id.\"\n        );\n        $c->stash(\n            error_msg => \"No todo item found for record ID: $record_id.\",\n            form_data => $c->request->params,\n            template  => 'todo/details.tt',\n        );\n        return;\n    }\n\n    # Retrieve form data from the user's request\n    my $form_data = $c->request->params;\n\n    # Validate mandatory fields\n    unless ($form_data->{sitename}) {\n        $self->logging->log_with_details(\n            $c,\n            'warn',\n            __FILE__,\n            __LINE__,\n            'modify.validation',\n            'Sitename is required but missing in the form data.'\n        );\n        $c->stash(\n            error_msg => 'Sitename is required. Please provide it.',\n            form_data => $form_data,\n            record    => $todo,\n            template  => 'todo/details.tt',\n        );\n        return;\n    }\n\n    # Declare and initialize variables\n    my $parent_todo = $form_data->{parent_todo} || $todo->parent_todo || '';\n    my $accumulative_time = $form_data->{accumulative_time} || 0;\n\n    # Attempt to update the todo record\n    eval {\n        $todo->update({\n            sitename             => $form_data->{sitename},\n            start_date          => $form_data->{start_date},\n            parent_todo         => $parent_todo,\n            due_date           => $form_data->{due_date} || DateTime->now->add(days => 7)->ymd,\n            subject            => $form_data->{subject},\n            description        => $form_data->{description},\n            estimated_man_hours => $form_data->{estimated_man_hours},\n            comments           => $form_data->{comments},\n            accumulative_time  => $accumulative_time,\n            reporter          => $form_data->{reporter},\n            company_code      => $form_data->{company_code},\n            owner             => $form_data->{owner},\n            developer         => $form_data->{developer},\n            username_of_poster => $c->session->{username},\n            status            => $form_data->{status},\n            priority          => $form_data->{priority},\n            share             => $form_data->{share} || 0,\n            last_mod_by       => $c->session->{username} || 'system',\n            last_mod_date     => DateTime->now->ymd,\n            user_id           => $form_data->{user_id} || 1,\n            project_id        => $form_data->{project_id},\n            date_time_posted  => $form_data->{date_time_posted}\n        });\n    };\n\n    if ($@) {\n        $self->logging->log_with_details(\n            $c,\n            'error',\n            __FILE__,\n            __LINE__,\n            'modify.update_failure',\n            \"Failed to update todo item for record ID: $record_id. Error: $@\"\n        );\n        $c->stash(\n            error_msg => \"An error occurred while updating the record: $@\",\n            form_data => $form_data,\n            record    => $todo,\n            template  => 'todo/details.tt',\n        );\n        return;\n    }\n\n    # Log successful update\n    $self->logging->log_with_details(\n        $c,\n        'info',\n        __FILE__,\n        __LINE__,\n        'modify.success',\n        \"Todo item successfully updated for record ID: $record_id.\"\n    );\n\n    # Handle successful update\n    $c->stash(\n        success_msg => \"Todo item with ID $record_id has been successfully updated.\",\n        record      => $todo,\n        template    => 'todo/details.tt',\n    );\n\n    # Redirect the user back to the page they came from\n    my $referer = $c->request->referer || $c->uri_for($self->action_for('list_todos'));\n    $c->response->redirect($referer);\n}\n\n\nsub create :Local {\n    my ( $self, $c ) = @_;\n\n    # Retrieve the form data from the request\n    my $record_id = $c->request->params->{record_id};\n    my $sitename = $c->request->params->{sitename};\n    my $start_date = $c->request->params->{start_date};\n    my $parent_todo = $c->request->params->{parent_todo} || 0;\n    my $due_date = $c->request->params->{due_date} || DateTime->now->add(days => 7)->ymd; # Set default value if not provided\n    my $subject = $c->request->params->{subject};\n    my $schema = $c->model('DBEncy');\n    my $description = $c->request->params->{description};\n    my $estimated_man_hours = $c->request->params->{estimated_man_hours};\n    my $comments = $c->request->params->{comments};\n    my $accumulative_time = $c->request->params->{accumulative_time};\n    my $reporter = $c->request->params->{reporter};\n    my $company_code = $c->request->params->{company_code};\n    my $owner = $c->request->params->{owner};\n    my $developer = $c->request->params->{developer};\n    my $username_of_poster = $c->session->{username} || 'Shanta';\n    my $status = $c->request->params->{status};\n    my $priority = $c->request->params->{priority};\n    my $share = $c->request->params->{share} || 0;\n    my $last_mod_by = $c->session->{username} || 'default_user';\n    my $last_mod_date = $c->request->params->{last_mod_date};\n    my $group_of_poster = $c->session->{roles} || 'default_group';\n    my $project_id = $c->request->params->{project_id};\n    my $manual_project_id = $c->request->params->{manual_project_id};\n    my $date_time_posted = $c->request->params->{date_time_posted};\n\n    # If manual_project_id is not empty, use it as the project ID\n    my $selected_project_id = $manual_project_id ? $manual_project_id : $project_id;\n\n    # Fetch the project_code using the selected_project_id\n    my $project_code;\n    if ($selected_project_id) {\n        my $project = $schema->resultset('Project')->find($selected_project_id);\n        $project_code = $project ? $project->project_code : 'default_code'; # Set a default code if not found\n    } else {\n        $project_code = 'default_code'; # Set a default code if no project ID is provided\n    }\n\n    # Check if accumulative_time is a valid integer\n    $accumulative_time = $c->request->params->{accumulative_time};\n    if (!defined $accumulative_time || $accumulative_time !~ /^\\d+$/) {\n        $accumulative_time = 0;\n    }\n\n    # Get the current date\n    my $current_date = DateTime->now->ymd;\n\n    # Retrieve user_id from session or another reliable source\n    my $user_id = $c->session->{user_id};\n    unless (defined $user_id) {\n        # Handle the case where user_id is not found\n        $c->response->body('User ID not found in session');\n        return;\n    }\n\n    # Create a new todo record\n    my $todo = $schema->resultset('Todo')->create({\n        record_id => $record_id,\n        sitename => $sitename,\n        start_date => $start_date,\n        parent_todo => $parent_todo,\n        due_date => $due_date,\n        subject => $subject,\n        description => $description,\n        estimated_man_hours => $estimated_man_hours,\n        comments => $comments,\n        accumulative_time => $accumulative_time,\n        reporter => $reporter,\n        company_code => $company_code,\n        owner => $owner,\n        project_code => $project_code, # Ensure this is set\n        developer => $developer,\n        username_of_poster => $username_of_poster,\n        status => $status,\n        priority => $priority,\n        share => $share,\n        last_mod_by => $last_mod_by,\n        last_mod_date => $current_date,\n        user_id => $user_id, # Ensure this is set\n        group_of_poster => $group_of_poster,\n        project_id => $selected_project_id,\n        date_time_posted => $date_time_posted,\n    });\n\n    # Redirect the user to the index action\n    $c->response->redirect($c->uri_for($self->action_for('index')));\n}\n\n\n\n\n\n\nsub day :Path('/todo/day') :Args {\n    my ( $self, $c, $date_arg ) = @_;\n\n    # Validate the date_arg if it's defined\n    my $date;\n    if (defined $date_arg) {\n        my $iso8601 = DateTime::Format::ISO8601->new;\n        eval { $date = $iso8601->parse_datetime($date_arg) };\n        $date = DateTime->now->ymd unless $date;  # Use today's date if $date_arg is not valid\n    } else {\n        $date = DateTime->now->ymd;  # Use today's date if $date_arg is not defined\n    }\n# Calculate the previous and next dates\nmy $dt = DateTime::Format::ISO8601->parse_datetime($date);\nmy $previous_date = $dt->clone->subtract(days => 1)->strftime('%Y-%m-%d');\nmy $next_date = $dt->clone->add(days => 1)->strftime('%Y-%m-%d');\n\n    # Get the Todo model\n    my $todo_model = $c->model('Todo');\n\n    # Fetch todos for the site, ordered by start_date\n    my $todos = $todo_model->get_top_todos($c, $c->session->{SiteName});\n\n    # Filter todos for the given day and status not equal to 3\n    my @filtered_todos = grep { $_->start_date le $date && $_->status ne '3' } @$todos;\n\n    # Add the todos to the stash\n    $c->stash(\n        todos => \\@filtered_todos,\n        sitename => $c->session->{SiteName},\n        date => $date,\n        previous_date => $previous_date,\n        next_date => $next_date,\n        template => 'todo/day.tt',\n    );\n\n    $c->forward($c->view('TT'));\n}\nsub week :Path('/todo/week') :Args {\n    my ($self, $c, $date) = @_;\n\n    # Get the Todo model\n    my $todo_model = $c->model('Todo');\n\n    # If no date is provided, use the current date\n    if (!defined $date) {\n        $date = DateTime->now->ymd;\n    }\n\n    # Calculate the start and end of the week\n    my $dt = DateTime::Format::ISO8601->parse_datetime($date);\n    my $start_of_week = $dt->clone->subtract(days => $dt->day_of_week - 1)->strftime('%Y-%m-%d');\n    my $end_of_week = $dt->clone->add(days => 7 - $dt->day_of_week)->strftime('%Y-%m-%d');\n\n    # Fetch todos for the site within the week, ordered by start_date\n    my $todos = $todo_model->get_top_todos($c, $c->session->{SiteName});\n\n    # Filter todos for the given week and status not equal to 3\n    my @filtered_todos = grep { $_->start_date ge $start_of_week && $_->start_date le $end_of_week && $_->status ne '3' } @$todos;\n\n    # Add the todos to the stash\n    $c->stash(\n        todos => \\@filtered_todos,\n        sitename => $c->session->{SiteName},\n        start_of_week => $start_of_week,\n        end_of_week => $end_of_week,\n        template => 'todo/week.tt',\n    );\n\n    $c->forward($c->view('TT'));\n}\n1;\n"
+                },
+                "codebaseEnabled": true
+            },
+            "createdAt": 1744830162318,
+            "isInternal": false,
+            "rawContent": {
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Pre-emptive log rotation triggered: 195117 bytes >= 81920 bytes"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Current log file size: 195181 bytes, max size: 102400 bytes"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Log file size (195181 bytes) exceeds maximum size (102400 bytes). Rotating log file."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Log rotated: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/archive/application.log_20250416_120114"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Can't locate Comserv/Controller/WeaverBeck.pm in @INC (you may need to install the Comserv::Controller::WeaverBeck module) (@INC entries checked: /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5 /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/5.38.2/x86_64-linux-gnu-thread-multi /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/5.38.2 /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/x86_64-linux-gnu-thread-multi /home/shanta/perl5/lib/perl5/5.38.2/x86_64-linux-gnu-thread-multi /home/shanta/perl5/lib/perl5/5.38.2 /home/shanta/perl5/lib/perl5/x86_64-linux-gnu-thread-multi /home/shanta/perl5/lib/perl5 /etc/perl /usr/local/lib/x86_64-linux-gnu/perl/5.38.2 /usr/local/share/perl/5.38.2 /usr/lib/x86_64-linux-gnu/perl5/5.38 /usr/share/perl5 /usr/lib/x86_64-linux-gnu/perl-base /usr/lib/x86_64-linux-gnu/perl/5.38 /usr/share/perl/5.38 /usr/local/lib/site_perl) at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv.pm line 106."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "BEGIN failed--compilation aborted at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv.pm line 106."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Compilation failed in require at /home/shanta/PycharmProjects/comserv2/Comserv/script/../local/lib/perl5/Catalyst/Utils.pm line 310."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph"
+                    }
+                ]
+            }
+        },
+        {
+            "id": "dda892bc-3f2c-46a3-a0b7-8311c2937756",
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "I'll help you resolve the error related to the missing `Comserv/Controller/WeaverBeck.pm` file. Let's first examine the error message and then check the relevant files to understand what's happening.\n\nThe error indicates that the system is trying to load a controller module called `Comserv::Controller::WeaverBeck`, but it can't find it in the include paths. This is causing the application to fail during startup.\n\nLet's first check the Comserv.pm file at line 106 to see how this controller is being referenced:"
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01H6ZJwmRsQ8srboCVgu5M4U",
+                    "statusText": "Viewed file",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": "Comserv/script/../lib/Comserv.pm",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv.pm"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "text",
+                    "text": "Now I see the issue. On line 106, the application is explicitly trying to load the `Comserv::Controller::WeaverBeck` module, but this module doesn't exist in your system.\n\nLet's check if there's a WeaverBeck.pm file in the controllers directory:"
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01VoxC6WUurKZgdpTvUgWdSp",
+                    "status": "IN_PROGRESS",
+                    "isHidden": true
+                },
+                {
+                    "type": "shellCommand",
+                    "command": "find /home/shanta/PycharmProjects/comserv2 -name \"WeaverBeck.pm\"",
+                    "id": "f8f8d8dc-dd74-40c1-9d7f-62b3ba87a6b2",
+                    "status": "CONFIRMATION",
+                    "toolCallId": "toolu_01VoxC6WUurKZgdpTvUgWdSp"
+                }
+            ],
+            "context": {
+                "author": "Coding Agent"
+            },
+            "createdAt": 1744830164563,
+            "isInternal": false
+        }
+    ],
+    "isAgent": true,
+    "isNameGenerated": true,
+    "isCustomAgent": false,
+    "isUnitTestsAgent": false,
+    "autoApply": false
+}
+}

@@ -1,0 +1,1275 @@
+Log rotated: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/archive/application.log_20250826_072414
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Cloudflare API Authentication
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: cloudflare_api_token_guide
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Cloudflare API Token Guide
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: cloudflare_api_token_ip_restriction_fix
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Cloudflare API Token Ip Restriction Fix
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: cloudflare_integration
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Cloudflare Integration
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: commands
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Commands
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: config
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Config
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: ContentManagement
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: ContentManagement
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: controller_list
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Controller List
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: controller_routing_guidelines
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Controller Routing Guidelines
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: controllers
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Controllers
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: customizing_profile
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Customizing Profile
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: db_config_loading
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Db Config Loading
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: db_config_loading_fix
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Db Config Loading Fix
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: DBIDocument
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: DBIDocument
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: developer_guides
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Developer Guides
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: document_management
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Document Management
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_config_guide
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Config Guide
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Documentation_Controller
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Controller
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_editor_guide
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Editor Guide
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_filename_issue
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Filename Issue
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_guide
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Guide
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_index_adaptation
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Index Adaptation
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Documentation_Management
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Management
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_migration_guide
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Migration Guide
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_migration_to_tt
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Migration To Tt
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_organization
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Organization
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_role_access
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Role Access
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Documentation_System
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation System
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_system
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation System
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_system_guide
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation System Guide
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_system_overview
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation System Overview
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_template
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Template
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_tt_template
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Tt Template
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_update_summary
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Update Summary
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: documentation_workflow
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Workflow
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Documentation_Workflow
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Documentation Workflow
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: DocumentManagement
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: DocumentManagement
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: domain_sync
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Domain Sync
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: domain_sync_feature
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Domain Sync Feature
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: ENCY
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: ENCY
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: ENCYController
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: ENCYController
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: ENCYModel
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: ENCYModel
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: enhanced_todo_navigation
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Enhanced Todo Navigation
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: error
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Error
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: FAQ
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: FAQ
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Files
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Files
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: fix_project_edit_button
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Fix Project Edit Button
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: fix_project_edit_form
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Fix Project Edit Form
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: fix_project_selection_todo_filtering
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Fix Project Selection Todo Filtering
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Forager
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Forager
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: getting_started
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Getting Started
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Git
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Git
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: git_merge_conflicts
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Git Merge Conflicts
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: git_pull_guide
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Git Pull Guide
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: guidelines
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Guidelines
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: HelpDesk
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: HelpDesk
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: HelpDeskSystem
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: HelpDeskSystem
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: HostingSignup
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: HostingSignup
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: HostingSignup_Mail
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: HostingSignup Mail
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: index
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Index
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Installation
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Installation
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Inventory
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Inventory
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: KVM_ISO_Transfer
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: KVM ISO Transfer
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: linux_commands
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Linux Commands
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: linux_commands_reference
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Linux Commands Reference
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Logging
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Logging
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: logging_best_practices
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Logging Best Practices
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Login
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Login
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: login_authentication
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Login Authentication
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Mail
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Mail
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: mail_admin_guide
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Mail Admin Guide
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: mail_configuration_guide
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Mail Configuration Guide
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: mail_documentation_update
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Mail Documentation Update
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: mail_system
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Mail System
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: mail_troubleshooting
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Mail Troubleshooting
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: mail_user_guide
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Mail User Guide
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: MailSystem
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: MailSystem
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: main_changelog
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Main Changelog
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: markdown_viewer
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Markdown Viewer
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: mcoop_getting_started
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Mcoop Getting Started
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: mcoop_module
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Mcoop Module
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: mcoop_user_guide
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Mcoop User Guide
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: member_resources
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Member Resources
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: menu_system
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Menu System
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: menu_system_guide
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Menu System Guide
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: model_list
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Model List
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: models
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Models
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: navigation_system
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Navigation System
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: network_diagnostics
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Network Diagnostics
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: network_map_json_storage
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Network Map Json Storage
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Overview
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Overview
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: page_migration_guide
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Page Migration Guide
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Pages
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Pages
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: project_management_system
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Project Management System
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: project_selection_log_creation
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Project Selection Log Creation
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Projects
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Projects
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: proxmox
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Proxmox
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Proxmox_CD_Visibility
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Proxmox CD Visibility
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: proxmox_commands
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Proxmox Commands
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: proxmox_integration
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Proxmox Integration
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: proxy_troubleshooting
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Proxy Troubleshooting
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Queens
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Queens
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: README
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: README
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: recent_updates
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Recent Updates
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: RestartStarman
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: RestartStarman
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Root
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Root
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Schema
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Schema
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: sessionplan
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Sessionplan
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: setup
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Setup
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: setupcontorller
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Setupcontorller
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Site
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Site
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: site_domain_resolution
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Site Domain Resolution
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: site_guide
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Site Guide
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: site_specific
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Site Specific
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Sites
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Sites
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Starman
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Starman
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: starman_restart_card
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Starman Restart Card
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: starman_restart_guide
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Starman Restart Guide
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: system_info
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: System Info
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: system_overview
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: System Overview
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: template_system
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Template System
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: templates
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Templates
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: theme_mappings_handling
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Theme Mappings Handling
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: theme_system
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Theme System
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: ThemeConfig
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: ThemeConfig
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Todo
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Todo
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: todo_edit_functionality
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Todo Edit Functionality
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: todo_filtering_and_views
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Todo Filtering And Views
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: todo_system
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Todo System
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: troubleshooting
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Troubleshooting
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: tutorials
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Tutorials
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: usbm
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Usbm
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: User
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: User
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: user_docs
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: User Docs
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: user_management
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: User Management
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: user_manual
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: User Manual
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Ve7tit
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Ve7tit
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: view
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: View
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: Virtualmin_Integration
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: Virtualmin Integration
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:948] _format_title - Formatting title from: WorkShops
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:972] _format_title - Formatted title result: WorkShops
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:735] index - Category access check for admin_guides: is_admin=1, user_role=admin
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:764] index - Category admin_guides access: granted for user with role admin
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:735] index - Category access check for controllers: is_admin=1, user_role=admin
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:764] index - Category controllers access: granted for user with role admin
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:735] index - Category access check for developer_guides: is_admin=1, user_role=admin
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:764] index - Category developer_guides access: granted for user with role admin
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:735] index - Category access check for tutorials: is_admin=1, user_role=admin
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:764] index - Category tutorials access: granted for user with role admin
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:735] index - Category access check for user_guides: is_admin=1, user_role=admin
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:764] index - Category user_guides access: granted for user with role admin
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:735] index - Category access check for proxmox: is_admin=1, user_role=admin
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:764] index - Category proxmox access: granted for user with role admin
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:735] index - Category access check for modules: is_admin=1, user_role=admin
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:764] index - Category modules access: granted for user with role admin
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:735] index - Category access check for changelog: is_admin=1, user_role=admin
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:764] index - Category changelog access: granted for user with role admin
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:735] index - Category access check for models: is_admin=1, user_role=admin
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:764] index - Category models access: granted for user with role admin
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:735] index - Category access check for general: is_admin=1, user_role=admin
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:764] index - Category general access: granted for user with role admin
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:735] index - Category access check for site_specific: is_admin=1, user_role=admin
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:764] index - Category site_specific access: granted for user with role admin
+error: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:814] index - Error loading completed items JSON: garbage after JSON object, at character offset 12687 (before "{"completed_items":[...") at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm line 805.
+
+debug: [2025-08-26 07:24:14] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:844] index - User role: admin, Display role: Administrator, Session roles: admin, Admin categories: admin_guides, proxmox, controllers, changelog, Has admin in session: Yes
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM: [2025-08-26 07:24:31] [/HOME/SHANTA/PYCHARMPROJECTS/COMSERV2/COMSERV/SCRIPT/../LIB/COMSERV/UTIL/LOGGING.PM] [197:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+INFO: [2025-08-26 07:24:33] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/NPM.pm:36] BUILD - NPM Controller initialized
+INFO: Starting Documentation controller initialization with hybrid approach (directory scan + config overrides)
+DEBUG: Attempting to load documentation config from: /home/shanta/PycharmProjects/comserv2/Comserv/script/../root/Documentation/config/documentation_config.json
+INFO: Loaded documentation configuration: 11 categories, 5 pages
+DEBUG: Category keys loaded: tutorials, user_guides, proxmox, admin_guides, controllers, developer_guides, site_specific, modules, changelog, documentation, models
+INFO: Step 1: Auto-discovering documentation files via directory scan
+INFO: Starting directory scan for documentation files
+INFO: Directory scan completed. Found 394 pages.
+INFO: Auto-discovered 394 documentation files
+INFO: Step 2: Applying configuration overrides
+INFO: Applied 5 configuration overrides
+INFO: Step 3: Categorizing all documentation pages
+INFO: Categorizing documentation pages
+INFO: Page categorization completed
+INFO: Hybrid documentation system initialized: 399 total pages (394 auto-discovered + 5 overrides) across 11 categories
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:454] _perform_startup_operations - Performing one-time startup operations
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:334] track_application_start - Application started at 2025-08-26
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:363] generate_all_theme_css - Starting theme CSS generation
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:397] generate_all_theme_css - Adding special styles for theme: apis
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: apis
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: usbm
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: dark
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:397] generate_all_theme_css - Adding special styles for theme: mcoop
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: mcoop
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: default
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:411] generate_all_theme_css - Generated CSS for theme: csc
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:421] generate_all_theme_css - Completed theme CSS generation
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:477] _perform_startup_operations - Cached system info - Hostname: workstation.computersystemconsulting.ca, IP: 192.168.1.199
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:550] _test_database_connections - All database connections tested successfully
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:505] _perform_startup_operations - Startup operations completed successfully
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:560] _setup_site_cached - Setting up site for domain: workstation.local
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:799] setup_site - Starting setup_site action
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:809] setup_site - Extracted domain: workstation.local
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1038] site_setup - SiteName: CSC
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1054] site_setup - Using Catalyst's built-in proxy configuration for URLs without port
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1058] site_setup - Test URL: http://workstation.local:3000/test
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1065] site_setup - Set default HostName: http://workstation.local
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm:122] get_site_details_by_name - Getting site details for name: CSC
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm:133] get_site_details_by_name - Found site: ID=1, Name=CSC
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1106] site_setup - ControllerName set to: CSC
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:138] get_site_theme - Getting theme for site: CSC
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:162] get_site_theme - Using theme from session for CSC: csc
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1127] site_setup - Set theme_name in stash: csc
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1137] site_setup - Completed site_setup action with HostName: http://workstation.local
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:1033] setup_site - Completed site setup
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:231] set_theme - Setting theme for site: CSC
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:54] get_all_themes - Getting all available themes
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:235] set_theme - Available themes: apis, csc, dark, default, mcoop, usbm
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:138] get_site_theme - Getting theme for site: CSC
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/ThemeConfig.pm:162] get_site_theme - Using theme from session for CSC: csc
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:254] set_theme - Set theme for site CSC to csc
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:591] _setup_site_cached - Cached site setup for domain: workstation.local, SiteName: CSC
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:62] documentation_base - Captured lowercase documentation route
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:69] documentation_index - Handling lowercase documentation index route
+DEBUG: [2025-08-26 07:24:35] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:270] _patch_build_log - Documentation index build step executed
+INFO: [2025-08-26 07:24:35] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:286] index - Accessing documentation index
+DEBUG: [2025-08-26 07:24:35] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:294] index - Session roles: admin
+DEBUG: [2025-08-26 07:24:35] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:302] index - User role determined from session: admin, is_admin: 1
+DEBUG: [2025-08-26 07:24:35] [DEBUG] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Documentation.pm:384] index - Documentation index loaded with 389 pages for role: admin
+Log file opened: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+Test log entry
+Wrote test log entry to file
+Global log file path set to: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log
+/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Util/Logging.pm: [2025-08-26 07:25:14] [179:0] Logging system initialized with log file: /home/shanta/PycharmProjects/comserv2/Comserv/script/../logs/application.log - No message provided
+Failed to open file: Scanning directory: root/Documentation
+
+Failed to open file: Found documentation file: Documentation/documentation_config_guide.md
+
+Failed to open file: Categorizing file: documentation_config_guide, path: Documentation/documentation_config_guide.md
+
+Failed to open file: Found documentation: documentation_config_guide (type: markdown, path: Documentation/documentation_config_guide.md)
+
+Failed to open file: Found documentation file: Documentation/admin_guides.tt
+
+Failed to open file: Categorizing file: admin_guides, path: Documentation/admin_guides.tt
+
+Failed to open file: Found documentation: admin_guides (type: template, path: Documentation/admin_guides.tt)
+
+Failed to open file: Found documentation file: Documentation/theme_system.tt
+
+Failed to open file: Categorizing file: theme_system, path: Documentation/theme_system.tt
+
+Failed to open file: Found documentation: theme_system (type: template, path: Documentation/theme_system.tt)
+
+Failed to open file: Found documentation file: Documentation/proxmox.tt
+
+Failed to open file: Categorizing file: proxmox, path: Documentation/proxmox.tt
+
+Failed to open file: Found documentation: proxmox (type: template, path: Documentation/proxmox.tt)
+
+Failed to open file: Found documentation file: Documentation/Installation.tt
+
+Failed to open file: Categorizing file: Installation, path: Documentation/Installation.tt
+
+Failed to open file: Found documentation: Installation (type: template, path: Documentation/Installation.tt)
+
+Failed to open file: Found documentation file: Documentation/system_overview.tt
+
+Failed to open file: Categorizing file: system_overview, path: Documentation/system_overview.tt
+
+Failed to open file: Found documentation: system_overview (type: template, path: Documentation/system_overview.tt)
+
+Failed to open file: Found documentation file: Documentation/usbm.tt
+
+Failed to open file: Categorizing file: usbm, path: Documentation/usbm.tt
+
+Failed to open file: Found documentation: usbm (type: template, path: Documentation/usbm.tt)
+
+Failed to open file: Found documentation file: Documentation/Root.tt
+
+Failed to open file: Categorizing file: Root, path: Documentation/Root.tt
+
+Failed to open file: Found documentation: Root (type: template, path: Documentation/Root.tt)
+
+Failed to open file: Found documentation file: Documentation/todo_system.md
+
+Failed to open file: Categorizing file: todo_system, path: Documentation/todo_system.md
+
+Failed to open file: Found documentation: todo_system (type: markdown, path: Documentation/todo_system.md)
+
+Failed to open file: Found documentation file: Documentation/Queens.tt
+
+Failed to open file: Categorizing file: Queens, path: Documentation/Queens.tt
+
+Failed to open file: Found documentation: Queens (type: template, path: Documentation/Queens.tt)
+
+Failed to open file: Found documentation file: Documentation/enhanced_todo_navigation.md
+
+Failed to open file: Categorizing file: enhanced_todo_navigation, path: Documentation/enhanced_todo_navigation.md
+
+Failed to open file: Found documentation: enhanced_todo_navigation (type: markdown, path: Documentation/enhanced_todo_navigation.md)
+
+Failed to open file: Found documentation file: Documentation/markdown_viewer.tt
+
+Failed to open file: Categorizing file: markdown_viewer, path: Documentation/markdown_viewer.tt
+
+Failed to open file: Found documentation: markdown_viewer (type: template, path: Documentation/markdown_viewer.tt)
+
+Failed to open file: Found documentation file: Documentation/DocumentManagement.tt
+
+Failed to open file: Categorizing file: DocumentManagement, path: Documentation/DocumentManagement.tt
+
+Failed to open file: Found documentation: DocumentManagement (type: template, path: Documentation/DocumentManagement.tt)
+
+Failed to open file: Found documentation file: Documentation/Documentation.tt
+
+Failed to open file: Categorizing file: Documentation, path: Documentation/Documentation.tt
+
+Failed to open file: Found documentation: Documentation (type: template, path: Documentation/Documentation.tt)
+
+Failed to open file: Found documentation file: Documentation/todo_system.tt
+
+Failed to open file: Found documentation: todo_system (type: template, path: Documentation/todo_system.tt)
+
+Failed to open file: Found documentation file: Documentation/Forager.tt
+
+Failed to open file: Categorizing file: Forager, path: Documentation/Forager.tt
+
+Failed to open file: Found documentation: Forager (type: template, path: Documentation/Forager.tt)
+
+Failed to open file: Found documentation file: Documentation/models.tt
+
+Failed to open file: Categorizing file: models, path: Documentation/models.tt
+
+Failed to open file: Found documentation: models (type: template, path: Documentation/models.tt)
+
+Failed to open file: Found documentation file: Documentation/Files.tt
+
+Failed to open file: Categorizing file: Files, path: Documentation/Files.tt
+
+Failed to open file: Found documentation: Files (type: template, path: Documentation/Files.tt)
+
+Failed to open file: Found documentation file: Documentation/project_selection_log_creation.md
+
+Failed to open file: Categorizing file: project_selection_log_creation, path: Documentation/project_selection_log_creation.md
+
+Failed to open file: Found documentation: project_selection_log_creation (type: markdown, path: Documentation/project_selection_log_creation.md)
+
+Failed to open file: Found documentation file: Documentation/BMaserModel.tt
+
+Failed to open file: Categorizing file: BMaserModel, path: Documentation/BMaserModel.tt
+
+Failed to open file: Found documentation: BMaserModel (type: template, path: Documentation/BMaserModel.tt)
+
+Failed to open file: Found documentation file: Documentation/all_docs.tt
+
+Failed to open file: Categorizing file: all_docs, path: Documentation/all_docs.tt
+
+Failed to open file: Found documentation: all_docs (type: template, path: Documentation/all_docs.tt)
+
+Failed to open file: Found documentation file: Documentation/document_management.tt
+
+Failed to open file: Categorizing file: document_management, path: Documentation/document_management.tt
+
+Failed to open file: Found documentation: document_management (type: template, path: Documentation/document_management.tt)
+
+Failed to open file: Found documentation file: Documentation/Virtualmin_Integration.tt
+
+Failed to open file: Categorizing file: Virtualmin_Integration, path: Documentation/Virtualmin_Integration.tt
+
+Failed to open file: Found documentation: Virtualmin_Integration (type: template, path: Documentation/Virtualmin_Integration.tt)
+
+Failed to open file: Found documentation file: Documentation/user_docs.tt
+
+Failed to open file: Categorizing file: user_docs, path: Documentation/user_docs.tt
+
+Failed to open file: Found documentation: user_docs (type: template, path: Documentation/user_docs.tt)
+
+Failed to open file: Found documentation file: Documentation/Projects.tt
+
+Failed to open file: Categorizing file: Projects, path: Documentation/Projects.tt
+
+Failed to open file: Found documentation: Projects (type: template, path: Documentation/Projects.tt)
+
+Failed to open file: Found documentation file: Documentation/BMasterController.tt
+
+Failed to open file: Categorizing file: BMasterController, path: Documentation/BMasterController.tt
+
+Failed to open file: Found documentation: BMasterController (type: template, path: Documentation/BMasterController.tt)
+
+Failed to open file: Found documentation file: Documentation/fix_project_edit_form.md
+
+Failed to open file: Categorizing file: fix_project_edit_form, path: Documentation/fix_project_edit_form.md
+
+Failed to open file: Found documentation: fix_project_edit_form (type: markdown, path: Documentation/fix_project_edit_form.md)
+
+Failed to open file: Found documentation file: Documentation/ENCYModel.tt
+
+Failed to open file: Categorizing file: ENCYModel, path: Documentation/ENCYModel.tt
+
+Failed to open file: Found documentation: ENCYModel (type: template, path: Documentation/ENCYModel.tt)
+
+Failed to open file: Found documentation file: Documentation/fix_project_selection_todo_filtering.md
+
+Failed to open file: Categorizing file: fix_project_selection_todo_filtering, path: Documentation/fix_project_selection_todo_filtering.md
+
+Failed to open file: Found documentation: fix_project_selection_todo_filtering (type: markdown, path: Documentation/fix_project_selection_todo_filtering.md)
+
+Failed to open file: Found documentation file: Documentation/user_manual.tt
+
+Failed to open file: Categorizing file: user_manual, path: Documentation/user_manual.tt
+
+Failed to open file: Found documentation: user_manual (type: template, path: Documentation/user_manual.tt)
+
+Failed to open file: Found documentation file: Documentation/sessionplan.tt
+
+Failed to open file: Categorizing file: sessionplan, path: Documentation/sessionplan.tt
+
+Failed to open file: Found documentation: sessionplan (type: template, path: Documentation/sessionplan.tt)
+
+Failed to open file: Found documentation file: Documentation/Login.tt
+
+Failed to open file: Categorizing file: Login, path: Documentation/Login.tt
+
+Failed to open file: Found documentation: Login (type: template, path: Documentation/Login.tt)
+
+Failed to open file: Found documentation file: Documentation/main_changelog.md
+
+Failed to open file: Categorizing file: main_changelog, path: Documentation/main_changelog.md
+
+Failed to open file: Found documentation: main_changelog (type: markdown, path: Documentation/main_changelog.md)
+
+Failed to open file: Found documentation file: Documentation/error.tt
+
+Failed to open file: Categorizing file: error, path: Documentation/error.tt
+
+Failed to open file: Found documentation: error (type: template, path: Documentation/error.tt)
+
+Failed to open file: Found documentation file: Documentation/todo_filtering_and_views.md
+
+Failed to open file: Categorizing file: todo_filtering_and_views, path: Documentation/todo_filtering_and_views.md
+
+Failed to open file: Found documentation: todo_filtering_and_views (type: markdown, path: Documentation/todo_filtering_and_views.md)
+
+Failed to open file: Found documentation file: Documentation/Todo.tt
+
+Failed to open file: Categorizing file: Todo, path: Documentation/Todo.tt
+
+Failed to open file: Found documentation: Todo (type: template, path: Documentation/Todo.tt)
+
+Failed to open file: Found documentation file: Documentation/ENCY.tt
+
+Failed to open file: Categorizing file: ENCY, path: Documentation/ENCY.tt
+
+Failed to open file: Found documentation: ENCY (type: template, path: Documentation/ENCY.tt)
+
+Failed to open file: Found documentation file: Documentation/system_info.tt
+
+Failed to open file: Categorizing file: system_info, path: Documentation/system_info.tt
+
+Failed to open file: Found documentation: system_info (type: template, path: Documentation/system_info.tt)
+
+Failed to open file: Found documentation file: Documentation/admin.tt
+
+Failed to open file: Categorizing file: admin, path: Documentation/admin.tt
+
+Failed to open file: Found documentation: admin (type: template, path: Documentation/admin.tt)
+
+Failed to open file: Found documentation file: Documentation/proxy_troubleshooting.md
+
+Failed to open file: Categorizing file: proxy_troubleshooting, path: Documentation/proxy_troubleshooting.md
+
+Failed to open file: Found documentation: proxy_troubleshooting (type: markdown, path: Documentation/proxy_troubleshooting.md)
+
+Failed to open file: Found documentation file: Documentation/recent_updates.tt
+
+Failed to open file: Categorizing file: recent_updates, path: Documentation/recent_updates.tt
+
+Failed to open file: Found documentation: recent_updates (type: template, path: Documentation/recent_updates.tt)
+
+Failed to open file: Found documentation file: Documentation/index.tt
+
+Failed to open file: Categorizing file: index, path: Documentation/index.tt
+
+Failed to open file: Found documentation: index (type: template, path: Documentation/index.tt)
+
+Failed to open file: Found documentation file: Documentation/todo_edit_functionality.md
+
+Failed to open file: Categorizing file: todo_edit_functionality, path: Documentation/todo_edit_functionality.md
+
+Failed to open file: Found documentation: todo_edit_functionality (type: markdown, path: Documentation/todo_edit_functionality.md)
+
+Failed to open file: Found documentation file: Documentation/Admin.tt
+
+Failed to open file: Categorizing file: Admin, path: Documentation/Admin.tt
+
+Failed to open file: Found documentation: Admin (type: template, path: Documentation/Admin.tt)
+
+Failed to open file: Found documentation file: Documentation/DBIDocument.tt
+
+Failed to open file: Categorizing file: DBIDocument, path: Documentation/DBIDocument.tt
+
+Failed to open file: Found documentation: DBIDocument (type: template, path: Documentation/DBIDocument.tt)
+
+Failed to open file: Found documentation file: Documentation/setupcontorller.tt
+
+Failed to open file: Categorizing file: setupcontorller, path: Documentation/setupcontorller.tt
+
+Failed to open file: Found documentation: setupcontorller (type: template, path: Documentation/setupcontorller.tt)
+
+Failed to open file: Found documentation file: Documentation/mcoop_module.md
+
+Failed to open file: Categorizing file: mcoop_module, path: Documentation/mcoop_module.md
+
+Failed to open file: Found documentation: mcoop_module (type: markdown, path: Documentation/mcoop_module.md)
+
+Failed to open file: Found documentation file: Documentation/Git.tt
+
+Failed to open file: Categorizing file: Git, path: Documentation/Git.tt
+
+Failed to open file: Found documentation: Git (type: template, path: Documentation/Git.tt)
+
+Failed to open file: Found documentation file: Documentation/setup.tt
+
+Failed to open file: Categorizing file: setup, path: Documentation/setup.tt
+
+Failed to open file: Found documentation: setup (type: template, path: Documentation/setup.tt)
+
+Failed to open file: Found documentation file: Documentation/WorkShops.tt
+
+Failed to open file: Categorizing file: WorkShops, path: Documentation/WorkShops.tt
+
+Failed to open file: Found documentation: WorkShops (type: template, path: Documentation/WorkShops.tt)
+
+Failed to open file: Found documentation file: Documentation/Overview.tt
+
+Failed to open file: Categorizing file: Overview, path: Documentation/Overview.tt
+
+Failed to open file: Found documentation: Overview (type: template, path: Documentation/Overview.tt)
+
+Failed to open file: Found documentation file: Documentation/Schema.tt
+
+Failed to open file: Categorizing file: Schema, path: Documentation/Schema.tt
+
+Failed to open file: Found documentation: Schema (type: template, path: Documentation/Schema.tt)
+
+Failed to open file: Found documentation file: Documentation/Logging.tt
+
+Failed to open file: Categorizing file: Logging, path: Documentation/Logging.tt
+
+Failed to open file: Found documentation: Logging (type: template, path: Documentation/Logging.tt)
+
+Failed to open file: Found documentation file: Documentation/Inventory.tt
+
+Failed to open file: Categorizing file: Inventory, path: Documentation/Inventory.tt
+
+Failed to open file: Found documentation: Inventory (type: template, path: Documentation/Inventory.tt)
+
+Failed to open file: Found documentation file: Documentation/architecture.tt
+
+Failed to open file: Categorizing file: architecture, path: Documentation/architecture.tt
+
+Failed to open file: Found documentation: architecture (type: template, path: Documentation/architecture.tt)
+
+Failed to open file: Found documentation file: Documentation/changelog.tt
+
+Failed to open file: Categorizing file: changelog, path: Documentation/changelog.tt
+
+Failed to open file: Found documentation: changelog (type: template, path: Documentation/changelog.tt)
+
+Failed to open file: Found documentation file: Documentation/AIAssistants.tt
+
+Failed to open file: Categorizing file: AIAssistants, path: Documentation/AIAssistants.tt
+
+Failed to open file: Found documentation: AIAssistants (type: template, path: Documentation/AIAssistants.tt)
+
+Failed to open file: Found documentation file: Documentation/documentation_system.md
+
+Failed to open file: Categorizing file: documentation_system, path: Documentation/documentation_system.md
+
+Failed to open file: Found documentation: documentation_system (type: markdown, path: Documentation/documentation_system.md)
+
+Failed to open file: Found documentation file: Documentation/proxmox_integration.md
+
+Failed to open file: Categorizing file: proxmox_integration, path: Documentation/proxmox_integration.md
+
+Failed to open file: Found documentation: proxmox_integration (type: markdown, path: Documentation/proxmox_integration.md)
+
+Failed to open file: Found documentation file: Documentation/fix_project_edit_button.md
+
+Failed to open file: Categorizing file: fix_project_edit_button, path: Documentation/fix_project_edit_button.md
+
+Failed to open file: Found documentation: fix_project_edit_button (type: markdown, path: Documentation/fix_project_edit_button.md)
+
+Failed to open file: Found documentation file: Documentation/config.tt
+
+Failed to open file: Categorizing file: config, path: Documentation/config.tt
+
+Failed to open file: Found documentation: config (type: template, path: Documentation/config.tt)
+
+Failed to open file: Found documentation file: Documentation/ENCYController.tt
+
+Failed to open file: Categorizing file: ENCYController, path: Documentation/ENCYController.tt
+
+Failed to open file: Found documentation: ENCYController (type: template, path: Documentation/ENCYController.tt)
+
+Failed to open file: Found documentation file: Documentation/Sites.tt
+
+Failed to open file: Categorizing file: Sites, path: Documentation/Sites.tt
+
+Failed to open file: Found documentation: Sites (type: template, path: Documentation/Sites.tt)
+
+Failed to open file: Found documentation file: Documentation/Mail.tt
+
+Failed to open file: Categorizing file: Mail, path: Documentation/Mail.tt
+
+Failed to open file: Found documentation: Mail (type: template, path: Documentation/Mail.tt)
+
+Failed to open file: Found documentation file: Documentation/User.tt
+
+Failed to open file: Categorizing file: User, path: Documentation/User.tt
+
+Failed to open file: Found documentation: User (type: template, path: Documentation/User.tt)
+
+Failed to open file: Found documentation file: Documentation/site_specific.tt
+
+Failed to open file: Categorizing file: site_specific, path: Documentation/site_specific.tt
+
+Failed to open file: Found documentation: site_specific (type: template, path: Documentation/site_specific.tt)
+
+Failed to open file: Found documentation file: Documentation/guidelines.tt
+
+Failed to open file: Categorizing file: guidelines, path: Documentation/guidelines.tt
+
+Failed to open file: Found documentation: guidelines (type: template, path: Documentation/guidelines.tt)
+
+Failed to open file: Found documentation file: Documentation/Starman.tt
+
+Failed to open file: Categorizing file: Starman, path: Documentation/Starman.tt
+
+Failed to open file: Found documentation: Starman (type: template, path: Documentation/Starman.tt)
+
+Failed to open file: Found documentation file: Documentation/tutorials.tt
+
+Failed to open file: Categorizing file: tutorials, path: Documentation/tutorials.tt
+
+Failed to open file: Found documentation: tutorials (type: template, path: Documentation/tutorials.tt)
+
+Failed to open file: Found documentation file: Documentation/Calendar.tt
+
+Failed to open file: Categorizing file: Calendar, path: Documentation/Calendar.tt
+
+Failed to open file: Found documentation: Calendar (type: template, path: Documentation/Calendar.tt)
+
+Failed to open file: Found documentation file: Documentation/Api.tt
+
+Failed to open file: Categorizing file: Api, path: Documentation/Api.tt
+
+Failed to open file: Found documentation: Api (type: template, path: Documentation/Api.tt)
+
+Failed to open file: Found documentation file: Documentation/Ve7tit.tt
+
+Failed to open file: Categorizing file: Ve7tit, path: Documentation/Ve7tit.tt
+
+Failed to open file: Found documentation: Ve7tit (type: template, path: Documentation/Ve7tit.tt)
+
+Failed to open file: Found documentation file: Documentation/controllers.tt
+
+Failed to open file: Categorizing file: controllers, path: Documentation/controllers.tt
+
+Failed to open file: Found documentation: controllers (type: template, path: Documentation/controllers.tt)
+
+Failed to open file: Found documentation file: Documentation/BMaster.tt
+
+Failed to open file: Categorizing file: BMaster, path: Documentation/BMaster.tt
+
+Failed to open file: Found documentation: BMaster (type: template, path: Documentation/BMaster.tt)
+
+Failed to open file: Found documentation file: Documentation/Documentation_Workflow.md
+
+Failed to open file: Categorizing file: Documentation_Workflow, path: Documentation/Documentation_Workflow.md
+
+Failed to open file: Found documentation: Documentation_Workflow (type: markdown, path: Documentation/Documentation_Workflow.md)
+
+Failed to open file: Found documentation file: Documentation/documentation_workflow.tt
+
+Failed to open file: Categorizing file: documentation_workflow, path: Documentation/documentation_workflow.tt
+
+Failed to open file: Found documentation: documentation_workflow (type: template, path: Documentation/documentation_workflow.tt)
+
+Failed to open file: Found documentation file: Documentation/getting_started.tt
+
+Failed to open file: Categorizing file: getting_started, path: Documentation/getting_started.tt
+
+Failed to open file: Found documentation: getting_started (type: template, path: Documentation/getting_started.tt)
+
+Failed to open file: Found documentation file: Documentation/AI.tt
+
+Failed to open file: Categorizing file: AI, path: Documentation/AI.tt
+
+Failed to open file: Found documentation: AI (type: template, path: Documentation/AI.tt)
+
+Failed to open file: Found documentation file: Documentation/config_based/view.tt
+
+Failed to open file: Categorizing file: view, path: Documentation/config_based/view.tt
+
+Failed to open file: Found documentation: view (type: template, path: Documentation/config_based/view.tt)
+
+Failed to open file: Found documentation file: Documentation/config_based/index.tt
+
+Failed to open file: Categorizing file: index, path: Documentation/config_based/index.tt
+
+Failed to open file: Found documentation: index (type: template, path: Documentation/config_based/index.tt)
+
+Failed to open file: Found documentation file: Documentation/proxmox/Proxmox_CD_Visibility.tt
+
+Failed to open file: Categorizing file: Proxmox_CD_Visibility, path: Documentation/proxmox/Proxmox_CD_Visibility.tt
+
+Failed to open file: Found documentation: Proxmox_CD_Visibility (type: template, path: Documentation/proxmox/Proxmox_CD_Visibility.tt)
+
+Failed to open file: Found documentation file: Documentation/models/model_list.md
+
+Failed to open file: Categorizing file: model_list, path: Documentation/models/model_list.md
+
+Failed to open file: Found documentation: model_list (type: markdown, path: Documentation/models/model_list.md)
+
+Failed to open file: Found documentation file: Documentation/models/Site.md
+
+Failed to open file: Categorizing file: Site, path: Documentation/models/Site.md
+
+Failed to open file: Found documentation: Site (type: markdown, path: Documentation/models/Site.md)
+
+Failed to open file: Found documentation file: Documentation/models/User.md
+
+Failed to open file: Found documentation: User (type: markdown, path: Documentation/models/User.md)
+
+Failed to open file: Found documentation file: Documentation/models/README.md
+
+Failed to open file: Categorizing file: README, path: Documentation/models/README.md
+
+Failed to open file: Found documentation: README (type: markdown, path: Documentation/models/README.md)
+
+Failed to open file: Found documentation file: Documentation/models/ThemeConfig.md
+
+Failed to open file: Categorizing file: ThemeConfig, path: Documentation/models/ThemeConfig.md
+
+Failed to open file: Found documentation: ThemeConfig (type: markdown, path: Documentation/models/ThemeConfig.md)
+
+Failed to open file: Found documentation file: Documentation/models/index.tt
+
+Failed to open file: Categorizing file: index, path: Documentation/models/index.tt
+
+Failed to open file: Found documentation: index (type: template, path: Documentation/models/index.tt)
+
+Failed to open file: Found documentation file: Documentation/tutorials/mcoop_getting_started.md
+
+Failed to open file: Categorizing file: mcoop_getting_started, path: Documentation/tutorials/mcoop_getting_started.md
+
+Failed to open file: Found documentation: mcoop_getting_started (type: markdown, path: Documentation/tutorials/mcoop_getting_started.md)
+
+Failed to open file: Found documentation file: Documentation/tutorials/customizing_profile.md
+
+Failed to open file: Categorizing file: customizing_profile, path: Documentation/tutorials/customizing_profile.md
+
+Failed to open file: Found documentation: customizing_profile (type: markdown, path: Documentation/tutorials/customizing_profile.md)
+
+Failed to open file: Found documentation file: Documentation/tutorials/login_authentication.md
+
+Failed to open file: Categorizing file: login_authentication, path: Documentation/tutorials/login_authentication.md
+
+Failed to open file: Found documentation: login_authentication (type: markdown, path: Documentation/tutorials/login_authentication.md)
+
+Failed to open file: Found documentation file: Documentation/changelog/2025-04-documentation-admin-visibility-fix.md
+
+Failed to open file: Categorizing file: 2025-04-documentation-admin-visibility-fix, path: Documentation/changelog/2025-04-documentation-admin-visibility-fix.md
+
+Failed to open file: Found documentation: 2025-04-documentation-admin-visibility-fix (type: markdown, path: Documentation/changelog/2025-04-documentation-admin-visibility-fix.md)
+
+Failed to open file: Found documentation file: Documentation/changelog/2025-04-pagetop-hostname-display.md
+
+Failed to open file: Categorizing file: 2025-04-pagetop-hostname-display, path: Documentation/changelog/2025-04-pagetop-hostname-display.md
+
+Failed to open file: Found documentation: 2025-04-pagetop-hostname-display (type: markdown, path: Documentation/changelog/2025-04-pagetop-hostname-display.md)
+
+Failed to open file: Found documentation file: Documentation/changelog/2024-07-proxmox-controller-fixes.md
+
+Failed to open file: Categorizing file: 2024-07-proxmox-controller-fixes, path: Documentation/changelog/2024-07-proxmox-controller-fixes.md
+
+Failed to open file: Found documentation: 2024-07-proxmox-controller-fixes (type: markdown, path: Documentation/changelog/2024-07-proxmox-controller-fixes.md)
+
+Failed to open file: Found documentation file: Documentation/changelog/2024-08-proxmox-debug-msg-fix.md
+
+Failed to open file: Categorizing file: 2024-08-proxmox-debug-msg-fix, path: Documentation/changelog/2024-08-proxmox-debug-msg-fix.md
+
+Failed to open file: Found documentation: 2024-08-proxmox-debug-msg-fix (type: markdown, path: Documentation/changelog/2024-08-proxmox-debug-msg-fix.md)
+
+Failed to open file: Found documentation file: Documentation/changelog/2025-04-navigation-improvements.md
+
+Failed to open file: Categorizing file: 2025-04-navigation-improvements, path: Documentation/changelog/2025-04-navigation-improvements.md
+
+Failed to open file: Found documentation: 2025-04-navigation-improvements (type: markdown, path: Documentation/changelog/2025-04-navigation-improvements.md)
+
+Failed to open file: Found documentation file: Documentation/changelog/2024-06-15-login-redirect-fix.md
+
+Failed to open file: Categorizing file: 2024-06-15-login-redirect-fix, path: Documentation/changelog/2024-06-15-login-redirect-fix.md
+
+Failed to open file: Found documentation: 2024-06-15-login-redirect-fix (type: markdown, path: Documentation/changelog/2024-06-15-login-redirect-fix.md)
+
+Failed to open file: Found documentation file: Documentation/changelog/2025-04-mcoop-server-room-plan.md
+
+Failed to open file: Categorizing file: 2025-04-mcoop-server-room-plan, path: Documentation/changelog/2025-04-mcoop-server-room-plan.md
+
+Failed to open file: Found documentation: 2025-04-mcoop-server-room-plan (type: markdown, path: Documentation/changelog/2025-04-mcoop-server-room-plan.md)
+
+Failed to open file: Found documentation file: Documentation/changelog/2025-04-documentation-template-refactoring.md
+
+Failed to open file: Categorizing file: 2025-04-documentation-template-refactoring, path: Documentation/changelog/2025-04-documentation-template-refactoring.md
+
+Failed to open file: Found documentation: 2025-04-documentation-template-refactoring (type: markdown, path: Documentation/changelog/2025-04-documentation-template-refactoring.md)
+
+Failed to open file: Found documentation file: Documentation/changelog/2025-04-documentation-display-fix.md
+
+Failed to open file: Categorizing file: 2025-04-documentation-display-fix, path: Documentation/changelog/2025-04-documentation-display-fix.md
+
+Failed to open file: Found documentation: 2025-04-documentation-display-fix (type: markdown, path: Documentation/changelog/2025-04-documentation-display-fix.md)
+
+Failed to open file: Found documentation file: Documentation/changelog/2025-04-mcoop-admin-menu-restriction.md
+
+Failed to open file: Categorizing file: 2025-04-mcoop-admin-menu-restriction, path: Documentation/changelog/2025-04-mcoop-admin-menu-restriction.md
+
+Failed to open file: Found documentation: 2025-04-mcoop-admin-menu-restriction (type: markdown, path: Documentation/changelog/2025-04-mcoop-admin-menu-restriction.md)
+
+Failed to open file: Found documentation file: Documentation/changelog/2025-05-15-documentation-system-update.md
+
+Failed to open file: Categorizing file: 2025-05-15-documentation-system-update, path: Documentation/changelog/2025-05-15-documentation-system-update.md
+
+Failed to open file: Found documentation: 2025-05-15-documentation-system-update (type: markdown, path: Documentation/changelog/2025-05-15-documentation-system-update.md)
+
+Failed to open file: Found documentation file: Documentation/changelog/2024-07-project-id-fix.md
+
+Failed to open file: Categorizing file: 2024-07-project-id-fix, path: Documentation/changelog/2024-07-project-id-fix.md
+
+Failed to open file: Found documentation: 2024-07-project-id-fix (type: markdown, path: Documentation/changelog/2024-07-project-id-fix.md)
+
+Failed to open file: Found documentation file: Documentation/changelog/2025-04-documentation-workflow-update.md
+
+Failed to open file: Categorizing file: 2025-04-documentation-workflow-update, path: Documentation/changelog/2025-04-documentation-workflow-update.md
+
+Failed to open file: Found documentation: 2025-04-documentation-workflow-update (type: markdown, path: Documentation/changelog/2025-04-documentation-workflow-update.md)
+
+Failed to open file: Found documentation file: Documentation/changelog/2025-05-16-documentation-workflow-consolidation.md
+
+Failed to open file: Categorizing file: 2025-05-16-documentation-workflow-consolidation, path: Documentation/changelog/2025-05-16-documentation-workflow-consolidation.md
+
+Failed to open file: Found documentation: 2025-05-16-documentation-workflow-consolidation (type: markdown, path: Documentation/changelog/2025-05-16-documentation-workflow-consolidation.md)
+
+Failed to open file: Found documentation file: Documentation/changelog/2024-06-project-edit-fix.md
+
+Failed to open file: Categorizing file: 2024-06-project-edit-fix, path: Documentation/changelog/2024-06-project-edit-fix.md
+
+Failed to open file: Found documentation: 2024-06-project-edit-fix (type: markdown, path: Documentation/changelog/2024-06-project-edit-fix.md)
+
+Failed to open file: Found documentation file: Documentation/changelog/2024-08-pagetop-hostname-display.md
+
+Failed to open file: Categorizing file: 2024-08-pagetop-hostname-display, path: Documentation/changelog/2024-08-pagetop-hostname-display.md
+
+Failed to open file: Found documentation: 2024-08-pagetop-hostname-display (type: markdown, path: Documentation/changelog/2024-08-pagetop-hostname-display.md)
+
+Failed to open file: Found documentation file: Documentation/controllers/User.md
+
+Failed to open file: Found documentation: User (type: markdown, path: Documentation/controllers/User.md)
+
+Failed to open file: Found documentation file: Documentation/controllers/README.md
+
+Failed to open file: Found documentation: README (type: markdown, path: Documentation/controllers/README.md)
+
+Failed to open file: Found documentation file: Documentation/controllers/Documentation.md
+
+Failed to open file: Found documentation: Documentation (type: markdown, path: Documentation/controllers/Documentation.md)
+
+Failed to open file: Found documentation file: Documentation/controllers/index.tt
+
+Failed to open file: Found documentation: index (type: template, path: Documentation/controllers/index.tt)
+
+Failed to open file: Found documentation file: Documentation/controllers/Root.md
+
+Failed to open file: Found documentation: Root (type: markdown, path: Documentation/controllers/Root.md)
+
+Failed to open file: Found documentation file: Documentation/controllers/controller_list.md
+
+Failed to open file: Categorizing file: controller_list, path: Documentation/controllers/controller_list.md
+
+Failed to open file: Found documentation: controller_list (type: markdown, path: Documentation/controllers/controller_list.md)
+
+Failed to open file: Found documentation file: Documentation/roles/admin/KVM_ISO_Transfer.tt
+
+Failed to open file: Categorizing file: KVM_ISO_Transfer, path: Documentation/roles/admin/KVM_ISO_Transfer.tt
+
+Failed to open file: Found documentation: KVM_ISO_Transfer (type: template, path: Documentation/roles/admin/KVM_ISO_Transfer.tt)
+
+Failed to open file: Found documentation file: Documentation/roles/admin/Documentation_Management.md
+
+Failed to open file: Categorizing file: Documentation_Management, path: Documentation/roles/admin/Documentation_Management.md
+
+Failed to open file: Found documentation: Documentation_Management (type: markdown, path: Documentation/roles/admin/Documentation_Management.md)
+
+Failed to open file: Found documentation file: Documentation/roles/admin/documentation_system_guide.md
+
+Failed to open file: Categorizing file: documentation_system_guide, path: Documentation/roles/admin/documentation_system_guide.md
+
+Failed to open file: Found documentation: documentation_system_guide (type: markdown, path: Documentation/roles/admin/documentation_system_guide.md)
+
+Failed to open file: Found documentation file: Documentation/roles/admin/admin_guide.md
+
+Failed to open file: Categorizing file: admin_guide, path: Documentation/roles/admin/admin_guide.md
+
+Failed to open file: Found documentation: admin_guide (type: markdown, path: Documentation/roles/admin/admin_guide.md)
+
+Failed to open file: Found documentation file: Documentation/roles/admin/user_management.md
+
+Failed to open file: Categorizing file: user_management, path: Documentation/roles/admin/user_management.md
+
+Failed to open file: Found documentation: user_management (type: markdown, path: Documentation/roles/admin/user_management.md)
+
+Failed to open file: Found documentation file: Documentation/roles/developer/Documentation_Controller.md
+
+Failed to open file: Categorizing file: Documentation_Controller, path: Documentation/roles/developer/Documentation_Controller.md
+
+Failed to open file: Found documentation: Documentation_Controller (type: markdown, path: Documentation/roles/developer/Documentation_Controller.md)
+
+Failed to open file: Found documentation file: Documentation/roles/developer/api_reference.md
+
+Failed to open file: Categorizing file: api_reference, path: Documentation/roles/developer/api_reference.md
+
+Failed to open file: Found documentation: api_reference (type: markdown, path: Documentation/roles/developer/api_reference.md)
+
+Failed to open file: Found documentation file: Documentation/roles/normal/Documentation_System.md
+
+Failed to open file: Categorizing file: Documentation_System, path: Documentation/roles/normal/Documentation_System.md
+
+Failed to open file: Found documentation: Documentation_System (type: markdown, path: Documentation/roles/normal/Documentation_System.md)
+
+Failed to open file: Found documentation file: Documentation/roles/normal/mcoop_user_guide.md
+
+Failed to open file: Categorizing file: mcoop_user_guide, path: Documentation/roles/normal/mcoop_user_guide.md
+
+Failed to open file: Found documentation: mcoop_user_guide (type: markdown, path: Documentation/roles/normal/mcoop_user_guide.md)
+
+Failed to open file: Found documentation file: Documentation/roles/normal/getting_started.md
+
+Failed to open file: Found documentation: getting_started (type: markdown, path: Documentation/roles/normal/getting_started.md)
+
+Failed to open file: Found documentation file: Documentation/roles/normal/account_management.md
+
+Failed to open file: Categorizing file: account_management, path: Documentation/roles/normal/account_management.md
+
+Failed to open file: Found documentation: account_management (type: markdown, path: Documentation/roles/normal/account_management.md)
+
+Failed to open file: Found documentation file: Documentation/developer/troubleshooting.md
+
+Failed to open file: Categorizing file: troubleshooting, path: Documentation/developer/troubleshooting.md
+
+Failed to open file: Found documentation: troubleshooting (type: markdown, path: Documentation/developer/troubleshooting.md)
+
+Failed to open file: Found documentation file: Documentation/developer/authentication_system.md
+
+Failed to open file: Categorizing file: authentication_system, path: Documentation/developer/authentication_system.md
+
+Failed to open file: Found documentation: authentication_system (type: markdown, path: Documentation/developer/authentication_system.md)
+
+Failed to open file: Found documentation file: Documentation/developer/navigation_system.md
+
+Failed to open file: Categorizing file: navigation_system, path: Documentation/developer/navigation_system.md
+
+Failed to open file: Found documentation: navigation_system (type: markdown, path: Documentation/developer/navigation_system.md)
+
+Failed to open file: Found documentation file: Documentation/developer/template_system.md
+
+Failed to open file: Categorizing file: template_system, path: Documentation/developer/template_system.md
+
+Failed to open file: Found documentation: template_system (type: markdown, path: Documentation/developer/template_system.md)
+
+Failed to open file: Found documentation file: Documentation/developer/documentation_role_access.md
+
+Failed to open file: Categorizing file: documentation_role_access, path: Documentation/developer/documentation_role_access.md
+
+Failed to open file: Found documentation: documentation_role_access (type: markdown, path: Documentation/developer/documentation_role_access.md)
+
+Failed to open file: Found documentation file: Documentation/sites/mcoop/documentation_guide.md
+
+Failed to open file: Categorizing file: documentation_guide, path: Documentation/sites/mcoop/documentation_guide.md
+
+Failed to open file: Found documentation: documentation_guide (type: markdown, path: Documentation/sites/mcoop/documentation_guide.md)
+
+Failed to open file: Found documentation file: Documentation/sites/mcoop/site_guide.md
+
+Failed to open file: Categorizing file: site_guide, path: Documentation/sites/mcoop/site_guide.md
+
+Failed to open file: Found documentation: site_guide (type: markdown, path: Documentation/sites/mcoop/site_guide.md)
+
+Failed to open file: Found documentation file: Documentation/sites/mcoop/member_resources.md
+
+Failed to open file: Categorizing file: member_resources, path: Documentation/sites/mcoop/member_resources.md
+
+Failed to open file: Found documentation: member_resources (type: markdown, path: Documentation/sites/mcoop/member_resources.md)
+
+Failed to open file: Found documentation file: Documentation/sites/mcoop/templates.md
+
+Failed to open file: Categorizing file: templates, path: Documentation/sites/mcoop/templates.md
+
+Failed to open file: Found documentation: templates (type: markdown, path: Documentation/sites/mcoop/templates.md)
+
+Failed to open file: Found documentation file: Documentation/config/index.tt
+
+Failed to open file: Found documentation: index (type: template, path: Documentation/config/index.tt)
+
+Failed to open file: Scanning directory: root/Documentation/roles
+
+Failed to open file: Found documentation file: Documentation/roles/admin/KVM_ISO_Transfer.tt
+
+Failed to open file: Found documentation: KVM_ISO_Transfer (type: template, path: Documentation/roles/admin/KVM_ISO_Transfer.tt)
+
+Failed to open file: Found documentation file: Documentation/roles/admin/Documentation_Management.md
+
+Failed to open file: Found documentation: Documentation_Management (type: markdown, path: Documentation/roles/admin/Documentation_Management.md)
+
+Failed to open file: Found documentation file: Documentation/roles/admin/documentation_system_guide.md
+
+Failed to open file: Found documentation: documentation_system_guide (type: markdown, path: Documentation/roles/admin/documentation_system_guide.md)
+
+Failed to open file: Found documentation file: Documentation/roles/admin/admin_guide.md
+
+Failed to open file: Found documentation: admin_guide (type: markdown, path: Documentation/roles/admin/admin_guide.md)
+
+Failed to open file: Found documentation file: Documentation/roles/admin/user_management.md
+
+Failed to open file: Found documentation: user_management (type: markdown, path: Documentation/roles/admin/user_management.md)
+
+Failed to open file: Found documentation file: Documentation/roles/developer/Documentation_Controller.md
+
+Failed to open file: Found documentation: Documentation_Controller (type: markdown, path: Documentation/roles/developer/Documentation_Controller.md)
+
+Failed to open file: Found documentation file: Documentation/roles/developer/api_reference.md
+
+Failed to open file: Found documentation: api_reference (type: markdown, path: Documentation/roles/developer/api_reference.md)
+
+Failed to open file: Found documentation file: Documentation/roles/normal/Documentation_System.md
+
+Failed to open file: Found documentation: Documentation_System (type: markdown, path: Documentation/roles/normal/Documentation_System.md)
+
+Failed to open file: Found documentation file: Documentation/roles/normal/mcoop_user_guide.md
+
+Failed to open file: Found documentation: mcoop_user_guide (type: markdown, path: Documentation/roles/normal/mcoop_user_guide.md)
+
+Failed to open file: Found documentation file: Documentation/roles/normal/getting_started.md
+
+Failed to open file: Found documentation: getting_started (type: markdown, path: Documentation/roles/normal/getting_started.md)
+
+Failed to open file: Found documentation file: Documentation/roles/normal/account_management.md
+
+Failed to open file: Found documentation: account_management (type: markdown, path: Documentation/roles/normal/account_management.md)
+
+Failed to open file: Scanning directory: root/Documentation/sites
+
+Failed to open file: Found documentation file: Documentation/sites/mcoop/documentation_guide.md
+
+Failed to open file: Found documentation: documentation_guide (type: markdown, path: Documentation/sites/mcoop/documentation_guide.md)
+
+Failed to open file: Found documentation file: Documentation/sites/mcoop/site_guide.md
+
+Failed to open file: Found documentation: site_guide (type: markdown, path: Documentation/sites/mcoop/site_guide.md)
+
+Failed to open file: Found documentation file: Documentation/sites/mcoop/member_resources.md
+
+Failed to open file: Found documentation: member_resources (type: markdown, path: Documentation/sites/mcoop/member_resources.md)
+
+Failed to open file: Found documentation file: Documentation/sites/mcoop/templates.md
+
+Failed to open file: Found documentation: templates (type: markdown, path: Documentation/sites/mcoop/templates.md)
+
+Failed to open file: Scanning directory: root/Documentation/controllers
+
+Failed to open file: Found documentation file: Documentation/controllers/User.md
+
+Failed to open file: Found documentation: User (type: markdown, path: Documentation/controllers/User.md)
+
+Failed to open file: Found documentation file: Documentation/controllers/README.md
+
+Failed to open file: Found documentation: README (type: markdown, path: Documentation/controllers/README.md)
+
+Failed to open file: Found documentation file: Documentation/controllers/Documentation.md
+
+Failed to open file: Found documentation: Documentation (type: markdown, path: Documentation/controllers/Documentation.md)
+
+Failed to open file: Found documentation file: Documentation/controllers/index.tt
+
+Failed to open file: Found documentation: index (type: template, path: Documentation/controllers/index.tt)
+
+Failed to open file: Found documentation file: Documentation/controllers/Root.md
+
+Failed to open file: Found documentation: Root (type: markdown, path: Documentation/controllers/Root.md)
+
+Failed to open file: Found documentation file: Documentation/controllers/controller_list.md
+
+Failed to open file: Found documentation: controller_list (type: markdown, path: Documentation/controllers/controller_list.md)
+
+Failed to open file: Scanning directory: root/Documentation/models
+
+Failed to open file: Found documentation file: Documentation/models/model_list.md
+
+Failed to open file: Found documentation: model_list (type: markdown, path: Documentation/models/model_list.md)
+
+Failed to open file: Found documentation file: Documentation/models/Site.md
+
+Failed to open file: Found documentation: Site (type: markdown, path: Documentation/models/Site.md)
+
+Failed to open file: Found documentation file: Documentation/models/User.md
+
+Failed to open file: Found documentation: User (type: markdown, path: Documentation/models/User.md)
+
+Failed to open file: Found documentation file: Documentation/models/README.md
+
+Failed to open file: Found documentation: README (type: markdown, path: Documentation/models/README.md)
+
+Failed to open file: Found documentation file: Documentation/models/ThemeConfig.md
+
+Failed to open file: Found documentation: ThemeConfig (type: markdown, path: Documentation/models/ThemeConfig.md)
+
+Failed to open file: Found documentation file: Documentation/models/index.tt
+
+Failed to open file: Found documentation: index (type: template, path: Documentation/models/index.tt)
+
+Pre-emptive log rotation triggered: 114004 bytes >= 81920 bytes
+Current log file size: 114068 bytes, max size: 102400 bytes
+Log file size (114068 bytes) exceeds maximum size (102400 bytes). Rotating log file.

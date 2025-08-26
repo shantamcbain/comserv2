@@ -1,0 +1,49 @@
+{
+   "abstract" : "A simple drop-in substitute for <STDIN> that also captures non-standard keys like Home",
+   "author" : [
+      "Brian M. Kelly <Brian.Kelly@fullautosoftware.net>"
+   ],
+   "dynamic_config" : 0,
+   "generated_by" : "CPAN::Meta::Converter version 2.150010",
+   "license" : [
+      "open_source"
+   ],
+   "meta-spec" : {
+      "url" : "http://search.cpan.org/perldoc?CPAN::Meta::Spec",
+      "version" : 2
+   },
+   "name" : "Term-RawInput",
+   "prereqs" : {
+      "build" : {
+         "requires" : {
+            "ExtUtils::MakeMaker" : "6.42"
+         }
+      },
+      "configure" : {
+         "requires" : {
+            "ExtUtils::MakeMaker" : "0"
+         }
+      },
+      "runtime" : {
+         "requires" : {
+            "IO::Handle" : "0",
+            "Term::ReadKey" : "0",
+            "perl" : "5.006"
+         }
+      }
+   },
+   "provides" : {
+      "Term::RawInput" : {
+         "file" : "lib/Term/RawInput.pm",
+         "version" : "1.25"
+      }
+   },
+   "release_status" : "stable",
+   "resources" : {
+      "license" : [
+         "http://www.gnu.org/licenses/agpl.html"
+      ]
+   },
+   "version" : "1.25",
+   "x_serialization_backend" : "JSON::PP version 4.16"
+}

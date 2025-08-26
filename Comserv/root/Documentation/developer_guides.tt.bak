@@ -1,0 +1,25 @@
+[% PageVersion = 'Comserv/root/Documentation/developer_guides.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Developer Guides' %]
+
+<!-- Documentation page for Developer Guides -->
+<div class="documentation-content">
+
+[% IF categories.developer_guides %]
+<section class="doc-section developer-only">
+    <h2 class="section-toggle">Developer Documentation</h2>
+    <p>Resources for system developers. <span class="developer-badge">Developer Resources</span></p>
+    <div class="section-content">
+        [% FOREACH page_name IN categories.developer_guides.pages.sort %]
+            [% IF structured_pages.$page_name %]
+                [% page = structured_pages.$page_name %]
+            <a href="[% page.url %]" class="doc-card">
+                <h3>[% page.title %]</h3>
+                <p>[% page.description || 'Developer documentation.' %]</p>
+                <span class="role-badge">Developer</span>
+            </a>
+    </div>
+</section>

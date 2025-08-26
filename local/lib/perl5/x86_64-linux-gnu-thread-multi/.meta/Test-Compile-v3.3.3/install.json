@@ -1,0 +1,1 @@
+{"provides":{"Test::Compile":{"version":"v3.3.3","file":"lib/Test/Compile.pm"},"Test::Compile::Internal":{"version":"v3.3.3","file":"lib/Test/Compile/Internal.pm"}},"dist":"Test-Compile-v3.3.3","pathname":"E/EG/EGILES/Test-Compile-v3.3.3.tar.gz","version":"v3.3.3","name":"Test::Compile","target":"Test::Compile::Internal"}

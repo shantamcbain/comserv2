@@ -1,0 +1,845 @@
+2025-05-12 13:22:37 - Starting cleanup of 'Formatting title from' files
+2025-05-12 13:22:37 - Project root: /home/shanta/PycharmProjects/comserv2
+2025-05-12 13:22:37 - Searching for files...
+2025-05-12 13:22:37 - Found 0 files to clean up
+2025-05-12 13:22:37 - No files to clean up. Exiting.
+2025-05-12 13:25:21 - Starting cleanup of 'Formatting title from' files
+2025-05-12 13:25:21 - Project root: /home/shanta/PycharmProjects/comserv2
+2025-05-12 13:25:21 - Searching for files...
+2025-05-12 13:25:21 - Found 190 files to clean up
+2025-05-12 13:25:21 - Files to be removed:
+2025-05-12 13:25:21 -   - Formatted title result: Overview
+2025-05-12 13:25:21 -   - Formatted title result: BMaserModel
+2025-05-12 13:25:21 -   - Formatted title result: Sites
+2025-05-12 13:25:22 -   - Formatted title result: DBIDocument
+2025-05-12 13:25:22 -   - Formatted title result: ENCY
+2025-05-12 13:25:22 -   - Formatted title result: Mail Documentation Update
+2025-05-12 13:25:22 -   - Formatted title result: Usbm
+2025-05-12 13:25:22 -   - Formatted title result: View
+2025-05-12 13:25:22 -   - Formatted title result: User Management
+2025-05-12 13:25:22 -   - Formatted title result: Virtualmin Integration
+2025-05-12 13:25:22 -   - Formatted title result: Proxmox Integration
+2025-05-12 13:25:22 -   - Formatted title result: THEME SYSTEM README
+2025-05-12 13:25:22 -   - Formatted title result: AI
+2025-05-12 13:25:22 -   - Formatted title result: Mail User Guide
+2025-05-12 13:25:22 -   - Formatted title result: SYSTEM REQUIREMENTS
+2025-05-12 13:25:22 -   - Formatted title result: 2025 04 Documentation Template Refactoring
+2025-05-12 13:25:22 -   - Formatted title result: 2024 06 15 Login Redirect Fix
+2025-05-12 13:25:22 -   - Formatted title result: HostingSignup Mail
+2025-05-12 13:25:22 -   - Formatted title result: Member Resources
+2025-05-12 13:25:22 -   - Formatted title result: AI DEVELOPMENT GUIDELINES
+2025-05-12 13:25:22 -   - Formatted title result: HostingSignup
+2025-05-12 13:25:22 -   - Formatted title result: EMAIL MODULE FIX
+2025-05-12 13:25:22 -   - Formatted title result: Template System
+2025-05-12 13:25:22 -   - Formatted title result: Documentation Workflow
+2025-05-12 13:25:22 -   - Formatted title result: Setup
+2025-05-12 13:25:22 -   - Formatted title result: BMaster
+2025-05-12 13:25:22 -   - Formatted title result: Mcoop User Guide
+2025-05-12 13:25:22 -   - Formatted title result: THEME SYSTEM FIXES
+2025-05-12 13:25:22 -   - Formatted title result: API Reference
+2025-05-12 13:25:22 -   - Formatted title result: Linux Commands
+2025-05-12 13:25:22 -   - Formatted title result: SERVER DEPLOYMENT
+2025-05-12 13:25:22 -   - Formatted title result: Site Domain Resolution
+2025-05-12 13:25:22 -   - Formatted title result: FAQ
+2025-05-12 13:25:22 -   - Formatted title result: AI DOCUMENTATION GUIDELINES
+2025-05-12 13:25:22 -   - Formatted title result: 2025 04 Documentation Display Fix
+2025-05-12 13:25:22 -   - Formatted title result: Linux Commands Reference
+2025-05-12 13:25:22 -   - Formatted title result: System Overview
+2025-05-12 13:25:22 -   - Formatted title result: Controller List
+2025-05-12 13:25:22 -   - Formatted title result: Controller Routing Guidelines
+2025-05-12 13:25:22 -   - Formatted title result: Db Config Loading
+2025-05-12 13:25:22 -   - Formatted title result: Mcoop Module
+2025-05-12 13:25:22 -   - Formatted title result: 2025 05 16 Documentation Workflow Consolidation
+2025-05-12 13:25:22 -   - Formatted title result: 2025 09 15 Sudo Password Configuration
+2025-05-12 13:25:22 -   - Formatted title result: Proxy Troubleshooting
+2025-05-12 13:25:22 -   - Formatted title result: Navigation System
+2025-05-12 13:25:22 -   - Formatted title result: Error
+2025-05-12 13:25:22 -   - Formatted title result: Architecture
+2025-05-12 13:25:22 -   - Formatted title result: Calendar
+2025-05-12 13:25:22 -   - Formatted title result: Admintopmenu Guide
+2025-05-12 13:25:22 -   - Formatted title result: Enhanced Todo Navigation
+2025-05-12 13:25:22 -   - Formatted title result: Mail
+2025-05-12 13:25:22 -   - Formatted title result: Mail Troubleshooting
+2025-05-12 13:25:22 -   - Formatted title result: Account Management
+2025-05-12 13:25:22 -   - Formatted title result: 2024 06 21 Linux Commands Documentation
+2025-05-12 13:25:22 -   - Formatted title result: Todo Edit Functionality
+2025-05-12 13:25:22 -   - Formatted title result: 2024 08 Proxmox Debug Msg Fix
+2025-05-12 13:25:22 -   - Formatted title result: 2025 05 31 Linux Commands Reference
+2025-05-12 13:25:22 -   - Formatted title result: System Info
+2025-05-12 13:25:22 -   - Formatted title result: Forager
+2025-05-12 13:25:22 -   - Formatted title result: Network Diagnostics
+2025-05-12 13:25:22 -   - Formatted title result: Proxmox CD Visibility
+2025-05-12 13:25:22 -   - Formatted title result: Root
+2025-05-12 13:25:22 -   - Formatted title result: NEW THEME SYSTEM README
+2025-05-12 13:25:22 -   - Formatted title result: 2025 04 Documentation Admin Visibility Fix
+2025-05-12 13:25:22 -   - Formatted title result: 2025 05 15 Documentation System Update
+2025-05-12 13:25:22 -   - Formatted title result: ENCYModel
+2025-05-12 13:25:22 -   - Formatted title result: Changelog
+2025-05-12 13:25:22 -   - Formatted title result: Schema
+2025-05-12 13:25:22 -   - Formatted title result: Projects
+2025-05-12 13:25:22 -   - Formatted title result: Git Pull Guide
+2025-05-12 13:25:22 -   - Formatted title result: Fix Project Edit Form
+2025-05-12 13:25:22 -   - Formatted title result: Authentication System
+2025-05-12 13:25:22 -   - Formatted title result: Document Management
+2025-05-12 13:25:22 -   - Formatted title result: 2024 08 Ve7tit Controller Fixes
+2025-05-12 13:25:22 -   - Formatted title result: Mail Admin Guide
+2025-05-12 13:25:22 -   - Formatted title result: Documentation Index Adaptation
+2025-05-12 13:25:22 -   - Formatted title result: Starman Restart Guide
+2025-05-12 13:25:22 -   - Formatted title result: 2024 08 Controller Fixes
+2025-05-12 13:25:22 -   - Formatted title result: 2025 08 30 Hosting Signup Enhancements
+2025-05-12 13:25:22 -   - Formatted title result: ROUTING FIXES
+2025-05-12 13:25:22 -   - Formatted title result: Documentation System Overview
+2025-05-12 13:25:22 -   - Formatted title result: Documentation Controller
+2025-05-12 13:25:22 -   - Formatted title result: Controllers
+2025-05-12 13:25:22 -   - Formatted title result: Db Config Loading Fix
+2025-05-12 13:25:22 -   - Formatted title result: Documentation Migration Guide
+2025-05-12 13:25:22 -   - Formatted title result: 2025 04 13 Mcoop Url Case Fix
+2025-05-12 13:25:22 -   - Formatted title result: 2025 04 Git Pull Functionality
+2025-05-12 13:25:22 -   - Formatted title result: Sessionplan
+2025-05-12 13:25:22 -   - Formatted title result: Site Specific
+2025-05-12 13:25:22 -   - Formatted title result: AIAssistants
+2025-05-12 13:25:22 -   - Formatted title result: Logging Best Practices
+2025-05-12 13:25:22 -   - Formatted title result: Admin Guide
+2025-05-12 13:25:22 -   - Formatted title result: Theme System
+2025-05-12 13:25:22 -   - Formatted title result: Documentation Template
+2025-05-12 13:25:22 -   - Formatted title result: Fix Project Edit Button
+2025-05-12 13:25:22 -   - Formatted title result: Project Management System
+2025-05-12 13:25:22 -   - Formatted title result: Markdown Viewer
+2025-05-12 13:25:22 -   - Formatted title result: Models
+2025-05-12 13:25:22 -   - Formatted title result: Model List
+2025-05-12 13:25:22 -   - Formatted title result: DB CONFIG README
+2025-05-12 13:25:22 -   - Formatted title result: Proxmox
+2025-05-12 13:25:22 -   - Formatted title result: Starman
+2025-05-12 13:25:22 -   - Formatted title result: Customizing Profile
+2025-05-12 13:25:22 -   - Formatted title result: Theme Mappings Handling
+2025-05-12 13:25:22 -   - Formatted title result: Todo System
+2025-05-12 13:25:22 -   - Formatted title result: 2025 09 10 Restart Starman Functionality
+2025-05-12 13:25:22 -   - Formatted title result: 2025 04 Mcoop Server Room Plan
+2025-05-12 13:25:22 -   - Formatted title result: HelpDeskSystem
+2025-05-12 13:25:22 -   - Formatted title result: Mail System
+2025-05-12 13:25:22 -   - Formatted title result: 2025 05 25 Fix Formatting Title Logs
+2025-05-12 13:25:22 -   - Formatted title result: Ve7tit
+2025-05-12 13:25:22 -   - Formatted title result: Todo Filtering And Views
+2025-05-12 13:25:22 -   - Formatted title result: Documentation Role Access
+2025-05-12 13:25:22 -   - Formatted title result: Mcoop Getting Started
+2025-05-12 13:25:22 -   - Formatted title result: Recent Updates
+2025-05-12 13:25:22 -   - Formatted title result: Documentation Editor Guide
+2025-05-12 13:25:22 -   - Formatted title result: Documentation Update Summary
+2025-05-12 13:25:22 -   - Formatted title result: THEME SYSTEM CLEANUP
+2025-05-12 13:25:22 -   - Formatted title result: Fix Project Selection Todo Filtering
+2025-05-12 13:25:22 -   - Formatted title result: User
+2025-05-12 13:25:22 -   - Formatted title result: Setupcontorller
+2025-05-12 13:25:22 -   - Formatted title result: Login Authentication
+2025-05-12 13:25:22 -   - Formatted title result: Documentation System
+2025-05-12 13:25:22 -   - Formatted title result: 2025 04 Documentation Workflow Update
+2025-05-12 13:25:22 -   - Formatted title result: HelpDesk
+2025-05-12 13:25:22 -   - Formatted title result: Guidelines
+2025-05-12 13:25:22 -   - Formatted title result: 2025 04 Navigation Improvements
+2025-05-12 13:25:22 -   - Formatted title result: ENCYController
+2025-05-12 13:25:22 -   - Formatted title result: Menu System Guide
+2025-05-12 13:25:22 -   - Formatted title result: 2025 05 25 Documentation Organization
+2025-05-12 13:25:22 -   - Formatted title result: Tutorials
+2025-05-12 13:25:22 -   - Formatted title result: MailSystem
+2025-05-12 13:25:22 -   - Formatted title result: Config
+2025-05-12 13:25:22 -   - Formatted title result: Documentation System Guide
+2025-05-12 13:25:22 -   - Formatted title result: Documentation Management
+2025-05-12 13:25:22 -   - Formatted title result: KVM ISO Transfer
+2025-05-12 13:25:22 -   - Formatted title result: WorkShops
+2025-05-12 13:25:22 -   - Formatted title result: DocumentManagement
+2025-05-12 13:25:22 -   - Formatted title result: Site Guide
+2025-05-12 13:25:22 -   - Formatted title result: Back To Top
+2025-05-12 13:25:22 -   - Formatted title result: 2025 05 30 Documentation Structure Simplification
+2025-05-12 13:25:22 -   - Formatted title result: 2025 04 18 Helpdesk Controller Implementation
+2025-05-12 13:25:22 -   - Formatted title result: All Docs
+2025-05-12 13:25:22 -   - Formatted title result: AI Guidelines
+2025-05-12 13:25:22 -   - Formatted title result: 2025 08 25 Project Filtering And Display
+2025-05-12 13:25:22 -   - Formatted title result: Network Map Json Storage
+2025-05-12 13:25:22 -   - Formatted title result: Hosting Signup Templates
+2025-05-12 13:25:22 -   - Formatted title result: Documentation Organization
+2025-05-12 13:25:22 -   - Formatted title result: Documentation Guide
+2025-05-12 13:25:22 -   - Formatted title result: Getting Started
+2025-05-12 13:25:22 -   - Formatted title result: 2024 07 Proxmox Controller Fixes
+2025-05-12 13:25:22 -   - Formatted title result: 2025 08 18 Project Cards Css Fix
+2025-05-12 13:25:22 -   - Formatted title result: ThemeConfig
+2025-05-12 13:25:22 -   - Formatted title result: User Docs
+2025-05-12 13:25:22 -   - Formatted title result: Main Changelog
+2025-05-12 13:25:22 -   - Formatted title result: 2025 09 Starman Restart Fix
+2025-05-12 13:25:22 -   - Formatted title result: 2025 04 12 Hosting Signup Implementation
+2025-05-12 13:25:22 -   - Formatted title result: Queens
+2025-05-12 13:25:22 -   - Formatted title result: Documentation Filename Issue
+2025-05-12 13:25:22 -   - Formatted title result: API
+2025-05-12 13:25:22 -   - Formatted title result: 2025 04 Mcoop Admin Menu Restriction
+2025-05-12 13:25:22 -   - Formatted title result: Login
+2025-05-12 13:25:22 -   - Formatted title result: Project Selection Log Creation
+2025-05-12 13:25:22 -   - Formatted title result: Documentation Config Guide
+2025-05-12 13:25:22 -   - Formatted title result: Index
+2025-05-12 13:25:22 -   - Formatted title result: Logging
+2025-05-12 13:25:22 -   - Formatted title result: Troubleshooting
+2025-05-12 13:25:22 -   - Formatted title result: BMasterController
+2025-05-12 13:25:22 -   - Formatted title result: 2025 04 Pagetop Hostname Display
+2025-05-12 13:25:22 -   - Formatted title result: README
+2025-05-12 13:25:22 -   - Formatted title result: Admin Guides
+2025-05-12 13:25:22 -   - Formatted title result: User Manual
+2025-05-12 13:25:22 -   - Formatted title result: Todo
+2025-05-12 13:25:22 -   - Formatted title result: Inventory
+2025-05-12 13:25:22 -   - Formatted title result: 2024 04 24 Helpdesk Menu Enhancement
+2025-05-12 13:25:22 -   - Formatted title result: Admin
+2025-05-12 13:25:22 -   - Formatted title result: RestartStarman
+2025-05-12 13:25:22 -   - Formatted title result: Git
+2025-05-12 13:25:22 -   - Formatted title result: Templates
+2025-05-12 13:25:22 -   - Formatted title result: Starman Restart Card
+2025-05-12 13:25:22 -   - Formatted title result: 2025 05 31 Server Ip Display
+2025-05-12 13:25:22 -   - Formatted title result: Menu System
+2025-05-12 13:25:22 -   - Formatted title result: 2024 08 Pagetop Hostname Display
+2025-05-12 13:25:22 -   - Formatted title result: Site
+2025-05-12 13:25:22 -   - Formatted title result: Files
+2025-05-12 13:25:22 -   - Formatted title result: 2024 06 Project Edit Fix
+2025-05-12 13:25:22 -   - Formatted title result: 2024 07 Project Id Fix
+2025-05-12 13:25:22 -   - Formatted title result: Mail Configuration Guide
+2025-05-12 13:25:22 -   - Formatted title result: Installation
+2025-05-12 13:25:22 -   - Formatted title result: THEME SYSTEM CONSOLIDATION
+2025-05-12 13:25:22 - Removing files...
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Overview
+2025-05-12 13:25:22 -   - Removed: Formatted title result: BMaserModel
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Sites
+2025-05-12 13:25:22 -   - Removed: Formatted title result: DBIDocument
+2025-05-12 13:25:22 -   - Removed: Formatted title result: ENCY
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Mail Documentation Update
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Usbm
+2025-05-12 13:25:22 -   - Removed: Formatted title result: View
+2025-05-12 13:25:22 -   - Removed: Formatted title result: User Management
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Virtualmin Integration
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Proxmox Integration
+2025-05-12 13:25:22 -   - Removed: Formatted title result: THEME SYSTEM README
+2025-05-12 13:25:22 -   - Removed: Formatted title result: AI
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Mail User Guide
+2025-05-12 13:25:22 -   - Removed: Formatted title result: SYSTEM REQUIREMENTS
+2025-05-12 13:25:22 -   - Removed: Formatted title result: 2025 04 Documentation Template Refactoring
+2025-05-12 13:25:22 -   - Removed: Formatted title result: 2024 06 15 Login Redirect Fix
+2025-05-12 13:25:22 -   - Removed: Formatted title result: HostingSignup Mail
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Member Resources
+2025-05-12 13:25:22 -   - Removed: Formatted title result: AI DEVELOPMENT GUIDELINES
+2025-05-12 13:25:22 -   - Removed: Formatted title result: HostingSignup
+2025-05-12 13:25:22 -   - Removed: Formatted title result: EMAIL MODULE FIX
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Template System
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Documentation Workflow
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Setup
+2025-05-12 13:25:22 -   - Removed: Formatted title result: BMaster
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Mcoop User Guide
+2025-05-12 13:25:22 -   - Removed: Formatted title result: THEME SYSTEM FIXES
+2025-05-12 13:25:22 -   - Removed: Formatted title result: API Reference
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Linux Commands
+2025-05-12 13:25:22 -   - Removed: Formatted title result: SERVER DEPLOYMENT
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Site Domain Resolution
+2025-05-12 13:25:22 -   - Removed: Formatted title result: FAQ
+2025-05-12 13:25:22 -   - Removed: Formatted title result: AI DOCUMENTATION GUIDELINES
+2025-05-12 13:25:22 -   - Removed: Formatted title result: 2025 04 Documentation Display Fix
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Linux Commands Reference
+2025-05-12 13:25:22 -   - Removed: Formatted title result: System Overview
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Controller List
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Controller Routing Guidelines
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Db Config Loading
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Mcoop Module
+2025-05-12 13:25:22 -   - Removed: Formatted title result: 2025 05 16 Documentation Workflow Consolidation
+2025-05-12 13:25:22 -   - Removed: Formatted title result: 2025 09 15 Sudo Password Configuration
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Proxy Troubleshooting
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Navigation System
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Error
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Architecture
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Calendar
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Admintopmenu Guide
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Enhanced Todo Navigation
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Mail
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Mail Troubleshooting
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Account Management
+2025-05-12 13:25:22 -   - Removed: Formatted title result: 2024 06 21 Linux Commands Documentation
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Todo Edit Functionality
+2025-05-12 13:25:22 -   - Removed: Formatted title result: 2024 08 Proxmox Debug Msg Fix
+2025-05-12 13:25:22 -   - Removed: Formatted title result: 2025 05 31 Linux Commands Reference
+2025-05-12 13:25:22 -   - Removed: Formatted title result: System Info
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Forager
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Network Diagnostics
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Proxmox CD Visibility
+2025-05-12 13:25:22 -   - Removed: Formatted title result: Root
+2025-05-12 13:25:22 -   - Removed: Formatted title result: NEW THEME SYSTEM README
+2025-05-12 13:25:22 -   - Removed: Formatted title result: 2025 04 Documentation Admin Visibility Fix
+2025-05-12 13:25:22 -   - Removed: Formatted title result: 2025 05 15 Documentation System Update
+2025-05-12 13:25:23 -   - Removed: Formatted title result: ENCYModel
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Changelog
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Schema
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Projects
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Git Pull Guide
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Fix Project Edit Form
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Authentication System
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Document Management
+2025-05-12 13:25:23 -   - Removed: Formatted title result: 2024 08 Ve7tit Controller Fixes
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Mail Admin Guide
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Documentation Index Adaptation
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Starman Restart Guide
+2025-05-12 13:25:23 -   - Removed: Formatted title result: 2024 08 Controller Fixes
+2025-05-12 13:25:23 -   - Removed: Formatted title result: 2025 08 30 Hosting Signup Enhancements
+2025-05-12 13:25:23 -   - Removed: Formatted title result: ROUTING FIXES
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Documentation System Overview
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Documentation Controller
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Controllers
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Db Config Loading Fix
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Documentation Migration Guide
+2025-05-12 13:25:23 -   - Removed: Formatted title result: 2025 04 13 Mcoop Url Case Fix
+2025-05-12 13:25:23 -   - Removed: Formatted title result: 2025 04 Git Pull Functionality
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Sessionplan
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Site Specific
+2025-05-12 13:25:23 -   - Removed: Formatted title result: AIAssistants
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Logging Best Practices
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Admin Guide
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Theme System
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Documentation Template
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Fix Project Edit Button
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Project Management System
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Markdown Viewer
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Models
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Model List
+2025-05-12 13:25:23 -   - Removed: Formatted title result: DB CONFIG README
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Proxmox
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Starman
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Customizing Profile
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Theme Mappings Handling
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Todo System
+2025-05-12 13:25:23 -   - Removed: Formatted title result: 2025 09 10 Restart Starman Functionality
+2025-05-12 13:25:23 -   - Removed: Formatted title result: 2025 04 Mcoop Server Room Plan
+2025-05-12 13:25:23 -   - Removed: Formatted title result: HelpDeskSystem
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Mail System
+2025-05-12 13:25:23 -   - Removed: Formatted title result: 2025 05 25 Fix Formatting Title Logs
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Ve7tit
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Todo Filtering And Views
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Documentation Role Access
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Mcoop Getting Started
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Recent Updates
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Documentation Editor Guide
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Documentation Update Summary
+2025-05-12 13:25:23 -   - Removed: Formatted title result: THEME SYSTEM CLEANUP
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Fix Project Selection Todo Filtering
+2025-05-12 13:25:23 -   - Removed: Formatted title result: User
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Setupcontorller
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Login Authentication
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Documentation System
+2025-05-12 13:25:23 -   - Removed: Formatted title result: 2025 04 Documentation Workflow Update
+2025-05-12 13:25:23 -   - Removed: Formatted title result: HelpDesk
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Guidelines
+2025-05-12 13:25:23 -   - Removed: Formatted title result: 2025 04 Navigation Improvements
+2025-05-12 13:25:23 -   - Removed: Formatted title result: ENCYController
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Menu System Guide
+2025-05-12 13:25:23 -   - Removed: Formatted title result: 2025 05 25 Documentation Organization
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Tutorials
+2025-05-12 13:25:23 -   - Removed: Formatted title result: MailSystem
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Config
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Documentation System Guide
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Documentation Management
+2025-05-12 13:25:23 -   - Removed: Formatted title result: KVM ISO Transfer
+2025-05-12 13:25:23 -   - Removed: Formatted title result: WorkShops
+2025-05-12 13:25:23 -   - Removed: Formatted title result: DocumentManagement
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Site Guide
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Back To Top
+2025-05-12 13:25:23 -   - Removed: Formatted title result: 2025 05 30 Documentation Structure Simplification
+2025-05-12 13:25:23 -   - Removed: Formatted title result: 2025 04 18 Helpdesk Controller Implementation
+2025-05-12 13:25:23 -   - Removed: Formatted title result: All Docs
+2025-05-12 13:25:23 -   - Removed: Formatted title result: AI Guidelines
+2025-05-12 13:25:23 -   - Removed: Formatted title result: 2025 08 25 Project Filtering And Display
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Network Map Json Storage
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Hosting Signup Templates
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Documentation Organization
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Documentation Guide
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Getting Started
+2025-05-12 13:25:23 -   - Removed: Formatted title result: 2024 07 Proxmox Controller Fixes
+2025-05-12 13:25:23 -   - Removed: Formatted title result: 2025 08 18 Project Cards Css Fix
+2025-05-12 13:25:23 -   - Removed: Formatted title result: ThemeConfig
+2025-05-12 13:25:23 -   - Removed: Formatted title result: User Docs
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Main Changelog
+2025-05-12 13:25:23 -   - Removed: Formatted title result: 2025 09 Starman Restart Fix
+2025-05-12 13:25:23 -   - Removed: Formatted title result: 2025 04 12 Hosting Signup Implementation
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Queens
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Documentation Filename Issue
+2025-05-12 13:25:23 -   - Removed: Formatted title result: API
+2025-05-12 13:25:23 -   - Removed: Formatted title result: 2025 04 Mcoop Admin Menu Restriction
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Login
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Project Selection Log Creation
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Documentation Config Guide
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Index
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Logging
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Troubleshooting
+2025-05-12 13:25:23 -   - Removed: Formatted title result: BMasterController
+2025-05-12 13:25:23 -   - Removed: Formatted title result: 2025 04 Pagetop Hostname Display
+2025-05-12 13:25:23 -   - Removed: Formatted title result: README
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Admin Guides
+2025-05-12 13:25:23 -   - Removed: Formatted title result: User Manual
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Todo
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Inventory
+2025-05-12 13:25:23 -   - Removed: Formatted title result: 2024 04 24 Helpdesk Menu Enhancement
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Admin
+2025-05-12 13:25:23 -   - Removed: Formatted title result: RestartStarman
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Git
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Templates
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Starman Restart Card
+2025-05-12 13:25:23 -   - Removed: Formatted title result: 2025 05 31 Server Ip Display
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Menu System
+2025-05-12 13:25:23 -   - Removed: Formatted title result: 2024 08 Pagetop Hostname Display
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Site
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Files
+2025-05-12 13:25:23 -   - Removed: Formatted title result: 2024 06 Project Edit Fix
+2025-05-12 13:25:23 -   - Removed: Formatted title result: 2024 07 Project Id Fix
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Mail Configuration Guide
+2025-05-12 13:25:23 -   - Removed: Formatted title result: Installation
+2025-05-12 13:25:23 -   - Removed: Formatted title result: THEME SYSTEM CONSOLIDATION
+2025-05-12 13:25:23 - Cleanup completed successfully
+2025-05-12 13:25:23 - See /home/shanta/PycharmProjects/comserv2/Comserv/logs/cleanup_formatting_title_files.log for details
+2025-05-12 13:25:23 - Starting cleanup of 'Formatting title from' files
+2025-05-12 13:25:23 - Project root: /home/shanta/PycharmProjects/comserv2
+2025-05-12 13:25:23 - Searching for files...
+2025-05-12 13:25:23 - Found 0 files to clean up
+2025-05-12 13:25:23 - No files to clean up. Exiting.
+2025-05-12 13:29:21 - Starting cleanup of documentation-related log files
+2025-05-12 13:29:21 - Project root: /home/shanta/PycharmProjects/comserv2
+2025-05-12 13:29:21 - Searching for files...
+2025-05-12 13:29:21 - Found 48 files to clean up
+2025-05-12 13:29:21 - Files to be removed:
+2025-05-12 13:29:21 -   - Categorized as model: index
+2025-05-12 13:29:21 -   - Categorized as controller: HostingSignup_Mail
+2025-05-12 13:29:21 -   - Categorized as controller: Documentation_Controller
+2025-05-12 13:29:21 -   - Categorized as controller: Forager
+2025-05-12 13:29:21 -   - Categorized as controller: admin
+2025-05-12 13:29:21 -   - Categorized as controller: Root
+2025-05-12 13:29:21 -   - Category Controller Documentation has 25 pages
+2025-05-12 13:29:21 -   - Categorized as controller: 2024-08-controller-fixes
+2025-05-12 13:29:21 -   - Categorized as controller: HelpDesk
+2025-05-12 13:29:21 -   - Category Changelog has 33 pages
+2025-05-12 13:29:21 -   - Starting Documentation controller initialization
+2025-05-12 13:29:21 -   - Category User Guides has 6 pages
+2025-05-12 13:29:21 -   - Categorized as controller: ENCY
+2025-05-12 13:29:21 -   - Category Model Documentation has 8 pages
+2025-05-12 13:29:21 -   - Categorized as controller: 2025-04-18-helpdesk-controller-implementation
+2025-05-12 13:29:21 -   - Categorized as model: README
+2025-05-12 13:29:21 -   - Categorized as controller: HostingSignup
+2025-05-12 13:29:21 -   - Categorized as controller: proxmox
+2025-05-12 13:29:21 -   - Category Developer Documentation has 11 pages
+2025-05-12 13:29:21 -   - Categorized as model: model_list
+2025-05-12 13:29:21 -   - Categorized as controller: controller_list
+2025-05-12 13:29:21 -   - Categorized as controller: BMaster
+2025-05-12 13:29:21 -   - Categorized as controller: Todo
+2025-05-12 13:29:21 -   - Category Module Documentation has 6 pages
+2025-05-12 13:29:21 -   - Categorized as model: ThemeConfig
+2025-05-12 13:29:21 -   - Categorized as model: models
+2025-05-12 13:29:21 -   - Category Site-Specific Documentation has 4 pages
+2025-05-12 13:29:21 -   - Categorized as controller: 2024-07-proxmox-controller-fixes
+2025-05-12 13:29:21 -   - Category Administrator Guides has 15 pages
+2025-05-12 13:29:21 -   - Categorized as controller: controllers
+2025-05-12 13:29:21 -   - Categorized as controller: User
+2025-05-12 13:29:21 -   - Categorized as controller: Ve7tit
+2025-05-12 13:29:21 -   - Categorized as model: ENCYModel
+2025-05-12 13:29:21 -   - Categorized as controller: BMasterController
+2025-05-12 13:29:21 -   - Categorized as controller: Site
+2025-05-12 13:29:21 -   - Categorized as model: Calendar
+2025-05-12 13:29:21 -   - Categorized as controller: usbm
+2025-05-12 13:29:21 -   - Categorized as controller: controller_routing_guidelines
+2025-05-12 13:29:21 -   - Category Proxmox Documentation has 2 pages
+2025-05-12 13:29:21 -   - Categorized as model: BMaserModel
+2025-05-12 13:29:21 -   - Categorized as controller: Admin
+2025-05-12 13:29:21 -   - Category All Documentation has 193 pages
+2025-05-12 13:29:21 -   - Documentation system initialized with 193 pages
+2025-05-12 13:29:21 -   - Category All Documentation has 192 pages
+2025-05-12 13:29:21 -   - Documentation system initialized with 192 pages
+2025-05-12 13:29:21 -   - Category Tutorials has 3 pages
+2025-05-12 13:29:21 -   - Categorized as controller: Mail
+2025-05-12 13:29:21 -   - Categorized as controller: ENCYController
+2025-05-12 13:29:21 - Removing files...
+2025-05-12 13:29:21 -   - Removed: Categorized as model: index
+2025-05-12 13:29:21 -   - Removed: Categorized as controller: HostingSignup_Mail
+2025-05-12 13:29:21 -   - Removed: Categorized as controller: Documentation_Controller
+2025-05-12 13:29:21 -   - Removed: Categorized as controller: Forager
+2025-05-12 13:29:21 -   - Removed: Categorized as controller: admin
+2025-05-12 13:29:21 -   - Removed: Categorized as controller: Root
+2025-05-12 13:29:21 -   - Removed: Category Controller Documentation has 25 pages
+2025-05-12 13:29:21 -   - Removed: Categorized as controller: 2024-08-controller-fixes
+2025-05-12 13:29:21 -   - Removed: Categorized as controller: HelpDesk
+2025-05-12 13:29:21 -   - Removed: Category Changelog has 33 pages
+2025-05-12 13:29:21 -   - Removed: Starting Documentation controller initialization
+2025-05-12 13:29:21 -   - Removed: Category User Guides has 6 pages
+2025-05-12 13:29:21 -   - Removed: Categorized as controller: ENCY
+2025-05-12 13:29:21 -   - Removed: Category Model Documentation has 8 pages
+2025-05-12 13:29:21 -   - Removed: Categorized as controller: 2025-04-18-helpdesk-controller-implementation
+2025-05-12 13:29:21 -   - Removed: Categorized as model: README
+2025-05-12 13:29:21 -   - Removed: Categorized as controller: HostingSignup
+2025-05-12 13:29:21 -   - Removed: Categorized as controller: proxmox
+2025-05-12 13:29:21 -   - Removed: Category Developer Documentation has 11 pages
+2025-05-12 13:29:21 -   - Removed: Categorized as model: model_list
+2025-05-12 13:29:21 -   - Removed: Categorized as controller: controller_list
+2025-05-12 13:29:21 -   - Removed: Categorized as controller: BMaster
+2025-05-12 13:29:21 -   - Removed: Categorized as controller: Todo
+2025-05-12 13:29:21 -   - Removed: Category Module Documentation has 6 pages
+2025-05-12 13:29:21 -   - Removed: Categorized as model: ThemeConfig
+2025-05-12 13:29:21 -   - Removed: Categorized as model: models
+2025-05-12 13:29:21 -   - Removed: Category Site-Specific Documentation has 4 pages
+2025-05-12 13:29:21 -   - Removed: Categorized as controller: 2024-07-proxmox-controller-fixes
+2025-05-12 13:29:21 -   - Removed: Category Administrator Guides has 15 pages
+2025-05-12 13:29:21 -   - Removed: Categorized as controller: controllers
+2025-05-12 13:29:21 -   - Removed: Categorized as controller: User
+2025-05-12 13:29:21 -   - Removed: Categorized as controller: Ve7tit
+2025-05-12 13:29:21 -   - Removed: Categorized as model: ENCYModel
+2025-05-12 13:29:21 -   - Removed: Categorized as controller: BMasterController
+2025-05-12 13:29:21 -   - Removed: Categorized as controller: Site
+2025-05-12 13:29:21 -   - Removed: Categorized as model: Calendar
+2025-05-12 13:29:21 -   - Removed: Categorized as controller: usbm
+2025-05-12 13:29:21 -   - Removed: Categorized as controller: controller_routing_guidelines
+2025-05-12 13:29:21 -   - Removed: Category Proxmox Documentation has 2 pages
+2025-05-12 13:29:21 -   - Removed: Categorized as model: BMaserModel
+2025-05-12 13:29:21 -   - Removed: Categorized as controller: Admin
+2025-05-12 13:29:21 -   - Removed: Category All Documentation has 193 pages
+2025-05-12 13:29:21 -   - Removed: Documentation system initialized with 193 pages
+2025-05-12 13:29:21 -   - Removed: Category All Documentation has 192 pages
+2025-05-12 13:29:21 -   - Removed: Documentation system initialized with 192 pages
+2025-05-12 13:29:21 -   - Removed: Category Tutorials has 3 pages
+2025-05-12 13:29:21 -   - Removed: Categorized as controller: Mail
+2025-05-12 13:29:21 -   - Removed: Categorized as controller: ENCYController
+2025-05-12 13:29:21 - Cleanup completed successfully
+2025-05-12 13:29:21 - See /home/shanta/PycharmProjects/comserv2/Comserv/logs/cleanup_formatting_title_files.log for details
+2025-05-12 13:34:39 - Starting cleanup of documentation-related log files
+2025-05-12 13:34:39 - Project root: /home/shanta/PycharmProjects/comserv2
+2025-05-12 13:34:39 - Searching for files...
+2025-05-12 13:34:39 - Found 46 files to clean up
+2025-05-12 13:34:39 - Files to be removed:
+2025-05-12 13:34:39 -   - Categorized as model: index
+2025-05-12 13:34:39 -   - Categorized as controller: HostingSignup_Mail
+2025-05-12 13:34:39 -   - Categorized as controller: Documentation_Controller
+2025-05-12 13:34:39 -   - Categorized as controller: Forager
+2025-05-12 13:34:39 -   - Documentation system initialized with 195 pages
+2025-05-12 13:34:39 -   - Categorized as controller: admin
+2025-05-12 13:34:39 -   - Categorized as controller: Root
+2025-05-12 13:34:39 -   - Category Controller Documentation has 25 pages
+2025-05-12 13:34:39 -   - Categorized as controller: 2024-08-controller-fixes
+2025-05-12 13:34:39 -   - Categorized as controller: HelpDesk
+2025-05-12 13:34:39 -   - Starting Documentation controller initialization
+2025-05-12 13:34:39 -   - Category User Guides has 6 pages
+2025-05-12 13:34:39 -   - Category All Documentation has 195 pages
+2025-05-12 13:34:39 -   - Categorized as controller: ENCY
+2025-05-12 13:34:39 -   - Category Model Documentation has 8 pages
+2025-05-12 13:34:39 -   - Categorized as controller: 2025-04-18-helpdesk-controller-implementation
+2025-05-12 13:34:39 -   - Category Changelog has 34 pages
+2025-05-12 13:34:39 -   - Categorized as model: README
+2025-05-12 13:34:39 -   - Categorized as controller: HostingSignup
+2025-05-12 13:34:39 -   - Categorized as controller: proxmox
+2025-05-12 13:34:39 -   - Category Developer Documentation has 11 pages
+2025-05-12 13:34:39 -   - Categorized as model: model_list
+2025-05-12 13:34:39 -   - Categorized as controller: controller_list
+2025-05-12 13:34:39 -   - Categorized as controller: BMaster
+2025-05-12 13:34:39 -   - Categorized as controller: Todo
+2025-05-12 13:34:39 -   - Category Module Documentation has 6 pages
+2025-05-12 13:34:39 -   - Categorized as model: ThemeConfig
+2025-05-12 13:34:39 -   - Categorized as model: models
+2025-05-12 13:34:39 -   - Category Site-Specific Documentation has 4 pages
+2025-05-12 13:34:39 -   - Categorized as controller: 2024-07-proxmox-controller-fixes
+2025-05-12 13:34:39 -   - Category Administrator Guides has 15 pages
+2025-05-12 13:34:39 -   - Categorized as controller: controllers
+2025-05-12 13:34:39 -   - Categorized as controller: User
+2025-05-12 13:34:39 -   - Categorized as controller: Ve7tit
+2025-05-12 13:34:39 -   - Categorized as model: ENCYModel
+2025-05-12 13:34:39 -   - Categorized as controller: BMasterController
+2025-05-12 13:34:39 -   - Categorized as controller: Site
+2025-05-12 13:34:39 -   - Categorized as model: Calendar
+2025-05-12 13:34:39 -   - Categorized as controller: usbm
+2025-05-12 13:34:39 -   - Categorized as controller: controller_routing_guidelines
+2025-05-12 13:34:39 -   - Category Proxmox Documentation has 2 pages
+2025-05-12 13:34:39 -   - Categorized as model: BMaserModel
+2025-05-12 13:34:39 -   - Categorized as controller: Admin
+2025-05-12 13:34:39 -   - Category Tutorials has 3 pages
+2025-05-12 13:34:39 -   - Categorized as controller: Mail
+2025-05-12 13:34:39 -   - Categorized as controller: ENCYController
+2025-05-12 13:34:39 - Removing files...
+2025-05-12 13:34:39 -   - Removed: Categorized as model: index
+2025-05-12 13:34:39 -   - Removed: Categorized as controller: HostingSignup_Mail
+2025-05-12 13:34:39 -   - Removed: Categorized as controller: Documentation_Controller
+2025-05-12 13:34:39 -   - Removed: Categorized as controller: Forager
+2025-05-12 13:34:39 -   - Removed: Documentation system initialized with 195 pages
+2025-05-12 13:34:39 -   - Removed: Categorized as controller: admin
+2025-05-12 13:34:39 -   - Removed: Categorized as controller: Root
+2025-05-12 13:34:39 -   - Removed: Category Controller Documentation has 25 pages
+2025-05-12 13:34:39 -   - Removed: Categorized as controller: 2024-08-controller-fixes
+2025-05-12 13:34:39 -   - Removed: Categorized as controller: HelpDesk
+2025-05-12 13:34:39 -   - Removed: Starting Documentation controller initialization
+2025-05-12 13:34:39 -   - Removed: Category User Guides has 6 pages
+2025-05-12 13:34:39 -   - Removed: Category All Documentation has 195 pages
+2025-05-12 13:34:39 -   - Removed: Categorized as controller: ENCY
+2025-05-12 13:34:39 -   - Removed: Category Model Documentation has 8 pages
+2025-05-12 13:34:39 -   - Removed: Categorized as controller: 2025-04-18-helpdesk-controller-implementation
+2025-05-12 13:34:39 -   - Removed: Category Changelog has 34 pages
+2025-05-12 13:34:39 -   - Removed: Categorized as model: README
+2025-05-12 13:34:39 -   - Removed: Categorized as controller: HostingSignup
+2025-05-12 13:34:39 -   - Removed: Categorized as controller: proxmox
+2025-05-12 13:34:39 -   - Removed: Category Developer Documentation has 11 pages
+2025-05-12 13:34:39 -   - Removed: Categorized as model: model_list
+2025-05-12 13:34:39 -   - Removed: Categorized as controller: controller_list
+2025-05-12 13:34:39 -   - Removed: Categorized as controller: BMaster
+2025-05-12 13:34:39 -   - Removed: Categorized as controller: Todo
+2025-05-12 13:34:39 -   - Removed: Category Module Documentation has 6 pages
+2025-05-12 13:34:39 -   - Removed: Categorized as model: ThemeConfig
+2025-05-12 13:34:39 -   - Removed: Categorized as model: models
+2025-05-12 13:34:39 -   - Removed: Category Site-Specific Documentation has 4 pages
+2025-05-12 13:34:39 -   - Removed: Categorized as controller: 2024-07-proxmox-controller-fixes
+2025-05-12 13:34:39 -   - Removed: Category Administrator Guides has 15 pages
+2025-05-12 13:34:39 -   - Removed: Categorized as controller: controllers
+2025-05-12 13:34:39 -   - Removed: Categorized as controller: User
+2025-05-12 13:34:39 -   - Removed: Categorized as controller: Ve7tit
+2025-05-12 13:34:39 -   - Removed: Categorized as model: ENCYModel
+2025-05-12 13:34:39 -   - Removed: Categorized as controller: BMasterController
+2025-05-12 13:34:39 -   - Removed: Categorized as controller: Site
+2025-05-12 13:34:39 -   - Removed: Categorized as model: Calendar
+2025-05-12 13:34:39 -   - Removed: Categorized as controller: usbm
+2025-05-12 13:34:39 -   - Removed: Categorized as controller: controller_routing_guidelines
+2025-05-12 13:34:39 -   - Removed: Category Proxmox Documentation has 2 pages
+2025-05-12 13:34:39 -   - Removed: Categorized as model: BMaserModel
+2025-05-12 13:34:39 -   - Removed: Categorized as controller: Admin
+2025-05-12 13:34:39 -   - Removed: Category Tutorials has 3 pages
+2025-05-12 13:34:39 -   - Removed: Categorized as controller: Mail
+2025-05-12 13:34:39 -   - Removed: Categorized as controller: ENCYController
+2025-05-12 13:34:39 - Cleanup completed successfully
+2025-05-12 13:34:39 - See /home/shanta/PycharmProjects/comserv2/Comserv/logs/cleanup_formatting_title_files.log for details
+2025-05-12 13:38:11 - Starting cleanup of documentation-related log files
+2025-05-12 13:38:11 - Project root: /home/shanta/PycharmProjects/comserv2
+2025-05-12 13:38:11 - Searching for files...
+2025-05-12 13:38:11 - Found 115 files to clean up
+2025-05-12 13:38:11 - Files to be removed:
+2025-05-12 13:38:11 -   - Added Documentation_Management to admin_guides category
+2025-05-12 13:38:11 -   - Added KVM_ISO_Transfer to admin_guides category
+2025-05-12 13:38:12 -   - Added BMaster to controllers category
+2025-05-12 13:38:12 -   - Added documentation_migration_guide to developer_guides category
+2025-05-12 13:38:12 -   - Added 2025-05-31-server-ip-display to changelog category
+2025-05-12 13:38:12 -   - Added member_resources to site-specific category for site: mcoop
+2025-05-12 13:38:12 -   - Added documentation_system_guide to admin_guides category
+2025-05-12 13:38:12 -   - Added 2025-05-25-fix-formatting-title-logs to changelog category
+2025-05-12 13:38:12 -   - Added 2024-06-21-linux-commands-documentation to changelog category
+2025-05-12 13:38:12 -   - Added HostingSignup_Mail to controllers category
+2025-05-12 13:38:12 -   - Added todo_filtering_and_views to modules category
+2025-05-12 13:38:12 -   - Documentation system initialized with 195 pages
+2025-05-12 13:38:12 -   - Added index to models category
+2025-05-12 13:38:12 -   - Added controllers to controllers category
+2025-05-12 13:38:12 -   - Added mcoop_getting_started to tutorials category
+2025-05-12 13:38:12 -   - Added proxmox_integration to proxmox category
+2025-05-12 13:38:12 -   - Added 2025-08-18-project-cards-css-fix to changelog category
+2025-05-12 13:38:12 -   - Added controller_routing_guidelines to controllers category
+2025-05-12 13:38:12 -   - Added controller_list to controllers category
+2025-05-12 13:38:12 -   - Added 2025-04-git-pull-functionality to changelog category
+2025-05-12 13:38:12 -   - Added ThemeConfig to models category
+2025-05-12 13:38:12 -   - Added 2024-08-proxmox-debug-msg-fix to changelog category
+2025-05-12 13:38:12 -   - Added 2025-08-30-hosting-signup-enhancements to changelog category
+2025-05-12 13:38:12 -   - Added Admin to controllers category
+2025-05-12 13:38:12 -   - Added user_management to admin_guides category
+2025-05-12 13:38:12 -   - Added ENCYModel to models category
+2025-05-12 13:38:12 -   - Added 2025-05-15-documentation-system-update to changelog category
+2025-05-12 13:38:12 -   - Added menu_system_guide to developer_guides category
+2025-05-12 13:38:12 -   - Added ENCY to controllers category
+2025-05-12 13:38:12 -   - Added troubleshooting to developer_guides category
+2025-05-12 13:38:12 -   - Added HostingSignup to controllers category
+2025-05-12 13:38:12 -   - Added navigation_system to developer_guides category
+2025-05-12 13:38:12 -   - Added proxmox to controllers category
+2025-05-12 13:38:12 -   - Added 2025-05-30-documentation-structure-simplification to changelog category
+2025-05-12 13:38:12 -   - Added templates to site-specific category for site: mcoop
+2025-05-12 13:38:12 -   - Added customizing_profile to tutorials category
+2025-05-12 13:38:12 -   - Added login_authentication to tutorials category
+2025-05-12 13:38:12 -   - Added todo_system to modules category
+2025-05-12 13:38:12 -   - Added 2025-09-starman-restart-fix to changelog category
+2025-05-12 13:38:12 -   - Added 2024-08-pagetop-hostname-display to changelog category
+2025-05-12 13:38:12 -   - Added HelpDesk to controllers category
+2025-05-12 13:38:12 -   - Added Documentation_Controller to controllers category
+2025-05-12 13:38:12 -   - Added system_overview to admin_guides category
+2025-05-12 13:38:12 -   - Added documentation_index_adaptation to developer_guides category
+2025-05-12 13:38:12 -   - Added 2025-05-16-documentation-workflow-consolidation to changelog category
+2025-05-12 13:38:12 -   - Added 2025-04-13-mcoop-url-case-fix to changelog category
+2025-05-12 13:38:12 -   - Added FAQ to user_guides category
+2025-05-12 13:38:12 -   - Added system_info to admin_guides category
+2025-05-12 13:38:12 -   - Added Todo to controllers category
+2025-05-12 13:38:12 -   - Added template_system to developer_guides category
+2025-05-12 13:38:12 -   - Added Forager to controllers category
+2025-05-12 13:38:12 -   - Added 2025-04-18-helpdesk-controller-implementation to controllers category
+2025-05-12 13:38:12 -   - Added 2024-04-24-helpdesk-menu-enhancement to changelog category
+2025-05-12 13:38:12 -   - Added project_selection_log_creation to modules category
+2025-05-12 13:38:12 -   - Added starman_restart_guide to admin_guides category
+2025-05-12 13:38:12 -   - Added 2024-08-ve7tit-controller-fixes to changelog category
+2025-05-12 13:38:12 -   - Added mcoop_user_guide to user_guides category
+2025-05-12 13:38:12 -   - Added db_config_loading_fix to changelog category
+2025-05-12 13:38:12 -   - Added 2025-05-25-documentation-organization to changelog category
+2025-05-12 13:38:12 -   - Added models to models category
+2025-05-12 13:38:12 -   - Added 2024-08-controller-fixes to controllers category
+2025-05-12 13:38:12 -   - Added ENCYController to controllers category
+2025-05-12 13:38:12 -   - Added authentication_system to developer_guides category
+2025-05-12 13:38:12 -   - Added admin_guides to admin_guides category
+2025-05-12 13:38:12 -   - Added 2025-05-31-linux-commands-reference to changelog category
+2025-05-12 13:38:12 -   - Added getting_started to user_guides category
+2025-05-12 13:38:12 -   - Added Projects to modules category
+2025-05-12 13:38:12 -   - Added 2025-09-10-restart-starman-functionality to changelog category
+2025-05-12 13:38:12 -   - Added network_map_json_storage to developer_guides category
+2025-05-12 13:38:12 -   - Added api_reference to developer_guides category
+2025-05-12 13:38:12 -   - Added 2024-06-project-edit-fix to changelog category
+2025-05-12 13:38:12 -   - Added 2024-06-15-login-redirect-fix to changelog category
+2025-05-12 13:38:12 -   - Added documentation_guide to site-specific category for site: mcoop
+2025-05-12 13:38:12 -   - Added 2025-04-pagetop-hostname-display to changelog category
+2025-05-12 13:38:12 -   - Added Ve7tit to controllers category
+2025-05-12 13:38:12 -   - Added Site to controllers category
+2025-05-12 13:38:13 -   - Added SYSTEM_REQUIREMENTS to admin_guides category
+2025-05-12 13:38:13 -   - Added 2024-07-proxmox-controller-fixes to controllers category
+2025-05-12 13:38:13 -   - Added 2025-04-documentation-admin-visibility-fix to changelog category
+2025-05-12 13:38:13 -   - Added 2025-04-documentation-template-refactoring to changelog category
+2025-05-12 13:38:13 -   - Added 2025-04-mcoop-server-room-plan to changelog category
+2025-05-12 13:38:13 -   - Added 2025-05-12-fix-documentation-controller-logging to changelog category
+2025-05-12 13:38:13 -   - Added 2024-07-project-id-fix to changelog category
+2025-05-12 13:38:13 -   - Added Proxmox_CD_Visibility to proxmox category
+2025-05-12 13:38:13 -   - Added admin to controllers category
+2025-05-12 13:38:13 -   - Added Root to controllers category
+2025-05-12 13:38:13 -   - Added BMasterController to controllers category
+2025-05-12 13:38:13 -   - Added User to controllers category
+2025-05-12 13:38:13 -   - Added Installation to admin_guides category
+2025-05-12 13:38:13 -   - Added 2025-04-mcoop-admin-menu-restriction to changelog category
+2025-05-12 13:38:13 -   - Added 2025-09-15-sudo-password-configuration to changelog category
+2025-05-12 13:38:13 -   - Added project_management_system to modules category
+2025-05-12 13:38:13 -   - Added 2025-04-12-hosting-signup-implementation to changelog category
+2025-05-12 13:38:13 -   - Added site_guide to site-specific category for site: mcoop
+2025-05-12 13:38:13 -   - Added admin_guide to admin_guides category
+2025-05-12 13:38:13 -   - Added model_list to models category
+2025-05-12 13:38:13 -   - Added account_management to user_guides category
+2025-05-12 13:38:13 -   - Added usbm to controllers category
+2025-05-12 13:38:13 -   - Added Calendar to models category
+2025-05-12 13:38:13 -   - Added 2025-04-documentation-workflow-update to changelog category
+2025-05-12 13:38:13 -   - Added starman_restart_card to admin_guides category
+2025-05-12 13:38:13 -   - Added Mail to controllers category
+2025-05-12 13:38:13 -   - Added README to models category
+2025-05-12 13:38:13 -   - Added mail_user_guide to user_guides category
+2025-05-12 13:38:13 -   - Added todo_edit_functionality to modules category
+2025-05-12 13:38:13 -   - Added BMaserModel to models category
+2025-05-12 13:38:13 -   - Added mail_admin_guide to admin_guides category
+2025-05-12 13:38:13 -   - Added documentation_role_access to developer_guides category
+2025-05-12 13:38:13 -   - Added linux_commands to admin_guides category
+2025-05-12 13:38:13 -   - Added 2025-08-25-project-filtering-and-display to changelog category
+2025-05-12 13:38:13 -   - Added Documentation_System to user_guides category
+2025-05-12 13:38:13 -   - Added admintopmenu_guide to admin_guides category
+2025-05-12 13:38:13 -   - Added 2025-04-navigation-improvements to changelog category
+2025-05-12 13:38:13 -   - Added 2025-04-documentation-display-fix to changelog category
+2025-05-12 13:38:13 -   - Added db_config_loading to developer_guides category
+2025-05-12 13:38:13 - Removing files...
+2025-05-12 13:38:13 -   - Removed: Added Documentation_Management to admin_guides category
+2025-05-12 13:38:13 -   - Removed: Added KVM_ISO_Transfer to admin_guides category
+2025-05-12 13:38:13 -   - Removed: Added BMaster to controllers category
+2025-05-12 13:38:13 -   - Removed: Added documentation_migration_guide to developer_guides category
+2025-05-12 13:38:13 -   - Removed: Added 2025-05-31-server-ip-display to changelog category
+2025-05-12 13:38:13 -   - Removed: Added member_resources to site-specific category for site: mcoop
+2025-05-12 13:38:13 -   - Removed: Added documentation_system_guide to admin_guides category
+2025-05-12 13:38:13 -   - Removed: Added 2025-05-25-fix-formatting-title-logs to changelog category
+2025-05-12 13:38:13 -   - Removed: Added 2024-06-21-linux-commands-documentation to changelog category
+2025-05-12 13:38:13 -   - Removed: Added HostingSignup_Mail to controllers category
+2025-05-12 13:38:13 -   - Removed: Added todo_filtering_and_views to modules category
+2025-05-12 13:38:13 -   - Removed: Documentation system initialized with 195 pages
+2025-05-12 13:38:13 -   - Removed: Added index to models category
+2025-05-12 13:38:13 -   - Removed: Added controllers to controllers category
+2025-05-12 13:38:13 -   - Removed: Added mcoop_getting_started to tutorials category
+2025-05-12 13:38:13 -   - Removed: Added proxmox_integration to proxmox category
+2025-05-12 13:38:13 -   - Removed: Added 2025-08-18-project-cards-css-fix to changelog category
+2025-05-12 13:38:13 -   - Removed: Added controller_routing_guidelines to controllers category
+2025-05-12 13:38:13 -   - Removed: Added controller_list to controllers category
+2025-05-12 13:38:13 -   - Removed: Added 2025-04-git-pull-functionality to changelog category
+2025-05-12 13:38:13 -   - Removed: Added ThemeConfig to models category
+2025-05-12 13:38:13 -   - Removed: Added 2024-08-proxmox-debug-msg-fix to changelog category
+2025-05-12 13:38:13 -   - Removed: Added 2025-08-30-hosting-signup-enhancements to changelog category
+2025-05-12 13:38:13 -   - Removed: Added Admin to controllers category
+2025-05-12 13:38:13 -   - Removed: Added user_management to admin_guides category
+2025-05-12 13:38:13 -   - Removed: Added ENCYModel to models category
+2025-05-12 13:38:13 -   - Removed: Added 2025-05-15-documentation-system-update to changelog category
+2025-05-12 13:38:13 -   - Removed: Added menu_system_guide to developer_guides category
+2025-05-12 13:38:13 -   - Removed: Added ENCY to controllers category
+2025-05-12 13:38:13 -   - Removed: Added troubleshooting to developer_guides category
+2025-05-12 13:38:13 -   - Removed: Added HostingSignup to controllers category
+2025-05-12 13:38:13 -   - Removed: Added navigation_system to developer_guides category
+2025-05-12 13:38:13 -   - Removed: Added proxmox to controllers category
+2025-05-12 13:38:13 -   - Removed: Added 2025-05-30-documentation-structure-simplification to changelog category
+2025-05-12 13:38:13 -   - Removed: Added templates to site-specific category for site: mcoop
+2025-05-12 13:38:13 -   - Removed: Added customizing_profile to tutorials category
+2025-05-12 13:38:13 -   - Removed: Added login_authentication to tutorials category
+2025-05-12 13:38:13 -   - Removed: Added todo_system to modules category
+2025-05-12 13:38:13 -   - Removed: Added 2025-09-starman-restart-fix to changelog category
+2025-05-12 13:38:13 -   - Removed: Added 2024-08-pagetop-hostname-display to changelog category
+2025-05-12 13:38:13 -   - Removed: Added HelpDesk to controllers category
+2025-05-12 13:38:13 -   - Removed: Added Documentation_Controller to controllers category
+2025-05-12 13:38:13 -   - Removed: Added system_overview to admin_guides category
+2025-05-12 13:38:13 -   - Removed: Added documentation_index_adaptation to developer_guides category
+2025-05-12 13:38:13 -   - Removed: Added 2025-05-16-documentation-workflow-consolidation to changelog category
+2025-05-12 13:38:13 -   - Removed: Added 2025-04-13-mcoop-url-case-fix to changelog category
+2025-05-12 13:38:13 -   - Removed: Added FAQ to user_guides category
+2025-05-12 13:38:13 -   - Removed: Added system_info to admin_guides category
+2025-05-12 13:38:13 -   - Removed: Added Todo to controllers category
+2025-05-12 13:38:13 -   - Removed: Added template_system to developer_guides category
+2025-05-12 13:38:13 -   - Removed: Added Forager to controllers category
+2025-05-12 13:38:13 -   - Removed: Added 2025-04-18-helpdesk-controller-implementation to controllers category
+2025-05-12 13:38:13 -   - Removed: Added 2024-04-24-helpdesk-menu-enhancement to changelog category
+2025-05-12 13:38:13 -   - Removed: Added project_selection_log_creation to modules category
+2025-05-12 13:38:13 -   - Removed: Added starman_restart_guide to admin_guides category
+2025-05-12 13:38:13 -   - Removed: Added 2024-08-ve7tit-controller-fixes to changelog category
+2025-05-12 13:38:13 -   - Removed: Added mcoop_user_guide to user_guides category
+2025-05-12 13:38:13 -   - Removed: Added db_config_loading_fix to changelog category
+2025-05-12 13:38:13 -   - Removed: Added 2025-05-25-documentation-organization to changelog category
+2025-05-12 13:38:13 -   - Removed: Added models to models category
+2025-05-12 13:38:13 -   - Removed: Added 2024-08-controller-fixes to controllers category
+2025-05-12 13:38:13 -   - Removed: Added ENCYController to controllers category
+2025-05-12 13:38:13 -   - Removed: Added authentication_system to developer_guides category
+2025-05-12 13:38:13 -   - Removed: Added admin_guides to admin_guides category
+2025-05-12 13:38:13 -   - Removed: Added 2025-05-31-linux-commands-reference to changelog category
+2025-05-12 13:38:13 -   - Removed: Added getting_started to user_guides category
+2025-05-12 13:38:13 -   - Removed: Added Projects to modules category
+2025-05-12 13:38:13 -   - Removed: Added 2025-09-10-restart-starman-functionality to changelog category
+2025-05-12 13:38:13 -   - Removed: Added network_map_json_storage to developer_guides category
+2025-05-12 13:38:13 -   - Removed: Added api_reference to developer_guides category
+2025-05-12 13:38:13 -   - Removed: Added 2024-06-project-edit-fix to changelog category
+2025-05-12 13:38:13 -   - Removed: Added 2024-06-15-login-redirect-fix to changelog category
+2025-05-12 13:38:13 -   - Removed: Added documentation_guide to site-specific category for site: mcoop
+2025-05-12 13:38:13 -   - Removed: Added 2025-04-pagetop-hostname-display to changelog category
+2025-05-12 13:38:13 -   - Removed: Added Ve7tit to controllers category
+2025-05-12 13:38:13 -   - Removed: Added Site to controllers category
+2025-05-12 13:38:13 -   - Removed: Added SYSTEM_REQUIREMENTS to admin_guides category
+2025-05-12 13:38:13 -   - Removed: Added 2024-07-proxmox-controller-fixes to controllers category
+2025-05-12 13:38:13 -   - Removed: Added 2025-04-documentation-admin-visibility-fix to changelog category
+2025-05-12 13:38:13 -   - Removed: Added 2025-04-documentation-template-refactoring to changelog category
+2025-05-12 13:38:13 -   - Removed: Added 2025-04-mcoop-server-room-plan to changelog category
+2025-05-12 13:38:13 -   - Removed: Added 2025-05-12-fix-documentation-controller-logging to changelog category
+2025-05-12 13:38:13 -   - Removed: Added 2024-07-project-id-fix to changelog category
+2025-05-12 13:38:13 -   - Removed: Added Proxmox_CD_Visibility to proxmox category
+2025-05-12 13:38:13 -   - Removed: Added admin to controllers category
+2025-05-12 13:38:13 -   - Removed: Added Root to controllers category
+2025-05-12 13:38:13 -   - Removed: Added BMasterController to controllers category
+2025-05-12 13:38:13 -   - Removed: Added User to controllers category
+2025-05-12 13:38:13 -   - Removed: Added Installation to admin_guides category
+2025-05-12 13:38:13 -   - Removed: Added 2025-04-mcoop-admin-menu-restriction to changelog category
+2025-05-12 13:38:13 -   - Removed: Added 2025-09-15-sudo-password-configuration to changelog category
+2025-05-12 13:38:13 -   - Removed: Added project_management_system to modules category
+2025-05-12 13:38:13 -   - Removed: Added 2025-04-12-hosting-signup-implementation to changelog category
+2025-05-12 13:38:13 -   - Removed: Added site_guide to site-specific category for site: mcoop
+2025-05-12 13:38:13 -   - Removed: Added admin_guide to admin_guides category
+2025-05-12 13:38:13 -   - Removed: Added model_list to models category
+2025-05-12 13:38:13 -   - Removed: Added account_management to user_guides category
+2025-05-12 13:38:13 -   - Removed: Added usbm to controllers category
+2025-05-12 13:38:13 -   - Removed: Added Calendar to models category
+2025-05-12 13:38:13 -   - Removed: Added 2025-04-documentation-workflow-update to changelog category
+2025-05-12 13:38:13 -   - Removed: Added starman_restart_card to admin_guides category
+2025-05-12 13:38:13 -   - Removed: Added Mail to controllers category
+2025-05-12 13:38:13 -   - Removed: Added README to models category
+2025-05-12 13:38:13 -   - Removed: Added mail_user_guide to user_guides category
+2025-05-12 13:38:13 -   - Removed: Added todo_edit_functionality to modules category
+2025-05-12 13:38:13 -   - Removed: Added BMaserModel to models category
+2025-05-12 13:38:13 -   - Removed: Added mail_admin_guide to admin_guides category
+2025-05-12 13:38:13 -   - Removed: Added documentation_role_access to developer_guides category
+2025-05-12 13:38:13 -   - Removed: Added linux_commands to admin_guides category
+2025-05-12 13:38:13 -   - Removed: Added 2025-08-25-project-filtering-and-display to changelog category
+2025-05-12 13:38:13 -   - Removed: Added Documentation_System to user_guides category
+2025-05-12 13:38:13 -   - Removed: Added admintopmenu_guide to admin_guides category
+2025-05-12 13:38:13 -   - Removed: Added 2025-04-navigation-improvements to changelog category
+2025-05-12 13:38:13 -   - Removed: Added 2025-04-documentation-display-fix to changelog category
+2025-05-12 13:38:13 -   - Removed: Added db_config_loading to developer_guides category
+2025-05-12 13:38:13 - Cleanup completed successfully
+2025-05-12 13:38:13 - See /home/shanta/PycharmProjects/comserv2/Comserv/logs/cleanup_formatting_title_files.log for details
+2025-05-12 13:40:01 - Starting cleanup of documentation-related log files
+2025-05-12 13:40:01 - Project root: /home/shanta/PycharmProjects/comserv2
+2025-05-12 13:40:01 - Searching for files...
+2025-05-12 13:40:01 - Found 0 files to clean up
+2025-05-12 13:40:01 - No files to clean up. Exiting.

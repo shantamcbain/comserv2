@@ -1,0 +1,395 @@
+{
+    "checksum": "6ac5f28a8d98a8ce15096b781332719c69f3a73ffb8fdd5c245691f494aa86ba",
+    "data": {
+    "id": "d9c70bfc-7ee2-442b-98de-24a969f2a91f",
+    "createdAt": 1750361560771,
+    "updatedAt": 1750361587655,
+    "title": "Apply Default Container System to All Documenta...",
+    "messages": [
+        {
+            "id": "7fd673ae-0ffd-423d-8876-c3ff25fd4d61",
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "Apply Default Container System to All Documentation Pages"
+                },
+                {
+                    "type": "text",
+                    "text": "Task: Update all documentation pages and other remaining pages to use the standard apiary-container system for consistency across the entire application."
+                },
+                {
+                    "type": "text",
+                    "text": "Scope:"
+                },
+                {
+                    "type": "text",
+                    "text": "All files in /Documentation/ directory that currently use documentation-container"
+                },
+                {
+                    "type": "text",
+                    "text": "Any remaining pages that use custom container classes"
+                },
+                {
+                    "type": "text",
+                    "text": "Remove all custom CSS that duplicates functionality now provided by base-containers.css"
+                },
+                {
+                    "type": "text",
+                    "text": "Requirements:"
+                },
+                {
+                    "type": "text",
+                    "text": "Replace documentation-container with apiary-container"
+                },
+                {
+                    "type": "text",
+                    "text": "Add proper apiary-header with icons and context information"
+                },
+                {
+                    "type": "text",
+                    "text": "Convert custom info boxes to standard alert classes"
+                },
+                {
+                    "type": "text",
+                    "text": "Update buttons to use standard btn classes"
+                },
+                {
+                    "type": "text",
+                    "text": "Remove all duplicate CSS styles"
+                },
+                {
+                    "type": "text",
+                    "text": "Maintain existing functionality and content structure"
+                },
+                {
+                    "type": "text",
+                    "text": "Follow the established naming conventions and file structure"
+                },
+                {
+                    "type": "text",
+                    "text": "Files to Update:"
+                },
+                {
+                    "type": "text",
+                    "text": "/Documentation/error.tt (clean up duplicate content)"
+                },
+                {
+                    "type": "text",
+                    "text": "Any remaining documentation files with custom containers"
+                },
+                {
+                    "type": "text",
+                    "text": "Theme editor pages"
+                },
+                {
+                    "type": "text",
+                    "text": "API credentials pages"
+                },
+                {
+                    "type": "text",
+                    "text": "Any other pages found with custom container classes"
+                },
+                {
+                    "type": "text",
+                    "text": "Expected Outcome: All pages will have consistent styling using the universal container system, reducing code duplication and ensuring a cohesive user experience across the application."
+                }
+            ],
+            "context": {
+                "currentFile": {
+                    "path": "Comserv/root/static/css/themes/base-containers.css",
+                    "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root/static/css/themes/base-containers.css",
+                    "sources": [
+                        "opened_tab"
+                    ],
+                    "content": "/* Universal Container System */\n/* File: base-containers.css - Theme-agnostic container classes */\n/* Uses existing theme variables to ensure consistency across all themes */\n\n/* Standard Container Structure */\n.apiary-container {\n    max-width: 1400px;\n    margin: 0 auto;\n    padding: 20px;\n    background: linear-gradient(135deg, var(--background-color) 0%);\n    min-height: calc(100vh - 200px);\n}\n\n/* Header Styles */\n.apiary-header {\n    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);\n    color: var(--text-color);\n    padding: 30px;\n    border-radius: 12px;\n    margin-bottom: 30px;\n    box-shadow: 0 4px 15px rgba(0,0,0,0.1);\n}\n\n.apiary-header h1,\n.apiary-header h2 {\n    margin: 0 0 15px 0;\n    font-size: 2.5rem;\n    font-weight: 700;\n    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);\n    color: var(--text-color);\n}\n\n.apiary-header h1 i,\n.apiary-header h2 i {\n    color: var(--accent-color);\n    margin-right: 15px;\n    text-shadow: 1px 1px 2px rgba(0,0,0,0.5);\n}\n\n.apiary-context {\n    display: flex;\n    flex-wrap: wrap;\n    gap: 20px;\n    font-size: 1rem;\n}\n\n.context-item {\n    background: rgba(255,255,255,0.2);\n    padding: 8px 15px;\n    border-radius: 20px;\n    backdrop-filter: blur(10px);\n    color: var(--text-color);\n}\n\n.status-active {\n    color: var(--accent-color);\n    font-weight: bold;\n}\n\n/* Dashboard Stats */\n.dashboard-stats {\n    display: grid;\n    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));\n    gap: 20px;\n    margin-bottom: 30px;\n}\n\n.stat-card {\n    background: var(--background-color);\n    border-radius: 12px;\n    padding: 25px;\n    box-shadow: 0 4px 15px rgba(0,0,0,0.08);\n    border-left: 5px solid var(--primary-color);\n    transition: transform 0.3s ease, box-shadow 0.3s ease;\n}\n\n.stat-card:hover {\n    transform: translateY(-5px);\n    box-shadow: 0 8px 25px rgba(0,0,0,0.15);\n}\n\n.stat-card.hives {\n    border-left-color: var(--primary-color);\n}\n\n.stat-card.inspections {\n    border-left-color: var(--accent-color);\n}\n\n.stat-card.todos {\n    border-left-color: var(--warning-color);\n}\n\n.stat-card.inventory {\n    border-left-color: var(--secondary-color);\n}\n\n/* Schema comparison specific stat cards */\n.stat-card.databases {\n    border-left-color: var(--primary-color);\n}\n\n.stat-card.connected {\n    border-left-color: var(--success-color);\n}\n\n.stat-card.tables {\n    border-left-color: var(--accent-color);\n}\n\n.stat-card.results {\n    border-left-color: var(--success-color);\n}\n\n.stat-card .stat-icon {\n    font-size: 2.5rem;\n    color: var(--primary-color);\n    margin-bottom: 15px;\n}\n\n.stat-card.inspections .stat-icon {\n    color: var(--accent-color);\n}\n\n.stat-card.todos .stat-icon {\n    color: var(--warning-color);\n}\n\n.stat-card.inventory .stat-icon {\n    color: var(--secondary-color);\n}\n\n/* Schema comparison specific stat card icons */\n.stat-card.databases .stat-icon {\n    color: var(--primary-color);\n}\n\n.stat-card.connected .stat-icon {\n    color: var(--success-color);\n}\n\n.stat-card.tables .stat-icon {\n    color: var(--accent-color);\n}\n\n.stat-card.results .stat-icon {\n    color: var(--success-color);\n}\n\n.stat-content {\n    display: flex;\n    flex-direction: column;\n}\n\n.stat-number {\n    font-size: 2.5rem;\n    font-weight: 700;\n    color: var(--text-color);\n    line-height: 1;\n}\n\n.stat-label {\n    font-size: 1rem;\n    color: #666;\n    margin-top: 5px;\n}\n\n.stat-detail {\n    font-size: 0.9rem;\n    color: #888;\n    margin-top: 3px;\n}\n\n/* Quick Actions */\n.quick-actions {\n    background: var(--background-color);\n    border-radius: 12px;\n    padding: 25px;\n    margin-bottom: 30px;\n    box-shadow: 0 4px 15px rgba(0,0,0,0.08);\n}\n\n.quick-actions h3 {\n    margin: 0 0 20px 0;\n    color: var(--text-color);\n    font-size: 1.5rem;\n}\n\n.quick-actions h3 i {\n    color: var(--accent-color);\n    margin-right: 10px;\n}\n\n.action-buttons {\n    display: flex;\n    flex-wrap: wrap;\n    gap: 15px;\n}\n\n/* Feature Grid */\n.feature-grid {\n    display: grid;\n    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));\n    gap: 25px;\n    margin-bottom: 30px;\n}\n\n.feature-card {\n    background: var(--background-color);\n    border-radius: 12px;\n    overflow: hidden;\n    box-shadow: 0 4px 15px rgba(0,0,0,0.08);\n    transition: transform 0.3s ease, box-shadow 0.3s ease;\n    border-top: 4px solid var(--primary-color);\n}\n\n.feature-card:hover {\n    transform: translateY(-5px);\n    box-shadow: 0 8px 25px rgba(0,0,0,0.15);\n}\n\n.feature-card.readonly {\n    border-top-color: #ccc;\n    opacity: 0.8;\n}\n\n.feature-header {\n    background: linear-gradient(135deg, var(--table-header-bg) 0%);\n    padding: 20px;\n    border-bottom: 1px solid var(--border-color);\n}\n\n.feature-header h3, .feature-header h4 {\n    margin: 0;\n    color: var(--text-color);\n    font-size: 1.3rem;\n    display: flex;\n    align-items: center;\n}\n\n.feature-icon {\n    font-size: 1.5rem;\n    color: var(--primary-color);\n    margin-right: 12px;\n}\n\n.feature-content {\n    padding: 20px;\n}\n\n.feature-content p {\n    margin: 0 0 15px 0;\n    color: var(--text-color);\n    line-height: 1.6;\n}\n\n.feature-list {\n    list-style: none;\n    padding: 0;\n    margin: 0;\n}\n\n.feature-list li {\n    padding: 5px 0;\n    color: var(--text-color);\n    position: relative;\n    padding-left: 20px;\n}\n\n.feature-list li:before {\n    content: \"•\";\n    position: absolute;\n    left: 0;\n    top: 5px;\n    color: var(--accent-color);\n}\n\n.feature-actions {\n    padding: 20px;\n    background: var(--table-header-bg);\n    border-top: 1px solid var(--border-color);\n    display: flex;\n    gap: 10px;\n    flex-wrap: wrap;\n}\n\n/* Button Styles */\n.btn {\n    display: inline-flex;\n    align-items: center;\n    padding: 10px 20px;\n    border: none;\n    border-radius: 8px;\n    text-decoration: none;\n    font-weight: 500;\n    transition: all 0.3s ease;\n    cursor: pointer;\n    font-size: 0.95rem;\n}\n\n.btn i {\n    margin-right: 8px;\n}\n\n.btn-primary {\n    background: var(--primary-color);\n    color: var(--text-color);\n}\n\n.btn-primary:hover {\n    background: var(--link-hover-color);\n    transform: translateY(-2px);\n}\n\n.btn-secondary {\n    background: var(--secondary-color);\n    color: var(--text-color);\n}\n\n.btn-secondary:hover {\n    background: var(--accent-color);\n    transform: translateY(-2px);\n}\n\n.btn-success {\n    background: var(--success-color);\n    color: white;\n}\n\n.btn-success:hover {\n    background: #218838;\n    transform: translateY(-2px);\n}\n\n.btn-info {\n    background: var(--link-color);\n    color: white;\n}\n\n.btn-info:hover {\n    background: var(--link-hover-color);\n    transform: translateY(-2px);\n}\n\n.btn-warning {\n    background: var(--warning-color);\n    color: var(--text-color);\n}\n\n.btn-warning:hover {\n    background: #e0a800;\n    transform: translateY(-2px);\n}\n\n.btn-outline {\n    background: transparent;\n    color: var(--primary-color);\n    border: 2px solid var(--primary-color);\n}\n\n.btn-outline:hover {\n    background: var(--primary-color);\n    color: white;\n}\n\n.btn-sm {\n    padding: 8px 16px;\n    font-size: 0.9rem;\n}\n\n/* Alert Styles */\n.alert {\n    padding: 15px 20px;\n    border-radius: 8px;\n    margin-bottom: 20px;\n    border-left: 4px solid;\n}\n\n.alert-info {\n    background: #e7f3ff;\n    border-left-color: var(--link-color);\n    color: #0c5460;\n}\n\n.alert-warning {\n    background: #fff3cd;\n    border-left-color: var(--warning-color);\n    color: #856404;\n}\n\n.alert h3 {\n    margin: 0 0 10px 0;\n    font-size: 1.2rem;\n}\n\n/* Public View Styles */\n.public-view {\n    text-align: center;\n    max-width: 800px;\n    margin: 0 auto;\n}\n\n.welcome-section h2 {\n    color: var(--text-color);\n    font-size: 2.2rem;\n    margin-bottom: 20px;\n}\n\n.welcome-section h2 i {\n    color: var(--accent-color);\n    margin-right: 15px;\n}\n\n.info-cards {\n    display: grid;\n    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));\n    gap: 20px;\n    margin: 30px 0;\n}\n\n.info-card {\n    background: var(--background-color);\n    padding: 25px;\n    border-radius: 12px;\n    box-shadow: 0 4px 15px rgba(0,0,0,0.08);\n    text-align: center;\n}\n\n.info-icon {\n    font-size: 3rem;\n    color: var(--primary-color);\n    margin-bottom: 15px;\n}\n\n.info-card h3 {\n    color: var(--text-color);\n    margin: 0 0 15px 0;\n}\n\n.access-section {\n    background: var(--background-color);\n    padding: 30px;\n    border-radius: 12px;\n    box-shadow: 0 4px 15px rgba(0,0,0,0.08);\n    margin-top: 30px;\n}\n\n.access-buttons {\n    display: flex;\n    justify-content: center;\n    gap: 15px;\n    margin-top: 20px;\n}\n\n/* Admin Section */\n.admin-section {\n    background: var(--background-color);\n    border-radius: 12px;\n    padding: 25px;\n    margin-top: 30px;\n    box-shadow: 0 4px 15px rgba(0,0,0,0.08);\n    border-top: 4px solid var(--text-color);\n}\n\n.admin-section h3 {\n    color: var(--text-color);\n    margin: 0 0 20px 0;\n    font-size: 1.5rem;\n}\n\n.admin-section h3 i {\n    color: var(--primary-color);\n    margin-right: 10px;\n}\n\n.admin-grid {\n    display: grid;\n    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));\n    gap: 20px;\n}\n\n.admin-card {\n    background: var(--table-header-bg);\n    padding: 20px;\n    border-radius: 8px;\n    border-left: 4px solid var(--primary-color);\n}\n\n.admin-card h4 {\n    margin: 0 0 15px 0;\n    color: var(--text-color);\n}\n\n.admin-card ul {\n    list-style: none;\n    padding: 0;\n    margin: 0;\n}\n\n.admin-card li {\n    padding: 5px 0;\n}\n\n.admin-card a {\n    color: var(--link-color);\n    text-decoration: none;\n    transition: color 0.3s ease;\n}\n\n.admin-card a:hover {\n    color: var(--link-hover-color);\n}\n\n/* Debug Styles */\n.debug-messages {\n    background: var(--table-header-bg);\n    border: 1px solid var(--border-color);\n    border-radius: 8px;\n    padding: 15px;\n    margin-bottom: 20px;\n    font-family: monospace;\n}\n\n.debug {\n    color: #6c757d;\n    font-size: 0.9rem;\n    margin: 5px 0;\n}\n\n/* Graph Container Styles */\n.graph-container {\n    border: 1px solid var(--border-color);\n    padding: 10px;\n    margin: 10px;\n    position: static;\n    z-index: auto;\n    background: var(--background-color);\n    border-radius: 8px;\n    box-shadow: 0 2px 8px rgba(0,0,0,0.1);\n}\n\n.graph-container iframe {\n    width: 100%;\n    height: 600px;\n    border: none;\n    border-radius: 4px;\n}\n\n.no-data-message {\n    text-align: center;\n    padding: 40px 20px;\n    background: linear-gradient(135deg, var(--background-color) 0%);\n    border-radius: 8px;\n    border: 2px dashed var(--primary-color);\n}\n\n.no-data-message a {\n    display: inline-block;\n    padding: 15px 30px;\n    background: var(--primary-color);\n    color: white;\n    text-decoration: none;\n    border-radius: 8px;\n    font-weight: 500;\n    transition: all 0.3s ease;\n}\n\n.no-data-message a:hover {\n    background: var(--link-hover-color);\n    transform: translateY(-2px);\n}\n\n/* Animation for loading states */\n@keyframes pulse {\n    0% { opacity: 1; }\n    50% { opacity: 0.5; }\n    100% { opacity: 1; }\n}\n\n.loading {\n    animation: pulse 1.5s ease-in-out infinite;\n}\n\n/* Responsive Design */\n@media (max-width: 768px) {\n    .apiary-container {\n        padding: 15px;\n    }\n    \n    .apiary-header {\n        padding: 20px;\n        text-align: center;\n    }\n    \n    .apiary-header h1 {\n        font-size: 2rem;\n    }\n    \n    .apiary-context {\n        justify-content: center;\n    }\n    \n    .dashboard-stats {\n        grid-template-columns: 1fr;\n    }\n    \n    .feature-grid {\n        grid-template-columns: 1fr;\n    }\n    \n    .action-buttons {\n        justify-content: center;\n    }\n    \n    .access-buttons {\n        flex-direction: column;\n        align-items: center;\n    }\n    \n    .admin-grid {\n        grid-template-columns: 1fr;\n    }\n}\n\n@media (max-width: 480px) {\n    .apiary-header h1 {\n        font-size: 1.8rem;\n    }\n    \n    .stat-number {\n        font-size: 2rem;\n    }\n    \n    .feature-actions {\n        flex-direction: column;\n    }\n    \n    .btn {\n        justify-content: center;\n        width: 100%;\n    }\n}",
+                    "language": "plain text"
+                },
+                "codebaseEnabled": true
+            },
+            "createdAt": 1750361560771,
+            "isInternal": false,
+            "rawContent": {
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Apply Default Container System to All Documentation Pages"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Task: Update all documentation pages and other remaining pages to use the standard apiary-container system for consistency across the entire application."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Scope:"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "All files in /Documentation/ directory that currently use documentation-container"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Any remaining pages that use custom container classes"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Remove all custom CSS that duplicates functionality now provided by base-containers.css"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Requirements:"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Replace documentation-container with apiary-container"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Add proper apiary-header with icons and context information"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Convert custom info boxes to standard alert classes"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Update buttons to use standard btn classes"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Remove all duplicate CSS styles"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Maintain existing functionality and content structure"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Follow the established naming conventions and file structure"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Files to Update:"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "/Documentation/error.tt (clean up duplicate content)"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Any remaining documentation files with custom containers"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Theme editor pages"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "API credentials pages"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Any other pages found with custom container classes"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Expected Outcome: All pages will have consistent styling using the universal container system, reducing code duplication and ensuring a cohesive user experience across the application."
+                            }
+                        ]
+                    },
+                    {
+                        "type": "paragraph"
+                    }
+                ]
+            }
+        },
+        {
+            "id": "51644cca-8b90-4492-9784-918cea22916e",
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "I'll help you apply the default container system to all documentation pages. Let me start by exploring the current structure and identifying the files that need to be updated."
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01AMKDEGLuTQjgHg4bCfpCe9",
+                    "statusText": "Viewed folder",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": ".",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/."
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01RW7uGJLkpK3uzmDL7Yy2ZV",
+                    "statusText": "Viewed folder",
+                    "status": "SUCCESS",
+                    "context": {
+                        "files": [
+                            {
+                                "path": "Comserv/root",
+                                "fsPath": "/home/shanta/PycharmProjects/comserv2/Comserv/root"
+                            }
+                        ]
+                    },
+                    "isHidden": false
+                },
+                {
+                    "type": "text",
+                    "text": "Now let me examine the Documentation directory structure and look for files that need to be updated:"
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_0174TmUgVwXzQ8WzZypv2G8n",
+                    "title": "File search",
+                    "statusText": "Done",
+                    "status": "SUCCESS",
+                    "isHidden": false
+                },
+                {
+                    "type": "text",
+                    "text": "Let me search for .tt files in the Documentation directory:"
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01NMMNjxrxBLfqa4cEwxbd4w",
+                    "title": "File search",
+                    "statusText": "Done",
+                    "status": "SUCCESS",
+                    "isHidden": false
+                },
+                {
+                    "type": "toolCall",
+                    "toolCallId": "toolu_01WLjG3NtaNoyQT4ZPaSW1U8",
+                    "title": "Fulltext search",
+                    "statusText": "Running fulltext search",
+                    "status": "IN_PROGRESS",
+                    "isHidden": false
+                }
+            ],
+            "context": {
+                "author": "Coding Agent",
+                "operationId": "a5bfe7c8-ed71-43a8-a9d1-43b5d6aedf48"
+            },
+            "createdAt": 1750361562441,
+            "isInternal": false
+        }
+    ],
+    "isAgent": true,
+    "isCustomAgent": false,
+    "isUnitTestsAgent": false,
+    "isE2EAgent": false,
+    "autoApply": false
+}
+}

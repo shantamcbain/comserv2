@@ -1,0 +1,35 @@
+{
+   "abstract" : "Log module of Catalyst that uses Log::Dispatch",
+   "author" : [
+      "Shota Takayama <shot[at]bindstorm.jp>"
+   ],
+   "dynamic_config" : 0,
+   "generated_by" : "Module::Build version 0.4234",
+   "license" : [
+      "unknown"
+   ],
+   "meta-spec" : {
+      "url" : "http://search.cpan.org/perldoc?CPAN::Meta::Spec",
+      "version" : 2
+   },
+   "name" : "Catalyst-Plugin-Log-Dispatch",
+   "no_index" : {
+      "directory" : [
+         "t",
+         "inc"
+      ]
+   },
+   "prereqs" : {
+      "runtime" : {
+         "requires" : {
+            "Catalyst" : "5.65",
+            "Log::Dispatch" : "2.13",
+            "Test::More" : 0,
+            "UNIVERSAL::require" : 0
+         }
+      }
+   },
+   "release_status" : "stable",
+   "version" : "0.121",
+   "x_serialization_backend" : "JSON::PP version 4.16"
+}

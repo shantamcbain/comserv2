@@ -1,0 +1,373 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2025-04-documentation-admin-visibility-fix.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Documentation Admin Visibility Fix' %]
+
+<!-- Documentation page for 2025-04-documentation-admin-visibility-fix -->
+<div class="documentation-content">
+
+
+
+<!-- Include documentation CSS -->
+<link rel="stylesheet" href="/static/css/documentation.css">
+
+<div class="markdown-content">
+
+
+**Date:** April 10, 2025  
+
+**Author:** Shanta  
+
+**Status:** Completed
+
+
+
+<h2>Overview</h2>
+
+
+
+This document outlines the fix for an issue where admin users were not seeing admin-specific documentation categories in the Documentation system. The problem was that the system was not properly recognizing users with the 'admin' role in their session roles array.
+
+
+
+<h2>Changes Made</h2>
+
+
+
+<h3>1. Improved Role Detection</h3>
+
+
+
+The Documentation controller was updated to properly detect admin users by checking both the <code>user_role</code> value and the session roles array:
+
+
+
+<ul><li>Modified the controller to check for admin role in both <code>user_role</code> and session roles</li></ul>
+
+<ul><li>Prioritized session roles over user object roles</li></ul>
+
+<ul><li>Added more detailed logging of role detection</li></ul>
+
+
+
+<h3>2. Enhanced Page and Category Filtering</h3>
+
+
+
+The page and category filtering logic was updated to ensure admin users can see all documentation:
+
+
+
+<ul><li>Updated the page filtering logic to consider both <code>user_role</code> and session roles</li></ul>
+
+<ul><li>Updated the category filtering logic to properly recognize admin users</li></ul>
+
+<ul><li>Added additional logging for category access decisions</li></ul>
+
+
+
+<h3>3. Simplified Template Conditions</h3>
+
+
+
+The template conditions for displaying admin sections were simplified and made more consistent:
+
+
+
+<ul><li>Simplified the admin section visibility conditions in the template</li></ul>
+
+<ul><li>Made the conditions more consistent across different sections</li></ul>
+
+<ul><li>Added comprehensive debug information to help diagnose role issues</li></ul>
+
+
+
+<h2>Technical Details</h2>
+
+
+
+<h3>Controller Changes</h3>
+
+
+
+The changes were made in the <code>Documentation.pm</code> controller file located at:
+
+<code>Comserv/lib/Comserv/Controller/Documentation.pm</code>
+
+
+
+**Before (Role Detection):**
+
+<code></code>`perl
+
+<h1>Get the current user's role</h1>
+
+my $user_role = 'normal';  # Default to normal user
+
+if ($c->user_exists) {
+
+    # Check if roles are stored in session
+
+    if ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && @{$c->session->{roles}}) {
+
+        # If user has multiple roles, prioritize admin role
+
+        if (grep { $_ eq 'admin' } @{$c->session->{roles}}) {
+
+            $user_role = 'admin';
+
+        } else {
+
+            # Otherwise use the first role
+
+            $user_role = $c->session->{roles}->[0];
+
+        }
+
+    } else {
+
+        # Fallback to user->role if available
+
+        $user_role = $c->user->role || 'normal';
+
+    }
+
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index', "User role determined: $user_role");
+
+}
+
+<code></code>`
+
+
+
+**After (Role Detection):**
+
+<code></code>`perl
+
+<h1>Get the current user's role</h1>
+
+my $user_role = 'normal';  # Default to normal user
+
+
+
+<h1>First check session roles (this works even if user is not fully authenticated)</h1>
+
+if ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && @{$c->session->{roles}}) {
+
+    # If user has multiple roles, prioritize admin role
+
+    if (grep { $_ eq 'admin' } @{$c->session->{roles}}) {
+
+        $user_role = 'admin';
+
+    } else {
+
+        # Otherwise use the first role
+
+        $user_role = $c->session->{roles}->[0];
+
+    }
+
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
+
+        "User role determined from session: $user_role");
+
+}
+
+<h1>If no role found in session but user exists, try to get role from user object</h1>
+
+elsif ($c->user_exists) {
+
+    $user_role = $c->user->role || 'normal';
+
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
+
+        "User role determined from user object: $user_role");
+
+}
+
+
+
+<h1>Log the final role determination</h1>
+
+$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+
+    "Final user role determined: $user_role");
+
+<code></code>`
+
+
+
+**Before (Category Filtering):**
+
+<code></code>`perl
+
+<h1>Skip if the user doesn't have the required role</h1>
+
+<h1>But always include for admins</h1>
+
+my $has_role = ($user_role eq 'admin'); # Admins can see everything
+
+
+
+unless ($has_role) {
+
+    foreach my $role (@{$category->{roles}}) {
+
+        if ($role eq $user_role || ($role eq 'normal' && $user_role)) {
+
+            $has_role = 1;
+
+            last;
+
+        }
+
+    }
+
+}
+
+<code></code>`
+
+
+
+**After (Category Filtering):**
+
+<code></code>`perl
+
+<h1>Skip if the user doesn't have the required role</h1>
+
+<h1>But always include for admins (check both user_role and session roles)</h1>
+
+my $has_role = ($user_role eq 'admin'); # Check if user_role is admin
+
+
+
+<h1>Also check if admin is in session roles</h1>
+
+if (!$has_role && $c->session->{roles} && ref $c->session->{roles} eq 'ARRAY') {
+
+    $has_role = grep { $_ eq 'admin' } @{$c->session->{roles}};
+
+}
+
+
+
+<h1>If still not admin, check for other matching roles</h1>
+
+unless ($has_role) {
+
+    foreach my $role (@{$category->{roles}}) {
+
+        # Check if role matches user_role or is in session roles
+
+        if ($role eq $user_role) {
+
+            $has_role = 1;
+
+            last;
+
+        }
+
+        # Check session roles
+
+        elsif ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY') {
+
+            if (grep { $_ eq $role } @{$c->session->{roles}}) {
+
+                $has_role = 1;
+
+                last;
+
+            }
+
+        }
+
+        # Special case for normal role
+
+        elsif ($role eq 'normal' && $user_role) {
+
+            $has_role = 1;
+
+            last;
+
+        }
+
+    }
+
+}
+
+
+
+<h1>Log role access decision</h1>
+
+$self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
+
+    "Category $category_key access: " . ($has_role ? "granted" : "denied"));
+
+<code></code>`
+
+
+
+<h3>Template Changes</h3>
+
+
+
+The changes were made in the <code>index.tt</code> template file located at:
+
+<code>Comserv/root/Documentation/index.tt</code>
+
+
+
+**Before:**
+
+<code></code>`tt
+
+<!-- Admin Documentation Sections - Only visible to administrators -->
+
+[% IF display_role == 'Administrator' || user_role == 'admin' %]
+
+<code></code>`
+
+
+
+**After:**
+
+<code></code>`tt
+
+<!-- Admin Documentation Sections - Only visible to administrators -->
+
+[% IF user_role == 'admin' || c.session.roles.grep('admin').size %]
+
+<code></code>`
+
+
+
+<h2>Benefits</h2>
+
+
+
+<ul><li>**Improved Access Control**: Admin users now correctly see all admin documentation categories</li></ul>
+
+<ul><li>**Better Role Detection**: The system now properly recognizes admin users from session roles</li></ul>
+
+<ul><li>**Enhanced Debugging**: Added comprehensive debug information to help diagnose role issues</li></ul>
+
+<ul><li>**Consistent User Experience**: Admin users now have access to all documentation they should see</li></ul>
+
+
+
+<h2>Future Considerations</h2>
+
+
+
+<ul><li>Consider implementing a more comprehensive role-based access control system</li></ul>
+
+<ul><li>Add more detailed logging for role-based access decisions</li></ul>
+
+<ul><li>Create a unified approach to role checking across the application</li></ul>
+
+<ul><li>Consider adding a role management interface for administrators</li></ul>
+
+</div>

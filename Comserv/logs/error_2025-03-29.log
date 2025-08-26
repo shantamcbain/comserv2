@@ -1,0 +1,39 @@
+[2025-03-29 04:26:55] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm:77] get_site_details - Error fetching site details: DBIx::Class::ResultSource::_minimal_valueset_satisfying_constraint(): Unable to satisfy requested constraint 'primary', missing values for column(s): 'id' at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Site.pm line 66
+
+[2025-03-29 04:26:55] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:883] site_setup - No site found for SiteName: default
+[2025-03-29 04:28:49] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:883] site_setup - No site found for SiteName: default
+[2025-03-29 04:28:49] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:883] site_setup - No site found for SiteName: default
+[2025-03-29 04:28:49] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:883] site_setup - No site found for SiteName: default
+[2025-03-29 04:29:00] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:883] site_setup - No site found for SiteName: default
+[2025-03-29 04:29:00] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:883] site_setup - No site found for SiteName: default
+[2025-03-29 04:29:01] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:883] site_setup - No site found for SiteName: default
+[2025-03-29 04:29:02] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:883] site_setup - No site found for SiteName: default
+[2025-03-29 04:30:55] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:883] site_setup - No site found for SiteName: default
+[2025-03-29 04:30:55] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:883] site_setup - No site found for SiteName: default
+[2025-03-29 04:32:09] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:883] site_setup - No site found for SiteName: default
+[2025-03-29 04:32:14] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:883] site_setup - No site found for SiteName: default
+[2025-03-29 04:32:14] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:883] site_setup - No site found for SiteName: default
+[2025-03-29 04:33:20] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:883] site_setup - No site found for SiteName: default
+[2025-03-29 04:33:20] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:883] site_setup - No site found for SiteName: default
+[2025-03-29 04:47:21] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:883] site_setup - No site found for SiteName: default
+[2025-03-29 04:47:21] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:883] site_setup - No site found for SiteName: default
+[2025-03-29 04:47:21] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:883] site_setup - No site found for SiteName: default
+[2025-03-29 04:47:31] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:883] site_setup - No site found for SiteName: default
+[2025-03-29 04:47:32] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:883] site_setup - No site found for SiteName: default
+[2025-03-29 04:49:12] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:883] site_setup - No site found for SiteName: default
+[2025-03-29 04:49:12] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:883] site_setup - No site found for SiteName: default
+[2025-03-29 05:18:11] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:667] auto - Could not retrieve site domain for 127.0.0.1. Using default site.
+[2025-03-29 05:18:11] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:687] setup_site - DOMAIN ERROR: '127.0.0.1' not found in sitedomain table
+[2025-03-29 05:18:11] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:727] setup_site - Failed to send admin email notification about domain error for 127.0.0.1
+[2025-03-29 05:36:33] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:679] auto - Could not retrieve site domain for 127.0.0.1. Trying CSC site.
+[2025-03-29 05:36:33] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:711] setup_site - DOMAIN ERROR: '127.0.0.1' not found in sitedomain table
+[2025-03-29 05:36:33] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:751] setup_site - Failed to send admin email notification about domain error for 127.0.0.1
+[2025-03-29 05:44:07] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:689] auto - Could not retrieve site domain for 127.0.0.1. Trying CSC site.
+[2025-03-29 05:44:07] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:721] setup_site - DOMAIN ERROR: '127.0.0.1' not found in sitedomain table
+[2025-03-29 05:44:07] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:761] setup_site - Failed to send admin email notification about domain error for 127.0.0.1
+[2025-03-29 05:53:15] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:703] auto - Could not retrieve site domain for 127.0.0.1. Using default site.
+[2025-03-29 05:53:15] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:740] setup_site - DOMAIN ERROR: '127.0.0.1' not found in sitedomain table
+[2025-03-29 05:53:15] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:794] setup_site - Failed to send admin email notification about domain error for 127.0.0.1
+[2025-03-29 06:00:20] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:703] auto - Could not retrieve site domain for usbm.workstation. Using default site.
+[2025-03-29 06:00:20] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:740] setup_site - DOMAIN ERROR: 'usbm.workstation' not found in sitedomain table
+[2025-03-29 06:00:20] [INFO] [/home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Controller/Root.pm:794] setup_site - Failed to send admin email notification about domain error for usbm.workstation
