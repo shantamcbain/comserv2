@@ -1,0 +1,20 @@
+[% PageVersion = 'TopDropListIT.tt,v 1.0 2025/05/15 Shanta Exp Shanta' %]
+
+<li class="horizontal-dropdown">
+    <a href="/it" class="dropbtn">IT</a>
+    <div class="dropdown-content">
+        <a href="/it">IT Home</a>
+        <a href="/it/resources">Resources</a>
+        <a href="/it/documentation">Documentation</a>
+        <a href="/it/support">Support</a>
+        <a href="/it/tools">Tools</a>
+        <a href="/it/network">Network</a>
+        <a href="/it/servers">Servers</a>
+        <a href="/it/security">Security</a>
+    </div>
+</li>
+
+[% IF c.session.debug_mode == 1 %]
+    <!-- Debug: TopDropListIT.tt loaded -->
+    <!-- Version: [% PageVersion %] -->
+[% END %]

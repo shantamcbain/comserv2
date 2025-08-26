@@ -1,0 +1,205 @@
+[% META title = 'View Device' %]
+[% PageVersion = 'NetworkMap/view_device.tt,v 0.01 2025/04/20 shanta Exp shanta ' %]
+
+[% IF c.session.debug_mode == 1 %]
+ <br>[% PageVersion %]</br>
+ [% IF debug_msg.size %]
+   <div class="debug-message">
+     <ul>
+     [% FOREACH msg IN debug_msg %]
+       <li>[% msg %]</li>
+     [% END %]
+     </ul>
+   </div>
+ [% END %]
+[% END %]
+
+<div class="network-map-container">
+    <h1>Device Details: [% device_name | html %]</h1>
+    
+    <div class="network-map-actions">
+        <div class="action-buttons">
+            <a href="[% c.uri_for('/NetworkMap') %]" class="btn btn-secondary">Back to Network Map</a>
+            <a href="[% c.uri_for('/NetworkMap/remove_device', device_name) %]" class="btn btn-danger">Remove Device</a>
+        </div>
+    </div>
+    
+    [% IF status_msg %]
+        <div class="alert alert-success">[% status_msg %]</div>
+    [% END %]
+    
+    [% IF error_msg %]
+        <div class="alert alert-danger">[% error_msg %]</div>
+    [% END %]
+    
+    <div class="device-details">
+        <div class="detail-card">
+            <h2>Basic Information</h2>
+            <table class="detail-table">
+                <tr>
+                    <th>Device Name:</th>
+                    <td>[% device_name | html %]</td>
+                </tr>
+                <tr>
+                    <th>IP Address:</th>
+                    <td>[% device.ip | html %]</td>
+                </tr>
+                <tr>
+                    <th>Network:</th>
+                    <td>[% network_name | html %]</td>
+                </tr>
+                <tr>
+                    <th>Type:</th>
+                    <td>[% device.type | html %]</td>
+                </tr>
+                <tr>
+                    <th>Added Date:</th>
+                    <td>[% device.added_date | html %]</td>
+                </tr>
+            </table>
+        </div>
+        
+        <div class="detail-card">
+            <h2>Description</h2>
+            <div class="description-box">
+                [% IF device.description %]
+                    [% device.description | html | html_line_break %]
+                [% ELSE %]
+                    <em>No description provided</em>
+                [% END %]
+            </div>
+        </div>
+        
+        <div class="detail-card">
+            <h2>Services</h2>
+            [% IF device.services.size %]
+                <ul class="services-list">
+                    [% FOREACH service IN device.services.sort %]
+                        <li>[% service | html %]</li>
+                    [% END %]
+                </ul>
+            [% ELSE %]
+                <p><em>No services listed</em></p>
+            [% END %]
+        </div>
+    </div>
+</div>
+
+<style>
+    .network-map-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .network-map-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    
+    .action-buttons {
+        display: flex;
+        gap: 10px;
+    }
+    
+    .btn {
+        display: inline-block;
+        padding: 8px 16px;
+        text-decoration: none;
+        border-radius: 4px;
+        font-weight: 500;
+    }
+    
+    .btn-secondary {
+        background-color: #6c757d;
+        color: white;
+    }
+    
+    .btn-danger {
+        background-color: #dc3545;
+        color: white;
+    }
+    
+    .alert {
+        padding: 12px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+    }
+    
+    .alert-success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .alert-danger {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+    
+    .device-details {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+    
+    .detail-card {
+        background-color: #f8f9fa;
+        padding: 20px;
+        border-radius: 5px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .detail-card h2 {
+        margin-top: 0;
+        margin-bottom: 15px;
+        color: #343a40;
+        font-size: 1.5rem;
+        border-bottom: 1px solid #dee2e6;
+        padding-bottom: 10px;
+    }
+    
+    .detail-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    .detail-table th, .detail-table td {
+        padding: 8px;
+        text-align: left;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .detail-table th {
+        width: 30%;
+        color: #495057;
+    }
+    
+    .description-box {
+        background-color: #ffffff;
+        padding: 15px;
+        border-radius: 4px;
+        border: 1px solid #dee2e6;
+        min-height: 100px;
+    }
+    
+    .services-list {
+        margin: 0;
+        padding-left: 20px;
+    }
+    
+    .services-list li {
+        margin-bottom: 5px;
+    }
+    
+    .debug-message {
+        background-color: #f8d7da;
+        color: #721c24;
+        padding: 10px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+    }
+</style>

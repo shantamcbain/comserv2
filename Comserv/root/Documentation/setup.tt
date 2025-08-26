@@ -1,0 +1,118 @@
+xx[% PageVersion = 'Documentation/setup.tt,v 0.03 2024/10/00 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+[% END %]
+    [% PageVersion %]
+
+<h1 id="setup_top"><a href="#top">Setup Module</a></h1>
+<p>The Setup module is responsible for guiding the user through the initial setup process of the application. This includes setting up the necessary databases and ensuring that the application is ready for use. The module is divided into three parts: the Controller, the Model, and the View. The Controller handles user input and requests, the Model manages the data and business logic, and the View displays the setup process to the user. The module is built using the Catalyst framework and the Template Toolkit.</p>
+
+<<h2 id="boot_order"><a href="#boot_order">Boot Order</a></h2>
+<p>The application boot order is as follows:</p>
+<ol>
+    <li><strong>Command Line Initialization</strong>: The application starts by reading configuration files and initializing necessary components.</li>
+    <li><strong>Debug Mode Check</strong>: The application checks if debug mode is enabled based on the command line arguments.</li>
+    <li><strong>Conditional Initialization</strong>:
+        <ul>
+            <li><strong>If Debug Mode is Enabled</strong>:
+                <ol>
+                    <li><strong>Verbose Logging</strong>: Enable verbose logging for debugging purposes.</li>
+                    <li><strong>Development Database Connection</strong>: Connect to the development database.</li>
+                    <li><strong>Process in `root.pm`</strong>:
+                        <ol>
+                            <li>Extract the domain from the request.</li>
+                            <li>Fetch the site domain record from the database.</li>
+                            <li>If found, set the `SiteName` in the session.</li>
+                            <li>Dispatch to the `Admin` controller.</li>
+                            <li>Render the `admin/index.tt` template.</li>
+                        </ol>
+                    </li>
+                </ol>
+            </li>
+            <li><strong>If Debug Mode is Disabled</strong>:
+                <ol>
+                    <li><strong>Standard Logging</strong>: Enable standard logging.</li>
+                    <li><strong>Production Database Connection</strong>: Connect to the production database.</li>
+                </ol>
+            </li>
+        </ul>
+    </li>
+    <li><strong>Domain Name Extraction</strong>: The domain name is extracted from the request to determine the site context.</li>
+    <li><strong>Session Initialization</strong>: User sessions are initialized or resumed.</li>
+    <li><strong>Controller Dispatch</strong>: The appropriate controller is dispatched based on the request URL.</li>
+</ol>
+
+<h2 id="problems"><a href="#problems">Problems Encountered</a></h2>
+<p>We have been encountering issues with the application not getting beyond the "Couldn't detach to command 'none': Invalid action or component." error message. The following details the coding that is in the application for testing the domain and the issues encountered:</p>
+
+<h3>Domain Testing Code in `root.pm`</h3>
+<pre><code class="language-perl">
+# Extract the domain from the request
+my $domain = $c->req->base->host;
+$domain =~ s/:.*//;
+
+# Fetch the site domain record from the database
+try {
+    my $site_domain = $c->model('DB::SiteDomain')->find({ domain => $domain });
+    if ($site_domain) {
+        # Set the SiteName in the session
+        $c->session->{SiteName} = $site_domain->site_name;
+        $c->log->debug("Site domain found: " . $site_domain->domain);
+    } else {
+        $c->log->debug("No site domain found for domain: $domain");
+        $c->session->{SiteName} = 'none';
+    }
+} catch {
+    $c->log->error("Error during domain extraction: $_");
+};
+
+# Dispatch to the Admin controller
+$c->forward('Admin', 'index');
+
+# Render the admin/index.tt template
+$c->stash(template => 'admin/index.tt');
+</code></pre>
+
+<h3>Issues Encountered</h3>
+<p>The application is not finding the controller for 'none' and is displaying the error message "Couldn't detach to command 'none': Invalid action or component." This issue arises because:</p>
+<ul>
+    <li>The domain extraction process is not finding a matching site domain record in the database.</li>
+    <li>As a result, the `SiteName` is set to 'none'.</li>
+    <li>The application then attempts to dispatch to a controller or action named 'none', which does not exist.</li>
+    <li>This leads to the error message being displayed instead o f the intended `admin/index.tt` template.</li>
+</ul>
+
+<p>To resolve this issue, ensure that the domain extraction process correctly identifies the site domain and that the appropriate controller and action are dispatched based on the `SiteName`.</p>
+<h2 id="page_display"><a href="#page_display">Page Display</a></h2>
+<p>The page display process is as follows:</p>
+<ol>
+    <li>**Domain Name Handling**: The domain name is used to fetch the site-specific configuration and set the `SiteName` in the session.</li>
+    <li>**Controller Action Execution**: The controller action corresponding to the request URL is executed.</li>
+    <li>**Template Rendering**: The appropriate template is rendered based on the controller action and the `SiteName`.</li>
+    <li>**Response Delivery**: The rendered page is delivered to the user's browser.</li>
+</ol>
+
+<p>For more detailed information, refer to the `Root.pm` and `Admin.pm` controllers.</p>
+
+<h2 id="setup_controller"><a href="#setup_controller">Setup Controller</a></h2>
+[% INCLUDE 'Documentation/SetupController.tt' %]
+
+<h2 id="setup_model"><a href="#setup_model">Setup Model</a></h2>
+[% INCLUDE 'Documentation/SetupModel.tt' %]
+
+<h2 id="setup_view"><a href="#setup_view">Setup View</a></h2>
+<p>The Setup View is responsible for displaying the setup process to the user. It includes templates that guide the user through the setup steps and provide feedback on the success or failure of the setup process.</p>
+
+<h2>Instructions for AI Assistance</h2>
+<p>When providing assistance, please reference the following files to ensure consistency and proper integration:</p>
+<ul>
+    <li>`root.pm`</li>
+    <li>`Comserv::Controller::Admin`</li>
+    <li>`Comserv::Controller::Setup`</li>
+    <li>`Documentation/SetupController.tt`</li>
+</ul>
+
+<p>Additionally, request any files that contain subroutines to maintain consistency in the code. Ensure consistent naming conventions and use existing code where possible.</p>
+
+<p>We are committed to ensuring that the setup process is smooth and user-friendly. Please refer to the relevant sections for more details on the Setup module.</p>
+
+<p><a href="#setup_top">Back to top of Setup Documentation</a></p>

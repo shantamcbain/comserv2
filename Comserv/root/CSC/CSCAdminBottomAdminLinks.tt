@@ -1,0 +1,44 @@
+
+
+
+
+
+
+
+
+<!-- This is CSCAdmin Bottom links. -->
+	CSC Admin links
+
+                 &nbsp; |
+
+	<A HREF ="../CSC/address_book.cgi?&submit_power_search=on&simple_search_string=" Target ="_Blank">CSC Address book</a>
+	&nbsp; |
+
+	<A HREF ="/cgi-bin/CSC/csc_admin_cal.cgi?&view=MonthView&submit_power_search=on&simple_search_string=" Target ="_Blank">'s  Cal</a>
+	&nbsp; |
+           <A HREF ="/cgi-bin/CSC/csc_sr.cgi?session_id=$session_id&submit_power_search=on&simple_search_string=$username" Target ="mainCon">CSC SR </a>
+	   &nbsp; |
+
+	<A HREF ="/cgi-bin/CSC/csc_log.cgi?" Target ="_Blank">CSC log </a>
+	&nbsp; |
+
+	<A HREF ="/cgi-bin/CSC/expense_admin.cgi?" Target ="_Blank">CSC Expense Admin </a>
+	&nbsp; |
+
+
+
+	<A HREF ="/cgi-bin/CSC/todo.cgi?show_all_open_bugs_for_user=on&user=Shanta&sort_field1=start_date&sort_field2=priority&&first_record_to_display=0&records_per_page=50&submit_power_search=on&search = AND status != 'DONE'&columns_to_view=project_code&columns_to_view=start_date&columns_to_view=end_date&columns_to_view=priority&columns_to_view=&columns_to_view=abstract" Target ="_Blank">'s CSC todo list </a>
+                 &nbsp; |
+
+                   <A  HREF ="http://srv01.cybersoup.com/cgi-bin/sqwebmail?index=1">Mail </a>
+		   &nbsp; |
+
+	<A HREF ="../CSC/csc_url_admin.cgi?" target="_Blank" >Links </a>
+
+                 &nbsp; |
+
+<A HREF ="/cgi-bin/CSC/csc_project_tracker.cgi?&submit_power_search=on&simple_search_string==" Target ="_Blank">CSC Project Tracker </a>
+	&nbsp; |
+
+                    <A  HREF ="http://computersystemconsulting.ca/stats/">CSC Stats </a>
+<!--This is the end of CSCBottomAdminLinks.ttml-->

@@ -1,0 +1,36 @@
+
+
+
+
+
+
+
+
+<form METHOD="POST" ACTION="http://forager.com/cgi-bin/store/store.cgi">
+<input type="hidden" name="shop" value="csc">
+<input type="hidden" name="L" value="eng">
+<input type="hidden" name="prev" value="P|CSCClientMemberShips">
+
+<table width=100% border=0 cellspacing=0 cellpadding=10>
+<tr>
+<td valign=top width=10% align=right><img src="http://forager.com/images/shops/csc/products/CityShopAdmin_thmb.png" alt="no image" border=0>
+<p><b>our price:<br>$<font color=red>10.00</font></b><br>(11.00 &euro;)
+<p><input type="submit" name="AddToCartButton" value="Add To Cart">
+ 
+</td>
+<td valign=top>
+<input type=hidden name="item|1|CSCClientMemberShips" value="12">
+<h3><b>Computer System Consulting Memberships</b></h3></font>
+
+Our membership program gives you access to a greater set of FAQ's, our knowledge bases, our Customer Service Request system (CSR), our email news letter, etc. As a CSC Member you will get one free CSR per month. You may purchace additional CSR's at our reduced member rates.<br>
+
+</td></tr></table></form>
+ 
+
+
+Host your site with us. Web Applications, virtual offices, and HelpDesk systems  built to your needs.	      
+    
+</td>
+
+
+ 

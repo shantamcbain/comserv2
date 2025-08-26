@@ -1,0 +1,96 @@
+body {
+  font-family: Verdana, Helvetica, sans-serif;
+  font-size: 20px;
+  background-image : url("static/images/BMaster/honey2.jpg");
+  color: black;
+  background-color: #ccffff;
+}
+header {
+    /* Site Greeting */
+}
+
+h1 {
+    /* Site Greeting */
+}
+
+/* Debug Information */
+.debug-content {
+
+}
+/* Main Menu */
+nav {
+    background-color: #ccffff;
+}
+
+.horizontal-menu {
+    display: flex;
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+}
+
+.horizontal-dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.dropbtn {
+    display: inline-block;
+    color: black;
+    text-align: center;
+    padding: 14px 16px;
+    text-decoration: none;
+}
+
+.dropdown-content {
+    display: none;
+    position: absolute;
+    background-color: #f9f9f9;
+    min-width: 160px;
+    box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
+    z-index: 1;
+}
+
+.dropdown-content a {
+    color: black;
+    padding: 12px 16px;
+    text-decoration: none;
+    display: block;
+    text-align: left;
+}
+
+.horizontal-dropdown:hover .dropdown-content {
+    display: block;
+}
+
+/* Submenu Styles */
+.submenu-item {
+    position: relative;
+}
+
+.submenu-header {
+    font-weight: bold;
+}
+
+.submenu {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 100%;
+    min-width: 160px;
+    background-color: #f9f9f9;
+    box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
+    z-index: 1;
+}
+
+.submenu a {
+    color: black;
+    padding: 12px 16px;
+    text-decoration: none;
+    display: block;
+    text-align: left;
+}
+
+.submenu-item:hover .submenu {
+    display: block;
+}

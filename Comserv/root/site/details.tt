@@ -1,0 +1,168 @@
+[% PageVersion = 'site/details.tt,v 0.02 2025/06/15 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<style>
+    .domain-actions {
+        display: flex;
+        gap: 5px;
+        margin-top: 5px;
+    }
+    
+    .inline-form {
+        display: inline-block;
+        margin-right: 5px;
+    }
+    
+    .btn {
+        padding: 5px 10px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+        text-decoration: none;
+        display: inline-block;
+    }
+    
+    .btn-sm {
+        padding: 3px 8px;
+        font-size: 11px;
+    }
+    
+    .btn-primary {
+        background-color: #007bff;
+        color: white;
+    }
+    
+    .btn-danger {
+        background-color: #dc3545;
+        color: white;
+    }
+    
+    .btn-info {
+        background-color: #17a2b8;
+        color: white;
+    }
+    
+    .cloudflare-badge {
+        display: inline-block;
+        background-color: #f38020;
+        color: white;
+        font-size: 11px;
+        padding: 2px 6px;
+        border-radius: 3px;
+        margin-left: 5px;
+        vertical-align: middle;
+    }
+</style>
+
+<h1>Site Details</h1>
+
+<div>
+    <h1>[% site.name %]</h1>
+    Domains:
+    <ul>
+ [% FOREACH site_domain IN domains %]
+    <li>
+        [% site_domain.domain %]
+        [% IF site_domain.is_on_cloudflare %]
+            <span class="cloudflare-badge">Cloudflare</span>
+        [% END %]
+        <div class="domain-actions">
+            <form action="/site/delete_domain" method="post" class="inline-form">
+                <input type="hidden" name="domain_id" value="[% site_domain.id %]">
+                <input type="hidden" name="site_id" value="[% site.id %]">
+                <input type="submit" value="Delete" class="btn btn-sm btn-danger">
+            </form>
+            <form action="/site/edit_domain/[% site_domain.id %]" method="post" class="inline-form">
+                <input type="hidden" name="site_id" value="[% site_domain.site_id %]">
+                <input type="submit" value="Edit" class="btn btn-sm btn-primary">
+            </form>
+            [% IF site_domain.is_on_cloudflare %]
+                <a href="[% c.uri_for('/cloudflareapi/dns/' _ site_domain.domain) %]" class="btn btn-sm btn-info">Manage DNS</a>
+            [% END %]
+        </div>
+    </li>
+[% END %]
+[% IF new_domain %]
+    <li>[% new_domain.domain %]</li>
+[% END %]
+    </ul>
+
+<form method="POST" action="[% c.uri_for('/site/add_domain_post') %]">
+    <input type="hidden" name="site_id" value="[% site.id %]">
+    <label for="domain">Domain:</label>
+    <input type="text" id="domain" name="domain" required><br>
+    <input type="submit" value="Add Domain">
+</form>
+
+<form method="POST" action="/site/modify?id=[% site.id %]"><br>
+        <label for="name">Name:</label>
+        <input type="text" id="name" name="name" value="[% site.name %]"><br>
+        <label for="description">Description:</label>
+        <input type="text" id="description" name="description" value="[% site.description %]"><br>
+
+        <label for="affiliate">Affiliate:</label>
+
+        <input type="text" id="affiliate" name="affiliate" value="[% site.affiliate %]"><br>
+        <label for="pid">PID:</label>
+        <input type="text" id="pid" name="pid" value="[% site.pid %]"><br>
+        <label for="auth_table">Auth Table:</label>
+        <input type="text" id="auth_table" name="auth_table" value="[% site.auth_table %]"><br>
+        <label for="home_view">Home View:</label>
+        <input type="text" id="home_view" name="home_view" value="[% site.home_view %]"><br>
+        <label for="app_logo">App Logo:</label>
+        <input type="text" id="app_logo" name="app_logo" value="[% site.app_logo %]"><br>
+        <label for="app_logo_alt">App Logo Alt:</label>
+        <input type="text" id="app_logo_alt" name="app_logo_alt" value="[% site.app_logo_alt %]"><br>
+        <label for="app_logo_width">App Logo Width:</label>
+        <input type="text" id="app_logo_width" name="app_logo_width" value="[% site.app_logo_width %]"><br>
+        <label for="app_logo_height">App Logo Height:</label>
+        <input type="text" id="app_logo_height" name="app_logo_height" value="[% site.app_logo_height %]"><br>
+        <label for="css_view_name">CSS View Name:</label>
+        <input type="text" id="css_view_name" name="css_view_name" value="[% site.css_view_name %]"><br>
+        <label for="mail_from">Mail From:</label>
+        <input type="text" id="mail_from" name="mail_from" value="[% site.mail_from %]"><br>
+        <label for="mail_to">Mail To:</label>
+        <input type="text" id="mail_to" name="mail_to" value="[% site.mail_to %]"><br>
+        <label for="mail_to_discussion">Mail To Discussion:</label>
+        <input type="text" id="mail_to_discussion" name="mail_to_discussion" value="[% site.mail_to_discussion %]"><br>
+        <label for="mail_to_admin">Mail To Admin:</label>
+        <input type="text" id="mail_to_admin" name="mail_to_admin" value="[% site.mail_to_admin %]"><br>
+        <label for="mail_to_user">Mail To User:</label>
+        <input type="text" id="mail_to_user" name="mail_to_user" value="[% site.mail_to_user %]"><br>
+        <label for="mail_to_client">Mail To Client:</label>
+        <input type="text" id="mail_to_client" name="mail_to_client" value="[% site.mail_to_client %]"><br>
+        <label for="mail_replyto">Mail ReplyTo:</label>
+        <input type="text" id="mail_replyto" name="mail_replyto" value="[% site.mail_replyto %]"><br>
+        <label for="site_display_name">Site Display Name:</label>
+        <input type="text" id="site_display_name" name="site_display_name" value="[% site.site_display_name %]"><br>
+        <label for="document_root_url">Document Root URL:</label>
+        <input type="text" id="document_root_url" name="document_root_url" value="[% site.document_root_url %]"><br>
+        <label for="link_target">Link Target:</label>
+        <input type="text" id="link_target" name="link_target" value="[% site.link_target %]"><br>
+        <label for="http_header_params">HTTP Header Params:</label><br>
+        <input type="text" id="http_header_params" name="http_header_params" value="[% site.http_header_params %]"><br>
+        <label for="image_root_url">Image Root URL:</label>
+        <input type="text" id="image_root_url" name="image_root_url" value="[% site.image_root_url %]"><br>
+        <label for="global_datafiles_directory">Global Datafiles Directory:</label>
+        <input type="text" id="global_datafiles_directory" name="global_datafiles_directory" value="[% site.global_datafiles_directory %]"><br>
+        <label for="templates_cache_directory">Templates Cache Directory:</label>
+        <input type="text" id="templates_cache_directory" name="templates_cache_directory" value="[% site.templates_cache_directory %]"><br>
+        <label for="app_datafiles_directory">App Datafiles Directory:</label>
+        <input type="text" id="app_datafiles_directory" name="app_datafiles_directory" value="[% site.app_datafiles_directory %]"><br>
+        <label for="datasource_type">Datasource Type:</label>
+        <input type="text" id="datasource_type" name="datasource_type" value="[% site.datasource_type %]"><br>
+        <label for="cal_table">Cal Table:</label>
+        <input type="text" id="cal_table" name="cal_table" value="[% site.cal_table %]"><br>
+        <label for="http_header_description">HTTP Header Description:</label>
+        <input type="text" id="http_header_description" name="http_header_description" value="[% site.http_header_description %]"><br>
+        <label for="http_header_keywords">HTTP Header Keywords:</label>
+        <input type="text" id="http_header_keywords" name="http_header_keywords" value="[% site.http_header_keywords %]"><br>
+        <input type="submit" value="Modify">
+    </form>
+    <form method="POST" action="/site/delete?id=[% site.id %]">
+        <input type="submit" value="Delete">
+    </form>
+</div></div>

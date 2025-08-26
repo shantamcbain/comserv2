@@ -1,0 +1,55 @@
+[% META title = 'Chat Support' %]
+
+<div class="container">
+    <h1>Chat Support</h1>
+    
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h2>Chat Support System</h2>
+                </div>
+                <div class="card-body">
+                    <p>
+                        Our chat support system allows users to get help in real-time. 
+                        The chat widget appears on all pages of the site, allowing users to ask questions
+                        and get assistance from our support team.
+                    </p>
+                    
+                    <h3>Features</h3>
+                    <ul>
+                        <li>Real-time messaging</li>
+                        <li>Persistent chat history</li>
+                        <li>Admin interface for support staff</li>
+                        <li>Notification system for new messages</li>
+                    </ul>
+                    
+                    [% IF c.check_user_roles('admin') %]
+                    <div class="mt-4">
+                        <a href="[% c.uri_for('/chat/admin') %]" class="btn btn-primary">
+                            Go to Chat Admin Interface
+                        </a>
+                    </div>
+                    [% END %]
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Support Hours</h3>
+                </div>
+                <div class="card-body">
+                    <p>Our support team is available during the following hours:</p>
+                    <ul>
+                        <li>Monday - Friday: 9am - 5pm</li>
+                        <li>Saturday: 10am - 2pm</li>
+                        <li>Sunday: Closed</li>
+                    </ul>
+                    <p>Messages sent outside of these hours will be answered on the next business day.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

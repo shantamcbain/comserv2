@@ -1,0 +1,8 @@
+[% PageVersion = 'Navigation/TopDropListCoop.tt,v 0.03 2025/04/01 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<!-- Start /Navigation/TopDropListCoop.tt -->
+<!-- MCOOP menu has been removed and merged into the Admin menu -->
+<!-- End /Navigation/TopDropListCoop.tt -->

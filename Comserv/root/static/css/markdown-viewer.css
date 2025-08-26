@@ -1,0 +1,256 @@
+/* Markdown Viewer Specific Styles */
+
+.markdown-viewer {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: Arial, sans-serif;
+    background: #f8f9fa;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.markdown-header {
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.markdown-header h1 {
+    color: #0056b3;
+    margin: 0 0 15px 0;
+}
+
+.markdown-content {
+    background: #fff;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.markdown-content h1 {
+    color: #0056b3;
+    margin-top: 0;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.markdown-content h2 {
+    color: #0056b3;
+    margin-top: 30px;
+    margin-bottom: 15px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #e9ecef;
+    cursor: pointer;
+    position: relative;
+}
+
+.markdown-content h2 .toggle-icon {
+    position: absolute;
+    right: 10px;
+    transition: transform 0.3s;
+}
+
+.markdown-content h2 .toggle-icon.open {
+    transform: rotate(180deg);
+}
+
+.markdown-content h3 {
+    color: #0056b3;
+    margin-top: 20px;
+    margin-bottom: 10px;
+}
+
+.markdown-content h4 {
+    color: #0056b3;
+    margin-top: 15px;
+    margin-bottom: 10px;
+}
+
+.markdown-content p {
+    margin-bottom: 15px;
+    line-height: 1.6;
+    color: #333;
+}
+
+.markdown-content ul, .markdown-content ol {
+    margin-bottom: 15px;
+    padding-left: 25px;
+}
+
+.markdown-content li {
+    margin-bottom: 5px;
+    line-height: 1.6;
+}
+
+.markdown-content code {
+    background: #f1f3f5;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 0.9em;
+    color: #e83e8c;
+}
+
+.markdown-content pre {
+    background: #f1f3f5;
+    padding: 15px;
+    border-radius: 5px;
+    overflow-x: auto;
+    margin-bottom: 15px;
+    position: relative;
+}
+
+.markdown-content pre code {
+    background: none;
+    padding: 0;
+    color: #333;
+    display: block;
+}
+
+.markdown-content a {
+    color: #0056b3;
+    text-decoration: none;
+}
+
+.markdown-content a:hover {
+    text-decoration: underline;
+}
+
+.markdown-content blockquote {
+    border-left: 4px solid #0056b3;
+    padding-left: 15px;
+    margin-left: 0;
+    color: #555;
+    font-style: italic;
+}
+
+.markdown-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 15px;
+}
+
+.markdown-content table th, .markdown-content table td {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    text-align: left;
+}
+
+.markdown-content table th {
+    background: #f1f3f5;
+    font-weight: bold;
+}
+
+.markdown-content table tr:nth-child(even) {
+    background: #f8f9fa;
+}
+
+.section-content {
+    display: block !important;
+    max-height: none !important;
+    overflow: visible !important;
+}
+
+.markdown-footer {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #e9ecef;
+}
+
+.navigation {
+    display: flex;
+    justify-content: space-between;
+}
+
+.nav-button {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 15px;
+    background: #0056b3;
+    color: white;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: bold;
+    transition: background 0.2s;
+}
+
+.nav-button:hover {
+    background: #004494;
+    text-decoration: none;
+}
+
+.nav-button svg {
+    margin-right: 8px;
+}
+
+.action-link {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 10px;
+    background: #f1f3f5;
+    color: #0056b3;
+    border-radius: 4px;
+    text-decoration: none;
+    font-size: 0.9em;
+    margin-right: 10px;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.action-link:hover {
+    background: #e9ecef;
+}
+
+.action-link svg {
+    margin-right: 5px;
+}
+
+.document-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 15px;
+    font-size: 0.9em;
+}
+
+.last-updated {
+    color: #666;
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+    .markdown-viewer {
+        padding: 15px;
+    }
+    
+    .markdown-content {
+        padding: 15px;
+    }
+    
+    .document-info {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .actions {
+        margin-top: 10px;
+    }
+    
+    .navigation {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .nav-button {
+        width: 100%;
+        justify-content: center;
+    }
+}

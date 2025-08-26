@@ -1,0 +1,20 @@
+[% PageVersion = 'Bmaster/hive.tt,v 0.01 2023/08/30 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+[% END %]
+[% PageVersion %]
+<h1>Hive Information</h1>
+
+<p>Our hives are carefully managed to ensure the health and productivity of our bees. Here's an overview of our hive management practices:</p>
+
+<h2>Brood Changes Over the Season</h2>
+<!-- Add a graph showing brood changes over the season here -->
+
+<h2>Hive Inspections</h2>
+<p>We regularly inspect our hives to monitor the health of the bees and the queen, check for pests and diseases, and assess the need for additional space or resources.</p>
+
+<h2>Hive Management Practices</h2>
+<p>We use a variety of hive management practices to ensure the health and productivity of our bees, including regular inspections, swarm prevention, and winter preparation.</p>
+
+<!-- Add more hive information as needed -->
+
+<p>For more information on our hive management practices, please contact us.</p>

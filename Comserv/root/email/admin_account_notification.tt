@@ -1,0 +1,13 @@
+<h2>New Account Created</h2>
+
+<p>A new user account has been created in the [% site_name || 'Comserv' %] system with the following details:</p>
+
+<ul>
+    <li><strong>Username:</strong> [% username %]</li>
+    <li><strong>Name:</strong> [% first_name %] [% last_name %]</li>
+    <li><strong>Email:</strong> [% email %]</li>
+    <li><strong>Role(s):</strong> [% roles %]</li>
+    <li><strong>Created at:</strong> [% created_at %]</li>
+</ul>
+
+<p>This is an automated notification. No action is required.</p>

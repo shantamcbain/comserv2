@@ -1,0 +1,49 @@
+<style>
+    .field-name {
+        /* Add your CSS properties here */
+    }
+    .field-input {
+        /* Add your CSS properties here */
+    }
+    .field-description {
+        /* Add your CSS properties here */
+    }
+</style>
+[% IF c.stash.error_messages.size %]
+    <ul class="error-messages">
+        [% FOREACH error_msg IN c.stash.error_messages %]
+            <li>[% error_msg %]</li>
+        [% END %]
+    </ul>
+[% END %]
+<form method="POST" action="[% c.uri_for(c.controller.action_for('add_yard')) %]">
+    <label for="yard_code" class="field-name"><b>Yard Code:</b></label>
+
+   <input type="text" id="yard_code" name="yard_code" value="[% c.stash.yard_code %]" class="field-input" required>
+    <p class="field-description">This is the unique identifier for the yard.</p>
+
+    <label for="yard_name" class="field-name"><b>Yard Name:</b></label>
+    <input type="text" id="yard_name" name="yard_name" value="[% c.stash.yard_name %]" class="field-input" required>
+    <p class="field-description">This is the name of the yard.</p>
+
+ <input type="text" id="sitename" name="sitename" value="[% c.session.SiteName %]" class="field-input" readonly>
+    <p class="field-description">The owner of the yard. Should be filled for you.</p>
+
+    <label for="total_yard_size" class="field-name"><b>Total Yard Size:</b></label>
+    <input type="number" id="total_yard_size" name="total_yard_size" value="[% c.stash.total_yard_size %]" class="field-input" required>
+    <p class="field-description">This is the total size of the yard in hives it can support.</p>
+
+    <label for="date_established" class="field-name"><b>Date Established:</b></label>
+    <input type="date" id="date_established" name="date_established" value="[% c.stash.date_established %]" class="field-input" required>
+    <p class="field-description">This is the date when the yard was established.</p>
+
+    <label for="notes" class="field-name"><b>Notes:</b></label>
+  <textarea id="notes" name="notes" class="field-input">[% c.stash.notes %]</textarea>
+    <p class="field-description">Any additional notes or comments about the yard.</p>
+
+    <label for="image" class="field-name"><b>Image:</b></label>
+    <input type="file" id="image" value="yard_image" name="image" class="field-input">
+    <p class="field-description">An image of the yard.</p>
+
+    <input type="submit" value="Submit">
+</form>

@@ -1,0 +1,135 @@
+[% META title = 'VM Creation Started' %]
+
+<div class="container">
+    <div class="success-panel">
+        <h1>Virtual Machine Creation Started</h1>
+        
+        <div class="success-message">
+            [% success_msg %]
+        </div>
+        
+        <div class="vm-details">
+            <h2>VM Details</h2>
+            <table>
+                <tr>
+                    <th>VM ID:</th>
+                    <td>[% vm_id %]</td>
+                </tr>
+                <tr>
+                    <th>Task ID:</th>
+                    <td>[% task_id %]</td>
+                </tr>
+            </table>
+        </div>
+        
+        <div class="next-steps">
+            <h2>Next Steps</h2>
+            <p>Your virtual machine is being created. This process may take several minutes to complete.</p>
+            <p>You can:</p>
+            <ul>
+                <li><a href="[% c.uri_for('/proxmox/vm_status', vm_id) %]">Check VM Status</a></li>
+                <li><a href="[% c.uri_for('/proxmox') %]">Return to Proxmox Dashboard</a></li>
+                <li><a href="[% c.uri_for('/proxmox/create') %]">Create Another VM</a></li>
+            </ul>
+        </div>
+        
+        [% IF debug_msg && debug_msg.size %]
+        <div class="debug-info">
+            <h3>Debug Information</h3>
+            <pre>[% FOREACH msg IN debug_msg %][% msg %]
+[% END %]</pre>
+        </div>
+        [% END %]
+    </div>
+</div>
+
+<style>
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: Arial, sans-serif;
+}
+
+.success-panel {
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 30px;
+}
+
+h1 {
+    color: #333;
+    margin-bottom: 30px;
+    text-align: center;
+}
+
+h2 {
+    color: #555;
+    margin-top: 30px;
+    margin-bottom: 15px;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 10px;
+}
+
+.success-message {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 4px;
+    font-weight: bold;
+    text-align: center;
+}
+
+.vm-details table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+}
+
+.vm-details th, .vm-details td {
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.vm-details th {
+    width: 30%;
+    font-weight: bold;
+}
+
+.next-steps ul {
+    margin-top: 15px;
+    padding-left: 20px;
+}
+
+.next-steps li {
+    margin-bottom: 10px;
+}
+
+.next-steps a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+.next-steps a:hover {
+    text-decoration: underline;
+}
+
+.debug-info {
+    background-color: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 15px;
+    margin-top: 30px;
+    overflow-x: auto;
+}
+
+.debug-info pre {
+    margin: 0;
+    white-space: pre-wrap;
+    font-family: monospace;
+}
+</style>

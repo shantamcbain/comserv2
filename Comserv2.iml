@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="PYTHON_MODULE" version="4">
+  <component name="NewModuleRootManager" inherit-compiler-output="true">
+    <exclude-output />
+    <perl5>
+      <path value="file://$MODULE_DIR$/Comserv/root/todo" type="ttk2-templates" />
+      <path value="file://$MODULE_DIR$/Comserv/root" type="ttk2-templates" />
+      <path value="file://$MODULE_DIR$/Comserv/root/BMaster" type="ttk2-templates" />
+      <path value="file://$MODULE_DIR$/Comserv/root/CSC" type="ttk2-templates" />
+      <path value="file://$MODULE_DIR$/Comserv/root/dev" type="ttk2-templates" />
+      <path value="file://$MODULE_DIR$/Comserv/root/Documentation" type="ttk2-templates" />
+      <path value="file://$MODULE_DIR$/Comserv/root/Forager" type="ttk2-templates" />
+      <path value="file://$MODULE_DIR$/Comserv/root/log" type="ttk2-templates" />
+      <path value="file://$MODULE_DIR$/Comserv/root/Monashee" type="ttk2-templates" />
+      <path value="file://$MODULE_DIR$/Comserv/root/Navigation" type="ttk2-templates" />
+      <path value="file://$MODULE_DIR$/Comserv/root/setup" type="ttk2-templates" />
+      <path value="file://$MODULE_DIR$/Comserv/root/Shanta" type="ttk2-templates" />
+      <path value="file://$MODULE_DIR$/Comserv/root/SunFire" type="ttk2-templates" />
+      <path value="file://$MODULE_DIR$/Comserv/root/USBM" type="ttk2-templates" />
+      <path value="file://$MODULE_DIR$/Comserv/root/user" type="ttk2-templates" />
+      <path value="file://$MODULE_DIR$/Comserv/root/WorkShops" type="ttk2-templates" />
+      <path value="file://$MODULE_DIR$/Comserv/lib" type="perl-library" />
+    </perl5>
+    <content url="file://$MODULE_DIR$">
+      <excludeFolder url="file://$MODULE_DIR$/venv" />
+    </content>
+    <orderEntry type="jdk" jdkName="Python 3.11 (venv) (2)" jdkType="Python SDK" />
+    <orderEntry type="sourceFolder" forTests="false" />
+  </component>
+  <component name="SonarLintModuleSettings">
+    <option name="uniqueId" value="2edd6c9f-36fa-4fbc-86f3-a33cc7cecccb" />
+  </component>
+</module>

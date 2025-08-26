@@ -1,0 +1,132 @@
+[% META title = 'Test AJAX' %]
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4>AJAX Test Page</h4>
+                </div>
+                <div class="card-body">
+                    <p>This page tests if jQuery and AJAX are working correctly.</p>
+                    
+                    <div class="mb-3">
+                        <button id="test-jquery" class="btn btn-primary">Test jQuery</button>
+                        <button id="test-ajax" class="btn btn-success">Test AJAX</button>
+                        <button id="test-vanilla" class="btn btn-warning">Test Vanilla JS</button>
+                    </div>
+                    
+                    <div id="result" class="alert alert-info">
+                        Results will appear here...
+                    </div>
+                    
+                    <div id="debug" class="mt-3 p-3 bg-light">
+                        <h5>Debug Information:</h5>
+                        <div id="debug-output"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Debug function to check if jQuery is loaded
+function checkJQuery() {
+    if (typeof jQuery !== 'undefined') {
+        return "jQuery is loaded (version: " + jQuery.fn.jquery + ")";
+    } else {
+        return "jQuery is NOT loaded!";
+    }
+}
+
+// Debug function to log to console and debug output
+function debugLog(message) {
+    console.log(message);
+    $('#debug-output').append("<div>" + message + "</div>");
+}
+
+// When the document is ready
+document.addEventListener('DOMContentLoaded', function() {
+    // Log jQuery status on page load
+    var jQueryStatus = checkJQuery();
+    console.log(jQueryStatus);
+    document.getElementById('debug-output').innerHTML = "<div>" + jQueryStatus + "</div>";
+    
+    // Test jQuery button (using vanilla JS as fallback)
+    var testJQueryBtn = document.getElementById('test-jquery');
+    if (testJQueryBtn) {
+        testJQueryBtn.addEventListener('click', function() {
+            console.log("jQuery button clicked");
+            if (typeof jQuery !== 'undefined') {
+                $('#result').html("jQuery is working! This text was set using jQuery.");
+                $('#result').removeClass('alert-info').addClass('alert-success');
+            } else {
+                document.getElementById('result').innerHTML = "jQuery is NOT working! This text was set using vanilla JavaScript.";
+                document.getElementById('result').classList.remove('alert-info');
+                document.getElementById('result').classList.add('alert-danger');
+            }
+        });
+    }
+    
+    // Test AJAX button (using jQuery)
+    var testAjaxBtn = document.getElementById('test-ajax');
+    if (testAjaxBtn) {
+        testAjaxBtn.addEventListener('click', function() {
+            console.log("AJAX button clicked");
+            if (typeof jQuery !== 'undefined') {
+                $('#result').html("Sending AJAX request...");
+                
+                $.ajax({
+                    url: '[% c.uri_for("/proxy_manager/test_ajax") %]',
+                    method: 'GET',
+                    dataType: 'json',
+                    success: function(data) {
+                        $('#result').html("AJAX request successful! Response: " + JSON.stringify(data));
+                        $('#result').removeClass('alert-info').addClass('alert-success');
+                    },
+                    error: function(xhr, status, error) {
+                        $('#result').html("AJAX request failed! Error: " + error);
+                        $('#result').removeClass('alert-info').addClass('alert-danger');
+                        debugLog("AJAX Error: " + status + " - " + error);
+                        debugLog("Response: " + xhr.responseText);
+                    }
+                });
+            } else {
+                document.getElementById('result').innerHTML = "Cannot test AJAX because jQuery is not loaded!";
+                document.getElementById('result').classList.remove('alert-info');
+                document.getElementById('result').classList.add('alert-danger');
+            }
+        });
+    }
+    
+    // Test Vanilla JS button (using XMLHttpRequest)
+    var testVanillaBtn = document.getElementById('test-vanilla');
+    if (testVanillaBtn) {
+        testVanillaBtn.addEventListener('click', function() {
+            console.log("Vanilla JS button clicked");
+            document.getElementById('result').innerHTML = "Sending vanilla JS XMLHttpRequest...";
+            
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', '[% c.uri_for("/proxy_manager/test_ajax") %]', true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        var data = JSON.parse(xhr.responseText);
+                        document.getElementById('result').innerHTML = "Vanilla JS request successful! Response: " + JSON.stringify(data);
+                        document.getElementById('result').classList.remove('alert-info');
+                        document.getElementById('result').classList.add('alert-success');
+                    } else {
+                        document.getElementById('result').innerHTML = "Vanilla JS request failed! Status: " + xhr.status;
+                        document.getElementById('result').classList.remove('alert-info');
+                        document.getElementById('result').classList.add('alert-danger');
+                        debugLog("XHR Error: Status " + xhr.status);
+                        debugLog("Response: " + xhr.responseText);
+                    }
+                }
+            };
+            xhr.send();
+        });
+    }
+});
+</script>

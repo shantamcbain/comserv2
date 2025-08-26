@@ -1,0 +1,48 @@
+[% PageVersion	= 'CSC/HelpDeskContents.tt,v 0.01 2024/01/27shanta Exp shanta '	%]
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+<br>  [%	PageVersion %] <br>
+   [% "Debugging HostName: " _ HostName %]
+	[%# INCLUDE 'debug.tt' %]
+[% END %]
+<!--This code in helpdeskContents.ttml-->
+
+
+	<H3>Having trouble? We Can Help!</H3>
+
+
+<ol>
+ <li><h3>Site user</h3>
+  <p>Site owner's will find resources to help you keep your site up and running.</p>   <p><A HREF ="[% data.script_name %]?session_id=[% session_id %]&amp;submit_logon=on&amp;site=[%SiteName%]" TARGET ="[% data.link_target %]"  title=" Click here to  log in"> Logon</A> </p></li>
+ <li>Site software problems  Search  <a href="/faq" >Application FAQ,s </a> for your
+ <li>Content of the [% SCRIPT_DISPLAY_NAME %] site.
+ </li>
+ <li><h3></h3></li>
+
+
+</ol>
+
+<h3>Didn't find it!</h3>
+
+Still don't find it! Submit a ticket at <a href="http://computersystemconsulting.ca/whmcs/supporttickets.php?action=open">Click Here</a>. login and fill in a support ticket and we will get on your problem. To fill in a service request you must log in. You may use your [% SCRIPT_DISPLAY_NAME %][% SiteName %] username and Password. If you don't have one click register and create one. You will then be able to use this username and Password to log into both [% SCRIPT_DISPLAY_NAME %][% SiteName %] and our support ticket system.
+
+
+
+
+
+          [% INCLUDE  'CSC/LiveEditAdmin.tt' %]
+
+ [% PROCESS 'CSC/HelpDeskHomePagesql.tt' %]
+
+      [% body %]
+
+
+
+
+
+<!--End of code in helpdeskContents.ttml-->
+[% body %]
+[% embed( 'LiveEditAdmin')%]
+
+<!--End of code in helpdeskContents.ttml-->
+

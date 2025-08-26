@@ -1,0 +1,59 @@
+Edit Project
+
+<form method="POST" action="/project/update_project">
+    <input type="hidden" id="project_id" name="project_id" value="[% project.id %]">
+   [% INCLUDE "todo/site_list.tt" %]<br>
+    <button type="button" onclick="openAddSiteForm()">Add Site</button><br>
+
+    <label for="name">Project Name:</label><br>
+    <input type="text" id="name" name="name" value="[% project.name %]" required><br>
+
+    <label for="parent_id">Parent Project:</label>
+
+    [% INCLUDE "todo/project_list.tt" projects=projects selected_project_id=project.parent_id %]<br>
+    <label for="description">Description:</label><br>
+    <textarea id="description" name="description" required>[% project.description %]</textarea><br>
+
+    <label for="start_date">Start Date:</label><br>
+    <input type="date" id="start_date" name="start_date" value="[% project.start_date %]" required><br>
+
+    <label for="end_date">End Date:</label><br>
+    <input type="date" id="end_date" name="end_date" value="[% project.end_date %]" required><br>
+
+    <label for="status">Status:</label><br>
+    <select id="status" name="status" required>
+        <option value="Requested" [% IF project.status == 'Requested' %]selected[% END %]>Requested</option>
+        <option value="Public" [% IF project.status == 'Public' %]selected[% END %]>Public</option>
+        <option value="In-Process" [% IF project.status == 'In-Process' %]selected[% END %]>In-Process</option>
+        <option value="Testing" [% IF project.status == 'Testing' %]selected[% END %]>Testing</option>
+        <!-- Fixed typo in variable name -->
+        <option value="Delivered" [% IF project.status == 'Delivered' %]selected[% END %]>Delivered</option>
+    </select><br>
+
+    <label for="project_code">Project Code:</label><br>
+    <input type="text" id="project_code" name="project_code" value="[% project.project_code %]" required><br>
+
+    <label for="project_size">Project Size:</label><br>
+    <input type="number" id="project_size" name="project_size" value="[% project.project_size %]" required><br>
+
+    <label for="estimated_man_hours">Estimated Man Hours:</label><br>
+    <input type="number" id="estimated_man_hours" name="estimated_man_hours" value="[% project.estimated_man_hours %]" required><br>
+
+    <label for="developer_name">Developer Name:</label><br>
+    <input type="text" id="developer_name" name="developer_name" value="[% project.developer_name %]" required><br>
+
+    <label for="client_name">Client Name:</label><br>
+    <input type="text" id="client_name" name="client_name" value="[% project.client_name %]" required><br>
+
+    <label for="comments">Comments:</label><br>
+    <textarea id="comments" name="comments" required>[% project.comments %]</textarea><br>
+
+    <input type="submit" value="Update Project [% project.name %]">
+</form>
+<script>
+function openAddSiteForm() {
+    var url = window.location.origin + '/site/add_site_form';
+    console.log("Opening URL: " + url);
+    window.open(url, '_blank');
+}
+</script>

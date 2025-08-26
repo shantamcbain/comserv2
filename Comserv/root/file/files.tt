@@ -1,0 +1,27 @@
+[% PageVersion = 'files/files.tt,v 0.01 2024/04/16 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+[%	PageVersion %]
+[% END %]
+
+
+<h1>Our Files</h1>
+[% FOREACH file IN files %]
+    <p>
+        ID: [% file.id %]<br>
+        Workshop ID: [% file.workshop_id %]<br>
+        File Name: [% file.file_name %]<br>
+        File Type: [% file.file_type %]<br>
+        Site ID: [% file.site_id %]<br>
+        Reference ID: [% file.reference_id %]<br>
+        Category ID: [% file.category_id %]<br>
+        Share ID: [% file.share_id %]<br>
+        Description: [% file.description %]<br>
+        Upload Date: [% file.upload_date %]<br>
+        File Size: [% file.file_size %]<br>
+        File Path: <a href="[% file.file_url %]" target="_blank">[% file.file_path %]</a><br>
+        File URL: [% file.file_url %]<br>
+        File Status: [% file.file_status %]<br>
+        File Format: [% file.file_format %]<br>
+        User ID: [% file.user_id %]<br>
+    </p>
+[% END %]

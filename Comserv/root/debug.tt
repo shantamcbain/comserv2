@@ -1,0 +1,68 @@
+[% META title = 'Projects Documentation' %]
+[% PageVersion = 'Documentation/Projects.tt,v 0.01 2024/05/28 Shanta Exp shanta ' %]Debug Information
+
+
+Debug Errors
+
+[% IF c.stash.debug_errors && c.stash.debug_errors.size > 0 %]
+    <h2>Debug Errors</h2>
+    <ul>
+        <!-- Iterate over each error and display it in a list item -->
+        [% FOREACH error IN c.stash.debug_errors %]
+            <li>[% error | html %]</li>
+        [% END %]
+    </ul>
+[% ELSE %]
+    <p>No debug errors.</p>
+[% END %]
+
+[% IF c.stash.debug_msg && c.stash.debug_msg.size > 0 %]
+    <h2>Debug Messages</h2>
+    <ul>
+        <!-- Iterate over each debug message and display it in a list item -->
+        [% FOREACH msg IN c.stash.debug_msg %]
+            <li>[% msg | html %]</li>
+        [% END %]
+    </ul>
+[% ELSE %]
+    <p>No debug messages.</p>
+[% END %]
+[% IF debug_info %]
+<div style="background-color: #f8f9fa; padding: 15px; margin-bottom: 20px; border: 1px solid #ddd;">
+    <h3>Debug Information</h3>
+    <p><strong>User Exists:</strong> [% debug_info.user_exists %]</p>
+    <p><strong>Session ID:</strong> [% debug_info.session_id %]</p>
+    <p><strong>Roles:</strong> [% IF debug_info.roles %][% debug_info.roles.join(', ') %][% ELSE %]None[% END %]</p>
+    <h4>Session Data:</h4>
+    <pre>[% USE Dumper; Dumper.dump(debug_info.session_data) %]</pre>
+</div>
+[% END %]
+<h2>Stash Information</h2>
+<ul>
+    <!-- Iterate over each key in the stash and display its value -->
+    [% FOREACH key IN c.stash.keys.sort %]
+        <li>
+            <strong>[% key %]:</strong>
+            [% IF ref(c.stash.$key) == 'ARRAY' %]
+                [% Dumper(c.stash.$key) | html %]
+            [% ELSE %]
+                [% c.stash.$key | html %]
+            [% END %]
+        </li>
+    [% END %]
+</ul>
+
+<h2>Session Information</h2>
+<ul>
+    <!-- Iterate over each key in the session and display its value -->
+    [% FOREACH key IN c.session.keys.sort %]
+        <li>
+            <strong>[% key %]:</strong>
+            [% IF ref(c.session.$key) == 'ARRAY' %]
+                [% Dumper(c.session.$key) | html %]
+            [% ELSE %]
+                [% c.session.$key | html %]
+            [% END %]
+        </li>
+    [% END %]
+</ul>

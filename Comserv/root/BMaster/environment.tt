@@ -1,0 +1,17 @@
+[% PageVersion = 'Bmaster/environment.tt,v 0.01 2023/08/30 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+[% END %]
+[% PageVersion %]
+<h1>Environment</h1>
+
+<p>Bees play a crucial role in our environment, and the environment in turn plays a crucial role in the health and productivity of our bees. Here's an overview of the environmental factors that affect our bees:</p>
+
+<h2>Climate</h2>
+<p>The climate in our area provides ideal conditions for beekeeping, with warm summers for nectar flow and mild winters for overwintering.</p>
+
+<h2>Agricultural Practices</h2>
+<p>We work closely with local farmers to ensure that their agricultural practices are bee-friendly, including minimizing the use of pesticides and providing diverse floral resources.</p>
+
+<!-- Add more environment information as needed -->
+
+<p>For more information on how the environment affects our bees, please contact us.</p>

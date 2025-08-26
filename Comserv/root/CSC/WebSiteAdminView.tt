@@ -1,0 +1,58 @@
+[% PageVersion	= 'WebSiteAdminView.tt,v 0.01 2023/08/30 shanta Exp shanta '	%]
+[% IF debug == 1 %]
+ [%	PageVersion %]
+[% END %]
+<A NAME="PageTop"></A>
+<br>
+<br>
+<h4>Website Administration</h4>
+<p>
+
+WebSite administration is an on going project.</p>
+
+<p>This phosphiy has lead us to formulate a diffrent plan to web managment.</p>
+<ul>
+<li><b>Basic site adminstration:</b> This is the daily stuff that never seems to go away
+   <br></li>
+   <ul>
+   <li><b>Domain administration:</b> /li>
+   <li><b>Mail Amin:</b></li>
+   <li><b>Advanced site Administration:</b> T</li>
+   <li><b>:</b> </li>
+   <li><b>:</b> </li>
+   </ul>
+<li><b>Site Development:</b> </li>
+    <li><b></b>: ,
+     </li>
+    <li><b>FAQ:</b> This is were you provide answers to common questions regarding the organisation, site use, etc. Only site admin may create/modify records</li>
+    <li><b>Recipe:</b> Database</li>
+
+   <li><b>HelpDesk:</b> This link is for reporting problems that occur with the application or missing information a user may what.</li>
+</ul>
+<li><b>Admin Links:</b> This group of links will only appear if the user is in the Admin group.</li>
+    <ul>
+    <li><b>News Manager:</b> This is were admin will add news items The the application is currently set to return 1 record, the last entry, to the current public home page.</li>
+    <li><b>Project tracker:</b> This is were you keep track of all the projects that are in progress in the organisation. This can be both site related and organisation related.</li>
+    <li><b>ToDo list:</b> This module records and tracks individual tasks that need to be done in any project. This module looks up the projects that you have going and give you a list that you can assign the ToDo to. On the right of each entire is link to the Log table. use this link to add a log entry. This brands the log entry with to ToDo so that time spent on a project can be accumulated back to the project by task.</li>
+    <li><b>Log:</b> This is were one keeps track of what one is doing. New entries should be created from ToDo to maintain a link through to projects. This is for record keeping.</li>
+    <li><b>Page Manager:</b> Some pages on the site may be edited with this module. The advantage is untrained staff my change page content controlled by this tool. There are shortcoming as no programming logic may be applied at this time. All link must be off site as the session file may not be added to any link.</li>
+    <li><b>FAQ Manager:</b> This tool is were FAQ are created and modified by site admin.</li>
+    <li><b>Customer service Request:</b> This is your link to site problems. Here you tell us about areas that don't work. Features that you would liked changed. Etc.</li>
+    <li><b>Droplist:</b> Many of the modules have droplist that contain items that may be added by this tool. For example. The URL module has droplist that define the placement of the link. Two of importance are Category and subject. The items that appear in these list are actually records in this tool. If the placement that admin feels is needed to properly define the grouping of the link it may be added here. All admin have access to this.</li>
+    </ul>
+<li><b>HelpDesk:</b> This link is to our HelpDesk system. Here is were everyone will go to find answers they need. The resource contains application FAQ, Site FAQ, Customer service request forms, etc. This is subscription service that is included with our hosting services. Both site and application. Off site access is also available.</li>
+</ul>
+
+
+
+<p>Last Update 
+<br>
+
+
+<br>
+
+
+
+
+
+

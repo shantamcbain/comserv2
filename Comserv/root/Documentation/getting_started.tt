@@ -1,0 +1,106 @@
+[% META title = 'Getting Started' %]
+[% PageVersion = 'Documentation/getting_started.tt,v 1.0 2024/05/30 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="documentation-page">
+    <h1>Getting Started</h1>
+    
+    <div class="section">
+        <h2>Introduction</h2>
+        <p>
+            Welcome to the Comserv system! This guide will help you get started with using the platform.
+            The system provides various features and tools to help you manage your content and services efficiently.
+        </p>
+    </div>
+    
+    <div class="section">
+        <h2>System Requirements</h2>
+        <ul>
+            <li>Modern web browser (Chrome, Firefox, Safari, Edge)</li>
+            <li>Internet connection</li>
+            <li>User account with appropriate permissions</li>
+        </ul>
+    </div>
+    
+    <div class="section">
+        <h2>First Steps</h2>
+        <ol>
+            <li>Log in to your account using your credentials</li>
+            <li>Explore the dashboard to get familiar with the interface</li>
+            <li>Check your profile settings and update if necessary</li>
+            <li>Review available documentation for specific features</li>
+        </ol>
+    </div>
+    
+    <div class="section">
+        <h2>Common Tasks</h2>
+        <ul>
+            <li>Creating and managing content</li>
+            <li>Setting up user permissions</li>
+            <li>Configuring system settings</li>
+            <li>Generating reports</li>
+        </ul>
+    </div>
+    
+    <div class="section">
+        <h2>Need Help?</h2>
+        <p>
+            If you encounter any issues or have questions, please refer to the other documentation pages
+            or contact the system administrator for assistance.
+        </p>
+    </div>
+</div>
+
+<style>
+    .documentation-page {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+    }
+    
+    .section {
+        margin-bottom: 30px;
+    }
+    
+    h1 {
+        color: #333;
+        border-bottom: 2px solid #eee;
+        padding-bottom: 10px;
+    }
+    
+    h2 {
+        color: #0066cc;
+        margin-top: 20px;
+    }
+    
+    ul, ol {
+        padding-left: 25px;
+    }
+    
+    li {
+        margin-bottom: 8px;
+    }
+</style>
+
+<div class="page-version">
+    [% IF template.variables.PageVersion %]
+        Page Version: [% template.variables.PageVersion %]
+    [% ELSIF page_version %]
+        Page Version: [% page_version %]
+    [% END %]
+</div>
+
+<style>
+    .page-version {
+        margin-top: 50px;
+        padding-top: 10px;
+        border-top: 1px solid #eee;
+        font-size: 12px;
+        color: #999;
+        text-align: center;
+    }
+</style>

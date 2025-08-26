@@ -1,0 +1,46 @@
+
+
+
+<ul>
+ <li><h3>Hosting Services</h3></li>
+   <ul>
+     <li><a href="http://www.computersystemconsulting.ca/whmcs/cart.php?gid=1" target="_blank" name="Domain Hosting.">Domain</a>
+         The start of your web presents     
+     You have email services, ftp, MySQL databases
+     </li>
+     <li><a href="http://www.computersystemconsulting.ca/whmcs/cart.php?gid=1"  target="_blank">Site Hosting</a>.
+     Your site will be hosted on a domain that is appropriate to your site theme. For example if your are an sustainable farmer then your site would be on forager.com. Your base URL will be http://forager.com/yoursitename and http://yoursitename.forager.com. 
+     </li>
+   </ul>  
+ <li><h3>New Reseller accounts</h3></li>
+   <ul>
+     <li>Our <a href="http://www.computersystemconsulting.ca/whmcs/cart.php?pid=2" target="_new">Reseller</a> accounts give you your own web hosting business!!  Host multiple hosting clients and your own resellers if you want.
+     </li>
+   </ul>  
+   
+ <li><h3>HelpDesk Solutions</h3></li>
+   <ul>
+     <li>Out <a href="http://www.computersystemconsulting.ca/whmcs/cart.php?a=add&pid=6" target="_new">HelpDesk systems and services</a> will support you in the administration of your web presence. We have a choice of many free and paid options to serve your needs. 
+     </li>
+   </ul>  
+<li><h3>WebStore and eCommerce.</h3> 
+We have chosen CityShop as The base of our eCommerce. CityShop stores all data in either Flat file or MySQL. Both work well but larger stores should use MySQL.</li>
+     <ul>
+      <li><a href="http://cgi.computersystemconsulting.ca/cgi-bin/store/store.cgi?&shop=csc&L=eng&P=CityShopHosting"  target="_blank">CityShop Store Hosting</a> Your store hosted on our server.All our hosted stores use MySQL.
+      </li>
+      <li><a href="http://cgi.computersystemconsulting.ca/cgi-bin/store/store.cgi?&shop=csc&L=eng&P=CityShopAdmin"  target="_blank">Administration Services.</a>  </li>
+      <li><a href="http://cgi.computersystemconsulting.ca/cgi-bin/store/store.cgi?&shop=csc&L=eng&P=CityShopInstalation"  target="_blank">CityShop installation</a>  </li>
+ <!-- <li>          <h3 >Got a CityShop Webstore use our CityShop Admin</h3>
+	  
+          This page requires Login In.<br>
+      
+
+   	</li>
+ -->     </ul>
+<li><h3>Web Applications and HelpDesk Systems</h3>
+		<ol>
+			<li><a href="http://cgi.computersystemconsulting.ca/cgi-bin/store/store.cgi?&shop=csc&L=eng&P=CSCInstalation"  target="_blank">Install</a> Our application on your server. What needs to be done.</li>
+			<li><a href="http://cgi.computersystemconsulting.ca/cgi-bin/store/store.cgi?&shop=csc&L=eng&P=CSCSetup"  target="_blank">Setup.pm </a>our application on your server. This is were we change the base application to look and do what you want. The further you go from the base application the more time it will take to do.</li>
+			<li><a href="http://cgi.computersystemconsulting.ca/cgi-bin/store/store.cgi?&shop=csc&L=eng&P=CSCSetup"  target="_blank">Setup.pm </a>our application on our server. Same as setting up on your server you just don't have to pay for installation. This applies to our hosting the application on one of our existing domains.</li>
+		</ol>
+</ul>

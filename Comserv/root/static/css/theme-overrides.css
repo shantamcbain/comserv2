@@ -1,0 +1,57 @@
+/* Theme overrides to ensure proper application of theme styles */
+
+/* General theme overrides that apply to all themes */
+body[class*="theme-"] {
+  /* Allow each theme to control its own background */
+}
+
+/* Link styles (excluding menu links) */
+body[class*="theme-"] a:not(.dropbtn):not(.dropdown-content a):not(.submenu a) {
+  color: var(--link-color) !important;
+}
+
+body[class*="theme-"] a:not(.dropbtn):not(.dropdown-content a):not(.submenu a):hover {
+  color: var(--link-hover-color) !important;
+}
+
+/* Button styles */
+body[class*="theme-"] button,
+body[class*="theme-"] .button,
+body[class*="theme-"] input[type="submit"],
+body[class*="theme-"] input[type="button"] {
+  background-color: var(--button-bg) !important;
+  color: var(--button-text) !important;
+  border: 1px solid var(--button-border) !important;
+}
+
+body[class*="theme-"] button:hover,
+body[class*="theme-"] .button:hover,
+body[class*="theme-"] input[type="submit"]:hover,
+body[class*="theme-"] input[type="button"]:hover {
+  background-color: var(--button-hover-bg) !important;
+}
+
+/* Menu styles */
+body[class*="theme-"] nav {
+  background-color: var(--nav-bg) !important;
+}
+
+body[class*="theme-"] .dropbtn {
+  color: var(--nav-text) !important;
+}
+
+body[class*="theme-"] .dropdown-content {
+  background-color: var(--dropdown-bg, var(--secondary-color)) !important;
+}
+
+body[class*="theme-"] .dropdown-content a {
+  color: var(--nav-link-color) !important;
+}
+
+body[class*="theme-"] .submenu {
+  background-color: var(--dropdown-bg, var(--secondary-color)) !important;
+}
+
+body[class*="theme-"] .submenu a {
+  color: var(--nav-link-color) !important;
+}

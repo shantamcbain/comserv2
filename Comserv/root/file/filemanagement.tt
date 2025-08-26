@@ -1,0 +1,21 @@
+[% PageVersion = 'files.filemanagement.tt,v 0.02 2024/03/01 shanta Exp shanta ' %]
+<meta charset="utf-8">
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+</head>
+<form action="/file" method="get">
+    <input type="hidden" name="dir_path" value="[% current_directory | uri %]">
+    <input type="checkbox" name="show_hidden" value="1" [% 'checked' IF show_hidden %]> Show hidden files and directories
+    <input type="submit" value="Update">
+</form>
+<h2>Current Directory: [% current_directory %]</h2>
+
+<ul id="directoryList">
+    [% FOREACH directory IN directories %]
+        <li><a href="/file?dir_path=[% (current_directory _ '/' _ directory) | uri %]">[% directory %]</a></li>
+    [% END %]
+    [% FOREACH file IN files %]
+        <li>[% file.name %] - [% file.type %] - [% file.size %] - [% file.date %] - [% file.description %]</li>
+    [% END %]
+</ul>

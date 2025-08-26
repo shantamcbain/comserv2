@@ -1,0 +1,38 @@
+
+
+
+
+
+
+
+
+ <tr>
+  <td Class='LeftSideBarNavLinkStyle'>
+           <A HREF="/cgi-bin/CSC/csc.cgi?" TARGET = "_blank" ><font   class="LeftSideBarNavStyle"> CSC Home</A> </font></a><br>
+    </td>
+    </tr>
+ <tr>  
+   <td>&nbsp;</td>
+ </tr>
+ <tr>  
+
+   <td Class='LeftSideBarNavLinkStyle'>
+           <A HREF="Http://forager.com/cgi-bin/store/store.cgi?shop=csc"  TARGET = "" ><font   class="LeftSideBarNavStyle"> Products</A> </font></a><br>
+    </td>
+    </tr>
+  <tr>  
+   <td>&nbsp;</td>
+ </tr>
+  <tr>  
+
+   <td Class='LeftSideBarNavLinkStyle'>
+           <A HREF="/cgi-bin/CSC/news.cgi?"  TARGET = ""><font   class="LeftSideBarNavStyle">Whats New</A> </font></a><br>
+    </td>
+    </tr>
+<tr>  
+   <td>&nbsp;</td>
+ </tr>
+
+
+
+

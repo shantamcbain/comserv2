@@ -1,0 +1,498 @@
+[% PageVersion = 'ENCY/HerbView.tt,v 0.01 2025/01/19 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% IF mode == 'view' %]
+    <h1>[% herb.botanical_name %]</h1>
+[% ELSE %]
+    <h1>[% mode == 'edit' ? 'Editing Herb: ' : 'Add New Herb' %] [% herb.botanical_name %]</h1>
+[% END %]
+
+[% IF c.req.param('message') %]
+    <p class="error">[% c.req.param('message') | html %]</p>
+[% END %]
+[% IF mode == 'view' %]
+    <div>
+        <a href="[% c.uri_for('/ENCY/BotanicalNameView') %]">Back to Botanical Name View</a>
+        [% IF c.session.roles == 'admin' %]
+            <a href="[% c.uri_for('/ENCY/edit_herb', { id => herb.record_id }) %]">Edit Herb</a>
+        [% END %]
+    </div>
+[% END %]
+Record ID:[% herb.record_id %]
+[% IF mode != 'view' %]
+    <form action="[% c.uri_for('/ENCY/edit_herb') %]" method="post">
+        [% IF mode == 'edit' %]
+            <input type="hidden" name="record_id" value="[% herb.record_id %]" />
+        [% END %]
+        <input type="submit" value="[% mode == 'add' ? 'Add Herb' : 'Update Herb' %]" />
+    </form>
+[% END %]
+
+<table>
+    <tr>
+        <th colspan="2"><h2>Naming</h2></th>
+    </tr>
+    <tr>
+        <td>Botanical Name:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.botanical_name %]
+            [% ELSE %]
+                <input type="text" id="botanical_name" name="botanical_name" value="[% herb.botanical_name %]" size="50" required />
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td>Common Names:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.common_names %]
+            [% ELSE %]
+                <input type="text" id="common_names" name="common_names" value="[% herb.common_names %]" size="50" />
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td>Key Name:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.key_name %]
+            [% ELSE %]
+                <input type="text" id="key_name" name="key_name" value="[% herb.key_name %]" size="50" />
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td>Parts Used:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.parts_used %]
+            [% ELSE %]
+                <input type="text" id="parts_used" name="parts_used" value="[% herb.parts_used %]" size="50" />
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td>Sister Plants:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.sister_plants %]
+            [% ELSE %]
+                <input type="text" id="sister_plants" name="sister_plants" value="[% herb.sister_plants %]" size="50" required />
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td>Comments:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.comments %]
+            [% ELSE %]
+                <textarea id="comments" name="comments" rows="4" cols="50">[% herb.comments %]</textarea>
+            [% END %]
+        </td>
+    </tr>
+
+    <tr>
+        <th colspan="2"><h2>Characteristics</h2></th>
+    </tr>
+    <tr>
+        <td>Identifying Character:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.ident_character %]
+            [% ELSE %]
+                <input type="text" id="ident_character" name="ident_character" value="[% herb.ident_character %]" size="50" />
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td>Stem:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.stem %]
+            [% ELSE %]
+                <input type="text" id="stem" name="stem" value="[% herb.stem %]" size="50" />
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td>Leaves:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.leaves %]
+            [% ELSE %]
+                <input type="text" id="leaves" name="leaves" value="[% herb.leaves %]" size="50" />
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td>Flowers:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.flowers %]
+            [% ELSE %]
+                <input type="text" id="flowers" name="flowers" value="[% herb.flowers %]" size="50" />
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td>Fruit:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.fruit %]
+            [% ELSE %]
+                <input type="text" id="fruit" name="fruit" value="[% herb.fruit %]" size="50" />
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td>Taste:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.taste %]
+            [% ELSE %]
+                <input type="text" id="taste" name="taste" value="[% herb.taste %]" size="50" />
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td>Odour:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.odour %]
+            [% ELSE %]
+                <input type="text" id="odour" name="odour" value="[% herb.odour %]" size="50" />
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td>Root:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.root %]
+            [% ELSE %]
+                <input type="text" id="root" name="root" value="[% herb.root %]" size="50" />
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td>Image URL:</td>
+        <td>
+            [% IF mode == 'view' %]
+                <img src="[% herb.image %]" width="300" height="325" />
+            [% ELSE %]
+                <input type="url" id="image" name="image" value="[% herb.image %]" size="50" />
+            [% END %]
+        </td>
+    </tr>
+
+    <tr>
+        <th colspan="2"><h2>Distribution</h2></th>
+    </tr>
+    <tr>
+        <td>Distribution:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.distribution %]
+            [% ELSE %]
+                <input type="text" id="distribution" name="distribution" value="[% herb.distribution %]" size="50" />
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td>Cultivation:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.cultivation %]
+            [% ELSE %]
+                <input type="text" id="cultivation" name="cultivation" value="[% herb.cultivation %]" size="50" />
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td>Harvest:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.harvest %]
+            [% ELSE %]
+                <input type="text" id="harvest" name="harvest" value="[% herb.harvest %]" size="50" />
+            [% END %]
+        </td>
+    </tr>
+
+    <tr>
+        <th colspan="2"><h2>Medical</h2></th>
+    </tr>
+    <tr>
+        <td>Therapeutic Action:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.therapeutic_action %]
+            [% ELSE %]
+                <textarea id="therapeutic_action" name="therapeutic_action" rows="4" cols="50">[% herb.therapeutic_action %]</textarea>
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td>Medical Uses:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.medical_uses %]
+            [% ELSE %]
+                <textarea id="medical_uses" name="medical_uses" rows="4" cols="50">[% herb.medical_uses %]</textarea>
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td>Constituents:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.constituents %]
+            [% ELSE %]
+                <textarea id="constituents" name="constituents" rows="4" cols="50">[% herb.constituents %]</textarea>
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td>Solvents:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.solvents %]
+            [% ELSE %]
+                <input type="text" id="solvents" name="solvents" value="[% herb.solvents %]" size="50" />
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td>Dosage:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.dosage %]
+            [% ELSE %]
+                <input type="text" id="dosage" name="dosage" value="[% herb.dosage %]" size="50" />
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td>Administration:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.administration %]
+            [% ELSE %]
+                <input type="text" id="administration" name="administration" value="[% herb.administration %]" size="50" />
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td>Formulas:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.formulas %]
+            [% ELSE %]
+                <textarea id="formulas" name="formulas" rows="4" cols="50">[% herb.formulas %]</textarea>
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td>Contra Indications:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.contra_indications %]
+            [% ELSE %]
+                <textarea id="contra_indications" name="contra_indications" rows="4" cols="50">[% herb.contra_indications %]</textarea>
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td>Preparation:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.preparation %]
+            [% ELSE %]
+                <textarea id="preparation" name="preparation" rows="4" cols="50" required>[% herb.preparation %]</textarea>
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td>Chinese:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.chinese %]
+            [% ELSE %]
+                <input type="text" id="chinese" name="chinese" value="[% herb.chinese %]" size="50" />
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td>Veterinary:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.vetrinary %]
+            [% ELSE %]
+                <input type="text" id="vetrinary" name="vetrinary" value="[% herb.vetrinary %]" size="50" />
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td>Homeopathic:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.homiopathic %]
+            [% ELSE %]
+                <input type="text" id="homiopathic" name="homiopathic" value="[% herb.homiopathic %]" size="50" />
+            [% END %]
+        </td>
+    </tr>
+
+    <tr>
+        <th colspan="2"><h2>Pollination and Pollinators</h2></th>
+    </tr>
+ <tr>
+    <td>Apis:</td>
+    <td>
+        [% IF mode == 'view' %]
+            [% herb.apis == 1 ? 'Yes' : 'No' %]
+        [% ELSE %]
+            <select id="apis" name="apis">
+                <option value="0" [% IF herb.apis == 0 %]selected[% END %]>No</option>
+                <option value="1" [% IF herb.apis == 1 %]selected[% END %]>Yes</option>
+            </select>
+        [% END %]
+    </td>
+</tr>
+
+    <tr>
+        <td>Pollinator:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.pollinator %]
+            [% ELSE %]
+                <input type="text" id="pollinator" name="pollinator" value="[% herb.pollinator %]" size="50" />
+            [% END %]
+        </td>
+    </tr>
+<tr>
+    <td>Pollen:</td>
+    <td>
+        [% IF mode == 'view' %]
+            [% herb.pollen == 1 ? 'Yes' : 'No' %]
+        [% ELSE %]
+            <select i
+d="pollen" name="pollen">
+                <option value="0" [% IF herb.pollen == 0 %]selected[% END %]>No</option>
+                <option value="1" [% IF herb.pollen == 1 %]selected[% END %]>Yes</option>
+            </select>
+        [% END %]
+    </td>
+</tr>
+    <tr>
+        <td>Pollen Notes:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.pollennotes %]
+            [% ELSE %]
+                <textarea id="pollennotes" name="pollennotes" rows="4" cols="50">[% herb.pollennotes %]</textarea>
+            [% END %]
+        </td>
+    </tr>
+<tr>
+    <td>Nectar:</td>
+    <td>
+        [% IF mode == 'view' %]
+            [% herb.nectar == 1 ? 'Yes' : 'No' %]
+        [% ELSE %]
+            <select id="nectar" name="nectar">
+                <option value="0" [% IF herb.nectar == 0 %]selected[% END %]>No</option>
+                <option value="1" [% IF herb.nectar == 1 %]selected[% END %]>Yes</option>
+            </select>
+        [% END %]
+    </td>
+</tr>
+
+    <tr>
+        <td>Nectar Notes:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.nectarnotes %]
+            [% ELSE %]
+                <textarea id="nectarnotes" name="nectarnotes" rows="4" cols="50">[% herb.nectarnotes %]</textarea>
+            [% END %]
+        </td>
+    </tr>
+
+    <tr>
+        <th colspan="2"><h2>Other</h2></th>
+    </tr>
+    <tr>
+        <td>Non-Medical Uses:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.non_med %]
+            [% ELSE %]
+                <textarea id="non_med" name="non_med" rows="4" cols="50">[% herb.non_med %]</textarea>
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td>Culinary Uses:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.culinary %]
+            [% ELSE %]
+                <input type="text" id="culinary" name="culinary" value="[% herb.culinary %]" size="50" required />
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td>History:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.history %]
+            [% ELSE %]
+                <textarea id="history" name="history" rows="4" cols="50">[% herb.history %]</textarea>
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td>Reference:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.reference %]
+            [% ELSE %]
+                <textarea id="reference" name="reference" rows="4" cols="50">[% herb.reference %]</textarea>
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td>URL:</td>
+        <td>
+            [% IF mode == 'view' %]
+                <a href="[% herb.url %]">[% herb.url %]</a>
+            [% ELSE %]
+                <input type="url" id="url" name="url" value="[% herb.url %]" size="50" required />
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td>Share:</td>
+        <td>
+            [% IF mode == 'view' %]
+                [% herb.share == 0 ? 'Public' : 'Private' %]
+            [% ELSE %]
+                <select id="share" name="share">
+                    <option value="0" [% IF herb.share == 0 %]selected[% END %]>Public</option>
+                    <option value="1" [% IF herb.share == 1 %]selected[% END %]>Private</option>
+                </select>
+            [% END %]
+        </td>
+    </tr>
+</table>
+
+[% IF mode != 'view' %]
+        <input type="submit" value="[% mode == 'add' ? 'Add Herb' : 'Update Herb' %]" />
+
+</form>
+[% END %]

@@ -1,0 +1,291 @@
+[% META 
+   title = "Page Migration Tool Guide"
+   description = "Guide for migrating pages from Forager schema to Ency schema using the admin migration tool"
+   roles = "admin"
+   category = "admin"
+%]
+
+<div class="doc-page">
+    <h1>Page Migration Tool Guide</h1>
+    
+    <div class="doc-section">
+        <h2>Overview</h2>
+        <p>
+            The Page Migration Tool allows administrators to migrate pages from the Forager schema to the Ency schema (pages_content table). 
+            This tool provides a safe, controlled way to move page data between different database schemas.
+        </p>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Access</h2>
+        <ul>
+            <li><strong>URL:</strong> <code>/admin/migrate_pages</code></li>
+            <li><strong>Requirements:</strong> Admin role required</li>
+            <li><strong>Location:</strong> Admin Dashboard → Database Management → Migrate Pages (Forager → Ency)</li>
+        </ul>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Features</h2>
+        
+        <h3>1. Preview Migration</h3>
+        <ul>
+            <li>Shows all pages available for migration from the Forager schema</li>
+            <li>Identifies potential issues before migration</li>
+            <li>Displays field mapping information</li>
+            <li>Allows selective migration of pages</li>
+        </ul>
+        
+        <h3>2. Issue Detection</h3>
+        <p>The tool automatically detects:</p>
+        <ul>
+            <li>Duplicate page codes (pages that already exist in the destination)</li>
+            <li>Missing required fields (sitename, menu, page_code)</li>
+            <li>Data validation issues</li>
+        </ul>
+        
+        <h3>3. Selective Migration</h3>
+        <ul>
+            <li>Choose which pages to migrate using checkboxes</li>
+            <li>Select all functionality for bulk operations</li>
+            <li>Pages with issues are automatically disabled from selection</li>
+        </ul>
+        
+        <h3>4. Migration Results</h3>
+        <ul>
+            <li>Detailed log of migration process</li>
+            <li>Count of migrated, skipped, and error pages</li>
+            <li>Error details for troubleshooting</li>
+        </ul>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Field Mapping</h2>
+        <p>The tool maps fields from Forager schema to Ency schema as follows:</p>
+        
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Forager Field</th>
+                    <th>Ency Field</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>record_id</td><td>id</td><td>New auto-increment ID assigned</td></tr>
+                <tr><td>sitename</td><td>sitename</td><td>Direct mapping</td></tr>
+                <tr><td>menu</td><td>menu</td><td>Direct mapping</td></tr>
+                <tr><td>page_code</td><td>page_code</td><td>Direct mapping (must be unique)</td></tr>
+                <tr><td>app_title</td><td>title</td><td>Falls back to page_code if empty</td></tr>
+                <tr><td>body</td><td>body</td><td>Direct mapping</td></tr>
+                <tr><td>description</td><td>description</td><td>Direct mapping</td></tr>
+                <tr><td>keywords</td><td>keywords</td><td>Direct mapping</td></tr>
+                <tr><td>link_order</td><td>link_order</td><td>Direct mapping, defaults to 0</td></tr>
+                <tr><td>status</td><td>status</td><td>Direct mapping, defaults to 'active'</td></tr>
+                <tr><td>username_of_poster</td><td>created_by</td><td>Falls back to last_mod_by or 'migrated'</td></tr>
+                <tr><td>last_mod_date</td><td>created_at, updated_at</td><td>Used for both timestamps</td></tr>
+                <tr><td>-</td><td>roles</td><td>Defaults to 'public'</td></tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Usage Instructions</h2>
+        
+        <h3>Step 1: Access the Tool</h3>
+        <ol>
+            <li>Log in as an administrator</li>
+            <li>Go to Admin Dashboard</li>
+            <li>Click "Migrate Pages (Forager → Ency)" under Database Management</li>
+        </ol>
+        
+        <h3>Step 2: Preview Migration</h3>
+        <ol>
+            <li>Click "Preview Migration" button</li>
+            <li>Review the list of pages to be migrated</li>
+            <li>Check for any issues highlighted in red/yellow</li>
+            <li>Note the total count and issues count</li>
+        </ol>
+        
+        <h3>Step 3: Select Pages</h3>
+        <ol>
+            <li>Use checkboxes to select pages for migration</li>
+            <li>Use "Select All" to choose all available pages</li>
+            <li>Pages with issues cannot be selected (they appear disabled)</li>
+        </ol>
+        
+        <h3>Step 4: Perform Migration</h3>
+        <ol>
+            <li>Click "Migrate Selected Pages" button</li>
+            <li>Confirm the migration when prompted</li>
+            <li>Review the migration results</li>
+        </ol>
+        
+        <h3>Step 5: Verify Results</h3>
+        <ol>
+            <li>Check the migration log for details</li>
+            <li>Verify migrated pages in the Ency schema</li>
+            <li>Address any errors if they occurred</li>
+        </ol>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Safety Features</h2>
+        <ul>
+            <li><strong>Preview Mode:</strong> Always preview before migrating</li>
+            <li><strong>Duplicate Detection:</strong> Prevents overwriting existing pages</li>
+            <li><strong>Issue Identification:</strong> Highlights problems before migration</li>
+            <li><strong>Selective Migration:</strong> Choose exactly which pages to migrate</li>
+            <li><strong>Detailed Logging:</strong> Complete audit trail of migration process</li>
+            <li><strong>Error Handling:</strong> Graceful handling of migration errors</li>
+        </ul>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Troubleshooting</h2>
+        
+        <h3>Common Issues</h3>
+        
+        <h4>1. "Page code already exists"</h4>
+        <ul>
+            <li>The destination already has a page with this page_code</li>
+            <li>Either skip this page or manually resolve the conflict</li>
+        </ul>
+        
+        <h4>2. "Missing required field"</h4>
+        <ul>
+            <li>Source page is missing sitename, menu, or page_code</li>
+            <li>Update the source data before migration</li>
+        </ul>
+        
+        <h4>3. Database connection errors</h4>
+        <ul>
+            <li>Check that both Forager and Ency databases are accessible</li>
+            <li>Verify database configuration</li>
+        </ul>
+        
+        <h3>Error Recovery</h3>
+        <ul>
+            <li>Migration is performed page by page</li>
+            <li>If one page fails, others continue to process</li>
+            <li>Failed pages are logged with specific error messages</li>
+            <li>Re-run migration to retry failed pages after fixing issues</li>
+        </ul>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Best Practices</h2>
+        <ol>
+            <li><strong>Always Preview First:</strong> Use the preview feature to understand what will be migrated</li>
+            <li><strong>Start Small:</strong> Test with a few pages before bulk migration</li>
+            <li><strong>Backup Data:</strong> Ensure you have backups before migration</li>
+            <li><strong>Resolve Issues:</strong> Fix any identified issues before migration</li>
+            <li><strong>Verify Results:</strong> Check migrated data in the destination schema</li>
+            <li><strong>Document Changes:</strong> Keep records of what was migrated and when</li>
+        </ol>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Technical Details</h2>
+        
+        <h3>Database Models Used</h3>
+        <ul>
+            <li><strong>Source:</strong> <code>DBForager</code> model, <code>Page</code> resultset</li>
+            <li><strong>Destination:</strong> <code>DBEncy</code> model, <code>Page</code> resultset</li>
+        </ul>
+        
+        <h3>Controller Methods</h3>
+        <ul>
+            <li><code>migrate_pages</code>: Main migration interface</li>
+            <li><code>_preview_page_migration</code>: Preview functionality</li>
+            <li><code>_perform_page_migration</code>: Actual migration process</li>
+            <li><code>_map_forager_to_ency_page</code>: Field mapping logic</li>
+        </ul>
+        
+        <h3>Templates</h3>
+        <ul>
+            <li><code>admin/migrate_pages.tt</code>: Migration interface template</li>
+        </ul>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Support</h2>
+        <p>For issues or questions about the Page Migration Tool:</p>
+        <ol>
+            <li>Check the application logs for detailed error messages</li>
+            <li>Review this documentation</li>
+            <li>Contact the system administrator</li>
+            <li>Check the Catalyst application debug output if available</li>
+        </ol>
+    </div>
+    
+    <div class="doc-footer">
+        <p><em>Last updated: January 2025</em></p>
+        <p><em>Version: 1.0</em></p>
+    </div>
+</div>
+
+<style>
+.doc-page {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.doc-section {
+    margin-bottom: 30px;
+}
+
+.doc-section h2 {
+    color: #2c3e50;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 10px;
+}
+
+.doc-section h3 {
+    color: #34495e;
+    margin-top: 25px;
+}
+
+.doc-section h4 {
+    color: #7f8c8d;
+    margin-top: 20px;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 15px 0;
+}
+
+.table th,
+.table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+}
+
+.table th {
+    background-color: #f2f2f2;
+    font-weight: bold;
+}
+
+.table-striped tbody tr:nth-child(odd) {
+    background-color: #f9f9f9;
+}
+
+code {
+    background-color: #f4f4f4;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-family: monospace;
+}
+
+.doc-footer {
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid #ddd;
+    color: #7f8c8d;
+    font-style: italic;
+}
+</style>

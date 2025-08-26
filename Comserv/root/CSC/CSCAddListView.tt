@@ -1,0 +1,58 @@
+
+
+
+
+
+
+
+
+
+
+
+<style type="text/css">
+<!--
+
+.combobox {
+background-color: #FFFFFF;
+color: #808080;
+font-size: 10pt;
+font-family: arial;
+font-weight: bold;
+}
+
+-->
+</style>
+
+
+
+
+
+
+<form>
+
+<select class="combobox" name="SiteMap" onchange="if(options[selectedIndex].value){location = options[selectedIndex].value}" size="1">
+<option selected>Add Forms  </option>
+<option value="url_cat.cgi?display_add_form=on&">Category</option>
+<option value="client.cgi?display_add_form=on&">Client</option>
+<option value="/cgi-bin/CSC/droplist.cgi?display_add_form=on&">DropList category</option>
+<option value="/cgi-bin/CSC/csc_kb.cgi?display_add_form=on&">KB</option>
+<option value="/log.cgi?display_add_form=on&">Log</option>
+<option value="/cgi-bin/News/news_manager.cgi?display_add_form=on&">News</option>
+<option value="/CSC/site_news_manager.cgi?display_add_form=on&">Site News</option>
+<option value="/Projects/project_tracker.cgi?&display_add_form=on">Project</option>
+<option value="http://computersystemconsulting.ca/cgi-bin/CSC/csc_url_sub.cgi?display_add_form=on&">Subject</option>
+<option value="/cgi-bin/ToDo/todo.cgi?display_add_form=on&">ToDo</option>
+<option value="/cgi-bin/CSC/csc_url_admin.cgi?display_add_form=on&">URL</option>
+<option value="http://computersystemconsulting.ca/cgi-bin/Extropia/extropia_kb.cgi?display_add_form=on&">Extropia kb</option>
+<option value="http://computersystemconsulting.ca/cgi-bin/Extropia/extropia_methouds.cgi?display_add_form=on&">Extropia Methouds</option>
+</select>
+</form>
+
+
+
+
+
+     	 
+		  
+
+

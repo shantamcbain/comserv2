@@ -1,0 +1,174 @@
+{
+  "categories": {
+    "user_guides": {
+      "title": "User Guides",
+      "description": "Documentation for end users of the system",
+      "icon": "fas fa-users",
+      "roles": ["normal", "editor", "admin", "developer"],
+      "site_specific": false,
+      "display_order": 1
+    },
+    "admin_guides": {
+      "title": "Administrator Guides",
+      "description": "Documentation for system administrators",
+      "icon": "fas fa-shield-alt",
+      "roles": ["admin", "developer"],
+      "site_specific": false,
+      "display_order": 2
+    },
+    "developer_guides": {
+      "title": "Developer Documentation",
+      "description": "Documentation for developers",
+      "icon": "fas fa-code",
+      "roles": ["developer"],
+      "site_specific": false,
+      "display_order": 3
+    },
+    "tutorials": {
+      "title": "Tutorials",
+      "description": "Step-by-step guides for common tasks",
+      "icon": "fas fa-graduation-cap",
+      "roles": ["normal", "editor", "admin", "developer"],
+      "site_specific": false,
+      "display_order": 4
+    },
+    "site_specific": {
+      "title": "Site-Specific Documentation",
+      "description": "Documentation specific to this site",
+      "icon": "fas fa-building",
+      "roles": ["normal", "editor", "admin", "developer"],
+      "site_specific": true,
+      "display_order": 5
+    },
+    "modules": {
+      "title": "Module Documentation",
+      "description": "Documentation for specific system modules",
+      "icon": "fas fa-puzzle-piece",
+      "roles": ["admin", "developer"],
+      "site_specific": false,
+      "display_order": 6
+    }
+  },
+  "pages": [
+    {
+      "id": "user_guide",
+      "title": "User Guide",
+      "description": "Complete guide for using the system",
+      "path": "Documentation/roles/normal/user_guide.md",
+      "categories": ["user_guides"],
+      "roles": ["normal", "editor", "admin", "developer"],
+      "site": "all",
+      "format": "markdown"
+    },
+    {
+      "id": "getting_started",
+      "title": "Getting Started",
+      "description": "Quick start guide for new users",
+      "path": "Documentation/roles/normal/getting_started.md",
+      "categories": ["user_guides", "tutorials"],
+      "roles": ["normal", "editor", "admin", "developer"],
+      "site": "all",
+      "format": "markdown"
+    },
+    {
+      "id": "account_management",
+      "title": "Account Management",
+      "description": "How to manage your account settings",
+      "path": "Documentation/roles/normal/account_management.md",
+      "categories": ["user_guides"],
+      "roles": ["normal", "editor", "admin", "developer"],
+      "site": "all",
+      "format": "markdown"
+    },
+    {
+      "id": "admin_guide",
+      "title": "Administrator Guide",
+      "description": "Complete guide for system administrators",
+      "path": "Documentation/roles/admin/admin_guide.md",
+      "categories": ["admin_guides"],
+      "roles": ["admin", "developer"],
+      "site": "all",
+      "format": "markdown"
+    },
+    {
+      "id": "installation",
+      "title": "Installation Guide",
+      "description": "How to install and configure the system",
+      "path": "Documentation/roles/admin/installation.md",
+      "categories": ["admin_guides"],
+      "roles": ["admin", "developer"],
+      "site": "all",
+      "format": "markdown"
+    },
+    {
+      "id": "api_reference",
+      "title": "API Reference",
+      "description": "Complete API documentation for developers",
+      "path": "Documentation/roles/developer/api_reference.md",
+      "categories": ["developer_guides"],
+      "roles": ["developer"],
+      "site": "all",
+      "format": "markdown"
+    },
+    {
+      "id": "database_schema",
+      "title": "Database Schema",
+      "description": "Database structure and relationships",
+      "path": "Documentation/roles/developer/database_schema.tt",
+      "categories": ["developer_guides"],
+      "roles": ["developer"],
+      "site": "all",
+      "format": "template"
+    },
+    {
+      "id": "login_authentication",
+      "title": "Login and Authentication",
+      "description": "How to log in and manage authentication",
+      "path": "Documentation/tutorials/login_authentication.md",
+      "categories": ["tutorials"],
+      "roles": ["normal", "editor", "admin", "developer"],
+      "site": "all",
+      "format": "markdown"
+    },
+    {
+      "id": "mcoop_user_guide",
+      "title": "MCOOP User Guide",
+      "description": "User guide specific to MCOOP site",
+      "path": "Documentation/sites/mcoop/mcoop_user_guide.md",
+      "categories": ["user_guides", "site_specific"],
+      "roles": ["normal", "editor", "admin", "developer"],
+      "site": "MCOOP",
+      "format": "markdown"
+    },
+    {
+      "id": "mcoop_getting_started",
+      "title": "Getting Started with MCOOP",
+      "description": "Quick start guide for MCOOP users",
+      "path": "Documentation/tutorials/mcoop_getting_started.md",
+      "categories": ["tutorials", "site_specific"],
+      "roles": ["normal", "editor", "admin", "developer"],
+      "site": "MCOOP",
+      "format": "markdown"
+    },
+    {
+      "id": "documentation_system",
+      "title": "Documentation System",
+      "description": "How the documentation system works",
+      "path": "Documentation/documentation_system.md",
+      "categories": ["developer_guides", "modules"],
+      "roles": ["developer"],
+      "site": "all",
+      "format": "markdown"
+    },
+    {
+      "id": "user_module",
+      "title": "User Module",
+      "description": "Documentation for the User module",
+      "path": "Documentation/modules/user_module.tt",
+      "categories": ["modules"],
+      "roles": ["admin", "developer"],
+      "site": "all",
+      "format": "template"
+    }
+  ]
+}

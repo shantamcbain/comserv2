@@ -1,0 +1,28 @@
+
+
+
+
+
+
+
+
+<!-- CSCSideBarScript begin -->
+
+<SCRIPT type="text/JavaScript">
+
+<!-- This script and many more are available free online at -->
+<!-- The JavaScript Source!! http://javascript.internet.com -->
+
+<!-- Begin
+function formHandler(form) {
+var windowprops = "height=600,width=700,location=no,"
++ "scrollbars=yes,menubars=no,toolbars=no,resizable=yes";
+
+var URL = form.site.options[form.site.selectedIndex].value;
+popup = window.open(URL,"MenuPopup",windowprops);
+}
+// End -->
+</script>
+
+<!-- CSCSideBarScript end -->
+  

@@ -1,0 +1,39 @@
+[% PageVersion = 'pages/view.tt,v 1.0 2024/12/29 Page View Template' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="page-content">
+    <h1>[% page.title %]</h1>
+    
+    [% IF c.session.roles.match('admin') %]
+    <div class="admin-controls">
+        <a href="/pages/edit/[% page.page_code %]" class="btn btn-primary">Edit Page</a>
+    </div>
+    [% END %]
+    
+    <div class="page-body">
+        [% page.body %]
+    </div>
+    
+    [% IF page.description %]
+    <meta name="description" content="[% page.description %]">
+    [% END %]
+    
+    [% IF page.keywords %]
+    <meta name="keywords" content="[% page.keywords %]">
+    [% END %]
+    
+    [% IF c.session.debug_mode == 1 %]
+    <div class="debug-info">
+        <h4>Debug Info:</h4>
+        <p>Page Code: [% page.page_code %]</p>
+        <p>Site: [% page.sitename %]</p>
+        <p>Menu: [% page.menu %]</p>
+        <p>Roles: [% page.roles %]</p>
+        <p>Status: [% page.status %]</p>
+        <p>Created: [% page.created_at %]</p>
+        <p>Updated: [% page.updated_at %]</p>
+    </div>
+    [% END %]
+</div>

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<!-- File: /home/shanta/PycharmProjects/comserv/Comserv/root/layout.tt -->
+<html>[% PageVersion = 'layout.tt,v 0.01 2023/08/30 shanta Exp shanta ' %]
+[%# DBI is now provided by the application context, no need to include DefaultDBI.tt %]
+[% INCLUDE 'setup/DefaultVariables.tt' %]
+    <!DOCTYPE html>
+    <html>[% PageVersion	= 'layout.tt,v 0.02 2024/05/01 shanta Exp shanta '	%]
+    [% TRY %]
+        [% INCLUDE 'setup/DefaultDBI.tt' %]
+    [% CATCH %]
+        [% # Silently ignore errors with DefaultDBI.tt %]
+    [% END %]
+    [% TRY %]
+        [% INCLUDE 'setup/DefaultVariables.tt' %]
+    [% CATCH %]
+        [% # Silently ignore errors with DefaultVariables.tt %]
+    [% END %]
+
+[% IF c.session.debug_mode == 1 %]
+ [% PageVersion %]
+[% END %]
+    [% INCLUDE 'Header.tt' %]
+<body class="theme-[% theme_name || c.stash.theme_name || c.session.theme_name || 'default' %]">
+    [% INCLUDE 'pagetop.tt' %]
+[%# INCLUDE 'home.tt' %]
+    [% content %]
+    [% INCLUDE 'AdminNotes.tt' %]
+    [% TRY %]
+        [% INCLUDE 'footer.tt' %]
+    [% CATCH %]
+        <!-- Error including footer.tt: [% error.info %] -->
+        <footer>
+            <div class="footer-content">
+                <p>&copy; [% USE date; date.format(date.now, '%Y') %] Comserv. All rights reserved.</p>
+                [% IF c.session.debug_mode == 1 %]
+                    <p>[% PageVersion %]</p>
+                    <p><a href="/reset_session">Reset Session</a></p>
+                [% END %]
+            </div>
+        </footer>
+    [% END %]
+</body>
+</html>

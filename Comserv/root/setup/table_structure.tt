@@ -1,0 +1,30 @@
+<head>
+    [% PageVersion = 'Table_structure.tt,v 0.01 2023/12/01 shanta Exp shanta ' %]
+    <meta charset="utf-8">
+    [% IF debug_mode == 1 %]
+        [% PageVersion %]
+        [% INCLUDE 'debug.tt' %]
+    [% END %]
+</head>
+<h1>Structure of [% table %]</h1>
+
+<table>
+    <tr>
+        <th>Field</th>
+        <th>Type</th>
+        <th>Null</th>
+        <th>Key</th>
+        <th>Default</th>
+        <th>Extra</th>
+    </tr>
+    [% FOREACH field IN table_structure %]
+        <tr>
+            <td>[% field.Field %]</td>
+            <td>[% field.Type %]</td>
+            <td>[% field.Null %]</td>
+            <td>[% field.Key %]</td>
+            <td>[% field.Default %]</td>
+            <td>[% field.Extra %]</td>
+        </tr>
+    [% END %]
+</table>

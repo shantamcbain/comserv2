@@ -1,0 +1,12 @@
+[Cleanup] Remove unnecessary files from application root
+
+- Removed all "Formatting title from:" files that were incorrectly created
+- Removed all "Added ... to ... category" files that were incorrectly created
+- Cleaned up empty directory entries that were created without permission
+- No functional changes to the application code
+
+These files were created by an AI assistant without proper permission and
+were cluttering the application root directory. This cleanup improves the
+repository organization and makes it easier to navigate the codebase.
+
+This change is ready for deployment to the production server.

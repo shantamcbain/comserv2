@@ -1,0 +1,67 @@
+---
+# Ansible playbook for deploying NPM API configuration files
+# Usage: ansible-playbook -i inventory.yml npm_config_deploy.yml -e "environment=production"
+
+- name: Deploy NPM API configuration
+  hosts: catalyst_servers
+  become: yes
+  vars:
+    app_root: /opt/catalyst
+    config_dir: "{{ app_root }}/Comserv/config"
+    source_config_dir: /etc/catalyst
+    environment: "{{ environment | default('development') }}"
+    
+  tasks:
+    - name: Ensure config directory exists
+      file:
+        path: "{{ config_dir }}"
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: '0755'
+      
+    - name: Copy NPM configuration file
+      copy:
+        src: "{{ source_config_dir }}/npm-{{ environment }}.conf"
+        dest: "{{ config_dir }}/npm-{{ environment }}.conf"
+        owner: www-data
+        group: www-data
+        mode: '0600'
+      register: config_copy
+      
+    - name: Set CATALYST_ENV environment variable
+      lineinfile:
+        path: /etc/environment
+        regexp: '^CATALYST_ENV='
+        line: 'CATALYST_ENV={{ environment }}'
+        state: present
+      
+    - name: Restart Catalyst application
+      systemd:
+        name: catalyst
+        state: restarted
+      when: config_copy.changed
+      
+    - name: Verify NPM API configuration
+      shell: "grep -i 'NPM environment' {{ app_root }}/Comserv/logs/application.log | tail -1"
+      register: log_check
+      changed_when: false
+      
+    - name: Display verification result
+      debug:
+        msg: "{{ log_check.stdout }}"
+        
+    - name: Test NPM API connectivity
+      uri:
+        url: "{{ lookup('ini', 'endpoint section=NPM file=' + config_dir + '/npm-' + environment + '.conf') }}/nginx/proxy-hosts"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ lookup('ini', 'api_key section=NPM file=' + config_dir + '/npm-' + environment + '.conf') }}"
+        status_code: 200
+        validate_certs: no
+      register: api_test
+      ignore_errors: yes
+      
+    - name: Display API test result
+      debug:
+        msg: "NPM API connectivity test: {{ 'Success' if api_test.status == 200 else 'Failed - ' + api_test.msg }}"

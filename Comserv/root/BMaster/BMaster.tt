@@ -1,0 +1,57 @@
+[%# INCLUDE 'layout.tt' %]
+[% PageVersion	= 'Bmaster.tt,v 0.01 2023/08/30 shanta Exp shanta '	%]
+[% IF debug_mode == 1 %]
+ [%	PageVersion %]
+[% END %]
+<h1>BMaster Module</h1>
+<p>Welcome to the BMaster Module of our application!</p>
+<p>Explore the different sections:</p>
+<ul>
+    <li><a href="/BMaster/bee_pasture">Bee pasture. </a> Learn about plants that are used by pollinators for pasture.</li>
+    <li><a href="/BMaster/apiary">Apiary Management System </a> Help you run your beekeeping operations.</li>    <li><a href="/BMaster/Queens">Queen Rearing System</a>Learn to raise queens with our system.</li>
+    <li><a href="/BMaster/hive">Hive Management</a>Part of our Apriary system Track the life of your hives. Use the information to see what to do next</li>
+    <li><a href="/BMaster/honey">Honey Production</a></li>
+    <li><a href="/BMaster/beehealth">Bee Health</a></li>
+    <li><a href="/BMaster/environment">Environmental Considerations</a></li>
+    <li><a href="/BMaster/education">Education and Collaboration</a>Our online, In yard and workshop training system. Learn to keep your bees with us.</li>
+</ul>
+<p>Here are some key features and practices for each section:</p>
+<h2>Hive Management</h2>
+<p>
+    - Monitor hive health and behavior regularly.<br>
+    - Ensure proper ventilation and temperature regulation in the hive.<br>
+    - Check for signs of disease, pests, or parasites and take appropriate action.<br>
+    - Maintain a clean and organized hive to prevent the buildup of debris and mold.<br>
+    - Provide adequate food sources, such as nectar and pollen, especially during periods of nectar scarcity.<br>
+    - Regularly inspect and maintain hive components, including frames, supers, and covers.<br>
+    - Practice swarm prevention techniques to manage hive population and prevent colony loss.<br>
+    - Implement Integrated Pest Management (IPM) strategies to control pests and diseases while minimizing chemical use.<br>
+</p>
+<h2>Honey Production</h2>
+<p>
+    - Harvest honey when the frames are capped and the moisture content is below a certain threshold (usually around 18%).<br>
+    - Extract honey using a centrifuge or other appropriate extraction method.<br>
+    - Filter honey to remove impurities, such as wax and bee parts.<br>
+    - Store honey in clean and airtight containers to maintain its quality.<br>
+    - Label and package honey with relevant information, including the source, floral origin, and any special characteristics.<br>
+</p>
+<h2>Bee Health</h2>
+<p>
+    - Provide a diverse range of flowering plants to ensure a balanced diet for the bees.<br>
+    - Minimize exposure to pesticides by selecting bee-friendly plants and avoiding chemical treatments near the hives.<br>
+    - Monitor for signs of diseases and parasites, such as Varroa mites, and take prompt action if detected.<br>
+    - Follow best practices for disease prevention, such as regular hive inspections, proper hygiene, and the use of disease-resistant bee stocks.<br>
+    - Stay informed about local and regional BMaster regulations and guidelines.<br>
+</p>
+<h2>Environmental Considerations</h2>
+<p>
+    - Consider the impact of BMaster activities on the surrounding environment.<br>
+    - Place hives in suitable locations that provide access to forage and minimize potential conflicts with humans or animals.<br>
+    - Avoid BMaster in areas with high pesticide use or contamination.<br>
+    - Educate and engage with the local community about the importance of bees and the benefits of sustainable BMaster practices.<br>
+    - Promote and support habitat conservation initiatives to provide a healthy ecosystem for bees and other pollinators.<br>
+</p>
+<h2>Education and Collaboration</h2>
+<p>
+    - Stay updated on the latest research, best practices, and innovations in BMaster.<br>
+    - Attend BMaster conferences, workshops, and training programs to enhance knowledge and skills.<br>

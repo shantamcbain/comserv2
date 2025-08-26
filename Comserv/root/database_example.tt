@@ -1,0 +1,100 @@
+[% META title = 'Database Access Example' %]
+
+<div class="container">
+    <h1>Database Access Example</h1>
+    
+    <div class="card mb-4">
+        <div class="card-header">
+            <h2>Using the Database Helper</h2>
+        </div>
+        <div class="card-body">
+            <p>This page demonstrates how to access databases using the new database helper.</p>
+            
+            <h3>Available Databases</h3>
+            [% TRY %]
+                [% SET databases = db_helper.list_databases(c) %]
+                <ul>
+                    [% FOREACH db IN databases %]
+                        <li>[% db %]</li>
+                    [% END %]
+                </ul>
+            [% CATCH %]
+                <div class="alert alert-danger">
+                    <p>Error listing databases: [% error.info %]</p>
+                </div>
+            [% END %]
+
+            <h3>Tables in ENCY Database</h3>
+            [% TRY %]
+                [% SET tables = db_helper.list_tables(c, 'ency') %]
+                [% IF tables && tables.size > 0 %]
+                    <ul>
+                        [% FOREACH table IN tables %]
+                            <li>[% table %]</li>
+                        [% END %]
+                    </ul>
+                [% ELSE %]
+                    <p>No tables found or database connection failed.</p>
+                [% END %]
+            [% CATCH %]
+                <div class="alert alert-danger">
+                    <p>Error listing tables: [% error.info %]</p>
+                </div>
+            [% END %]
+            
+            <h3>Sample Query</h3>
+            [% SET query = "SELECT * FROM site LIMIT 5" %]
+            [% TRY %]
+                [% SET results = db_helper.execute_query(c, 'ency', query, []) %]
+
+                [% IF results && results.size > 0 %]
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                [% FOREACH key IN results.0.keys.sort %]
+                                    <th>[% key %]</th>
+                                [% END %]
+                            </tr>
+                        </thead>
+                        <tbody>
+                            [% FOREACH row IN results %]
+                                <tr>
+                                    [% FOREACH key IN row.keys.sort %]
+                                        <td>[% row.$key %]</td>
+                                    [% END %]
+                                </tr>
+                            [% END %]
+                        </tbody>
+                    </table>
+                [% ELSE %]
+                    <p>No results found or query returned empty result set.</p>
+                [% END %]
+            [% CATCH %]
+                <div class="alert alert-danger">
+                    <p>Error executing query: [% error.info %]</p>
+                </div>
+            [% END %]
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h2>How to Use in Your Templates</h2>
+        </div>
+        <div class="card-body">
+            <h3>1. Include the DefaultDBI.tt file</h3>
+            <pre><code>[% INCLUDE setup/DefaultDBI.tt %]</code></pre>
+            
+            <h3>2. Use the Database Helper</h3>
+            <pre><code>[% SET databases = db_helper.list_databases(c) %]
+[% SET tables = db_helper.list_tables(c, 'database_name') %]
+[% SET results = db_helper.execute_query(c, 'database_name', "SELECT * FROM table_name", []) %]</code></pre>
+
+            <h3>3. Use the Macros from DefaultDBI.tt</h3>
+            <pre><code>[% INCLUDE setup/DefaultDBI.tt %]
+
+[% SET results = INCLUDE execute_query('database_name', 'SELECT * FROM table_name') %]
+[% SET data = INCLUDE get_data('ModelName', 'method_name', {param1 => 'value1'}) %]</code></pre>
+        </div>
+    </div>
+</div>

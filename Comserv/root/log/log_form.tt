@@ -1,0 +1,86 @@
+[% PageVersion = 'log/log_form.tt,v 0.02 2024/01/28 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+
+[%- USE date -%]
+<script>
+window.onload = function() {
+    var now = new Date();
+    var hours = now.getHours();
+    var minutes = now.getMinutes();
+    if (hours < 10) hours = "0" + hours;
+    if (minutes < 10) minutes = "0" + minutes;
+    document.getElementById('start_time').value = hours + ":" + minutes;
+};
+</script>
+<h1>Log Form</h1>
+[% IF error_msg %]
+    <p>Error: [% error_msg %]</p>
+[% END %]
+[% IF success_msg %]
+    <p>Success: [% success_msg %]</p>
+[% END %]
+<form action="/log/create_log" method="POST">
+
+    <label for="todo_record_id">Todo Record ID:</label><br>
+    <input type="hidden" id="todo_record_id" name="todo_record_id" value="[% todo_record_id %]">
+    <input type="text" id="todo_record_id_display" name="todo_record_id_display" value="[% todo_record_id %]" readonly>
+
+    <a href="[% c.uri_for('/todo/addtodo') %]"> Add Todo</a><br>
+
+    [% INCLUDE "todo/site_list.tt" %]<br>
+
+    <label for="start_date">Start Date:</label><br>
+    <input type="date" id="start_date" name="start_date" value="[% start_date %]"><br>
+
+
+
+
+
+[% # Set up selected_project_id for project_list.tt %]
+[% SET selected_project_id = '' %]
+[% IF current_project %]
+    [% SET selected_project_id = current_project.id %]
+[% ELSIF project_id %]
+    [% SET selected_project_id = project_id %]
+[% END %]
+
+[% INCLUDE "todo/project_list.tt" projects=projects selected_project_id=selected_project_id %]
+
+    <label for="due_date">Due Date:</label><br>
+    <input type="date" id="due_date" name="due_date" value="[% due_date %]"><br>
+
+    <label for="abstract">Abstract:</label><br>
+    <textarea id="abstract" name="abstract" required rows="4" cols="50">[% abstract %]</textarea><br>
+
+    <label for="details">Details:</label><br>
+    <textarea id="details" name="details" required rows="4" cols="50">[% details %]</textarea><br>
+
+    <label for="start_time">Start Time:</label><br>
+    <input type="time" id="start_time" name="start_time" value=""><br>
+
+    <label for="end_time">End Time:</label><br>
+    <input type="time" id="end_time" name="end_time" value=""><br>
+
+    <input type="text" id="group_of_poster" name="group_of_poster" value="[% c.session.roles %]" readonly><br>
+
+ <label for="priority">Priority:</label><br>
+<select id="priority" name="priority">
+    [% FOREACH key IN build_priority.keys.sort %]
+        <option value="[% key %]" [% 'selected' IF key == priority %]>[% build_priority.$key %]</option>
+    [% END %]
+</select><br>
+
+<label for="status">Status:</label><br>
+<select id="status" name="status">
+    [% FOREACH key IN build_status.keys.sort %]
+        <option value="[% key %]" [% 'selected' IF key == status %]>[% build_status.$key %]</option>
+    [% END %]
+</select><br>
+    <label for="comments">Comments:</label><br>
+    <textarea id="comments" name="comments" rows="4" cols="50">[% comments %]</textarea><br>
+
+    <input type="submit" value="Submit">
+</form>

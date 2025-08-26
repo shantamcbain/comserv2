@@ -1,0 +1,23 @@
+[% PageVersion = 'Bmaster/honey.tt,v 0.01 2023/08/30 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+[% END %]
+[% PageVersion %]
+<h1>Honey Production</h1>
+
+<p>Our honey is 100% pure, raw, and unfiltered, harvested from our healthy hives. Here's an overview of our honey production process:</p>
+
+<h2>Honey Harvest</h2>
+<p>We carefully harvest our honey at the peak of the nectar flow, when the honey is ripe and the flavor is at its best.</p>
+
+<h2>Honey Extraction</h2>
+<p>We use a centrifugal honey extractor to extract the honey from the frames, preserving the integrity of the honeycomb for future use by the bees.</p>
+
+<h2>Honey Management</h2>
+<p>After extraction, our honey is strained to remove any remaining wax particles, then stored in airtight containers to preserve its quality.</p>
+
+<h2>Honey Production</h2>
+<p>Our honey production practices are designed to ensure the health of our bees and the quality of our honey. We never over-harvest or feed our bees sugar syrup to replace the honey we've taken.</p>
+
+<!-- Add more honey information as needed -->
+
+<p>For more information on our honey production, please contact us.</p>

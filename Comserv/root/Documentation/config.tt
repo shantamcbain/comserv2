@@ -1,0 +1,277 @@
+[% META title = 'Documentation Configuration' %]
+
+<div class="documentation-config-container">
+    <h1><i class="fas fa-cogs"></i> Documentation Configuration</h1>
+    
+    [% IF status_msg %]
+    <div class="status-message success">
+        <i class="fas fa-check-circle"></i> [% status_msg %]
+    </div>
+    [% END %]
+    
+    [% IF error_msg %]
+    <div class="status-message error">
+        <i class="fas fa-exclamation-circle"></i> [% error_msg %]
+    </div>
+    [% END %]
+    
+    <div class="admin-actions">
+        <a href="[% c.uri_for('/Documentation/refresh') %]" class="action-button reload-button">
+            <i class="fas fa-sync-alt"></i> Refresh Documentation
+        </a>
+        <a href="[% c.uri_for('/Documentation/debug') %]" class="action-button debug-button">
+            <i class="fas fa-bug"></i> Debug Documentation
+        </a>
+        <a href="[% c.uri_for('/Documentation') %]" class="action-button back-button">
+            <i class="fas fa-arrow-left"></i> Back to Documentation
+        </a>
+    </div>
+    
+    <div class="config-sections">
+        <!-- Categories Section -->
+        <div class="config-section">
+            <h2><i class="fas fa-folder"></i> Categories</h2>
+            <p>Documentation is organized into the following categories:</p>
+            
+            <div class="categories-grid">
+                [% FOREACH category_key IN categories.keys.sort %]
+                    [% SET category = categories.$category_key %]
+                    <div class="category-card">
+                        <div class="category-header">
+                            <h3>[% category.title %]</h3>
+                        </div>
+                        <div class="category-details">
+                            <p>[% category.description %]</p>
+                            <div class="category-meta">
+                                <span class="category-key"><strong>Key:</strong> [% category_key %]</span>
+                                <span class="category-roles"><strong>Roles:</strong> [% category.roles.join(', ') %]</span>
+                                <span class="category-site-specific"><strong>Site-specific:</strong> [% category.site_specific ? 'Yes' : 'No' %]</span>
+                                <span class="category-pages"><strong>Pages:</strong> [% category.pages.size %]</span>
+                            </div>
+                        </div>
+                    </div>
+                [% END %]
+            </div>
+        </div>
+        
+        <!-- Pages Section -->
+        <div class="config-section">
+            <h2><i class="fas fa-file-alt"></i> Pages</h2>
+            <p>The following documentation pages are configured:</p>
+            
+            <div class="pages-table-container">
+                <table class="pages-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Path</th>
+                            <th>Site</th>
+                            <th>Roles</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        [% FOREACH page_id IN pages.keys.sort %]
+                            [% SET page = pages.$page_id %]
+                            <tr>
+                                <td>[% page_id %]</td>
+                                <td class="path-cell">[% page.path %]</td>
+                                <td>[% page.site %]</td>
+                                <td>[% page.roles.join(', ') %]</td>
+                            </tr>
+                        [% END %]
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .documentation-config-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: var(--body-font, Arial, sans-serif);
+    }
+    
+    .documentation-config-container h1 {
+        color: var(--accent-color, #0066cc);
+        border-bottom: 2px solid #eee;
+        padding-bottom: 10px;
+    }
+    
+    .admin-actions {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+    
+    .action-button {
+        display: inline-flex;
+        align-items: center;
+        padding: 8px 15px;
+        border-radius: 4px;
+        text-decoration: none;
+        font-size: 0.9em;
+        transition: background-color 0.2s;
+        color: white;
+    }
+    
+    .reload-button {
+        background-color: var(--accent-color, #0066cc);
+    }
+    
+    .debug-button {
+        background-color: var(--warning-color, #e67e22);
+    }
+    
+    .back-button {
+        background-color: var(--text-color, #555);
+    }
+    
+    .action-button:hover {
+        filter: brightness(90%);
+    }
+    
+    .action-button i {
+        margin-right: 8px;
+    }
+    
+    .config-sections {
+        display: flex;
+        flex-direction: column;
+        gap: 30px;
+    }
+    
+    .config-section {
+        background-color: var(--secondary-color, #f9f9f9);
+        border-radius: 5px;
+        padding: 20px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    
+    .config-section h2 {
+        color: var(--accent-color, #0066cc);
+        margin-top: 0;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 10px;
+    }
+    
+    .categories-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 15px;
+        margin-top: 20px;
+    }
+    
+    .category-card {
+        background-color: white;
+        border-radius: 5px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+    
+    .category-header {
+        background-color: var(--accent-color, #0066cc);
+        color: white;
+        padding: 10px 15px;
+    }
+    
+    .category-header h3 {
+        margin: 0;
+        font-size: 1.1em;
+    }
+    
+    .category-details {
+        padding: 15px;
+    }
+    
+    .category-details p {
+        margin-top: 0;
+        color: var(--text-color, #555);
+    }
+    
+    .category-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        font-size: 0.9em;
+        color: var(--text-color, #666);
+        margin-top: 10px;
+    }
+    
+    .pages-table-container {
+        overflow-x: auto;
+        margin-top: 20px;
+    }
+    
+    .pages-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9em;
+    }
+    
+    .pages-table th {
+        background-color: var(--accent-color, #0066cc);
+        color: white;
+        text-align: left;
+        padding: 10px;
+    }
+    
+    .pages-table td {
+        padding: 8px 10px;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .pages-table tr:nth-child(even) {
+        background-color: rgba(0,0,0,0.02);
+    }
+    
+    .pages-table tr:hover {
+        background-color: rgba(0,102,204,0.05);
+    }
+    
+    .path-cell {
+        font-family: monospace;
+        font-size: 0.85em;
+    }
+    
+    .status-message {
+        padding: 10px 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+    }
+    
+    .status-message.success {
+        background-color: #e6f7e6;
+        color: #2e7d32;
+        border-left: 4px solid #2e7d32;
+    }
+    
+    .status-message.error {
+        background-color: #fdecea;
+        color: #c62828;
+        border-left: 4px solid #c62828;
+    }
+    
+    .status-message i {
+        margin-right: 10px;
+        font-size: 1.1em;
+    }
+    
+    @media (max-width: 768px) {
+        .categories-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .admin-actions {
+            flex-direction: column;
+        }
+        
+        .action-button {
+            width: 100%;
+        }
+    }
+</style>

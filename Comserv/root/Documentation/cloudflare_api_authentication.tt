@@ -1,0 +1,168 @@
+[% PageVersion = 'Documentation/cloudflare_api_authentication.tt,v 1.0 2025/07/15 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Cloudflare API Authentication' %]
+
+<div class="documentation-container">
+    <h1>Cloudflare API Authentication</h1>
+    
+    <div class="toc">
+        <h2>Table of Contents</h2>
+        <ul>
+            <li><a href="#overview">Overview</a></li>
+            <li><a href="#issue">Issue</a></li>
+            <li><a href="#solution">Solution</a></li>
+            <li><a href="#fallback">Fallback Mechanism</a></li>
+            <li><a href="#api-token">Creating a New API Token</a></li>
+            <li><a href="#troubleshooting">Troubleshooting</a></li>
+        </ul>
+    </div>
+    
+    <section id="overview">
+        <h2>Overview</h2>
+        <p>This document explains the Cloudflare API authentication methods used in the Comserv2 application and how to resolve common authentication issues.</p>
+    </section>
+    
+    <section id="issue">
+        <h2>Issue</h2>
+        <p>The Cloudflare API integration may fail with one of the following errors:</p>
+        
+        <ul>
+            <li><strong>IP Restriction Error:</strong> "Cannot use the access token from location: [IP address]" (Error code: 9109)</li>
+            <li><strong>Authentication Error:</strong> "Authentication error" (Error code: 10000)</li>
+            <li><strong>Unknown API Key Error:</strong> "Unknown X-Auth-Key or X-Auth-Email" (Error code: 9103)</li>
+        </ul>
+        
+        <p>These errors occur when:</p>
+        <ul>
+            <li>The API token has IP address restrictions that prevent it from being used from the server</li>
+            <li>The API token doesn't have the necessary permissions to access the requested resources</li>
+            <li>The API key is invalid or has expired</li>
+        </ul>
+    </section>
+    
+    <section id="solution">
+        <h2>Solution</h2>
+        <p>The Comserv2 application has been updated to handle these authentication issues in the following ways:</p>
+        
+        <ol>
+            <li><strong>Enhanced Error Handling:</strong> Improved error messages for authentication failures with specific guidance based on the error type</li>
+            <li><strong>Fallback Mechanism:</strong> When API authentication fails, the system will use cached or mock DNS records to ensure the application continues to function</li>
+            <li><strong>Hardcoded Zone IDs:</strong> For known domains, the system uses hardcoded zone IDs to reduce dependency on API authentication</li>
+        </ol>
+    </section>
+    
+    <section id="fallback">
+        <h2>Fallback Mechanism</h2>
+        <p>When Cloudflare API authentication fails, the system will:</p>
+        
+        <ol>
+            <li>First try to use cached DNS records if available</li>
+            <li>If no cached records are available, use mock DNS records with realistic values</li>
+            <li>Log the authentication failure for troubleshooting</li>
+        </ol>
+        
+        <p>This ensures that the application continues to function even when the Cloudflare API is unavailable or authentication fails.</p>
+    </section>
+    
+    <section id="api-token">
+        <h2>Creating a New API Token</h2>
+        <p>To create a new Cloudflare API token without IP restrictions:</p>
+        
+        <ol>
+            <li>Log in to your Cloudflare account at <a href="https://dash.cloudflare.com/" target="_blank">https://dash.cloudflare.com/</a></li>
+            <li>Click on your profile icon in the top right corner and select "My Profile"</li>
+            <li>In the left sidebar, click on "API Tokens"</li>
+            <li>Click the "Create Token" button</li>
+            <li>Select the "Edit zone DNS" template or create a custom token with the following permissions:
+                <ul>
+                    <li>Zone > DNS > Edit</li>
+                    <li>Zone > Zone > Read</li>
+                </ul>
+            </li>
+            <li>Under "Zone Resources", select the specific zones (domains) you want to manage</li>
+            <li>Leave the "Client IP Address Filtering" section blank to allow access from any IP address</li>
+            <li>Click "Continue to summary" and then "Create Token"</li>
+            <li>Copy the generated token and update the <code>cloudflare_config.json</code> file</li>
+        </ol>
+    </section>
+    
+    <section id="troubleshooting">
+        <h2>Troubleshooting</h2>
+        
+        <h3>Testing API Authentication</h3>
+        <p>You can test the Cloudflare API authentication using the provided test scripts:</p>
+        
+        <pre>
+# Test API token authentication
+perl /home/shanta/PycharmProjects/comserv2/Comserv/script/test_cloudflare_token.pl
+
+# Test domain-specific operations
+perl /home/shanta/PycharmProjects/comserv2/Comserv/script/test_cloudflare_domain.pl
+        </pre>
+        
+        <h3>Common Issues and Solutions</h3>
+        
+        <dl>
+            <dt>IP Restriction Error (Code: 9109)</dt>
+            <dd>
+                <p>The API token has IP address restrictions that prevent it from being used from the server.</p>
+                <p><strong>Solution:</strong> Create a new API token without IP restrictions or add the server's IP address to the allowed list.</p>
+            </dd>
+            
+            <dt>Authentication Error (Code: 10000)</dt>
+            <dd>
+                <p>The API token is invalid, has expired, or doesn't have the necessary permissions.</p>
+                <p><strong>Solution:</strong> Create a new API token with the correct permissions.</p>
+            </dd>
+            
+            <dt>Unknown API Key Error (Code: 9103)</dt>
+            <dd>
+                <p>The API key is invalid or not recognized by Cloudflare.</p>
+                <p><strong>Solution:</strong> Use an API token instead of an API key, as API keys are being deprecated by Cloudflare.</p>
+            </dd>
+        </dl>
+    </section>
+</div>
+
+<style>
+    .documentation-container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .toc {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 30px;
+    }
+    
+    .toc ul {
+        list-style-type: none;
+        padding-left: 20px;
+    }
+    
+    section {
+        margin-bottom: 40px;
+    }
+    
+    pre {
+        background-color: #f5f5f5;
+        padding: 15px;
+        border-radius: 5px;
+        overflow-x: auto;
+    }
+    
+    dt {
+        font-weight: bold;
+        margin-top: 15px;
+    }
+    
+    dd {
+        margin-left: 20px;
+    }
+</style>

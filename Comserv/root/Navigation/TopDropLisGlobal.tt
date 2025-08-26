@@ -1,0 +1,48 @@
+[% PageVersion = 'Navigation/TopDropLisGlobal.tt,v 0.01 2024/01/01hanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [%# PageVersion %]
+    [% #"Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+        <li class="horizontal-dropdown">
+            <a href="#" class="dropbtn">Global</a>
+            <div class="dropdown-content">
+                <a href="/mail">Mail</a>
+                <a href="/jobs">Jobs</a>
+                <a href="/join">Join</a>
+               <!-- Add more global options -->
+
+    <a href="/cgi-bin/index.cgi?[% session_string %]&amp;site=[% SiteName%]&amp;view=JobView" Target
+="_Blank">
+         <font   class="LeftSideBarNavStyle">Jobs</font></a>
+    [% embed('AffiliateLinkView') %]
+   <a href="http://www.computersystemconsulting.ca/whmcs/cart.php?a=add&domain=register&amp;aff=[% data.affiliate_number %]"  target="_blank"title="Domain registration services."><font   class="LeftSideBarNavStyle">Register Domains</font></a>
+[% IF group == 'Dev_admin' OR
+         group == 'CSC_Developer'OR
+         username  == 'Shanta' %]
+
+
+
+    [% IF firstname %]
+    <a href="http://dev.[% HostName %]/cgi-bin/index.cgi?site=[% SiteName %]" target="_Blank" name="DevSite"
+       title="DevSite See what we are working on."><font   class="HeaderBarNavStyle">What we are working on.</font></a>
+    [% END %]
+    <a href="http://[% HostName %]/cgi-bin/index.cgi?site=[% SiteName %]" target="_Blank" name="DevSite" title="DevSite See what we are working on."><font   class="HeaderBarNavStyle">What we are working on.</font></a>
+    [% END %]
+    [% IF c.session.group == 'admin' %]
+
+               [% IF c.session.global_links.size %]
+                    [% FOREACH link IN c.session.global_links %]
+                        <a href="[% link.url %]">[% link.name %]</a>
+                        [% IF c.session.group == 'admin' %]
+                            <a href="/edit_link?link_id=[% link.id %]">Edit/Delete</a>
+                        [% END %]
+                    [% END %]
+                [% END %]
+                [% IF c.session.group == 'admin' %]
+                    <a href="/add_link?menu=global">Add</a>
+                [% END %]
+    [% END %]
+        <!-- Global menu -->
+             </div>
+        </li>

@@ -1,0 +1,267 @@
+[% META title = 'Page Migration Tool' %]
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <h2>Page Migration Tool</h2>
+            <p class="lead">Migrate pages from Forager schema to Ency schema (pages_content table)</p>
+            
+            [% IF error_msg %]
+                <div class="alert alert-danger">
+                    <strong>Error:</strong> [% error_msg %]
+                </div>
+            [% END %]
+            
+            [% IF show_result %]
+                <div class="alert alert-info">
+                    <h4>Migration Results</h4>
+                    <ul>
+                        <li><strong>Migrated:</strong> [% migration_result.migrated_count %] pages</li>
+                        <li><strong>Skipped:</strong> [% migration_result.skipped_count %] pages</li>
+                        <li><strong>Errors:</strong> [% migration_result.error_count %] pages</li>
+                    </ul>
+                    
+                    [% IF migration_result.migration_log.size > 0 %]
+                        <h5>Migration Log:</h5>
+                        <ul>
+                            [% FOREACH log_entry IN migration_result.migration_log %]
+                                <li>[% log_entry %]</li>
+                            [% END %]
+                        </ul>
+                    [% END %]
+                    
+                    [% IF migration_result.errors.size > 0 %]
+                        <h5>Errors:</h5>
+                        <ul class="text-danger">
+                            [% FOREACH error IN migration_result.errors %]
+                                <li>[% error %]</li>
+                            [% END %]
+                        </ul>
+                    [% END %]
+                </div>
+            [% END %]
+            
+            [% IF show_preview %]
+                <div class="panel panel-info">
+                    <div class="panel-heading">
+                        <h3 class="panel-title">Migration Preview</h3>
+                    </div>
+                    <div class="panel-body">
+                        <p><strong>Total pages found:</strong> [% preview_data.total_count %]</p>
+                        <p><strong>Pages with issues:</strong> [% preview_data.issues_count %]</p>
+                        
+                        [% IF preview_data.mapping_issues.size > 0 %]
+                            <div class="alert alert-warning">
+                                <h4>Issues Found:</h4>
+                                [% FOREACH issue_item IN preview_data.mapping_issues %]
+                                    [% IF issue_item.error %]
+                                        <p><strong>Error:</strong> [% issue_item.error %]</p>
+                                    [% ELSE %]
+                                        <p><strong>Page:</strong> [% issue_item.page.page_code %] ([% issue_item.page.sitename %])</p>
+                                        <ul>
+                                            [% FOREACH issue IN issue_item.issues %]
+                                                <li>[% issue %]</li>
+                                            [% END %]
+                                        </ul>
+                                    [% END %]
+                                [% END %]
+                            </div>
+                        [% END %]
+                        
+                        [% IF preview_data.forager_pages.size > 0 %]
+                            <form method="post" action="[% c.uri_for('/admin/migrate_pages') %]">
+                                <input type="hidden" name="action" value="migrate">
+                                
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th><input type="checkbox" id="select_all"> Select All</th>
+                                                <th>Site</th>
+                                                <th>Menu</th>
+                                                <th>Page Code</th>
+                                                <th>Title</th>
+                                                <th>Status</th>
+                                                <th>Last Modified</th>
+                                                <th>Issues</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            [% FOREACH page IN preview_data.forager_pages %]
+                                                [% 
+                                                    has_issues = 0;
+                                                    page_issues = [];
+                                                    FOREACH issue_item IN preview_data.mapping_issues;
+                                                        IF issue_item.page && issue_item.page.record_id == page.record_id;
+                                                            has_issues = 1;
+                                                            page_issues = issue_item.issues;
+                                                            LAST;
+                                                        END;
+                                                    END;
+                                                %]
+                                                <tr [% IF has_issues %]class="warning"[% END %]>
+                                                    <td>
+                                                        [% UNLESS has_issues %]
+                                                            <input type="checkbox" name="selected_pages" value="[% page.record_id %]" class="page-checkbox">
+                                                        [% ELSE %]
+                                                            <input type="checkbox" disabled title="Page has issues">
+                                                        [% END %]
+                                                    </td>
+                                                    <td>[% page.sitename %]</td>
+                                                    <td>[% page.menu %]</td>
+                                                    <td>[% page.page_code %]</td>
+                                                    <td>[% page.app_title || page.page_code %]</td>
+                                                    <td>[% page.status %]</td>
+                                                    <td>[% page.last_mod_date %]</td>
+                                                    <td>
+                                                        [% IF has_issues %]
+                                                            <span class="text-warning">
+                                                                [% FOREACH issue IN page_issues %]
+                                                                    [% issue %][% UNLESS loop.last %]<br>[% END %]
+                                                                [% END %]
+                                                            </span>
+                                                        [% ELSE %]
+                                                            <span class="text-success">✓ Ready</span>
+                                                        [% END %]
+                                                    </td>
+                                                </tr>
+                                            [% END %]
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <button type="submit" class="btn btn-primary" id="migrate-btn" disabled>
+                                        <i class="fa fa-database"></i> Migrate Selected Pages
+                                    </button>
+                                    <a href="[% c.uri_for('/admin/migrate_pages') %]" class="btn btn-default">
+                                        <i class="fa fa-refresh"></i> Start Over
+                                    </a>
+                                </div>
+                            </form>
+                        [% END %]
+                    </div>
+                </div>
+            [% ELSE %]
+                <!-- Initial form to start migration -->
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <h3 class="panel-title">Start Migration Process</h3>
+                    </div>
+                    <div class="panel-body">
+                        <p>This tool will help you migrate pages from the Forager schema to the Ency schema (pages_content table).</p>
+                        
+                        <div class="alert alert-info">
+                            <h4>Field Mapping:</h4>
+                            <ul>
+                                <li><strong>record_id</strong> → <strong>id</strong> (new auto-increment)</li>
+                                <li><strong>sitename</strong> → <strong>sitename</strong></li>
+                                <li><strong>menu</strong> → <strong>menu</strong></li>
+                                <li><strong>page_code</strong> → <strong>page_code</strong></li>
+                                <li><strong>app_title</strong> → <strong>title</strong></li>
+                                <li><strong>body</strong> → <strong>body</strong></li>
+                                <li><strong>description</strong> → <strong>description</strong></li>
+                                <li><strong>keywords</strong> → <strong>keywords</strong></li>
+                                <li><strong>link_order</strong> → <strong>link_order</strong></li>
+                                <li><strong>status</strong> → <strong>status</strong></li>
+                                <li><strong>username_of_poster</strong> → <strong>created_by</strong></li>
+                                <li><strong>last_mod_date</strong> → <strong>created_at/updated_at</strong></li>
+                                <li>Default <strong>roles</strong> → <strong>'public'</strong></li>
+                            </ul>
+                        </div>
+                        
+                        <form method="post" action="[% c.uri_for('/admin/migrate_pages') %]">
+                            <input type="hidden" name="action" value="preview">
+                            <button type="submit" class="btn btn-info btn-lg">
+                                <i class="fa fa-search"></i> Preview Migration
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            [% END %]
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle select all checkbox
+    const selectAllCheckbox = document.getElementById('select_all');
+    const pageCheckboxes = document.querySelectorAll('.page-checkbox');
+    const migrateBtn = document.getElementById('migrate-btn');
+    
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            pageCheckboxes.forEach(function(checkbox) {
+                if (!checkbox.disabled) {
+                    checkbox.checked = selectAllCheckbox.checked;
+                }
+            });
+            updateMigrateButton();
+        });
+    }
+    
+    // Handle individual checkboxes
+    pageCheckboxes.forEach(function(checkbox) {
+        checkbox.addEventListener('change', function() {
+            updateMigrateButton();
+            
+            // Update select all checkbox state
+            if (selectAllCheckbox) {
+                const checkedCount = document.querySelectorAll('.page-checkbox:checked').length;
+                const enabledCount = document.querySelectorAll('.page-checkbox:not(:disabled)').length;
+                selectAllCheckbox.checked = checkedCount === enabledCount && enabledCount > 0;
+                selectAllCheckbox.indeterminate = checkedCount > 0 && checkedCount < enabledCount;
+            }
+        });
+    });
+    
+    function updateMigrateButton() {
+        if (migrateBtn) {
+            const checkedCount = document.querySelectorAll('.page-checkbox:checked').length;
+            migrateBtn.disabled = checkedCount === 0;
+            migrateBtn.textContent = checkedCount > 0 ? 
+                `Migrate ${checkedCount} Selected Page${checkedCount > 1 ? 's' : ''}` : 
+                'Migrate Selected Pages';
+        }
+    }
+    
+    // Confirmation before migration
+    if (migrateBtn) {
+        migrateBtn.addEventListener('click', function(e) {
+            const checkedCount = document.querySelectorAll('.page-checkbox:checked').length;
+            if (!confirm(`Are you sure you want to migrate ${checkedCount} page${checkedCount > 1 ? 's' : ''}? This action cannot be undone.`)) {
+                e.preventDefault();
+            }
+        });
+    }
+});
+</script>
+
+<style>
+.table-responsive {
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.warning {
+    background-color: #fcf8e3 !important;
+}
+
+.text-success {
+    color: #3c763d;
+}
+
+.text-warning {
+    color: #8a6d3b;
+}
+
+.text-danger {
+    color: #a94442;
+}
+
+#migrate-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+</style>

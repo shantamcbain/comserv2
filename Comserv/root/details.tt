@@ -1,0 +1,28 @@
+[% PageVersion = 'WorkShops/details.tt,v 0.2 2024/01/02 shanta Exp shanta ' %]
+[% IF debug == 1 %]
+    [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [% INCLUDE 'debug.tt' %]
+[% END %]
+<h2>Work Shop Details</h2>
+
+<form action="/todo/save" method="POST">
+  <input type="hidden" name="record_id" value="[% task.record_id %]">
+
+  [% FOREACH attribute IN task.keys %]
+    <label for="[% attribute %]">[% attribute %]:</label>
+    <input type="text" name="[% attribute %]" value="[% task.$attribute %]">
+    <br>
+  [% END %]
+
+  <button type="submit">Save</button>
+  <button type="button" onclick="confirmDelete()">Delete</button>
+</form>
+
+<script>
+  function confirmDelete() {
+    if (confirm("Are you sure you want to delete this task?")) {
+      // Add code to handle task deletion
+    }
+  }
+</script>

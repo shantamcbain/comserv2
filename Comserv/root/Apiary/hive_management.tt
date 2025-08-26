@@ -1,0 +1,197 @@
+[% META title = 'Hive Management System' %]
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>Hive Management System</h1>
+            <p class="lead">Welcome to the Hive Management System. This system helps beekeepers track and manage their hives.</p>
+            
+            <div class="alert alert-info">
+                <strong>Note:</strong> This system is currently under development. More features will be added soon.
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3>Hive Inspection Checklist</h3>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group">
+                        <li class="list-group-item">Queen presence and laying pattern</li>
+                        <li class="list-group-item">Brood pattern and stages</li>
+                        <li class="list-group-item">Food stores (honey and pollen)</li>
+                        <li class="list-group-item">Population strength</li>
+                        <li class="list-group-item">Disease and pest signs</li>
+                        <li class="list-group-item">Equipment condition</li>
+                        <li class="list-group-item">Space requirements</li>
+                        <li class="list-group-item">Swarm indicators</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3>Seasonal Management</h3>
+                </div>
+                <div class="card-body">
+                    <div class="accordion" id="seasonalAccordion">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">
+                                    <button class="btn btn-link" type="button" data-toggle="collapse" data-target="#springCollapse">
+                                        Spring Management
+                                    </button>
+                                </h5>
+                            </div>
+                            <div id="springCollapse" class="collapse">
+                                <div class="card-body">
+                                    <ul>
+                                        <li>Clean and inspect equipment</li>
+                                        <li>Assess colony strength</li>
+                                        <li>Feed if necessary</li>
+                                        <li>Manage for swarm prevention</li>
+                                        <li>Add supers as needed</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">
+                                    <button class="btn btn-link" type="button" data-toggle="collapse" data-target="#summerCollapse">
+                                        Summer Management
+                                    </button>
+                                </h5>
+                            </div>
+                            <div id="summerCollapse" class="collapse">
+                                <div class="card-body">
+                                    <ul>
+                                        <li>Monitor honey flow</li>
+                                        <li>Add honey supers</li>
+                                        <li>Manage ventilation</li>
+                                        <li>Monitor for pests</li>
+                                        <li>Harvest honey</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">
+                                    <button class="btn btn-link" type="button" data-toggle="collapse" data-target="#fallCollapse">
+                                        Fall Management
+                                    </button>
+                                </h5>
+                            </div>
+                            <div id="fallCollapse" class="collapse">
+                                <div class="card-body">
+                                    <ul>
+                                        <li>Assess food stores</li>
+                                        <li>Feed if necessary</li>
+                                        <li>Treat for Varroa mites</li>
+                                        <li>Reduce entrances</li>
+                                        <li>Combine weak colonies</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">
+                                    <button class="btn btn-link" type="button" data-toggle="collapse" data-target="#winterCollapse">
+                                        Winter Management
+                                    </button>
+                                </h5>
+                            </div>
+                            <div id="winterCollapse" class="collapse">
+                                <div class="card-body">
+                                    <ul>
+                                        <li>Provide winter insulation</li>
+                                        <li>Ensure adequate ventilation</li>
+                                        <li>Protect from wind</li>
+                                        <li>Monitor food stores</li>
+                                        <li>Clear entrances of snow</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3>Hive Records</h3>
+                </div>
+                <div class="card-body">
+                    <p>Keeping detailed records of your hives is essential for successful beekeeping. Track the following information:</p>
+                    <ul>
+                        <li>Queen information (age, source, performance)</li>
+                        <li>Inspection dates and findings</li>
+                        <li>Treatments applied</li>
+                        <li>Feeding records</li>
+                        <li>Honey harvests</li>
+                        <li>Equipment additions or changes</li>
+                        <li>Weather conditions</li>
+                    </ul>
+                    <p><strong>Coming Soon:</strong> Digital hive record keeping system</p>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3>Hive Management</h3>
+                </div>
+                <div class="card-body">
+                    <p>View and manage hives by yard:</p>
+                    <form action="/Apiary/hives_for_yard" method="get" class="mb-3">
+                        <div class="input-group">
+                            <input type="text" name="yard_id" class="form-control" placeholder="Enter yard ID">
+                            <div class="input-group-append">
+                                <button type="submit" class="btn btn-primary">View Hives</button>
+                            </div>
+                        </div>
+                    </form>
+                    <div class="list-group mt-3">
+                        <a href="/Apiary/hives_for_yard/Y001" class="list-group-item list-group-item-action">Yard Y001 Hives</a>
+                        <a href="/Apiary/hives_for_yard/Y002" class="list-group-item list-group-item-action">Yard Y002 Hives</a>
+                        <a href="/Apiary/hives_for_yard/Y003" class="list-group-item list-group-item-action">Yard Y003 Hives</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3>Resources</h3>
+                </div>
+                <div class="card-body">
+                    <p>Learn more about hive management with these resources:</p>
+                    <ul>
+                        <li><a href="#">Hive Inspection Guide</a></li>
+                        <li><a href="#">Swarm Prevention Techniques</a></li>
+                        <li><a href="#">Honey Harvesting Best Practices</a></li>
+                        <li><a href="#">Winter Preparation Checklist</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3>Return to Apiary Management</h3>
+                </div>
+                <div class="card-body">
+                    <a href="/Apiary" class="btn btn-primary">Back to Apiary Management</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

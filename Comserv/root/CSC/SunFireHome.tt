@@ -1,0 +1,116 @@
+
+[% PageVersion	= 'SunFireHome.tt,v 0.01 2023/08/30 shanta Exp shanta '	%]
+[% IF debug == 1 %]
+ [%	PageVersion %]
+[% END %]
+
+
+
+ <table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td>
+<div ALIGN="center">
+
+</div>
+<A NAME="PageTop"></A>
+</div>
+<p>On this site we will track the progress of the SunFire server.</p>
+
+<ul>
+  <li>I have added your email to the script so You will be notified when a to do's etc are added to the application.</li>
+  <li>When you log in next you will see an admin notes link. This will be the place for communication between us
+  within the application. It opens a from that you can edit and save.</li>
+  <li><p> I have added 3 new account packages g999, hosting, and reseller. All can be set to
+  having a fixed IP assigned but as we don't have that fixed yet. we will have to add it later. </p></li>
+  <li>
+   <p>
+    </p>
+  </li>
+  <li><h3>Begin the creation of the g999 node sites. </h3> <p>My suggestion is to start with the ones that are not
+  currently
+  working.
+  then move to moving the working sites over.</p>
+  <h3>My reasoning is</h3>
+    <ol>
+     <li>We can get non producing nodes producing! </li>
+     <li>We can test the ability to use one IP for multiple noses.</li>
+     <li>We will be able to get a list of ports that need to be open.</li>
+     <li> We can practice the process before moving working nodes.</li>
+     <li>We get get a picture of the needed security to operate a node safely. A copy of the requirements should
+     give us this information.</li>
+
+    </ol>
+    </li>
+  <li>
+   <h2>Fixed IP:</h2>
+<p>Need to contact Telus again to continue this process. </p>
+<h3>Questions to ask </h3>
+<ul>
+  <li>Can we attach an Ip to a
+   virtual card?</li>
+  <li> How are the Ports etc passed through to the nic? Is it done through the telus router or do we need to
+   put a switch/router between Telus and the Telus router and our server. </li>
+   <li>What device on the Telus side do we need to access the ips.</li>
+   <li><h3>Possible Devices that we may need to interface between the server and Telus.</h3>
+    <ol>
+     <li><A HREF="https://www.newegg.ca/p/N82E16833704677?Description=TP-Link%20Omada%20VPN%20Router%20with%2010G
+     %20Ports%20(ER8411)&cm_re=TP-Link_Omada%20VPN%20Router%20with%2010G%20Ports%20(ER8411)-_-33-704-677-_-Product"
+      TARGET = "_blank"><font   class="LeftSideBarNavStyle">TP-Link ER8411 New egg 549.99</A></li>
+     <li><A HREF="https://www.amazon.ca/TP-Link-Omada-Router-Ports-ER8411/dp/B0BK9T1P5F/ref=sr_1_6?crid=376VLK5ESJOOA&keywords=multi%2Bwan%2Bport%2Bvpn%2Brouters.&qid=1687975217&s=electronics&sprefix=%2Celectronics%2C223&sr=1-6&ufe=app_do%3Aamzn1.fos.cf04ee5d-781c-46c9-aafd-1e06ef1dcfcb&th=1TP-Link"
+     TARGET = "_blank"><font   class="LeftSideBarNavStyle"> Omada VPN Router with 10G Ports (ER8411)</A></li>
+      <li><A HREF="https://www.amazon.com/dp/B0771YYT3K?tag=easytopte" TARGET = "_blank" ><font
+      class="LeftSideBarNavStyle">TP-Link Omada VPN Router with 10G Ports (ER8411) Amazon $500</A></li>
+
+      <li> <A HREF="https://www.ebay.ca/sch/i.html?_dkr=1&iconV2Request=true&_blrs=recall_filtering&_ssn=neweggcanada&store_cat=0
+      &store_name=neweggcanada&_oac=1&_nkw=tp-link%20er7206" TARGET = "_blank" ><font   class="LeftSideBarNavStyle">
+      TP-Link ER7206</A> </li>
+    </ol></li>
+    </ul>
+  </li>
+  <li>Setup.pm the firewall and SSL for security. I will start working on this </li>
+  <li>The DNS is now setup to use the NS on my
+  computersystemconsulting.ca the nameservers defined are ns1.computersystemconsulting.ca the primary NS ns3
+  .computersystemconsulting.ca is the sunfire server. Having truble getting enom, My registar set to using the ns3
+  nameserver will try again soon. May be it knows it is a dynamic IP.</li>
+</ul>
+
+<h2>Key links</h2>
+<p>This list will provide links to the SunFire server. I have cleaned up the server a bit so it functions better
+with the incomplete setup we are at right now</p>
+<ul>
+  <li>       <A HREF="https://209.121.123.102:2087" TARGET = "_blank" ><font   class="LeftSideBarNavStyle"> Whm via
+  ip address.</A> </font></a><p>IP based access for accessing the server from external locations.
+  </p></li>
+  <li>       <A HREF="https://c999patrick.computersystemconsulting.ca:2087" TARGET = "_blank" ><font
+  class="LeftSideBarNavStyle"> Whm
+  via
+  g999patrick.computersystemconsulting.ca </font></a> Have not tested<p></li>
+  <li>       <A HREF="https://sunfire.computersystemconsulting.ca:2087" TARGET = "_blank" ><font
+  class="LeftSideBarNavStyle"> Whm
+  via
+  sunfire.computersystemconsulting.ca </font></a> This now works externally<p></li>
+
+  <li>       <A HREF="192.168.1.25:2087" TARGET = "_blank" ><font
+  class="LeftSideBarNavStyle"> Whm
+  via
+  The WIFI router which has a static IP 192.168.1.25.  </font></a> This link only will work in the sunfire network
+  . The nic card is not set to be static yet.<p></li>
+</ul>
+
+
+
+<div ALIGN="center">
+
+<p>Last Updated: Thurday June 21 2023</p>
+
+
+
+
+
+</td>
+</tr>
+</table>
+
+
+
+

@@ -1,0 +1,430 @@
+[% META title = 'Proxmox Server Management' %]
+[% PageVersion = 'proxmox/servers.tt,v 1.0.0 2025/03/25 AI_Assistant Exp' %]
+
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1>Proxmox Server Management</h1>
+
+    [% IF c.flash.success_msg %]
+    <div class="alert alert-success">
+        [% c.flash.success_msg %]
+    </div>
+    [% END %]
+
+    [% IF c.flash.error_msg %]
+    <div class="alert alert-danger">
+        [% c.flash.error_msg %]
+    </div>
+    [% END %]
+
+    [% IF c.session.debug_mode == 1 && c.stash.debug_msg && c.stash.debug_msg.size > 0 %]
+    <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+            <h3>Debug Messages</h3>
+        </div>
+        <div class="card-body">
+            <div class="debug-log" style="background-color: #f8f9fa; border: 1px solid #ddd; padding: 15px; max-height: 300px; overflow-y: auto; font-family: monospace;">
+                [% FOREACH msg IN c.stash.debug_msg %]
+                <div class="debug-entry" style="margin-bottom: 5px; padding: 3px 0; border-bottom: 1px dotted #ddd;">
+                    <span class="debug-index" style="display: inline-block; width: 30px; font-weight: bold;">[% loop.index %]:</span>
+                    <span class="debug-message">[% msg %]</span>
+                </div>
+                [% END %]
+            </div>
+        </div>
+    </div>
+    [% END %]
+    
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="mb-0">Configured Servers</h3>
+                    <a href="[% c.uri_for('/proxmox_servers/add') %]" class="btn btn-success">Add New Server</a>
+                </div>
+                <div class="card-body">
+                    [% IF servers.size > 0 %]
+                        <div class="table-responsive">
+                            <table class="table table-striped table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Name</th>
+                                        <th>Host</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    [% FOREACH server IN servers %]
+                                    <tr>
+                                        <td>[% server.id %]</td>
+                                        <td>[% server.name %]</td>
+                                        <td>[% server.host %]</td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <a href="[% c.uri_for('/proxmox_servers/edit', server.id) %]" class="btn btn-primary">Edit</a>
+                                                <a href="#" class="btn btn-info" onclick="testConnection('[% server.id %]'); return false;">Test Connection</a>
+                                                <a href="[% c.uri_for('/proxmox_servers/test', server.id) %]" class="btn btn-secondary" target="_blank">Direct Test</a>
+                                                <a href="[% c.uri_for('/proxmox', server.id) %]" class="btn btn-success">Manage VMs</a>
+                                                <a href="#" class="btn btn-danger" onclick="confirmDelete('[% server.id %]'); return false;">Delete</a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    [% END %]
+                                </tbody>
+                            </table>
+                        </div>
+                    [% ELSE %]
+                        <div class="alert alert-info">
+                            <p>No Proxmox servers configured yet. Click the "Add New Server" button to add your first server.</p>
+                        </div>
+                    [% END %]
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3>About Proxmox Server Management</h3>
+                </div>
+                <div class="card-body">
+                    <p>This interface allows you to manage your Proxmox VE server connections. You can add, edit, and delete server configurations, as well as test connectivity to ensure your credentials are working properly.</p>
+                    <p>Once you have configured a server, you can use the "Manage VMs" button to access the virtual machine management interface for that server.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Connection Test Modal -->
+<div class="modal fade" id="connectionTestModal" tabindex="-1" aria-labelledby="connectionTestModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="connectionTestModalLabel">Connection Test</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="connectionTestResult">
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Testing connection...</span>
+                    </div>
+                    <p>Testing connection to Proxmox server...</p>
+                    <p id="connectionTimer" class="text-primary fw-bold">Time elapsed: 0 seconds</p>
+                    <div id="connectionWarning"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteConfirmModalLabel">Confirm Deletion</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this Proxmox server configuration?</p>
+                <p class="text-danger">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <a href="#" id="confirmDeleteButton" class="btn btn-danger">Delete</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .connection-log {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 10px;
+        max-height: 300px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 0.9rem;
+        margin-bottom: 15px;
+    }
+    .log-entry {
+        margin-bottom: 5px;
+        line-height: 1.4;
+    }
+    .log-timestamp {
+        font-weight: bold;
+        margin-right: 5px;
+    }
+</style>
+
+<script>
+    function testConnection(serverId) {
+        console.log("Starting connection test for server ID: " + serverId);
+
+        // Show the modal
+        var modal = new bootstrap.Modal(document.getElementById('connectionTestModal'));
+        modal.show();
+        console.log("Modal shown");
+
+        // Reset the timer and warning
+        var timerElement = document.getElementById('connectionTimer');
+        var warningElement = document.getElementById('connectionWarning');
+        var resultElement = document.getElementById('connectionTestResult');
+
+        if (!timerElement) {
+            console.error("Timer element not found!");
+            return;
+        }
+
+        // Reset UI elements
+        timerElement.textContent = 'Time elapsed: 0 seconds';
+        warningElement.innerHTML = '';
+        resultElement.innerHTML = '<div class="spinner-border text-primary" role="status"><span class="visually-hidden">Testing connection...</span></div> Testing connection...';
+        console.log("UI elements reset");
+
+        // Initialize timer variables
+        var startTime = Date.now(); // Use milliseconds timestamp
+        var timerCount = 0;
+        console.log("Timer initialized at: " + startTime);
+
+        // Start the timer display - use a simple counter to ensure reliability
+        console.log("Starting timer interval");
+        var timerInterval = setInterval(function() {
+            timerCount++;
+            console.log("Timer tick: " + timerCount + " seconds");
+            timerElement.textContent = 'Time elapsed: ' + timerCount + ' seconds';
+
+            // If it's taking too long, show a warning
+            if (timerCount > 8 && warningElement.innerHTML === '') {
+                console.log("Adding warning - connection taking too long");
+                warningElement.innerHTML =
+                    '<div class="alert alert-warning mt-3">' +
+                    '<p>Connection is taking longer than expected. This could indicate network issues or server unavailability.</p>' +
+                    '</div>';
+            }
+
+            // Force browser to repaint timer
+            document.body.offsetHeight;
+        }, 1000);
+
+        // Test the connection
+        var testUrl = '[% c.uri_for("/proxmox_servers/test") %]/' + serverId;
+        console.log("Fetching from URL: " + testUrl);
+
+        // Add a direct link to the test URL for debugging
+        warningElement.innerHTML =
+            '<div class="alert alert-info mt-3">' +
+            '<p>Debug: Testing connection using URL: <a href="' + testUrl + '" target="_blank">' + testUrl + '</a></p>' +
+            '</div>';
+
+        fetch(testUrl, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('HTTP error! Status: ' + response.status);
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Stop the timer
+                clearInterval(timerInterval);
+                console.log("Connection test response:", data);
+
+                // Keep the final timer count
+                console.log("Final timer count: " + timerCount + " seconds");
+
+                // Format the elapsed time
+                var elapsedTimeStr = '';
+                if (data.elapsed_time) {
+                    elapsedTimeStr = '<p>Server-side connection time: ' + (data.elapsed_time).toFixed(2) + ' seconds</p>';
+                    elapsedTimeStr += '<p>Browser-side timer: ' + timerCount + ' seconds</p>';
+                }
+
+                // Format debug messages if available
+                var logEntries = '';
+                console.log("Checking for debug messages in response");
+                console.log("data.debug_msg exists: " + (data.debug_msg ? "YES" : "NO"));
+                if (data.debug_msg) {
+                    console.log("data.debug_msg length: " + data.debug_msg.length);
+                    console.log("First few debug messages:");
+                    for (var i = 0; i < Math.min(5, data.debug_msg.length); i++) {
+                        console.log("  " + i + ": " + data.debug_msg[i]);
+                    }
+                }
+
+                if (data.debug_msg && data.debug_msg.length > 0) {
+                    console.log("Building debug message display");
+                    logEntries = '<div class="mt-3 border-top pt-3"><h5>Connection Log:</h5>' +
+                        '<div class="alert alert-info mb-2">' +
+                        '<strong>Debug messages:</strong> ' +
+                        'Total messages: ' + (data.debug_msg_count || data.debug_msg.length) +
+                        '</div>' +
+                        '<div class="connection-log" style="background-color: #f8f9fa; border: 1px solid #ddd; padding: 15px; margin-bottom: 20px; max-height: 400px; overflow-y: auto; font-family: monospace;">';
+
+                    // Add a header message
+                    logEntries += '<div class="log-entry text-primary font-weight-bold">' +
+                        '<span class="log-message">Connection test started at ' + new Date().toLocaleString() + '</span>' +
+                        '</div>';
+
+                    data.debug_msg.forEach(function(msg, index) {
+                        var logClass = 'text-info';
+                        if (msg.indexOf('ERROR:') !== -1) logClass = 'text-danger font-weight-bold';
+                        if (msg.indexOf('SUCCESS') !== -1 || msg.indexOf('successful') !== -1) logClass = 'text-success';
+                        if (msg.indexOf('WARNING:') !== -1) logClass = 'text-warning';
+                        if (msg.indexOf('Model Debug') !== -1) logClass = 'text-primary';
+                        if (msg.indexOf('UNDEFINED') !== -1) logClass = 'text-danger';
+                        if (msg.indexOf('MISSING') !== -1) logClass = 'text-danger';
+
+                        logEntries += '<div class="log-entry ' + logClass + '" style="margin-bottom: 5px; padding: 3px 0; border-bottom: 1px dotted #ddd;">' +
+                            '<span class="log-index" style="display: inline-block; width: 30px; font-weight: bold;">' + index + ':</span> ' +
+                            '<span class="log-message">' + msg + '</span>' +
+                            '</div>';
+                    });
+
+                    logEntries += '</div></div>';
+                }
+
+                // Format log entries if available (legacy format)
+                if (!logEntries && data.debug_info && data.debug_info.log_entries) {
+                    logEntries = '<div class="mt-3 border-top pt-3"><h5>Connection Log:</h5><div class="connection-log">';
+                    
+                    data.debug_info.log_entries.forEach(function(entry) {
+                        var logClass = 'text-info';
+                        if (entry.level === 'error') logClass = 'text-danger';
+                        if (entry.level === 'warn') logClass = 'text-warning';
+                        
+                        logEntries += '<div class="log-entry ' + logClass + '">' +
+                            '<span class="log-timestamp">[' + entry.timestamp + ']</span>' +
+                            '<span class="log-message">' + entry.message + '</span>' +
+                            '</div>';
+                    });
+                    
+                    logEntries += '</div></div>';
+                }
+
+                // Format debug info if available
+                var debugInfo = '';
+                if (data.debug_info && data.debug_info.proxmox_debug) {
+                    debugInfo = '<div class="mt-3 border-top pt-3">' +
+                        '<h5>Technical Details:</h5>' +
+                        '<div class="alert alert-secondary">' +
+                        '<pre>' + JSON.stringify(data.debug_info.proxmox_debug, null, 2) + '</pre>' +
+                        '</div>' +
+                        '</div>';
+                }
+
+                // Update the modal content based on success or failure
+                if (data.success) {
+                    document.getElementById('connectionTestResult').innerHTML =
+                        '<div class="alert alert-success">' +
+                            '<h4 class="alert-heading">Connection Successful!</h4>' +
+                            '<p>' + data.message + '</p>' +
+                            elapsedTimeStr +
+                        '</div>' +
+                        logEntries +
+                        debugInfo;
+                } else {
+                    document.getElementById('connectionTestResult').innerHTML =
+                        '<div class="alert alert-danger">' +
+                            '<h4 class="alert-heading">Connection Failed</h4>' +
+                            '<p>' + (data.error || 'Unknown error occurred') + '</p>' +
+                            elapsedTimeStr +
+                            '<div class="mt-3">' +
+                                '<h5>Troubleshooting Tips:</h5>' +
+                                '<ul>' +
+                                    '<li>Verify the hostname or IP address is correct</li>' +
+                                    '<li>Check that the API token is valid and has not expired</li>' +
+                                    '<li>Ensure the API token has sufficient permissions</li>' +
+                                    '<li>Check network connectivity and firewall settings</li>' +
+                                    '<li>Check the debug messages below for more details</li>' +
+                                '</ul>' +
+                            '</div>' +
+                        '</div>' +
+                        logEntries +
+                        debugInfo;
+                }
+            })
+            .catch(error => {
+                // Stop the timer
+                clearInterval(timerInterval);
+                console.error("Connection test error:", error);
+
+                // Keep the final timer count
+                console.log("Final timer count on error: " + timerCount + " seconds");
+
+                // Create a simple log for client-side errors
+                var debugMsgs = [
+                    "==== TEST_CONNECTION START ====",
+                    "Testing connection to Proxmox server",
+                    "ERROR: Client-side error: " + error.message,
+                    "Browser-side timer: " + timerCount + " seconds",
+                    "==== TEST_CONNECTION END ===="
+                ];
+
+                var errorLog = '<div class="mt-3 border-top pt-3"><h5>Connection Log:</h5>' +
+                    '<div class="alert alert-info mb-2">' +
+                    'Debug messages are displayed below to help diagnose connection issues. ' +
+                    'Total messages: ' + debugMsgs.length +
+                    '</div>' +
+                    '<div class="connection-log">';
+
+                // Add a header message
+                errorLog += '<div class="log-entry text-primary font-weight-bold">' +
+                    '<span class="log-message">Connection test started at ' + new Date().toLocaleString() + '</span>' +
+                    '</div>';
+
+                debugMsgs.forEach(function(msg) {
+                    var logClass = 'text-info';
+                    if (msg.indexOf('ERROR:') !== -1) logClass = 'text-danger font-weight-bold';
+                    if (msg.indexOf('SUCCESS') !== -1 || msg.indexOf('successful') !== -1) logClass = 'text-success';
+                    if (msg.indexOf('WARNING:') !== -1) logClass = 'text-warning';
+
+                    errorLog += '<div class="log-entry ' + logClass + '">' +
+                        '<span class="log-message">' + msg + '</span>' +
+                        '</div>';
+                });
+
+                errorLog += '</div></div>';
+
+                document.getElementById('connectionTestResult').innerHTML =
+                    '<div class="alert alert-danger">' +
+                        '<h4 class="alert-heading">Connection Error</h4>' +
+                        '<p>Failed to connect to the server: ' + error.message + '</p>' +
+                        '<p>Browser-side timer: ' + timerCount + ' seconds</p>' +
+                        '<p>Request URL: ' + testUrl + '</p>' +
+                        '<div class="mt-3">' +
+                            '<h5>Troubleshooting Tips:</h5>' +
+                            '<ul>' +
+                                '<li>Check your internet connection</li>' +
+                                '<li>Verify the server is online and reachable</li>' +
+                                '<li>Check if the application server is running</li>' +
+                                '<li>Check the URL path is correct</li>' +
+                                '<li>Check the server logs for more details</li>' +
+                            '</ul>' +
+                        '</div>' +
+                    '</div>' +
+                    errorLog;
+            });
+    }
+
+    function confirmDelete(serverId) {
+        var modal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+        document.getElementById('confirmDeleteButton').href = '[% c.uri_for("/proxmox_servers/delete") %]/' + serverId;
+        modal.show();
+    }
+</script>

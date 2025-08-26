@@ -1,0 +1,15 @@
+<head>
+    [% PageVersion = 'Tables.tt,v 0.01 2023/12/01 shanta Exp shanta ' %]
+    <meta charset="utf-8">
+    [% IF debug_mode == 1 %]
+        [% PageVersion %]
+        [% INCLUDE 'debug.tt' %]
+    [% END %]
+</head><h1>Structure of [% table %]</h1>
+<h1>Tables in [% database %]</h1>
+
+<ul>
+[% FOREACH table IN tables %]
+    <li><a href="/show_table_structure?database=[% database %]&table=[% table %]" target="_blank">[% table %]</a></li>
+[% END %]
+</ul>

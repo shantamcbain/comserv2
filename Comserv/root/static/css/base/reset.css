@@ -1,0 +1,57 @@
+/* Reset and base styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+body {
+  font-family: var(--body-font, Verdana, Helvetica, sans-serif);
+  font-size: var(--font-size-base, 1rem);
+  color: var(--text-color, #000000);
+  background-color: var(--background-color, #ffffff);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--header-font, Verdana, Helvetica, sans-serif);
+  margin-bottom: 0.5em;
+  font-weight: bold;
+}
+
+p {
+  margin-bottom: 1em;
+}
+
+a {
+  color: var(--link-color, #0000FF);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+ul, ol {
+  margin-left: 1.5em;
+  margin-bottom: 1em;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th, td {
+  padding: 0.5em;
+  border: 1px solid var(--border-color, #cccccc);
+}
+
+th {
+  background-color: var(--table-header-bg, #f2f2f2);
+  font-weight: bold;
+}

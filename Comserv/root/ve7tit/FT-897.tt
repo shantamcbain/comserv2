@@ -1,0 +1,52 @@
+[% PageVersion = 've7tit/FT-897.tt,v 0.01 2024/08/30 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<h2>Yaesu FT-897 HF/VHF/UHF All Mode Transceiver</h2>
+
+<div class="equipment-details">
+    <h3>Specifications</h3>
+    <ul>
+        <li><strong>Frequency Range:</strong> HF/50/144/430 MHz</li>
+        <li><strong>Power Output:</strong> 100W HF/50MHz, 50W 144MHz, 20W 430MHz</li>
+        <li><strong>Modes:</strong> SSB/CW/AM/FM/Digital</li>
+        <li><strong>Features:</strong> Compact design, built-in DSP, IF shift</li>
+    </ul>
+
+    <h3>Description</h3>
+    <p>
+        The Yaesu FT-897 is a versatile all-mode transceiver covering HF, VHF, and UHF bands. 
+        It's designed for both base station and portable operation with options for internal 
+        batteries. This radio is particularly useful for field operations and emergency communications.
+    </p>
+
+    <h3>Current Setup</h3>
+    <p>
+        Our FT-897 is set up with the following accessories:
+    </p>
+    <ul>
+        <li>SignaLink USB interface for digital modes</li>
+        <li>External power supply for base station operation</li>
+        <li>Z-100Plus antenna tuner</li>
+    </ul>
+
+    <h3>Operation Notes</h3>
+    <p>
+        The FT-897 is primarily used for:
+    </p>
+    <ul>
+        <li>HF digital mode operations (FT8, JS8Call)</li>
+        <li>VHF/UHF local communications</li>
+        <li>Field day operations</li>
+        <li>Emergency communications exercises</li>
+    </ul>
+
+    <h3>Resources</h3>
+    <ul>
+        <li><a href="https://www.yaesu.com/indexVS.cfm?cmd=DisplayProducts&ProdCatID=102&encProdID=0372FA803B7BBADBF7F4E0D14EEA8D88" target="_blank">Manufacturer's Website</a></li>
+        <li><a href="https://www.manualslib.com/manual/1010228/Yaesu-Ft-897.html" target="_blank">User Manual</a></li>
+    </ul>
+</div>
+
+<p><a href="/ve7tit">Return to Equipment List</a></p>

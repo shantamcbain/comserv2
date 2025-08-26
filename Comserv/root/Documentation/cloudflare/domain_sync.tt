@@ -1,0 +1,107 @@
+[% META 
+   title = 'Cloudflare Domain Synchronization'
+   date = '2025-07-15'
+   author = 'System Administrator'
+   status = 'Implemented'
+%]
+
+<div class="documentation-content">
+    <h1>Cloudflare Domain Synchronization</h1>
+    
+    <div class="metadata">
+        <p><strong>Date:</strong> [% template.date %]</p>
+        <p><strong>Author:</strong> [% template.author %]</p>
+        <p><strong>Status:</strong> [% template.status %]</p>
+    </div>
+    
+    <h2>Overview</h2>
+    <p>
+        This update adds functionality to synchronize domains from Cloudflare to the local configuration file. 
+        This ensures that the application always has an up-to-date list of domains managed by Cloudflare, 
+        even if changes were made directly in the Cloudflare dashboard.
+    </p>
+    
+    <h2>Changes</h2>
+    <ol>
+        <li>
+            <p><strong>Added a new method to the CloudflareManager module:</strong></p>
+            <ul>
+                <li>Fetches the list of domains from Cloudflare API</li>
+                <li>Updates the user_domains section in the configuration file</li>
+                <li>Updates the domains section in the configuration file with zone IDs</li>
+                <li>Handles IP restrictions by falling back to existing configuration data</li>
+            </ul>
+        </li>
+        <li>
+            <p><strong>Added a new endpoint to the CloudflareAPI controller:</strong></p>
+            <ul>
+                <li>Path: <code>/cloudflareapi/update_domains</code></li>
+                <li>Requires admin authentication</li>
+                <li>Calls the new CloudflareManager method</li>
+                <li>Provides appropriate success/error messages</li>
+                <li>Handles both API and fallback scenarios</li>
+            </ul>
+        </li>
+        <li>
+            <p><strong>Updated the Cloudflare management UI to include:</strong></p>
+            <ul>
+                <li>An "Update Domains from Cloudflare" button</li>
+                <li>Success/error message display</li>
+                <li>Confirmation dialog before updating</li>
+            </ul>
+        </li>
+    </ol>
+    
+    <h2>Technical Details</h2>
+    <p>
+        The implementation uses the existing list_zones method to fetch domains from Cloudflare, 
+        then updates the configuration file with the retrieved data. This ensures that any domains 
+        added or removed directly in Cloudflare are reflected in the application.
+    </p>
+    <p>
+        The update process preserves the structure of the configuration file while replacing 
+        the domain-related sections with fresh data from the Cloudflare API.
+    </p>
+    <p>
+        If the Cloudflare API cannot be accessed due to IP restrictions, the system will fall back 
+        to using the existing configuration data, ensuring that the functionality still works even 
+        when direct API access is not available.
+    </p>
+    
+    <h2>Security Considerations</h2>
+    <ul>
+        <li>Only administrators can trigger the domain synchronization</li>
+        <li>The API token used for Cloudflare API access is kept secure in the configuration file</li>
+        <li>All actions are logged for audit purposes</li>
+        <li>IP restrictions on the Cloudflare API token are respected</li>
+    </ul>
+    
+    <h2>Usage</h2>
+    <ol>
+        <li>Log in as an administrator</li>
+        <li>Navigate to the Cloudflare DNS Management page (via Admin menu or directly at <code>/cloudflareapi</code>)</li>
+        <li>Click the "Update Domains from Cloudflare" button at the top of the page</li>
+        <li>Confirm the action when prompted</li>
+    </ol>
+    <p>
+        After synchronization, the updated domain list will be used for all Cloudflare-related 
+        operations in the application.
+    </p>
+    
+    <h2>Troubleshooting</h2>
+    <p>
+        If you encounter an error message about IP restrictions, it means your Cloudflare API token 
+        is configured to only allow access from specific IP addresses, and your server's IP address 
+        is not on the allowed list. In this case, the system will fall back to using the existing 
+        configuration data.
+    </p>
+    <p>
+        To resolve this issue, you can either:
+    </p>
+    <ol>
+        <li>Update your Cloudflare API token to allow access from your server's IP address</li>
+        <li>Create a new API token without IP restrictions</li>
+        <li>Continue using the fallback mechanism, which will still update the user_domains section 
+            but won't update the zone IDs</li>
+    </ol>
+</div>

@@ -1,0 +1,21 @@
+/* Theme: csc */
+:root {
+  --accent-color: #FF9900;
+  --background-color: #ccffff;
+  --border-color: #99cccc;
+  --footer-bg: #ccffff;
+  --footer-text-color: #000000;
+  --header-bg: #ccffff;
+  --link-color: #0000FF;
+  --link-hover-color: #000099;
+  --nav-bg: #ccffff;
+  --nav-link-color: #000000;
+  --nav-text: #000000;
+  --primary-color: #ccffff;
+  --secondary-color: #e6ffff;
+  --success-color: #27ae60;
+  --table-header-bg: #ccffff;
+  --text-color: #000000;
+  --warning-color: #f39c12;
+}
+

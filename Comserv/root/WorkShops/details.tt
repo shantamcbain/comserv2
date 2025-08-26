@@ -1,0 +1,53 @@
+[% PageVersion = 'WorkShops/details.tt,v 0.01 2024/03/11 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+ [% PageVersion %]
+[% END %]
+
+<h1>Workshop Details</h1>
+
+<table>
+    <tr>
+        <th>Field</th>
+        <th>Value</th>
+    </tr>
+    <tr>
+        <td>Title</td>
+        <td>[% workshop.title %]</td>
+    </tr>
+    <tr>
+        <td>Description</td>
+        <td>[% workshop.description %]</td>
+    </tr>
+    <tr>
+        <td>Date</td>
+        <td>[% formatted_date %]</td>
+    </tr>
+    <tr>
+        <td>End Time</td>
+        <td>[% workshop.end_time %]</td>
+    </tr>
+    <tr>
+        <td>Time</td>
+        <td>[% workshop.time %]</td>
+    </tr>
+    <tr>
+        <td>Location</td>
+        <td>[% workshop.location %]</td>
+    </tr>
+    <tr>
+        <td>Instructor</td>
+        <td>[% workshop.instructor %]</td>
+    </tr>
+    <tr>
+        <td>Max Participants</td>
+        <td>[% workshop.max_participants %]</td>
+    </tr>
+</table>
+[% IF c.user_exists && c.session.roles.match('admin') %]
+    <a href="/workshop/edit/[% workshop.id %]">Edit</a>
+[% END %]
+[% IF error %]
+    <p class="error">[% error %]</p>
+[% END %]
+
+<!-- Rest of your template code -->

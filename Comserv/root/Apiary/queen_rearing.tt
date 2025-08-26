@@ -1,0 +1,136 @@
+[% META title = 'Queen Rearing System' %]
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>Queen Rearing System</h1>
+            <p class="lead">Welcome to the Queen Rearing System. This system helps beekeepers manage their queen rearing operations.</p>
+            
+            <div class="alert alert-info">
+                <strong>Note:</strong> This system is currently under development. More features will be added soon.
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3>Queen Rearing Calendar</h3>
+                </div>
+                <div class="card-body">
+                    <p>The queen rearing process follows a strict timeline. Use this calendar to plan your grafting and emergence dates.</p>
+                    <table class="table table-bordered">
+                        <thead>
+                            <tr>
+                                <th>Day</th>
+                                <th>Event</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Day 0</td>
+                                <td>Grafting</td>
+                                <td>Transfer larvae to queen cups</td>
+                            </tr>
+                            <tr>
+                                <td>Day 4</td>
+                                <td>Cell Capping</td>
+                                <td>Queen cells are capped</td>
+                            </tr>
+                            <tr>
+                                <td>Day 10</td>
+                                <td>Cell Transfer</td>
+                                <td>Transfer cells to mating nucs</td>
+                            </tr>
+                            <tr>
+                                <td>Day 16</td>
+                                <td>Virgin Emergence</td>
+                                <td>Virgin queens emerge</td>
+                            </tr>
+                            <tr>
+                                <td>Day 21-28</td>
+                                <td>Mating Flights</td>
+                                <td>Queens take mating flights</td>
+                            </tr>
+                            <tr>
+                                <td>Day 30+</td>
+                                <td>Laying</td>
+                                <td>Queens begin laying eggs</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3>Queen Rearing Methods</h3>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group">
+                        <li class="list-group-item">Grafting Method</li>
+                        <li class="list-group-item">Jenter/Nicot System</li>
+                        <li class="list-group-item">Miller Method</li>
+                        <li class="list-group-item">Alley Method</li>
+                        <li class="list-group-item">Hopkins Method</li>
+                        <li class="list-group-item">Cloake Board Method</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3>Queen Management</h3>
+                </div>
+                <div class="card-body">
+                    <p>Track and manage your queens:</p>
+                    <form action="/Apiary/frames_for_queen" method="get" class="mb-3">
+                        <div class="input-group">
+                            <input type="text" name="queen_tag_number" class="form-control" placeholder="Enter queen tag number">
+                            <div class="input-group-append">
+                                <button type="submit" class="btn btn-primary">View Frames</button>
+                            </div>
+                        </div>
+                    </form>
+                    <div class="list-group mt-3">
+                        <a href="/Apiary/frames_for_queen/Q2023-001" class="list-group-item list-group-item-action">Queen Q2023-001</a>
+                        <a href="/Apiary/frames_for_queen/Q2023-002" class="list-group-item list-group-item-action">Queen Q2023-002</a>
+                        <a href="/Apiary/frames_for_queen/Q2023-003" class="list-group-item list-group-item-action">Queen Q2023-003</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3>Resources</h3>
+                </div>
+                <div class="card-body">
+                    <p>Learn more about queen rearing with these resources:</p>
+                    <ul>
+                        <li><a href="#">Queen Rearing Essentials</a></li>
+                        <li><a href="#">Grafting Techniques</a></li>
+                        <li><a href="#">Mating Nuc Management</a></li>
+                        <li><a href="#">Queen Marking Guide</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3>Return to Apiary Management</h3>
+                </div>
+                <div class="card-body">
+                    <a href="/Apiary" class="btn btn-primary">Back to Apiary Management</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

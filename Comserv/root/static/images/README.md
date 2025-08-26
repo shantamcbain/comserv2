@@ -1,0 +1,45 @@
+# Comserv Images
+
+This directory contains all image assets used by the Comserv application.
+
+## Directory Structure
+
+- **icons/**: Contains SVG icon files used throughout the application
+- **Mcoop/**: Contains images specific to the Monashee Coop site
+- **BMaster/**: Contains images for the BMaster site
+- Other site-specific directories
+
+## Icon System
+
+The `icons/` directory contains SVG files that are used by the application's icon system. These icons are referenced in the CSS and used to replace Font Awesome icons with locally hosted alternatives.
+
+### Adding New Icons
+
+To add new icons:
+
+1. Create an SVG file in the `icons/` directory
+2. Add a corresponding entry in the `svg-icons.css` file
+3. Use the icon in your templates with the appropriate class
+
+You can also use the `generate_icons.pl` script in the icons directory to generate multiple icons at once.
+
+## Image Guidelines
+
+- Keep images optimized for web use (compress when possible)
+- Use SVG for icons and simple graphics
+- Use PNG for complex images with transparency
+- Use JPG for photographs
+- Keep file sizes under 100KB when possible
+- Use descriptive filenames
+
+## Maintenance
+
+When adding new images:
+
+1. Place them in the appropriate directory
+2. Optimize them for web use
+3. Document them in this README if they serve a special purpose
+
+## Last Updated
+
+June 2, 2024

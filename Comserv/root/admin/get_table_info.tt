@@ -1,0 +1,35 @@
+[% PageVersion = 'Admin/get_table_info.tt,v 0.01 2024/05/30 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<h1>Table Information</h1>
+
+[% IF error %]
+    <p><strong>Error:</strong> [% error %]</p>
+[% ELSE %]
+    <h2>Table: [% table_name %]</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Column Name</th>
+                <th>Data Type</th>
+                <th>Is Nullable?</th>
+                <th>Default Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            [% FOREACH column IN table_info.keys %]
+                <tr>
+                    <td>[% column %]</td>
+                    <td>[% table_info.$column.data_type %]</td>
+                    <td>[% table_info.$column.is_nullable ? 'Yes' : 'No' %]</td>
+                    <td>[% table_info.$column.default_value OR 'None' %]</td>
+                </tr>
+            [% END %]
+        </tbody>
+    </table>
+[% END %]
+
+<p><a href="[% c.uri_for('/admin') %]">Back to Admin Home</a></p>

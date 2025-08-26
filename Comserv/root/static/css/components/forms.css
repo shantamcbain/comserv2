@@ -1,0 +1,95 @@
+/* Form styles */
+form {
+  margin-bottom: var(--spacing-large);
+}
+
+.form-group {
+  margin-bottom: var(--spacing-medium);
+}
+
+label {
+  display: block;
+  margin-bottom: var(--spacing-small);
+  font-weight: bold;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="date"],
+input[type="time"],
+input[type="url"],
+input[type="search"],
+textarea,
+select {
+  width: 100%;
+  padding: var(--spacing-small);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-family: var(--body-font);
+  font-size: var(--font-size-base);
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="number"]:focus,
+input[type="date"]:focus,
+input[type="time"]:focus,
+input[type="url"]:focus,
+input[type="search"]:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(0, 153, 51, 0.2);
+}
+
+/* Inline forms */
+.form-inline {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-small);
+}
+
+.form-inline label {
+  margin-bottom: 0;
+  margin-right: var(--spacing-small);
+}
+
+/* Form validation */
+.form-error {
+  color: var(--warning-color);
+  font-size: var(--font-size-small);
+  margin-top: var(--spacing-small);
+}
+
+input.error,
+textarea.error,
+select.error {
+  border-color: var(--warning-color);
+}
+
+/* Success message */
+.form-success {
+  color: var(--success-color);
+  padding: var(--spacing-medium);
+  border: 1px solid var(--success-color);
+  border-radius: 4px;
+  margin-bottom: var(--spacing-large);
+}
+
+/* Warning message */
+.warning {
+  font-family: var(--body-font);
+  font-size: var(--font-size-large);
+  color: var(--warning-color);
+  background: #f8f8f8;
+  text-align: center;
+  vertical-align: top;
+  border: medium solid var(--success-color);
+  border-style: dashed;
+  padding: var(--spacing-medium);
+  margin-bottom: var(--spacing-large);
+}

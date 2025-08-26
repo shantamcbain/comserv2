@@ -1,0 +1,58 @@
+[% PageVersion = 'Documentation/Inventory.tt,v 0.01 2024/12/14 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<h2 id="inventory"><a href="#documentation_top">Inventory Management</a></h2>
+
+<h3>Table of Contents</h3>
+<ul>
+    <li><a href="#inventory_overview">Inventory Overview</a></li>
+    <li><a href="#item_management">Item Management</a></li>
+    <li><a href="#supplier_management">Supplier Management</a></li>
+    <li><a href="#sub_items">Sub-Items</a></li>
+</ul>
+
+<p>The Inventory module provides tools for managing items, their attributes, suppliers, and sub-items within the Comserv application.</p>
+
+<h3 id="inventory_overview"><a href="#inventory">Inventory Overview</a></h3>
+
+<p>Inventory Management in Comserv involves tracking and managing all physical assets and their components:</p>
+
+<ul>
+    <li><strong>Stock Levels:</strong> Monitor current stock levels to ensure adequate supply.</li>
+    <li><strong>Reordering:</strong> Automate or manage manual reorder processes when stock falls below set thresholds.</li>
+    <li><strong>Supplier Links:</strong> Associate items with one or more suppliers for procurement.</li>
+</ul>
+
+<h3 id="item_management"><a href="#inventory">Item Management</a></h3>
+
+<p>Item Management features include:</p>
+
+<ul>
+    <li><strong>Item Creation:</strong> Add new items with attributes like name, description, color, and images.</li>
+    <li><strong>Item Modification:</strong> Update existing item details including stock status, pricing, and attributes.</li>
+    <li><strong>Item Deletion:</strong> Remove items no longer in use from the inventory system.</li>
+</ul>
+
+<h3 id="supplier_management"><a href="#inventory">Supplier Management</a></h3>
+
+<p>Supplier Management involves:</p>
+
+<ul>
+    <li><strong>Supplier Registration:</strong> Add new suppliers with contact details, lead times, and product offerings.</li>
+    <li><strong>Supplier Updates:</strong> Modify supplier information, including contact changes or updated product lists.</li>
+    <li><strong>Supplier-Item Association:</strong> Link items to suppliers for easy procurement and pricing updates.</li>
+</ul>
+
+<h3 id="sub_items"><a href="#inventory">Sub-Items</a></h3>
+
+<p>Sub-items management allows for:</p>
+
+<ul>
+    <li><strong>Dependency Tracking:</strong> Track which items are composed of what sub-items, ensuring all components are available.</li>
+    <li><strong>Availability Checks:</strong> Automatically check the availability of sub-items when an item is ordered or assembled.</li>
+    <li><strong>Reordering Sub-Items:</strong> Trigger reorders for sub-items when they run low, ensuring continuous production or assembly.</li>
+</ul>
+
+<p>For more detailed instructions on how to use these features, please refer to the specific documentation for each aspect of inventory management as we continue to develop and refine our strategies.</p>

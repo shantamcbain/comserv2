@@ -1,0 +1,123 @@
+[% PageTitle = "DBI Setup for AutoCRUD Integration" %]
+[%  "Documentation/DBIDocument.tt,v 0.03 2025/01/02 Shanta Exp shanta" %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [%# "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+
+<h1>DBI Setup for AutoCRUD Integration</h1>
+<p>With the integration of `Catalyst::Plugin::AutoCRUD`, we enhance our database operations by providing an automatic CRUD interface for managing content within our Catalyst application, 'Comserv'.</p>
+<p>AI features will further enhance the capabilities of AutoCRUD, allowing for intelligent data management and user interactions.</p>
+
+<h2>Integration Plan for AutoCRUD</h2>
+
+<h3>Step 1: Setup & Configuration</h3>
+<ul>
+    <li><strong>Install AutoCRUD:</strong> Use CPAN or your preferred method to install `Catalyst::Plugin::AutoCRUD`.</li>
+    <li><strong>Update Catalyst Configuration: add into Conserv.pmS</strong>
+<pre><code>
+use Catalyst qw/
+    ConfigLoader
+    Static::Simple
+    AutoCRUD
+/;
+
+PACKAGE->config(
+    name => 'Comserv',
+    'Plugin::AutoCRUD' => {
+        login_url => /user/login',
+        logout_url => '/user/logout',
+        # More configurations as per your needs
+    },
+);
+
+PACKAGE->setup;
+</code></pre>
+    </li>
+</ul>
+
+<h3>Step 2: Database Schema Migration</h3>
+<ul>
+    <li><strong>Define New Schema:</strong> Use `DBIx::Class::Schema::Loader` to generate Object-Relational Mapping (ORM) classes from your existing database schema. Adjust these classes to normalize the data structure:
+<pre><code>
+script/comserv_create.pl model DB::PageSchema DBIx::Class::Schema::Loader create=static dbi:mysql:database=ComservDb root password
+</code></pre>
+    </li>
+    <li><strong>Normalize Data:</strong>
+        <ul>
+            <li>Create separate tables for pages, content, metadata, etc., to break down the monolithic 'page.db' structure.</li>
+            <li>Define relationships between these tables in your schema classes.</li>
+        </ul>
+    </li>
+    <li><strong>Data Migration:</strong>
+        <ul>
+            <li>Write a Perl script to read from the old `page.db` table and insert data into the new normalized schema:</li>
+<pre><code>
+use DBI;
+use Comserv::Model::DB::PageSchema;
+
+Connect to old database
+my $dbh_old = DBI->connect("dbi:mysql:dbname=old_db", "username", "password") or die $DBI::errstr;
+
+Connect to new database using ORM
+my $schema = Comserv::Model::DB::PageSchema->connect($c->config->{Model::DB::PageSchema}->{connect_info});
+
+Fetch all data from old table
+my $sth = $dbh_old->prepare("SELECT * FROM page");
+$sth->execute();
+
+while (my $row = $sth->fetchrow_hashref) {
+    # Convert old data to fit new schema
+    my $page = $schema->resultset('Page')->create({
+        title => $row->{title},
+        content => $row->{content},
+        # Map other fields accordingly
+    });
+    # Handle links or other nested data here
+}
+
+Cleanup
+$sth->finish;
+$dbh_old->disconnect;
+</code></pre>
+        </ul>
+    </li>
+</ul>
+
+<h3>Step 3: Implement CRUD Operations</h3>
+<ul>
+    <li><strong>Define Access:</strong> Ensure that AutoCRUD has the necessary permissions to interact with your new schema.</li>
+    <li><strong>Create CRUD Controllers:</strong> Let AutoCRUD generate basic Create, Read, Update, and Delete (CRUD) controllers for your models, which you can customize further:
+<pre><code>
+$c->action_namespace("")->auto_crud({
+    resultset => 'Page',
+    columns => [qw/id title content/],
+    # Further customization options
+});
+</code></pre>
+    </li>
+</ul>
+
+<h3>Step 4: Testing & Deployment</h3>
+<ul>
+    <li><strong>Test the CRUD Interface:</strong> Ensure all operations work as expected, especially with the migrated normalized data.</li>
+    <li><strong>Deployment:</strong> Update your deployment scripts to include the new schema and AutoCRUD configurations.</li>
+</ul>
+
+<h3>Step 5: Update Documentation & Training</h3>
+<ul>
+    <li><strong>Document New Processes:</strong> Update this document and any other relevant documentation to reflect changes in database structure and management.</li>
+    <li><strong>Training:</strong> Train content editors on the new system, focusing on the web-based CRUD operations provided by AutoCRUD.</li>
+</ul>
+
+<h2>Debugging</h2>
+<p>Continue using the existing debugging setup, and add AutoCRUD-specific debugging where necessary.</p>
+
+<h2>Security</h2>
+<p>Ensure that security measures are maintained or enhanced, particularly focusing on data integrity and access control with the new schema setup.</p>
+
+<h2>Catalyst Integration</h2>
+<p>The `DB::PageSchema` module now integrates with Catalyst to manage page content through AutoCRUD, using the Catalyst context for session management and other features.</p>
+
+<p>For further enhancements using Artificial Intelligence (AI), please refer to the <a href="#AI">AI Integration Plan</a>.</p>

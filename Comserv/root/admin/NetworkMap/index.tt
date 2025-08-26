@@ -1,0 +1,141 @@
+[% META title = 'Network Map Administration' %]
+
+<div class="container">
+    <h1>Network Map Administration</h1>
+    
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h2>Actions</h2>
+                </div>
+                <div class="card-body">
+                    <a href="[% c.uri_for('/admin/NetworkMap/add_network') %]" class="btn btn-primary">Add Network</a>
+                    <a href="[% c.uri_for('/admin/NetworkMap/add_device') %]" class="btn btn-success">Add Device</a>
+                    <a href="[% c.uri_for('/admin/NetworkMap/export_json') %]" class="btn btn-info">Export JSON</a>
+                    <a href="[% c.uri_for('/admin/NetworkMap/export_text') %]" class="btn btn-secondary">Export Text</a>
+                    
+                    <div class="float-right">
+                        <form method="post" action="[% c.uri_for('/admin/NetworkMap/sync_with_db') %]" class="form-inline">
+                            <select name="direction" class="form-control mr-2">
+                                <option value="to_db">JSON to Database</option>
+                                <option value="from_db">Database to JSON</option>
+                            </select>
+                            <button type="submit" class="btn btn-warning">Synchronize</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h2>Filter Devices</h2>
+                </div>
+                <div class="card-body">
+                    <form method="get" action="[% c.uri_for('/admin/NetworkMap') %]" class="form-inline">
+                        <label for="site" class="mr-2">Site:</label>
+                        <select name="site" id="site" class="form-control mr-2">
+                            <option value="">All Sites</option>
+                            [% FOREACH site IN sites %]
+                                <option value="[% site.name %]" [% IF site_filter == site.name %]selected[% END %]>[% site.name %]</option>
+                            [% END %]
+                        </select>
+                        <button type="submit" class="btn btn-primary">Filter</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h2>Networks</h2>
+                </div>
+                <div class="card-body">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Network ID</th>
+                                <th>Name</th>
+                                <th>CIDR</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            [% IF networks.size %]
+                                [% FOREACH network_id IN networks.keys.sort %]
+                                    <tr>
+                                        <td>[% network_id %]</td>
+                                        <td>[% networks.$network_id.name %]</td>
+                                        <td>[% networks.$network_id.cidr %]</td>
+                                        <td>[% networks.$network_id.description %]</td>
+                                    </tr>
+                                [% END %]
+                            [% ELSE %]
+                                <tr>
+                                    <td colspan="4" class="text-center">No networks defined</td>
+                                </tr>
+                            [% END %]
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h2>Devices</h2>
+                </div>
+                <div class="card-body">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>IP Address</th>
+                                <th>MAC Address</th>
+                                <th>Type</th>
+                                <th>Network</th>
+                                <th>Site</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            [% IF devices.size %]
+                                [% FOREACH device_name IN devices.keys.sort %]
+                                    [% SET device = devices.$device_name %]
+                                    [% SET network_name = networks.${device.network}.name || 'Unknown' %]
+                                    <tr>
+                                        <td>[% device_name %]</td>
+                                        <td>[% device.ip %]</td>
+                                        <td>[% device.mac %]</td>
+                                        <td>[% device.type %]</td>
+                                        <td>[% network_name %]</td>
+                                        <td>[% device.site_name %]</td>
+                                        <td>
+                                            <a href="[% c.uri_for('/admin/NetworkMap/view_device', device_name) %]" class="btn btn-sm btn-info">View</a>
+                                            <a href="[% c.uri_for('/admin/NetworkMap/edit_device', device_name) %]" class="btn btn-sm btn-warning">Edit</a>
+                                            <a href="[% c.uri_for('/admin/NetworkMap/remove_device', device_name) %]" class="btn btn-sm btn-danger">Remove</a>
+                                        </td>
+                                    </tr>
+                                [% END %]
+                            [% ELSE %]
+                                <tr>
+                                    <td colspan="7" class="text-center">No devices found</td>
+                                </tr>
+                            [% END %]
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

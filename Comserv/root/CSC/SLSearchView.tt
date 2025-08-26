@@ -1,0 +1,31 @@
+
+<FORM action="" method="post">
+<TABLE BORDER ="0" COLSPAN = "2">
+<TR>
+    <TD>
+    <FONT FACE = "Helvetica, Arial, San Serif" SIZE = "2"><B>Search Answers ( Keywords )</B></FONT></TD>
+    <TD>
+    <FONT FACE = "ARIAL, HELVETICA" SIZE = "1"><INPUT SIZE = "30" TYPE = "TEXT" NAME = "search_answers"></FONT></TD>
+</TR>
+
+<TR>
+    <TD>
+    <FONT FACE = "Helvetica, Arial, San Serif" SIZE = "2"><B>Search Category</B></FONT></TD>
+    <TD>
+    <SELECT NAME="category">
+        <OPTION VALUE="null"><FONT FACE = "ARIAL, HELVETICA" SIZE = "1">Select a Category</FONT>
+        <OPTION VALUE="null"><FONT FACE = "ARIAL, HELVETICA" SIZE = "1">Search All</FONT>
+        <OPTION VALUE="Install"><FONT FACE = "ARIAL, HELVETICA" SIZE = "1">Installation</FONT>
+        <OPTION VALUE=" Postgres"><FONT FACE = "ARIAL, HELVETICA" SIZE = "1">SQL</FONT>
+    </SELECT></TD>
+</TR>
+
+<TR COLSPAN = "2">
+    <TD>
+                <INPUT TYPE="SUBMIT" NAME="display_simple_search_results"
+               VALUE = " Search Answer        "> 
+    </TD>
+</TR>
+
+</TABLE>
+</FORM>

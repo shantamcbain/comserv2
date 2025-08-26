@@ -1,0 +1,58 @@
+[% PageVersion = 'admin/list_migrations.tt,v 0.01 2024/03/01 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<h1>Database Migration Scripts</h1>
+
+<div class="migration-list">
+    [% IF migration_files.size %]
+        <table class="migrations-table">
+            <thead>
+                <tr>
+                    <th>Migration File</th>
+                    <th>Date Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                [% FOREACH file IN migration_files %]
+                    <tr>
+                        <td>[% file %]</td>
+                        <td>[% USE Date %][% Date.format(migrations_dir _ '/' _ file.stat.mtime, '%Y-%m-%d %H:%M:%S') %]</td>
+                        <td>
+                            <a href="[% c.uri_for('/admin/view_migration', file) %]" class="button">View</a>
+                            <a href="[% c.uri_for('/admin/run_migration', file) %]" class="button" onclick="return confirm('Are you sure you want to run this migration?')">Run</a>
+                        </td>
+                    </tr>
+                [% END %]
+            </tbody>
+        </table>
+    [% ELSE %]
+        <p>No migration scripts found.</p>
+    [% END %]
+</div>
+
+<style>
+.migrations-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+}
+
+.migrations-table th,
+.migrations-table td {
+    padding: 8px;
+    border: 1px solid #ddd;
+    text-align: left;
+}
+
+.button {
+    padding: 5px 10px;
+    margin: 0 5px;
+    background: #007bff;
+    color: white;
+    text-decoration: none;
+    border-radius: 3px;
+}
+</style>

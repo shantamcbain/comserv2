@@ -1,0 +1,21 @@
+[% PageVersion	= 'site/index.tt,v 0.01 2023/11/28 shanta Exp shanta '	%]
+[% IF debug_mode == 1 %]
+ [%	PageVersion %]
+[% END %]
+<h1>Site List</h1>
+<table>
+    <tr>
+        <th>Domain ID</th>
+        <th>Site ID</th>
+        <th>Domain</th>
+        <th>Edit</th>
+    </tr>
+    [% FOREACH domain IN domains %]
+    <tr>
+        <td>[% domain.id %]</td>
+        <td>[% domain.site_id %]</td>
+        <td>[% domain.domain %]</td>
+        <td><a href="/site/edit_domain/[% domain.id %]">Edit</a></td>
+    </tr>
+    [% END %]
+</table>
