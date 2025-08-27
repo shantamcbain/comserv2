@@ -52,6 +52,8 @@ Comserv/local/
 
 # Logs
 Comserv/logs/
+Comserv/script/logs/
+*.log
 
 # Temporary files
 _deparsed_XSubs.pm
