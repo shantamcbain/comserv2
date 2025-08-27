@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<project version="4">
-  <component name="ai.zencoder.plugin.chat.index">
-    <option name="activeChatId" value="9f426d99-e586-4457-a163-751c18597fab" />
-    <option name="chatMetadata" value="{&quot;9f426d99-e586-4457-a163-751c18597fab&quot;:{&quot;id&quot;:&quot;9f426d99-e586-4457-a163-751c18597fab&quot;,&quot;title&quot;:&quot;Git Branching Merge Conflicts&quot;,&quot;createdAt&quot;:1756220027845,&quot;updatedAt&quot;:1756220916958,&quot;isNameGenerated&quot;:true,&quot;messageCount&quot;:24,&quot;lastMessagePreview&quot;:&quot;## The Fix Plan\n\n**Problem**: Main branch has ~325 files with invalid names that will break the appl...&quot;}}" />
-  </component>
-</project>
