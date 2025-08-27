@@ -1,1 +1,0 @@
-{"version":"0.37","dist":"Catalyst-View-JSON-0.37","name":"Catalyst::View::JSON","pathname":"H/HA/HAARG/Catalyst-View-JSON-0.37.tar.gz","provides":{"Catalyst::View::JSON":{"version":"0.37","file":"lib/Catalyst/View/JSON.pm"},"Catalyst::Helper::View::JSON":{"file":"lib/Catalyst/Helper/View/JSON.pm"}},"target":"Catalyst::View::JSON"}
