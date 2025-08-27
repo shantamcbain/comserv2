@@ -3,6 +3,9 @@
            <li class="horizontal-dropdown">
                 <a href="/HelpDesk" class="dropbtn">HelpDesk</a>
                 <div class="dropdown-content">
+                    [% IF c.session.username %]
+                    <a href="/navigation/add_link"><i class="icon-add"></i>Add Link</a>
+                    [% END %]
                     [% IF c.session.roles && c.session.roles.grep('^admin$').size %]
                     <a href="/HelpDesk/admin"><i class="icon-admin"></i>HelpDesk Admin</a>
                     [% END %]
@@ -25,5 +28,3 @@
                     [% END %]
                 </div>
             </li>
-
-

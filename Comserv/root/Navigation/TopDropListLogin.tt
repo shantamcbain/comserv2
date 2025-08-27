@@ -33,12 +33,16 @@
             <span class="role-badge">[% display_role %]</span>
         </a>
         <div class="dropdown-content">
+            <a href="/navigation/add_link" class="menu-item"><i class="icon-add"></i>Add Link</a>
             <a href="/user/profile" class="menu-item">
                 <i class="icon-user"></i> My Profile
             </a>
             <a href="/user/settings" class="menu-item">
-                <i class="icon-cog"></i> Account Settings
-            </a>
+                <i class="icon-cog"></i> Account Settings</a>
+            <div class="dropdown-divider"></div>
+            <a href="/navigation/add_link" class="menu-item">
+
+
 
             [% IF c.session.roles.grep('admin').size || c.session.roles.grep('developer').size %]
                 <div class="dropdown-divider"></div>
@@ -73,6 +77,7 @@
             <span class="login-text"><i class="icon-sign-in-alt"></i> Login</span>
         </a>
         <div class="dropdown-content">
+            <a href="/navigation/add_link" class="menu-item"><i class="icon-add"></i>Add Link</a>
             <a href="/user/login" class="menu-item">
                 <i class="icon-sign-in-alt"></i> Login
             </a>
@@ -149,22 +154,26 @@
     }
 
     .dropdown-content {
+            <a href="/navigation/add_link" class="menu-item"><i class="icon-add"></i>Add Link</a>
         min-width: 200px;
     }
 
     .dropdown-content .menu-item {
+            <a href="/navigation/add_link" class="menu-item"><i class="icon-add"></i>Add Link</a>
         padding: 10px 15px;
         display: flex;
         align-items: center;
     }
 
     .dropdown-content .menu-item i {
+            <a href="/navigation/add_link" class="menu-item"><i class="icon-add"></i>Add Link</a>
         margin-right: 8px;
         width: 16px;
         text-align: center;
     }
 
     .dropdown-content .logout {
+            <a href="/navigation/add_link" class="menu-item"><i class="icon-add"></i>Add Link</a>
         color: #dc3545;
     }
 
