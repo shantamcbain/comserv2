@@ -311,7 +311,7 @@ sub add_link :Path('/navigation/add_link') :Args(0) {
             $c->flash->{error_msg} = "Name, URL, and category are required fields.";
             $c->stash->{permissions} = $permissions;
             $c->stash->{form_data} = $c->req->params;
-            $c->stash->{template} = 'navigation/add_link.tt';
+            $c->stash->{template} = 'Navigation/add_link.tt';
             return;
         }
         
@@ -320,7 +320,7 @@ sub add_link :Path('/navigation/add_link') :Args(0) {
             $c->flash->{error_msg} = "You don't have permission to create this type of link.";
             $c->stash->{permissions} = $permissions;
             $c->stash->{form_data} = $c->req->params;
-            $c->stash->{template} = 'navigation/add_link.tt';
+            $c->stash->{template} = 'Navigation/add_link.tt';
             return;
         }
         
@@ -364,7 +364,7 @@ sub add_link :Path('/navigation/add_link') :Args(0) {
     $c->stash->{permissions} = $permissions;
     $c->stash->{preset_category} = $preset_category;
     $c->stash->{preset_sitename} = $preset_sitename;
-    $c->stash->{template} = 'navigation/add_link.tt';
+    $c->stash->{template} = 'Navigation/add_link.tt';
 }
 
 # Method to manage all user's links
@@ -386,7 +386,7 @@ sub manage_links :Path('/navigation/manage_links') :Args(0) {
     
     $c->stash->{user_links} = $user_links;
     $c->stash->{permissions} = $permissions;
-    $c->stash->{template} = 'navigation/manage_links.tt';
+    $c->stash->{template} = 'Navigation/manage_links.tt';
 }
 
 # Method to edit a link
@@ -437,7 +437,7 @@ sub edit_link :Path('/navigation/edit_link') :Args(0) {
         unless ($name && $url) {
             $c->flash->{error_msg} = "Name and URL are required fields.";
             $c->stash->{link} = { $link->get_columns };
-            $c->stash->{template} = 'navigation/edit_link.tt';
+            $c->stash->{template} = 'Navigation/edit_link.tt';
             return;
         }
         
@@ -462,7 +462,7 @@ sub edit_link :Path('/navigation/edit_link') :Args(0) {
     
     # Show the edit form
     $c->stash->{link} = { $link->get_columns };
-    $c->stash->{template} = 'navigation/edit_link.tt';
+    $c->stash->{template} = 'Navigation/edit_link.tt';
 }
 
 # Method to delete a link

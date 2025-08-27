@@ -8,6 +8,9 @@
         <li class="horizontal-dropdown">
             <a href="/membership" class="dropbtn">Member</a>
             <div class="dropdown-content">
+                [% IF c.session.username %]
+                <a href="/navigation/add_link"><i class="icon-add"></i>Add Link</a>
+                [% END %]
                 <a href="/membership">Membership Information</a>
                 <a href="/applymembership">Apply for Membership</a>
    [% IF member_links.defined %]

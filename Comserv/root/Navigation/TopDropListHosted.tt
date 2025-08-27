@@ -1,4 +1,4 @@
-[% PageVersion = 'Navigation/TopDropListHosted.tt,v 0.01 2024/01/01hanta Exp shanta ' %]
+[% PageVersion = 'Navigation/TopDropListHosted.tt,v 0.02 2025/08/27hanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [%# PageVersion %]
     [%# "Debugging HostName: " _ HostName %]
@@ -8,6 +8,9 @@
         <li class="horizontal-dropdown">
             <a href="/hosted" class="dropbtn">Hosted</a>
             <div class="dropdown-content">
+                [% IF c.session.username %]
+                <a href="/navigation/add_link"><i class="icon-add"></i>Add Link</a>
+                [% END %]
                 <a href="/apply">Apply for Hosted Account</a>
                 <a href="/accounts">Hosted Accounts</a>
                 <a href="https://shamanbotanicals.ca" target="_blank">shamanbotanicals.ca </a>

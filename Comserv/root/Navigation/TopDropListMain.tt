@@ -11,6 +11,9 @@
          <li class="horizontal-dropdown">
                 <a href="/" class="dropbtn"><i class="icon-main"></i>Main</a>
                 <div class="dropdown-content">
+                    [% IF c.session.username %]
+                    <a href="/navigation/add_link"><i class="icon-add"></i>Add Link</a>
+                    [% END %]
                     <a href="/" onclick="activateSite('Home')"><i class="icon-home"></i>Home</a>
                     <a href="[% c.session.return_url %]"><i class="icon-back"></i>Go Back</a>
                <span><a href="/workshop" onclick="activateSite('Workshops')" target="_blenk"><i class="icon-workshop"></i>Workshops</a></span>
@@ -18,71 +21,34 @@
                 <span class="submenu-header"><i class="icon-mail"></i>Mail</span>
                 <div class="submenu">
      [% IF c.session.username == 'Shanta' %]
-    <a href="https://beemaster.ca:20000" target="_Blank">BMaster</a>
-    <a href="https://computersystemconsulting.ca:20000" target="_Blank">CSC</a>
-    <a href="https://forager.com:20000" target="_Blank">Forager</a>
-     <a href="https://grindrodbc.com:20000" target="_Blank">Grindrod</a>
-   <a href="https://helpfullearth.com:20000" target="_Blank">Helpfullearth</a>
-    <a href="https://skyefarm.com:20000" target="_Blank">skyefarm.com</a>
-    <a href="https://usbm.ca:20000" target="_Blank">Usbm</a>
-    <a href="https://weaverbeck.com:20000" target="_Blank">Weaverback</a>
-[% END %][%# HostName %][% MailServer %]
- <!-- Ensure the URL does not include a port number -->
-[% IF c.session.first_name %]
-    <!-- Construct the URL without a port number -->
-    <A HREF="[% c.session.MailServer.replace(':80', '') %]" target="_Blank">[%c.session.first_name %]'s Mail</a>
-[% ELSE %]
-    <A HREF="[% c.session.MailServer.replace(':3000', '') %]" target="_Blank">Mail</a>
-[% END %]
-
- </div>
+                    <a href="http://mail.coop.ca/roundcube/" target="_blank"><i class="icon-webmail"></i>COOP Webmail</a>
+                    <a href="http://wbeck.zapto.org/roundcube/" target="_blank"><i class="icon-webmail"></i>WB Webmail</a>
+      [% END %]
+                    [% FOREACH link = c.stash.dbi.query("SELECT * FROM internal_links_tb WHERE category = 'Main_links' AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
+                        <a href="[% link.url %]?site=[% SiteName %]&amp;[% session_string %]&amp;[% link.view_name %]" name="Contact" target="[% link.target %]" title="[% link.name %]">[% link.name %]</a>
+                    [% END %]
+                </div>
             </div>
-                    <ul>
-      <!-- populate from Page_tb -->
-       [% IF main_pages.defined %]
-           [% FOREACH link IN main_pages %]
-	           <a href="&amp;page=[% link.page_code %]" name="Contact" target="[% link.target %]"
-                  title=" [% linkview_.name %] "><font   class="LeftSideBarNavStyle">[% link.view_name %]</font></a>
-               [% IF c.session.group == 'admin' %]
-                  <a href="/edit_link?link_id=[% link.record_id %]">Edit/Delete</a>
-               [% END %]
-	       [% END %]
-       [% END %]
-	      <!-- populate from links_tb -->
-       [% IF main_links.defined %]
-	       [% FOREACH link IN main_links %]
-	           <a href="[% link.url %]?site=[% SiteName %]&amp;[% link.view_name %]" name="Contact" target="[% link.target %]" title=" [% link.name %] "><font   class="LeftSideBarNavStyle">[% link.name %]</font ></a>
-               [% IF c.session.group == 'admin' %]
-                  <a href="/edit_link/[% link.record_id %]">Edit/Delete</a>
-               [% END %]
-	       [% END %]
-       [% END %]
-       </ul>[% IF c.session.main_links.size %]
-    [% FOREACH link IN c.session.main_links %]
-        <a href="site=[% SiteName %]&amp;page=[% link.page_code %]" name="Contact" target="[% link.target %]" title=" [% link.view_name %] "><font class="LeftSideBarNavStyle">[% link.view_name %]</font></a>
-    [% END %]
-[% END %]
-                    <!-- Add more main menu options
-Main menu -->
-[% "main_links: " _ c.session.main_links | html %]
-<!-- Main menu -->
-
-
-
-
-<!-- Main menu -->
-[% IF c.session.main_links.defined AND c.session.main_links.size %]
-    [% FOREACH link IN c.session.main_links %]
-        test
-        <a href="[% link.url %]">[% link.name %]</a>
-        [% IF c.session.group == 'admin' %]
-            <a href="/edit_link?link_id=[% link.id %]">Edit/Delete</a>
-        [% END %]
-    [% END %]
-[% END %]
-[% IF c.session.group == 'admin' %]
-    <a href="/add_link?menu=main">Add</a>
-[% END %]
-             </div>
+            <div class="submenu-item">
+                <span class="submenu-header"><i class="icon-folder"></i>Shared Folders</span>
+                <div class="submenu">
+                    <a href="/Shares"><i class="icon-cloud"></i>File Shares</a>
+                    <a href="/media"><i class="icon-image"></i>Media Server</a>
+                    <a href="/" onclick="activateSite('BMaster')"><i class="icon-drive"></i>BMaster</a>
+                    <a href="/cloud"><i class="icon-sync"></i>Cloud Sync</a>
+                </div>
+            </div>
+            <div class="submenu-item">
+                <span class="submenu-header"><i class="icon-globe"></i>Global Links</span>
+                <div class="submenu">
+                    [% FOREACH link = c.stash.dbi.query("SELECT * FROM internal_links_tb WHERE category = 'Private_links' AND owner = '$username' AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
+                        <a href="[% link.url %]?site=[% SiteName %]&amp;[% session_string %]&amp;[% link.view_name %]" name="Contact" target="[% link.target %]" title="[% link.name %]">[% link.name %]</a>
+                    [% END %]
+                    [% FOREACH link = c.stash.dbi.query("SELECT * FROM page_tb WHERE (menu = 'Main' AND status = 2) AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
+                        <a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=[% link.page_code %]" name="Contact" target="[% link.target %]" title="[% link.view_name %]">[% link.view_name %]</a>
+                    [% END %]
+                </div>
+            </div>
+                </div>
         </li>
-      <!-- End /HTMLTemplates/Default/TopDropListMain.ttml -->
+        <!-- End /HTMLTemplates/Default/TopDropListMain.tt-->

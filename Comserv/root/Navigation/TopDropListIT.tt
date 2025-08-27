@@ -1,8 +1,11 @@
-[% PageVersion = 'TopDropListIT.tt,v 1.0 2025/05/15 Shanta Exp Shanta' %]
+[% PageVersion = 'TopDropListIT.tt,v 1.01 2025/08/27 Shanta Exp Shanta' %]
 
 <li class="horizontal-dropdown">
     <a href="/it" class="dropbtn">IT</a>
     <div class="dropdown-content">
+        [% IF c.session.username %]
+        <a href="/navigation/add_link"><i class="icon-add"></i>Add Link</a>
+        [% END %]
         <a href="/it">IT Home</a>
         <a href="/it/resources">Resources</a>
         <a href="/it/documentation">Documentation</a>
