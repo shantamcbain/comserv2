@@ -1,1 +1,0 @@
-{"dist":"Sereal-Encoder-5.004","pathname":"Y/YV/YVES/Sereal-Encoder-5.004.tar.gz","version":"5.004","name":"Sereal::Encoder","target":"Sereal::Encoder","provides":{"Sereal::Encoder":{"file":"lib/Sereal/Encoder.pm","version":"5.004"},"Sereal::Encoder::Constants":{"file":"lib/Sereal/Encoder/Constants.pm","version":"5.004"}}}

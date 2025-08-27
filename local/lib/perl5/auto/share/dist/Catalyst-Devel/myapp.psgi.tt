@@ -1,8 +1,0 @@
-use strict;
-use warnings;
-
-use [% name %];
-
-my $app = [% name %]->apply_default_middlewares([% name %]->psgi_app);
-$app;
-
