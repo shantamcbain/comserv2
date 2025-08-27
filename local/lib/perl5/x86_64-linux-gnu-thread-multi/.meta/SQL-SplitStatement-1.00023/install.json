@@ -1,1 +1,0 @@
-{"pathname":"V/VE/VEESH/SQL-SplitStatement-1.00023.tar.gz","dist":"SQL-SplitStatement-1.00023","target":"SQL::SplitStatement","name":"SQL::SplitStatement","version":"1.00023","provides":{"SQL::SplitStatement":{"file":"lib/SQL/SplitStatement.pm","version":"1.00023"},"SQL::SplitStatement::Tokenizer":{"file":"lib/SQL/SplitStatement/Tokenizer.pm","version":"1.00023"}}}

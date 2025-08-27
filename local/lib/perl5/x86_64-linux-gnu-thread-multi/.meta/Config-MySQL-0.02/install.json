@@ -1,1 +1,0 @@
-{"provides":{"Config::MySQL::Reader":{"version":"0.02","file":"lib/Config/MySQL/Reader.pm"},"Config::MySQL::Writer":{"file":"lib/Config/MySQL/Writer.pm","version":"0.02"},"Config::MySQL":{"file":"lib/Config/MySQL.pm","version":"0.02"}},"target":"Config::MySQL","name":"Config::MySQL","version":"0.02","pathname":"I/IA/IARNELL/Config-MySQL-0.02.tar.gz","dist":"Config-MySQL-0.02"}

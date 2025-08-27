@@ -1,1 +1,0 @@
-{"pathname":"E/ET/ETHER/Object-Signature-1.08.tar.gz","dist":"Object-Signature-1.08","target":"Object::Signature","name":"Object::Signature","version":"1.08","provides":{"Object::Signature":{"version":"1.08","file":"lib/Object/Signature.pm"},"Object::Signature::File":{"file":"lib/Object/Signature/File.pm","version":"1.08"}}}
