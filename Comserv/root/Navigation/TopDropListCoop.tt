@@ -4,5 +4,13 @@
 [% END %]
 
 <!-- Start /Navigation/TopDropListCoop.tt -->
-<!-- MCOOP menu has been removed and merged into the Admin menu -->
+        <li class="horizontal-dropdown">
+            <a href="/coop" class="dropbtn"><i class="icon-coop"></i>COOP</a>
+            <div class="dropdown-content">
+                [% IF c.session.username %]
+                <a href="/navigation/add_link"><i class="icon-add"></i>Add Link</a>
+                [% END %]
+                <!-- COOP content would go here -->
+            </div>
+        </li>
 <!-- End /Navigation/TopDropListCoop.tt -->

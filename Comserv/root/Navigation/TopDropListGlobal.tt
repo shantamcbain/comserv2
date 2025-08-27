@@ -7,6 +7,9 @@
         <li class="horizontal-dropdown">
             <a href="#" class="dropbtn"><i class="icon-global"></i>Global</a>
             <div class="dropdown-content">
+                [% IF c.session.username %]
+                <a href="/navigation/add_link"><i class="icon-add"></i>Add Link</a>
+                [% END %]
                 <a href="/mail"><i class="icon-mail"></i>Mail</a>
                 <a href="/jobs"><i class="icon-file"></i>Jobs</a>
                 <a href="/join"><i class="icon-user-plus"></i>Join</a>

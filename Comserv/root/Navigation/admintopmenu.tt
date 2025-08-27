@@ -6,7 +6,9 @@
 <li class="horizontal-dropdown">
     <a href="/admin" class="dropbtn"><i class="icon-admin"></i>Admin</a>
     <div class="dropdown-content">
-        <a href="/add_link?menu=admin"><i class="icon-add"></i>Add New Link</a>
+        [% IF c.session.username %]
+        <a href="/navigation/add_link"><i class="icon-add"></i>Add Link</a>
+        [% END %]
         
         <div class="submenu-item">
             <span class="submenu-header"><a href="/admin" class="dropbtn"><i class="icon-admin"></i>Admin</a></span>
@@ -262,6 +264,13 @@
             <span class="submenu-header"><a href="/admin"><i class="icon-link"></i>System Links</a></span>
             <div class="submenu">
                 <a href="/admin/edit_admin_notes"><i class="icon-edit"></i>Edit Admin Notes</a>
+                
+                <!-- Link Management -->
+                <div class="submenu-section">
+                    <span class="submenu-section-title">Navigation Management</span>
+                    <a href="/navigation/add_link"><i class="icon-add"></i>Add New Link</a>
+                    <a href="/navigation/manage_links"><i class="icon-manage"></i>Manage Links</a>
+                </div>
                 
                 <!-- System Management -->
                 <div class="submenu-section">
