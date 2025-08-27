@@ -1,1 +1,0 @@
-{"dist":"YAML-LibYAML-v0.904.0","pathname":"T/TI/TINITA/YAML-LibYAML-v0.904.0.tar.gz","version":"v0.904.0","name":"YAML::LibYAML","provides":{"YAML::LibYAML":{"version":"v0.904.0","file":"lib/YAML/LibYAML.pm"},"YAML::XS":{"version":"v0.904.0","file":"lib/YAML/XS.pm"}},"target":"YAML::XS"}

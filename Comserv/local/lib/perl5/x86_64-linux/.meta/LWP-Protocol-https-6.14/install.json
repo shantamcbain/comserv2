@@ -1,1 +1,0 @@
-{"dist":"LWP-Protocol-https-6.14","name":"LWP::Protocol::https","provides":{"LWP::Protocol::https":{"file":"lib/LWP/Protocol/https.pm","version":"6.14"},"LWP::Protocol::https::Socket":{"version":"6.14","file":"lib/LWP/Protocol/https.pm"}},"target":"LWP::Protocol::https","version":"6.14","pathname":"O/OA/OALDERS/LWP-Protocol-https-6.14.tar.gz"}
