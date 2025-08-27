@@ -1,0 +1,115 @@
+[% PageVersion = 'edit_link.tt,v 0.01 2025/08/19 shanta Exp shanta ' %]
+[% IF debug == 1 %]
+    [% PageVersion %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+
+<div class="container">
+    <h2>Edit Link</h2>
+    
+    [% IF error_msg %]
+        <div class="alert alert-danger">
+            [% error_msg %]
+        </div>
+    [% END %]
+    
+    [% IF success_msg %]
+        <div class="alert alert-success">
+            [% success_msg %]
+        </div>
+    [% END %]
+    
+    <div class="link-info">
+        <p><strong>Link Type:</strong> 
+            <span class="badge badge-[% IF link.category == 'Private_links' %]secondary[% ELSE %]primary[% END %]">
+                [% IF link.category == 'Private_links' %]Private[% ELSE %]Public[% END %]
+            </span>
+        </p>
+        <p><strong>Category:</strong> 
+            [% IF link.category == 'Private_links' %]
+                Private Links
+            [% ELSE %]
+                [% link.category.replace('_', ' ') | ucfirst %]
+            [% END %]
+        </p>
+        <p><strong>Site:</strong> [% link.sitename %]</p>
+    </div>
+    
+    <form method="POST" action="/navigation/edit_link?id=[% link.id %]">
+        <div class="form-group">
+            <label for="name">Link Name:</label>
+            <input type="text" id="name" name="name" class="form-control" 
+                   value="[% link.name | html %]" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="url">URL:</label>
+            <input type="url" id="url" name="url" class="form-control" 
+                   value="[% link.url | html %]" required placeholder="https://example.com">
+        </div>
+        
+        <div class="form-group">
+            <label for="target">Target:</label>
+            <select id="target" name="target" class="form-control">
+                <option value="_self" [% IF link.target == '_self' || !link.target %]selected[% END %]>Same Window</option>
+                <option value="_blank" [% IF link.target == '_blank' %]selected[% END %]>New Window</option>
+            </select>
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Update Link</button>
+            <a href="/navigation/manage_links" class="btn btn-secondary">Cancel</a>
+            <a href="/navigation/delete_link?id=[% link.id %]" 
+               class="btn btn-danger" 
+               onclick="return confirm('Are you sure you want to delete this link: [% link.name | html | js %]?')">
+                Delete Link
+            </a>
+        </div>
+    </form>
+</div>
+
+<style>
+.link-info {
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+    border: 1px solid #dee2e6;
+}
+
+.link-info p {
+    margin-bottom: 8px;
+}
+
+.link-info p:last-child {
+    margin-bottom: 0;
+}
+
+.badge {
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.badge-primary {
+    background-color: #007bff;
+    color: white;
+}
+
+.badge-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.form-actions {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #ddd;
+}
+
+.form-actions .btn {
+    margin-right: 10px;
+}
+</style>
