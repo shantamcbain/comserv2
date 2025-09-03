@@ -196,7 +196,8 @@ $c->stash->{sites} = $sites;
 
     # Determine the directory to store the file in based on the user's permissions
     my $directory;
-    if ($c->user_exists && $c->check_user_roles('admin')) {
+    my $root_controller = $c->controller('Root');
+    if ($root_controller->user_exists($c) && $root_controller->check_user_roles($c, 'admin')) {
         # If the user is an admin, they can upload to any directory
         $directory = $c->request->param('directory');
     } else {

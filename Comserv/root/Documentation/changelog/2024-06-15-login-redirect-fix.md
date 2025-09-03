@@ -32,12 +32,6 @@ Additionally, the login system now better preserves the original referring page 
 
 ## Affected Files
 
-- `Comserv/lib/Comserv/Controller/User.pm`
-- `Comserv/root/Documentation/controllers/User.md`
-- `Comserv/root/Documentation/tutorials/login_authentication.md`
-- `Comserv/root/Documentation/developer/authentication_system.md`
 
 ## Related Issues
 
-- Fixed "Couldn't render template 'user/do_login.tt: file error - user/do_login.tt: not found'" error
-- Improved user experience by returning to the original page after login

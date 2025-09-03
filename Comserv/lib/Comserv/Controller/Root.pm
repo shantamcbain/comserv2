@@ -162,7 +162,130 @@ BEGIN { extends 'Catalyst::Controller' }
 
 __PACKAGE__->config(namespace => '');
 
-
+# Auto method to set up common stash variables for all requests
+sub auto :Private {
+    my ($self, $c) = @_;
+    
+    # Set up site name
+    $self->fetch_and_set($c, 'SiteName');
+    
+    # Set up theme
+    $self->set_theme($c);
+    
+    # Set up user information for templates
+    # Check both Catalyst auth system and session-based auth
+    my $user_logged_in = 0;
+    my $username = '';
+    my $user_id = '';
+    my $user_roles = [];
+    my $is_admin = 0;
+    
+    if ($c->user_exists) {
+        # Using Catalyst authentication system
+        my $user = $c->user;
+        $user_logged_in = 1;
+        $username = $user->username if $user->can('username');
+        $user_id = $user->id if $user->can('id');
+        $user_roles = $user->roles if $user->can('roles');
+        
+        # Also check session for backward compatibility
+        $c->session->{username} = $username if $username;
+        $c->session->{user_id} = $user_id if $user_id;
+        $c->session->{roles} = $user_roles if $user_roles;
+        
+    } elsif ($self->user_exists($c)) {
+        # Using session-based authentication (backward compatibility)
+        $user_logged_in = 1;
+        $username = $c->session->{username};
+        $user_id = $c->session->{user_id};
+        $user_roles = $c->session->{roles};
+    }
+    
+    # Check admin status
+    if ($user_logged_in) {
+        $is_admin = $self->check_user_roles($c, 'admin');
+    }
+    
+    # Set stash variables
+    $c->stash->{username} = $username;
+    $c->stash->{user_id} = $user_id;
+    $c->stash->{user_roles} = $user_roles;
+    $c->stash->{is_admin} = $is_admin;
+    $c->stash->{user_logged_in} = $user_logged_in;
+    
+    # Set up navigation data
+    my $site_name = $c->stash->{SiteName} || 'All';
+    my $nav_controller = $c->controller('Navigation');
+    
+    if ($nav_controller) {
+        # Ensure navigation tables exist and populate navigation data
+        $nav_controller->populate_navigation($c);
+        
+        # Get main menu items
+        $c->stash->{main_pages} = $nav_controller->get_pages($c, 'Main', $site_name);
+        $c->stash->{member_pages} = $nav_controller->get_pages($c, 'Member', $site_name);
+        $c->stash->{coop_pages} = $nav_controller->get_pages($c, 'Coop', $site_name);
+        $c->stash->{it_pages} = $nav_controller->get_pages($c, 'IT', $site_name);
+        $c->stash->{helpdesk_pages} = $nav_controller->get_pages($c, 'HelpDesk', $site_name);
+        $c->stash->{hosted_pages} = $nav_controller->get_pages($c, 'Hosted', $site_name);
+        
+        # Get internal links
+        $c->stash->{main_links} = $nav_controller->get_internal_links($c, 'Main_links', $site_name);
+        $c->stash->{member_links} = $nav_controller->get_internal_links($c, 'Member_links', $site_name);
+        $c->stash->{coop_links} = $nav_controller->get_internal_links($c, 'Coop_links', $site_name);
+        $c->stash->{it_links} = $nav_controller->get_internal_links($c, 'IT_links', $site_name);
+        $c->stash->{helpdesk_links} = $nav_controller->get_internal_links($c, 'HelpDesk_links', $site_name);
+        $c->stash->{hosted_links} = $nav_controller->get_internal_links($c, 'Hosted_links', $site_name);
+        
+        # Get admin data if user is admin
+        if ($c->stash->{is_admin}) {
+            $c->stash->{admin_pages} = $nav_controller->get_admin_pages($c, $site_name);
+            $c->stash->{admin_links} = $nav_controller->get_admin_links($c, $site_name);
+        }
+        
+        # Get private links for logged in users
+        if ($c->stash->{user_logged_in}) {
+            $c->stash->{private_links} = $nav_controller->get_private_links($c, $c->session->{username}, $site_name);
+        }
+        
+        # Get navigation items from the new navigation system (showing private items only to logged-in users)
+        # Temporarily commented out to restore login functionality
+        # eval {
+        #     my $user_logged_in = $c->stash->{user_logged_in} || 0;
+        #     if ($nav_controller->can('get_navigation_tree')) {
+        #         $c->stash->{navigation_main} = $nav_controller->get_navigation_tree($c, 'Main', $user_logged_in);
+        #         $c->stash->{navigation_member} = $nav_controller->get_navigation_tree($c, 'Member', $user_logged_in);
+        #         $c->stash->{navigation_coop} = $nav_controller->get_navigation_tree($c, 'Coop', $user_logged_in);
+        #         $c->stash->{navigation_it} = $nav_controller->get_navigation_tree($c, 'IT', $user_logged_in);
+        #         $c->stash->{navigation_helpdesk} = $nav_controller->get_navigation_tree($c, 'HelpDesk', $user_logged_in);
+        #         $c->stash->{navigation_hosted} = $nav_controller->get_navigation_tree($c, 'Hosted', $user_logged_in);
+        #         
+        #         # Get admin navigation if user is admin
+        #         if ($c->stash->{is_admin}) {
+        #             $c->stash->{navigation_admin} = $nav_controller->get_navigation_tree($c, 'Admin', $user_logged_in);
+        #         }
+        #     }
+        # };
+        # if ($@) {
+        #     $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
+        #         "Error loading new navigation system: $@");
+        # }
+        
+        # Debug logging for menu data
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto',
+            "Menu data loaded for site '$site_name': " .
+            "main_pages=" . (@{$c->stash->{main_pages} || []} . " items, ") .
+            "main_links=" . (@{$c->stash->{main_links} || []} . " items, ") .
+            "user_logged_in=" . ($c->stash->{user_logged_in} ? 'yes' : 'no') . ", " .
+            "is_admin=" . ($c->stash->{is_admin} ? 'yes' : 'no')
+        );
+    } else {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
+            "Navigation controller not found - menus will be empty");
+    }
+    
+    return 1; # Continue processing
+}
 
 sub index :Path('/') :Args(0) {
     my ($self, $c) = @_;
@@ -457,6 +580,8 @@ sub auto :Private {
         return $uri;
     };
     
+    # Note: user_exists and check_user_roles methods are available via controller('Root')
+    
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Starting auto action with temporary uri_no_port helper");
 
     # Track application start
@@ -646,7 +771,9 @@ sub send_email {
             );
             
             unless ($smtp) {
-                die "Could not connect to SMTP server $smtp_host:$smtp_port: $!";
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'send_email',
+                    "Could not connect to SMTP server $smtp_host:$smtp_port: $!");
+                return 0; # Return failure instead of dying
             }
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',

@@ -1,30 +1,230 @@
+[% PageVersion = 'Navigation/TopDropListHelpDesk.tt,v 0.02 2025/09/03 shanta Exp shanta ' %]
 
- 
-           <li class="horizontal-dropdown">
-                <a href="/HelpDesk" class="dropbtn">HelpDesk</a>
-                <div class="dropdown-content">
-                    [% IF c.session.username %]
-                    <a href="/navigation/add_link"><i class="icon-add"></i>Add Link</a>
-                    [% END %]
+<li class="horizontal-dropdown">
+    <a href="/HelpDesk" class="dropbtn"><i class="icon-helpdesk"></i>HelpDesk</a>
+    <div class="dropdown-content">
+        <!-- Core HelpDesk Services -->
+        <a href="/HelpDesk" class="menu-item"><i class="icon-home"></i>HelpDesk Home</a>
+        <a href="/HelpDesk/ticket/new" class="menu-item"><i class="icon-ticket"></i>Submit a Ticket</a>
+        <a href="/HelpDesk/ticket/status" class="menu-item"><i class="icon-status"></i>Check Ticket Status</a>
+        <a href="/HelpDesk/contact" class="menu-item"><i class="icon-contact"></i>Contact Support</a>
+        
+        [% IF c.session.username %]
+        <div class="dropdown-divider"></div>
+        <a href="/navigation/add_link?menu=HelpDesk" class="menu-item"><i class="icon-add"></i>Add HelpDesk Link</a>
+        [% END %]
+        
+        <!-- Documentation & Knowledge Base -->
+        <div class="dropdown-divider"></div>
+        <div class="submenu-item">
+            <span class="submenu-header"><i class="icon-docs"></i>Documentation & Support</span>
+            <div class="submenu">
+                <a href="/Documentation" class="submenu-link"><i class="icon-docs"></i>Documentation</a>
+                <a href="/HelpDesk/kb" class="submenu-link"><i class="icon-kb"></i>Knowledge Base</a>
+                <a href="/faq" class="submenu-link"><i class="icon-faq"></i>FAQ</a>
+                
+                [% IF c.session.roles && c.session.roles.grep('^admin$').size %]
+                <div class="submenu-section">
+                    <span class="submenu-section-title">Admin Resources</span>
+                    <a href="/HelpDesk/kb/linux_commands" class="submenu-link"><i class="icon-terminal"></i>Linux Commands</a>
+                </div>
+                [% END %]
+            </div>
+        </div>
+        
+        <!-- Admin Controls -->
+        [% IF c.session.roles && c.session.roles.grep('^admin$').size %]
+        <div class="dropdown-divider"></div>
+        <div class="submenu-item">
+            <span class="submenu-header"><i class="icon-admin"></i>Admin Controls</span>
+            <div class="submenu">
+                <a href="/HelpDesk/admin" class="submenu-link"><i class="icon-admin"></i>HelpDesk Admin</a>
+            </div>
+        </div>
+        [% END %]
+        
+        <!-- Public HelpDesk Links added by admin -->
+        [% SET helpdesk_links = c.stash.dbi.query("SELECT * FROM internal_links_tb WHERE category = 'HelpDesk_links' AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
+        [% IF helpdesk_links.size %]
+        <div class="dropdown-divider"></div>
+        <div class="submenu-item">
+            <span class="submenu-header"><i class="icon-admin-links"></i>Additional Resources</span>
+            <div class="submenu">
+                [% FOREACH link IN helpdesk_links %]
+                    <a href="[% link.url %]" target="[% link.target || '_self' %]" title="[% link.name %]" class="submenu-link">
+                        [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
+                        [% link.name %]
+                    </a>
                     [% IF c.session.roles && c.session.roles.grep('^admin$').size %]
-                    <a href="/HelpDesk/admin"><i class="icon-admin"></i>HelpDesk Admin</a>
+                        <a href="/navigation/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
                     [% END %]
-                    <a href="/HelpDesk"><i class="icon-helpdesk"></i>HelpDesk Home</a>
-                    <a href="/HelpDesk/ticket/new"><i class="icon-ticket"></i>Submit a Ticket</a>
-                    <a href="/HelpDesk/ticket/status"><i class="icon-status"></i>Check Ticket Status</a>
-                    <a href="/Documentation"><i class="icon-docs"></i>Documentation</a>
-                    <a href="/HelpDesk/kb"><i class="icon-kb"></i>Knowledge Base</a>
+                [% END %]
+            </div>
+        </div>
+        [% END %]
+        
+        <!-- Member Links (legacy support) -->
+        [% IF member_links && member_links.size %]
+        <div class="dropdown-divider"></div>
+        <div class="submenu-item">
+            <span class="submenu-header"><i class="icon-member"></i>Member Resources</span>
+            <div class="submenu">
+                [% FOREACH link IN member_links %]
+                    <a href="[% link.url %]" target="[% link.target || '_self' %]" title="[% link.name %]" class="submenu-link">
+                        [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
+                        [% link.name %]
+                    </a>
                     [% IF c.session.roles && c.session.roles.grep('^admin$').size %]
-                    <a href="/HelpDesk/kb/linux_commands"><i class="icon-terminal"></i>Linux Commands</a>
+                        <a href="/navigation/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
                     [% END %]
-                    <a href="/faq"><i class="icon-faq"></i>FAQ</a>
-                    <a href="/HelpDesk/contact"><i class="icon-contact"></i>Contact Support</a>
-                    
-                    [% FOREACH link IN member_links %]
-                    <a href="[% link.url %]">[% link.name %]</a>
-                    [% IF c.session.roles && c.session.roles.grep('^admin$').size %]
-                        <a href="/edit_link?link_id=[% link.id %]">Edit/Delete</a>
-                    [% END %]
+                [% END %]
+            </div>
+        </div>
+        [% END %]
+        
+        <!-- Private HelpDesk Links for logged in users -->
+        [% IF c.session.username && c.stash.private_links %]
+            [% SET has_private_helpdesk_links = 0 %]
+            [% FOREACH link IN c.stash.private_links %]
+                [% IF link.category == 'HelpDesk_links' || link.menu == 'HelpDesk' %]
+                    [% SET has_private_helpdesk_links = 1 %]
+                [% END %]
+            [% END %]
+            
+            [% IF has_private_helpdesk_links %]
+            <div class="dropdown-divider"></div>
+            <div class="submenu-item">
+                <span class="submenu-header"><i class="icon-user-help"></i>My HelpDesk Links</span>
+                <div class="submenu">
+                    [% FOREACH link IN c.stash.private_links %]
+                        [% IF link.category == 'HelpDesk_links' || link.menu == 'HelpDesk' %]
+                            <a href="[% link.url %]" target="[% link.target || '_self' %]" title="[% link.name %]" class="submenu-link">
+                                [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
+                                [% link.name %]
+                            </a>
+                            <a href="/navigation/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
+                        [% END %]
                     [% END %]
                 </div>
-            </li>
+            </div>
+            [% END %]
+        [% END %]
+        
+        [% IF c.session.roles && c.session.roles.grep('^admin$').size %]
+        <div class="dropdown-divider"></div>
+        <a href="/navigation/manage_links?menu=HelpDesk" class="menu-item"><i class="icon-manage"></i>Manage HelpDesk Menu</a>
+        [% END %]
+    </div>
+</li>
+
+<style>
+    /* HelpDesk Menu Specific Styles */
+    .submenu-item {
+        position: relative;
+    }
+
+    .submenu-header {
+        display: block;
+        padding: 8px 15px;
+        background-color: #e9ecef;
+        color: #495057;
+        font-weight: bold;
+        font-size: 0.9em;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .submenu {
+        background-color: #f8f9fa;
+    }
+
+    .submenu-section {
+        border-top: 1px solid #dee2e6;
+        margin-top: 5px;
+        padding-top: 5px;
+    }
+
+    .submenu-section-title {
+        display: block;
+        padding: 4px 25px;
+        font-size: 0.8em;
+        font-weight: bold;
+        color: #6c757d;
+        text-transform: uppercase;
+    }
+
+    .submenu-link {
+        padding: 8px 25px;
+        display: flex;
+        align-items: center;
+        text-decoration: none;
+        color: #495057;
+        font-size: 0.9em;
+        transition: background-color 0.2s;
+    }
+
+    .submenu-link:hover {
+        background-color: #e9ecef;
+    }
+
+    .submenu-link i {
+        margin-right: 6px;
+        width: 14px;
+        text-align: center;
+    }
+
+    .menu-item {
+        padding: 10px 15px;
+        display: flex;
+        align-items: center;
+        text-decoration: none;
+        color: #333;
+        transition: background-color 0.2s;
+    }
+
+    .menu-item:hover {
+        background-color: #f8f9fa;
+    }
+
+    .menu-item i {
+        margin-right: 8px;
+        width: 16px;
+        text-align: center;
+    }
+
+    .dropdown-divider {
+        height: 1px;
+        margin: 5px 0;
+        overflow: hidden;
+        background-color: #e9ecef;
+    }
+
+    .edit-link {
+        font-size: 0.8em;
+        color: #6c757d;
+        margin-left: 10px;
+        text-decoration: none;
+        padding: 2px 5px;
+    }
+
+    .edit-link:hover {
+        color: #495057;
+        text-decoration: underline;
+    }
+
+    /* Icons for HelpDesk menu */
+    .icon-helpdesk:before { content: "🆘"; }
+    .icon-home:before { content: "🏠"; }
+    .icon-ticket:before { content = "🎫"; }
+    .icon-status:before { content: "📊"; }
+    .icon-contact:before { content: "📞"; }
+    .icon-add:before { content: "➕"; }
+    .icon-docs:before { content: "📖"; }
+    .icon-kb:before { content: "📚"; }
+    .icon-faq:before { content: "❓"; }
+    .icon-terminal:before { content: "💻"; }
+    .icon-admin:before { content: "👨‍💼"; }
+    .icon-admin-links:before { content: "⚙️"; }
+    .icon-member:before { content: "👥"; }
+    .icon-user-help:before { content: "👤🆘"; }
+    .icon-manage:before { content = "⚙️"; }
+</style>

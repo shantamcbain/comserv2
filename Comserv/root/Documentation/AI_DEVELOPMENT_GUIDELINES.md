@@ -12,9 +12,37 @@
 4. **Maintain Naming Conventions**: Follow established naming patterns for files, classes, and methods.
 5. **Request Permission for Structural Changes**: Obtain explicit permission before creating new directories or changing established patterns.
 
+## File Modification Guidelines
+
+### CRITICAL: No .backup File Creation
+- **NEVER create .backup files** when modifying existing files
+- .backup files eliminate user's ability to read changes
+- .backup file creation consumes unnecessary resources
+- Instead: Provide exact changes in +/- diff format for copy-paste ready application
+- Show before/after code blocks when beneficial for clarity
+- Use ExecuteShellCommand only for viewing file contents, not for creating backup copies
+
+### Preferred Change Documentation Format
+```diff
+- old code line
++ new code line
+```
+
+### Resource Conservation
+- Each tool call counts as 1 operation toward the 10-15 operation limit
+- Avoid unnecessary file operations
+- Combine multiple changes into single clear documentation
+
 ## Session Workflow (5-10 Prompts)
 
 Given the limited number of interactions in each session (5-10 prompts), follow this workflow:
+
+### Long Chat Warning
+- **Prompts 1-10**: Optimal working range
+- **Prompts 11-15**: Acceptable but approaching limits  
+- **Prompts 16+**: LONG CHAT ZONE - High risk of resource exhaustion and context drift
+- **When entering long chats**: Focus on completing current task efficiently, avoid scope creep
+- **Resource management becomes critical** - each tool call must be essential
 
 1. **Read Documentation & Code** (1-2 prompts)
    - Examine relevant documentation in `/Comserv/root/Documentation/`
@@ -38,6 +66,15 @@ Given the limited number of interactions in each session (5-10 prompts), follow 
 5. **Update Documentation** (1 prompt)
    - Update relevant documentation files
    - Create commit message
+
+## Authentication System
+
+Authentication approach is defined in `authentication_evolution_plan.md`:
+- **Current phase**: Phase 1 (compatibility layer)
+- **DO NOT** change authentication approach without reading the plan first
+- **DO NOT** modify templates for authentication in current phase  
+- **ASK PERMISSION** before changing documented authentication strategy
+- **Templates expect** session-based authentication: `c.session.username`, `c.session.roles`
 
 ## File Storage Guidelines
 
@@ -91,6 +128,29 @@ Given the limited number of interactions in each session (5-10 prompts), follow 
    - Use TRY/CATCH blocks for potentially problematic includes
    - Provide fallback content
 
+## Change Documentation & Session Continuity
+
+### CRITICAL: Cross-Session Change Tracking
+- **AI agents cannot access previous chat histories** between sessions
+- **MUST document all code changes** in this file or create a dedicated change log
+- **Before ending a session**: Update this guidelines file with:
+  - List of modified files
+  - Summary of changes made
+  - Any new patterns or conventions established
+- **At start of new session**: Review recent changes documented here
+- **Use a dedicated "Recent Changes" section** at the end of this file for temporary change tracking
+
+### Change Log Format
+```markdown
+### Recent Changes (Session Date: YYYY-MM-DD)
+**Modified Files:**
+- path/to/file1: Description of change
+- path/to/file2: Description of change
+
+**Summary:** Brief overview of what was accomplished
+**Notes:** Any important context for future sessions
+```
+
 ## Commit Message Format
 
 ```
@@ -132,3 +192,14 @@ Before submitting changes, verify:
 - [ ] Existing code reused where appropriate
 - [ ] Documentation updated
 - [ ] Commit message prepared according to format
+- [ ] Changes documented in Recent Changes section for future sessions
+
+## Recent Changes
+
+### Recent Changes (Session Date: 2025-01-10)
+**Modified Files:**
+- Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.md: Added cross-session change tracking requirements and Recent Changes section
+
+**Summary:** Enhanced guidelines to require documentation of code changes between AI agent sessions since chat history is not accessible across sessions.
+
+**Notes:** This addresses the continuity issue where AI agents need to understand what changes were made in previous sessions when writing commit messages or continuing development work.

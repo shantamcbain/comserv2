@@ -29,12 +29,15 @@ nav {
 }
 
 .dropdown-content {
-  display: none;
+  display: none !important;
   position: absolute;
   background-color: var(--dropdown-bg);
   min-width: 160px;
   box-shadow: var(--dropdown-shadow);
   z-index: 1;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
 }
 
 .dropdown-content a {
@@ -49,8 +52,11 @@ nav {
   background-color: var(--nav-hover-bg);
 }
 
+/* Ensure menus only show on hover, not always open */
 .horizontal-dropdown:hover .dropdown-content {
-  display: block;
+  display: block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 /* Submenu Styles */
@@ -63,7 +69,7 @@ nav {
 }
 
 .submenu {
-  display: none;
+  display: none !important;
   position: absolute;
   top: 0;
   left: 100%;
@@ -71,6 +77,9 @@ nav {
   background-color: var(--dropdown-bg);
   box-shadow: var(--dropdown-shadow);
   z-index: 1;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
 }
 
 /* Add a class for right-aligned submenus */
@@ -94,7 +103,9 @@ nav {
 }
 
 .submenu-item:hover .submenu {
-  display: block;
+  display: block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 /* Enhanced Admin Menu Styles */
@@ -313,4 +324,57 @@ nav {
   margin-top: 0;
   border-top: none;
   padding-top: 0;
+}
+
+/* User info display styles */
+.user-info {
+  padding: 8px 12px;
+  background-color: var(--user-info-bg, rgba(0, 0, 0, 0.05));
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 5px;
+}
+
+.user-info .username {
+  display: block;
+  font-weight: bold;
+  color: var(--text-color);
+  margin-bottom: 3px;
+}
+
+.user-info .user-roles {
+  display: block;
+  font-size: 0.85em;
+  color: var(--text-muted, #666);
+  font-style: italic;
+}
+
+.menu-separator {
+  border: none;
+  border-top: 1px solid var(--border-color);
+  margin: 5px 0;
+}
+
+/* Style for add buttons in submenus */
+.submenu-add-button {
+  display: block;
+  padding: var(--spacing-small) var(--spacing-medium);
+  text-decoration: none;
+  background-color: var(--button-bg, #007bff);
+  color: var(--button-text, #fff);
+  border: 1px solid var(--button-border, #007bff);
+  border-radius: 3px;
+  margin: 5px 8px;
+  text-align: center;
+  font-size: 0.9em;
+  transition: all 0.2s ease;
+}
+
+.submenu-add-button:hover {
+  background-color: var(--button-hover-bg, #0069d9);
+  border-color: var(--button-hover-border, #0069d9);
+  color: var(--button-hover-text, #fff);
+}
+
+.submenu-add-button i {
+  margin-right: 5px;
 }

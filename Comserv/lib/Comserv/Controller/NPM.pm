@@ -46,7 +46,8 @@ sub index :Path :Args(0) {
     my ($self, $c) = @_;
     
     # Check if user is logged in and has admin privileges
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
+    my $root_controller = $c->controller('Root');
+    unless ($root_controller->user_exists($c) && $root_controller->check_user_roles($c, 'admin')) {
         $self->logging->log_with_details($c, 'WARN', __FILE__, __LINE__, 'index', "Unauthorized access attempt to NPM controller");
         $c->response->status(403);
         $c->stash(
@@ -85,7 +86,8 @@ sub proxy_hosts :Path('proxy-hosts') :Args(0) {
     my ($self, $c) = @_;
     
     # Check if user is logged in and has admin privileges
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
+    my $root_controller = $c->controller('Root');
+    unless ($root_controller->user_exists($c) && $root_controller->check_user_roles($c, 'admin')) {
         $self->logging->log_with_details($c, 'WARN', __FILE__, __LINE__, 'proxy_hosts', "Unauthorized access attempt to NPM proxy hosts");
         $c->response->status(403);
         $c->stash(
@@ -121,7 +123,8 @@ sub create_proxy_host :Path('create-proxy-host') :Args(0) {
     my ($self, $c) = @_;
     
     # Check if user is logged in and has admin privileges
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
+    my $root_controller = $c->controller('Root');
+    unless ($root_controller->user_exists($c) && $root_controller->check_user_roles($c, 'admin')) {
         $self->logging->log_with_details($c, 'WARN', __FILE__, __LINE__, 'create_proxy_host', "Unauthorized access attempt to create NPM proxy host");
         $c->response->status(403);
         $c->stash(
@@ -223,7 +226,8 @@ sub edit_proxy_host :Path('edit-proxy-host') :Args(1) {
     my ($self, $c, $proxy_host_id) = @_;
     
     # Check if user is logged in and has admin privileges
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
+    my $root_controller = $c->controller('Root');
+    unless ($root_controller->user_exists($c) && $root_controller->check_user_roles($c, 'admin')) {
         $self->logging->log_with_details($c, 'WARN', __FILE__, __LINE__, 'edit_proxy_host', "Unauthorized access attempt to edit NPM proxy host");
         $c->response->status(403);
         $c->stash(
@@ -338,7 +342,8 @@ sub delete_proxy_host :Path('delete-proxy-host') :Args(1) {
     my ($self, $c, $proxy_host_id) = @_;
     
     # Check if user is logged in and has admin privileges
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
+    my $root_controller = $c->controller('Root');
+    unless ($root_controller->user_exists($c) && $root_controller->check_user_roles($c, 'admin')) {
         $self->logging->log_with_details($c, 'WARN', __FILE__, __LINE__, 'delete_proxy_host', "Unauthorized access attempt to delete NPM proxy host");
         $c->response->status(403);
         $c->stash(
@@ -417,7 +422,8 @@ sub rotate_api_key :Path('rotate-api-key') :Args(0) {
     my ($self, $c) = @_;
     
     # Check if user is logged in and has admin privileges
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
+    my $root_controller = $c->controller('Root');
+    unless ($root_controller->user_exists($c) && $root_controller->check_user_roles($c, 'admin')) {
         $self->logging->log_with_details($c, 'WARN', __FILE__, __LINE__, 'rotate_api_key', "Unauthorized access attempt to rotate NPM API key");
         $c->response->status(403);
         $c->stash(
@@ -574,7 +580,8 @@ sub proxy_api :Path('api') :Args {
     my ($self, $c, @path_parts) = @_;
     
     # Check if user is logged in and has admin privileges
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
+    my $root_controller = $c->controller('Root');
+    unless ($root_controller->user_exists($c) && $root_controller->check_user_roles($c, 'admin')) {
         $self->logging->log_with_details($c, 'WARN', __FILE__, __LINE__, 'proxy_api', "Unauthorized access attempt to NPM API proxy");
         $c->response->status(403);
         $c->response->body('Access denied');

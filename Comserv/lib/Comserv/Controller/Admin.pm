@@ -28,7 +28,8 @@ sub begin : Private {
     my ($self, $c) = @_;
     
     # Add detailed logging
-    my $username = $c->user_exists ? $c->user->username : 'Guest';
+    my $root_controller = $c->controller('Root');
+    my $username = $root_controller->user_exists($c) ? ($c->session->{username} || 'Guest') : 'Guest';
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', 
         "Admin controller begin method called by user: $username");
     
@@ -62,7 +63,8 @@ sub base :Chained('/') :PathPart('admin') :CaptureArgs(0) {
     my $has_admin_role = 0;
     
     # First check if user exists
-    if ($c->user_exists) {
+    my $root_controller = $c->controller('Root');
+    if ($root_controller->user_exists($c)) {
         # Get roles from session
         my $roles = $c->session->{roles};
         
@@ -629,7 +631,8 @@ sub users :Chained('base') :PathPart('users') :Args(0) {
         "Starting users action");
     
     # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
+    my $root_controller = $c->controller('Root');
+    unless ($root_controller->user_exists($c) && $root_controller->check_user_roles($c, 'admin')) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'users', 
             "Access denied: User does not have admin role");
         
@@ -796,7 +799,8 @@ sub settings :Path('/admin/settings') :Args(0) {
         "Starting settings action");
     
     # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
+    my $root_controller = $c->controller('Root');
+    unless ($root_controller->user_exists($c) && $root_controller->check_user_roles($c, 'admin')) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'settings', 
             "Access denied: User does not have admin role");
         
@@ -994,7 +998,8 @@ sub system_info :Path('/admin/system_info') :Args(0) {
         "Starting system_info action");
     
     # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
+    my $root_controller = $c->controller('Root');
+    unless ($root_controller->user_exists($c) && $root_controller->check_user_roles($c, 'admin')) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'system_info', 
             "Access denied: User does not have admin role");
         
@@ -1128,7 +1133,8 @@ sub logs :Path('/admin/logs') :Args(0) {
         "Starting logs action");
     
     # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
+    my $root_controller = $c->controller('Root');
+    unless ($root_controller->user_exists($c) && $root_controller->check_user_roles($c, 'admin')) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'logs', 
             "Access denied: User does not have admin role");
         
@@ -1194,7 +1200,8 @@ sub backup :Path('/admin/backup') :Args(0) {
         "Starting backup action");
 
     # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
+    my $root_controller = $c->controller('Root');
+    unless ($root_controller->user_exists($c) && $root_controller->check_user_roles($c, 'admin')) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'backup',
             "Access denied: User does not have admin role");
 

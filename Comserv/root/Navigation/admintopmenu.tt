@@ -13,6 +13,7 @@
         <div class="submenu-item">
             <span class="submenu-header"><a href="/admin" class="dropbtn"><i class="icon-admin"></i>Admin</a></span>
             <div class="submenu">
+                <a href="/navigation/add_link?category=Admin_links&return_url=/admin" class="submenu-add-button"><i class="icon-add"></i>Add Admin Link</a>
                 <a href='/admin/view_log'><i class="icon-log"></i>View Log</a>
                 <a href="/admin/git_pull"><i class="icon-log"></i>Git Pull</a>
                 <a href='/ProxyManager'><i class="icon-log"></i>Proxy Manager</a>
@@ -303,6 +304,7 @@
         <div class="submenu-item">
             <span class="submenu-header"><a href="/mcoop"><i class="icon-mcoop"></i>MCOOP Admin</a></span>
             <div class="submenu">
+                <a href="/navigation/add_link?category=Admin_links&return_url=/admin" class="submenu-add-button"><i class="icon-add"></i>Add Admin Link</a>
                 <a href="/mcoop"><i class="icon-home"></i>MCOOP Home</a>
                 <a href="/mcoop/server-room-plan"><i class="icon-server"></i>Server Room Plan</a>
                 <a href="/mcoop/network"><i class="icon-network"></i>Network Infrastructure</a>

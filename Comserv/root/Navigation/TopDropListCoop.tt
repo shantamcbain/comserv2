@@ -1,16 +1,60 @@
-[% PageVersion = 'Navigation/TopDropListCoop.tt,v 0.03 2025/04/01 shanta Exp shanta ' %]
+[% PageVersion = 'Navigation/TopDropListCoop.tt,v 0.04 2025/09/03 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
 <!-- Start /Navigation/TopDropListCoop.tt -->
-        <li class="horizontal-dropdown">
-            <a href="/coop" class="dropbtn"><i class="icon-coop"></i>COOP</a>
-            <div class="dropdown-content">
-                [% IF c.session.username %]
-                <a href="/navigation/add_link"><i class="icon-add"></i>Add Link</a>
+<li class="horizontal-dropdown">
+    <a href="/coop" class="dropbtn"><i class="icon-coop"></i>COOP</a>
+    <div class="dropdown-content">
+        <a href="/coop"><i class="icon-home"></i>COOP Home</a>
+        
+        [% IF c.session.username %]
+        <div class="dropdown-divider"></div>
+        <a href="/navigation/add_link?menu=COOP" class="menu-item"><i class="icon-add"></i>Add COOP Link</a>
+        [% END %]
+        
+        <!-- Public COOP Links added by admin -->
+        [% FOREACH link = c.stash.dbi.query("SELECT * FROM internal_links_tb WHERE category = 'COOP_links' AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
+            <a href="[% link.url %]" target="[% link.target || '_self' %]" title="[% link.name %]" class="menu-item">
+                [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
+                [% link.name %]
+            </a>
+            [% IF c.session.roles.grep('admin').size %]
+                <a href="/navigation/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
+            [% END %]
+        [% END %]
+        
+        <!-- Private COOP Links for logged in users -->
+        [% IF c.session.username && c.stash.private_links %]
+            [% SET has_private_coop_links = 0 %]
+            [% FOREACH link IN c.stash.private_links %]
+                [% IF link.category == 'COOP_links' || link.menu == 'COOP' %]
+                    [% SET has_private_coop_links = 1 %]
                 [% END %]
-                <!-- COOP content would go here -->
+            [% END %]
+            
+            [% IF has_private_coop_links %]
+            <div class="dropdown-divider"></div>
+            <div class="submenu-section">
+                <span class="submenu-section-title">My COOP Links</span>
+                [% FOREACH link IN c.stash.private_links %]
+                    [% IF link.category == 'COOP_links' || link.menu == 'COOP' %]
+                        <a href="[% link.url %]" target="[% link.target || '_self' %]" title="[% link.name %]" class="private-link">
+                            [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
+                            [% link.name %]
+                        </a>
+                        <a href="/navigation/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
+                    [% END %]
+                [% END %]
             </div>
-        </li>
+            [% END %]
+        [% END %]
+        
+        [% IF c.session.roles.grep('admin').size %]
+        <div class="dropdown-divider"></div>
+        <a href="/navigation/manage_links?menu=COOP" class="menu-item"><i class="icon-manage"></i>Manage COOP Menu</a>
+        [% END %]
+    </div>
+</li>
 <!-- End /Navigation/TopDropListCoop.tt -->
