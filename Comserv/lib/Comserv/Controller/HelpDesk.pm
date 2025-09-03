@@ -271,8 +271,9 @@ sub admin :Chained('base') :PathPart('admin') :Args(0) {
     }
     
     unless ($has_admin_role) {
+        my $root_controller = $c->controller('Root');
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'admin', 
-            "Unauthorized access attempt to HelpDesk admin by user: " . ($c->user_exists ? $c->user->username : 'Guest'));
+            "Unauthorized access attempt to HelpDesk admin by user: " . ($root_controller->user_exists($c) ? ($c->session->{username} || 'Guest') : 'Guest'));
         
         # Redirect to main HelpDesk page with error message
         $c->stash->{error_msg} = "You don't have permission to access the HelpDesk admin area.";

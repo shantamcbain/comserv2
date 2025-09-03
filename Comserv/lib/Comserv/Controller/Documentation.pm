@@ -593,11 +593,11 @@ sub index :Path('/Documentation') :Args(0) {
             "User role determined from session: $user_role, is_admin: $is_admin");
     }
     # If no role found in session but user exists, try to get role from user object
-    elsif ($c->user_exists) {
-        $user_role = $c->user->role || 'normal';
+    elsif ($c->controller('Root')->user_exists($c)) {
+        $user_role = $c->session->{roles} || 'normal';
         $is_admin = 1 if lc($user_role) eq 'admin';
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
-            "User role determined from user object: $user_role, is_admin: $is_admin");
+            "User role determined from session: $user_role, is_admin: $is_admin");
     }
     
     # Special case for site CSC - ensure admin role is recognized

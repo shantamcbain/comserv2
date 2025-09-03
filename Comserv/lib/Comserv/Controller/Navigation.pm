@@ -5,6 +5,8 @@ use Data::Dumper;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
+use URI::Escape qw(uri_escape);
+
 # Class-level cache for navigation data
 has '_navigation_cache' => (
     is => 'rw',
@@ -35,6 +37,12 @@ replacing the direct DBI usage in templates with proper model usage.
 
 =cut
 
+# Helper: current sitename convenience
+sub _current_site {
+    my ($self, $c) = @_;
+    return $c->stash->{SiteName} || $c->session->{SiteName} || 'All';
+}
+
 # Method to get internal links for a specific category and site
 sub get_internal_links {
     my ($self, $c, $category, $site_name) = @_;
@@ -46,10 +54,22 @@ sub get_internal_links {
     
     # Use eval to catch any database errors
     eval {
+        # Determine username (for owner-private logic)
+        my $username = $c->session->{username} || '';
+        my $root_controller = $c->controller('Root');
+        my $is_logged_in = $root_controller->user_exists($c) && $username ? 1 : 0;
+
+        # Show:
+        # - public links in category for site/all
+        # - PLUS private links owned by this user (category anywhere they added it)
+        my %where = (
+            category => $category,
+            sitename => [ $site_name, 'All' ],
+        );
+
         # Try to use the DBIx::Class API first
         my $rs = $c->model('DBEncy')->resultset('InternalLinksTb')->search({
-            category => $category,
-            sitename => [ $site_name, 'All' ]
+            %where
         }, {
             order_by => { -asc => 'link_order' }
         });
@@ -64,7 +84,13 @@ sub get_internal_links {
             my $dbh = $c->model('DBEncy')->schema->storage->dbh;
             
             # Prepare and execute the query
-            my $query = "SELECT * FROM internal_links_tb WHERE category = ? AND (sitename = ? OR sitename = 'All') ORDER BY link_order";
+            my $query = qq{
+                SELECT *
+                FROM internal_links_tb
+                WHERE category = ?
+                  AND (sitename = ? OR sitename = 'All')
+                ORDER BY link_order
+            };
             my $sth = $dbh->prepare($query);
             $sth->execute($category, $site_name);
             
@@ -242,14 +268,21 @@ sub get_private_links {
     
     # Use eval to catch any database errors
     eval {
-        # Try to use the DBIx::Class API first
-        my $rs = $c->model('DBEncy')->resultset('InternalLinksTb')->search({
-            category => 'Private_links',
-            description => $username,  # Using description field to store username
-            sitename => [ $site_name, 'All' ]
-        }, {
-            order_by => { -asc => 'link_order' }
-        });
+        # Private links are stored with description=username (Phase 1 approach)
+        # Aggregate across categories but respect site scope (current site + All)
+        my $rs = $c->model('DBEncy')->resultset('InternalLinksTb')->search(
+            {
+                description => $username,
+                sitename    => [ $site_name, 'All' ],
+            },
+            {
+                order_by => [
+                    { -asc => 'category' },
+                    { -asc => 'link_order' },
+                    { -asc => 'name' },
+                ],
+            }
+        );
         
         while (my $row = $rs->next) {
             push @results, { $row->get_columns };
@@ -261,7 +294,13 @@ sub get_private_links {
             my $dbh = $c->model('DBEncy')->schema->storage->dbh;
             
             # Prepare and execute the query
-            my $query = "SELECT * FROM internal_links_tb WHERE category = 'Private_links' AND description = ? AND (sitename = ? OR sitename = 'All') ORDER BY link_order";
+            my $query = qq{
+                SELECT *
+                FROM internal_links_tb
+                WHERE description = ?
+                  AND (sitename = ? OR sitename = 'All')
+                ORDER BY category ASC, link_order ASC, name ASC
+            };
             my $sth = $dbh->prepare($query);
             $sth->execute($username, $site_name);
             
@@ -285,7 +324,8 @@ sub add_link :Path('/navigation/add_link') :Args(0) {
     my ($self, $c) = @_;
     
     # Check if user is logged in
-    unless ($c->user_exists && $c->session->{username}) {
+    my $root_controller = $c->controller('Root');
+    unless ($root_controller->user_exists($c) && $c->session->{username}) {
         $c->flash->{error_msg} = "You must be logged in to add links.";
         $c->response->redirect($c->uri_for('/user/login'));
         return;
@@ -297,6 +337,9 @@ sub add_link :Path('/navigation/add_link') :Args(0) {
     
     # Determine user permissions
     my $permissions = $self->get_user_link_permissions($c);
+    my $return_url  = $c->req->param('return_url') || $c->req->referer || $c->uri_for('/')->as_string;
+    # ensure we always have a safe relative fallback
+    $return_url = $c->uri_for('/')->as_string unless $return_url;
     
     if ($c->req->method eq 'POST') {
         my $name = $c->req->param('name');
@@ -305,6 +348,8 @@ sub add_link :Path('/navigation/add_link') :Args(0) {
         my $category = $c->req->param('category');
         my $sitename = $c->req->param('sitename');
         my $link_type = $c->req->param('link_type') || 'private'; # private, public
+        my $cross_site = $c->req->param('cross_site') ? 1 : 0;    # show on all sites
+        my $effective_site = $cross_site ? 'All' : ($sitename || $user_sitename || $self->_current_site($c));
         
         # Validate required fields
         unless ($name && $url && $category) {
@@ -316,7 +361,7 @@ sub add_link :Path('/navigation/add_link') :Args(0) {
         }
         
         # Validate permissions
-        unless ($self->validate_link_permissions($c, $link_type, $category, $sitename)) {
+        unless ($self->validate_link_permissions($c, $link_type, $category, $effective_site)) {
             $c->flash->{error_msg} = "You don't have permission to create this type of link.";
             $c->stash->{permissions} = $permissions;
             $c->stash->{form_data} = $c->req->params;
@@ -325,12 +370,12 @@ sub add_link :Path('/navigation/add_link') :Args(0) {
         }
         
         # Get the next link order for this category/site
-        my $max_order = $self->get_max_link_order($c, $category, $sitename, $username, $link_type);
+        my $max_order = $self->get_max_link_order($c, $category, $effective_site, $username, $link_type);
         
         # Prepare link data
         my $link_data = {
             category => $category,
-            sitename => $sitename,
+            sitename => $effective_site,
             name => $name,
             url => $url,
             target => $target,
@@ -347,23 +392,30 @@ sub add_link :Path('/navigation/add_link') :Args(0) {
         eval {
             $c->model('DBEncy')->resultset('InternalLinksTb')->create($link_data);
             $c->flash->{success_msg} = "Link '$name' added successfully.";
+            # Clear cached nav so the new link appears immediately
+            $self->clear_navigation_cache($c);
         };
         if ($@) {
             $c->log->error("Error adding link: $@");
             $c->flash->{error_msg} = "Error adding link. Please try again.";
         }
         
-        $c->response->redirect($c->uri_for('/navigation/manage_links'));
+        # Redirect to where user clicked "+ Add Link"
+        $c->response->redirect($return_url);
         return;
     }
     
     # Pre-populate form based on URL parameters
     my $preset_category = $c->req->param('category') || '';
     my $preset_sitename = $c->req->param('sitename') || $user_sitename;
+    my $preset_return   = $return_url;
+    my $preset_linktype = 'private';
     
     $c->stash->{permissions} = $permissions;
     $c->stash->{preset_category} = $preset_category;
     $c->stash->{preset_sitename} = $preset_sitename;
+    $c->stash->{preset_return_url} = $preset_return;
+    $c->stash->{preset_link_type} = $preset_linktype;
     $c->stash->{template} = 'Navigation/add_link.tt';
 }
 
@@ -372,7 +424,8 @@ sub manage_links :Path('/navigation/manage_links') :Args(0) {
     my ($self, $c) = @_;
     
     # Check if user is logged in
-    unless ($c->user_exists && $c->session->{username}) {
+    my $root_controller = $c->controller('Root');
+    unless ($root_controller->user_exists($c) && $c->session->{username}) {
         $c->flash->{error_msg} = "You must be logged in to manage links.";
         $c->response->redirect($c->uri_for('/user/login'));
         return;
@@ -386,6 +439,7 @@ sub manage_links :Path('/navigation/manage_links') :Args(0) {
     
     $c->stash->{user_links} = $user_links;
     $c->stash->{permissions} = $permissions;
+    $c->stash->{template_title} = 'Manage Links';
     $c->stash->{template} = 'Navigation/manage_links.tt';
 }
 
@@ -394,7 +448,8 @@ sub edit_link :Path('/navigation/edit_link') :Args(0) {
     my ($self, $c) = @_;
     
     # Check if user is logged in
-    unless ($c->user_exists && $c->session->{username}) {
+    my $root_controller = $c->controller('Root');
+    unless ($root_controller->user_exists($c) && $c->session->{username}) {
         $c->flash->{error_msg} = "You must be logged in to edit links.";
         $c->response->redirect($c->uri_for('/user/login'));
         return;
@@ -470,7 +525,8 @@ sub delete_link :Path('/navigation/delete_link') :Args(0) {
     my ($self, $c) = @_;
     
     # Check if user is logged in
-    unless ($c->user_exists && $c->session->{username}) {
+    my $root_controller = $c->controller('Root');
+    unless ($root_controller->user_exists($c) && $c->session->{username}) {
         $c->flash->{error_msg} = "You must be logged in to delete links.";
         $c->response->redirect($c->uri_for('/user/login'));
         return;
@@ -533,12 +589,14 @@ sub get_user_link_permissions {
     }
     
     my $permissions = {
-        can_create_private => 1,  # All logged-in users can create private links
-        can_create_public => 0,   # Only privileged users
-        can_manage_all_sites => 0, # Only CSC SiteName admin
-        available_categories => ['Private_links'],
-        available_sites => [$sitename || 'All'],
-        user_role => 'user'
+        can_create_private  => 1,  # All logged-in users can create private links
+        can_create_public   => 0,  # Only admins (developer scaffolding reserved)
+        can_manage_all_sites => 0,
+        # Users can add private links into any category they can see. Keep a sane default list.
+        available_categories => ['Main_links','Member_links','Admin_links','Hosted_link','Private_links'],
+        # Sites: current site + All for cross-site private (allowed)
+        available_sites => [$sitename || 'All', 'All'],
+        user_role => 'normal'
     };
     
     # Check for admin privileges
@@ -554,24 +612,18 @@ sub get_user_link_permissions {
     
     if ($is_admin) {
         $permissions->{can_create_public} = 1;
-        $permissions->{user_role} = 'admin';
-        push @{$permissions->{available_categories}}, 
-             'Main_links', 'Member_links', 'Admin_links', 'Hosted_link';
+        $permissions->{user_role}         = 'admin';
+        # admin already has the full list above
     }
     
-    # Check for CSC SiteName admin (can manage all sites)
-    if (grep { lc($_) eq 'csc' } @$roles) {
-        $permissions->{can_manage_all_sites} = 1;
-        $permissions->{user_role} = 'csc_admin';
-        
-        # Get all available sites
-        my @all_sites = ('All');
-        eval {
-            # You might want to get this from a sites table or config
-            push @all_sites, $sitename if $sitename;
-        };
-        $permissions->{available_sites} = \@all_sites;
+    # Developer scaffolding (future role) - keep structure ready
+    if (grep { lc($_) eq 'developer' } @$roles) {
+        # For now, developer behaves like normal. When enabled later, adjust here.
+        $permissions->{user_role} = $is_admin ? 'admin' : 'normal';
     }
+    
+    # Cross-site handling: normal users can set private links to All; admins can do both types cross-site.
+    # available_sites already includes current and 'All'
     
     return $permissions;
 }
@@ -591,12 +643,12 @@ sub validate_link_permissions {
         return 0;
     }
     
-    # Check category permissions
+    # Check category permissions (private links can be added to any known category in available list)
     unless (grep { $_ eq $category } @{$permissions->{available_categories}}) {
         return 0;
     }
     
-    # Check site permissions
+    # Check site permissions (allow current site and 'All')
     unless (grep { $_ eq $sitename } @{$permissions->{available_sites}}) {
         return 0;
     }
@@ -700,7 +752,8 @@ sub populate_navigation_data {
         
         # Set is_admin flag based on user roles
         my $is_admin = 0;
-        if ($c->user_exists && $c->session->{roles}) {
+        my $root_controller = $c->controller('Root');
+        if ($root_controller->user_exists($c) && $c->session->{roles}) {
             if (ref($c->session->{roles}) eq 'ARRAY') {
                 $is_admin = grep { lc($_) eq 'admin' } @{$c->session->{roles}};
             } elsif (!ref($c->session->{roles})) {
@@ -745,7 +798,7 @@ sub populate_navigation_data {
         }
         
         # Populate private links for logged-in users
-        if ($c->user_exists && $username) {
+        if ($root_controller->user_exists($c) && $username) {
             $nav_data->{private_links} = $self->get_private_links($c, $username, $site_name);
         }
         
@@ -777,6 +830,7 @@ sub _ensure_navigation_tables_exist {
         my $tables = $db_model->list_tables();
         my $internal_links_exists = grep { $_ eq 'internal_links_tb' } @$tables;
         my $page_tb_exists = grep { $_ eq 'page_tb' } @$tables;
+        my $navigation_exists = grep { $_ eq 'navigation' } @$tables;
         
         # If tables don't exist, try to create them
         if (!$internal_links_exists || !$page_tb_exists) {
@@ -833,10 +887,221 @@ sub _ensure_navigation_tables_exist {
                 }
             }
         }
+        
+        # Check and run migration for navigation table if it exists but lacks is_private column
+        if ($navigation_exists) {
+            my $has_is_private = $self->column_exists($c, 'navigation', 'is_private');
+            if (!$has_is_private) {
+                $c->log->info("Running migration to add is_private column to navigation table");
+                $self->run_navigation_migration($c);
+            }
+        }
     };
     if ($@) {
         $c->log->error("Error ensuring navigation tables exist: $@");
     }
+}
+
+# Method to get navigation items filtered by privacy settings
+sub get_navigation_items {
+    my ($self, $c, $menu_name, $user_logged_in) = @_;
+    
+    $c->log->debug("Getting navigation items for menu: $menu_name, user_logged_in: " . ($user_logged_in ? 'yes' : 'no'));
+    
+    my @results;
+    
+    eval {
+        # Get navigation items from the new navigation table
+        my $rs = $c->model('DBEncy')->resultset('Navigation')->search(
+            { 
+                menu => $menu_name,
+                -or => [
+                    { is_private => 0 },                    # Public items always shown
+                    { is_private => 1, -and => $user_logged_in ? () : ('0=1') } # Private items only if logged in
+                ]
+            },
+            { 
+                order_by => [
+                    { -asc => 'parent_id' },    # Top-level items first (parent_id is null)
+                    { -asc => 'order' }         # Then by order within same level
+                ],
+                prefetch => ['page', 'parent', 'children']
+            }
+        );
+        
+        while (my $nav_item = $rs->next) {
+            my $item_data = {
+                id          => $nav_item->id,
+                page_id     => $nav_item->page_id,
+                menu        => $nav_item->menu,
+                parent_id   => $nav_item->parent_id,
+                order       => $nav_item->order,
+                is_private  => $nav_item->is_private,
+            };
+            
+            # Include page data if available
+            if ($nav_item->page) {
+                $item_data->{page} = {
+                    id          => $nav_item->page->id,
+                    name        => $nav_item->page->name,
+                    url         => $nav_item->page->url,
+                    target      => $nav_item->page->target,
+                    description => $nav_item->page->description,
+                    status      => $nav_item->page->status,
+                };
+            }
+            
+            push @results, $item_data;
+        }
+        
+        $c->log->debug("Found " . scalar(@results) . " navigation items");
+    };
+    if ($@) {
+        $c->log->error("Error getting navigation items: $@");
+    }
+    
+    return \@results;
+}
+
+# Method to get hierarchical navigation structure
+sub get_navigation_tree {
+    my ($self, $c, $menu_name, $user_logged_in) = @_;
+    
+    my $items = $self->get_navigation_items($c, $menu_name, $user_logged_in);
+    
+    # Build hierarchical structure
+    my %item_lookup = map { $_->{id} => $_ } @$items;
+    my @tree = ();
+    
+    foreach my $item (@$items) {
+        if (defined $item->{parent_id} && exists $item_lookup{$item->{parent_id}}) {
+            # Add as child to parent
+            $item_lookup{$item->{parent_id}}->{children} ||= [];
+            push @{$item_lookup{$item->{parent_id}}->{children}}, $item;
+        } else {
+            # Top-level item
+            push @tree, $item;
+        }
+    }
+    
+    return \@tree;
+}
+
+# Helper method to check if a column exists in a table
+sub column_exists {
+    my ($self, $c, $table_name, $column_name) = @_;
+    
+    eval {
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        my $sth = $dbh->prepare("SHOW COLUMNS FROM `$table_name` LIKE ?");
+        $sth->execute($column_name);
+        my $result = $sth->fetchrow_arrayref();
+        return $result ? 1 : 0;
+    };
+    if ($@) {
+        $c->log->error("Error checking if column exists: $@");
+        return 0;
+    }
+}
+
+# Method to run the navigation table migration
+sub run_navigation_migration {
+    my ($self, $c) = @_;
+    
+    eval {
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        
+        # Add is_private column
+        $dbh->do("ALTER TABLE `navigation` ADD COLUMN `is_private` TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'Flag to mark navigation items as private (1) or public (0)'");
+        
+        # Create indexes for better performance
+        $dbh->do("CREATE INDEX `idx_navigation_privacy` ON `navigation` (`is_private`)");
+        $dbh->do("CREATE INDEX `idx_navigation_menu_privacy` ON `navigation` (`menu`, `is_private`)");
+        
+        # Update table comment
+        $dbh->do("ALTER TABLE `navigation` COMMENT = 'Navigation structure with hierarchical support and public/private visibility'");
+        
+        $c->log->info("Successfully ran navigation migration - added is_private column");
+    };
+    if ($@) {
+        $c->log->error("Error running navigation migration: $@");
+    }
+}
+
+# Method to add a navigation item (Admin interface)
+sub add_navigation_item :Path('/navigation/add') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Check if user is admin
+    my $root_controller = $c->controller('Root');
+    unless ($root_controller->user_exists($c) && $c->session->{roles} && 
+            (grep { $_ eq 'admin' } @{$c->session->{roles}})) {
+        $c->flash->{error_msg} = "Administrative privileges required.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    if ($c->req->method eq 'POST') {
+        my $page_id = $c->req->param('page_id');
+        my $menu = $c->req->param('menu');
+        my $parent_id = $c->req->param('parent_id') || undef;
+        my $order = $c->req->param('order') || 0;
+        my $is_private = $c->req->param('is_private') ? 1 : 0;
+        
+        # Validate required fields
+        unless ($page_id && $menu) {
+            $c->flash->{error_msg} = "Page ID and Menu are required fields.";
+            $c->stash->{template} = 'Navigation/add.tt';
+            return;
+        }
+        
+        # Add the navigation item
+        eval {
+            $c->model('DBEncy')->resultset('Navigation')->create({
+                page_id => $page_id,
+                menu => $menu,
+                parent_id => $parent_id,
+                order => $order,
+                is_private => $is_private,
+            });
+            $c->flash->{success_msg} = "Navigation item added successfully.";
+            $self->clear_navigation_cache($c);
+            $c->response->redirect($c->uri_for('/navigation/manage'));
+            return;
+        };
+        if ($@) {
+            $c->log->error("Error adding navigation item: $@");
+            $c->flash->{error_msg} = "Error adding navigation item: $@";
+        }
+    }
+    
+    # Load pages for dropdown
+    $c->stash->{pages} = [$c->model('DBEncy')->resultset('PageTb')->search({}, 
+                         { order_by => 'name' })->all];
+    $c->stash->{template} = 'Navigation/add.tt';
+}
+
+# Method to manage navigation items (Admin interface)
+sub manage :Path('/navigation/manage') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Check if user is admin
+    my $root_controller = $c->controller('Root');
+    unless ($root_controller->user_exists($c) && $c->session->{roles} && 
+            (grep { $_ eq 'admin' } @{$c->session->{roles}})) {
+        $c->flash->{error_msg} = "Administrative privileges required.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    # Get all navigation items
+    my @navigation_items = $c->model('DBEncy')->resultset('Navigation')->search({}, {
+        order_by => ['menu', 'parent_id', 'order'],
+        prefetch => 'page'
+    })->all;
+    
+    $c->stash->{navigation_items} = \@navigation_items;
+    $c->stash->{template} = 'Navigation/manage.tt';
 }
 
 # Method to clear navigation cache (useful for admin operations)

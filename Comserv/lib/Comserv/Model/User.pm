@@ -28,7 +28,7 @@ package Comserv::Model::User;
 
                 sub from_session {
                     my ($self, $c, $id) = @_;
-                    return $self->new(_user => $c->model('DBEncy::User')->find($id));
+                    return $self->new(_user => $c->model('DBEncy')->resultset('User')->find($id));
                 }
 
                 sub supports {
@@ -77,11 +77,10 @@ package Comserv::Model::User;
                 }
 
                 sub create_user {
-                    my ($self, $user_data) = @_;
-                    my $schema = Comserv::Model::DBEncy->new->schema;
-                    my $existing_user = $schema->resultset('User')->find({ username => $user_data->{username} });
+                    my ($self, $c, $user_data) = @_;
+                    my $existing_user = $c->model('DBEncy')->resultset('User')->find({ username => $user_data->{username} });
                     return "Username already exists" if $existing_user;
-                    my $new_user = $schema->resultset('User')->create({
+                    my $new_user = $c->model('DBEncy')->resultset('User')->create({
                         %$user_data,
                         roles => $user_data->{roles} // 'default_role',
                     });
@@ -89,9 +88,8 @@ package Comserv::Model::User;
                 }
                 
                 sub delete_user {
-                    my ($self, $user_id) = @_;
-                    my $schema = Comserv::Model::DBEncy->new->schema;
-                    my $user = $schema->resultset('User')->find($user_id);
+                    my ($self, $c, $user_id) = @_;
+                    my $user = $c->model('DBEncy')->resultset('User')->find($user_id);
                     
                     return "User not found" unless $user;
                     

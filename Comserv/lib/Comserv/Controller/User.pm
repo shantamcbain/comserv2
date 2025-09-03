@@ -85,8 +85,9 @@ sub do_login :Local {
             $c, 'info', __FILE__, __LINE__, 'do_login',
             "User already logged in as: " . $c->session->{username} . ", proceeding with login"
         );
-        # Clear the session to allow re-login
-        $c->session({});
+        # Do not automatically clear session here; allow re-login flow to re-authenticate cleanly
+        # If you want to force re-auth, uncomment the next line
+        # $c->session({});
     }
 
     # Check if the request method is POST
@@ -152,24 +153,80 @@ sub do_login :Local {
         "Final redirect path: $redirect_path"
     );
 
-    # Find user in database
-    my $user = $c->model('DBEncy::User')->find({ username => $username });
-    unless ($user) {
-        $self->logging->log_with_details(
-            $c, 'warn', __FILE__, __LINE__, 'do_login',
-            "Login failed: Username '$username' not found."
-        );
-        # Store error message in flash and redirect back to login page
-        $c->flash->{error_msg} = "Invalid username or password.";
-        $c->response->redirect($c->uri_for('/user/login'));
+    # Manual authentication to bypass Catalyst auth system issues
+    my $user;
+    eval {
+        $user = $c->model('DBEncy::User')->find({ username => $username });
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login', 
+            "Manual user lookup for '$username': " . (defined $user ? "found" : "not found"));
+    };
+    
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_login',
+            "Error during manual user lookup: $@");
+        $c->flash->{error_msg} = 'Database error occurred. Please try again later.';
+        $c->res->redirect($c->uri_for('/user/login'));
         return;
     }
+    
+    if ($user && $user->check_password($password)) {
+        # Manual authentication successful
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login', 
+            "User '$username' successfully authenticated via manual check.");
+        
+        # Get the authenticated user object (already retrieved above)
+        
+        # Store additional session data for backward compatibility
+        $c->session->{username} = $user->username;
+        $c->session->{user_id}  = $user->id;
+        $c->session->{first_name} = $user->first_name if $user->can('first_name');
+        $c->session->{last_name}  = $user->last_name if $user->can('last_name');
+        $c->session->{email}    = $user->email if $user->can('email');
 
-    # Verify password
-    if ($self->hash_password($password) ne $user->password) {
+        # Handle roles - parse string format to array for template compatibility
+        my $roles = $user->roles;
+        
+        if (defined $roles && !ref $roles) {
+            # If roles is a string, split by comma and clean up whitespace
+            if ($roles =~ /,/) {
+                $roles = [ map { s/^\s+|\s+$//g; $_ } split /,/, $roles ];
+            } else {
+                # Single role as string
+                $roles = [ $roles ];
+            }
+        } elsif (ref $roles eq 'ARRAY') {
+            # Already an array, keep as is
+            # This branch exists for future compatibility
+        } else {
+            # Undefined or invalid, default to user role
+            $self->logging->log_with_details(
+                $c, 'warn', __FILE__, __LINE__, 'do_login',
+                "User '$username' has invalid or missing roles. Defaulting to ['user']."
+            );
+            $roles = ['user'];
+        }
+
+        # Log the roles before assigning to session
+        my $roles_debug = ref($roles) eq 'ARRAY' ? join(', ', @$roles) : $roles;
+        $self->logging->log_with_details(
+            $c, 'info', __FILE__, __LINE__, 'do_login',
+            "Setting roles in session: $roles_debug"
+        );
+        
+        # Assign roles to session (no hard-coded username-based tweaks)
+        $c->session->{roles} = $roles;
+        
+        # Log the final roles
+        $roles_debug = ref($roles) eq 'ARRAY' ? join(', ', @$roles) : $roles;
+        $self->logging->log_with_details(
+            $c, 'info', __FILE__, __LINE__, 'do_login',
+            "Final roles in session: $roles_debug"
+        );
+    } else {
+        # Authentication failed
         $self->logging->log_with_details(
             $c, 'warn', __FILE__, __LINE__, 'do_login',
-            "Login failed: Password mismatch for username '$username'."
+            "Login failed: Invalid username or password for '$username'."
         );
 
         # Store error message in flash and redirect back to login page
@@ -177,73 +234,6 @@ sub do_login :Local {
         $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
-
-    # Success
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login', "User '$username' successfully authenticated.");
-
-    # Clear any existing session data
-    $c->session({});
-
-    # Set new session data
-    $c->session->{username} = $user->username;
-    $c->session->{user_id}  = $user->id;
-    $c->session->{first_name} = $user->first_name;
-    $c->session->{last_name}  = $user->last_name;
-    $c->session->{email}    = $user->email;
-
-    # Fetch user role(s)
-    my $roles = $user->roles;
-
-    # Check if the roles field contains a single role (string) and wrap it into an array
-    if (defined $roles && !ref $roles) {
-        $roles = [ $roles ];  # Convert single role to array.
-    }
-
-    # Default to ['user'] only if roles are undefined or invalid
-    if (!defined $roles || ref $roles ne 'ARRAY') {
-        $self->logging->log_with_details(
-            $c, 'warn', __FILE__, __LINE__, 'do_login',
-            "User '$username' has invalid or missing roles. Defaulting to ['user']."
-        );
-        $roles = ['user'];
-    }
-
-    # Log the roles before assigning to session
-    my $roles_debug = ref($roles) eq 'ARRAY' ? join(', ', @$roles) : $roles;
-    $self->logging->log_with_details(
-        $c, 'info', __FILE__, __LINE__, 'do_login',
-        "Setting roles in session: $roles_debug"
-    );
-    
-    # Ensure admin role is included if the user should have it
-    if (ref($roles) eq 'ARRAY') {
-        my $has_admin = 0;
-        foreach my $role (@$roles) {
-            if (lc($role) eq 'admin') {
-                $has_admin = 1;
-                last;
-            }
-        }
-        
-        # Check if this user should have admin role based on username
-        if ($username eq 'Shanta' && !$has_admin) {
-            $self->logging->log_with_details(
-                $c, 'info', __FILE__, __LINE__, 'do_login',
-                "Adding admin role for user: $username"
-            );
-            push @$roles, 'admin';
-        }
-    }
-    
-    # Assign roles to session
-    $c->session->{roles} = $roles;
-    
-    # Log the final roles
-    $roles_debug = ref($roles) eq 'ARRAY' ? join(', ', @$roles) : $roles;
-    $self->logging->log_with_details(
-        $c, 'info', __FILE__, __LINE__, 'do_login',
-        "Final roles in session: $roles_debug"
-    );
 
     # Set a success message in the flash
     $c->flash->{success_msg} = "Login successful. Welcome, $username!";
@@ -262,251 +252,11 @@ sub do_login :Local {
 
     # After successful login, redirect to the appropriate page
     # No need for a template here as this is an action, not a route
-    # Use uri_for if it's a relative path, otherwise use the path directly
+    # Normalize and redirect
     if ($redirect_path =~ /^\// && $redirect_path !~ /^https?:\/\//i) {
-        # It's a relative path, use uri_for
         $c->res->redirect($c->uri_for($redirect_path));
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login', "Using uri_for for redirect: " . $c->uri_for($redirect_path));
     } else {
-        # It's an absolute URL, use it directly
-        $c->res->redirect($redirect_path);
-    }
-    return;
-}
-
-sub do_login_global_remove_completely :Path('/do_login_remove_completely') :Args(0) {
-    my ($self, $c) = @_;
-
-    # Check if this is a GET request (direct access)
-    if ($c->req->method eq 'GET') {
-        # Redirect to the login page instead of processing the login
-        $self->logging->log_with_details(
-            $c, 'info', __FILE__, __LINE__, 'do_login_global',
-            "GET request to do_login, redirecting to login page"
-        );
-        $c->response->redirect($c->uri_for('/user/login'));
-        return;
-    }
-
-    # For POST requests, continue with login processing
-    $self->process_login($c);
-}
-
-sub process_login {
-    my ($self, $c) = @_;
-
-    # Check if logging is available
-    if (not $self->logging || not $self->logging->can('log_with_details')) {
-        print STDERR "ERROR: Logging object or method `log_with_details` is missing in User controller\n";
-    }
-
-    # Start login process
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login', 'Login process initiated.');
-
-    # Check if the user is already logged in
-    if ($c->session->{username}) {
-        $self->logging->log_with_details(
-            $c, 'info', __FILE__, __LINE__, 'do_login',
-            "User already logged in as: " . $c->session->{username}
-        );
-    }
-
-    # Check if the request method is POST
-    $self->logging->log_with_details(
-        $c, 'info', __FILE__, __LINE__, 'do_login',
-        "Request method: " . $c->req->method
-    );
-
-    # Get user input - try different methods
-    my $username = $c->req->body_parameters->{username} || $c->req->param('username') || '';
-    my $password = $c->req->body_parameters->{password} || $c->req->param('password') || '';
-
-    # Log the raw parameters
-    $self->logging->log_with_details(
-        $c, 'info', __FILE__, __LINE__, 'do_login',
-        "Raw username param: " . ($c->req->param('username') || 'undefined')
-    );
-    $self->logging->log_with_details(
-        $c, 'info', __FILE__, __LINE__, 'do_login',
-        "Raw password param: " . ($c->req->param('password') ? 'present' : 'undefined')
-    );
-
-    # Debug: Log all parameters
-    $self->logging->log_with_details(
-        $c, 'info', __FILE__, __LINE__, 'do_login',
-        "All parameters: " . Dumper($c->req->params)
-    );
-
-    # Also try different ways to access parameters
-    $self->logging->log_with_details(
-        $c, 'info', __FILE__, __LINE__, 'do_login',
-        "Using body_parameters: " . Dumper($c->req->body_parameters)
-    );
-    $self->logging->log_with_details(
-        $c, 'info', __FILE__, __LINE__, 'do_login',
-        "Using query_parameters: " . Dumper($c->req->query_parameters)
-    );
-
-    # Check if we're getting the form_source parameter
-    my $form_source = $c->req->params->{form_source} || 'unknown';
-    $self->logging->log_with_details(
-        $c, 'info', __FILE__, __LINE__, 'do_login',
-        "Form source: $form_source"
-    );
-
-    $self->logging->log_with_details(
-        $c, 'info', __FILE__, __LINE__, 'do_login',
-        "Attempting login for username: $username"
-    );
-
-    # Get redirect path
-    # Check for return_to parameter first (highest priority)
-    my $return_to = $c->req->param('return_to');
-    my $redirect_path;
-    
-    if ($return_to) {
-        $redirect_path = $return_to;
-        $self->logging->log_with_details(
-            $c, 'info', __FILE__, __LINE__, 'do_login',
-            "Using return_to parameter for redirect: $return_to"
-        );
-    } else {
-        # Fall back to session referer
-        $redirect_path = $c->session->{referer} || '/';
-        $self->logging->log_with_details(
-            $c, 'info', __FILE__, __LINE__, 'do_login',
-            "Using session referer for redirect: " . ($c->session->{referer} || 'undefined')
-        );
-    }
-    
-    # Store the redirect path for debugging
-    $c->stash->{debug_msg} = "Redirect path: $redirect_path";
-
-    # Ensure we're not redirecting back to the login page
-    if ($redirect_path =~ m{/user/login} || $redirect_path =~ m{/login} || $redirect_path =~ m{/do_login}) {
-        $redirect_path = '/';
-        $self->logging->log_with_details(
-            $c, 'info', __FILE__, __LINE__, 'do_login',
-            "Avoiding redirect to login page, using home page instead"
-        );
-    }
-    
-    $self->logging->log_with_details(
-        $c, 'debug', __FILE__, __LINE__, 'do_login',
-        "Final redirect path: $redirect_path"
-    );
-
-    # Find user in database
-    my $user = $c->model('DBEncy::User')->find({ username => $username });
-    unless ($user) {
-        $self->logging->log_with_details(
-            $c, 'warn', __FILE__, __LINE__, 'do_login',
-            "Login failed: Username '$username' not found."
-        );
-
-        # Store error message in flash and redirect back to login page
-        $c->flash->{error_msg} = 'Invalid username or password.';
-        $c->response->redirect($c->uri_for('/user/login'));
-        return;
-    }
-
-    # Verify password
-    if ($self->hash_password($password) ne $user->password) {
-        $self->logging->log_with_details(
-            $c, 'warn', __FILE__, __LINE__, 'do_login',
-            "Login failed: Password mismatch for username '$username'."
-        );
-
-        # Store error message in flash and redirect back to login page
-        $c->flash->{error_msg} = 'Invalid username or password.';
-        $c->response->redirect($c->uri_for('/user/login'));
-        return;
-    }
-
-    # Success
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login', "User '$username' successfully authenticated.");
-
-    # Clear any existing session data
-    # Reset the session to an empty hash
-    $c->session({});
-
-    # Clear any error messages
-    $c->stash->{error_msg} = undef;
-
-    # Set new session data
-    $c->session->{username} = $user->username;
-    $c->session->{user_id}  = $user->id;
-    $c->session->{first_name} = $user->first_name;
-    $c->session->{last_name}  = $user->last_name;
-    $c->session->{email}    = $user->email;
-
-    # Log the session data
-    $self->logging->log_with_details(
-        $c, 'info', __FILE__, __LINE__, 'do_login',
-        "Session data set: username=" . $user->username . ", user_id=" . $user->id
-    );
-
-    # Fetch user role(s)
-    my $roles = $user->roles;
-
-    # Check if the roles field contains a single role (string) and wrap it into an array
-    if (defined $roles && !ref $roles) {
-        $roles = [ $roles ];  # Convert single role to array.
-    }
-
-    # Default to ['user'] only if roles are undefined or invalid
-    if (!defined $roles || ref $roles ne 'ARRAY') {
-        $self->logging->log_with_details(
-            $c, 'warn', __FILE__, __LINE__, 'do_login',
-            "User '$username' has invalid or missing roles. Defaulting to ['user']."
-        );
-        $roles = ['user'];
-    }
-
-    # Assign roles to session
-    $c->session->{roles} = $roles;
-
-    # Redirect after successful login
-    # Clear the referer to prevent redirect loops
-    $c->session->{referer} = undef;
-
-    # Set a success message in the session
-    $c->flash->{success_msg} = "Login successful. Welcome, $username!";
-
-    # Log that we've set the flash message
-    $self->logging->log_with_details(
-        $c, 'info', __FILE__, __LINE__, 'do_login',
-        "Set flash success_msg: Login successful. Welcome, $username!"
-    );
-
-    # Log the redirect
-    $self->logging->log_with_details(
-        $c, 'info', __FILE__, __LINE__, 'do_login',
-        "Redirecting user '$username' to: $redirect_path");
-
-    # Log the redirect attempt
-    $self->logging->log_with_details(
-        $c, 'info', __FILE__, __LINE__, 'do_login',
-        "Preparing to redirect to: $redirect_path"
-    );
-
-    # Double-check that we're not redirecting back to the login page
-    if ($redirect_path =~ m{/user/login} || $redirect_path =~ m{/login} || $redirect_path =~ m{/do_login}) {
-        $redirect_path = '/';
-        $self->logging->log_with_details(
-            $c, 'info', __FILE__, __LINE__, 'do_login',
-            "Redirecting to home page instead of login page"
-        );
-    }
-
-    # Redirect directly - no template needed for this action
-    # Use uri_for if it's a relative path, otherwise use the path directly
-    if ($redirect_path =~ /^\//) {
-        # It's a relative path, use uri_for
-        $c->res->redirect($c->uri_for($redirect_path));
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login', "Using uri_for for redirect: " . $c->uri_for($redirect_path));
-    } else {
-        # It's an absolute URL, use it directly
         $c->res->redirect($redirect_path);
     }
     return;
@@ -527,7 +277,14 @@ sub logout :Local {
         "User '" . ($c->session->{username} || 'unknown') . "' logging out, current URL: $current_url");
 
     # Get username before clearing session (for the success message)
-    my $username = $c->session->{username} || 'Guest';
+    my $username = '';
+    if ($c->user_exists) {
+        $username = $c->user->username if $c->user->can('username');
+    } elsif ($c->session->{username}) {
+        $username = $c->session->{username};
+    } else {
+        $username = 'Guest';
+    }
 
     # Store important site information before clearing the session
     my $site_name = $c->session->{SiteName} || '';
@@ -537,6 +294,13 @@ sub logout :Local {
     # Log the site information we're preserving
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'logout',
         "Preserving site info: SiteName=$site_name, theme=$theme_name, controller=$controller_name");
+
+    # Logout from Catalyst authentication system
+    if ($c->user_exists) {
+        $c->logout;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'logout',
+            "User logged out from Catalyst auth system");
+    }
 
     # Properly delete the session (instead of just emptying it)
     $c->delete_session("User logged out");
@@ -1061,9 +825,6 @@ sub do_edit_user :Local :Args(1) {
     if ($user) {
         # The user was found, so retrieve the form data
         my $form_data = $c->request->body_parameters;
-
-        # Print the form data
-        print "Form data: " . Dumper($form_data);
 
         # Update the user record with the new data
         $user->update({
