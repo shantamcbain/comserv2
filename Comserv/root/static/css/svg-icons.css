@@ -3,6 +3,12 @@
  * Uses locally hosted SVG files for icons
  */
 
+/* Remove all emoji fallback content from icon elements */
+[class*="icon-"]::before,
+[class*="fas"]::before {
+  content: none !important;
+}
+
 /* Base icon class */
 .icon {
   display: inline-block;
@@ -433,6 +439,323 @@
 .icon-tables, .fas.fa-table {
   -webkit-mask-image: url('/static/images/icons/tables.svg');
   mask-image: url('/static/images/icons/tables.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+/* Missing icons that need to be added */
+.icon-list, .fas.fa-list-ul {
+  -webkit-mask-image: url('/static/images/icons/list.svg');
+  mask-image: url('/static/images/icons/list.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-user-guide, .fas.fa-book {
+  -webkit-mask-image: url('/static/images/icons/user-guide.svg');
+  mask-image: url('/static/images/icons/user-guide.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-admin-guide, .fas.fa-user-shield {
+  -webkit-mask-image: url('/static/images/icons/admin-guide.svg');
+  mask-image: url('/static/images/icons/admin-guide.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-tutorial, .fas.fa-graduation-cap {
+  -webkit-mask-image: url('/static/images/icons/tutorial.svg');
+  mask-image: url('/static/images/icons/tutorial.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-changelog, .fas.fa-history {
+  -webkit-mask-image: url('/static/images/icons/changelog.svg');
+  mask-image: url('/static/images/icons/changelog.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-terminal, .fas.fa-terminal {
+  -webkit-mask-image: url('/static/images/icons/terminal.svg');
+  mask-image: url('/static/images/icons/terminal.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-link, .fas.fa-link {
+  -webkit-mask-image: url('/static/images/icons/link.svg');
+  mask-image: url('/static/images/icons/link.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-view, .fas.fa-eye {
+  -webkit-mask-image: url('/static/images/icons/view.svg');
+  mask-image: url('/static/images/icons/view.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-manage, .fas.fa-cog {
+  -webkit-mask-image: url('/static/images/icons/manage.svg');
+  mask-image: url('/static/images/icons/manage.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-user-admin, .fas.fa-user-cog {
+  -webkit-mask-image: url('/static/images/icons/user-admin.svg');
+  mask-image: url('/static/images/icons/user-admin.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-theme, .fas.fa-palette {
+  -webkit-mask-image: url('/static/images/icons/theme.svg');
+  mask-image: url('/static/images/icons/theme.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-git, .fas.fa-git {
+  -webkit-mask-image: url('/static/images/icons/git.svg');
+  mask-image: url('/static/images/icons/git.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-cloud, .fas.fa-cloud {
+  -webkit-mask-image: url('/static/images/icons/cloud.svg');
+  mask-image: url('/static/images/icons/cloud.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-service, .fas.fa-wrench {
+  -webkit-mask-image: url('/static/images/icons/service.svg');
+  mask-image: url('/static/images/icons/service.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-report, .fas.fa-chart-bar {
+  -webkit-mask-image: url('/static/images/icons/report.svg');
+  mask-image: url('/static/images/icons/report.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-toggle-on, .fas.fa-toggle-on {
+  -webkit-mask-image: url('/static/images/icons/toggle-on.svg');
+  mask-image: url('/static/images/icons/toggle-on.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-toggle-off, .fas.fa-toggle-off {
+  -webkit-mask-image: url('/static/images/icons/toggle-off.svg');
+  mask-image: url('/static/images/icons/toggle-off.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+/* Additional icons generated from usage */
+
+.icon-3d, .fas.fa-3d {
+  -webkit-mask-image: url('/static/images/icons/3d.svg');
+  mask-image: url('/static/images/icons/3d.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-accounts, .fas.fa-accounts {
+  -webkit-mask-image: url('/static/images/icons/accounts.svg');
+  mask-image: url('/static/images/icons/accounts.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-admin-links, .fas.fa-admin-links {
+  -webkit-mask-image: url('/static/images/icons/admin-links.svg');
+  mask-image: url('/static/images/icons/admin-links.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-apply, .fas.fa-apply {
+  -webkit-mask-image: url('/static/images/icons/apply.svg');
+  mask-image: url('/static/images/icons/apply.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-briefcase, .fas.fa-briefcase {
+  -webkit-mask-image: url('/static/images/icons/briefcase.svg');
+  mask-image: url('/static/images/icons/briefcase.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-contact, .fas.fa-contact {
+  -webkit-mask-image: url('/static/images/icons/contact.svg');
+  mask-image: url('/static/images/icons/contact.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-development, .fas.fa-development {
+  -webkit-mask-image: url('/static/images/icons/development.svg');
+  mask-image: url('/static/images/icons/development.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-docs, .fas.fa-docs {
+  -webkit-mask-image: url('/static/images/icons/docs.svg');
+  mask-image: url('/static/images/icons/docs.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-drive, .fas.fa-drive {
+  -webkit-mask-image: url('/static/images/icons/drive.svg');
+  mask-image: url('/static/images/icons/drive.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-faq, .fas.fa-faq {
+  -webkit-mask-image: url('/static/images/icons/faq.svg');
+  mask-image: url('/static/images/icons/faq.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-folder, .fas.fa-folder {
+  -webkit-mask-image: url('/static/images/icons/folder.svg');
+  mask-image: url('/static/images/icons/folder.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-globe, .fas.fa-globe {
+  -webkit-mask-image: url('/static/images/icons/globe.svg');
+  mask-image: url('/static/images/icons/globe.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-herb, .fas.fa-herb {
+  -webkit-mask-image: url('/static/images/icons/herb.svg');
+  mask-image: url('/static/images/icons/herb.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-image, .fas.fa-image {
+  -webkit-mask-image: url('/static/images/icons/image.svg');
+  mask-image: url('/static/images/icons/image.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-info, .fas.fa-info {
+  -webkit-mask-image: url('/static/images/icons/info.svg');
+  mask-image: url('/static/images/icons/info.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-it, .fas.fa-it {
+  -webkit-mask-image: url('/static/images/icons/it.svg');
+  mask-image: url('/static/images/icons/it.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-kb, .fas.fa-kb {
+  -webkit-mask-image: url('/static/images/icons/kb.svg');
+  mask-image: url('/static/images/icons/kb.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-production, .fas.fa-production {
+  -webkit-mask-image: url('/static/images/icons/production.svg');
+  mask-image: url('/static/images/icons/production.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-resources, .fas.fa-resources {
+  -webkit-mask-image: url('/static/images/icons/resources.svg');
+  mask-image: url('/static/images/icons/resources.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-security, .fas.fa-security {
+  -webkit-mask-image: url('/static/images/icons/security.svg');
+  mask-image: url('/static/images/icons/security.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-site, .fas.fa-site {
+  -webkit-mask-image: url('/static/images/icons/site.svg');
+  mask-image: url('/static/images/icons/site.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-special, .fas.fa-special {
+  -webkit-mask-image: url('/static/images/icons/special.svg');
+  mask-image: url('/static/images/icons/special.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-status, .fas.fa-status {
+  -webkit-mask-image: url('/static/images/icons/status.svg');
+  mask-image: url('/static/images/icons/status.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-store, .fas.fa-store {
+  -webkit-mask-image: url('/static/images/icons/store.svg');
+  mask-image: url('/static/images/icons/store.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-support, .fas.fa-support {
+  -webkit-mask-image: url('/static/images/icons/support.svg');
+  mask-image: url('/static/images/icons/support.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-ticket, .fas.fa-ticket {
+  -webkit-mask-image: url('/static/images/icons/ticket.svg');
+  mask-image: url('/static/images/icons/ticket.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-tool, .fas.fa-tool {
+  -webkit-mask-image: url('/static/images/icons/tool.svg');
+  mask-image: url('/static/images/icons/tool.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-tools, .fas.fa-tools {
+  -webkit-mask-image: url('/static/images/icons/tools.svg');
+  mask-image: url('/static/images/icons/tools.svg');
   background-color: currentColor;
   background-image: none;
 }

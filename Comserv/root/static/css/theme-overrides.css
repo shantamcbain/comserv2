@@ -42,6 +42,15 @@ body[class*="theme-"] .dropbtn {
 
 body[class*="theme-"] .dropdown-content {
   background-color: var(--dropdown-bg, var(--secondary-color)) !important;
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+body[class*="theme-"] .horizontal-dropdown:hover .dropdown-content {
+  display: block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 body[class*="theme-"] .dropdown-content a {
@@ -50,6 +59,15 @@ body[class*="theme-"] .dropdown-content a {
 
 body[class*="theme-"] .submenu {
   background-color: var(--dropdown-bg, var(--secondary-color)) !important;
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+body[class*="theme-"] .submenu-item:hover .submenu {
+  display: block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 body[class*="theme-"] .submenu a {

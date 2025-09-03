@@ -48,7 +48,8 @@ sub index :Path :Args(0) {
     my ($self, $c) = @_;
     
     # Check if user is logged in - use session-based check as a fallback
-    my $is_authenticated = $c->user_exists;
+    my $root_controller = $c->controller('Root');
+    my $is_authenticated = $root_controller->user_exists($c);
     
     # If not authenticated via Catalyst, check session directly
     if (!$is_authenticated && $c->session->{username}) {
@@ -285,7 +286,8 @@ sub dns_records :Path('dns') :Args(1) {
     my ($self, $c, $domain) = @_;
     
     # Check if user is logged in - use session-based check as a fallback
-    my $is_authenticated = $c->user_exists;
+    my $root_controller = $c->controller('Root');
+    my $is_authenticated = $root_controller->user_exists($c);
     
     # If not authenticated via Catalyst, check session directly
     if (!$is_authenticated && $c->session->{username}) {
@@ -490,7 +492,8 @@ sub ajax_dns_records :Path('dns_records') :Args(0) {
     }
     
     # Check if user is logged in
-    my $is_authenticated = $c->user_exists;
+    my $root_controller = $c->controller('Root');
+    my $is_authenticated = $root_controller->user_exists($c);
     
     if (!$is_authenticated && $c->session->{username}) {
         $is_authenticated = 1;
@@ -601,7 +604,8 @@ sub create_dns_record :Path('dns/create') :Args(0) {
     my ($self, $c) = @_;
     
     # Check if user is logged in - use session-based check as a fallback
-    my $is_authenticated = $c->user_exists;
+    my $root_controller = $c->controller('Root');
+    my $is_authenticated = $root_controller->user_exists($c);
     
     # If not authenticated via Catalyst, check session directly
     if (!$is_authenticated && $c->session->{username}) {
@@ -701,7 +705,8 @@ sub update_dns_record :Path('dns/update') :Args(0) {
     my ($self, $c) = @_;
     
     # Check if user is logged in - use session-based check as a fallback
-    my $is_authenticated = $c->user_exists;
+    my $root_controller = $c->controller('Root');
+    my $is_authenticated = $root_controller->user_exists($c);
     
     # If not authenticated via Catalyst, check session directly
     if (!$is_authenticated && $c->session->{username}) {
@@ -803,7 +808,8 @@ sub delete_dns_record :Path('dns/delete') :Args(0) {
     my ($self, $c) = @_;
     
     # Check if user is logged in - use session-based check as a fallback
-    my $is_authenticated = $c->user_exists;
+    my $root_controller = $c->controller('Root');
+    my $is_authenticated = $root_controller->user_exists($c);
     
     # If not authenticated via Catalyst, check session directly
     if (!$is_authenticated && $c->session->{username}) {
@@ -886,7 +892,8 @@ sub purge_cache :Path('cache/purge') :Args(0) {
     my ($self, $c) = @_;
     
     # Check if user is logged in - use session-based check as a fallback
-    my $is_authenticated = $c->user_exists;
+    my $root_controller = $c->controller('Root');
+    my $is_authenticated = $root_controller->user_exists($c);
     
     # If not authenticated via Catalyst, check session directly
     if (!$is_authenticated && $c->session->{username}) {
@@ -1195,7 +1202,8 @@ sub update_domains :Path('update_domains') :Args(0) {
     my ($self, $c) = @_;
     
     # Check if user is logged in - use session-based check as a fallback
-    my $is_authenticated = $c->user_exists;
+    my $root_controller = $c->controller('Root');
+    my $is_authenticated = $root_controller->user_exists($c);
     
     # If not authenticated via Catalyst, check session directly
     if (!$is_authenticated && $c->session->{username}) {
