@@ -12,6 +12,7 @@ use Comserv::Util::Logging;
 has 'schema' => (
     is => 'ro',
     required => 1,
+    handles => ['resultset'],
 );
 
 # Add method to read theme mappings from JSON

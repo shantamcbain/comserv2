@@ -1,9 +1,1 @@
-{
-  "sites": {
-    "CSC": "csc",
-    "USBM": "usbm", 
-    "APIs": "apis",
-    "MCoop": "mcoop"
-  },
-  "default_theme": "default"
-}
+{"default_theme":"default","sites":{"csc":"themes","APIs":"apis","MCoop":"mcoop","BMaster":"apis","USBM":"usbm","mcoop":"mcoop","CSC":"site_themes","bmaster":"apis","apis":"apis","usbm":"usbm"}}

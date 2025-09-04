@@ -169,8 +169,10 @@ sub auto :Private {
     # Set up site name
     $self->fetch_and_set($c, 'SiteName');
     
-    # Set up theme
-    $self->set_theme($c);
+    # Set up theme using canonical ThemeConfig model
+    my $SiteName = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+    my $theme_name = $c->model('ThemeConfig')->get_site_theme($c, $SiteName);
+    $c->stash->{theme_name} = $theme_name;
     
     # Set up user information for templates
     # Check both Catalyst auth system and session-based auth
@@ -352,7 +354,7 @@ sub set_theme {
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'set_theme', "Setting theme for site: $site_name");
 
-    # Get all available themes
+    # Get all available themes from canonical ThemeConfig
     my $all_themes = $c->model('ThemeConfig')->get_all_themes($c);
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'set_theme',
         "Available themes: " . join(", ", sort keys %$all_themes));
@@ -595,7 +597,24 @@ sub auto :Private {
     # Generate theme CSS files if they don't exist
     # We only need to do this once per application start
     if (!$self->_theme_css_generated) {
-        $c->model('ThemeConfig')->generate_all_theme_css($c);
+        # Backward-compatible bulk generator (optional: only if the method exists)
+        if (ref $c->model('ThemeConfig') && $c->model('ThemeConfig')->can('generate_all_theme_css')) {
+            $c->model('ThemeConfig')->generate_all_theme_css($c);
+        } else {
+            # Fallback: perform per-theme CSS generation using available definitions
+            my $themes = $c->model('ThemeConfig')->get_all_themes($c);
+            foreach my $theme_name (keys %$themes) {
+                my $theme_id = $themes->{$theme_name}{id} || next;
+                next unless $theme_id;
+                my $css = $c->model('ThemeConfig')->generate_theme_css($c, $theme_id);
+                my $dir = $c->path_to('root', 'static', 'css', 'themes');
+                my $file = "$dir/$theme_name.css";
+                require File::Path;
+                unless (-d $dir) { File::Path::make_path($dir); }
+                use File::Slurp;
+                write_file($file, $css);
+            }
+        }
         $self->_theme_css_generated(1);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Generated all theme CSS files");
     }
@@ -1097,7 +1116,7 @@ sub site_setup {
             "Set HostName from document_root_url: " . $site->document_root_url);
     }
 
-    # Get theme from ThemeConfig
+    # Get theme from canonical ThemeConfig
     my $theme_name = $c->model('ThemeConfig')->get_site_theme($c, $SiteName);
 
     # Set theme in stash for Header.tt to use
