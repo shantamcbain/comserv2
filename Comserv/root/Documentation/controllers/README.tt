@@ -1,0 +1,23 @@
+[% PageVersion = 'README.tt,v 1.00 2025/01/10 shanta Exp shanta' %]
+
+<div class="documentation-content">
+    <h1>Controller Documentation</h1>
+    
+    <p>This directory contains documentation for all Comserv controllers.</p>
+    
+    <div class="controller-list">
+        <h2>Available Controller Documentation</h2>
+        <p>Each controller has its own documentation file explaining its purpose, methods, and usage patterns.</p>
+    </div>
+</div>
+
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+    [% IF debug_msg.defined && debug_msg.size > 0 %]
+        <div class="debug-messages">
+            [% FOREACH msg IN debug_msg %]
+                <p class="debug">Debug: [% msg %]</p>
+            [% END %]
+        </div>
+    [% END %]
+[% END %]
