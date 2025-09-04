@@ -1,32 +1,32 @@
-# Documentation Configuration Guide
+[% PageVersion = 'documentation_config_guide.tt,v 1.00 2025/05/15 shanta Exp shanta' %]
 
-**Last Updated:** May 15, 2025  
-**Author:** Shanta  
-**Status:** Active
+<div class="documentation-content">
+    <h1>Documentation Configuration Guide</h1>
+    
+    <div class="metadata">
+        <p><strong>Last Updated:</strong> May 15, 2025</p>
+        <p><strong>Author:</strong> Shanta</p>
+        <p><strong>Status:</strong> Active</p>
+    </div>
 
-## Overview
+    <h2>Overview</h2>
+    <p>The documentation system in Comserv uses a central configuration file (<code>documentation_config.json</code>) to manage documentation categories and file paths. This document explains the structure and usage of this configuration file.</p>
 
-The documentation system in Comserv uses a central configuration file (`documentation_config.json`) to manage documentation categories and file paths. This document explains the structure and usage of this configuration file.
+    <h2>File Location</h2>
+    <p>The configuration file is located at:</p>
+    <pre class="code-block">/root/Documentation/documentation_config.json</pre>
 
-## File Location
+    <h2>Configuration Structure</h2>
+    <p>The configuration file has two main sections:</p>
+    <ol>
+        <li><strong>Categories</strong>: Defines all documentation categories and their properties</li>
+        <li><strong>Default Paths</strong>: Maps documentation keys to file paths</li>
+    </ol>
 
-The configuration file is located at:
-```
-/root/Documentation/documentation_config.json
-```
+    <h3>Categories Section</h3>
+    <p>The categories section defines all documentation categories and their properties:</p>
 
-## Configuration Structure
-
-The configuration file has two main sections:
-
-1. **Categories**: Defines all documentation categories and their properties
-2. **Default Paths**: Maps documentation keys to file paths
-
-### Categories Section
-
-The categories section defines all documentation categories and their properties:
-
-```json
+    <pre class="json-code">
 "categories": {
   "user_guides": {
     "title": "User Guides",
@@ -43,15 +43,16 @@ The categories section defines all documentation categories and their properties
     "pages": ["admin_guide", "user_management", "documentation_role_access"]
   }
 }
-```
+    </pre>
 
-Each category has the following properties:
-
-- **title**: The display title for the category
-- **description**: A brief description of the category
-- **roles**: An array of roles that can access this category
-- **site_specific**: Boolean indicating if the category is site-specific
-- **pages**: An array of documentation keys that belong to this category
+    <p>Each category has the following properties:</p>
+    <ul>
+        <li><strong>title</strong>: The display title for the category</li>
+        <li><strong>description</strong>: A brief description of the category</li>
+        <li><strong>roles</strong>: An array of roles that can access this category</li>
+        <li><strong>site_specific</strong>: Boolean indicating if the category is site-specific</li>
+        <li><strong>pages</strong>: An array of documentation keys that belong to this category</li>
+    </ul>
 
 ### Default Paths Section
 

@@ -1,3 +1,4 @@
+
 # AI Documentation Guidelines
 
 ## Overview
@@ -36,13 +37,16 @@ All documentation must be placed in the appropriate subdirectory of `/Comserv/ro
 ## Documentation Standards
 
 1. **File Format**
-   - Use Markdown format with the `.md` extension
+   - **For browser display**: Use Markdown format with the `.tt` extension
+   - **For AI processing**: Files intended for AI to read use `.md` extension
+   - **Conversion rule**: If documentation is found in `.md` format, convert it to `.tt` format for browser display
+   - **Content format**: Don't use markdown syntax in `.tt` files - use plain text with Template Toolkit formatting
    - Follow consistent formatting within documents
 
 2. **File Naming**
    - Use lowercase with underscores for spaces
-   - For changelog entries, use the format: `YYYY-MM-description.md`
-   - For controller documentation, use the controller name: `ControllerName.md`
+   - For changelog entries, use the format: `YYYY-MM-description.tt`
+   - For controller documentation, use the controller name: `ControllerName.tt`
 
 3. **Documentation Structure**
    - Start with a clear title using `# Title`
@@ -63,12 +67,13 @@ When creating new documentation:
 
 2. **Create the file in the correct location**
    - Use the `str_replace_editor` tool with the correct path
-   - Example: `/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/controllers/MyController.md`
+   - Example: `/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/controllers/MyController.tt`
 
 3. **Update related documentation**
-   - If documenting a controller, update the controller list in `/controllers/controller_list.md`
+   - If documenting a controller, update the controller list in `/controllers/controller_list.tt`
    - If adding a changelog entry, ensure it follows the standard format
-
+4. **If the documentation is in .md format convert it to .tt format**
+   - Don't use md format in the .tt file.
 ## Example: Documenting a Controller
 
 ```markdown
@@ -127,9 +132,98 @@ When updating the system:
 3. Ensure documentation is placed in the correct location
 4. Keep the documentation structure consistent
 
+## Session Planning
+Add session tracking section to keep continuity:
+
+### Current Session: File Cleanup & Merge
+**Task**: Clean up misplaced files from Codebuddy session
+**Status**: COMPLETED
+**Files Reviewed & Actions Taken**:
+- `/Comserv.pm` (in project root - duplicate) → REMOVED after confirming no useful changes
+- `/Comserv/root/lib/` directory (misplaced application files) → MERGED improvements and REMOVED
+- `/Comserv/root/Comserv/` directory (nested duplicate) → REMOVED
+
+**Key Changes Merged**:
+- ThemeEditor.pm: Added proper error handling with File::Slurp and Try::Tiny modules
+- ThemeConfig.pm: Enhanced error handling and added missing utility methods
+- Both files now use improved JSON processing with proper error capture
+
+**Operation Count**: Used approximately 18-19 operations for this cleanup session
+
 ## Cleaning Up Documentation
 
 If you find documentation files in the wrong location or categorization files:
 
-1. Use the cleanup script: `/Comserv/root/Documentation/scripts/cleanup_categorization_files.pl`
-2. Move documentation files to the correct location using the script: `/Comserv/root/Documentation/scripts/move_docs_to_proper_location.pl`
+1. Move documentation files to the correct location 
+2. Adjust catagorization if necessary  
+3. Remove unnecessary files
+4. **ALWAYS check file contents before deletion - may contain useful AI-generated improvements**
+
+## Version Control and Commit Guidelines
+
+### Commit Sequence and Best Practices
+
+**CRITICAL**: Keep commits small and focused to enable easy merging to main branch.
+
+#### Pre-Commit Checklist
+1. **Test the fix**: Verify functionality works as expected
+2. **Document changes**: Update relevant documentation files
+3. **Create changelog entry**: Add entry to appropriate changelog file
+4. **Update AI guidelines**: Note any learnings or process improvements
+
+#### Commit Strategy - Small, Focused Commits
+**Goal**: Each commit should represent one logical change that can be easily reviewed and merged.
+
+**Recommended commit sequence for bug fixes:**
+1. **Commit 1: Core Fix**
+   - The minimal code change that fixes the issue
+   - Example: "Fix missing get_site_theme method in ThemeConfig model"
+
+2. **Commit 2: Documentation Update** (if substantial)
+   - Update relevant documentation
+   - Example: "Update ThemeConfig documentation with new method"
+
+3. **Commit 3: Changelog Entry**
+   - Add changelog entry documenting the fix
+   - Example: "Add changelog entry for ThemeConfig get_site_theme fix"
+
+4. **Commit 4: Tests** (when applicable)
+   - Add or update tests for the fix
+   - Example: "Add tests for get_site_theme method"
+
+#### Commit Message Standards
+- **Format**: `[Component] Brief description of change`
+- **Examples**:
+  - `[ThemeConfig] Fix missing get_site_theme method`
+  - `[Documentation] Update AI guidelines with commit workflow`
+  - `[Tests] Add unit tests for theme configuration`
+
+#### Avoiding Large Commits
+**NEVER commit more than 50 files at once** unless it's a massive refactoring that cannot be broken down.
+
+**Red flags** that indicate commits should be split:
+- Multiple unrelated fixes in one commit
+- Documentation + code + tests + changelog all in one commit
+- More than 10 files changed (unless they're all related to the same feature)
+- Mixing bug fixes with new features
+
+#### Branch Strategy for Easy Merging
+1. **Create feature/fix branches** for each logical change
+2. **Keep branches short-lived** (1-3 days max)
+3. **Merge to main frequently** to avoid conflicts
+4. **Use descriptive branch names**: `fix/theme-config-method`, `docs/commit-guidelines`
+
+#### Emergency Fix Protocol
+For critical production issues:
+1. **Minimal fix first**: Create the smallest possible fix
+2. **Test immediately**: Verify the fix resolves the issue
+3. **Commit and deploy**: Single commit with clear message
+4. **Follow up**: Add documentation and tests in separate commits
+
+### Current Session Update
+**Task**: Fix missing get_site_theme method in ThemeConfig
+**Status**: COMPLETED - Method implemented and tested
+**Files Modified**: 1 file - `/Comserv/lib/Comserv/Model/ThemeConfig.pm`
+**Next Steps**: 
+- Create changelog entry
+- Ready for commit as single focused change

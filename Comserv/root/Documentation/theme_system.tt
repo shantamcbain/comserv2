@@ -269,3 +269,6 @@
         margin-left: 20px;
     }
 </style>
+
+<!-- Updated guidance: canonical definitions live at /static/config/theme_definitions.json -->
+<!-- Theme system now uses a single source of truth: static/config/theme_definitions.json -->

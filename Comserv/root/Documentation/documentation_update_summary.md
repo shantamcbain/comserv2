@@ -1,12 +1,11 @@
 # Documentation System Update Summary
 
+Plan: migrate to single-source theme definitions at static/config/theme_definitions.json and read from that source across ThemeConfig, Root, and ThemeAdmin paths.
+
 ## Issue Resolution
 
 We identified and documented a critical issue with the Documentation controller:
 
-- The controller file was named `Documantation.pm` (with an 'a')
-- But the package inside was declared as `Comserv::Controller::Documentation` (with an 'o')
-- This mismatch caused both the `/documentation` and `/Documentation` routes to fail
 
 The issue was resolved by ensuring the filename matches the package name.
 
