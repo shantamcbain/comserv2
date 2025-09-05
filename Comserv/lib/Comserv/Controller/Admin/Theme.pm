@@ -131,6 +131,11 @@ sub index :Path('/admin/theme') :Args(0) {
     my $site_name = $c->session->{SiteName} || 'bmast';
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Current site name: $site_name");
 
+    # Check if current site is CSC (gets access to all themes)
+    my $is_csc = (lc($site_name) eq 'csc') ? 1 : 0;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
+        "CSC access: " . ($is_csc ? "Yes" : "No"));
+
     # Create a simple site object without database access
     my $site = {
         id => 1,
@@ -145,9 +150,35 @@ sub index :Path('/admin/theme') :Args(0) {
     # Create a simple sites array with just this site
     my @sites = ($site);
 
-    # Get available themes
+    # Get available themes - CSC gets all themes, others get site-specific
     my $themes = $c->model('ThemeConfig')->get_all_themes($c);
-    my @available_themes = sort keys %$themes;
+    my @available_themes;
+    
+    if ($is_csc) {
+        # CSC admin gets access to all themes
+        @available_themes = sort keys %$themes;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+            "CSC admin - showing all " . scalar(@available_themes) . " themes");
+    } else {
+        # Non-CSC sites only get their own theme(s)
+        # Get themes that are either the current site theme or generic themes
+        my $current_theme = $site->{theme};
+        
+        # Include the current site's theme and any "default" or "generic" themes
+        foreach my $theme_key (keys %$themes) {
+            if ($theme_key eq $current_theme || 
+                $theme_key eq 'default' || 
+                $theme_key =~ /^generic/i ||
+                $theme_key eq $site_name) {
+                push @available_themes, $theme_key;
+            }
+        }
+        
+        @available_themes = sort @available_themes;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+            "Non-CSC site ($site_name) - showing " . scalar(@available_themes) . " themes: " . 
+            join(", ", @available_themes));
+    }
 
     # Pass data to template
     $c->stash->{site} = $site;
@@ -155,6 +186,7 @@ sub index :Path('/admin/theme') :Args(0) {
     $c->stash->{available_themes} = \@available_themes;
     $c->stash->{themes} = $themes;
     $c->stash->{theme_name} = $site->{theme};
+    $c->stash->{is_csc} = $is_csc;
     $c->stash->{template} = 'admin/theme/index.tt';
 }
 
@@ -263,6 +295,136 @@ sub edit_css :Path('/admin/theme/edit') :Args(1) {
 
     $c->stash(
         template => 'admin/theme/edit_css.tt',
+        css_content => $css_content,
+        theme_name => $theme_name,
+        theme_variables => $theme_variables,
+        theme_data => $theme_data,
+        available_images => \%available_images
+    );
+}
+
+# Interactive CSS Editor - Enhanced real-time theme editing
+sub edit_css_interactive :Path('/admin/theme/edit_css_interactive') :Args() {
+    my ($self, $c, $theme_name) = @_;
+    
+    # If no theme name provided, use current site's theme
+    if (!$theme_name) {
+        my $site_name = $c->session->{SiteName} || 'bmast';
+        $theme_name = $c->model('ThemeConfig')->get_site_theme($c, $site_name) || 'default';
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_css_interactive', 
+            "No theme specified, using current site theme: $theme_name for site: $site_name");
+    }
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_css_interactive', "Interactive editing CSS for theme: $theme_name");
+
+    my $theme_dir = $c->model('ThemeConfig')->get_theme_css_directory($c);
+    my $css_file = "$theme_dir/$theme_name.css";
+
+    if ($c->req->method eq 'POST') {
+        my $response_data = { success => 0 };
+        
+        try {
+            # Handle theme variables update
+            if (my $variables = $c->req->params->{variables}) {
+                # Update theme definition with new variables
+                my $theme_config = $c->model('ThemeConfig');
+                my $theme_data = $theme_config->get_theme($c, $theme_name);
+                
+                if (ref $variables eq 'HASH') {
+                    $theme_data->{variables} = { %{$theme_data->{variables} || {}}, %$variables };
+                    $theme_config->save_theme($c, $theme_name, $theme_data);
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_css_interactive', 
+                        "Theme variables updated for: $theme_name");
+                }
+            }
+            
+            # Handle CSS content update
+            if (defined $c->req->params->{css_content}) {
+                my $css_content = $c->req->params->{css_content};
+                write_file($css_file, $css_content);
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_css_interactive', 
+                    "CSS file updated successfully for theme: $theme_name");
+            }
+            
+            $response_data->{success} = 1;
+            $response_data->{message} = 'Theme updated successfully';
+            
+        } catch {
+            $response_data->{error} = "Error saving theme: $_";
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_css_interactive', 
+                "Error updating theme $theme_name: $_");
+        };
+        
+        # Return JSON response for AJAX requests
+        if ($c->req->header('Content-Type') && $c->req->header('Content-Type') =~ /application\/json/) {
+            $c->response->content_type('application/json');
+            $c->response->body(encode_json($response_data));
+            return;
+        }
+        
+        # Set flash message for regular form submissions
+        if ($response_data->{success}) {
+            $c->flash->{message} = $response_data->{message};
+        } else {
+            $c->flash->{error} = $response_data->{error};
+        }
+    }
+
+    my $css_content = -f $css_file ? read_file($css_file) : '';
+
+    # Get theme data from the model
+    my $theme_data = $c->model('ThemeConfig')->get_theme($c, $theme_name);
+    my $theme_variables = $theme_data->{variables} || {};
+
+    # If no variables were found, use defaults
+    if (scalar(keys %$theme_variables) == 0) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'edit_css_interactive',
+            "No theme variables found for theme '$theme_name', using defaults");
+        $theme_variables = {
+            'background-color' => '#ffffff',
+            'text-color' => '#000000',
+            'primary-color' => '#007bff',
+            'secondary-color' => '#6c757d',
+            'accent-color' => '#fd7e14',
+            'button-bg' => '#007bff',
+            'button-text' => '#ffffff',
+            'button-border' => '#007bff',
+            'link-color' => '#007bff',
+            'nav-bg' => '#f8f9fa',
+            'nav-text' => '#000000',
+            'border-color' => '#dee2e6',
+            'success-color' => '#28a745',
+            'warning-color' => '#ffc107',
+            'body-font' => 'Arial, sans-serif',
+            'header-font' => 'Georgia, serif',
+            'font-size-base' => '16px',
+            'font-size-small' => '14px',
+            'font-size-large' => '20px'
+        };
+    }
+
+    # Get list of available images
+    my @image_dirs = ('BMaster', 'apis', 'csc', 'usbm');
+    my %available_images;
+
+    foreach my $dir (@image_dirs) {
+        my $image_path = $c->path_to('root', 'static', 'images', $dir);
+        if (-d $image_path) {
+            my @images = glob("$image_path/*.{jpg,jpeg,png,gif}");
+            $available_images{$dir} = [map { my $file = $_; $file =~ s/.*\/([^\/]+)$/$1/; $file } @images];
+        }
+    }
+
+    # Log the variables for debugging
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_css_interactive',
+        "Theme variables: " . join(", ", keys %$theme_variables));
+
+    # Log available images
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_css_interactive',
+        "Available image directories: " . join(", ", keys %available_images));
+
+    $c->stash(
+        template => 'admin/theme/edit_css_interactive.tt',
         css_content => $css_content,
         theme_name => $theme_name,
         theme_variables => $theme_variables,
@@ -413,6 +575,8 @@ sub update_css :Path('/admin/theme/update_css') :Args(1) {
     # Redirect back to the edit page
     $c->response->redirect($c->uri_for($self->action_for('edit_css'), [$theme_name]));
 }
+
+
 
 # Add a compatibility method to handle old URLs
 sub legacy_redirect :Path('/themeadmin') :Args {
