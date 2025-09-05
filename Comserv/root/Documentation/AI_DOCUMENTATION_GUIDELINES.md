@@ -221,9 +221,192 @@ For critical production issues:
 4. **Follow up**: Add documentation and tests in separate commits
 
 ### Current Session Update
-**Task**: Fix missing get_site_theme method in ThemeConfig
-**Status**: COMPLETED - Method implemented and tested
-**Files Modified**: 1 file - `/Comserv/lib/Comserv/Model/ThemeConfig.pm`
+**Task**: CSS Theme System Documentation Update  
+**Status**: COMPLETED - Comprehensive documentation created for theme system enhancements
+**Goal**: Document all changes made to CSS/theme system since last commit
+**Components Completed**:
+- Created comprehensive changelog: `/Comserv/root/Documentation/changelog/2025-01-19-css-theme-system-enhancements.tt`
+- Documented Interactive CSS Editor implementation (edit_css_interactive.tt template)
+- Documented Theme Management Controller enhancements with CSC admin access controls
+- Documented CSS file structure improvements and Template Toolkit plugin integration
+- Covered technical improvements including CSS variable system and access controls
+**Files Created**: 
+- `/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/changelog/2025-01-19-css-theme-system-enhancements.tt` - Comprehensive theme system changelog
+**Template Toolkit Plugin Status**: ✅ ACTIVE - Confirmed TTK2 plugin configuration in Comserv2.iml
+**Key Components Documented**:
+- Interactive CSS Editor with 924-line JavaScript implementation  
+- Enhanced Theme.pm controller with CSC admin logic and utility methods
+- New CSS files: theme-editor.css, component_styles.css, site_themes.css, themes.css
+- PyCharm TTK2 plugin integration with 12+ template directories configured
+**Resource Conservation**: Used efficient file operations, single comprehensive documentation file created
+
+## Code Delivery Format for PyCharm Integration
+
+**CRITICAL**: When providing code changes, use PyCharm-compatible diff format for user review and editing.
+
+### Required Code Delivery Format
+1. **Always provide code changes in unified diff format** that can be viewed and edited in PyCharm
+2. **Use clear section headers** to identify each file being changed
+3. **Show exact lines being replaced** with proper context
+4. **Format for copy-paste application** after user review/editing
+
+### Example Format:
+```
+--- a/path/to/file.pm
++++ b/path/to/file.pm
+@@ -line,count +line,count @@
+ context line
+-old code line
++new code line
+ context line
+```
+
+### Alternative Format (when diff is not suitable):
+**File: /path/to/file.pm**
+```perl
+# Replace this code:
+sub old_method {
+    my $self = shift;
+    # old implementation
+}
+
+# With this code:
+sub new_method {
+    my $self = shift;
+    # new implementation
+}
+```
+
+### Code Delivery Rules
+1. **always use EditFile with automatic diff.
+2. **ALWAYS provide viewable/editable code** before applying changes  
+3. **Show complete code blocks** with sufficient context
+4. **Use copy-paste ready formatting** for user convenience
+5. **Indicate file paths clearly** for each change
+
+### Workflow Integration
+1. Analyze the requirement
+2. Provide code changes in diff/block format 
+3. Wait for user approval/editing
+4. Apply changes only after confirmation
+5. Update documentation with this workflow
+
+## Application Error Logging
+**IMPORTANT**: All application errors are logged to `/Comserv/logs/application.log` or `/Comserv/logs/errors.log`
+- Check these files first when debugging application issues
+- Do not waste time looking for fictional log locations
+- Use `tail -20 /path/to/logfile` to see recent errors
+
+## EditFile Tool Usage and Automatic Diff Format
+
+### Standard Code Editing Method
+**CRITICAL**: Always use the `EditFile` tool for code modifications. This provides the expected "automatic diff display" format that includes:
+
+1. **Confirmation message** that the file has been edited
+2. **Automatic code snippets** showing changed sections with line numbers  
+3. **Context around changes** for verification
+4. **"Review the changes and make sure they are as expected"** prompt
+
+### Common Issues That Break EditFile Functionality
+
+**When EditFile fails, DO NOT immediately switch to command-line tools.** Instead, diagnose and retry:
+
+1. **File Permission Problems**
+   - Check if files are read-only or have permission restrictions
+   - Solution: Fix permissions first, then retry EditFile
+
+2. **File Path Issues** 
+   - MUST use absolute paths: `/home/shanta/PycharmProjects/comserv2/...`
+   - NEVER use relative paths or shortcuts
+   - Solution: Convert to absolute path and retry
+
+3. **Template Toolkit (.tt) File Issues**
+   - .tt files can have special encoding issues  
+   - .tt files require specific header format for Template Toolkit processing
+   - Solution: Verify file exists and is readable, retry with exact path
+
+### Template Toolkit (.tt) File Header Format
+
+**CRITICAL**: All .tt template files must follow this exact header format to avoid parsing errors:
+
+```
+[% META title = 'Page Title Here' %]
+[% PageVersion = 'path/to/file.tt,v 0.01 YYYY/MM/DD author Exp author ' %]
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+```
+
+**Key Rules for .tt Headers**:
+1. **META title**: Use single quotes, no concatenation with variables in the META directive
+2. **PageVersion**: Include file path, version, date, and author
+3. **Debugging block**: Standard format for all templates
+4. **Variable concatenation**: Use `_` operator, like `'Interactive Theme Editor - ' _ theme_name` in the title display, NOT in META
+
+**Example from working template (CSC.tt)**:
+```
+[% META title = 'Computer Systems Consulting' %]
+[% PageVersion = 'CSC/CSC.tt,v 0.03 2025/04/29 shanta Exp shanta ' %]
+```
+
+**WRONG - causes parse error**:
+```
+[% META title = 'Interactive Theme Editor - ' _ theme_name %]
+```
+
+**RIGHT - for dynamic titles**:
+```
+[% META title = 'Interactive Theme Editor' %]
+<h1>Interactive Theme Editor - [% theme_name %]</h1>
+```
+
+4. **Cascading Failure Pattern - AVOID THIS**
+   - **WRONG**: EditFile fails → switch to `sed`/`cp` → stay in command-line mode
+   - **RIGHT**: EditFile fails → diagnose issue → retry EditFile with corrections
+   - Once using command-line tools, you lose the automatic diff format
+
+### EditFile Troubleshooting Checklist
+Before switching to command-line tools:
+1. ✓ Verify absolute file path starting with `/home/shanta/PycharmProjects/comserv2`
+2. ✓ Check file exists and is readable
+3. ✓ Verify file permissions allow writing
+4. ✓ Retry EditFile with corrected parameters
+5. **ONLY** use command-line as absolute last resort
+
+### Session Continuity
+**CRITICAL**: When working on tasks that span multiple sessions, always update this documentation with:
+
+#### Current Session Status Template
+```
+### Current Session: [Brief Task Description]
+**Task**: [Detailed description of what is being done]
+**Status**: [IN PROGRESS/COMPLETED/BLOCKED]
+**Goal**: [End objective]
+**Components Being Developed**: 
+- [Component 1]
+- [Component 2]
+**Files Being Modified**: 
+- [File path 1] - [what changes]
+- [File path 2] - [what changes]
 **Next Steps**: 
-- Create changelog entry
-- Ready for commit as single focused change
+- [Step 1]
+- [Step 2]
+**Context**: [Important context for next session]
+**Resource Conservation**: [Notes on operation tracking]
+```
+
+#### Session Handoff Protocol
+1. **Always update the Current Session section** before ending a session
+2. **Document what was attempted** even if incomplete
+3. **List specific next steps** for continuation
+4. **Include file paths and specific changes** being made
+5. **Note any issues encountered** and solutions tried
+
+This prevents future sessions from:
+- Repeating failed approaches
+- Wasting time rediscovering context
+- Starting over unnecessarily
+- Using wrong tools or methods
