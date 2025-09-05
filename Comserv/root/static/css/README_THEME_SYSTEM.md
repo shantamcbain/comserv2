@@ -4,6 +4,8 @@
 
 The theme system has been refactored to use CSS variables and a centralized approach. This allows for easier customization and maintenance of themes.
 
+**Latest Updates**: See [CSS Theme System Enhancements - January 2025](/Documentation/changelog/2025-01-19-css-theme-system-enhancements.tt) for recent improvements including interactive CSS editor and enhanced theme management.
+
 ## Files Structure
 
 - `/static/css/base.css` - Contains base styles and CSS variables

@@ -14,6 +14,17 @@
     [% IF info_msg %]
         <div class="alert alert-info">[% info_msg %]</div>
     [% END %]
+    <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+            <h3 class="card-title mb-0">Interactive CSS Editor</h3>
+        </div>
+        <div class="card-body">
+            <p>Edit theme CSS files with real-time preview and syntax highlighting.</p>
+            <a href="[% c.uri_for('/admin/theme/edit_css_interactive') %]" class="btn btn-info btn-lg">
+                Launch Interactive CSS Theme Editor
+            </a>
+        </div>
+    </div>
 
     <div class="card mb-4">
         <div class="card-header bg-primary text-white">

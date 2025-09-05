@@ -1,0 +1,40 @@
+[% META title = 'Theme Configuration' %]
+[% PageVersion = 'ThemeConfig.tt,v 0.01 2025/01/19 shanta Exp shanta ' %]
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+
+<div class="documentation-content">
+    <h1>Theme Configuration</h1>
+
+    <section class="overview">
+        <div class="alert alert-warning">
+            <strong>Updated Guidance</strong>: Canonical definitions live at <code>/static/config/theme_definitions.json</code>
+        </div>
+        <p>Theme system now reads from the canonical <code>theme_definitions.json</code> file in <code>static/config/</code>. All code paths should reference this single source of truth for themes and mappings.</p>
+    </section>
+
+    <section class="recent-enhancements">
+        <h2>Recent Enhancements</h2>
+        <div class="enhancement-highlight">
+            <strong>Interactive Theme Editor</strong>: The theme system now includes a comprehensive interactive CSS editor with real-time preview capabilities. See the <a href="/Documentation/changelog/2025-01-19-css-theme-system-enhancements.tt">CSS Theme System Enhancements - January 2025</a> changelog for complete details on new features including:
+        </div>
+        <ul class="feature-list">
+            <li>Interactive CSS editing interface</li>
+            <li>Enhanced Theme Management Controller with CSC admin access controls</li>
+            <li>New CSS file structure and Template Toolkit integration</li>
+            <li>Advanced theme variable management</li>
+        </ul>
+    </section>
+
+    <section class="related-documentation">
+        <h2>Related Documentation</h2>
+        <ul class="documentation-links">
+            <li><a href="/static/css/README_THEME_SYSTEM.tt">Theme System Overview</a> - Technical documentation for the CSS theme system</li>
+            <li><a href="/Documentation/admin/theme_mappings_handling.tt">Theme Mappings Handling</a> - Git operations and theme mapping management</li>
+        </ul>
+    </section>
+</div>

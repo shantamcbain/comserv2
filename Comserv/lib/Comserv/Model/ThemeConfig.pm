@@ -28,7 +28,8 @@ sub get_theme_mappings_path {
 }
 
 sub get_theme_css_directory {
-    return shift->path_to('root', 'static', 'css', 'themes');
+    my ($self, $c) = @_;
+    return $c->path_to('root', 'static', 'css', 'themes');
 }
 
 sub get_theme_definitions {
@@ -55,6 +56,23 @@ sub get_all_themes {
     $self->log_with_details($c, 'info', __FILE__, __LINE__, 'get_all_themes', "Loading canonical theme definitions");
     my $defs = $self->get_theme_definitions($c);
     return $defs;
+}
+
+# Get specific theme data by theme name
+sub get_theme {
+    my ($self, $c, $theme_name) = @_;
+    
+    $self->log_with_details($c, 'info', __FILE__, __LINE__, 'get_theme', "Getting theme data for: $theme_name");
+    
+    my $themes = $self->get_theme_definitions($c);
+    
+    if (exists $themes->{$theme_name}) {
+        $self->log_with_details($c, 'info', __FILE__, __LINE__, 'get_theme', "Found theme data for: $theme_name");
+        return $themes->{$theme_name};
+    }
+    
+    $self->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_theme', "Theme '$theme_name' not found, returning empty data");
+    return { variables => {} };
 }
 
 # Get the theme for a specific site
@@ -118,6 +136,44 @@ sub get_site_theme {
     $c->session->{"theme_$site_name"} = $default_theme if $c->session;
     
     return $default_theme;
+}
+
+# Save theme data to the theme definitions file
+sub save_theme {
+    my ($self, $c, $theme_name, $theme_data) = @_;
+    
+    $self->log_with_details($c, 'info', __FILE__, __LINE__, 'save_theme', "Saving theme: $theme_name");
+    
+    try {
+        # Load current theme definitions
+        my $config_file = $c->path_to('root', 'static', 'config', 'theme_definitions.json');
+        
+        my $config_data = {};
+        if (-f $config_file) {
+            my $config_json = read_file($config_file);
+            $config_data = decode_json($config_json);
+        }
+        
+        # Initialize themes section if it doesn't exist
+        $config_data->{themes} ||= {};
+        
+        # Update the theme
+        $config_data->{themes}->{$theme_name} = $theme_data;
+        
+        # Write back to file
+        my $json_output = encode_json($config_data);
+        write_file($config_file, $json_output);
+        
+        $self->log_with_details($c, 'info', __FILE__, __LINE__, 'save_theme', 
+            "Successfully saved theme '$theme_name' to $config_file");
+        
+        return 1;
+        
+    } catch {
+        $self->log_with_details($c, 'error', __FILE__, __LINE__, 'save_theme', 
+            "Error saving theme '$theme_name': $_");
+        return 0;
+    };
 }
 
 __PACKAGE__->meta->make_immutable;
