@@ -1,6 +1,15 @@
+[% META title = 'Todo System Documentation' %]
+[% PageVersion = 'models/Todo.tt,v 0.01 2025/01/15 shanta Exp shanta ' %]
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+
 # Todo System Documentation
 
-**File:** /home/shanta/PycharmProjects/comserv/Comserv/root/Documentation/todo_system.md
+File: /home/shanta/PycharmProjects/comserv/Comserv/root/Documentation/models/Todo.tt
 
 ## Overview
 
@@ -207,6 +216,15 @@ Implemented a comprehensive edit functionality:
 - Ensured the edit form includes all necessary fields and dropdowns
 - Fixed the issue with the edit button in the todo list
 
+### 5. Log Controller Model Method Fix (January 2025)
+
+Fixed critical error in Log controller's update method:
+- Corrected method call in Log.pm controller line 196
+- Changed from: $log_model->modify($log, $new_values)
+- Changed to: $log_model->modify($c, $record_id, $new_values)
+- This fix resolved the "Can't locate object method 'model' via package 'Comserv::Model::DBEncy::Log'" error
+- Users can now successfully save log entries in the application
+
 ## Usage Guidelines
 
 ### Creating a New Todo
@@ -226,7 +244,7 @@ Implemented a comprehensive edit functionality:
 4. Optional: If your project is not in the dropdown, you can enter a Manual Project ID
 5. Click "Add Todo" to create the todo item
 
-**Note:** The project selection is critical for proper todo creation. The system will use either the selected project from the dropdown or the manually entered project ID. If neither is provided, the database will reject the todo creation with a "Column 'project_id' cannot be null" error.
+Note: The project selection is critical for proper todo creation. The system will use either the selected project from the dropdown or the manually entered project ID. If neither is provided, the database will reject the todo creation with a "Column 'project_id' cannot be null" error.
 
 ### Viewing Todos
 

@@ -1,29 +1,45 @@
-# Mail Documentation Update Summary
+[% META title = 'Mail Documentation Update Summary' %]
+[% PageVersion = 'Documentation/general/mail_documentation_update.tt,v 0.01 2025/01/20 shanta Exp shanta ' %]
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
 
-## Overview
+<h1>Mail Documentation Update Summary</h1>
 
-This document summarizes the updates made to the mail system documentation in the Comserv application. The updates include comprehensive documentation for both users and administrators, covering configuration, troubleshooting, and best practices.
+<h2>Overview</h2>
 
-## Documents Created
+<p>This document summarizes the updates made to the mail system documentation in the Comserv application. The updates include comprehensive documentation for both users and administrators, covering configuration, troubleshooting, and best practices.</p>
 
-The following documentation files have been created:
+<h2>Documents Created</h2>
 
-1. **Mail System Documentation** (`/Documentation/mail_system.md`)
-   - Overview of the mail system architecture
-   - Description of components and their functions
-   - Explanation of configuration storage
-   - Webmail access information
-   - Fallback mechanisms
-   - Troubleshooting basics
-   - Best practices
+<p>The following documentation files have been created:</p>
 
-2. **Mail Configuration Guide** (`/Documentation/mail_configuration_guide.md`)
-   - Step-by-step configuration instructions
-   - SMTP settings explanation
-   - Testing procedures
-   - Configuration storage details
-   - Security considerations
-   - Example configurations for popular email providers
+<ol>
+<li><strong>Mail System Documentation</strong> (`/Documentation/mail_system.md`)
+<ul>
+<li>Overview of the mail system architecture</li>
+<li>Description of components and their functions</li>
+<li>Explanation of configuration storage</li>
+<li>Webmail access information</li>
+<li>Fallback mechanisms</li>
+<li>Troubleshooting basics</li>
+<li>Best practices</li>
+</ul>
+</li>
+
+<li><strong>Mail Configuration Guide</strong> (`/Documentation/mail_configuration_guide.md`)
+<ul>
+<li>Step-by-step configuration instructions</li>
+<li>SMTP settings explanation</li>
+<li>Testing procedures</li>
+<li>Configuration storage details</li>
+<li>Security considerations</li>
+<li>Example configurations for popular email providers</li>
+</ul>
+</li>
 
 3. **Mail Troubleshooting Guide** (`/Documentation/mail_troubleshooting.md`)
    - Detailed diagnostic procedures

@@ -1,40 +1,18 @@
-[% META title = 'Theme Configuration' %]
-[% PageVersion = 'ThemeConfig.tt,v 0.01 2025/01/19 shanta Exp shanta ' %]
-[% debug %]
-[% IF c.session.debug_mode == 1 %]
-    [% PageVersion %]
-    [% "Debugging HostName: " _ HostName %]
-    [%# INCLUDE 'debug.tt' %]
-[% END %]
+# Updated guidance: canonical definitions live at /static/config/theme_definitions.json
+ 
+Note: Theme system now reads from the canonical theme_definitions.json file in static/config/.
+All code paths should reference this single source of truth for themes and mappings.
 
-<div class="documentation-content">
-    <h1>Theme Configuration</h1>
+## Recent Enhancements
 
-    <section class="overview">
-        <div class="alert alert-warning">
-            <strong>Updated Guidance</strong>: Canonical definitions live at <code>/static/config/theme_definitions.json</code>
-        </div>
-        <p>Theme system now reads from the canonical <code>theme_definitions.json</code> file in <code>static/config/</code>. All code paths should reference this single source of truth for themes and mappings.</p>
-    </section>
+**Interactive Theme Editor**: The theme system now includes a comprehensive interactive CSS editor with real-time preview capabilities. See the [CSS Theme System Enhancements - January 2025](/Documentation/changelog/2025-01-19-css-theme-system-enhancements.tt) changelog for complete details on new features including:
 
-    <section class="recent-enhancements">
-        <h2>Recent Enhancements</h2>
-        <div class="enhancement-highlight">
-            <strong>Interactive Theme Editor</strong>: The theme system now includes a comprehensive interactive CSS editor with real-time preview capabilities. See the <a href="/Documentation/changelog/2025-01-19-css-theme-system-enhancements.tt">CSS Theme System Enhancements - January 2025</a> changelog for complete details on new features including:
-        </div>
-        <ul class="feature-list">
-            <li>Interactive CSS editing interface</li>
-            <li>Enhanced Theme Management Controller with CSC admin access controls</li>
-            <li>New CSS file structure and Template Toolkit integration</li>
-            <li>Advanced theme variable management</li>
-        </ul>
-    </section>
+- Interactive CSS editing interface
+- Enhanced Theme Management Controller with CSC admin access controls
+- New CSS file structure and Template Toolkit integration
+- Advanced theme variable management
 
-    <section class="related-documentation">
-        <h2>Related Documentation</h2>
-        <ul class="documentation-links">
-            <li><a href="/static/css/README_THEME_SYSTEM.tt">Theme System Overview</a> - Technical documentation for the CSS theme system</li>
-            <li><a href="/Documentation/admin/theme_mappings_handling.tt">Theme Mappings Handling</a> - Git operations and theme mapping management</li>
-        </ul>
-    </section>
-</div>
+## Related Documentation
+
+- [Theme System Overview](/static/css/README_THEME_SYSTEM.md) - Technical documentation for the CSS theme system
+- [Theme Mappings Handling](/Documentation/admin/theme_mappings_handling.md) - Git operations and theme mapping management

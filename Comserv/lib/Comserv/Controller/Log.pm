@@ -193,7 +193,7 @@ sub update :Path('/log/update') :Args(0) {
     my $log_model = Comserv::Model::Log->new();
 
     # Call the modify method on the Log model instance
-    $log_model->modify($log, $new_values);
+    $log_model->modify($c, $record_id, $new_values);
 
     # Redirect to the log details page after successful update
     $c->response->redirect($c->uri_for("/log", { record_id => $record_id }));

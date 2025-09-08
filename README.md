@@ -22,8 +22,8 @@ See the [Comserv README](Comserv/README.md) for detailed instructions on setting
 
 ## Documentation
 Comprehensive documentation is available in the `Comserv/docs/` directory, including:
-- [Project Management System](Comserv/docs/project_management_system.md)
-- [Theme System](Comserv/docs/THEME_SYSTEM_README.md)
+- [Project Management System](Comserv/root/Documentation/project_management_system.md)
+- [Theme System](Comserv/root/docs/THEME_SYSTEM_README.md)
 
 ## License
 This software is proprietary and confidential. Unauthorized copying, distribution, or use is prohibited.
