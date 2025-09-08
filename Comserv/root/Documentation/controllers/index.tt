@@ -1,81 +1,84 @@
-[% PageVersion = 'Documentation/controllers/index.tt,v 1.0 2025/04/08 shanta Exp shanta ' %]
-[% IF c.session.debug_mode == 1 %]
-    [% PageVersion %]
-[% END %]
+# Controllers Documentation
 
-<h1>Controller Documentation</h1>
+## Overview
 
-<p>This page lists all controllers in the Comserv application.</p>
+This page provides an index of all controller documentation in the Comserv system. Controllers are responsible for handling requests, processing data, and rendering views.
 
-<div class="controller-list">
-    <h2>Core Controllers</h2>
-    <ul>
-        <li><a href="[% c.uri_for('/Documentation/controllers/Root') %]">Root Controller</a></li>
-        <li><a href="[% c.uri_for('/Documentation/controllers/User') %]">User Controller</a></li>
-        <li><a href="[% c.uri_for('/Documentation/controllers/Site') %]">Site Controller</a></li>
-        <li><a href="[% c.uri_for('/Documentation/controllers/Documentation') %]">Documentation Controller</a></li>
-    </ul>
+## Core Controllers
 
-    <h2>Module Controllers</h2>
-    <ul>
-        <li><a href="[% c.uri_for('/Documentation/controllers/Todo') %]">Todo Controller</a></li>
-        <li><a href="[% c.uri_for('/Documentation/controllers/Project') %]">Project Controller</a></li>
-        <li><a href="[% c.uri_for('/Documentation/controllers/Proxmox') %]">Proxmox Controller</a></li>
-        <li><a href="[% c.uri_for('/Documentation/controllers/MCoop') %]">MCoop Controller</a></li>
-    </ul>
+- [Root Controller](Root_Controller.md) - The main controller that handles the root path and determines which site to display
+- [Documentation Controller](Documentation_Controller.md) - Handles the documentation system
+- [Admin Controller](Admin_Controller.md) - Handles administrative functions
+- [User Controller](User_Controller.md) - Handles user authentication and management
 
-    <h2>Admin Controllers</h2>
-    <ul>
-        <li><a href="[% c.uri_for('/Documentation/controllers/Admin') %]">Admin Controller</a></li>
-        <li><a href="[% c.uri_for('/Documentation/controllers/ThemeAdmin') %]">ThemeAdmin Controller</a></li>
-        <li><a href="[% c.uri_for('/Documentation/controllers/ThemeEditor') %]">ThemeEditor Controller</a></li>
-    </ul>
+## Site-Specific Controllers
 
-    <h2>Utility Controllers</h2>
-    <ul>
-        <li><a href="[% c.uri_for('/Documentation/controllers/File') %]">File Controller</a></li>
-        <li><a href="[% c.uri_for('/Documentation/controllers/Mail') %]">Mail Controller</a></li>
-        <li><a href="[% c.uri_for('/Documentation/controllers/Log') %]">Log Controller</a></li>
-    </ul>
+- [USBM Controller](USBM_Controller.md) - Universal School of Business Management site
+- [CSC Controller](CSC_Controller.md) - Computer System Consulting site
+- [Shanta Controller](Shanta_Controller.md) - Shanta's personal site
 
-    <h2>Site-Specific Controllers</h2>
-    <ul>
-        <li><a href="[% c.uri_for('/Documentation/controllers/CSC') %]">CSC Controller</a></li>
-        <li><a href="[% c.uri_for('/Documentation/controllers/ENCY') %]">ENCY Controller</a></li>
-        <li><a href="[% c.uri_for('/Documentation/controllers/USBM') %]">USBM Controller</a></li>
-        <li><a href="[% c.uri_for('/Documentation/controllers/Apiary') %]">Apiary Controller</a></li>
-        <li><a href="[% c.uri_for('/Documentation/controllers/BMaster') %]">BMaster Controller</a></li>
-        <li><a href="[% c.uri_for('/Documentation/controllers/Forager') %]">Forager Controller</a></li>
-        <li><a href="[% c.uri_for('/Documentation/controllers/Ve7tit') %]">Ve7tit Controller</a></li>
-        <li><a href="[% c.uri_for('/Documentation/controllers/WorkShop') %]">WorkShop Controller</a></li>
-    </ul>
-</div>
+## Feature Controllers
 
-<style>
-    .controller-list {
-        margin: 20px 0;
-    }
-    .controller-list h2 {
-        color: #0056b3;
-        margin: 20px 0 10px 0;
-        border-bottom: 1px solid #ddd;
-        padding-bottom: 5px;
-    }
-    .controller-list ul {
-        list-style-type: none;
-        padding: 0;
-        margin: 0;
-    }
-    .controller-list li {
-        margin: 5px 0;
-        padding: 5px 0;
-    }
-    .controller-list a {
-        color: #0056b3;
-        text-decoration: none;
-        font-weight: bold;
-    }
-    .controller-list a:hover {
-        text-decoration: underline;
-    }
-</style>
+- [HelpDesk Controller](HelpDesk_Controller.md) - Support ticket system
+- [Todo Controller](Todo_Controller.md) - Task management system
+- [Project Controller](Project_Controller.md) - Project management system
+- [Proxy Controller](Proxy_Controller.md) - Proxy management system
+
+## Guidelines
+
+- [Controller Routing Guidelines](/Documentation/controller_routing_guidelines) - Best practices for setting up routes
+- [Controller Naming Conventions](/Documentation/controller_naming_conventions) - Standards for naming controllers
+- [Controller Testing](/Documentation/controller_testing) - How to test controllers
+
+## Common Issues
+
+- [Filename/Package Mismatch](/Documentation/documentation_filename_issue) - Critical issue with controller filenames not matching package names
+- [All Sites Showing Same Content](/Documentation/all_sites_same_content) - Issue with controllers capturing the root path incorrectly
+
+## Creating New Controllers
+
+When creating a new controller:
+
+1. Ensure the filename matches the package name
+2. Set the namespace explicitly
+3. Use appropriate action attributes
+4. Include proper logging
+5. Forward to the view explicitly
+
+Example:
+
+```perl
+package Comserv::Controller::NewFeature;
+use Moose;
+use namespace::autoclean;
+use Comserv::Util::Logging;
+
+BEGIN { extends 'Catalyst::Controller'; }
+
+# Set the namespace
+__PACKAGE__->config(namespace => 'NewFeature');
+
+has 'logging' => (
+    is => 'ro',
+    default => sub { Comserv::Util::Logging->instance }
+);
+
+sub auto :Private {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', 
+        "NewFeature controller auto method called");
+    return 1;
+}
+
+sub index :Path :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
+        "NewFeature index action called");
+    $c->stash(template => 'NewFeature/index.tt');
+    $c->forward($c->view('TT'));
+}
+
+__PACKAGE__->meta->make_immutable;
+
+1;
+```
