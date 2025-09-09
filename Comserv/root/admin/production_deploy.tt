@@ -1,0 +1,443 @@
+[% META title = 'Production Deployment Management' %]
+
+<div class="admin-container">
+    <h1>Production Deployment Management</h1>
+    
+    <!-- Current Status Section -->
+    <div class="status-section">
+        <h2>Current Deployment Status</h2>
+        <div class="status-grid">
+            <div class="status-item">
+                <label>Current Branch:</label>
+                <span class="branch-name">[% deployment_status.current_branch || 'Unknown' %]</span>
+            </div>
+            <div class="status-item">
+                <label>Current Commit:</label>
+                <span class="commit-hash">[% deployment_status.current_commit || 'Unknown' %]</span>
+            </div>
+            <div class="status-item">
+                <label>Last Commit:</label>
+                <span class="commit-message">[% deployment_status.last_commit_message || 'Unknown' %]</span>
+            </div>
+            <div class="status-item">
+                <label>Last Update:</label>
+                <span class="commit-date">[% deployment_status.last_commit_date || 'Unknown' %]</span>
+            </div>
+            <div class="status-item">
+                <label>Starman Status:</label>
+                <span class="service-status [% deployment_status.starman_status == 'active' ? 'active' : 'inactive' %]">
+                    [% deployment_status.starman_status || 'Unknown' %]
+                </span>
+            </div>
+            [% IF deployment_status.commits_behind > 0 %]
+            <div class="status-item warning">
+                <label>Behind Origin:</label>
+                <span class="behind-count">[% deployment_status.commits_behind %] commits</span>
+            </div>
+            [% END %]
+            [% IF deployment_status.has_uncommitted_changes %]
+            <div class="status-item warning">
+                <label>Uncommitted Changes:</label>
+                <span class="changes-warning">Yes - Review before deployment</span>
+            </div>
+            [% END %]
+        </div>
+    </div>
+
+    <!-- Deployment Form Section -->
+    <div class="deployment-section">
+        <h2>Deploy to Production</h2>
+        
+        [% IF error_msg %]
+        <div class="alert alert-error">
+            <strong>Error:</strong> [% error_msg %]
+        </div>
+        [% END %]
+        
+        [% IF warning_msg %]
+        <div class="alert alert-warning">
+            <strong>Warning:</strong> [% warning_msg %]
+        </div>
+        [% END %]
+        
+        [% IF success_msg %]
+        <div class="alert alert-success">
+            <strong>Success:</strong> [% success_msg %]
+        </div>
+        [% END %]
+
+        <form method="POST" action="[% c.uri_for('/admin/production_deploy') %]" class="deployment-form">
+            <input type="hidden" name="action" value="deploy">
+            
+            <div class="form-group">
+                <label for="branch">Select Branch to Deploy:</label>
+                <select name="branch" id="branch" required>
+                    <option value="">-- Select Branch --</option>
+                    [% FOREACH branch IN available_branches %]
+                    <option value="[% branch.name %]" 
+                            [% IF branch.name == 'main' %]selected[% END %]
+                            class="[% branch.type %] [% IF branch.is_current %]current[% END %]">
+                        [% branch.name %] 
+                        [% IF branch.type == 'remote' %](remote)[% END %]
+                        [% IF branch.is_current %](current)[% END %]
+                    </option>
+                    [% END %]
+                </select>
+                <small class="help-text">Select the branch to deploy to production. 'main' is recommended for stable releases.</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="version_tag">Version Tag (Optional):</label>
+                <input type="text" name="version_tag" id="version_tag" placeholder="e.g., v1.2.3">
+                <small class="help-text">Create a git tag for this deployment (useful for tracking releases).</small>
+            </div>
+            
+            <div class="form-group checkbox-group">
+                <label>
+                    <input type="checkbox" name="create_backup" value="1" checked>
+                    Create backup branch before deployment
+                </label>
+                <small class="help-text">Recommended: Creates a backup branch with timestamp before making changes.</small>
+            </div>
+            
+            <div class="deployment-warning">
+                <h3>⚠️ Deployment Warning</h3>
+                <p>This action will:</p>
+                <ul>
+                    <li>Switch to the selected branch</li>
+                    <li>Pull the latest changes from the remote repository</li>
+                    <li>Restart the Starman production server (brief downtime)</li>
+                    <li>Apply all changes immediately to the live system</li>
+                </ul>
+                <p><strong>Make sure you have tested the changes before deploying to production!</strong></p>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary deploy-btn" onclick="return confirm('Are you sure you want to deploy to production? This will cause brief downtime.')">
+                    🚀 Deploy to Production
+                </button>
+                <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Deployment Output Section -->
+    [% IF deploy_output %]
+    <div class="output-section">
+        <h2>Deployment Output</h2>
+        <div class="deployment-output [% deploy_success ? 'success' : 'error' %]">
+            <pre>[% deploy_output | html %]</pre>
+        </div>
+    </div>
+    [% END %]
+
+    <!-- Available Branches Section -->
+    <div class="branches-section">
+        <h2>Available Branches</h2>
+        <div class="branches-list">
+            [% FOREACH branch IN available_branches %]
+            <div class="branch-item [% branch.type %] [% IF branch.is_current %]current[% END %]">
+                <span class="branch-name">[% branch.name %]</span>
+                <span class="branch-type">[% branch.type %]</span>
+                [% IF branch.is_current %]<span class="current-indicator">Current</span>[% END %]
+            </div>
+            [% END %]
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="quick-actions">
+        <h2>Quick Actions</h2>
+        <div class="action-buttons">
+            <a href="[% c.uri_for('/admin/git_pull') %]" class="btn btn-secondary">
+                📥 Simple Git Pull
+            </a>
+            <a href="[% c.uri_for('/admin/restart_starman') %]" class="btn btn-secondary">
+                🔄 Restart Starman Only
+            </a>
+            <a href="[% c.uri_for('/admin/system_info') %]" class="btn btn-secondary">
+                📊 System Information
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+.admin-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.status-section, .deployment-section, .output-section, .branches-section, .quick-actions {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.status-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px;
+    background: white;
+    border-radius: 4px;
+    border-left: 4px solid #007bff;
+}
+
+.status-item.warning {
+    border-left-color: #ffc107;
+    background: #fff3cd;
+}
+
+.status-item label {
+    font-weight: bold;
+    color: #495057;
+}
+
+.service-status.active {
+    color: #28a745;
+    font-weight: bold;
+}
+
+.service-status.inactive {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.deployment-form {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: #495057;
+}
+
+.form-group select, .form-group input[type="text"] {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.checkbox-group label {
+    display: flex;
+    align-items: center;
+    font-weight: normal;
+}
+
+.checkbox-group input[type="checkbox"] {
+    margin-right: 8px;
+    width: auto;
+}
+
+.help-text {
+    display: block;
+    margin-top: 5px;
+    color: #6c757d;
+    font-size: 12px;
+}
+
+.deployment-warning {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 4px;
+    padding: 15px;
+    margin: 20px 0;
+}
+
+.deployment-warning h3 {
+    margin-top: 0;
+    color: #856404;
+}
+
+.deployment-warning ul {
+    margin: 10px 0;
+    padding-left: 20px;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 14px;
+    font-weight: bold;
+    text-align: center;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+}
+
+.deploy-btn {
+    font-size: 16px;
+    padding: 12px 24px;
+}
+
+.deployment-output {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 15px;
+    margin-top: 15px;
+}
+
+.deployment-output.success {
+    border-color: #28a745;
+    background: #d4edda;
+}
+
+.deployment-output.error {
+    border-color: #dc3545;
+    background: #f8d7da;
+}
+
+.deployment-output pre {
+    margin: 0;
+    white-space: pre-wrap;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+}
+
+.branches-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.branch-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+}
+
+.branch-item.current {
+    border-color: #007bff;
+    background: #e3f2fd;
+}
+
+.branch-item.local .branch-type {
+    color: #28a745;
+}
+
+.branch-item.remote .branch-type {
+    color: #6c757d;
+}
+
+.current-indicator {
+    background: #007bff;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.alert {
+    padding: 12px 16px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+.alert-success {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+
+.alert-error {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}
+
+.alert-warning {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    color: #856404;
+}
+</style>
+
+<script>
+// Add confirmation for deployment
+document.addEventListener('DOMContentLoaded', function() {
+    const deployBtn = document.querySelector('.deploy-btn');
+    if (deployBtn) {
+        deployBtn.addEventListener('click', function(e) {
+            const branch = document.getElementById('branch').value;
+            const createBackup = document.querySelector('input[name="create_backup"]').checked;
+            const versionTag = document.getElementById('version_tag').value;
+            
+            let confirmMsg = `Are you sure you want to deploy branch "${branch}" to production?\n\n`;
+            confirmMsg += "This will:\n";
+            confirmMsg += "• Pull latest changes from the repository\n";
+            confirmMsg += "• Restart the Starman server (brief downtime)\n";
+            confirmMsg += "• Apply changes to the live system immediately\n";
+            
+            if (createBackup) {
+                confirmMsg += "• Create a backup branch before deployment\n";
+            }
+            
+            if (versionTag) {
+                confirmMsg += `• Create version tag: ${versionTag}\n`;
+            }
+            
+            if (!confirm(confirmMsg)) {
+                e.preventDefault();
+            }
+        });
+    }
+});
+</script>
