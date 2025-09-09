@@ -1,21 +1,79 @@
-/* Theme: csc */
+/* Generated CSS for theme: csc */
+
 :root {
   --accent-color: #FF9900;
   --background-color: #ccffff;
-  --border-color: #99cccc;
-  --footer-bg: #ccffff;
-  --footer-text-color: #000000;
-  --header-bg: #ccffff;
-  --link-color: #0000FF;
-  --link-hover-color: #000099;
+  --body-font: Verdana, Helvetica, sans-serif;
+  --border-color: #cccccc;
+  --button-bg: #f2f2f2;
+  --button-border: #cccccc;
+  --button-hover-bg: #e0e0e0;
+  --button-text: black;
+  --font-size-base: 20px;
+  --font-size-large: 20px;
+  --font-size-small: 14px;
+  --font-size-xlarge: 24px;
+  --header-font: Verdana, Helvetica, sans-serif;
+  --link-color: black;
+  --link-hover-color: black;
   --nav-bg: #ccffff;
-  --nav-link-color: #000000;
-  --nav-text: #000000;
+  --nav-hover-bg: rgba(0, 0, 0, 0.1);
+  --nav-text: black;
   --primary-color: #ccffff;
-  --secondary-color: #e6ffff;
-  --success-color: #27ae60;
-  --table-header-bg: #ccffff;
-  --text-color: #000000;
-  --warning-color: #f39c12;
+  --secondary-color: #f9f9f9;
+  --success-color: #009900;
+  --table-header-bg: #f2f2f2;
+  --text-color: black;
+  --warning-color: red;
+}
+
+.body {
+  background-color: #ccffff;
+  color: black;
+  font-family: Verdana, Helvetica, sans-serif;
+  font-size: 20px;
+}
+
+.dropbtn {
+  color: black;
+}
+
+.dropdown-content {
+  background-color: #f9f9f9;
+}
+
+.dropdown-content a {
+  color: black;
+}
+
+.nav {
+  background-color: #ccffff;
+}
+
+.project-details-table {
+  border-collapse: collapse;
+  margin-bottom: 20px;
+  width: 100%;
+}
+
+.project-details-table th {
+  background-color: #f2f2f2;
+  font-weight: bold;
+}
+
+.project-details-table tr:hover {
+  background-color: #e0e0e0;
+}
+
+.project-details-table tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+.submenu {
+  background-color: #f9f9f9;
+}
+
+.submenu a {
+  color: black;
 }
 
