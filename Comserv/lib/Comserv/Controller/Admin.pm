@@ -14,6 +14,7 @@ use File::Basename;
 use File::Path qw(make_path);
 use File::Copy;
 use Digest::SHA qw(sha256_hex);
+use POSIX qw(strftime);
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -1477,6 +1478,278 @@ sub git_pull :Path('/admin/git_pull') :Args(0) {
         "Completed git_pull action");
 }
 
+# Enhanced production deployment management
+sub production_deploy :Path('/admin/production_deploy') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'production_deploy', 
+        "Starting production deployment management");
+    
+    # Check if the user has admin role
+    unless ($c->user_exists && ($c->check_user_roles('admin') || $c->session->{username} eq 'Shanta')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'production_deploy', 
+            "Access denied: User does not have admin role");
+        
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        $c->response->redirect($c->uri_for('/user/login', {
+            destination => $c->req->uri
+        }));
+        return;
+    }
+    
+    # Handle POST requests for deployment actions
+    if ($c->req->method eq 'POST') {
+        my $action = $c->req->param('action');
+        my $branch = $c->req->param('branch') || 'main';
+        my $create_backup = $c->req->param('create_backup') || 0;
+        my $version_tag = $c->req->param('version_tag') || '';
+        
+        if ($action eq 'deploy') {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'production_deploy', 
+                "Deploying branch '$branch' to production, backup: $create_backup");
+            
+            my ($success, $output, $warning) = $self->execute_production_deploy($c, $branch, $create_backup, $version_tag);
+            
+            $c->stash(
+                deploy_output => $output,
+                deploy_success => $success,
+                success_msg => $success ? "Production deployment completed successfully." : undef,
+                error_msg => $success ? undef : "Production deployment failed. See output for details.",
+                warning_msg => $warning
+            );
+        }
+    }
+    
+    # Get current deployment status
+    my $deployment_status = $self->get_deployment_status($c);
+    
+    # Get available branches
+    my $available_branches = $self->get_available_branches($c);
+    
+    # Use the standard debug message system
+    if ($c->session->{debug_mode}) {
+        push @{$c->stash->{debug_msg}}, "Admin controller production_deploy view - Template: admin/production_deploy.tt";
+    }
+    
+    $c->stash(
+        template => 'admin/production_deploy.tt',
+        deployment_status => $deployment_status,
+        available_branches => $available_branches
+    );
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'production_deploy', 
+        "Completed production deployment management");
+}
+
+# Execute production deployment
+sub execute_production_deploy {
+    my ($self, $c, $branch, $create_backup, $version_tag) = @_;
+    my $output = '';
+    my $warning = undef;
+    my $success = 0;
+    
+    $branch ||= 'main';
+    
+    try {
+        # Get current branch and commit info
+        my $current_branch = `git -C ${\$c->path_to()} branch --show-current 2>&1`;
+        chomp $current_branch;
+        my $current_commit = `git -C ${\$c->path_to()} rev-parse HEAD 2>&1`;
+        chomp $current_commit;
+        
+        $output .= "Current branch: $current_branch\n";
+        $output .= "Current commit: $current_commit\n\n";
+        
+        # Create backup branch if requested
+        if ($create_backup) {
+            my $timestamp = strftime("%Y%m%d-%H%M%S", localtime);
+            my $backup_branch = "backup-production-$timestamp";
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_production_deploy', 
+                "Creating backup branch: $backup_branch");
+            
+            my $backup_output = `git -C ${\$c->path_to()} checkout -b $backup_branch 2>&1`;
+            $output .= "Created backup branch '$backup_branch':\n$backup_output\n";
+            
+            # Switch back to original branch
+            my $switch_back = `git -C ${\$c->path_to()} checkout $current_branch 2>&1`;
+            $output .= "Switched back to $current_branch:\n$switch_back\n";
+        }
+        
+        # Fetch latest changes
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_production_deploy', 
+            "Fetching latest changes");
+        my $fetch_output = `git -C ${\$c->path_to()} fetch origin 2>&1`;
+        $output .= "Fetch output:\n$fetch_output\n";
+        
+        # Switch to target branch if different
+        if ($branch ne $current_branch) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_production_deploy', 
+                "Switching to branch: $branch");
+            my $checkout_output = `git -C ${\$c->path_to()} checkout $branch 2>&1`;
+            $output .= "Checkout to $branch:\n$checkout_output\n";
+            
+            if ($checkout_output =~ /error|fatal/i) {
+                die "Failed to checkout branch $branch: $checkout_output";
+            }
+        }
+        
+        # Pull latest changes
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_production_deploy', 
+            "Pulling latest changes from $branch");
+        my $pull_output = `git -C ${\$c->path_to()} pull origin $branch 2>&1`;
+        $output .= "Pull from origin/$branch:\n$pull_output\n";
+        
+        # Create version tag if specified
+        if ($version_tag) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_production_deploy', 
+                "Creating version tag: $version_tag");
+            my $tag_output = `git -C ${\$c->path_to()} tag -a $version_tag -m "Production deployment $version_tag" 2>&1`;
+            $output .= "Created tag '$version_tag':\n$tag_output\n";
+        }
+        
+        # Check if pull was successful
+        if ($pull_output =~ /Already up to date|Fast-forward|Updating|Merge made/) {
+            $success = 1;
+            $output .= "\n✓ Code update completed successfully\n";
+            
+            # Attempt to restart Starman if available
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_production_deploy', 
+                "Attempting to restart Starman server");
+            
+            my $restart_output = `sudo systemctl restart starman 2>&1`;
+            my $restart_status = $? >> 8;
+            
+            if ($restart_status == 0) {
+                $output .= "\n✓ Starman server restarted successfully\n";
+                
+                # Check service status
+                my $status_output = `sudo systemctl status starman --no-pager -l 2>&1`;
+                $output .= "Service status:\n$status_output\n";
+            } else {
+                $warning = "Code updated successfully, but Starman restart failed. Manual restart may be required.";
+                $output .= "\n⚠ Starman restart failed:\n$restart_output\n";
+            }
+        } else {
+            $output .= "\n✗ Git pull may have encountered issues\n";
+        }
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_production_deploy', 
+            "Production deployment completed with success: $success");
+            
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_production_deploy', 
+            "Production deployment failed: $error");
+        $output .= "\n✗ Deployment failed: $error\n";
+        $success = 0;
+    };
+    
+    return ($success, $output, $warning);
+}
+
+# Get current deployment status
+sub get_deployment_status {
+    my ($self, $c) = @_;
+    
+    my $status = {};
+    
+    try {
+        # Current branch
+        my $current_branch = `git -C ${\$c->path_to()} branch --show-current 2>&1`;
+        chomp $current_branch;
+        $status->{current_branch} = $current_branch;
+        
+        # Current commit
+        my $current_commit = `git -C ${\$c->path_to()} rev-parse HEAD 2>&1`;
+        chomp $current_commit;
+        $status->{current_commit} = substr($current_commit, 0, 8);
+        
+        # Last commit message
+        my $last_commit_msg = `git -C ${\$c->path_to()} log -1 --pretty=format:"%s" 2>&1`;
+        chomp $last_commit_msg;
+        $status->{last_commit_message} = $last_commit_msg;
+        
+        # Last commit date
+        my $last_commit_date = `git -C ${\$c->path_to()} log -1 --pretty=format:"%ci" 2>&1`;
+        chomp $last_commit_date;
+        $status->{last_commit_date} = $last_commit_date;
+        
+        # Check if there are uncommitted changes
+        my $git_status = `git -C ${\$c->path_to()} status --porcelain 2>&1`;
+        $status->{has_uncommitted_changes} = $git_status ? 1 : 0;
+        
+        # Check if we're behind origin
+        my $behind_count = `git -C ${\$c->path_to()} rev-list HEAD..origin/$current_branch --count 2>&1`;
+        chomp $behind_count;
+        $status->{commits_behind} = $behind_count || 0;
+        
+        # Starman service status
+        my $starman_status = `sudo systemctl is-active starman 2>&1`;
+        chomp $starman_status;
+        $status->{starman_status} = $starman_status;
+        
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_deployment_status', 
+            "Error getting deployment status: $_");
+    };
+    
+    return $status;
+}
+
+# Get available branches for deployment
+sub get_available_branches {
+    my ($self, $c) = @_;
+    
+    my @branches = ();
+    
+    try {
+        # Get local branches
+        my $local_branches = `git -C ${\$c->path_to()} branch 2>&1`;
+        my @local = split /\n/, $local_branches;
+        
+        # Get remote branches
+        my $remote_branches = `git -C ${\$c->path_to()} branch -r 2>&1`;
+        my @remote = split /\n/, $remote_branches;
+        
+        # Process local branches
+        for my $branch (@local) {
+            $branch =~ s/^\*?\s+//;  # Remove * and whitespace
+            next if $branch =~ /HEAD/;
+            push @branches, {
+                name => $branch,
+                type => 'local',
+                is_current => $branch =~ /^\*/
+            };
+        }
+        
+        # Process remote branches (only origin)
+        for my $branch (@remote) {
+            $branch =~ s/^\s+//;  # Remove whitespace
+            next unless $branch =~ /^origin\/(.+)$/;
+            my $branch_name = $1;
+            next if $branch_name eq 'HEAD';
+            
+            # Check if we already have this as local
+            my $has_local = grep { $_->{name} eq $branch_name } @branches;
+            
+            unless ($has_local) {
+                push @branches, {
+                    name => $branch_name,
+                    type => 'remote',
+                    is_current => 0
+                };
+            }
+        }
+        
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_available_branches', 
+            "Error getting available branches: $_");
+    };
+    
+    return \@branches;
+}
+
 # Execute the git pull operation
 sub execute_git_pull {
     my ($self, $c) = @_;
@@ -1665,6 +1938,178 @@ sub database :Path('/admin/database') :Args(0) {
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'database', 
         "Completed database management action");
+}
+
+# Restart Starman service
+sub restart_starman :Path('/admin/restart_starman') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', 
+        "Starting Starman restart action");
+    
+    # Check if the user has admin role
+    unless ($c->user_exists && ($c->check_user_roles('admin') || $c->session->{username} eq 'Shanta')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'restart_starman', 
+            "Access denied: User does not have admin role");
+        
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        $c->response->redirect($c->uri_for('/user/login', {
+            destination => $c->req->uri
+        }));
+        return;
+    }
+    
+    # Handle POST requests for restart action
+    if ($c->req->method eq 'POST') {
+        my $action = $c->req->param('action');
+        
+        if ($action eq 'restart') {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', 
+                "Executing Starman restart");
+            
+            my ($success, $output) = $self->execute_starman_restart($c);
+            
+            $c->stash(
+                restart_output => $output,
+                restart_success => $success,
+                success_msg => $success ? "Starman service restarted successfully." : undef,
+                error_msg => $success ? undef : "Starman restart failed. See output for details."
+            );
+        }
+    }
+    
+    # Get current service status
+    my $service_status = $self->get_starman_status($c);
+    
+    # Use the standard debug message system
+    if ($c->session->{debug_mode}) {
+        push @{$c->stash->{debug_msg}}, "Admin controller restart_starman view - Template: admin/restart_starman.tt";
+    }
+    
+    $c->stash(
+        template => 'admin/restart_starman.tt',
+        service_status => $service_status
+    );
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', 
+        "Completed Starman restart action");
+}
+
+# Execute Starman service restart
+sub execute_starman_restart {
+    my ($self, $c) = @_;
+    my $output = '';
+    my $success = 0;
+    
+    try {
+        # Get current service status
+        my $status_before = `sudo systemctl is-active starman 2>&1`;
+        chomp $status_before;
+        $output .= "Service status before restart: $status_before\n\n";
+        
+        # Restart the service
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_starman_restart', 
+            "Executing systemctl restart starman");
+        
+        my $restart_output = `sudo systemctl restart starman 2>&1`;
+        my $restart_status = $? >> 8;
+        
+        $output .= "Restart command output:\n$restart_output\n";
+        
+        if ($restart_status == 0) {
+            $success = 1;
+            $output .= "\n✓ Starman service restart command completed successfully\n";
+            
+            # Wait a moment for service to start
+            sleep(2);
+            
+            # Check service status after restart
+            my $status_after = `sudo systemctl is-active starman 2>&1`;
+            chomp $status_after;
+            $output .= "Service status after restart: $status_after\n";
+            
+            # Get detailed status
+            my $detailed_status = `sudo systemctl status starman --no-pager -l 2>&1`;
+            $output .= "\nDetailed service status:\n$detailed_status\n";
+            
+            if ($status_after eq 'active') {
+                $output .= "\n✓ Starman service is now active and running\n";
+            } else {
+                $success = 0;
+                $output .= "\n⚠ Starman service may not have started properly (status: $status_after)\n";
+            }
+        } else {
+            $output .= "\n✗ Starman restart command failed with exit code: $restart_status\n";
+        }
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_starman_restart', 
+            "Starman restart completed with success: $success");
+            
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_starman_restart', 
+            "Starman restart failed: $error");
+        $output .= "\n✗ Restart failed: $error\n";
+        $success = 0;
+    };
+    
+    return ($success, $output);
+}
+
+# Get Starman service status
+sub get_starman_status {
+    my ($self, $c) = @_;
+    
+    my $status = {};
+    
+    try {
+        # Service active status
+        my $is_active = `sudo systemctl is-active starman 2>&1`;
+        chomp $is_active;
+        $status->{is_active} = $is_active;
+        
+        # Service enabled status
+        my $is_enabled = `sudo systemctl is-enabled starman 2>&1`;
+        chomp $is_enabled;
+        $status->{is_enabled} = $is_enabled;
+        
+        # Get main PID
+        my $main_pid = `sudo systemctl show starman --property=MainPID --value 2>&1`;
+        chomp $main_pid;
+        $status->{main_pid} = $main_pid || 'N/A';
+        
+        # Get memory usage if service is running
+        if ($is_active eq 'active' && $main_pid && $main_pid ne '0') {
+            my $memory_usage = `ps -p $main_pid -o rss= 2>/dev/null`;
+            chomp $memory_usage;
+            if ($memory_usage) {
+                $status->{memory_usage} = sprintf("%.1f MB", $memory_usage / 1024);
+            } else {
+                $status->{memory_usage} = 'N/A';
+            }
+        } else {
+            $status->{memory_usage} = 'N/A';
+        }
+        
+        # Get uptime
+        my $uptime_seconds = `sudo systemctl show starman --property=ActiveEnterTimestamp --value 2>&1`;
+        if ($uptime_seconds && $uptime_seconds ne 'n/a') {
+            # This would need more processing to calculate actual uptime
+            $status->{uptime} = 'Available';
+        } else {
+            $status->{uptime} = 'N/A';
+        }
+        
+        # Get last few log entries
+        my $recent_logs = `sudo journalctl -u starman --no-pager -n 5 --output=short-iso 2>&1`;
+        $status->{recent_logs} = $recent_logs;
+        
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_starman_status', 
+            "Error getting Starman status: $_");
+    };
+    
+    return $status;
 }
 
 =head1 AUTHOR
