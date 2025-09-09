@@ -150,35 +150,13 @@ sub index :Path('/admin/theme') :Args(0) {
     # Create a simple sites array with just this site
     my @sites = ($site);
 
-    # Get available themes - CSC gets all themes, others get site-specific
+    # Get available themes - all admins can see all themes
     my $themes = $c->model('ThemeConfig')->get_all_themes($c);
-    my @available_themes;
+    my @available_themes = sort keys %$themes;
     
-    if ($is_csc) {
-        # CSC admin gets access to all themes
-        @available_themes = sort keys %$themes;
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
-            "CSC admin - showing all " . scalar(@available_themes) . " themes");
-    } else {
-        # Non-CSC sites only get their own theme(s)
-        # Get themes that are either the current site theme or generic themes
-        my $current_theme = $site->{theme};
-        
-        # Include the current site's theme and any "default" or "generic" themes
-        foreach my $theme_key (keys %$themes) {
-            if ($theme_key eq $current_theme || 
-                $theme_key eq 'default' || 
-                $theme_key =~ /^generic/i ||
-                $theme_key eq $site_name) {
-                push @available_themes, $theme_key;
-            }
-        }
-        
-        @available_themes = sort @available_themes;
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
-            "Non-CSC site ($site_name) - showing " . scalar(@available_themes) . " themes: " . 
-            join(", ", @available_themes));
-    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+        "Admin user for site ($site_name) - showing all " . scalar(@available_themes) . " themes: " . 
+        join(", ", @available_themes));
 
     # Pass data to template
     $c->stash->{site} = $site;
