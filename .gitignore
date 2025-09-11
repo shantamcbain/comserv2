@@ -97,3 +97,6 @@ Thumbs.db
 *.pid
 *.socket
 
+/logs/archive/application.*
+/Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.md
+/Comserv/root/Documentation/AI_DOCUMENTATION_GUIDELINES.md
