@@ -1,5 +1,15 @@
 # Changelog
 
+## [2025-01-20] - Admin Authentication System Refactor
+
+### Major Enhancement
+- **[Admin Authentication System Refactor](2025-01-20-admin-authentication-refactor.tt)** - Complete overhaul of admin authentication with centralized AdminAuth utility and dedicated Git controller
+  - Fixed CSC admin access issues
+  - Created centralized authentication utility
+  - Separated Git operations into dedicated controller
+  - Enhanced branch selection and file protection
+  - Improved code maintainability and consistency
+
 ## [Unreleased] - Bug Fix Update
 
 ### Fixed

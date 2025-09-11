@@ -1,6 +1,6 @@
 [% META title = 'Restart Starman Server' %]
 <!-- File: /home/shanta/PycharmProjects/comserv2/Comserv/root/admin/restart_starman.tt -->
-[% PageVersion = 'admin/restart_starman.tt,v 0.01 2025/09/10 shanta Exp shanta ' %]
+[% PageVersion = 'admin/restart_starman.tt,v 0.02 2025/01/10 shanta Exp shanta ' %]
 
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
@@ -17,18 +17,85 @@
     <a href="[% c.uri_for('/admin/network_diagnostics') %]" class="btn btn-sm btn-info">
         <i class="fas fa-network-wired"></i> Network Diagnostics
     </a>
+    <a href="[% c.uri_for('/admin/starman_diagnostics') %]" class="btn btn-sm btn-warning">
+        <i class="fas fa-stethoscope"></i> Starman Diagnostics
+    </a>
 </div>
 
 <div class="container">
     <div class="row">
         <div class="col-md-12">
-            <h1>Restart Starman Server</h1>
-            
+            <h1><i class="fas fa-server"></i> Restart Starman Server</h1>
+
             <!-- User status banner -->
             <div class="alert alert-info mb-4">
                 <strong>Welcome [% c.session.username || 'Guest' %][% IF c.session.roles.grep('^admin$').size %] Administrator[% END %] to Computer System Consulting!</strong>
             </div>
-            
+
+            <!-- Current Service Status Display -->
+            [% IF service_status %]
+                <div class="card mb-4">
+                    <div class="card-header [% IF service_status.is_active == 'active' %]bg-success[% ELSE %]bg-danger[% END %] text-white">
+                        <h3 class="mb-0">
+                            <i class="fas fa-info-circle"></i> Current Starman Service Status
+                            [% IF service_status.is_active == 'active' %]
+                                <span class="badge badge-light ml-2">RUNNING</span>
+                            [% ELSE %]
+                                <span class="badge badge-light ml-2">STOPPED</span>
+                            [% END %]
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <table class="table table-sm">
+                                    <tr>
+                                        <td><strong>Service Status:</strong></td>
+                                        <td>
+                                            <span class="badge [% IF service_status.is_active == 'active' %]badge-success[% ELSE %]badge-danger[% END %]">
+                                                [% service_status.is_active || 'unknown' %]
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Enabled:</strong></td>
+                                        <td>
+                                            <span class="badge [% IF service_status.is_enabled == 'enabled' %]badge-success[% ELSE %]badge-warning[% END %]">
+                                                [% service_status.is_enabled || 'unknown' %]
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Process ID:</strong></td>
+                                        <td>[% service_status.main_pid || 'N/A' %]</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Memory Usage:</strong></td>
+                                        <td>[% service_status.memory_usage || 'N/A' %]</td>
+                                    </tr>
+                                </table>
+                            </div>
+                            <div class="col-md-6">
+                                [% IF service_status.recent_logs %]
+                                    <h6><strong>Recent Log Entries:</strong></h6>
+                                    <div class="log-preview">
+                                        <pre class="small">[% service_status.recent_logs | html %]</pre>
+                                    </div>
+                                [% END %]
+                            </div>
+                        </div>
+
+                        <!-- Auto-refresh button -->
+                        <div class="mt-3">
+                            <button onclick="refreshStatus()" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-sync-alt"></i> Refresh Status
+                            </button>
+                            <small class="text-muted ml-2">Last updated: <span id="last-updated">[% USE date; date.format(date.now, '%Y-%m-%d %H:%M:%S') %]</span></small>
+                        </div>
+                    </div>
+                </div>
+            [% END %]
+
             [% IF debug_msg || c.session.debug_mode == 1 %]
                 <div class="alert alert-info">
                     <strong>Debug Information:</strong>
@@ -51,75 +118,142 @@
                     <p>Show credentials form param: [% c.req.params.show_credentials_form ? 'Yes' : 'No' %]</p>
                 </div>
             [% END %]
-            
+
             [% IF error_msg %]
-                <div class="alert alert-danger">
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="fas fa-exclamation-triangle"></i>
                     <strong>Error:</strong> [% error_msg %]
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
                 </div>
             [% END %]
-            
+
             [% IF success_msg %]
-                <div class="alert alert-success">
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="fas fa-check-circle"></i>
                     <strong>Success:</strong> [% success_msg %]
+                    [% IF restart_success %]
+                        <div class="mt-2">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle"></i>
+                                The service should now be running. Check the status above for confirmation.
+                            </small>
+                        </div>
+                    [% END %]
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
                 </div>
             [% END %]
-            
+
             [% IF warning_msg %]
-                <div class="alert alert-warning">
+                <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                    <i class="fas fa-exclamation-circle"></i>
                     <strong>Warning:</strong> [% warning_msg %]
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
                 </div>
             [% END %]
-            
+
             [% IF output %]
                 <div class="card mb-4">
-                    <div class="card-header bg-info text-white">
-                        <h3 class="mb-0">Command Output</h3>
+                    <div class="card-header [% IF restart_success %]bg-success[% ELSE %]bg-danger[% END %] text-white">
+                        <h3 class="mb-0">
+                            <i class="fas fa-terminal"></i> Restart Command Output
+                            [% IF restart_success %]
+                                <span class="badge badge-light ml-2">SUCCESS</span>
+                            [% ELSE %]
+                                <span class="badge badge-light ml-2">FAILED</span>
+                            [% END %]
+                        </h3>
                     </div>
                     <div class="card-body">
-                        <pre class="command-output">[% output | html %]</pre>
+                        <div class="command-output-container">
+                            <pre class="command-output">[% output | html %]</pre>
+                            <div class="output-actions mt-3">
+                                <button onclick="copyOutput()" class="btn btn-sm btn-outline-secondary">
+                                    <i class="fas fa-copy"></i> Copy Output
+                                </button>
+                                <button onclick="toggleOutputExpand()" class="btn btn-sm btn-outline-secondary">
+                                    <i class="fas fa-expand"></i> <span id="expand-text">Expand</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             [% END %]
-            
+
             [% UNLESS output %]
                 [% # Always show the credentials form when confirming restart or when explicitly requested %]
                 [% IF show_password_form || c.request.params.show_credentials_form || (c.request.params.confirm && (!c.request.params.sudo_username || !c.request.params.sudo_password)) %]
                     <div class="alert alert-info">
                         <strong>Credentials Required:</strong> Please enter your system username and password with sudo privileges to restart the Starman server.
                     </div>
-                    
+
                     <div class="card">
                         <div class="card-header bg-primary text-white">
-                            <h3 class="mb-0">Enter System Credentials</h3>
+                            <h3 class="mb-0">
+                                <i class="fas fa-key"></i> Enter System Credentials
+                            </h3>
                         </div>
                         <div class="card-body">
-                            <form method="POST" action="[% c.uri_for('/admin/restart_starman') %]">
+                            <div class="alert alert-info">
+                                <i class="fas fa-shield-alt"></i>
+                                <strong>Security Notice:</strong> Your credentials are used only for this restart operation and are not stored.
+                            </div>
+
+                            <form method="POST" action="[% c.uri_for('/admin/restart_starman') %]" id="restart-form">
                                 <input type="hidden" name="confirm" value="1">
                                 <div class="form-group mb-3">
-                                    <label for="sudo_username">Username:</label>
-                                    <input type="text" class="form-control" id="sudo_username" name="sudo_username" value="[% c.request.params.sudo_username || c.session.username || 'www-data' %]" required autofocus>
-                                    <small class="form-text text-muted">Enter the system username with sudo privileges (usually www-data for production servers).</small>
+                                    <label for="sudo_username">
+                                        <i class="fas fa-user"></i> Username:
+                                    </label>
+                                    <input type="text" class="form-control" id="sudo_username" name="sudo_username"
+                                           value="[% c.request.params.sudo_username || c.session.username || 'www-data' %]"
+                                           required autofocus autocomplete="username">
+                                    <small class="form-text text-muted">
+                                        Enter the system username with sudo privileges (usually www-data for production servers).
+                                    </small>
                                 </div>
                                 <div class="form-group mb-3">
-                                    <label for="sudo_password">Password:</label>
-                                    <input type="password" class="form-control" id="sudo_password" name="sudo_password" required>
-                                    <small class="form-text text-muted">Your password will not be stored and is only used for this restart operation.</small>
+                                    <label for="sudo_password">
+                                        <i class="fas fa-lock"></i> Password:
+                                    </label>
+                                    <input type="password" class="form-control" id="sudo_password" name="sudo_password"
+                                           required autocomplete="current-password">
+                                    <small class="form-text text-muted">
+                                        Your password will not be stored and is only used for this restart operation.
+                                    </small>
                                 </div>
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-sync"></i> Restart Starman Server
-                                </button>
-                                <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">
-                                    <i class="fas fa-times"></i> Cancel
-                                </a>
+
+                                <div class="form-group mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="confirm-restart" required>
+                                        <label class="form-check-label" for="confirm-restart">
+                                            I understand that this will temporarily interrupt service to all users
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="btn-group" role="group">
+                                    <button type="submit" class="btn btn-primary" id="restart-btn">
+                                        <i class="fas fa-sync"></i> Restart Starman Server
+                                    </button>
+                                    <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">
+                                        <i class="fas fa-times"></i> Cancel
+                                    </a>
+                                </div>
                             </form>
                         </div>
                     </div>
                 [% ELSE %]
                     <div class="alert alert-warning">
-                        <strong>Warning:</strong> This action will restart the Starman server. 
+                        <strong>Warning:</strong> This action will restart the Starman server.
                         The application will be temporarily unavailable during the restart.
                     </div>
-                    
+
                     <div class="card">
                         <div class="card-header bg-primary text-white">
                             <h3 class="mb-0">Confirm Starman Restart</h3>
@@ -133,9 +267,9 @@
                                 <li>Apply any configuration changes</li>
                                 <li>Reload the application code</li>
                             </ul>
-                            
+
                             <p>Are you sure you want to proceed?</p>
-                            
+
                             <form method="POST" action="[% c.uri_for('/admin/restart_starman') %]">
                                 <input type="hidden" name="confirm" value="1">
                                 <input type="hidden" name="show_credentials_form" value="1">
@@ -172,18 +306,129 @@
         word-wrap: break-word;
         max-height: 400px;
         overflow-y: auto;
-        font-family: monospace;
+        font-family: 'Courier New', monospace;
         margin: 0;
+        border: 1px solid #dee2e6;
+        font-size: 0.9em;
+        line-height: 1.4;
     }
+
+    .command-output.expanded {
+        max-height: none;
+    }
+
+    .command-output-container {
+        position: relative;
+    }
+
+    .output-actions {
+        border-top: 1px solid #dee2e6;
+        padding-top: 10px;
+    }
+
     .quick-nav {
         margin-bottom: 15px;
         padding: 10px 0;
         border-bottom: 1px solid #eee;
     }
+
     .btn-sm {
         padding: 0.25rem 0.5rem;
         font-size: 0.875rem;
         line-height: 1.5;
         border-radius: 0.2rem;
     }
+
+    .log-preview {
+        max-height: 200px;
+        overflow-y: auto;
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 10px;
+    }
+
+    .log-preview pre {
+        margin: 0;
+        font-size: 0.8em;
+        line-height: 1.3;
+    }
+
+    .loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
 </style>
+
+<script>
+function refreshStatus() {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
+    button.disabled = true;
+
+    setTimeout(() => {
+        window.location.reload();
+    }, 500);
+}
+
+function copyOutput() {
+    const output = document.querySelector('.command-output');
+    if (output) {
+        navigator.clipboard.writeText(output.textContent).then(() => {
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.innerHTML = '<i class="fas fa-check"></i> Copied!';
+            setTimeout(() => {
+                button.innerHTML = originalText;
+            }, 2000);
+        });
+    }
+}
+
+function toggleOutputExpand() {
+    const output = document.querySelector('.command-output');
+    const expandText = document.getElementById('expand-text');
+
+    if (output.classList.contains('expanded')) {
+        output.classList.remove('expanded');
+        expandText.textContent = 'Expand';
+        event.target.querySelector('i').className = 'fas fa-expand';
+    } else {
+        output.classList.add('expanded');
+        expandText.textContent = 'Collapse';
+        event.target.querySelector('i').className = 'fas fa-compress';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('restart-form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            const button = document.getElementById('restart-btn');
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Restarting...';
+            button.disabled = true;
+
+            const overlay = document.createElement('div');
+            overlay.className = 'loading-overlay';
+            overlay.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin fa-2x"></i><br><small>Executing restart command...</small></div>';
+            form.appendChild(overlay);
+        });
+    }
+
+    setInterval(() => {
+        const timestamp = document.getElementById('last-updated');
+        if (timestamp) {
+            timestamp.textContent = new Date().toLocaleString();
+        }
+    }, 30000);
+});
+</script>

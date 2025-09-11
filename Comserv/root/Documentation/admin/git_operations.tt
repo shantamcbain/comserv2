@@ -1,0 +1,451 @@
+[% META title = 'Git Operations Documentation' %]
+[% PageVersion = 'git_operations.tt,v 1.0 2025/01/20 Development Team Exp Development Team' %]
+
+<h1>Git Operations System</h1>
+<p><strong>Controller:</strong> <code>Comserv::Controller::Admin::Git</code></p>
+<p><strong>Purpose:</strong> Dedicated controller for Git-related administrative operations</p>
+<p><strong>Location:</strong> <code>/Comserv/lib/Comserv/Controller/Admin/Git.pm</code></p>
+
+<div class="alert alert-info">
+<h2>Overview</h2>
+<p>The Git Operations controller handles all Git-related administrative functions including pull operations, branch management, and deployment workflows. It was separated from the main Admin controller to improve maintainability and provide specialized Git functionality.</p>
+</div>
+
+<h2>Key Features</h2>
+
+<div class="row">
+<div class="col-md-6">
+<h3>Branch Management</h3>
+<ul>
+<li>✅ Branch selection for pull operations</li>
+<li>✅ Current branch detection</li>
+<li>✅ Remote branch listing</li>
+<li>✅ Automatic branch switching</li>
+</ul>
+</div>
+
+<div class="col-md-6">
+<h3>File Protection</h3>
+<ul>
+<li>✅ Theme file change detection</li>
+<li>✅ Automatic backup creation</li>
+<li>✅ Git stash integration</li>
+<li>✅ Change restoration after pull</li>
+</ul>
+</div>
+</div>
+
+<div class="row">
+<div class="col-md-6">
+<h3>Error Handling</h3>
+<ul>
+<li>✅ Comprehensive error reporting</li>
+<li>✅ Command output capture</li>
+<li>✅ Graceful failure handling</li>
+<li>✅ Detailed logging</li>
+</ul>
+</div>
+
+<div class="col-md-6">
+<h3>User Interface</h3>
+<ul>
+<li>✅ Branch selection dropdown</li>
+<li>✅ Real-time command output</li>
+<li>✅ Success/error feedback</li>
+<li>✅ Warning notifications</li>
+</ul>
+</div>
+</div>
+
+<h2>Main Methods</h2>
+
+<h3>git_pull</h3>
+<div class="method-details">
+<p><strong>Path:</strong> <code>/admin/git_pull</code></p>
+<p><strong>Purpose:</strong> Main interface for Git pull operations with branch selection</p>
+<p><strong>Template:</strong> <code>admin/git_pull.tt</code></p>
+
+<h4>Functionality:</h4>
+<ul>
+<li><strong>Authentication:</strong> Uses AdminAuth utility for access control</li>
+<li><strong>Branch Detection:</strong> Shows current branch and available remote branches</li>
+<li><strong>Form Handling:</strong> Processes POST requests for pull confirmation</li>
+<li><strong>Output Display:</strong> Shows detailed command output to user</li>
+</ul>
+
+<h4>Request Flow:</h4>
+<ol>
+<li><strong>GET Request:</strong> Display branch selection form</li>
+<li><strong>POST Request:</strong> Execute git pull with selected branch</li>
+<li><strong>Result Display:</strong> Show command output and status</li>
+</ol>
+
+<div class="code-example">
+<h4>URL Examples:</h4>
+<pre><code># Access git pull interface
+https://yoursite.com/admin/git_pull
+
+# Direct access (requires admin authentication)
+curl -X GET https://yoursite.com/admin/git_pull</code></pre>
+</div>
+</div>
+
+<h3>execute_git_pull</h3>
+<div class="method-details">
+<p><strong>Purpose:</strong> Execute the actual git pull operation with comprehensive error handling</p>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>$c</code> - Catalyst context object</li>
+<li><code>$branch</code> - Target branch name (defaults to 'main')</li>
+</ul>
+
+<h4>Operation Sequence:</h4>
+<ol>
+<li><strong>Directory Change:</strong> Navigate to application directory</li>
+<li><strong>Theme File Check:</strong> Detect local changes in theme_mappings.json</li>
+<li><strong>Backup Creation:</strong> Create timestamped backup if changes detected</li>
+<li><strong>Change Stashing:</strong> Stash local changes with descriptive message</li>
+<li><strong>Remote Fetch:</strong> Fetch latest changes from origin</li>
+<li><strong>Branch Switch:</strong> Switch to target branch if different from current</li>
+<li><strong>Pull Execution:</strong> Pull changes from origin/branch</li>
+<li><strong>Change Restoration:</strong> Attempt to reapply stashed changes</li>
+</ol>
+
+<h4>Return Values:</h4>
+<ul>
+<li><strong>$success:</strong> 1 if operation succeeded, 0 if failed</li>
+<li><strong>$output:</strong> Detailed command output for user display</li>
+<li><strong>$warning:</strong> Warning message if issues occurred (optional)</li>
+</ul>
+
+<div class="code-example">
+<h4>Usage Example:</h4>
+<pre><code>my ($success, $output, $warning) = $self->execute_git_pull($c, 'develop');
+
+if ($success) {
+    $c->stash->{success_msg} = "Git pull completed successfully";
+} else {
+    $c->stash->{error_msg} = "Git pull failed";
+}
+
+$c->stash->{output} = $output;
+$c->stash->{warning_msg} = $warning if $warning;</code></pre>
+</div>
+</div>
+
+<h3>get_current_branch</h3>
+<div class="method-details">
+<p><strong>Purpose:</strong> Determine the current Git branch</p>
+<p><strong>Returns:</strong> String - current branch name or 'unknown' if error</p>
+
+<h4>Implementation:</h4>
+<ul>
+<li>Uses <code>git branch --show-current</code> command</li>
+<li>Handles directory navigation</li>
+<li>Provides error handling with fallback</li>
+<li>Logs errors for debugging</li>
+</ul>
+
+<div class="code-example">
+<h4>Usage Example:</h4>
+<pre><code>my $current_branch = $self->get_current_branch($c);
+$c->stash->{current_branch} = $current_branch;
+
+# In template:
+&lt;p&gt;Current Branch: &lt;strong&gt;[% current_branch %]&lt;/strong&gt;&lt;/p&gt;</code></pre>
+</div>
+</div>
+
+<h3>get_available_branches</h3>
+<div class="method-details">
+<p><strong>Purpose:</strong> Get list of available remote branches for selection</p>
+<p><strong>Returns:</strong> Array reference of branch names</p>
+
+<h4>Implementation:</h4>
+<ul>
+<li>Fetches latest remote branch information</li>
+<li>Parses <code>git branch -r</code> output</li>
+<li>Filters out HEAD references</li>
+<li>Provides fallback branch list if remote fetch fails</li>
+</ul>
+
+<h4>Fallback Branches:</h4>
+<ul>
+<li>main</li>
+<li>master</li>
+<li>develop</li>
+</ul>
+
+<div class="code-example">
+<h4>Usage Example:</h4>
+<pre><code>my $branches = $self->get_available_branches($c);
+$c->stash->{available_branches} = $branches;
+
+# In template:
+&lt;select name="branch"&gt;
+[% FOREACH branch IN available_branches %]
+    &lt;option value="[% branch %]"&gt;[% branch %]&lt;/option&gt;
+[% END %]
+&lt;/select&gt;</code></pre>
+</div>
+</div>
+
+<h2>Theme File Protection System</h2>
+
+<div class="alert alert-warning">
+<h3>Automatic Protection</h3>
+<p>The Git operations system automatically protects local customizations in theme_mappings.json during pull operations.</p>
+</div>
+
+<h3>Protection Process</h3>
+<ol>
+<li><strong>Change Detection:</strong> Uses <code>git status --porcelain</code> to detect modifications</li>
+<li><strong>Backup Creation:</strong> Creates timestamped backup file</li>
+<li><strong>Stash Operation:</strong> Stashes changes with descriptive message</li>
+<li><strong>Pull Execution:</strong> Performs git pull operation</li>
+<li><strong>Restoration Attempt:</strong> Tries to reapply stashed changes</li>
+<li><strong>Conflict Handling:</strong> Provides warning if automatic restoration fails</li>
+</ol>
+
+<h3>Backup File Format</h3>
+<div class="code-example">
+<pre><code># Backup filename pattern
+theme_mappings.json.backup.{timestamp}
+
+# Example
+theme_mappings.json.backup.1642694400</code></pre>
+</div>
+
+<h3>Manual Recovery</h3>
+<p>If automatic restoration fails, administrators can manually recover changes:</p>
+
+<div class="code-example">
+<pre><code># List available stashes
+git stash list
+
+# Apply specific stash
+git stash apply stash@{0}
+
+# Or restore from backup
+cp theme_mappings.json.backup.{timestamp} theme_mappings.json</code></pre>
+</div>
+
+<h2>User Interface</h2>
+
+<h3>Git Pull Form</h3>
+<p><strong>Template:</strong> <code>/Comserv/root/admin/git_pull.tt</code></p>
+
+<h4>Form Elements:</h4>
+<ul>
+<li><strong>Current Branch Display:</strong> Shows currently active branch</li>
+<li><strong>Branch Selection Dropdown:</strong> Lists available remote branches</li>
+<li><strong>Confirmation Button:</strong> Initiates git pull operation</li>
+<li><strong>Output Display:</strong> Shows command results and status</li>
+</ul>
+
+<h4>Status Messages:</h4>
+<ul>
+<li><strong>Success:</strong> Green alert with success message</li>
+<li><strong>Error:</strong> Red alert with error details</li>
+<li><strong>Warning:</strong> Yellow alert for partial success with issues</li>
+<li><strong>Info:</strong> Blue alert for informational messages</li>
+</ul>
+
+<h3>Template Variables</h3>
+<div class="code-example">
+<pre><code># Available in git_pull.tt template
+[% current_branch %]        # Current Git branch
+[% available_branches %]    # Array of remote branches
+[% selected_branch %]       # Branch selected for pull
+[% output %]               # Command output text
+[% success_msg %]          # Success message
+[% error_msg %]            # Error message
+[% warning_msg %]          # Warning message
+[% debug_session_info %]   # Debug information</code></pre>
+</div>
+
+<h2>Authentication Integration</h2>
+
+<h3>AdminAuth Usage</h3>
+<p>The Git controller uses the centralized AdminAuth utility for access control:</p>
+
+<div class="code-example">
+<pre><code># In git_pull method
+return unless $self->admin_auth->require_admin_access($c, 'git_pull');</code></pre>
+</div>
+
+<h3>Supported Admin Types</h3>
+<ul>
+<li><strong>Standard Admin:</strong> Users with 'admin' role</li>
+<li><strong>CSC Admin:</strong> Users with SiteName = 'CSC' and 'admin' role</li>
+<li><strong>Special User:</strong> Username 'Shanta' (legacy support)</li>
+</ul>
+
+<h2>Logging and Debugging</h2>
+
+<h3>Log Categories</h3>
+<ul>
+<li><strong>git_pull:</strong> Main interface access and form processing</li>
+<li><strong>execute_git_pull:</strong> Git command execution and results</li>
+<li><strong>get_current_branch:</strong> Branch detection operations</li>
+<li><strong>get_available_branches:</strong> Remote branch listing</li>
+</ul>
+
+<h3>Debug Information</h3>
+<p>When debug mode is enabled, additional information is logged:</p>
+<ul>
+<li>Session data (username, roles, SiteName)</li>
+<li>Branch information (current and available)</li>
+<li>Command output details</li>
+<li>File protection operations</li>
+</ul>
+
+<h3>Log Search Examples</h3>
+<div class="code-example">
+<pre><code># Search for git operations
+grep "execute_git_pull" /path/to/application.log
+
+# Search for branch operations
+grep "get_.*_branch" /path/to/application.log
+
+# Search for authentication issues
+grep "git_pull.*AdminAuth" /path/to/application.log</code></pre>
+</div>
+
+<h2>Error Handling</h2>
+
+<h3>Common Error Scenarios</h3>
+
+<div class="troubleshooting-section">
+<h4>Network Connectivity Issues</h4>
+<p><strong>Symptoms:</strong> Git fetch or pull commands fail</p>
+<p><strong>Causes:</strong></p>
+<ul>
+<li>No internet connection</li>
+<li>Git remote URL incorrect</li>
+<li>Authentication credentials missing</li>
+</ul>
+<p><strong>Solutions:</strong></p>
+<ul>
+<li>Check network connectivity</li>
+<li>Verify git remote configuration</li>
+<li>Update git credentials if needed</li>
+</ul>
+</div>
+
+<div class="troubleshooting-section">
+<h4>Permission Issues</h4>
+<p><strong>Symptoms:</strong> Cannot write to repository directory</p>
+<p><strong>Causes:</strong></p>
+<ul>
+<li>Insufficient file system permissions</li>
+<li>Repository directory ownership issues</li>
+</ul>
+<p><strong>Solutions:</strong></p>
+<ul>
+<li>Check directory permissions</li>
+<li>Verify web server user has write access</li>
+<li>Update directory ownership if needed</li>
+</ul>
+</div>
+
+<div class="troubleshooting-section">
+<h4>Merge Conflicts</h4>
+<p><strong>Symptoms:</strong> Git pull fails due to conflicts</p>
+<p><strong>Causes:</strong></p>
+<ul>
+<li>Local changes conflict with remote changes</li>
+<li>Theme file modifications not properly stashed</li>
+</ul>
+<p><strong>Solutions:</strong></p>
+<ul>
+<li>Manually resolve conflicts</li>
+<li>Use backup files to restore local changes</li>
+<li>Reset to known good state if necessary</li>
+</ul>
+</div>
+
+<h3>Error Recovery</h3>
+<div class="code-example">
+<pre><code># Check repository status
+git status
+
+# View recent commits
+git log --oneline -10
+
+# Reset to last known good commit (if needed)
+git reset --hard HEAD~1
+
+# Restore from backup
+cp theme_mappings.json.backup.{timestamp} theme_mappings.json</code></pre>
+</div>
+
+<h2>Configuration</h2>
+
+<h3>Application Directory</h3>
+<p>The Git controller is configured to operate in:</p>
+<div class="code-example">
+<pre><code>/home/shanta/PycharmProjects/comserv2</code></pre>
+</div>
+
+<h3>Protected Files</h3>
+<p>Files automatically protected during git operations:</p>
+<ul>
+<li><code>Comserv/root/static/config/theme_mappings.json</code></li>
+</ul>
+
+<h3>Default Branches</h3>
+<p>Fallback branches if remote detection fails:</p>
+<ul>
+<li>main</li>
+<li>master</li>
+<li>develop</li>
+</ul>
+
+<h2>Future Enhancements</h2>
+
+<h3>Planned Features</h3>
+<ul>
+<li><strong>Branch Creation:</strong> Create new branches from interface</li>
+<li><strong>Branch Deletion:</strong> Remove unused branches</li>
+<li><strong>Commit History:</strong> View recent commits and changes</li>
+<li><strong>Tag Management:</strong> Create and manage release tags</li>
+<li><strong>Multiple File Protection:</strong> Extend protection to other config files</li>
+<li><strong>Rollback Functionality:</strong> Easy rollback to previous versions</li>
+</ul>
+
+<h3>Integration Opportunities</h3>
+<ul>
+<li><strong>Development Server:</strong> Integration with development server testing</li>
+<li><strong>Automated Testing:</strong> Run tests after git pull</li>
+<li><strong>Deployment Pipeline:</strong> Connect to deployment automation</li>
+<li><strong>Notification System:</strong> Email notifications for git operations</li>
+</ul>
+
+<h2>Related Documentation</h2>
+
+<ul>
+<li><a href="/documentation/admin/admin_authentication_system.tt">Admin Authentication System</a></li>
+<li><a href="/documentation/changelog/2025-01-20-admin-authentication-refactor.tt">Authentication Refactor Changelog</a></li>
+<li><a href="/documentation/admin/theme_mappings_handling.tt">Theme Mappings Management</a></li>
+<li><a href="/documentation/developer/deployment_workflow.tt">Deployment Workflow</a></li>
+</ul>
+
+<div class="alert alert-info">
+<h2>Support</h2>
+<p>For technical support with Git operations, contact the Development Team with:</p>
+<ul>
+<li>Git operation being performed (pull, branch switch, etc.)</li>
+<li>Selected branch name</li>
+<li>Complete error output from the interface</li>
+<li>Current repository status (<code>git status</code> output)</li>
+<li>Recent log entries related to git operations</li>
+</ul>
+</div>
+
+[% IF c.session.debug_mode == 1 %]
+<div class="debug-info">
+  <p>Template: git_operations.tt</p>
+  <p>Last Modified: [% PageVersion %]</p>
+</div>
+[% END %]
