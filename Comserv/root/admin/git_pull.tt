@@ -87,17 +87,42 @@
                             This operation is generally safe, but if you have local changes, they might conflict with the remote changes.
                         </p>
                         
-                        <p>Are you sure you want to proceed?</p>
-                        
-                        <form method="POST" action="[% c.uri_for('/admin/git_pull') %]">
-                            <input type="hidden" name="confirm" value="1">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-code-branch"></i> Yes, Pull from Git
-                            </button>
-                            <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">
-                                <i class="fas fa-times"></i> Cancel
-                            </a>
-                        </form>
+         [% IF current_branch %]
+         <div class="mb-3">
+             <strong>Current Branch:</strong> <span class="badge badge-info">[% current_branch %]</span>
+         </div>
+         [% END %]
+
+         <p>Are you sure you want to proceed?</p>
+
+         <form method="POST" action="[% c.uri_for('/admin/git_pull') %]">
+             <input type="hidden" name="confirm" value="1">
+
+             [% IF available_branches && available_branches.size > 0 %]
+             <div class="form-group mb-3">
+                 <label for="branch"><strong>Select Branch to Pull:</strong></label>
+                 <select name="branch" id="branch" class="form-control">
+                     [% FOREACH branch IN available_branches %]
+                         <option value="[% branch %]" [% IF branch == current_branch %]selected[% END %]>
+                             [% branch %] [% IF branch == current_branch %](current)[% END %]
+                         </option>
+                     [% END %]
+                 </select>
+                 <small class="form-text text-muted">
+                     Select the branch you want to pull from. The current branch is pre-selected.
+                 </small>
+     </div>
+     [% ELSE %]
+     <input type="hidden" name="branch" value="[% current_branch || 'main' %]">
+     [% END %]
+
+     <button type="submit" class="btn btn-primary">
+         <i class="fas fa-code-branch"></i> Yes, Pull from Git
+     </button>
+     <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">
+         <i class="fas fa-times"></i> Cancel
+     </a>
+ </form>
                     </div>
                 </div>
             [% ELSE %]

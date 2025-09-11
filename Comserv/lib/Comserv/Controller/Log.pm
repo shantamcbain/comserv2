@@ -145,6 +145,11 @@ sub update :Path('/log/update') :Args(0) {
         # If not 'DONE', use the provided end_time_str and do not calculate time
         $end_time = $strp->parse_datetime($end_time_str);
         $time = $c->request->body_parameters->{time}; # Use existing time value
+        
+        # Ensure time is not undef - set default value if empty or undefined
+        if (!defined $time || $time eq '') {
+            $time = '00:00:00';
+        }
     }
 
     # Convert roles array to string if it's an array reference
@@ -179,6 +184,15 @@ sub update :Path('/log/update') :Args(0) {
         priority        => $c->request->body_parameters->{priority},
         comments        => $c->request->body_parameters->{comments},
     };
+
+    # Additional validation to ensure time field is never undef
+    if (!defined $new_values->{time} || $new_values->{time} eq '') {
+        $new_values->{time} = '00:00:00';
+        $self->logging->log_with_details(
+            $c, 'debug', __FILE__, __LINE__, 'update',
+            "Time field was undefined or empty, setting to default: 00:00:00"
+        );
+    }
 
     # Validate the new values
     # This is a placeholder for your validation logic
