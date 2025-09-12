@@ -84,6 +84,7 @@ requires 'YAML::Syck';
 
 # Development and testing
 requires 'Term::ReadPassword';
+requires 'Term::Size::Any';
 requires 'Text::CSV';
 requires 'Starman';
 requires 'Test::More' => '0.88';

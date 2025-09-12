@@ -1,5 +1,5 @@
 [% META title = 'Logging Best Practices' %]
-[% PageVersion = 'Documentation/general/logging_best_practices.tt,v 0.01 2025/01/20 shanta Exp shanta ' %]
+[% PageVersion = 'Documentation/general/logging_best_practices.tt,v 0.02 2025/09/12 shanta Exp shanta ' %]
 [% debug %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
@@ -136,6 +136,39 @@ tail -n 50 /home/shanta/PycharmProjects/comserv2/Comserv/logs/application.log
 grep -i "error" /home/shanta/PycharmProjects/comserv2/Comserv/logs/application.log
 </pre>
 
+<h2>Authentication Logging</h2>
+
+<p>The centralized AdminAuth system provides enhanced authentication logging capabilities:</p>
+
+<h3>AdminAuth Logging Features</h3>
+<ul>
+    <li><strong>Enhanced Session Validation:</strong> Detailed logging for authentication failures with session info</li>
+    <li><strong>Multi-source Username Checking:</strong> Logs username resolution from multiple sources</li>
+    <li><strong>Fallback Username Handling:</strong> Logs when fallback usernames are used</li>
+    <li><strong>Flexible Session Checking:</strong> Logs session validation details</li>
+</ul>
+
+<h3>AdminAuth Usage Pattern</h3>
+<pre>
+# In controller methods
+return unless $self->admin_auth->require_admin_access($c, 'action_name');
+
+# The AdminAuth utility automatically logs:
+# - Authentication attempts
+# - Session validation details
+# - Username resolution process
+# - Access granted/denied decisions
+# - Redirect actions for unauthorized users
+</pre>
+
+<h3>Authentication Logging Benefits</h3>
+<ul>
+    <li><strong>Consistent Logging:</strong> All admin controllers use same authentication logging</li>
+    <li><strong>Security Auditing:</strong> Comprehensive audit trail for admin access</li>
+    <li><strong>Debugging Support:</strong> Detailed session information for troubleshooting</li>
+    <li><strong>CSC Admin Tracking:</strong> Special logging for CSC admin users</li>
+</ul>
+
 <h2>Common Logging Patterns</h2>
 
 <h3>Controller Actions</h3>
@@ -174,6 +207,68 @@ if ($@) {
 }
 </pre>
 
+<h2>Enhanced System Logging</h2>
+
+<p>Recent system enhancements have improved logging capabilities across the application:</p>
+
+<h3>New Dependencies for Enhanced Logging</h3>
+<ul>
+    <li><strong>Term::Size::Any:</strong> Added for terminal size detection functionality in logging output</li>
+</ul>
+
+<h3>Controller Logging Standardization</h3>
+<p>All admin controllers have been updated with enhanced logging:</p>
+<ul>
+    <li><strong>Admin.pm:</strong> 51 lines changed - AdminAuth integration with enhanced logging</li>
+    <li><strong>NetworkMap.pm:</strong> 14 lines changed - authentication logging standardization</li>
+    <li><strong>ApiCredentials.pm:</strong> 13 lines changed - improved auth logging</li>
+    <li><strong>IT.pm:</strong> 16 lines changed - auth integration logging</li>
+    <li><strong>Root.pm:</strong> 18 lines changed - auth logging updates</li>
+    <li><strong>ThemeAdmin.pm:</strong> 28 lines changed - auth logging standardization</li>
+</ul>
+
+<h3>Git Controller Enhanced Logging</h3>
+<p>The Admin::Git controller (965+ lines) includes comprehensive logging for:</p>
+<ul>
+    <li><strong>Safe Git Operations:</strong> Detailed logging of git pull operations with backup/restore</li>
+    <li><strong>File Protection:</strong> Logging of file operations using File::Copy, File::Path, Archive::Tar</li>
+    <li><strong>Production Safety:</strong> Comprehensive logging of deployment operations and rollbacks</li>
+    <li><strong>Enhanced Debugging:</strong> Multi-source username checking and detailed session validation logging</li>
+</ul>
+
+<h3>Documentation System Logging</h3>
+<ul>
+    <li><strong>Documentation.pm:</strong> 106 lines changed - enhanced logging for documentation operations</li>
+    <li><strong>ScanMethods.pm:</strong> 60 lines changed - improved scanning operation logging</li>
+</ul>
+
+<h2>Best Practices for New Features</h2>
+
+<h3>AdminAuth Integration</h3>
+<p>When migrating controllers to use AdminAuth, ensure proper logging integration:</p>
+<pre>
+# Import AdminAuth
+use Comserv::Util::AdminAuth;
+
+# Add admin_auth method
+sub admin_auth {
+    my ($self) = @_;
+    return Comserv::Util::AdminAuth->new();
+}
+
+# Use in controller methods
+sub some_action :Path('action') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # AdminAuth automatically handles authentication logging
+    return unless $self->admin_auth->require_admin_access($c, 'some_action');
+    
+    # Continue with your action-specific logging
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'some_action',
+        "Performing some_action for user: " . ($c->session->{username} || 'unknown'));
+}
+</pre>
+
 <h2>Conclusion</h2>
 
-<p>Consistent and detailed logging is essential for maintaining and troubleshooting the Comserv system. Always use the `log_with_details` method to ensure comprehensive logging throughout the application.</p>
+<p>Consistent and detailed logging is essential for maintaining and troubleshooting the Comserv system. Always use the `log_with_details` method to ensure comprehensive logging throughout the application. The recent AdminAuth integration provides enhanced authentication logging capabilities that should be leveraged in all admin controllers.</p>

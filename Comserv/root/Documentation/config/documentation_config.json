@@ -111,6 +111,16 @@
       "format": "markdown"
     },
     {
+      "id": "server_update_procedure",
+      "title": "Server Update Procedure",
+      "description": "Step-by-step guide for updating software on the production server",
+      "path": "Documentation/admin/server_update_procedure.tt",
+      "categories": ["admin_guides"],
+      "roles": ["admin", "developer"],
+      "site": "all",
+      "format": "template"
+    },
+    {
       "id": "project_management_system",
       "title": "Project Management System",
       "description": "Documentation for the project management features",

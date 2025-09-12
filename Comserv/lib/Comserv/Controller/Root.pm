@@ -24,7 +24,23 @@ has 'logging' => (
 # Add user_exists method
 sub user_exists {
     my ($self, $c) = @_;
-    return ($c->session->{username} && $c->session->{user_id}) ? 1 : 0;
+    # Original strict check: requires both username AND user_id
+    if ($c->session->{username} && $c->session->{user_id}) {
+        return 1;
+    }
+    
+    # Fallback: if we have roles, consider user as existing (for session-based auth)
+    # This handles cases where session has valid roles but missing username/user_id
+    my $roles = $c->session->{roles};
+    if ($roles && ((ref($roles) eq 'ARRAY' && @$roles > 0) || ($roles ne '' && $roles ne 'none'))) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'user_exists',
+            "User exists via roles fallback (username=" . ($c->session->{username} || 'missing') . 
+            ", user_id=" . ($c->session->{user_id} || 'missing') . ", roles=" . 
+            (ref($roles) eq 'ARRAY' ? join(',', @$roles) : $roles) . ")");
+        return 1;
+    }
+    
+    return 0;
 }
 
 # Add check_user_roles method

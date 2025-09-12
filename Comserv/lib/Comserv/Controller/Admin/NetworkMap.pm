@@ -4,6 +4,7 @@ use Moose;
 use namespace::autoclean;
 use Comserv::Util::NetworkMap;
 use Comserv::Util::Logging;
+use Comserv::Util::AdminAuth;
 use JSON;
 use Try::Tiny;
 
@@ -16,6 +17,12 @@ __PACKAGE__->config(namespace => 'admin/NetworkMap');
 sub logging {
     my ($self) = @_;
     return Comserv::Util::Logging->instance();
+}
+
+# Returns an instance of the admin auth utility
+sub admin_auth {
+    my ($self) = @_;
+    return Comserv::Util::AdminAuth->new();
 }
 
 =head1 NAME
@@ -41,10 +48,11 @@ sub auto :Private {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', 
         "Admin::NetworkMap controller auto method called");
     
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
+    # STANDARDIZED ADMIN ACCESS CHECK - DO NOT MODIFY
+    # Use centralized AdminAuth utility for consistent authentication
+    unless ($self->admin_auth->check_admin_access($c, 'admin_networkmap')) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto', 
-            "User does not have admin role");
+            "Access denied: User does not have admin access");
         $c->response->redirect($c->uri_for('/'));
         return 0;
     }

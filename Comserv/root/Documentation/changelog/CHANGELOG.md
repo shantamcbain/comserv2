@@ -1,5 +1,62 @@
 # Changelog
 
+## [2025-01-21] - Major System Enhancements and Infrastructure Updates
+
+### Major Enhancements
+- **Admin Git Controller Implementation** - Complete separation of Git operations into dedicated controller
+  - **New Controller**: Created `Admin::Git` controller with 965+ lines of Git management functionality
+  - **Enhanced Security**: Centralized authentication using `AdminAuth` utility
+  - **Branch Management**: Advanced branch selection and protection mechanisms
+  - **File Operations**: Safe Git operations with proper error handling
+  - **Template Integration**: New admin templates for Git operations (git_commit.tt, git_stash.tt, restore_file.tt, safe_git_pull.tt)
+
+- **Documentation System Improvements** - Enhanced documentation management and organization
+  - **Template Conversion**: Converted AI guidelines from .tt back to .md format for better AI processing
+  - **Enhanced Scanning**: Improved documentation scanning methods with better error handling
+  - **Configuration Updates**: Updated documentation config with new categories and file mappings
+  - **Logging Integration**: Better integration with centralized logging system
+
+- **Authentication System Enhancements** - Improved admin authentication across all controllers
+  - **Centralized Auth**: Enhanced `AdminAuth` utility with better session management
+  - **Controller Updates**: Updated Admin, ApiCredentials, IT, NetworkMap, Root, and ThemeAdmin controllers
+  - **Consistent Security**: Standardized authentication checks across all admin functions
+  - **Session Management**: Improved session handling and user verification
+
+### Infrastructure Improvements
+- **Deployment Management** - Enhanced deployment infrastructure
+  - **Server Update Procedures**: New comprehensive server update documentation
+  - **Deployment Checklist**: Converted to .tt format with enhanced procedures
+  - **Admin Templates**: New admin interface templates for enhanced management
+  - **Git Ignore Updates**: Enhanced .gitignore with better exclusion patterns
+
+- **Dependency Management** - Improved module management
+  - **cpanfile Updates**: Added new required modules for enhanced functionality
+  - **Module Integration**: Better integration of Perl modules across controllers
+  - **Logging Enhancements**: Improved logging utility with better file handling
+
+### Files Modified
+- **Controllers**: Admin.pm, Admin/Git.pm (new), Admin/NetworkMap.pm, ApiCredentials.pm, Documentation.pm, Documentation/ScanMethods.pm, IT.pm, Root.pm, ThemeAdmin.pm
+- **Utilities**: AdminAuth.pm, Logging.pm
+- **Documentation**: Multiple .tt conversions, new admin documentation, enhanced changelogs
+- **Templates**: New admin templates for Git operations and enhanced management
+- **Configuration**: Updated .gitignore, cpanfile, documentation_config.json
+
+### Breaking Changes
+- **Git Operations**: Git functionality moved from Admin controller to dedicated Admin::Git controller
+- **Authentication**: Enhanced authentication requirements for admin functions
+- **Template Format**: AI guidelines converted from .tt to .md format (affects documentation system)
+
+## [2025-01-21] - Documentation System Overhaul
+
+### Major Enhancement
+- **Documentation System Overhaul** - Complete transformation from config-based to file scanning system
+  - **Accessibility Improvement**: Increased accessible documentation from 45 to 270+ files
+  - **Dynamic Discovery**: Automatic detection of all documentation files without config updates
+  - **Proper Logging Integration**: Fixed logging system to use centralized logging utility
+  - **Enhanced Categorization**: Intelligent categorization based on directory structure
+  - **Zero Maintenance**: New documentation files automatically discovered and categorized
+  - **Error Elimination**: Resolved "Failed to open file" errors from missing config entries
+
 ## [2025-01-20] - Admin Authentication System Refactor
 
 ### Major Enhancement

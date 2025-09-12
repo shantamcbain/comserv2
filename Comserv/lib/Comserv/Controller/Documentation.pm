@@ -2,7 +2,7 @@ package Comserv::Controller::Documentation;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
-use Comserv::Util::DocumentationConfig;
+use Comserv::Controller::Documentation::ScanMethods qw(_scan_directories _categorize_pages);
 use File::Find;
 use File::Basename;
 use File::Spec;
@@ -61,43 +61,66 @@ has 'documentation_categories' => (
     lazy => 1,
 );
 
-# Initialize - load configuration from JSON
+# Initialize - scan filesystem for documentation files
 sub BUILD {
     my ($self) = @_;
     my $logger = $self->logging;
 
-    $logger->log_to_file("Starting Documentation controller initialization", undef, 'INFO');
+    Comserv::Util::Logging::log_to_file("Starting Documentation controller initialization");
 
-    # Load categories from config
-    my $config_categories = $self->documentation_config->get_categories();
-    %{$self->documentation_categories} = %$config_categories;
+    # Initialize default categories
+    %{$self->documentation_categories} = (
+        'user_guides' => {
+            title => 'User Guides',
+            description => 'Documentation for end users of the system',
+            icon => 'fas fa-users',
+            roles => ['normal', 'editor', 'admin', 'developer'],
+            pages => []
+        },
+        'admin_guides' => {
+            title => 'Administrator Guides',
+            description => 'Documentation for system administrators',
+            icon => 'fas fa-shield-alt',
+            roles => ['admin', 'developer'],
+            pages => []
+        },
+        'developer_guides' => {
+            title => 'Developer Documentation',
+            description => 'Documentation for developers',
+            icon => 'fas fa-code',
+            roles => ['developer'],
+            pages => []
+        },
+        'tutorials' => {
+            title => 'Tutorials',
+            description => 'Step-by-step tutorials and guides',
+            icon => 'fas fa-graduation-cap',
+            roles => ['normal', 'editor', 'admin', 'developer'],
+            pages => []
+        },
+        'modules' => {
+            title => 'Module Documentation',
+            description => 'Documentation for system modules',
+            icon => 'fas fa-puzzle-piece',
+            roles => ['developer', 'admin'],
+            pages => []
+        },
+        'site_specific' => {
+            title => 'Site-Specific Documentation',
+            description => 'Documentation specific to individual sites',
+            icon => 'fas fa-building',
+            roles => ['admin', 'developer'],
+            pages => []
+        }
+    );
 
-    # Load pages from config and convert to the format expected by the controller
-    my $config_pages = $self->documentation_config->get_pages();
-    
-    foreach my $page (@$config_pages) {
-        my $page_id = $page->{id};
-        
-        # Convert config format to controller format
-        my %page_meta = (
-            path => $page->{path},
-            site => $page->{site} || 'all',
-            roles => $page->{roles} || ['normal'],
-            file_type => $page->{format} || 'markdown',
-            title => $page->{title},
-            description => $page->{description}
-        );
-        
-        # Store in documentation pages
-        $self->documentation_pages->{$page_id} = \%page_meta;
-        
-        # Log the loaded page
-        $logger->log_to_file("Loaded documentation page: $page_id (path: $page->{path})", undef, 'DEBUG');
-    }
+    # Note: File scanning will be done on first request since we need Catalyst context
+    # for proper logging. The _scan_directories and _categorize_pages methods will be
+    # called from the index method when needed.
 
-    $logger->log_to_file(sprintf("Documentation system initialized with %d categories and %d pages",
+    Comserv::Util::Logging::log_to_file(sprintf("Documentation system initialized with %d categories and %d pages",
         scalar keys %{$self->documentation_categories},
-        scalar keys %{$self->documentation_pages}), undef, 'INFO');
+        scalar keys %{$self->documentation_pages}));
 }
 
 sub auto :Private {
@@ -135,6 +158,9 @@ sub index :Path('/Documentation') :Args(0) {
 
     # Log the action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Accessing documentation index");
+    
+    # Ensure documentation has been scanned
+    $self->_ensure_scanned($c);
 
     # Get the current user's role
     my $user_role = 'normal';  # Default to normal user
@@ -307,6 +333,9 @@ sub view :Path('/Documentation') :Args(1) {
 
     # Log the action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view', "Accessing documentation page: $page");
+    
+    # Ensure documentation has been scanned
+    $self->_ensure_scanned($c);
 
     # Get the current user's role
     my $user_role = 'normal';  # Default to normal user
@@ -527,6 +556,21 @@ sub view :Path('/Documentation') :Args(1) {
         error_msg => "Documentation page '$page' not found.",
         template => 'Documentation/error.tt'
     );
+}
+
+# Ensure documentation scanning has been done
+sub _ensure_scanned {
+    my ($self, $c) = @_;
+    
+    # Check if we've already scanned (pages will be empty initially)
+    return if keys %{$self->documentation_pages} > 0;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_ensure_scanned',
+        "Performing initial documentation scan");
+    
+    # Import and call the scanning functions
+    _scan_directories($self, $c);
+    _categorize_pages($self, $c);
 }
 
 # Helper method to format titles

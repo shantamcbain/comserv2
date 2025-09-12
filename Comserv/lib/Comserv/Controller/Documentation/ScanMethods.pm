@@ -17,12 +17,16 @@ my $APP_LOG_FILE = $ENV{'COMSERV_LOG_DIR'} ?
 
 # Scan directories for documentation files
 sub _scan_directories {
-    my ($self) = @_;
+    my ($self, $c) = @_;
     
-    Comserv::Util::Logging::log_to_file("Starting directory scan for documentation files", $APP_LOG_FILE, 'INFO');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_scan_directories',
+        "Starting directory scan for documentation files");
     
     # Scan the Documentation directory for all files
-    my $doc_dir = "root/Documentation";
+    # Use absolute path to ensure we find the directory regardless of working directory
+    my $doc_dir = File::Spec->catdir($FindBin::Bin, '..', 'root', 'Documentation');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_scan_directories',
+        "Looking for documentation directory at: $doc_dir");
     if (-d $doc_dir) {
         find(
             {
@@ -33,7 +37,9 @@ sub _scan_directories {
 
                     my $basename = basename($file);
                     my $path = $File::Find::name;
-                    $path =~ s/^root\///; # Remove 'root/' prefix
+                    # Convert absolute path to relative path starting with Documentation/
+                    my $doc_base = File::Spec->catdir($FindBin::Bin, '..', 'root');
+                    $path =~ s/^\Q$doc_base\E[\/\\]?//; # Remove base path prefix
 
                     # Skip configuration files
                     return if $path =~ m{Documentation/.*_config\.json$};
@@ -59,8 +65,9 @@ sub _scan_directories {
                         }
                     }
 
-                    # Log the file being processed
-                    Comserv::Util::Logging::log_to_file("Processing file: $file, key: $key, path: $path", $APP_LOG_FILE, 'INFO');
+                    # Log the file being processed (only for debug level)
+                    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_scan_directories',
+                        "Processing file: $file, key: $key, path: $path, full_path: $File::Find::name");
 
                     # Determine site and role requirements
                     my $site = 'all';
@@ -103,19 +110,21 @@ sub _scan_directories {
             },
             $doc_dir
         );
+    } else {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_scan_directories',
+            "Documentation directory not found at: $doc_dir");
     }
     
-    Comserv::Util::Logging::log_to_file(
-        "Directory scan completed. Found " . scalar(keys %{$self->documentation_pages}) . " pages.",
-        $APP_LOG_FILE, 'INFO'
-    );
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_scan_directories',
+        "Directory scan completed. Found " . scalar(keys %{$self->documentation_pages}) . " pages.");
 }
 
 # Categorize pages based on their paths
 sub _categorize_pages {
-    my ($self) = @_;
+    my ($self, $c) = @_;
     
-    Comserv::Util::Logging::log_to_file("Categorizing documentation pages", $APP_LOG_FILE, 'INFO');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_categorize_pages',
+        "Categorizing documentation pages");
     
     # Clear existing category pages
     foreach my $category_key (keys %{$self->documentation_categories}) {
@@ -135,48 +144,49 @@ sub _categorize_pages {
             # Add to site-specific category if applicable
             if ($category_key eq 'site_specific' && $site ne 'all') {
                 push @{$category->{pages}}, $page_id unless grep { $_ eq $page_id } @{$category->{pages}};
-                Comserv::Util::Logging::log_to_file(
-                    "Added '$page_id' to site-specific category (site: $site)", $APP_LOG_FILE, 'INFO');
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_categorize_pages',
+                    "Added '$page_id' to site-specific category (site: $site)");
             }
             
             # Add to module category if it's in a module directory
             if ($category_key eq 'modules' && $path =~ m{Documentation/modules/}) {
                 push @{$category->{pages}}, $page_id unless grep { $_ eq $page_id } @{$category->{pages}};
-                Comserv::Util::Logging::log_to_file(
-                    "Added '$page_id' to modules category", $APP_LOG_FILE, 'INFO');
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_categorize_pages',
+                    "Added '$page_id' to modules category");
             }
             
             # Add to tutorials if it's in the tutorials directory
             if ($category_key eq 'tutorials' && $path =~ m{Documentation/tutorials/}) {
                 push @{$category->{pages}}, $page_id unless grep { $_ eq $page_id } @{$category->{pages}};
-                Comserv::Util::Logging::log_to_file(
-                    "Added '$page_id' to tutorials category", $APP_LOG_FILE, 'INFO');
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_categorize_pages',
+                    "Added '$page_id' to tutorials category");
             }
             
             # Add to user guides if it's in the normal roles directory
             if ($category_key eq 'user_guides' && $path =~ m{Documentation/roles/normal/}) {
                 push @{$category->{pages}}, $page_id unless grep { $_ eq $page_id } @{$category->{pages}};
-                Comserv::Util::Logging::log_to_file(
-                    "Added '$page_id' to user_guides category", $APP_LOG_FILE, 'INFO');
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_categorize_pages',
+                    "Added '$page_id' to user_guides category");
             }
             
             # Add to admin guides if it's in the admin roles directory
             if ($category_key eq 'admin_guides' && $path =~ m{Documentation/roles/admin/}) {
                 push @{$category->{pages}}, $page_id unless grep { $_ eq $page_id } @{$category->{pages}};
-                Comserv::Util::Logging::log_to_file(
-                    "Added '$page_id' to admin_guides category", $APP_LOG_FILE, 'INFO');
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_categorize_pages',
+                    "Added '$page_id' to admin_guides category");
             }
             
             # Add to developer guides if it's in the developer roles directory
             if ($category_key eq 'developer_guides' && $path =~ m{Documentation/roles/developer/}) {
                 push @{$category->{pages}}, $page_id unless grep { $_ eq $page_id } @{$category->{pages}};
-                Comserv::Util::Logging::log_to_file(
-                    "Added '$page_id' to developer_guides category", $APP_LOG_FILE, 'INFO');
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_categorize_pages',
+                    "Added '$page_id' to developer_guides category");
             }
         }
     }
     
-    Comserv::Util::Logging::log_to_file("Page categorization completed", $APP_LOG_FILE, 'INFO');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_categorize_pages',
+        "Page categorization completed");
 }
 
 # Return true value at the end of the module

@@ -31,7 +31,7 @@ sub index :Path :Args(0) {
     my ($self, $c) = @_;
     
     my $logger = $self->logging;
-    $logger->log_to_file("IT controller index action called", undef, 'INFO');
+    Comserv::Util::Logging::log_to_file("IT controller index action called");
     
     # Push debug messages to stash if in debug mode
     if ($c->session->{debug_mode}) {
@@ -60,7 +60,7 @@ sub resources :Local :Args(0) {
     my ($self, $c) = @_;
     
     my $logger = $self->logging;
-    $logger->log_to_file("IT resources action called", undef, 'INFO');
+    Comserv::Util::Logging::log_to_file("IT resources action called");
     
     # Push debug messages to stash if in debug mode
     if ($c->session->{debug_mode}) {
@@ -89,7 +89,7 @@ sub documentation :Local :Args(0) {
     my ($self, $c) = @_;
     
     my $logger = $self->logging;
-    $logger->log_to_file("IT documentation action called", undef, 'INFO');
+    Comserv::Util::Logging::log_to_file("IT documentation action called");
     
     # Push debug messages to stash if in debug mode
     if ($c->session->{debug_mode}) {
@@ -118,7 +118,7 @@ sub support :Local :Args(0) {
     my ($self, $c) = @_;
     
     my $logger = $self->logging;
-    $logger->log_to_file("IT support action called", undef, 'INFO');
+    Comserv::Util::Logging::log_to_file("IT support action called");
     
     # Push debug messages to stash if in debug mode
     if ($c->session->{debug_mode}) {
@@ -147,7 +147,7 @@ sub tools :Local :Args(0) {
     my ($self, $c) = @_;
     
     my $logger = $self->logging;
-    $logger->log_to_file("IT tools action called", undef, 'INFO');
+    Comserv::Util::Logging::log_to_file("IT tools action called");
     
     # Push debug messages to stash if in debug mode
     if ($c->session->{debug_mode}) {
@@ -176,7 +176,7 @@ sub network :Local :Args(0) {
     my ($self, $c) = @_;
     
     my $logger = $self->logging;
-    $logger->log_to_file("IT network action called", undef, 'INFO');
+    Comserv::Util::Logging::log_to_file("IT network action called");
     
     # Push debug messages to stash if in debug mode
     if ($c->session->{debug_mode}) {
@@ -205,7 +205,7 @@ sub servers :Local :Args(0) {
     my ($self, $c) = @_;
     
     my $logger = $self->logging;
-    $logger->log_to_file("IT servers action called", undef, 'INFO');
+    Comserv::Util::Logging::log_to_file("IT servers action called");
     
     # Push debug messages to stash if in debug mode
     if ($c->session->{debug_mode}) {
@@ -234,7 +234,7 @@ sub security :Local :Args(0) {
     my ($self, $c) = @_;
     
     my $logger = $self->logging;
-    $logger->log_to_file("IT security action called", undef, 'INFO');
+    Comserv::Util::Logging::log_to_file("IT security action called");
     
     # Push debug messages to stash if in debug mode
     if ($c->session->{debug_mode}) {
