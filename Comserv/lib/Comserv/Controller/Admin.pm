@@ -60,51 +60,12 @@ sub base :Chained('/') :PathPart('admin') :CaptureArgs(0) {
     # Common setup for all admin pages
     $c->stash(section => 'admin');
     
-    # TEMPORARY FIX: Allow specific users direct access
-    if ($c->session->{username} && $c->session->{username} eq 'Shanta') {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'base', 
-            "Admin access granted to user Shanta (bypass role check)");
-        return 1;
-    }
-    
-    # Check if the user has admin role
-    my $has_admin_role = 0;
-    
-    # First check if user exists
-    my $root_controller = $c->controller('Root');
-    if ($root_controller->user_exists($c)) {
-        # Get roles from session
-        my $roles = $c->session->{roles};
-        
-        # Log the roles for debugging
-        my $roles_debug = 'none';
-        if (defined $roles) {
-            if (ref($roles) eq 'ARRAY') {
-                $roles_debug = join(', ', @$roles);
-                
-                # Check if 'admin' is in the roles array
-                foreach my $role (@$roles) {
-                    if (lc($role) eq 'admin') {
-                        $has_admin_role = 1;
-                        last;
-                    }
-                }
-            } elsif (!ref($roles)) {
-                $roles_debug = $roles;
-                # Check if roles string contains 'admin'
-                if ($roles =~ /\badmin\b/i) {
-                    $has_admin_role = 1;
-                }
-            }
-        }
-        
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'base', 
-            "Admin access check - User: " . $c->session->{username} . ", Roles: $roles_debug, Has admin: " . ($has_admin_role ? 'Yes' : 'No'));
-    }
-    
-    unless ($has_admin_role) {
+    # STANDARDIZED ADMIN ACCESS CHECK - DO NOT MODIFY
+    # Use centralized AdminAuth utility for consistent authentication
+    # This ensures all admin controllers use the same authentication logic
+    unless ($self->admin_auth->check_admin_access($c, 'admin_base')) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'base', 
-            "Access denied: User does not have admin role");
+            "Access denied: User does not have admin access");
         
         # Set error message in flash
         $c->flash->{error_msg} = "You need to be an administrator to access this area.";
@@ -117,7 +78,7 @@ sub base :Chained('/') :PathPart('admin') :CaptureArgs(0) {
     }
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'base', 
-        "Completed Admin base action");
+        "Completed Admin base action - access granted");
     
     return 1;
 }

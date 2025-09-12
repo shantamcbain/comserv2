@@ -5,6 +5,7 @@ use JSON;
 use Try::Tiny;
 use File::Spec;
 use Comserv::Util::Logging;
+use Comserv::Util::AdminAuth;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -27,6 +28,12 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance }
 );
 
+# Returns an instance of the admin auth utility
+sub admin_auth {
+    my ($self) = @_;
+    return Comserv::Util::AdminAuth->new();
+}
+
 # Path to the credentials file
 has 'credentials_file' => (
     is => 'ro',
@@ -43,9 +50,9 @@ sub auto :Private {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', 
         "ApiCredentials controller auto method called by user: " . ($c->session->{username} || 'unknown'));
     
-    # Check if user has admin privileges
-    my $root_controller = $c->controller('Root');
-    unless ($root_controller->check_user_roles($c, 'admin')) {
+    # STANDARDIZED ADMIN ACCESS CHECK - DO NOT MODIFY
+    # Use centralized AdminAuth utility for consistent authentication
+    unless ($self->admin_auth->check_admin_access($c, 'api_credentials')) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto', 
             "Unauthorized access attempt to ApiCredentials by user: " . ($c->session->{username} || 'unknown'));
         

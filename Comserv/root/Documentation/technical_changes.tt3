@@ -1,0 +1,185 @@
+[% META title = 'Technical Changes Documentation' %]
+[% PageVersion = 'Documentation/technical_changes.tt,v 1.01 2025/01/21 system Exp system ' %]
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+
+<h1>Technical Changes Documentation</h1>
+
+<p><strong>Last Updated:</strong> January 2025 - Added Documentation System Overhaul</p>
+
+<h2>Recent Major Changes (January 2025)</h2>
+
+<h3>Documentation System Overhaul</h3>
+
+<p><strong>Date:</strong> January 21, 2025<br>
+<strong>Impact:</strong> Major system enhancement<br>
+<strong>Status:</strong> Completed</p>
+
+<p><strong>Problem:</strong><br>
+The previous documentation system had significant limitations:</p>
+<ul>
+<li>Only 45 out of 270+ documentation files were accessible</li>
+<li>Config-based system required manual updates for each new file</li>
+<li>Many configured pages didn't exist, causing "Failed to open file" errors</li>
+<li>Logging system was not properly integrated</li>
+</ul>
+
+<p><strong>Solution Implemented:</strong><br>
+Complete transformation from config-based to dynamic file scanning system:</p>
+
+<ol>
+<li><strong>Dynamic File Discovery</strong>: Replaced JSON config with filesystem scanning</li>
+<li><strong>Automatic Categorization</strong>: Intelligent categorization based on directory structure</li>
+<li><strong>Proper Logging Integration</strong>: Fixed logging to use centralized logging utility</li>
+<li><strong>Zero Maintenance</strong>: New files automatically discovered without config updates</li>
+</ol>
+
+<p><strong>Files Modified:</strong></p>
+<ul>
+<li><code>/lib/Comserv/Controller/Documentation.pm</code> - Main controller updated</li>
+<li><code>/lib/Comserv/Controller/Documentation/ScanMethods.pm</code> - New scanning module</li>
+</ul>
+
+<p><strong>Benefits:</strong></p>
+<ul>
+<li>All 270+ documentation files now accessible</li>
+<li>No configuration maintenance required</li>
+<li>Proper centralized logging integration</li>
+<li>Enhanced role-based access control</li>
+<li>Improved system reliability and scalability</li>
+</ul>
+
+<h2>Dependency Management Issues</h2>
+
+<h3>1. Net::CIDR Module Installation</h3>
+
+<p>The application requires the <code>Net::CIDR</code> Perl module for network address management in the <code>Comserv::Util::NetworkMap</code> module. Despite being correctly listed in the cpanfile, the module was not automatically installed during dependency resolution.</p>
+
+<p><strong>Issue:</strong></p>
+<pre>
+Can't locate Net/CIDR.pm in @INC (you may need to install the Net::CIDR module) (@INC entries checked: /opt/comserv/Comserv/lib /etc/perl /usr/local/lib/x86_64-linux-gnu/perl/5.38.2 /usr/local/share/perl/5.38.2 /usr/lib/x86_64-linux-gnu/perl5/5.38 /usr/share/perl5 /usr/lib/x86_64-linux-gnu/perl-base /usr/lib/x86_64-linux-gnu/perl/5.38 /usr/share/perl/5.38 /usr/local/lib/site_perl) at /opt/comserv/Comserv/lib/Comserv/Util/NetworkMap.pm line 7.
+</pre>
+
+<p><strong>Solution:</strong><br>
+The module must be installed manually using:</p>
+<pre>
+sudo cpanm Net::CIDR
+</pre>
+
+<p><strong>Explanation:</strong></p>
+<ol>
+<li>The <code>comserv_server.pl</code> script runs without this module because it uses lazy loading - the NetworkMap module is only loaded when actually used</li>
+<li>Starman pre-loads all modules during initialization, causing it to fail immediately when the dependency is missing</li>
+<li>Perl applications don't automatically install missing dependencies at runtime for security and stability reasons</li>
+</ol>
+
+<p><strong>Future Fix Required:</strong><br>
+The dependency management system needs to be reviewed to ensure all modules listed in cpanfile are properly installed during deployment. This could involve:</p>
+<ol>
+<li>Creating a deployment script that validates all dependencies are installed before starting the application</li>
+<li>Adding a pre-flight check to the Starman startup process</li>
+<li>Implementing a more robust dependency management system using Carton or a similar tool</li>
+<li>Adding clear documentation about required manual installation steps</li>
+</ol>
+
+<h2>Proxmox Model Fixes</h2>
+
+<h3>1. Duplicate Method Declarations</h3>
+
+<p>The <code>test_proxmox_node</code> method was defined three times in the Proxmox.pm file. This is a problem in Perl because only the last definition is used, and the others are silently ignored, which can lead to unexpected behavior.</p>
+
+<p><strong>Original Code (problematic):</strong></p>
+<pre>
+# First definition at lines 318-424
+sub test_proxmox_node {
+    # Implementation 1
+}
+
+# Second definition at lines 426-532
+sub test_proxmox_node {
+    # Implementation 2
+}
+
+# Third definition at lines 1142-1168
+sub test_proxmox_node {
+    # Implementation 3
+}
+</pre>
+
+<p><strong>Fixed Code:</strong></p>
+<pre>
+# Kept only the first implementation
+sub test_proxmox_node {
+    # Implementation 1
+}
+
+# Replaced second definition with comment
+# This duplicate test_proxmox_node method has been removed to fix declaration errors
+
+# Replaced third definition with comment
+# This duplicate test_proxmox_node method has been removed to fix declaration errors
+</pre>
+
+<h3>2. Indentation Error</h3>
+
+<p>There was an extra closing brace in the <code>_get_real_vms_new</code> method that caused incorrect nesting of code blocks.</p>
+
+<p><strong>Original Code (problematic):</strong></p>
+<pre>
+            # Store debug info
+            $self-&gt;{debug_info}-&gt;{error} = "No VMs found on any node";
+            $self-&gt;{debug_info}-&gt;{original_error} = "First API request failed: " . $res-&gt;status_line;
+
+            return [];
+        }
+        }
+    }
+}
+</pre>
+
+<p><strong>Fixed Code:</strong></p>
+<pre>
+            # Store debug info
+            $self-&gt;{debug_info}-&gt;{error} = "No VMs found on any node";
+            $self-&gt;{debug_info}-&gt;{original_error} = "First API request failed: " . $res-&gt;status_line;
+
+            return [];
+        }
+    }
+}
+</pre>
+
+<h3>3. Missing Attribute</h3>
+
+<p>The code referenced a <code>token</code> attribute that wasn't defined in the class, which could lead to undefined behavior.</p>
+
+<p><strong>Original Code (problematic):</strong></p>
+<pre>
+# No definition for 'token' attribute
+
+# But code references it
+if (!$self-&gt;{api_token} &amp;&amp; !$self-&gt;{token}) {
+    # ...
+}
+</pre>
+
+<p><strong>Fixed Code:</strong></p>
+<pre>
+# Added proper attribute definition
+has 'token' =&gt; (
+    is =&gt; 'rw',
+    isa =&gt; 'Str',
+    required =&gt; 0,
+);
+
+# Now the reference works correctly
+if (!$self-&gt;{api_token} &amp;&amp; !$self-&gt;{token}) {
+    # ...
+}
+</pre>
+
+[% END %]

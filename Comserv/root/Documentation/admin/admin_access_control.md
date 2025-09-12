@@ -138,6 +138,10 @@ When implementing role checks in .tt files:
    [% END %]
    ```
 
+## Related Documentation
+
+- [Admin Git Controller](../controllers/AdminGit.tt) - Comprehensive documentation for Git operations and admin-level repository management
+
 ## Troubleshooting
 
 If users are experiencing issues with admin access:

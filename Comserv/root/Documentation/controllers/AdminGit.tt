@@ -1,0 +1,224 @@
+[% META title = 'Admin Git Controller Documentation' %]
+[% PageVersion = 'controllers/AdminGit.tt,v 0.01 2025/01/15 shanta Exp shanta ' %]
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+
+[% WRAPPER 'site/layout.tt' %]
+
+<h1>Admin Git Controller Documentation</h1>
+
+<h2>Overview</h2>
+<p>The Admin::Git controller handles all Git-related administrative operations for the Comserv application. This controller was separated from the main Admin controller to improve maintainability and reduce file size. It provides both existing functionality and planned enhancements for comprehensive Git management.</p>
+
+<h2>Current Implemented Features</h2>
+
+<h3>Git Pull Operations</h3>
+<ul>
+    <li><strong>Branch Selection</strong>: Supports pulling from different branches (main, master, develop, etc.)</li>
+    <li><strong>Smart Theme Handling</strong>: Automatically detects and preserves local theme_mappings.json changes</li>
+    <li><strong>Automatic Stashing</strong>: Stashes local changes before pull and attempts to reapply them</li>
+    <li><strong>Branch Switching</strong>: Can switch to different branches before pulling</li>
+    <li><strong>Comprehensive Logging</strong>: All operations are logged with detailed information</li>
+    <li><strong>Error Handling</strong>: Robust error handling with user-friendly messages</li>
+</ul>
+
+<h3>Branch Management</h3>
+<ul>
+    <li><strong>Current Branch Detection</strong>: Shows which branch is currently active</li>
+    <li><strong>Available Branches</strong>: Lists all remote branches available for checkout</li>
+    <li><strong>Remote Fetch</strong>: Automatically fetches latest remote branch information</li>
+</ul>
+
+<h3>Security Features</h3>
+<ul>
+    <li><strong>Admin Authentication</strong>: Uses centralized AdminAuth utility for access control</li>
+    <li><strong>Session-based Access</strong>: Requires proper admin session for all operations</li>
+    <li><strong>Role-based Authorization</strong>: Checks user roles before allowing Git operations</li>
+</ul>
+
+<h2>Planned Git Management Enhancements</h2>
+
+<h3>Local Repository Management</h3>
+<ul>
+    <li><strong>git stash</strong> - Save/pop/list stashed changes
+        <ul>
+            <li>Stash current changes before deployment</li>
+            <li>List all available stashes</li>
+            <li>Apply specific stashes</li>
+            <li>Drop unwanted stashes</li>
+        </ul>
+    </li>
+    <li><strong>git commit</strong> - Commit local configuration changes
+        <ul>
+            <li>Stage modified files</li>
+            <li>Create commits with descriptive messages</li>
+            <li>Commit server-specific configurations</li>
+        </ul>
+    </li>
+    <li><strong>git status</strong> - Repository status monitoring
+        <ul>
+            <li>Show modified files</li>
+            <li>Display staged changes</li>
+            <li>Track untracked files</li>
+        </ul>
+    </li>
+    <li><strong>git diff</strong> - Change review capabilities
+        <ul>
+            <li>Preview changes before committing</li>
+            <li>Compare working directory with last commit</li>
+            <li>Review staged changes</li>
+        </ul>
+    </li>
+</ul>
+
+<h3>Advanced Git Operations</h3>
+<ul>
+    <li><strong>git log</strong> - Commit history viewing
+        <ul>
+            <li>View recent commits</li>
+            <li>Search commit history</li>
+            <li>Display commit details</li>
+        </ul>
+    </li>
+    <li><strong>git reset</strong> - Undo operations
+        <ul>
+            <li>Soft reset to previous commits</li>
+            <li>Hard reset for complete rollbacks</li>
+            <li>Unstage files</li>
+        </ul>
+    </li>
+    <li><strong>git checkout</strong> - File and branch operations
+        <ul>
+            <li>Switch between branches</li>
+            <li>Restore specific files</li>
+            <li>Create new branches</li>
+        </ul>
+    </li>
+</ul>
+
+<h3>Production Server Workflow</h3>
+<ul>
+    <li><strong>Deployment Safety Workflow</strong>:
+        <ol>
+            <li>Stash local changes (server-specific configs)</li>
+            <li>Pull latest updates from repository</li>
+            <li>Restore local configurations</li>
+            <li>Commit any necessary local changes</li>
+        </ol>
+    </li>
+    <li><strong>Configuration Management</strong>:
+        <ul>
+            <li>Preserve production-specific settings</li>
+            <li>Handle .psgi file management</li>
+            <li>Manage database configurations</li>
+            <li>Maintain local customizations</li>
+        </ul>
+    </li>
+</ul>
+
+<h2>UI Features for Admin Interface</h2>
+
+<h3>Current Interface</h3>
+<ul>
+    <li><strong>Git Pull Form</strong>: Branch selection and confirmation interface</li>
+    <li><strong>Status Display</strong>: Shows current branch and available branches</li>
+    <li><strong>Operation Results</strong>: Displays success/error messages and command output</li>
+    <li><strong>Debug Information</strong>: Comprehensive debugging for troubleshooting</li>
+</ul>
+
+<h3>Planned Interface Enhancements</h3>
+<ul>
+    <li><strong>Stash Management Dashboard</strong>:
+        <ul>
+            <li>List all stashes with descriptions</li>
+            <li>Apply/drop stashes with confirmation</li>
+            <li>Create new stashes with custom messages</li>
+        </ul>
+    </li>
+    <li><strong>Local Commit Interface</strong>:
+        <ul>
+            <li>File staging area with checkboxes</li>
+            <li>Commit message editor</li>
+            <li>Preview changes before committing</li>
+        </ul>
+    </li>
+    <li><strong>File Status Dashboard</strong>:
+        <ul>
+            <li>Visual representation of modified files</li>
+            <li>Color-coded status indicators</li>
+            <li>Quick actions for common operations</li>
+        </ul>
+    </li>
+    <li><strong>Change Review System</strong>:
+        <ul>
+            <li>Side-by-side diff viewer</li>
+            <li>Syntax highlighting for code changes</li>
+            <li>Line-by-line change navigation</li>
+        </ul>
+    </li>
+</ul>
+
+<h2>Methods Documentation</h2>
+
+<h3>Current Methods</h3>
+<ul>
+    <li><strong>git_pull</strong>: Main git pull interface with branch selection</li>
+    <li><strong>execute_git_pull</strong>: Executes the actual git pull operation</li>
+    <li><strong>get_current_branch</strong>: Returns the currently active branch</li>
+    <li><strong>get_available_branches</strong>: Lists all available remote branches</li>
+    <li><strong>logging</strong>: Returns logging utility instance</li>
+    <li><strong>admin_auth</strong>: Returns admin authentication utility</li>
+</ul>
+
+<h3>Planned Methods</h3>
+<ul>
+    <li><strong>git_status</strong>: Display repository status</li>
+    <li><strong>git_stash_list</strong>: List all stashes</li>
+    <li><strong>git_stash_save</strong>: Create new stash</li>
+    <li><strong>git_stash_apply</strong>: Apply specific stash</li>
+    <li><strong>git_stash_drop</strong>: Remove specific stash</li>
+    <li><strong>git_commit</strong>: Create commits</li>
+    <li><strong>git_diff</strong>: Show file differences</li>
+    <li><strong>git_log</strong>: Display commit history</li>
+    <li><strong>git_reset</strong>: Reset operations</li>
+    <li><strong>git_checkout_file</strong>: Restore specific files</li>
+</ul>
+
+<h2>Access Control</h2>
+<p>This controller is accessible to users with the following roles:</p>
+<ul>
+    <li><strong>admin</strong>: Full access to all Git operations</li>
+    <li><strong>csc_admin</strong>: Enhanced access for CSC administrators</li>
+</ul>
+
+<p>All methods require proper admin authentication through the AdminAuth utility.</p>
+
+<h2>Related Files</h2>
+<ul>
+    <li><strong>Controller</strong>: /Comserv/lib/Comserv/Controller/Admin/Git.pm</li>
+    <li><strong>Template</strong>: /Comserv/root/admin/git_pull.tt</li>
+    <li><strong>Utility</strong>: /Comserv/lib/Comserv/Util/AdminAuth.pm</li>
+    <li><strong>Logging</strong>: /Comserv/lib/Comserv/Util/Logging.pm</li>
+</ul>
+
+<h2>Configuration Notes</h2>
+<ul>
+    <li><strong>Application Directory</strong>: /home/shanta/PycharmProjects/comserv2</li>
+    <li><strong>Theme File Handling</strong>: Special handling for theme_mappings.json preservation</li>
+    <li><strong>Authentication Boundary</strong>: Local Git operations available, push operations require separate authentication setup</li>
+</ul>
+
+<h2>Future Development Priority</h2>
+<ol>
+    <li><strong>High Priority</strong>: git stash operations for deployment safety</li>
+    <li><strong>High Priority</strong>: git commit for local configuration management</li>
+    <li><strong>Medium Priority</strong>: git status dashboard for monitoring</li>
+    <li><strong>Medium Priority</strong>: git diff viewer for change review</li>
+    <li><strong>Low Priority</strong>: Advanced operations (reset, checkout, log)</li>
+</ol>
+
+[% END %]

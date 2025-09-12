@@ -102,3 +102,7 @@ Thumbs.db
 /Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.tt
 /Comserv/root/Documentation/AI_DOCUMENTATION_GUIDELINES.md
 /Comserv/root/Documentation/AI_DOCUMENTATION_GUIDELINES.tt
+/Comserv/root/admin/git_pull_new.tt
+/improved_login.tt
+/test_diagnostics.pl
+/Comserv/root/src/admin/test_diagnostics.tt

@@ -1,6 +1,6 @@
 <!-- File: /home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/features/todo_system.tt -->
 [% META title = 'Todo System Documentation' %]
-[% PageVersion = 'Documentation/features/todo_system.tt,v 1.00 2025/01/20 system Exp system ' %]
+[% PageVersion = 'Documentation/features/todo_system.tt,v 1.01 2025/09/12 system Exp system ' %]
 [% debug %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
@@ -29,10 +29,11 @@
 <p>The Todo controller handles all HTTP requests related to todo management and implements the following key features:</p>
 
 <ul>
-    <li><strong>Access Control:</strong> Admin-only access with session validation</li>
+    <li><strong>Access Control:</strong> Admin-only access with session validation (Legacy authentication - needs AdminAuth migration)</li>
     <li><strong>CRUD Operations:</strong> Create, Read, Update, Delete functionality</li>
     <li><strong>Advanced Filtering:</strong> Date-based, project-based, and status-based filtering</li>
     <li><strong>Time Tracking Integration:</strong> Integration with the logging system for time accumulation</li>
+    <li><strong>Enhanced Logging:</strong> Uses Comserv::Util::Logging for detailed operation tracking</li>
 </ul>
 
 <h3>Model: <code>Comserv::Model::Todo</code></h3>
@@ -406,11 +407,44 @@
     <li><strong>Performance Monitoring:</strong> Action timing and resource usage</li>
 </ul>
 
+<h2>Authentication Migration Status</h2>
+
+<p><strong>Current Status:</strong> The Todo controller uses legacy authentication patterns and needs migration to the centralized AdminAuth system.</p>
+
+<h3>Required Migration Steps</h3>
+<ol>
+    <li><strong>Add AdminAuth Import:</strong> <code>use Comserv::Util::AdminAuth;</code></li>
+    <li><strong>Add admin_auth Method:</strong> 
+        <pre><code>sub admin_auth {
+    my ($self) = @_;
+    return Comserv::Util::AdminAuth->new();
+}</code></pre>
+    </li>
+    <li><strong>Replace begin Method:</strong> Replace custom authentication logic with:
+        <pre><code>sub begin :Private {
+    my ($self, $c) = @_;
+    return unless $self->admin_auth->require_admin_access($c, 'todo_access');
+}</code></pre>
+    </li>
+    <li><strong>Update auto Method:</strong> Simplify authentication checks using centralized utility</li>
+    <li><strong>Remove Custom Logic:</strong> Remove manual role checking and session validation code</li>
+</ol>
+
+<h3>Benefits of Migration</h3>
+<ul>
+    <li><strong>Consistent Authentication:</strong> Same authentication logic as other admin controllers</li>
+    <li><strong>Enhanced Session Validation:</strong> Multi-source username checking and fallback handling</li>
+    <li><strong>Better Debugging:</strong> Centralized authentication logging and error handling</li>
+    <li><strong>CSC Admin Support:</strong> Proper support for CSC admin users</li>
+    <li><strong>Reduced Code:</strong> Elimination of duplicate authentication code</li>
+</ul>
+
 <h2>Future Enhancements</h2>
 
 <p>Potential areas for system enhancement:</p>
 
 <ol>
+    <li><strong>Authentication Migration:</strong> Migrate to centralized AdminAuth system (Priority 1)</li>
     <li><strong>Notification System:</strong> Email/SMS notifications for due dates</li>
     <li><strong>Attachment Support:</strong> File attachments to todos</li>
     <li><strong>Subtask Management:</strong> Hierarchical todo relationships</li>

@@ -7,6 +7,7 @@ use File::Slurp;
 use File::Path qw(make_path);
 use Data::Dumper;
 use Comserv::Util::Logging;
+use Comserv::Util::AdminAuth;
 use JSON qw(encode_json decode_json);
 
 BEGIN { extends 'Catalyst::Controller'; }
@@ -17,6 +18,12 @@ has 'logging' => (
     handles => ['log_with_details'],
 );
 
+# Returns an instance of the admin auth utility
+sub admin_auth {
+    my ($self) = @_;
+    return Comserv::Util::AdminAuth->new();
+}
+
 # Simple index method that uses the same template as the main index
 sub simple :Path('/themeadmin/simple') :Args(0) {
     my ($self, $c) = @_;
@@ -24,24 +31,9 @@ sub simple :Path('/themeadmin/simple') :Args(0) {
     # Log that we've entered the simple method
     $self->log_with_details($c, 'info', __FILE__, __LINE__, 'simple', "***** ENTERED THEMEADMIN SIMPLE METHOD *****");
 
-    # Check if the user is logged in
-    if (!$c->user_exists && !$c->session->{user_id}) {
-        $self->log_with_details($c, 'info', __FILE__, __LINE__, 'simple', "User not logged in, redirecting to login page");
-        $c->flash->{error} = 'You must be logged in to access this page';
-        $c->response->redirect($c->uri_for('/'));
-        return;
-    }
-
-    # Check if the user has the admin role
-    my $roles = $c->session->{roles};
-    if (!defined $roles || ref $roles ne 'ARRAY' || !grep { $_ eq 'admin' } @$roles) {
-        $self->log_with_details($c, 'info', __FILE__, __LINE__, 'simple',
-            "User does not have admin role, redirecting to home page. Roles: " .
-            (defined $roles ? (ref $roles eq 'ARRAY' ? join(", ", @$roles) : ref($roles)) : "undefined"));
-        $c->flash->{error} = 'You do not have permission to access this page. Required role: admin.';
-        $c->response->redirect($c->uri_for('/'));
-        return;
-    }
+    # STANDARDIZED ADMIN ACCESS CHECK - DO NOT MODIFY
+    # Use centralized AdminAuth utility for consistent authentication
+    return unless $self->admin_auth->require_admin_access($c, 'themeadmin_simple');
 
     # Get current site
     my $site_name = $c->session->{SiteName};

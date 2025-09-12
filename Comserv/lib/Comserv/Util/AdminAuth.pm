@@ -40,16 +40,29 @@ sub check_admin_access {
     
     $action_name ||= 'unknown_action';
     
-    # Get session data for debugging
-    my $username = $c->session->{username} || 'unknown';
+    # Get session data for debugging - check multiple username sources
+    my $username = $c->session->{username} || ($c->user ? $c->user->username : undef) || 'unknown';
     my $sitename = $c->session->{SiteName} || 'none';
     my $roles = $c->session->{roles} || [];
     my $roles_str = ref($roles) eq 'ARRAY' ? join(',', @$roles) : ($roles || 'none');
+    my $user_id = $c->session->{user_id} || 'none';
     
-    # Check if user has valid session (instead of relying on user_exists)
-    unless ($username && $username ne 'unknown') {
+    # Check if user has valid session - accept if roles exist even if username is missing
+    # This handles cases where session has roles but username isn't in expected location
+    my $has_valid_session = 0;
+    if ($username && $username ne 'unknown') {
+        $has_valid_session = 1;
+    } elsif ($roles && ((ref($roles) eq 'ARRAY' && @$roles > 0) || ($roles ne '' && $roles ne 'none'))) {
+        # If we have roles but no username, try to get username from user object or use user_id
+        $username = ($c->user ? $c->user->username : undef) || "user_id_$user_id" || 'session_user';
+        $has_valid_session = 1;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_admin_access',
+            "Using fallback username '$username' for $action_name (roles exist but username missing)");
+    }
+    
+    unless ($has_valid_session) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'check_admin_access',
-            "Access denied for $action_name: No valid session username");
+            "Access denied for $action_name: No valid session (username: $username, roles: $roles_str, user_id: $user_id)");
         return 0;
     }
     

@@ -1,0 +1,180 @@
+[% META title = 'Deployment Checklist' %]
+[% PageVersion = 'Documentation/deployment_checklist.tt,v 1.01 2025/01/21 system Exp system ' %]
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+
+<h1>Deployment Checklist</h1>
+
+<p>This document provides a checklist for deploying the Comserv application to ensure all dependencies and configurations are properly set up.</p>
+
+<p><strong>Last Updated:</strong> January 2025 - Updated for Documentation System Overhaul and current architecture</p>
+
+<h2>Pre-Deployment Checks</h2>
+
+<h3>1. Dependency Verification</h3>
+
+<p>Before deploying the application, ensure all required Perl modules are installed:</p>
+
+<pre>
+# Install cpanm if not already installed
+sudo cpan App::cpanminus
+
+# Install all dependencies from cpanfile
+cd /path/to/comserv
+sudo cpanm --installdeps .
+
+# Verify critical dependencies manually
+perl -e 'eval "use Net::CIDR"; print $@ ? "Net::CIDR is NOT installed\n" : "Net::CIDR is installed\n"'
+</pre>
+
+<p>If any modules show as not installed, install them manually:</p>
+
+<pre>
+sudo cpanm Net::CIDR
+# Add other missing modules as needed
+</pre>
+
+<h3>2. Configuration Files</h3>
+
+<p>Ensure all required configuration files exist and have correct permissions:</p>
+
+<ul>
+<li><code>/opt/comserv/Comserv/db_config.json</code> - Database configuration</li>
+<li><code>/opt/comserv/Comserv/config/network_map.json</code> - Network map configuration</li>
+</ul>
+
+<h3>3. Database Setup</h3>
+
+<p>Verify database connections:</p>
+
+<pre>
+# Test database connections
+cd /opt/comserv/Comserv
+perl -MComserv::Model::DBEncy -e 'print "DBEncy connection OK\n" if Comserv::Model::DBEncy-&gt;new-&gt;schema'
+perl -MComserv::Model::DBForager -e 'print "DBForager connection OK\n" if Comserv::Model::DBForager-&gt;new-&gt;schema'
+</pre>
+
+<h2>Deployment Steps</h2>
+
+<h3>1. Stop Running Services</h3>
+
+<pre>
+sudo systemctl stop comserv-starman
+</pre>
+
+<h3>2. Update Code</h3>
+
+<pre>
+cd /opt/comserv
+git pull origin main  # or your deployment branch
+</pre>
+
+<h3>3. Install Dependencies</h3>
+
+<pre>
+cd /opt/comserv/Comserv
+sudo cpanm --installdeps .
+</pre>
+
+<h3>4. Run Database Migrations (if needed)</h3>
+
+<pre>
+cd /opt/comserv/Comserv
+perl script/comserv_migration.pl upgrade
+</pre>
+
+<h3>5. Test Application</h3>
+
+<pre>
+# Test with development server
+cd /opt/comserv/Comserv
+CATALYST_DEBUG=1 perl script/comserv_server.pl -r
+</pre>
+
+<p>Verify the application starts without errors. Press Ctrl+C to stop the test server.</p>
+
+<h3>6. Start Production Server</h3>
+
+<pre>
+sudo systemctl start comserv-starman
+</pre>
+
+<h3>7. Verify Deployment</h3>
+
+<pre>
+# Check if Starman is running
+sudo systemctl status comserv-starman
+
+# Check application logs for errors
+tail -f /opt/comserv/logs/application.log
+</pre>
+
+<h3>8. Verify Documentation System (New in January 2025)</h3>
+
+<p>The documentation system now uses dynamic file scanning instead of config files:</p>
+
+<pre>
+# Test documentation access
+curl -I http://localhost:5000/Documentation
+# Should return 200 OK
+
+# Check that all documentation files are accessible
+# The system should automatically discover 270+ documentation files
+</pre>
+
+<p><strong>Key Changes:</strong></p>
+<ul>
+<li>No configuration files needed for documentation</li>
+<li>All files in <code>/root/Documentation/</code> are automatically discovered</li>
+<li>Role-based access control is automatic based on directory structure</li>
+<li>Centralized logging is properly integrated</li>
+</ul>
+
+<h2>Troubleshooting</h2>
+
+<h3>Common Issues</h3>
+
+<h4>1. Missing Perl Modules</h4>
+
+<p>If you see errors about missing modules:</p>
+
+<pre>
+Can't locate Module/Name.pm in @INC
+</pre>
+
+<p>Install the missing module:</p>
+
+<pre>
+sudo cpanm Module::Name
+</pre>
+
+<h4>2. Database Connection Issues</h4>
+
+<p>Check the database configuration in <code>/opt/comserv/Comserv/db_config.json</code> and ensure the database server is running and accessible.</p>
+
+<h4>3. Permission Issues</h4>
+
+<p>Ensure the application has proper permissions to read/write to its directories:</p>
+
+<pre>
+sudo chown -R www-data:www-data /opt/comserv/Comserv/logs
+sudo chown -R www-data:www-data /opt/comserv/Comserv/root/static/uploads
+</pre>
+
+<h4>4. Starman vs Development Server Discrepancies</h4>
+
+<p>If the application works with <code>comserv_server.pl</code> but not with Starman, it may be due to:</p>
+
+<ul>
+<li>Different environment variables</li>
+<li>Different user permissions</li>
+<li>Lazy loading vs eager loading of modules</li>
+</ul>
+
+<p>Check the Starman service configuration and logs for specific errors.</p>
+
+[% END %]

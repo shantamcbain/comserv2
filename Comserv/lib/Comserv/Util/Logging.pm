@@ -207,7 +207,7 @@ sub log_with_details {
 
     # Log to file - this is our primary logging mechanism
     # (rotation is now handled in log_to_file)
-    log_to_file($log_message, undef, $level);
+    log_to_file($log_message);
 
     # Add to debug_errors in stash if Catalyst context is available
     # But avoid calling $c->log methods to prevent recursion
@@ -229,7 +229,7 @@ sub log_error {
     my $log_message = sprintf("[%s] [ERROR] - %s:%d - %s", $timestamp, $file, $line, $error_message);
 
     # Log to file - this is our primary logging mechanism
-    log_to_file($log_message, undef, 'ERROR');
+    log_to_file($log_message);
 
     # Add to debug_errors in stash if Catalyst context is available
     # But avoid calling $c->log methods to prevent recursion

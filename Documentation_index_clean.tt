@@ -1,5 +1,5 @@
 <!-- File: Documentation/index.tt - Theme-integrated version -->
-[% PageVersion = 'Documentation/index.tt,v 1.7 2025/01/20 shanta Exp shanta - Theme Integration' %]
+[% PageVersion = 'Documentation/index.tt,v 1.7 2025/09/11 shanta Exp shanta - Theme Integration' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
