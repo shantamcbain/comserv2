@@ -39,9 +39,15 @@
                     </div>
                     [% END %]
                     [% IF software_status.git_status.has_uncommitted_changes %]
+                    <div class="status-item warning">
+                        <label>Uncommitted Changes:</label>
+                        <span class="value">Changes need to be committed</span>
+                    </div>
+                    [% END %]
+                    [% IF software_status.git_status.has_untracked_files %]
                     <div class="status-item info">
-                        <label>Local Changes:</label>
-                        <span class="value">Uncommitted changes present</span>
+                        <label>Untracked Files:</label>
+                        <span class="value">[% software_status.git_status.untracked_files.size %] file(s) not in Git</span>
                     </div>
                     [% END %]
                 </div>

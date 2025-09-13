@@ -378,9 +378,30 @@ sub get_software_management_status {
         chomp $current_branch;
         $status->{git_status}->{current_branch} = $current_branch || 'unknown';
         
-        # Check if there are uncommitted changes
+        # Check if there are uncommitted changes (exclude untracked files)
         my $git_status_output = `git -C ${\$c->path_to()} status --porcelain 2>&1`;
-        $status->{git_status}->{has_uncommitted_changes} = $git_status_output ? 1 : 0;
+        my $has_uncommitted_changes = 0;
+        my $has_untracked_files = 0;
+        my @untracked_files = ();
+        
+        # Parse git status output to distinguish between uncommitted changes and untracked files
+        # Uncommitted changes have prefixes like: M (modified), A (added), D (deleted), R (renamed), C (copied)
+        # Untracked files have prefix: ?? (untracked)
+        if ($git_status_output) {
+            for my $line (split /\n/, $git_status_output) {
+                # Check if line indicates actual uncommitted changes (not untracked files)
+                if ($line =~ /^[MADRCU]/) {
+                    $has_uncommitted_changes = 1;
+                } elsif ($line =~ /^\?\?\s+(.+)$/) {
+                    $has_untracked_files = 1;
+                    push @untracked_files, $1;
+                }
+            }
+        }
+        
+        $status->{git_status}->{has_uncommitted_changes} = $has_uncommitted_changes;
+        $status->{git_status}->{has_untracked_files} = $has_untracked_files;
+        $status->{git_status}->{untracked_files} = \@untracked_files;
         
         # Check if we're behind origin (no sudo required)
         my $behind_count = `git -C ${\$c->path_to()} rev-list HEAD..origin/$current_branch --count 2>/dev/null`;
@@ -431,6 +452,17 @@ sub get_software_management_status {
                 icon => 'fas fa-edit',
                 message => "You have uncommitted local changes",
                 action => 'Review changes before deploying',
+                link => undef
+            };
+        }
+        
+        if ($status->{git_status}->{has_untracked_files}) {
+            my $file_count = scalar @{$status->{git_status}->{untracked_files}};
+            push @{$status->{recommendations}}, {
+                type => 'info',
+                icon => 'fas fa-file-plus',
+                message => "You have $file_count untracked file(s)",
+                action => 'Add files to Git if needed, or add to .gitignore',
                 link => undef
             };
         }
