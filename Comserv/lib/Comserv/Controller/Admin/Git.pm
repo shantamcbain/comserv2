@@ -4,6 +4,7 @@ use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
 use Comserv::Util::AdminAuth;
+use Comserv::Util::BackupManager;
 use Try::Tiny;
 use File::Temp;
 use File::Copy;
@@ -35,6 +36,13 @@ sub logging {
 sub admin_auth {
     my ($self) = @_;
     return Comserv::Util::AdminAuth->new();
+}
+
+# Returns an instance of the backup manager utility
+sub backup_manager {
+    my ($self, $c) = @_;
+    my $app_dir = $c ? $c->config->{home} : undef;
+    return Comserv::Util::BackupManager->new($app_dir ? (app_dir => $app_dir) : ());
 }
 
 =head2 git_pull
@@ -265,26 +273,53 @@ sub get_available_branches {
         # First fetch to ensure we have latest remote branch info
         my $fetch_output = `git fetch origin 2>&1`;
         
-        my $branches_output = `git branch -r 2>&1`;
+        # Use --no-color to avoid ANSI color codes that interfere with parsing
+        my $branches_output = `git branch -r --no-color 2>&1`;
         my @branches = ();
+        my %excluded_branches = (
+            'master' => 1,    # Exclude master branch as requested
+            'master2' => 1,   # Exclude master2 as well
+            'HEAD' => 1       # Always exclude HEAD
+        );
+        
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_available_branches', 
+            "Raw git branch output: $branches_output");
         
         for my $line (split /\n/, $branches_output) {
             $line =~ s/^\s+|\s+$//g;  # trim whitespace
-            if ($line =~ /^origin\/(.+)$/ && $1 ne 'HEAD') {
-                push @branches, $1;
+            $line =~ s/\x1b\[[0-9;]*m//g;  # remove any remaining ANSI color codes
+            
+            if ($line =~ /^origin\/(.+)$/) {
+                my $branch_name = $1;
+                # Skip excluded branches and HEAD pointer
+                unless ($excluded_branches{$branch_name} || $branch_name =~ /^HEAD\s*->/) {
+                    push @branches, $branch_name;
+                }
             }
         }
         
-        # If no remote branches found, add some common ones
+        # Sort branches with main first, then alphabetically
+        @branches = sort {
+            return -1 if $a eq 'main' && $b ne 'main';
+            return 1 if $b eq 'main' && $a ne 'main';
+            return $a cmp $b;
+        } @branches;
+        
+        # If no remote branches found, use main as fallback (no master)
         if (@branches == 0) {
-            @branches = ('main', 'master', 'develop');
+            @branches = ('main');
+            $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'get_available_branches', 
+                "No remote branches found, using fallback: main");
         }
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_available_branches', 
+            "Found branches: " . join(', ', @branches));
         
         return \@branches;
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_available_branches', 
             "Error getting available branches: $_");
-        return ['main', 'master'];  # fallback with common branch names
+        return ['main'];  # fallback without master
     };
 }
 
@@ -429,88 +464,18 @@ Create backup of protected files before git operations
 sub backup_protected_files {
     my ($self, $c) = @_;
     
-    my $result = {
-        success => 0,
-        message => '',
-        output => '',
-        backup_id => '',
-        backup_path => '',
-        files_backed_up => []
-    };
+    # Use centralized BackupManager for protected files backup
+    my $username = $c->session->{username} || 'system';
+    my $result = $self->backup_manager->create_protected_files_backup($username);
     
-    try {
-        # Create backup directory if it doesn't exist
-        my $app_dir = '/home/shanta/PycharmProjects/comserv2';
-        my $backup_dir = "$app_dir/Comserv/backups";
-        make_path($backup_dir) unless -d $backup_dir;
-        
-        # Generate backup ID and filename
-        my $timestamp = strftime("%Y%m%d_%H%M%S", localtime);
-        $result->{backup_id} = "protected_files_$timestamp";
-        my $backup_filename = "$result->{backup_id}.tar.gz";
-        $result->{backup_path} = "$backup_dir/$backup_filename";
-        
-        # Get list of protected files that exist
-        my $protected_files = $self->get_protected_files($c);
-        my @existing_files = ();
-        
-        for my $file_info (@$protected_files) {
-            my $full_path = "$app_dir/$file_info->{path}";
-            if (-f $full_path) {
-                push @existing_files, {
-                    path => $file_info->{path},
-                    full_path => $full_path,
-                    description => $file_info->{description}
-                };
-                $result->{output} .= "Found protected file: $file_info->{path}\n";
-            }
-        }
-        
-        if (@existing_files == 0) {
-            $result->{success} = 1;
-            $result->{message} = 'No protected files found to backup';
-            $result->{output} .= "No protected files found to backup.\n";
-            return $result;
-        }
-        
-        # Create tar archive
-        my $tar = Archive::Tar->new();
-        
-        for my $file (@existing_files) {
-            $tar->add_files($file->{full_path});
-            push @{$result->{files_backed_up}}, $file->{path};
-            $result->{output} .= "Added to backup: $file->{path}\n";
-        }
-        
-        # Write the archive
-        $tar->write($result->{backup_path}, COMPRESS_GZIP);
-        
-        # Create metadata file
-        my $meta_data = {
-            description => "Protected files backup before git pull",
-            type => "protected_files",
-            filename => $backup_filename,
-            created_by => $c->session->{username} || 'system',
-            created_at => time(),
-            files => $result->{files_backed_up},
-            branch_operation => 1
-        };
-        
-        my $meta_file = "$result->{backup_path}.meta";
-        open(my $fh, '>', $meta_file) or die "Cannot create metadata file: $!";
-        print $fh encode_json($meta_data);
-        close($fh);
-        
-        $result->{success} = 1;
-        $result->{message} = "Backup created successfully";
-        $result->{output} .= "Backup created: $backup_filename\n";
-        $result->{output} .= "Files backed up: " . scalar(@{$result->{files_backed_up}}) . "\n";
-        
-    } catch {
-        my $error = $_;
-        $result->{message} = "Backup failed: $error";
-        $result->{output} .= "Backup error: $error\n";
-    };
+    # Log the backup operation
+    if ($result->{success}) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'backup_protected_files', 
+            "Successfully created protected files backup: $result->{backup_id}");
+    } else {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'backup_protected_files', 
+            "Failed to create protected files backup: $result->{message}");
+    }
     
     return $result;
 }
@@ -685,24 +650,8 @@ Get list of files that should be protected during git operations
 sub get_protected_files {
     my ($self, $c) = @_;
     
-    return [
-        {
-            path => 'Comserv/comserv.psgi',
-            description => 'PSGI application file (environment-specific)'
-        },
-        {
-            path => 'Comserv/db_config.json',
-            description => 'Database configuration (environment-specific)'
-        },
-        {
-            path => 'Comserv/config/api_credentials.json',
-            description => 'API credentials (environment-specific)'
-        },
-        {
-            path => 'Comserv/root/static/config/theme_mappings.json',
-            description => 'Theme mappings (may have local customizations)'
-        }
-    ];
+    # Use centralized BackupManager for protected files list
+    return $self->backup_manager->protected_files;
 }
 
 =head2 get_available_backups
@@ -870,7 +819,7 @@ sub execute_git_stash_pop {
         chdir($app_dir) or die "Cannot change to directory $app_dir: $!";
         
         # Execute git stash pop
-        my $stash_ref = $stash_index ? "stash@{$stash_index}" : "stash@{0}";
+        my $stash_ref = $stash_index ? "stash\@{$stash_index}" : "stash\@{0}";
         my $pop_output = `git stash pop "$stash_ref" 2>&1`;
         $result->{output} = $pop_output;
         
@@ -910,7 +859,7 @@ sub execute_git_stash_drop {
         chdir($app_dir) or die "Cannot change to directory $app_dir: $!";
         
         # Execute git stash drop
-        my $stash_ref = $stash_index ? "stash@{$stash_index}" : "stash@{0}";
+        my $stash_ref = $stash_index ? "stash\@{$stash_index}" : "stash\@{0}";
         my $drop_output = `git stash drop "$stash_ref" 2>&1`;
         $result->{output} = $drop_output;
         
@@ -1233,6 +1182,321 @@ sub get_recent_commits {
     };
     
     return $commits;
+}
+
+=head2 branch_management
+
+Branch management interface for admins
+
+=cut
+
+sub branch_management :Path('/admin/branch_management') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'branch_management', 
+        "Starting branch management interface");
+    
+    # Check admin access
+    return unless $self->admin_auth->require_admin_access($c, 'branch_management');
+    
+    # Handle POST requests for branch operations
+    if ($c->req->method eq 'POST') {
+        my $action = $c->req->param('action');
+        my $result = {};
+        
+        if ($action eq 'create_branch') {
+            my $branch_name = $c->req->param('branch_name');
+            my $source_branch = $c->req->param('source_branch') || 'main';
+            $result = $self->create_branch($c, $branch_name, $source_branch);
+        } elsif ($action eq 'delete_branch') {
+            my $branch_name = $c->req->param('branch_name');
+            $result = $self->delete_branch($c, $branch_name);
+        } elsif ($action eq 'switch_branch') {
+            my $branch_name = $c->req->param('branch_name');
+            $result = $self->switch_branch($c, $branch_name);
+        }
+        
+        # Store results in stash
+        $c->stash(%$result) if $result;
+    }
+    
+    # Get current branch and available branches
+    my $current_branch = $self->get_current_branch($c);
+    my $available_branches = $self->get_available_branches($c);
+    my $local_branches = $self->get_local_branches($c);
+    
+    # Add information to stash
+    $c->stash(
+        current_branch => $current_branch,
+        available_branches => $available_branches,
+        local_branches => $local_branches
+    );
+    
+    # Use the standard debug message system
+    if ($c->session->{debug_mode}) {
+        push @{$c->stash->{debug_msg}}, "Git controller branch_management view - Template: admin/branch_management.tt";
+    }
+    
+    # Set the template
+    $c->stash(template => 'admin/branch_management.tt');
+}
+
+=head2 get_local_branches
+
+Get list of local Git branches
+
+=cut
+
+sub get_local_branches {
+    my ($self, $c) = @_;
+    
+    try {
+        my $app_dir = '/home/shanta/PycharmProjects/comserv2';
+        chdir($app_dir) or die "Cannot change to directory $app_dir: $!";
+        
+        my $branches_output = `git branch --no-color 2>&1`;
+        my @branches = ();
+        
+        for my $line (split /\n/, $branches_output) {
+            $line =~ s/^\s*\*?\s*//;  # remove asterisk and whitespace
+            $line =~ s/^\s+|\s+$//g;  # trim whitespace
+            $line =~ s/\x1b\[[0-9;]*m//g;  # remove ANSI color codes
+            
+            # Skip empty lines and detached HEAD states
+            next if !$line || $line =~ /^\(.*\)$/;
+            
+            push @branches, $line;
+        }
+        
+        return \@branches;
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_local_branches', 
+            "Error getting local branches: $_");
+        return [];
+    };
+}
+
+=head2 create_branch
+
+Create a new Git branch
+
+=cut
+
+sub create_branch {
+    my ($self, $c, $branch_name, $source_branch) = @_;
+    
+    my $result = {
+        success => 0,
+        output => '',
+        action => 'create_branch'
+    };
+    
+    # Validate branch name
+    if (!$branch_name || $branch_name !~ /^[a-zA-Z0-9_\-\/]+$/) {
+        $result->{error_msg} = "Invalid branch name. Use only letters, numbers, underscores, hyphens, and forward slashes.";
+        return $result;
+    }
+    
+    $source_branch ||= 'main';
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_branch', 
+        "Creating branch '$branch_name' from '$source_branch'");
+    
+    try {
+        my $app_dir = '/home/shanta/PycharmProjects/comserv2';
+        chdir($app_dir) or die "Cannot change to directory $app_dir: $!";
+        
+        # First, fetch latest changes
+        $result->{output} .= "Fetching latest changes...\n";
+        my $fetch_output = `git fetch origin 2>&1`;
+        $result->{output} .= $fetch_output;
+        
+        # Check if branch already exists locally
+        my $local_check = `git branch --list "$branch_name" 2>&1`;
+        if ($local_check) {
+            $result->{error_msg} = "Branch '$branch_name' already exists locally.";
+            return $result;
+        }
+        
+        # Check if branch exists on remote
+        my $remote_check = `git branch -r --list "origin/$branch_name" 2>&1`;
+        if ($remote_check) {
+            $result->{error_msg} = "Branch '$branch_name' already exists on remote.";
+            return $result;
+        }
+        
+        # Create and switch to new branch
+        $result->{output} .= "Creating branch '$branch_name' from '$source_branch'...\n";
+        my $create_output = `git checkout -b "$branch_name" "origin/$source_branch" 2>&1`;
+        $result->{output} .= $create_output;
+        
+        if ($? != 0) {
+            die "Failed to create branch '$branch_name'";
+        }
+        
+        # Push the new branch to remote
+        $result->{output} .= "Pushing new branch to remote...\n";
+        my $push_output = `git push -u origin "$branch_name" 2>&1`;
+        $result->{output} .= $push_output;
+        
+        if ($? != 0) {
+            die "Failed to push branch '$branch_name' to remote";
+        }
+        
+        $result->{success} = 1;
+        $result->{success_msg} = "Branch '$branch_name' created successfully and pushed to remote.";
+        
+    } catch {
+        my $error = $_;
+        $result->{error_msg} = "Failed to create branch '$branch_name': $error";
+        $result->{output} .= "\nError: $error";
+    };
+    
+    return $result;
+}
+
+=head2 delete_branch
+
+Delete a Git branch (both local and remote)
+
+=cut
+
+sub delete_branch {
+    my ($self, $c, $branch_name) = @_;
+    
+    my $result = {
+        success => 0,
+        output => '',
+        action => 'delete_branch'
+    };
+    
+    # Validate branch name and prevent deletion of important branches
+    if (!$branch_name) {
+        $result->{error_msg} = "Branch name is required.";
+        return $result;
+    }
+    
+    if ($branch_name eq 'main' || $branch_name eq 'master' || $branch_name eq 'Production') {
+        $result->{error_msg} = "Cannot delete protected branch '$branch_name'.";
+        return $result;
+    }
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete_branch', 
+        "Deleting branch '$branch_name'");
+    
+    try {
+        my $app_dir = '/home/shanta/PycharmProjects/comserv2';
+        chdir($app_dir) or die "Cannot change to directory $app_dir: $!";
+        
+        # Get current branch to ensure we're not deleting the current branch
+        my $current_branch = `git branch --show-current 2>&1`;
+        chomp($current_branch);
+        
+        if ($current_branch eq $branch_name) {
+            # Switch to main before deleting
+            $result->{output} .= "Switching to main branch before deletion...\n";
+            my $checkout_output = `git checkout main 2>&1`;
+            $result->{output} .= $checkout_output;
+            
+            if ($? != 0) {
+                die "Failed to switch to main branch";
+            }
+        }
+        
+        # Delete local branch
+        $result->{output} .= "Deleting local branch '$branch_name'...\n";
+        my $delete_local = `git branch -D "$branch_name" 2>&1`;
+        $result->{output} .= $delete_local;
+        
+        # Delete remote branch (don't fail if it doesn't exist)
+        $result->{output} .= "Deleting remote branch '$branch_name'...\n";
+        my $delete_remote = `git push origin --delete "$branch_name" 2>&1`;
+        $result->{output} .= $delete_remote;
+        
+        $result->{success} = 1;
+        $result->{success_msg} = "Branch '$branch_name' deleted successfully.";
+        
+    } catch {
+        my $error = $_;
+        $result->{error_msg} = "Failed to delete branch '$branch_name': $error";
+        $result->{output} .= "\nError: $error";
+    };
+    
+    return $result;
+}
+
+=head2 switch_branch
+
+Switch to a different Git branch
+
+=cut
+
+sub switch_branch {
+    my ($self, $c, $branch_name) = @_;
+    
+    my $result = {
+        success => 0,
+        output => '',
+        action => 'switch_branch'
+    };
+    
+    if (!$branch_name) {
+        $result->{error_msg} = "Branch name is required.";
+        return $result;
+    }
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'switch_branch', 
+        "Switching to branch '$branch_name'");
+    
+    try {
+        my $app_dir = '/home/shanta/PycharmProjects/comserv2';
+        chdir($app_dir) or die "Cannot change to directory $app_dir: $!";
+        
+        # Fetch latest changes
+        $result->{output} .= "Fetching latest changes...\n";
+        my $fetch_output = `git fetch origin 2>&1`;
+        $result->{output} .= $fetch_output;
+        
+        # Check if we have uncommitted changes
+        my $status_output = `git status --porcelain 2>&1`;
+        if ($status_output) {
+            $result->{output} .= "Warning: You have uncommitted changes:\n$status_output\n";
+            $result->{output} .= "Stashing changes before branch switch...\n";
+            my $stash_output = `git stash push -m "Auto-stash before branch switch to $branch_name" 2>&1`;
+            $result->{output} .= $stash_output;
+        }
+        
+        # Switch to the branch
+        $result->{output} .= "Switching to branch '$branch_name'...\n";
+        my $checkout_output = `git checkout "$branch_name" 2>&1`;
+        $result->{output} .= $checkout_output;
+        
+        if ($? != 0) {
+            # Try to create local branch from remote if it doesn't exist locally
+            $result->{output} .= "Local branch not found, creating from remote...\n";
+            my $create_output = `git checkout -b "$branch_name" "origin/$branch_name" 2>&1`;
+            $result->{output} .= $create_output;
+            
+            if ($? != 0) {
+                die "Failed to switch to or create branch '$branch_name'";
+            }
+        }
+        
+        # Pull latest changes for the branch
+        $result->{output} .= "Pulling latest changes for branch '$branch_name'...\n";
+        my $pull_output = `git pull origin "$branch_name" 2>&1`;
+        $result->{output} .= $pull_output;
+        
+        $result->{success} = 1;
+        $result->{success_msg} = "Successfully switched to branch '$branch_name'.";
+        
+    } catch {
+        my $error = $_;
+        $result->{error_msg} = "Failed to switch to branch '$branch_name': $error";
+        $result->{output} .= "\nError: $error";
+    };
+    
+    return $result;
 }
 
 __PACKAGE__->meta->make_immutable;

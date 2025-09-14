@@ -1,6 +1,6 @@
 [% META title = 'Git Pull Confirmation' %]
 <!-- File: /home/shanta/PycharmProjects/comserv/Comserv/root/admin/git_pull.tt -->
-[% PageVersion = 'admin/git_pull.tt,v 0.03 2025/04/10 shanta Exp shanta ' %]
+[% PageVersion = 'admin/git_pull.tt,v 0.04 2025/01/27 shanta Exp shanta ' %]
 
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
@@ -10,6 +10,9 @@
 <div class="quick-nav">
     <a href="[% c.uri_for('/admin') %]" class="btn btn-sm btn-secondary">
         <i class="fas fa-arrow-left"></i> Back to Admin Dashboard
+    </a>
+    <a href="[% c.uri_for('/admin/branch_management') %]" class="btn btn-sm btn-info">
+        <i class="fas fa-code-branch"></i> Branch Management
     </a>
 </div>
 
@@ -109,7 +112,8 @@
                      [% END %]
                  </select>
                  <small class="form-text text-muted">
-                     Select the branch you want to pull from. The current branch is pre-selected.
+                     Select the branch you want to pull from. The current branch is pre-selected.<br>
+                     <strong>Note:</strong> Master branches are excluded from the list as requested. Use <a href="[% c.uri_for('/admin/branch_management') %]">Branch Management</a> for advanced operations.
                  </small>
      </div>
      [% ELSE %]

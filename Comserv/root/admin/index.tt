@@ -176,6 +176,14 @@
                         <i class="fas fa-network-wired"></i>
                         <span>Network Diagnostics</span>
                     </a>
+                    <a href="[% c.uri_for('/admin/emergency-restore') %]" class="admin-link emergency-restore">
+                        <i class="fas fa-life-ring"></i>
+                        <span>Emergency Restore</span>
+                    </a>
+                    <a href="[% c.uri_for('/admin/backup') %]" class="admin-link backup-management">
+                        <i class="fas fa-archive"></i>
+                        <span>Backup Management</span>
+                    </a>
                 </div>
             </div>
         </div>

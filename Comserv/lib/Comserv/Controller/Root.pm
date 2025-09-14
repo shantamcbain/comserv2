@@ -182,6 +182,24 @@ __PACKAGE__->config(namespace => '');
 sub auto :Private {
     my ($self, $c) = @_;
     
+    # Temporarily add back the uri_no_port function to prevent template errors
+    # This will be removed once all templates are updated
+    $c->stash->{uri_no_port} = sub {
+        my $path = shift;
+        my $uri = $c->uri_for($path, @_);
+        return $uri;
+    };
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Starting auto action with temporary uri_no_port helper");
+
+    # Track application start
+    $c->stash->{forwarder} = $c->req->path; # Store current path as potential redirect target
+    $self->track_application_start($c);
+
+    # Log the request path
+    my $path = $c->req->path;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Request path: '$path'");
+    
     # Set up site name
     $self->fetch_and_set($c, 'SiteName');
     
@@ -237,7 +255,7 @@ sub auto :Private {
     
     if ($nav_controller) {
         # Ensure navigation tables exist and populate navigation data
-        $nav_controller->populate_navigation($c);
+        $nav_controller->populate_navigation_data($c);
         
         # Get main menu items
         $c->stash->{main_pages} = $nav_controller->get_pages($c, 'Main', $site_name);
@@ -301,6 +319,116 @@ sub auto :Private {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
             "Navigation controller not found - menus will be empty");
     }
+
+    # Generate theme CSS files if they don't exist
+    # We only need to do this once per application start
+    if (!$self->_theme_css_generated) {
+        # Backward-compatible bulk generator (optional: only if the method exists)
+        if (ref $c->model('ThemeConfig') && $c->model('ThemeConfig')->can('generate_all_theme_css')) {
+            $c->model('ThemeConfig')->generate_all_theme_css($c);
+        } else {
+            # Fallback: perform per-theme CSS generation using available definitions
+            my $themes = $c->model('ThemeConfig')->get_all_themes($c);
+            foreach my $theme_name (keys %$themes) {
+                my $theme_id = $themes->{$theme_name}{id} || next;
+                next unless $theme_id;
+                my $css = $c->model('ThemeConfig')->generate_theme_css($c, $theme_id);
+                my $dir = $c->path_to('root', 'static', 'css', 'themes');
+                my $file = "$dir/$theme_name.css";
+                require File::Path;
+                unless (-d $dir) { File::Path::make_path($dir); }
+                use File::Slurp;
+                write_file($file, $css);
+            }
+        }
+        $self->_theme_css_generated(1);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Generated all theme CSS files");
+    }
+
+    # Get server information
+    my $system_info = Comserv::Util::SystemInfo::get_system_info();
+    $c->stash->{server_hostname} = $system_info->{hostname};
+    $c->stash->{server_ip} = $system_info->{ip};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', 
+        "Server info - Hostname: $system_info->{hostname}, IP: $system_info->{ip}");
+
+    # Perform general setup tasks
+    $self->setup_debug_mode($c);
+    
+    # Test database connections if in debug mode
+    if ($c->session->{debug_mode}) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Testing database connections in debug mode");
+        
+        # Add database connection status to debug messages
+        my $debug_msg = $c->stash->{debug_msg} ||= [];
+        push @$debug_msg, "Database connection check initiated. See logs for details.";
+        
+        # Test connections using the test_connection methods we added
+        eval {
+            if ($c->model('DBEncy')->test_connection($c)) {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "DBEncy connection successful");
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto', "DBEncy connection error: $@");
+        }
+        
+        eval {
+            if ($c->model('DBForager')->test_connection($c)) {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "DBForager connection successful");
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto', "DBForager connection error: $@");
+        }
+    }
+    
+    $self->setup_site($c);
+    $self->set_theme($c);
+    
+    # Try to populate navigation data if the controller is available
+    # This is done in a way that doesn't require explicit loading of the Navigation controller
+    eval {
+        # Check if the Navigation controller exists by trying to load it
+        require Comserv::Controller::Navigation;
+        
+        # If we get here, the controller exists, so try to use it
+        my $navigation = $c->controller('Navigation');
+        if ($navigation) {
+            $navigation->populate_navigation_data($c);
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Navigation data populated");
+        }
+    };
+    # Don't log errors here - if the controller isn't available, that's fine
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Completed general setup tasks");
+
+    # Call the index action only for the root path
+    if ($path eq '/' || $path eq '') {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Calling index action for root path");
+
+        # Check if we have a ControllerName in the session that might cause issues
+        my $ControllerName = $c->session->{ControllerName} || '';
+        if ($ControllerName && $ControllerName ne 'Root') {
+            # Verify the controller exists before proceeding
+            my $controller_exists = 0;
+            eval {
+                my $controller = $c->controller($ControllerName);
+                $controller_exists = 1 if $controller;
+            };
+
+            if (!$controller_exists) {
+                $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'auto',
+                    "Controller '$ControllerName' not found or not loaded. Setting ControllerName to 'Root'.");
+                $c->session->{ControllerName} = 'Root';
+                $c->stash->{ControllerName} = 'Root';
+            }
+        }
+
+        $self->index($c);
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Completed auto action");
     
     return 1; # Continue processing
 }
@@ -585,141 +713,6 @@ sub track_application_start {
     } else {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'track_application_start', "JSON file $json_file does not exist");
     }
-}
-
-sub auto :Private {
-    my ($self, $c) = @_;
-    
-    # Temporarily add back the uri_no_port function to prevent template errors
-    # This will be removed once all templates are updated
-    $c->stash->{uri_no_port} = sub {
-        my $path = shift;
-        my $uri = $c->uri_for($path, @_);
-        return $uri;
-    };
-    
-    # Note: user_exists and check_user_roles methods are available via controller('Root')
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Starting auto action with temporary uri_no_port helper");
-
-    # Track application start
-    $c->stash->{forwarder} = $c->req->path; # Store current path as potential redirect target
-    $self->track_application_start($c);
-
-    # Log the request path
-    my $path = $c->req->path;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Request path: '$path'");
-
-    # Generate theme CSS files if they don't exist
-    # We only need to do this once per application start
-    if (!$self->_theme_css_generated) {
-        # Backward-compatible bulk generator (optional: only if the method exists)
-        if (ref $c->model('ThemeConfig') && $c->model('ThemeConfig')->can('generate_all_theme_css')) {
-            $c->model('ThemeConfig')->generate_all_theme_css($c);
-        } else {
-            # Fallback: perform per-theme CSS generation using available definitions
-            my $themes = $c->model('ThemeConfig')->get_all_themes($c);
-            foreach my $theme_name (keys %$themes) {
-                my $theme_id = $themes->{$theme_name}{id} || next;
-                next unless $theme_id;
-                my $css = $c->model('ThemeConfig')->generate_theme_css($c, $theme_id);
-                my $dir = $c->path_to('root', 'static', 'css', 'themes');
-                my $file = "$dir/$theme_name.css";
-                require File::Path;
-                unless (-d $dir) { File::Path::make_path($dir); }
-                use File::Slurp;
-                write_file($file, $css);
-            }
-        }
-        $self->_theme_css_generated(1);
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Generated all theme CSS files");
-    }
-
-    # Get server information
-    my $system_info = Comserv::Util::SystemInfo::get_system_info();
-    $c->stash->{server_hostname} = $system_info->{hostname};
-    $c->stash->{server_ip} = $system_info->{ip};
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', 
-        "Server info - Hostname: $system_info->{hostname}, IP: $system_info->{ip}");
-
-    # Perform general setup tasks
-    $self->setup_debug_mode($c);
-    
-    # Test database connections if in debug mode
-    if ($c->session->{debug_mode}) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Testing database connections in debug mode");
-        
-        # Add database connection status to debug messages
-        my $debug_msg = $c->stash->{debug_msg} ||= [];
-        push @$debug_msg, "Database connection check initiated. See logs for details.";
-        
-        # Test connections using the test_connection methods we added
-        eval {
-            if ($c->model('DBEncy')->test_connection($c)) {
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "DBEncy connection successful");
-            }
-        };
-        if ($@) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto', "DBEncy connection error: $@");
-        }
-        
-        eval {
-            if ($c->model('DBForager')->test_connection($c)) {
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "DBForager connection successful");
-            }
-        };
-        if ($@) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto', "DBForager connection error: $@");
-        }
-    }
-    
-    $self->setup_site($c);
-    $self->set_theme($c);
-    
-    # Try to populate navigation data if the controller is available
-    # This is done in a way that doesn't require explicit loading of the Navigation controller
-    eval {
-        # Check if the Navigation controller exists by trying to load it
-        require Comserv::Controller::Navigation;
-        
-        # If we get here, the controller exists, so try to use it
-        my $navigation = $c->controller('Navigation');
-        if ($navigation) {
-            $navigation->populate_navigation_data($c);
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Navigation data populated");
-        }
-    };
-    # Don't log errors here - if the controller isn't available, that's fine
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Completed general setup tasks");
-
-    # Call the index action only for the root path
-    if ($path eq '/' || $path eq '') {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Calling index action for root path");
-
-        # Check if we have a ControllerName in the session that might cause issues
-        my $ControllerName = $c->session->{ControllerName} || '';
-        if ($ControllerName && $ControllerName ne 'Root') {
-            # Verify the controller exists before proceeding
-            my $controller_exists = 0;
-            eval {
-                my $controller = $c->controller($ControllerName);
-                $controller_exists = 1 if $controller;
-            };
-
-            if (!$controller_exists) {
-                $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'auto',
-                    "Controller '$ControllerName' not found or not loaded. Setting ControllerName to 'Root'.");
-                $c->session->{ControllerName} = 'Root';
-                $c->stash->{ControllerName} = 'Root';
-            }
-        }
-
-        $self->index($c);
-    }
-
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Completed auto action");
-    return 1; # Allow the request to proceed
 }
 
 sub setup_debug_mode {

@@ -1,0 +1,170 @@
+[% META title = 'Database Configuration Guide' %]
+[% PageVersion = 'Documentation/system/database_configuration.tt,v 1.0 2025/01/27 shanta Exp' %]
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+
+<h1>Database Configuration Guide</h1>
+
+<h2>Overview</h2>
+<p>This document explains the new standardized database configuration system for the Comserv application. The system supports multiple connection types with automatic failover and priority-based connection attempts.</p>
+
+<h2>Configuration Template</h2>
+<p>The database configuration uses a template-based approach with the file <code>db_config.json.template</code> that should be copied to <code>db_config.json</code> and customized for your environment.</p>
+
+<h3>Template Location</h3>
+<pre>Comserv/db_config.json.template</pre>
+
+<h3>Active Configuration Location</h3>
+<pre>Comserv/db_config.json</pre>
+
+<h2>Connection Types and Naming Convention</h2>
+
+<h3>Production Connections (Priority 1-2)</h3>
+<ul>
+<li><strong>production_server</strong> - Primary production ENCY database</li>
+<li><strong>production_forager</strong> - Primary production Forager database</li>
+</ul>
+
+<h3>ZeroTier Network Connections (Priority 3-4)</h3>
+<ul>
+<li><strong>zerotier_ency</strong> - ENCY database via ZeroTier network</li>
+<li><strong>zerotier_forager</strong> - Forager database via ZeroTier network</li>
+</ul>
+
+<h3>Local/Private Connections (Priority 5-6)</h3>
+<ul>
+<li><strong>local_ency</strong> - Local ENCY database for private/offline operation</li>
+<li><strong>local_forager</strong> - Local Forager database for private/offline operation</li>
+</ul>
+
+<h3>Backup Connections (Priority 7-8)</h3>
+<ul>
+<li><strong>backup_ency</strong> - Backup server ENCY database</li>
+<li><strong>backup_forager</strong> - Backup server Forager database</li>
+</ul>
+
+<h3>SQLite Offline Mode (Priority 9-10)</h3>
+<ul>
+<li><strong>sqlite_ency</strong> - SQLite offline ENCY database</li>
+<li><strong>sqlite_forager</strong> - SQLite offline Forager database</li>
+</ul>
+
+<h2>Configuration Fields</h2>
+
+<h3>MySQL Connections</h3>
+<ul>
+<li><code>db_type</code>: "mysql"</li>
+<li><code>host</code>: Database server hostname or IP address</li>
+<li><code>port</code>: Database server port (typically 3306)</li>
+<li><code>username</code>: Database username</li>
+<li><code>password</code>: Database password</li>
+<li><code>database</code>: Database name ("ency" or "shanta_forager")</li>
+<li><code>description</code>: Human-readable description</li>
+<li><code>priority</code>: Connection priority (1=highest)</li>
+<li><code>localhost_override</code>: Boolean for localhost preference</li>
+</ul>
+
+<h3>SQLite Connections</h3>
+<ul>
+<li><code>db_type</code>: "sqlite"</li>
+<li><code>database_path</code>: Path to SQLite database file</li>
+<li><code>description</code>: Human-readable description</li>
+<li><code>priority</code>: Connection priority (1=highest)</li>
+<li><code>localhost_override</code>: Boolean (typically false for SQLite)</li>
+</ul>
+
+<h2>Setup Instructions</h2>
+
+<h3>1. Copy Template</h3>
+<pre>cp Comserv/db_config.json.template Comserv/db_config.json</pre>
+
+<h3>2. Update Placeholders</h3>
+<p>Replace the following placeholders with your actual values:</p>
+<ul>
+<li><code>YOUR_PRODUCTION_HOST</code> - Your production database server</li>
+<li><code>YOUR_ZEROTIER_HOST</code> - Your ZeroTier network database server</li>
+<li><code>YOUR_BACKUP_HOST</code> - Your backup database server</li>
+<li><code>YOUR_USERNAME</code> - Your database username</li>
+<li><code>YOUR_PASSWORD</code> - Your database password</li>
+<li><code>YOUR_LOCAL_USERNAME</code> - Local database username</li>
+<li><code>YOUR_LOCAL_PASSWORD</code> - Local database password</li>
+<li><code>YOUR_BACKUP_USERNAME</code> - Backup database username</li>
+<li><code>YOUR_BACKUP_PASSWORD</code> - Backup database password</li>
+</ul>
+
+<h3>3. Create SQLite Directories</h3>
+<pre>mkdir -p Comserv/data</pre>
+
+<h2>Connection Priority System</h2>
+<p>The system attempts connections in priority order (1=highest priority). This allows for automatic failover:</p>
+
+<ol>
+<li><strong>Production servers</strong> - Primary live operation</li>
+<li><strong>ZeroTier network</strong> - Remote network access</li>
+<li><strong>Local/private</strong> - When public servers unavailable</li>
+<li><strong>Backup servers</strong> - Redundancy and failover</li>
+<li><strong>SQLite offline</strong> - No network connectivity required</li>
+</ol>
+
+<h2>DSN Format</h2>
+<p>The system automatically generates proper DSN strings:</p>
+
+<h3>MySQL DSN Format</h3>
+<pre>dbi:mysql:database=DATABASE_NAME;host=HOST;port=PORT</pre>
+
+<h3>SQLite DSN Format</h3>
+<pre>dbi:SQLite:dbname=PATH_TO_DATABASE_FILE</pre>
+
+<h2>Testing Configuration</h2>
+
+<h3>Test MySQL Connection</h3>
+<pre>perl -MDBI -e 'DBI-&gt;connect("dbi:mysql:database=ency;host=YOUR_HOST;port=3306", "username", "password") or die $DBI::errstr'</pre>
+
+<h3>Test SQLite Connection</h3>
+<pre>perl -MDBI -e 'DBI-&gt;connect("dbi:SQLite:dbname=data/ency_offline.db", "", "") or die $DBI::errstr'</pre>
+
+<h2>Troubleshooting</h2>
+
+<h3>Connection Failures</h3>
+<ul>
+<li>Check network connectivity to database servers</li>
+<li>Verify credentials and permissions</li>
+<li>Ensure database services are running</li>
+<li>Check firewall settings</li>
+</ul>
+
+<h3>SQLite Issues</h3>
+<ul>
+<li>Ensure data directory exists and is writable</li>
+<li>Check file permissions on SQLite database files</li>
+<li>Verify SQLite module is installed</li>
+</ul>
+
+<h3>Priority Issues</h3>
+<ul>
+<li>Lower priority numbers = higher priority</li>
+<li>Duplicate priorities may cause unpredictable behavior</li>
+<li>Test connection order with debug mode enabled</li>
+</ul>
+
+<h2>Security Considerations</h2>
+<ul>
+<li>Store <code>db_config.json</code> outside web root</li>
+<li>Set restrictive file permissions (600 or 640)</li>
+<li>Use strong passwords for database accounts</li>
+<li>Consider encrypted connections for production</li>
+<li>Regularly rotate database passwords</li>
+</ul>
+
+<h2>Related Files</h2>
+<ul>
+<li><code>Comserv/lib/Comserv/Model/DBEncy.pm</code> - ENCY database model</li>
+<li><code>Comserv/lib/Comserv/Model/DBForager.pm</code> - Forager database model</li>
+<li><code>Comserv/lib/Comserv/Model/HybridDB.pm</code> - Database selection logic</li>
+</ul>
+
+[% END %]

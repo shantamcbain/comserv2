@@ -542,8 +542,9 @@ sub restart_starman :Path('/admin/restart_starman') :Args(0) {
         }
     }
     
-    # Get current service status (this may fail without sudo, but that's ok for display)
-    my $service_status = $self->get_starman_status($c);
+    # Get current service status using the StarmanServiceManager utility
+    my $service_manager = $self->get_starman_service_manager($c);
+    my $service_status = $service_manager->get_service_status($c->path_to());
     
     # Use the standard debug message system
     if ($c->session->{debug_mode}) {
@@ -669,73 +670,41 @@ sub starman_diagnostics :Path('/admin/starman_diagnostics') :Args(0) {
     my ($self, $c) = @_;
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'starman_diagnostics', 
-        "Starting web-safe Starman diagnostics action");
+        "Starting Starman diagnostics action");
     
     # Use centralized admin authentication
     return unless $self->admin_auth->require_admin_access($c, 'starman_diagnostics');
     
-    # Initialize diagnostic and service management utilities
-    my $diagnostics = $self->get_starman_diagnostics_util($c);
-    my $service_manager = $self->get_starman_service_manager($c);
-    
-    # Handle POST requests for diagnostic and repair actions
+    # Handle POST requests for diagnostic actions
     if ($c->req->method eq 'POST') {
         my $action = $c->req->param('action') || '';
-        my $app_root = $c->path_to();
         
-        if ($action eq 'diagnose') {
+        if ($action eq 'run_diagnostics') {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'starman_diagnostics', 
-                "Executing web-safe Starman diagnostics");
+                "Running Starman diagnostics");
             
-            my $diagnostic_results = $diagnostics->execute_diagnostics($app_root);
-            $c->stash(diagnostic_results => $diagnostic_results);
-            
-        } elsif ($action eq 'auto_repair') {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'starman_diagnostics', 
-                "Executing web-safe automatic repair");
-            
-            my $repair_results = $service_manager->execute_auto_repair($app_root);
-            $c->stash(repair_results => $repair_results);
-            
-        } elsif ($action eq 'prepare_service') {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'starman_diagnostics', 
-                "Preparing Starman service file");
-            
-            my $service_results = $service_manager->prepare_service_file($app_root);
-            $c->stash(service_results => $service_results);
-            
-        } elsif ($action eq 'create_psgi') {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'starman_diagnostics', 
-                "Creating PSGI file");
-            
-            my $psgi_results = $service_manager->create_psgi_file($app_root);
-            $c->stash(psgi_results => $psgi_results);
+            my $output = $self->run_starman_diagnostics($c);
+            $c->stash(output => $output);
+            $c->stash(success_msg => "Diagnostics completed successfully");
         }
     }
     
-    # Get current service status
-    my $current_status = $service_manager->get_service_status($c->path_to());
-    
-    # Add test information to verify modules are working
-    $current_status->{module_test_results} = {
-        diagnostics_module => 'Loaded successfully',
-        service_manager_module => 'Loaded successfully',
-        timestamp => strftime("%Y-%m-%d %H:%M:%S", localtime)
-    };
+    # Get current service status using the StarmanServiceManager utility
+    my $service_manager = $self->get_starman_service_manager($c);
+    my $service_status = $service_manager->get_service_status($c->path_to());
     
     # Use the standard debug message system
     if ($c->session->{debug_mode}) {
         push @{$c->stash->{debug_msg}}, "Admin controller starman_diagnostics view - Template: admin/starman_diagnostics.tt";
-        push @{$c->stash->{debug_msg}}, "New diagnostic modules loaded and working correctly";
     }
     
     $c->stash(
         template => 'admin/starman_diagnostics.tt',
-        current_status => $current_status
+        service_status => $service_status
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'starman_diagnostics', 
-        "Completed web-safe Starman diagnostics action");
+        "Completed Starman diagnostics action");
 }
 
 # Get Starman diagnostics utility instance
@@ -756,6 +725,340 @@ sub get_starman_service_manager {
     return Comserv::Util::StarmanServiceManager->new(
         logger => $self->logging
     );
+}
+
+
+
+# Run basic Starman diagnostics
+sub run_starman_diagnostics {
+    my ($self, $c) = @_;
+    
+    my $output = "=== Starman Service Diagnostics ===\n\n";
+    
+    # Check service status
+    $output .= "1. Service Status Check:\n";
+    my $status_cmd = `systemctl status starman 2>&1`;
+    $output .= $status_cmd . "\n";
+    
+    # Check if PSGI file exists
+    $output .= "2. PSGI File Check:\n";
+    my $app_dir = '/home/shanta/PycharmProjects/comserv2';
+    my $psgi_file = "$app_dir/Comserv/comserv.psgi";
+    if (-f $psgi_file) {
+        $output .= "✓ PSGI file exists: $psgi_file\n";
+        my $psgi_perms = sprintf("%04o", (stat($psgi_file))[2] & 07777);
+        $output .= "  Permissions: $psgi_perms\n";
+    } else {
+        $output .= "✗ PSGI file missing: $psgi_file\n";
+    }
+    
+    # Check process information
+    $output .= "\n3. Process Information:\n";
+    my $ps_output = `ps aux | grep starman | grep -v grep 2>/dev/null`;
+    if ($ps_output) {
+        $output .= $ps_output;
+    } else {
+        $output .= "No Starman processes found\n";
+    }
+    
+    # Check port usage
+    $output .= "\n4. Port Usage Check:\n";
+    my $port_check = `netstat -tlnp 2>/dev/null | grep :5000 || echo "Port 5000 not in use"`;
+    $output .= $port_check;
+    
+    # Check recent logs
+    $output .= "\n5. Recent Service Logs:\n";
+    my $log_output = `journalctl -u starman --no-pager -n 10 2>/dev/null || echo "Could not access service logs"`;
+    $output .= $log_output;
+    
+    $output .= "\n=== Diagnostics Complete ===\n";
+    
+    return $output;
+}
+
+# Emergency backup directory browser and restore functionality
+sub emergency_restore :Chained('base') :PathPart('emergency-restore') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'emergency_restore', 
+        "Starting emergency restore interface");
+    
+    if ($c->req->method eq 'POST') {
+        my $action = $c->req->param('action');
+        
+        if ($action eq 'restore_psgi') {
+            my $result = $self->restore_psgi_file($c);
+            $c->stash(%$result);
+        } elsif ($action eq 'restore_file') {
+            my $backup_path = $c->req->param('backup_path');
+            my $target_file = $c->req->param('target_file');
+            my $result = $self->restore_file_from_backup($c, $backup_path, $target_file);
+            $c->stash(%$result);
+        }
+    }
+    
+    # Get backup directory contents
+    my $backup_contents = $self->get_backup_directory_contents($c);
+    $c->stash(backup_contents => $backup_contents);
+    
+    # Check if comserv.psgi exists
+    my $app_dir = '/home/shanta/PycharmProjects/comserv2';
+    my $psgi_exists = -f "$app_dir/Comserv/comserv.psgi";
+    $c->stash(psgi_exists => $psgi_exists);
+    
+    if ($c->session->{debug_mode}) {
+        push @{$c->stash->{debug_msg}}, "Admin controller emergency_restore view - Using simple output";
+    }
+    
+    # Get Starman status using existing functionality
+    my $software_status = $self->get_software_management_status($c);
+    
+    $c->stash(
+        template => 'admin/emergency_restore.tt',
+        backup_contents => $backup_contents,
+        software_status => $software_status
+    );
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'emergency_restore', 
+        "Completed emergency restore interface");
+}
+
+# Get contents of backup directories (both /Comserv/backup and /Comserv/backups)
+sub get_backup_directory_contents {
+    my ($self, $c) = @_;
+    
+    my $contents = {
+        backup_singular => [],  # /Comserv/backup/
+        backup_plural => [],    # /Comserv/backups/
+        error => ''
+    };
+    
+    my $app_dir = '/home/shanta/PycharmProjects/comserv2';
+    
+    # Check /Comserv/backup/ directory (mentioned by user)
+    my $backup_dir_singular = "$app_dir/Comserv/backup";
+    if (-d $backup_dir_singular) {
+        $contents->{backup_singular} = $self->scan_backup_directory($c, $backup_dir_singular, 'backup');
+    }
+    
+    # Check /Comserv/backups/ directory (used by existing Git controller)
+    my $backup_dir_plural = "$app_dir/Comserv/backups";
+    if (-d $backup_dir_plural) {
+        $contents->{backup_plural} = $self->scan_backup_directory($c, $backup_dir_plural, 'backups');
+    }
+    
+    if (!@{$contents->{backup_singular}} && !@{$contents->{backup_plural}}) {
+        $contents->{error} = "No backup directories found. Checked: $backup_dir_singular and $backup_dir_plural";
+    }
+    
+    return $contents;
+}
+
+# Scan a backup directory for files
+sub scan_backup_directory {
+    my ($self, $c, $backup_dir, $dir_type) = @_;
+    
+    my @files = ();
+    
+    eval {
+        opendir(my $dh, $backup_dir) or die "Cannot open directory: $!";
+        my @entries = readdir($dh);
+        closedir($dh);
+        
+        for my $entry (@entries) {
+            next if $entry =~ /^\.\.?$/;  # Skip . and ..
+            
+            my $full_path = "$backup_dir/$entry";
+            my $stat = stat($full_path);
+            
+            push @files, {
+                name => $entry,
+                full_path => $full_path,
+                is_directory => -d $full_path,
+                size => $stat ? $stat->size : 0,
+                modified => $stat ? strftime("%Y-%m-%d %H:%M:%S", localtime($stat->mtime)) : 'Unknown',
+                dir_type => $dir_type
+            };
+        }
+        
+        # Sort by modification time (newest first)
+        @files = sort { 
+            my $a_stat = stat($a->{full_path});
+            my $b_stat = stat($b->{full_path});
+            ($b_stat ? $b_stat->mtime : 0) <=> ($a_stat ? $a_stat->mtime : 0)
+        } @files;
+        
+    } or do {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'scan_backup_directory', 
+            "Error scanning backup directory $backup_dir: $@");
+    };
+    
+    return \@files;
+}
+
+# Emergency restore of comserv.psgi file
+sub restore_psgi_file {
+    my ($self, $c) = @_;
+    
+    my $result = {
+        success => 0,
+        message => '',
+        output => ''
+    };
+    
+    my $app_dir = '/home/shanta/PycharmProjects/comserv2';
+    my $target_file = "$app_dir/Comserv/comserv.psgi";
+    
+    # Look for comserv.psgi in backup directories
+    my @backup_dirs = (
+        "$app_dir/Comserv/backup",
+        "$app_dir/Comserv/backups"
+    );
+    
+    my $source_file = undef;
+    
+    for my $backup_dir (@backup_dirs) {
+        next unless -d $backup_dir;
+        
+        # Look for comserv.psgi directly
+        my $psgi_backup = "$backup_dir/comserv.psgi";
+        if (-f $psgi_backup) {
+            $source_file = $psgi_backup;
+            last;
+        }
+        
+        # Look for comserv.psgi in subdirectories
+        eval {
+            opendir(my $dh, $backup_dir) or die "Cannot open directory: $!";
+            my @entries = readdir($dh);
+            closedir($dh);
+            
+            for my $entry (@entries) {
+                next if $entry =~ /^\.\.?$/;
+                my $subdir = "$backup_dir/$entry";
+                next unless -d $subdir;
+                
+                my $psgi_in_subdir = "$subdir/comserv.psgi";
+                if (-f $psgi_in_subdir) {
+                    $source_file = $psgi_in_subdir;
+                    last;
+                }
+                
+                # Also check Comserv subdirectory
+                my $psgi_in_comserv = "$subdir/Comserv/comserv.psgi";
+                if (-f $psgi_in_comserv) {
+                    $source_file = $psgi_in_comserv;
+                    last;
+                }
+            }
+        };
+        
+        last if $source_file;
+    }
+    
+    if (!$source_file) {
+        $result->{message} = "comserv.psgi not found in any backup directory";
+        $result->{output} = "Searched directories: " . join(", ", @backup_dirs);
+        $result->{error_msg} = $result->{message};
+        return $result;
+    }
+    
+    # Create backup of current file if it exists
+    if (-f $target_file) {
+        my $backup_current = "$target_file.backup." . time();
+        if (copy($target_file, $backup_current)) {
+            $result->{output} .= "Created backup of existing file: $backup_current\n";
+        }
+    }
+    
+    # Copy the backup file to target location
+    eval {
+        copy($source_file, $target_file) or die "Copy failed: $!";
+        chmod(0755, $target_file);  # Make executable
+        
+        $result->{success} = 1;
+        $result->{message} = "comserv.psgi restored successfully";
+        $result->{output} .= "Restored comserv.psgi from: $source_file\n";
+        $result->{output} .= "Target location: $target_file\n";
+        $result->{success_msg} = "comserv.psgi has been restored. Starman should now be able to accept calls.";
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restore_psgi_file', 
+            "Successfully restored comserv.psgi from $source_file to $target_file");
+            
+    } or do {
+        $result->{message} = "Failed to restore comserv.psgi: $@";
+        $result->{output} .= "Restore error: $@\n";
+        $result->{error_msg} = $result->{message};
+        
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'restore_psgi_file', 
+            "Failed to restore comserv.psgi: $@");
+    };
+    
+    return $result;
+}
+
+# Generic file restore from backup
+sub restore_file_from_backup {
+    my ($self, $c, $backup_path, $target_file) = @_;
+    
+    my $result = {
+        success => 0,
+        message => '',
+        output => ''
+    };
+    
+    return $result unless $backup_path && $target_file;
+    
+    unless (-f $backup_path) {
+        $result->{message} = "Backup file not found: $backup_path";
+        $result->{error_msg} = $result->{message};
+        return $result;
+    }
+    
+    my $app_dir = '/home/shanta/PycharmProjects/comserv2';
+    my $full_target_path = "$app_dir/$target_file";
+    
+    # Create backup of current file if it exists
+    if (-f $full_target_path) {
+        my $backup_current = "$full_target_path.backup." . time();
+        if (copy($full_target_path, $backup_current)) {
+            $result->{output} .= "Created backup of existing file: $backup_current\n";
+        }
+    }
+    
+    # Ensure target directory exists
+    my $target_dir = dirname($full_target_path);
+    unless (-d $target_dir) {
+        make_path($target_dir) or do {
+            $result->{message} = "Failed to create target directory: $target_dir";
+            $result->{error_msg} = $result->{message};
+            return $result;
+        };
+    }
+    
+    # Copy the backup file to target location
+    eval {
+        copy($backup_path, $full_target_path) or die "Copy failed: $!";
+        
+        $result->{success} = 1;
+        $result->{message} = "File restored successfully";
+        $result->{output} .= "Restored file from: $backup_path\n";
+        $result->{output} .= "Target location: $full_target_path\n";
+        $result->{success_msg} = "File '$target_file' has been restored from backup.";
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restore_file_from_backup', 
+            "Successfully restored $target_file from $backup_path");
+            
+    } or do {
+        $result->{message} = "Failed to restore file: $@";
+        $result->{output} .= "Restore error: $@\n";
+        $result->{error_msg} = $result->{message};
+        
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'restore_file_from_backup', 
+            "Failed to restore file: $@");
+    };
+    
+    return $result;
 }
 
 =head1 AUTHOR

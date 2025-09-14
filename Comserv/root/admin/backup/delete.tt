@@ -1,0 +1,158 @@
+[% META title = 'Delete Backup' %]
+[% PageVersion = 'admin/backup/delete.tt,v 1.0 2025/01/27 comserv Exp comserv' %]
+
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+<div class="debug-info">
+  <p>Template: admin/backup/delete.tt</p>
+  <p>Last Modified: [% PageVersion %]</p>
+</div>
+[% END %]
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>Delete Backup</h1>
+            <p class="lead">Confirm deletion of backup file: <code>[% backup_filename %]</code></p>
+        </div>
+    </div>
+
+    <!-- Status Messages -->
+    [% IF success_msg %]
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <strong>Success:</strong> [% success_msg %]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    [% END %]
+
+    [% IF error_msg %]
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <strong>Error:</strong> [% error_msg %]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    [% END %]
+
+    <!-- Navigation -->
+    <div class="row mb-3">
+        <div class="col-md-12">
+            <a href="[% c.uri_for('/admin/backup') %]" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Backup Management
+            </a>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation -->
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h3><i class="fas fa-exclamation-triangle"></i> Confirm Deletion</h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <h4><i class="fas fa-exclamation-triangle"></i> Warning</h4>
+                        <p>You are about to permanently delete the following backup file:</p>
+                        <p><strong>Filename:</strong> <code>[% backup_filename %]</code></p>
+                        <p><strong>This action cannot be undone!</strong></p>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <h5><i class="fas fa-info-circle"></i> What will be deleted:</h5>
+                        <ul>
+                            <li>The backup file: <code>[% backup_filename %]</code></li>
+                            <li>Associated metadata file (if exists): <code>[% backup_filename %].meta</code></li>
+                        </ul>
+                    </div>
+
+                    <form method="post" action="[% c.uri_for('/admin/backup_delete', backup_filename) %]">
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="confirm_delete" required>
+                                <label class="form-check-label" for="confirm_delete">
+                                    I understand that this action is permanent and cannot be undone
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="[% c.uri_for('/admin/backup') %]" class="btn btn-secondary me-md-2">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                            <a href="[% c.uri_for('/admin/backup_view', backup_filename) %]" class="btn btn-info me-md-2">
+                                <i class="fas fa-eye"></i> View Details First
+                            </a>
+                            <button type="submit" name="confirm" value="yes" class="btn btn-danger" id="delete_button" disabled>
+                                <i class="fas fa-trash"></i> Delete Backup
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Additional Information -->
+    <div class="row mt-4">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Before You Delete</h4>
+                </div>
+                <div class="card-body">
+                    <h5>Consider these alternatives:</h5>
+                    <ul>
+                        <li><strong>View the backup first:</strong> Use the "View Details" button to see what's in this backup</li>
+                        <li><strong>Archive instead of delete:</strong> Move the backup to a different location if you might need it later</li>
+                        <li><strong>Create a new backup:</strong> If this backup is old, consider creating a fresh one before deleting</li>
+                    </ul>
+                    
+                    <h5>Backup Management Tips:</h5>
+                    <ul>
+                        <li>Keep at least 3-5 recent backups for safety</li>
+                        <li>Delete only very old backups or those you're certain you don't need</li>
+                        <li>Consider the backup type - protected files backups are especially important</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var confirmCheckbox = document.getElementById('confirm_delete');
+    var deleteButton = document.getElementById('delete_button');
+    
+    confirmCheckbox.addEventListener('change', function() {
+        deleteButton.disabled = !this.checked;
+        
+        if (this.checked) {
+            deleteButton.classList.remove('btn-secondary');
+            deleteButton.classList.add('btn-danger');
+        } else {
+            deleteButton.classList.remove('btn-danger');
+            deleteButton.classList.add('btn-secondary');
+        }
+    });
+});
+</script>
+
+<style>
+.debug-info {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+
+.card.border-danger {
+    border-color: #dc3545 !important;
+}
+
+.card.border-danger .card-header {
+    border-bottom-color: #dc3545;
+}
+</style>
