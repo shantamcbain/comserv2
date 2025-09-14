@@ -1,0 +1,184 @@
+[% META title = 'Restore Backup' %]
+[% PageVersion = 'admin/backup/restore.tt,v 1.0 2025/01/27 comserv Exp comserv' %]
+
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+<div class="debug-info">
+  <p>Template: admin/backup/restore.tt</p>
+  <p>Last Modified: [% PageVersion %]</p>
+</div>
+[% END %]
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>Restore from Backup</h1>
+            <p class="lead">Restore files from existing backups.</p>
+        </div>
+    </div>
+
+    <!-- Status Messages -->
+    [% IF success_msg %]
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <strong>Success:</strong> [% success_msg %]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    [% END %]
+
+    [% IF error_msg %]
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <strong>Error:</strong> [% error_msg %]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    [% END %]
+
+    <!-- Navigation -->
+    <div class="row mb-3">
+        <div class="col-md-12">
+            <a href="[% c.uri_for('/admin/backup') %]" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Backup Management
+            </a>
+        </div>
+    </div>
+
+    <!-- Restore Form -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Restore Options</h3>
+                </div>
+                <div class="card-body">
+                    [% IF available_backups.size > 0 %]
+                    <form method="post" action="[% c.uri_for('/admin/backup_restore') %]">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="backup_path" class="form-label">Select Backup</label>
+                                    <select class="form-select" id="backup_path" name="backup_path" required>
+                                        <option value="">Choose a backup...</option>
+                                        [% FOREACH backup IN available_backups %]
+                                        <option value="[% backup.full_path %]">
+                                            [% backup.filename %] 
+                                            ([% backup.modified %]
+                                            [% IF backup.metadata %] - [% backup.metadata.description %][% END %])
+                                        </option>
+                                        [% END %]
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="target_file" class="form-label">Target File to Restore</label>
+                                    <input type="text" class="form-control" id="target_file" name="target_file" 
+                                           placeholder="e.g., Comserv/lib/Comserv.pm" required>
+                                    <div class="form-text">
+                                        Enter the relative path of the file you want to restore from the backup.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <strong>Warning:</strong> Restoring a file will overwrite the current version. 
+                            Make sure you have a recent backup before proceeding.
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="[% c.uri_for('/admin/backup') %]" class="btn btn-secondary me-md-2">Cancel</a>
+                            <button type="submit" class="btn btn-warning">
+                                <i class="fas fa-undo"></i> Restore File
+                            </button>
+                        </div>
+                    </form>
+                    [% ELSE %]
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> 
+                        No backups available for restore. Create a backup first using the 
+                        <a href="[% c.uri_for('/admin/backup_create') %]">Create Backup</a> option.
+                    </div>
+                    [% END %]
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Available Backups Information -->
+    [% IF available_backups.size > 0 %]
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Available Backups</h3>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Filename</th>
+                                    <th>Type</th>
+                                    <th>Description</th>
+                                    <th>Created By</th>
+                                    <th>Created</th>
+                                    <th>Size</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                [% FOREACH backup IN available_backups %]
+                                <tr>
+                                    <td><code>[% backup.filename %]</code></td>
+                                    <td>
+                                        [% IF backup.metadata %]
+                                            <span class="badge bg-info">[% backup.metadata.type %]</span>
+                                        [% ELSE %]
+                                            <span class="badge bg-secondary">unknown</span>
+                                        [% END %]
+                                    </td>
+                                    <td>
+                                        [% IF backup.metadata %]
+                                            [% backup.metadata.description %]
+                                        [% ELSE %]
+                                            No description available
+                                        [% END %]
+                                    </td>
+                                    <td>
+                                        [% IF backup.metadata %]
+                                            [% backup.metadata.created_by %]
+                                        [% ELSE %]
+                                            Unknown
+                                        [% END %]
+                                    </td>
+                                    <td>[% backup.modified %]</td>
+                                    <td>[% backup.size %] bytes</td>
+                                    <td>
+                                        <a href="[% c.uri_for('/admin/backup_view', backup.filename) %]" 
+                                           class="btn btn-sm btn-outline-info">
+                                            <i class="fas fa-eye"></i> View
+                                        </a>
+                                    </td>
+                                </tr>
+                                [% END %]
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    [% END %]
+</div>
+
+<style>
+.debug-info {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+</style>

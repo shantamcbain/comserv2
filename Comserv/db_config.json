@@ -21,7 +21,7 @@
     "priority": 2,
     "localhost_override": true
   },
-  "zerotier_server": {
+  "zerotier_ency": {
     "db_type": "mysql",
     "host": "172.30.161.222",
     "port": 3306,
@@ -43,33 +43,62 @@
     "priority": 4,
     "localhost_override": false
   },
-  "workstation_mysql": {
+  "local_ency": {
     "db_type": "mysql",
     "host": "localhost",
     "port": 3306,
     "username": "shanta_forager",
     "password": "UA=nPF8*m+T#",
     "database": "ency",
-    "description": "Workstation MySQL - ENCY Database",
+    "description": "Local/Private Operation - ENCY Database",
     "priority": 5,
     "localhost_override": false
   },
-  "workstation_forager": {
+  "local_forager": {
     "db_type": "mysql",
     "host": "localhost",
     "port": 3306,
     "username": "shanta_forager",
     "password": "UA=nPF8*m+T#",
     "database": "shanta_forager",
-    "description": "Workstation MySQL - Forager Database",
+    "description": "Local/Private Operation - Forager Database",
     "priority": 6,
     "localhost_override": false
   },
-  "sqlite_offline": {
-    "db_type": "sqlite",
-    "database_path": "data/comserv_offline.db",
-    "description": "SQLite - True Offline Mode",
+  "backup_ency": {
+    "db_type": "mysql",
+    "host": "YOUR_BACKUP_HOST",
+    "port": 3306,
+    "username": "YOUR_BACKUP_USERNAME",
+    "password": "YOUR_BACKUP_PASSWORD",
+    "database": "ency",
+    "description": "Backup Server - ENCY Database",
     "priority": 7,
+    "localhost_override": false
+  },
+  "backup_forager": {
+    "db_type": "mysql",
+    "host": "YOUR_BACKUP_HOST",
+    "port": 3306,
+    "username": "YOUR_BACKUP_USERNAME",
+    "password": "YOUR_BACKUP_PASSWORD",
+    "database": "shanta_forager",
+    "description": "Backup Server - Forager Database",
+    "priority": 8,
+    "localhost_override": false
+  },
+  "sqlite_ency": {
+    "db_type": "sqlite",
+    "database_path": "data/comserv_ency_offline.db",
+    "description": "SQLite Offline Mode - ENCY Database",
+    "priority": 9,
+    "localhost_override": false
+  },
+  "sqlite_forager": {
+    "db_type": "sqlite",
+    "database_path": "data/comserv_forager_offline.db",
+    "description": "SQLite Offline Mode - Forager Database",
+    "priority": 10,
     "localhost_override": false
   },
   "shanta_ency": {
@@ -80,7 +109,7 @@
     "password": "UA=nPF8*m+T#",
     "database": "ency",
     "description": "Legacy DBEncy Configuration",
-    "priority": 8,
+    "priority": 11,
     "localhost_override": true
   },
   "shanta_forager": {
@@ -91,7 +120,7 @@
     "password": "UA=nPF8*m+T#",
     "database": "shanta_forager",
     "description": "Legacy DBForager Configuration",
-    "priority": 9,
+    "priority": 12,
     "localhost_override": true
   }
 }

@@ -79,21 +79,143 @@ if ($@) {
 
 my $config = decode_json($json_text);
 
+# Function to test database connectivity
+sub test_connection {
+    my ($connection_config) = @_;
+    
+    eval {
+        require DBI;
+        my $dsn;
+        my $dbh;
+        
+        if ($connection_config->{db_type} eq 'sqlite') {
+            # SQLite connection
+            $dsn = "dbi:SQLite:dbname=" . $connection_config->{database_path};
+            $dbh = DBI->connect($dsn, "", "", {
+                RaiseError => 0,
+                PrintError => 0,
+                sqlite_timeout => 5000,
+            });
+        } else {
+            # MySQL connection
+            $dsn = "dbi:mysql:database=" . $connection_config->{database} . 
+                   ";host=" . $connection_config->{host} . 
+                   ";port=" . $connection_config->{port};
+            $dbh = DBI->connect($dsn, $connection_config->{username}, $connection_config->{password}, {
+                RaiseError => 0,
+                PrintError => 0,
+                mysql_connect_timeout => 5,
+            });
+        }
+        
+        if ($dbh) {
+            $dbh->disconnect();
+            return 1;
+        }
+    };
+    return 0;
+}
+
+# Function to select the best database connection for ENCY database
+sub select_ency_connection {
+    my $config = shift;
+    
+    # Get all connections that serve the ENCY database, sorted by priority
+    my @ency_connections = grep { 
+        ($config->{$_}->{database} && $config->{$_}->{database} eq 'ency') ||
+        ($config->{$_}->{db_type} eq 'sqlite' && $_ =~ /ency/)
+    } sort { 
+        $config->{$a}->{priority} <=> $config->{$b}->{priority} 
+    } keys %$config;
+    
+    # Check localhost override first if any connection has it enabled
+    my @localhost_override = grep { 
+        $config->{$_}->{localhost_override} && 
+        (($config->{$_}->{database} && $config->{$_}->{database} eq 'ency') ||
+         ($config->{$_}->{db_type} eq 'sqlite' && $_ =~ /ency/))
+    } @ency_connections;
+    
+    if (@localhost_override) {
+        # Try localhost first for connections with localhost_override
+        for my $conn_name (@localhost_override) {
+            my $conn = $config->{$conn_name};
+            # Create a test connection config for localhost override
+            my $test_config = { %$conn };
+            $test_config->{host} = 'localhost' if $test_config->{host};
+            
+            if (test_connection($test_config)) {
+                warn "DBEncy: Using localhost override for $conn_name";
+                if ($conn->{db_type} eq 'sqlite') {
+                    return (undef, undef, $conn->{database_path}, undef, undef, $conn_name, 'sqlite');
+                } else {
+                    return ('localhost', $conn->{port}, $conn->{database}, $conn->{username}, $conn->{password}, $conn_name, 'mysql');
+                }
+            }
+        }
+    }
+    
+    # Try connections in priority order
+    for my $conn_name (@ency_connections) {
+        my $conn = $config->{$conn_name};
+        
+        if (test_connection($conn)) {
+            warn "DBEncy: Using connection $conn_name ($conn->{description})";
+            if ($conn->{db_type} eq 'sqlite') {
+                return (undef, undef, $conn->{database_path}, undef, undef, $conn_name, 'sqlite');
+            } else {
+                return ($conn->{host}, $conn->{port}, $conn->{database}, $conn->{username}, $conn->{password}, $conn_name, 'mysql');
+            }
+        }
+    }
+    
+    # If no connection works, fall back to the first available (legacy behavior)
+    if (exists $config->{shanta_ency}) {
+        my $conn = $config->{shanta_ency};
+        warn "DBEncy: Falling back to legacy shanta_ency configuration";
+        return ($conn->{host}, $conn->{port}, $conn->{database}, $conn->{username}, $conn->{password}, 'shanta_ency', 'mysql');
+    }
+    
+    die "DBEncy: No working database connection found for ENCY database";
+}
+
+# Select the best connection
+my ($host, $port, $database, $username, $password, $connection_name, $db_type) = select_ency_connection($config);
+
 # Print the configuration for debugging
 print "DBEncy Configuration:\n";
-print "Host: $config->{shanta_ency}->{host} (should be localhost)\n";
-print "Database: $config->{shanta_ency}->{database}\n";
-print "Username: $config->{shanta_ency}->{username}\n";
+print "Selected Connection: $connection_name\n";
+print "Database Type: $db_type\n";
+if ($db_type eq 'sqlite') {
+    print "Database Path: $database\n";
+} else {
+    print "Host: $host\n";
+    print "Database: $database\n";
+    print "Username: $username\n";
+}
 
 # Set the schema_class and connect_info attributes
+my $connect_info;
+if ($db_type eq 'sqlite') {
+    $connect_info = {
+        dsn => "dbi:SQLite:dbname=$database",
+        user => "",
+        password => "",
+        sqlite_unicode => 1,
+        on_connect_do => ["PRAGMA foreign_keys = ON"],
+    };
+} else {
+    $connect_info = {
+        dsn => "dbi:mysql:database=$database;host=$host;port=$port",
+        user => $username,
+        password => $password,
+        mysql_enable_utf8 => 1,
+        on_connect_do => ["SET NAMES 'utf8'", "SET CHARACTER SET 'utf8'"],
+    };
+}
+
 __PACKAGE__->config(
     schema_class => 'Comserv::Model::Schema::Ency',
-    connect_info => {
-        # Fixed DSN format for MySQL - most common format
-        dsn => "dbi:mysql:database=$config->{shanta_ency}->{database};host=$config->{shanta_ency}->{host};port=$config->{shanta_ency}->{port}",
-        user => $config->{shanta_ency}->{username},
-        password => $config->{shanta_ency}->{password},
-    }
+    connect_info => $connect_info
 );
 sub list_tables {
     my $self = shift;

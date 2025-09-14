@@ -1127,6 +1127,12 @@ sub auto :Private {
     return 1; # Allow the request to proceed
 }
 
+# Alias method for backward compatibility
+sub populate_navigation {
+    my ($self, $c) = @_;
+    return $self->populate_navigation_data($c);
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;
