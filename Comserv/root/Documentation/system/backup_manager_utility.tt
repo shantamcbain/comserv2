@@ -1,0 +1,224 @@
+[% META title = 'BackupManager Utility Documentation' %]
+[% PageVersion = 'system/backup_manager_utility.tt,v 1.1 2025/01/27 admin Exp' %]
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+
+<h1>BackupManager Utility Documentation</h1>
+
+<h2>Overview</h2>
+<p>The <code>Comserv::Util::BackupManager</code> utility provides centralized backup and restore functionality for the Comserv application. This utility consolidates backup operations that were previously scattered across multiple controllers, providing a consistent and reliable backup system.</p>
+
+<h2>Key Features</h2>
+<ul>
+<li><strong>Centralized Backup Management</strong>: Single utility for all backup operations</li>
+<li><strong>Cross-Platform Path Handling</strong>: Uses File::Spec for proper path management</li>
+<li><strong>Multiple Backup Directory Support</strong>: Handles both legacy and current backup directories</li>
+<li><strong>Protected File Management</strong>: Identifies and handles environment-specific files</li>
+<li><strong>Emergency Restore Capabilities</strong>: Quick restoration of critical files like comserv.psgi</li>
+<li><strong>Comprehensive File Scanning</strong>: Detailed backup directory analysis</li>
+</ul>
+
+<h2>File Location</h2>
+<pre>/Comserv/lib/Comserv/Util/BackupManager.pm</pre>
+
+<h2>Dependencies</h2>
+<ul>
+<li>Moose - Object-oriented framework</li>
+<li>Try::Tiny - Exception handling</li>
+<li>File::Copy - File operations</li>
+<li>File::Path - Directory operations</li>
+<li>File::Basename - Path manipulation</li>
+<li>File::stat - File statistics</li>
+<li>Archive::Tar - Archive handling</li>
+<li>JSON - JSON processing</li>
+<li>POSIX - System utilities</li>
+</ul>
+
+<h2>Core Attributes</h2>
+
+<h3>app_dir</h3>
+<p>Automatically detects the application root directory using intelligent path detection:</p>
+<ul>
+<li>Checks if current directory is /Comserv subdirectory</li>
+<li>Looks for Comserv directory in current or parent directories</li>
+<li>Falls back to current working directory</li>
+</ul>
+
+<h3>backup_dirs</h3>
+<p>Array of backup directories to scan:</p>
+<ul>
+<li><code>/Comserv/backup</code> - Legacy backup directory</li>
+<li><code>/Comserv/backups</code> - Current backup directory</li>
+</ul>
+
+<h3>protected_files</h3>
+<p>List of environment-specific files that require special handling:</p>
+<ul>
+<li><code>comserv.psgi</code> - PSGI application file</li>
+<li><code>db_config.json</code> - Database configuration</li>
+<li><code>config/api_credentials.json</code> - API credentials</li>
+<li><code>root/static/config/theme_mappings.json</code> - Theme mappings</li>
+</ul>
+
+<h2>Core Methods</h2>
+
+<h3>get_backup_directory_contents()</h3>
+<p>Scans all backup directories and returns comprehensive file listings.</p>
+<p><strong>Returns:</strong> HashRef with backup_singular, backup_plural arrays and error messages</p>
+<pre>my $contents = $backup_manager-&gt;get_backup_directory_contents();
+# Returns:
+# {
+#   backup_singular =&gt; [...],  # Files from /backup/
+#   backup_plural =&gt; [...],    # Files from /backups/
+#   error =&gt; ''                # Error message if any
+# }</pre>
+
+<h3>scan_backup_directory($backup_dir, $dir_type)</h3>
+<p>Scans a specific backup directory for files and subdirectories.</p>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>$backup_dir</code> - Directory path to scan</li>
+<li><code>$dir_type</code> - Type identifier ('backup' or 'backups')</li>
+</ul>
+<p><strong>Returns:</strong> ArrayRef of file information including name, path, size, modification date</p>
+
+<h3>restore_psgi_file()</h3>
+<p>Emergency restore of the comserv.psgi file from backup directories.</p>
+<p><strong>Returns:</strong> HashRef with success status, message, and output details</p>
+<pre>my $result = $backup_manager-&gt;restore_psgi_file();
+if ($result-&gt;{success}) {
+    print "PSGI file restored: " . $result-&gt;{message};
+} else {
+    print "Restore failed: " . $result-&gt;{error_msg};
+}</pre>
+
+<h3>find_psgi_backup()</h3>
+<p>Locates comserv.psgi file in backup directories.</p>
+<p><strong>Returns:</strong> String path to backup file or undef if not found</p>
+
+<h3>restore_file_from_backup($backup_path, $target_file)</h3>
+<p>Generic file restore functionality for any file from backup.</p>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>$backup_path</code> - Path to backup file</li>
+<li><code>$target_file</code> - Relative path to target file</li>
+</ul>
+<p><strong>Returns:</strong> HashRef with success status and details</p>
+
+<h3>create_protected_files_backup($username)</h3>
+<p>Create backup of protected files (used during git operations).</p>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>$username</code> - Optional username for backup metadata</li>
+</ul>
+<p><strong>Returns:</strong> HashRef with success, message, output, backup_path, files_backed_up</p>
+<pre>my $result = $backup_manager-&gt;create_protected_files_backup('admin');
+if ($result-&gt;{success}) {
+    print "Protected files backed up to: " . $result-&gt;{backup_path};
+    print "Files backed up: " . join(", ", @{$result-&gt;{files_backed_up}});
+}</pre>
+
+<h3>get_available_backups()</h3>
+<p>Get list of available backups for restore operations.</p>
+<p><strong>Returns:</strong> ArrayRef of backup information including filename, size, modification date, and metadata</p>
+<pre>my $backups = $backup_manager-&gt;get_available_backups();
+for my $backup (@$backups) {
+    print "Backup: " . $backup-&gt;{filename};
+    print "Created: " . $backup-&gt;{modified};
+    if ($backup-&gt;{metadata}) {
+        print "Description: " . $backup-&gt;{metadata}-&gt;{description};
+    }
+}</pre>
+
+<h3>create_manual_backup($description, $username, $files_to_backup)</h3>
+<p>Create a manual backup with custom description.</p>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>$description</code> - Description for the backup</li>
+<li><code>$username</code> - Username for backup metadata</li>
+<li><code>$files_to_backup</code> - Optional ArrayRef of files to backup (defaults to protected files)</li>
+</ul>
+<p><strong>Returns:</strong> HashRef with success, message, output, backup_path</p>
+<pre>my $result = $backup_manager-&gt;create_manual_backup(
+    "Pre-deployment backup", 
+    "admin", 
+    ["Comserv/comserv.psgi", "Comserv/db_config.json"]
+);
+if ($result-&gt;{success}) {
+    print "Manual backup created: " . $result-&gt;{backup_path};
+}</pre>
+
+<h2>Usage Examples</h2>
+
+<h3>Basic Usage</h3>
+<pre># Create backup manager instance
+my $backup_manager = Comserv::Util::BackupManager-&gt;new();
+
+# Get backup directory contents
+my $contents = $backup_manager-&gt;get_backup_directory_contents();
+
+# Emergency PSGI restore
+my $result = $backup_manager-&gt;restore_psgi_file();
+
+# Create protected files backup
+my $backup_result = $backup_manager-&gt;create_protected_files_backup('admin');
+
+# Get available backups
+my $backups = $backup_manager-&gt;get_available_backups();
+
+# Create manual backup
+my $manual_backup = $backup_manager-&gt;create_manual_backup("Custom backup", "admin");</pre>
+
+<h3>Controller Integration</h3>
+<pre># In a controller
+sub backup_manager {
+    my ($self, $c) = @_;
+    my $app_dir = $c ? $c-&gt;config-&gt;{home} : undef;
+    return Comserv::Util::BackupManager-&gt;new($app_dir ? (app_dir =&gt; $app_dir) : ());
+}</pre>
+
+<h2>Error Handling</h2>
+<p>The utility includes comprehensive error handling:</p>
+<ul>
+<li><strong>Directory Access Errors</strong>: Graceful handling of permission issues</li>
+<li><strong>File Operation Errors</strong>: Detailed error messages for copy/move operations</li>
+<li><strong>Path Resolution Errors</strong>: Fallback mechanisms for path detection</li>
+<li><strong>Backup Creation</strong>: Automatic backup of existing files before restore</li>
+</ul>
+
+<h2>Security Considerations</h2>
+<ul>
+<li><strong>Protected Files</strong>: Environment-specific files are identified and handled carefully</li>
+<li><strong>Path Validation</strong>: All paths are validated before operations</li>
+<li><strong>Permission Handling</strong>: Proper file permissions are maintained</li>
+<li><strong>Backup Safety</strong>: Existing files are backed up before restoration</li>
+</ul>
+
+<h2>Integration Points</h2>
+<p>This utility is integrated with:</p>
+<ul>
+<li><code>Comserv::Controller::Admin::Backup</code> - Web interface controller</li>
+<li><code>Comserv::Util::Logging</code> - Logging system</li>
+<li><code>Comserv::Util::AdminAuth</code> - Authentication system</li>
+</ul>
+
+<h2>Maintenance Notes</h2>
+<ul>
+<li><strong>Backup Directory Structure</strong>: Supports both legacy (/backup) and current (/backups) directories</li>
+<li><strong>File Permissions</strong>: Automatically sets executable permissions for PSGI files</li>
+<li><strong>Cross-Platform</strong>: Uses File::Spec for Windows/Linux compatibility</li>
+<li><strong>Extensible</strong>: Easy to add new protected file types or backup operations</li>
+</ul>
+
+<h2>Related Documentation</h2>
+<ul>
+<li><a href="/Documentation/system/backup_controller">Backup Controller Documentation</a></li>
+<li><a href="/Documentation/system/starman_service_manager">Starman Service Manager</a></li>
+<li><a href="/Documentation/system/system_info_utility">SystemInfo Utility</a></li>
+</ul>
+
+[% END %]
