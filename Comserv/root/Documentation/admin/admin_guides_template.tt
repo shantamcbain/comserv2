@@ -1,0 +1,202 @@
+[% META title = 'Admin Guides Template Documentation' %]
+[% PageVersion = 'admin/admin_guides_template.tt,v 0.01 2025/09/15 shanta Exp shanta ' %]
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+
+<h1>Admin Guides Template Documentation</h1>
+
+<h2>Overview</h2>
+
+<p>The admin_guides template provides a dynamic section for displaying administrator-specific documentation within the documentation system. It renders admin-only content with appropriate access control indicators.</p>
+
+<h2>Template Structure</h2>
+
+<p><strong>File:</strong> <code>admin_guides.md</code> (Template Toolkit format)</p>
+<p><strong>Type:</strong> Documentation section template</p>
+<p><strong>Access Level:</strong> Administrator only</p>
+
+<h2>Key Features</h2>
+
+<h3>1. Conditional Rendering</h3>
+<p>The template only renders if admin guides are available:</p>
+<pre>[% IF categories.admin_guides %]</pre>
+
+<h3>2. Admin-Only Section</h3>
+<ul>
+<li>Clear admin-only designation with CSS class <code>admin-only</code></li>
+<li>Visual admin badge indicator</li>
+<li>Role-based access control integration</li>
+</ul>
+
+<h3>3. Dynamic Content Generation</h3>
+<ul>
+<li>Iterates through available admin guide pages</li>
+<li>Generates documentation cards for each guide</li>
+<li>Displays page titles, descriptions, and metadata</li>
+</ul>
+
+<h2>Template Logic</h2>
+
+<h3>Page Iteration</h3>
+<pre>
+[% FOREACH page_name IN categories.admin_guides.pages.sort %]
+    [% IF structured_pages.$page_name %]
+        [% page = structured_pages.$page_name %]
+        &lt;!-- Render page card --&gt;
+    [% END %]
+[% END %]
+</pre>
+
+<h3>Card Structure</h3>
+<p>Each admin guide is rendered as a documentation card with:</p>
+<ul>
+<li>Clickable link to the guide</li>
+<li>Page title (h3 heading)</li>
+<li>Description or default text</li>
+<li>File type badge (if available)</li>
+<li>Admin-only role badge</li>
+</ul>
+
+<h2>CSS Classes</h2>
+
+<h3>Section Classes</h3>
+<ul>
+<li><code>doc-section</code> - Main documentation section</li>
+<li><code>admin-only</code> - Admin-only content indicator</li>
+<li><code>section-toggle</code> - Collapsible section header</li>
+<li><code>section-content</code> - Section content container</li>
+</ul>
+
+<h3>Card Classes</h3>
+<ul>
+<li><code>doc-card</code> - Individual documentation card</li>
+<li><code>file-type-badge</code> - File type indicator badge</li>
+<li><code>admin-badge</code> - Admin access indicator</li>
+<li><code>role-badge</code> - Role-based access badge</li>
+</ul>
+
+<h2>Data Structure Requirements</h2>
+
+<h3>Categories Structure</h3>
+<pre>
+categories.admin_guides = {
+    pages: [
+        'page_name_1',
+        'page_name_2',
+        ...
+    ]
+}
+</pre>
+
+<h3>Structured Pages</h3>
+<pre>
+structured_pages.page_name = {
+    url: '/path/to/page',
+    title: 'Page Title',
+    description: 'Page description',
+    file_type: 'tt' // optional
+}
+</pre>
+
+<h2>Integration Points</h2>
+
+<h3>Documentation System</h3>
+<p>This template integrates with the broader documentation system:</p>
+<ul>
+<li>Uses structured page data from documentation controller</li>
+<li>Follows documentation categorization system</li>
+<li>Implements consistent styling and layout</li>
+</ul>
+
+<h3>Access Control</h3>
+<p>Works with the admin access control system:</p>
+<ul>
+<li>Visual indicators for admin-only content</li>
+<li>Role-based rendering logic</li>
+<li>Integration with session-based authentication</li>
+</ul>
+
+<h2>Usage Context</h2>
+
+<p>This template is typically included in:</p>
+<ul>
+<li>Main documentation index pages</li>
+<li>Admin-specific documentation sections</li>
+<li>Role-based documentation views</li>
+</ul>
+
+<h2>Styling Features</h2>
+
+<h3>Visual Indicators</h3>
+<ul>
+<li><strong>Admin Badge:</strong> Clear "Admin Only" indicator</li>
+<li><strong>Role Badge:</strong> Role-specific access indicators</li>
+<li><strong>File Type Badge:</strong> Document type indicators</li>
+</ul>
+
+<h3>Interactive Elements</h3>
+<ul>
+<li><strong>Section Toggle:</strong> Collapsible section headers</li>
+<li><strong>Card Links:</strong> Clickable documentation cards</li>
+<li><strong>Hover Effects:</strong> Visual feedback on interaction</li>
+</ul>
+
+<h2>Related Templates</h2>
+
+<ul>
+<li><strong>admin_access_control.md:</strong> Admin access control documentation</li>
+<li><strong>adding_new_sites.md:</strong> Site addition procedures</li>
+<li><strong>server_update_procedure.tt:</strong> Server update documentation</li>
+</ul>
+
+<h2>Best Practices</h2>
+
+<h3>Content Organization</h3>
+<ul>
+<li>Group related admin guides together</li>
+<li>Use descriptive titles and descriptions</li>
+<li>Maintain consistent file type indicators</li>
+</ul>
+
+<h3>Access Control</h3>
+<ul>
+<li>Always include admin-only indicators</li>
+<li>Use appropriate role badges</li>
+<li>Ensure proper access control in controllers</li>
+</ul>
+
+<h3>Maintenance</h3>
+<ul>
+<li>Keep page data structure updated</li>
+<li>Verify links and URLs regularly</li>
+<li>Update descriptions as content changes</li>
+</ul>
+
+<h2>Troubleshooting</h2>
+
+<h3>Template Not Rendering</h3>
+<ul>
+<li>Check if <code>categories.admin_guides</code> is defined</li>
+<li>Verify page data in <code>structured_pages</code></li>
+<li>Ensure proper template inclusion</li>
+</ul>
+
+<h3>Missing Content</h3>
+<ul>
+<li>Verify page names in categories match structured_pages keys</li>
+<li>Check for proper data population in controller</li>
+<li>Ensure admin guides are properly categorized</li>
+</ul>
+
+<h3>Styling Issues</h3>
+<ul>
+<li>Verify CSS classes are defined</li>
+<li>Check for proper admin-only styling</li>
+<li>Ensure badge styles are loaded</li>
+</ul>
+
+[% END %]

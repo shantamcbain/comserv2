@@ -46,7 +46,7 @@
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-3">
-                            <a href="[% c.uri_for('/admin/backup_create') %]" 
+                            <a href="[% c.uri_for('/admin/backup/create_backup') %]" 
                                class="btn btn-primary btn-lg w-100"
                                title="Create a new backup of protected files or manual backup">
                                 <i class="fas fa-plus"></i> Create Backup
@@ -60,7 +60,7 @@
                             </a>
                         </div>
                         <div class="col-md-3">
-                            <a href="[% c.uri_for('/admin/backup_restore') %]" 
+                            <a href="[% c.uri_for('/admin/backup/restore_backup') %]" 
                                class="btn btn-info btn-lg w-100"
                                title="Restore files from existing backups">
                                 <i class="fas fa-undo"></i> Restore from Backup
@@ -267,12 +267,12 @@
                                     <td>[% backup.size %] bytes</td>
                                     <td>
                                         <div class="btn-group" role="group">
-                                            <a href="[% c.uri_for('/admin/backup_view', backup.filename) %]" 
+                                            <a href="[% c.uri_for('/admin/backup/view_backup', backup.filename) %]" 
                                                class="btn btn-sm btn-outline-info"
                                                title="View backup details and contents">
                                                 <i class="fas fa-eye"></i> View
                                             </a>
-                                            <a href="[% c.uri_for('/admin/backup_delete', backup.filename) %]" 
+                                            <a href="[% c.uri_for('/admin/backup/delete_backup', backup.filename) %]" 
                                                class="btn btn-sm btn-outline-danger"
                                                title="Delete this backup file permanently">
                                                 <i class="fas fa-trash"></i> Delete

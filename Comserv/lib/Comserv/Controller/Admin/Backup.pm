@@ -62,7 +62,7 @@ Main backup management interface
 
 =cut
 
-sub index :Path('/admin/backup') :Args(0) {
+sub index :Path :Args(0) {
     my ($self, $c) = @_;
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'backup_index', 
@@ -100,7 +100,7 @@ Create a new backup
 
 =cut
 
-sub create_backup :Path('/admin/backup_create') :Args(0) {
+sub create_backup :Local :Args(0) {
     my ($self, $c) = @_;
     
     return unless $self->admin_auth->require_admin_access($c, 'create_backup');
@@ -146,7 +146,7 @@ Restore from a specific backup
 
 =cut
 
-sub restore_backup :Path('/admin/backup_restore') :Args(0) {
+sub restore_backup :Local :Args(0) {
     my ($self, $c) = @_;
     
     return unless $self->admin_auth->require_admin_access($c, 'restore_backup');
@@ -179,7 +179,7 @@ View details of a specific backup
 
 =cut
 
-sub view_backup :Path('/admin/backup_view') :Args(1) {
+sub view_backup :Local :Args(1) {
     my ($self, $c, $backup_filename) = @_;
     
     return unless $self->admin_auth->require_admin_access($c, 'view_backup');
@@ -217,7 +217,7 @@ Delete a backup file
 
 =cut
 
-sub delete_backup :Path('/admin/backup_delete') :Args(1) {
+sub delete_backup :Local :Args(1) {
     my ($self, $c, $backup_filename) = @_;
     
     return unless $self->admin_auth->require_admin_access($c, 'delete_backup');

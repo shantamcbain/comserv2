@@ -1,0 +1,277 @@
+[% META title = 'Backup Controller Documentation' %]
+[% PageVersion = 'system/backup_controller.tt,v 1.1 2025/01/27 admin Exp' %]
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+
+<h1>Backup Controller Documentation</h1>
+
+<h2>Overview</h2>
+<p>The <code>Comserv::Controller::Admin::Backup</code> controller provides a comprehensive web interface for backup and restore management. This dedicated controller centralizes all backup functionality with proper admin authentication and integrates with the BackupManager utility.</p>
+
+<h2>Key Features</h2>
+<ul>
+<li><strong>Admin Authentication</strong>: Secure access control for backup operations</li>
+<li><strong>Centralized Management</strong>: Single interface for all backup/restore operations</li>
+<li><strong>Emergency Restore</strong>: Quick restoration of critical system files</li>
+<li><strong>Directory Scanning</strong>: Comprehensive backup directory analysis</li>
+<li><strong>Protected File Handling</strong>: Special handling for environment-specific files</li>
+<li><strong>Logging Integration</strong>: Complete audit trail of backup operations</li>
+</ul>
+
+<h2>File Location</h2>
+<pre>/Comserv/lib/Comserv/Controller/Admin/Backup.pm</pre>
+
+<h2>URL Structure</h2>
+<p>All backup operations are accessed under the <code>/admin/backup</code> namespace:</p>
+<ul>
+<li><code>/admin/backup</code> - Main backup interface</li>
+<li><code>/admin/backup/create_backup</code> - Create new backups (manual or protected files)</li>
+<li><code>/admin/backup/restore_backup</code> - Restore from specific backup</li>
+<li><code>/admin/backup/view_backup/[filename]</code> - View backup details</li>
+<li><code>/admin/backup/delete_backup/[filename]</code> - Delete backup files</li>
+</ul>
+
+<h2>Dependencies</h2>
+<ul>
+<li>Catalyst::Controller - Base controller framework</li>
+<li>Moose - Object-oriented framework</li>
+<li>Try::Tiny - Exception handling</li>
+<li>Comserv::Util::AdminAuth - Authentication utility</li>
+<li>Comserv::Util::BackupManager - Backup operations utility</li>
+<li>Comserv::Util::Logging - Logging system</li>
+</ul>
+
+<h2>Standardized Utility Methods</h2>
+
+<h3>admin_auth()</h3>
+<p>Provides standardized admin authentication.</p>
+<pre># DO NOT MODIFY - Standardized admin authentication pattern
+sub admin_auth {
+    my ($self) = @_;
+    return Comserv::Util::AdminAuth-&gt;new();
+}</pre>
+
+<h3>logging()</h3>
+<p>Provides standardized logging functionality.</p>
+<pre># DO NOT MODIFY - Standardized logging pattern
+sub logging {
+    my ($self) = @_;
+    return Comserv::Util::Logging-&gt;new();
+}</pre>
+
+<h3>backup_manager($c)</h3>
+<p>Creates BackupManager instance with proper app directory configuration.</p>
+<pre># DO NOT MODIFY - Standardized backup manager
+sub backup_manager {
+    my ($self, $c) = @_;
+    my $app_dir = $c ? $c-&gt;config-&gt;{home} : undef;
+    return Comserv::Util::BackupManager-&gt;new($app_dir ? (app_dir =&gt; $app_dir) : ());
+}</pre>
+
+<h2>Authentication System</h2>
+
+<h3>auto() Method</h3>
+<p>Automatic authentication check for all controller actions:</p>
+<ul>
+<li>Validates admin authentication for every request</li>
+<li>Redirects unauthorized users to login</li>
+<li>Logs all authentication attempts</li>
+<li>Provides detailed error messages</li>
+</ul>
+
+<h2>Core Actions</h2>
+
+<h3>index() - Main Backup Interface</h3>
+<p>Primary backup management interface providing:</p>
+<ul>
+<li>Backup directory overview with available backups</li>
+<li>Quick access to backup creation operations</li>
+<li>System status information (PSGI file status)</li>
+<li>Protected files listing</li>
+<li>Backup table with view/delete actions</li>
+</ul>
+
+<h3>create_backup() - Backup Creation</h3>
+<p>Comprehensive backup creation interface supporting:</p>
+<ul>
+<li><strong>Manual Backups</strong>: Custom description and file selection</li>
+<li><strong>Protected Files Backup</strong>: Automatic backup of environment-specific files</li>
+<li><strong>POST Processing</strong>: Handles form submissions for backup creation</li>
+<li><strong>Validation</strong>: Ensures proper parameters and permissions</li>
+<li><strong>Redirect</strong>: Returns to main interface after successful creation</li>
+</ul>
+
+<h3>restore_backup() - Backup Restoration</h3>
+<p>Restore functionality from specific backup files:</p>
+<ul>
+<li><strong>Backup Selection</strong>: Choose from available backup files</li>
+<li><strong>Target File Selection</strong>: Specify which file to restore</li>
+<li><strong>Safety Validation</strong>: Confirms backup and target file existence</li>
+<li><strong>Restore Process</strong>: Uses BackupManager for actual restoration</li>
+<li><strong>Result Reporting</strong>: Detailed success/error feedback</li>
+</ul>
+
+<h3>view_backup($backup_filename) - Backup Details</h3>
+<p>View detailed information about a specific backup:</p>
+<ul>
+<li><strong>Metadata Display</strong>: Shows backup description, creation date, creator</li>
+<li><strong>File Listing</strong>: Lists files included in the backup</li>
+<li><strong>Size Information</strong>: Backup file size and statistics</li>
+<li><strong>Type Information</strong>: Manual vs protected files backup</li>
+<li><strong>Error Handling</strong>: Graceful handling of missing backups</li>
+</ul>
+
+<h3>delete_backup($backup_filename) - Backup Deletion</h3>
+<p>Safe deletion of backup files with confirmation:</p>
+<ul>
+<li><strong>Confirmation Required</strong>: POST with 'confirm=yes' parameter</li>
+<li><strong>File Cleanup</strong>: Removes both backup file and metadata</li>
+<li><strong>Error Handling</strong>: Handles missing files and permission errors</li>
+<li><strong>Audit Logging</strong>: Complete logging of deletion operations</li>
+<li><strong>Redirect</strong>: Returns to main interface after successful deletion</li>
+</ul>
+
+<h2>Error Handling</h2>
+<p>The controller implements comprehensive error handling:</p>
+
+<h3>Authentication Errors</h3>
+<ul>
+<li>Invalid credentials redirect to login</li>
+<li>Session timeout handling</li>
+<li>Permission level validation</li>
+</ul>
+
+<h3>Backup Operation Errors</h3>
+<ul>
+<li>File not found errors</li>
+<li>Permission denied errors</li>
+<li>Disk space issues</li>
+<li>Corruption detection</li>
+</ul>
+
+<h3>System Errors</h3>
+<ul>
+<li>Directory access problems</li>
+<li>Path resolution failures</li>
+<li>Service communication issues</li>
+</ul>
+
+<h2>Logging and Auditing</h2>
+<p>All backup operations are logged with:</p>
+<ul>
+<li><strong>User Identification</strong>: Who performed the operation</li>
+<li><strong>Timestamp</strong>: When the operation occurred</li>
+<li><strong>Operation Details</strong>: What was done</li>
+<li><strong>File Paths</strong>: Source and destination files</li>
+<li><strong>Results</strong>: Success/failure status</li>
+<li><strong>Error Details</strong>: Complete error information if applicable</li>
+</ul>
+
+<h2>Security Features</h2>
+
+<h3>Access Control</h3>
+<ul>
+<li><strong>Admin-Only Access</strong>: Requires admin authentication</li>
+<li><strong>Session Validation</strong>: Continuous session checking</li>
+<li><strong>Operation Logging</strong>: Complete audit trail</li>
+</ul>
+
+<h3>File Protection</h3>
+<ul>
+<li><strong>Path Validation</strong>: Prevents directory traversal attacks</li>
+<li><strong>File Type Checking</strong>: Validates file extensions and types</li>
+<li><strong>Permission Preservation</strong>: Maintains proper file permissions</li>
+</ul>
+
+<h2>Integration Points</h2>
+
+<h3>Template Integration</h3>
+<p>Works with Template Toolkit templates for:</p>
+<ul>
+<li>Backup directory listings</li>
+<li>Restore operation interfaces</li>
+<li>Status and error displays</li>
+<li>Progress indicators</li>
+</ul>
+
+<h3>Utility Integration</h3>
+<p>Integrates with multiple utility modules:</p>
+<ul>
+<li><code>BackupManager</code> - Core backup operations</li>
+<li><code>AdminAuth</code> - Authentication services</li>
+<li><code>Logging</code> - Audit and error logging</li>
+<li><code>SystemInfo</code> - System status information</li>
+</ul>
+
+<h2>Usage Examples</h2>
+
+<h3>Creating Backups</h3>
+<pre># Create protected files backup:
+# POST to /admin/backup/create_backup
+# Parameters: backup_type=protected_files
+
+# Create manual backup:
+# POST to /admin/backup/create_backup  
+# Parameters: backup_type=manual, description="Custom backup"</pre>
+
+<h3>Restoring from Backup</h3>
+<pre># Restore specific file:
+# POST to /admin/backup/restore_backup
+# Parameters: backup_path=/path/to/backup.tar.gz, target_file=Comserv/comserv.psgi</pre>
+
+<h3>Managing Backups</h3>
+<pre># View backup details:
+# GET /admin/backup/view_backup/manual_backup_20250127_143022.tar.gz
+
+# Delete backup:
+# POST /admin/backup/delete_backup/manual_backup_20250127_143022.tar.gz
+# Parameters: confirm=yes</pre>
+
+<h2>Configuration</h2>
+<p>The controller uses configuration from:</p>
+<ul>
+<li><strong>Catalyst Config</strong>: Application home directory</li>
+<li><strong>BackupManager</strong>: Backup directory locations</li>
+<li><strong>AdminAuth</strong>: Authentication requirements</li>
+</ul>
+
+<h2>Maintenance Notes</h2>
+<ul>
+<li><strong>Standardized Patterns</strong>: Uses consistent utility method patterns</li>
+<li><strong>Error Recovery</strong>: Includes rollback mechanisms for failed operations</li>
+<li><strong>Performance</strong>: Optimized for large backup directories</li>
+<li><strong>Extensibility</strong>: Easy to add new backup operations</li>
+</ul>
+
+<h2>Troubleshooting</h2>
+
+<h3>Common Issues</h3>
+<ul>
+<li><strong>Permission Denied</strong>: Check file system permissions</li>
+<li><strong>File Not Found</strong>: Verify backup directory structure</li>
+<li><strong>Authentication Failed</strong>: Check admin credentials</li>
+<li><strong>Disk Space</strong>: Ensure adequate space for operations</li>
+</ul>
+
+<h3>Debug Information</h3>
+<p>Enable debug mode to see:</p>
+<ul>
+<li>Detailed operation logs</li>
+<li>File path resolution</li>
+<li>Authentication flow</li>
+<li>Error stack traces</li>
+</ul>
+
+<h2>Related Documentation</h2>
+<ul>
+<li><a href="/Documentation/system/backup_manager_utility">BackupManager Utility</a></li>
+<li><a href="/Documentation/system/admin_auth_utility">AdminAuth Utility</a></li>
+<li><a href="/Documentation/system/logging_utility">Logging System</a></li>
+<li><a href="/Documentation/controllers/admin_controllers">Admin Controllers Overview</a></li>
+</ul>
+
+[% END %]

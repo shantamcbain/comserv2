@@ -32,7 +32,7 @@ my $MAX_LOG_FILES = 20; # Maximum number of archived log files to keep
 sub _print_log {
     my ($msg) = @_;
     print STDERR "$msg\n";
-    if (defined $LOG_FH) {
+    if (defined $LOG_FH && fileno($LOG_FH)) {
         flock($LOG_FH, LOCK_EX);
         print $LOG_FH "$msg\n";
         flock($LOG_FH, LOCK_UN);
@@ -68,7 +68,7 @@ sub rotate_log {
         $archived_log = _split_large_log($LOG_FILE, $archive_dir, $filename, $timestamp, $MAX_LOG_SIZE);
     } else {
         # For smaller files, just move the whole file
-        move($LOG_FILE, $archived_log) or die "Could not rotate log: $!";
+        File::Copy::move($LOG_FILE, $archived_log) or die "Could not rotate log: $!";
     }
 
     # Reopen log file
@@ -361,7 +361,7 @@ sub force_log_rotation {
     } else {
         # For smaller files, just move the whole file
         $archived_log = File::Spec->catfile($archive_dir, "${filename}_${timestamp}");
-        move($LOG_FILE, $archived_log) or die "Could not rotate log: $!";
+        File::Copy::move($LOG_FILE, $archived_log) or die "Could not rotate log: $!";
     }
 
     # Reopen log file

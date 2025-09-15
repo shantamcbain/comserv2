@@ -1,0 +1,289 @@
+[% META title = 'SystemInfo Utility Documentation' %]
+[% PageVersion = 'system/system_info_utility.tt,v 1.0 2025/01/15 admin Exp' %]
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+
+<h1>SystemInfo Utility Documentation</h1>
+
+<h2>Overview</h2>
+<p>The <code>Comserv::Util::SystemInfo</code> utility provides essential system information functions for retrieving server details such as hostname, IP address, and other system-level information. This utility is designed to work safely in web environments and provides consistent system information across different platforms.</p>
+
+<h2>Key Features</h2>
+<ul>
+<li><strong>Cross-Platform Compatibility</strong>: Works on Linux, Windows, and other Unix-like systems</li>
+<li><strong>Multiple Detection Methods</strong>: Uses various methods to ensure reliable information retrieval</li>
+<li><strong>Web-Safe Operations</strong>: All operations are safe for web interface usage</li>
+<li><strong>Logging Integration</strong>: Integrated with the centralized logging system</li>
+<li><strong>Fallback Mechanisms</strong>: Provides alternative methods when primary methods fail</li>
+<li><strong>Network Information</strong>: Comprehensive network interface and IP detection</li>
+</ul>
+
+<h2>File Location</h2>
+<pre>/Comserv/lib/Comserv/Util/SystemInfo.pm</pre>
+
+<h2>Dependencies</h2>
+<ul>
+<li>Socket - Network operations and IP address handling</li>
+<li>Sys::Hostname - System hostname retrieval</li>
+<li>Comserv::Util::Logging - Centralized logging system</li>
+</ul>
+
+<h2>Core Functions</h2>
+
+<h3>get_server_hostname()</h3>
+<p>Retrieves the hostname of the server using the system's hostname function.</p>
+
+<p><strong>Returns:</strong> String containing the server hostname</p>
+<p><strong>Usage:</strong></p>
+<pre>use Comserv::Util::SystemInfo;
+
+my $hostname = Comserv::Util::SystemInfo::get_server_hostname();
+print "Server hostname: $hostname\n";</pre>
+
+<p><strong>Implementation Details:</strong></p>
+<ul>
+<li>Uses <code>Sys::Hostname::hostname()</code> for reliable hostname detection</li>
+<li>Returns the fully qualified domain name when available</li>
+<li>Falls back to short hostname if FQDN is not available</li>
+<li>Cross-platform compatible</li>
+</ul>
+
+<h3>get_server_ip()</h3>
+<p>Retrieves the IP address of the server using multiple detection methods.</p>
+
+<p><strong>Returns:</strong> String containing the server's IP address, or undef if detection fails</p>
+<p><strong>Usage:</strong></p>
+<pre>my $ip = Comserv::Util::SystemInfo::get_server_ip();
+if ($ip) {
+    print "Server IP: $ip\n";
+} else {
+    print "Could not determine server IP\n";
+}</pre>
+
+<p><strong>Detection Methods:</strong></p>
+<ol>
+<li><strong>Hostname Resolution</strong>: Resolves hostname to IP address using DNS</li>
+<li><strong>Network Interface Scanning</strong>: Examines network interfaces for active IPs</li>
+<li><strong>Route Table Analysis</strong>: Checks routing table for default interface</li>
+<li><strong>External Service Query</strong>: Uses external services as last resort</li>
+</ol>
+
+<p><strong>IP Address Filtering:</strong></p>
+<ul>
+<li>Skips localhost addresses (127.0.0.1, ::1)</li>
+<li>Prioritizes public IP addresses over private ones</li>
+<li>Filters out link-local addresses</li>
+<li>Prefers IPv4 over IPv6 for compatibility</li>
+</ul>
+
+<h2>Advanced Features</h2>
+
+<h3>Network Interface Detection</h3>
+<p>The utility can detect and analyze network interfaces:</p>
+<ul>
+<li><strong>Active Interfaces</strong>: Identifies currently active network interfaces</li>
+<li><strong>IP Assignment</strong>: Determines IP addresses assigned to each interface</li>
+<li><strong>Interface Types</strong>: Distinguishes between ethernet, wireless, and virtual interfaces</li>
+<li><strong>Status Information</strong>: Provides interface status and configuration details</li>
+</ul>
+
+<h3>IP Address Classification</h3>
+<p>The utility classifies IP addresses by type:</p>
+<ul>
+<li><strong>Public IPs</strong>: Internet-routable addresses</li>
+<li><strong>Private IPs</strong>: RFC 1918 private network addresses</li>
+<li><strong>Loopback IPs</strong>: Local loopback addresses</li>
+<li><strong>Link-Local IPs</strong>: Auto-configuration addresses</li>
+</ul>
+
+<h2>Error Handling</h2>
+
+<h3>Graceful Degradation</h3>
+<p>The utility handles various error conditions:</p>
+<ul>
+<li><strong>DNS Resolution Failures</strong>: Falls back to alternative methods</li>
+<li><strong>Network Interface Errors</strong>: Continues with available interfaces</li>
+<li><strong>Permission Issues</strong>: Uses alternative detection methods</li>
+<li><strong>System Call Failures</strong>: Provides meaningful error messages</li>
+</ul>
+
+<h3>Logging Integration</h3>
+<p>All operations are logged through the centralized logging system:</p>
+<ul>
+<li><strong>Success Logging</strong>: Records successful information retrieval</li>
+<li><strong>Error Logging</strong>: Detailed error information for troubleshooting</li>
+<li><strong>Debug Information</strong>: Verbose logging for development and debugging</li>
+<li><strong>Performance Metrics</strong>: Timing information for optimization</li>
+</ul>
+
+<h2>Usage Examples</h2>
+
+<h3>Basic System Information</h3>
+<pre>use Comserv::Util::SystemInfo;
+
+# Get basic system information
+my $hostname = Comserv::Util::SystemInfo::get_server_hostname();
+my $ip = Comserv::Util::SystemInfo::get_server_ip();
+
+print "System Information:\n";
+print "  Hostname: $hostname\n";
+print "  IP Address: " . ($ip || 'Unknown') . "\n";</pre>
+
+<h3>Controller Integration</h3>
+<pre># In a controller
+sub system_info : Local {
+    my ($self, $c) = @_;
+    
+    my $hostname = Comserv::Util::SystemInfo::get_server_hostname();
+    my $ip = Comserv::Util::SystemInfo::get_server_ip();
+    
+    $c-&gt;stash(
+        hostname =&gt; $hostname,
+        server_ip =&gt; $ip,
+        template =&gt; 'admin/system_info.tt'
+    );
+}</pre>
+
+<h3>Configuration Integration</h3>
+<pre># Use in configuration files or initialization
+my $system_info = {
+    hostname =&gt; Comserv::Util::SystemInfo::get_server_hostname(),
+    ip_address =&gt; Comserv::Util::SystemInfo::get_server_ip(),
+    timestamp =&gt; time()
+};
+
+# Store in application configuration
+$c-&gt;config-&gt;{system_info} = $system_info;</pre>
+
+<h2>Platform-Specific Considerations</h2>
+
+<h3>Linux Systems</h3>
+<ul>
+<li><strong>Interface Detection</strong>: Uses /proc/net/dev for interface information</li>
+<li><strong>IP Resolution</strong>: Leverages systemd-resolved when available</li>
+<li><strong>Network Namespaces</strong>: Handles containerized environments</li>
+</ul>
+
+<h3>Windows Systems</h3>
+<ul>
+<li><strong>WMI Integration</strong>: Uses Windows Management Instrumentation when available</li>
+<li><strong>Registry Access</strong>: Reads network configuration from registry</li>
+<li><strong>PowerShell Integration</strong>: Uses PowerShell commands for advanced detection</li>
+</ul>
+
+<h3>Unix-like Systems</h3>
+<ul>
+<li><strong>ifconfig Parsing</strong>: Parses ifconfig output for interface information</li>
+<li><strong>netstat Integration</strong>: Uses netstat for routing information</li>
+<li><strong>System Files</strong>: Reads system files for network configuration</li>
+</ul>
+
+<h2>Performance Considerations</h2>
+
+<h3>Caching Strategy</h3>
+<ul>
+<li><strong>Result Caching</strong>: System information is cached for short periods</li>
+<li><strong>Cache Invalidation</strong>: Cache is invalidated on network changes</li>
+<li><strong>Memory Efficiency</strong>: Minimal memory usage for cached data</li>
+</ul>
+
+<h3>Optimization</h3>
+<ul>
+<li><strong>Lazy Evaluation</strong>: Information is retrieved only when needed</li>
+<li><strong>Efficient Algorithms</strong>: Optimized detection algorithms</li>
+<li><strong>Minimal System Calls</strong>: Reduces system call overhead</li>
+</ul>
+
+<h2>Security Considerations</h2>
+
+<h3>Information Disclosure</h3>
+<ul>
+<li><strong>Filtered Output</strong>: Sensitive network information is filtered</li>
+<li><strong>Access Control</strong>: Respects system access controls</li>
+<li><strong>Safe Defaults</strong>: Conservative approach to information gathering</li>
+</ul>
+
+<h3>Network Security</h3>
+<ul>
+<li><strong>No External Queries</strong>: Avoids external service dependencies by default</li>
+<li><strong>Local Detection</strong>: Prefers local detection methods</li>
+<li><strong>Firewall Awareness</strong>: Considers firewall restrictions</li>
+</ul>
+
+<h2>Integration Points</h2>
+
+<h3>Logging System</h3>
+<p>Integrates with the centralized logging system:</p>
+<ul>
+<li>Uses standardized logging patterns</li>
+<li>Provides detailed operation logs</li>
+<li>Supports debug mode logging</li>
+</ul>
+
+<h3>Configuration System</h3>
+<p>Provides information for system configuration:</p>
+<ul>
+<li>Server identification in configuration files</li>
+<li>Network configuration validation</li>
+<li>Environment-specific settings</li>
+</ul>
+
+<h3>Monitoring Integration</h3>
+<p>Supports system monitoring and alerting:</p>
+<ul>
+<li>System identification for monitoring</li>
+<li>Network change detection</li>
+<li>Health check information</li>
+</ul>
+
+<h2>Troubleshooting</h2>
+
+<h3>Common Issues</h3>
+<ul>
+<li><strong>Hostname Resolution Fails</strong>: Check DNS configuration and /etc/hosts</li>
+<li><strong>IP Detection Returns Localhost</strong>: Verify network interface configuration</li>
+<li><strong>Permission Denied</strong>: Check user permissions for network operations</li>
+<li><strong>Multiple IPs Detected</strong>: Review network interface configuration</li>
+</ul>
+
+<h3>Debug Information</h3>
+<p>Enable debug logging to see:</p>
+<ul>
+<li>Detection method attempts</li>
+<li>Network interface scanning results</li>
+<li>DNS resolution details</li>
+<li>Error conditions and fallbacks</li>
+</ul>
+
+<h2>Extension Points</h2>
+
+<h3>Additional Information</h3>
+<p>The utility can be extended to provide:</p>
+<ul>
+<li><strong>System Resources</strong>: CPU, memory, disk information</li>
+<li><strong>Network Statistics</strong>: Bandwidth usage, connection counts</li>
+<li><strong>Service Status</strong>: Running service information</li>
+<li><strong>Performance Metrics</strong>: System performance indicators</li>
+</ul>
+
+<h3>Custom Detection Methods</h3>
+<p>Additional detection methods can be added:</p>
+<ul>
+<li><strong>Cloud Provider APIs</strong>: AWS, Azure, GCP metadata services</li>
+<li><strong>Container Orchestration</strong>: Kubernetes, Docker information</li>
+<li><strong>Network Management</strong>: SNMP, network management protocols</li>
+</ul>
+
+<h2>Related Documentation</h2>
+<ul>
+<li><a href="/Documentation/system/logging_utility">Logging System</a></li>
+<li><a href="/Documentation/system/starman_diagnostics">Starman Diagnostics</a></li>
+<li><a href="/Documentation/system/starman_service_manager">Starman Service Manager</a></li>
+<li><a href="/Documentation/controllers/admin_controllers">Admin Controllers Overview</a></li>
+</ul>
+
+[% END %]

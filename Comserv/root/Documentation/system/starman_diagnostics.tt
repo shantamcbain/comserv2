@@ -1,0 +1,373 @@
+[% META title = 'Starman Diagnostics Utility Documentation' %]
+[% PageVersion = 'system/starman_diagnostics.tt,v 1.0 2025/01/15 admin Exp' %]
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+
+<h1>Starman Diagnostics Utility Documentation</h1>
+
+<h2>Overview</h2>
+<p>The <code>Comserv::Util::StarmanDiagnostics</code> utility provides comprehensive diagnostics for Starman service without requiring interactive sudo commands. This utility focuses on checks that can be performed safely from a web interface, providing detailed analysis of service health and configuration.</p>
+
+<h2>Key Features</h2>
+<ul>
+<li><strong>Web-Safe Diagnostics</strong>: All checks can be performed without elevated privileges</li>
+<li><strong>Comprehensive Analysis</strong>: Multiple diagnostic checks covering all service aspects</li>
+<li><strong>Configuration Validation</strong>: Thorough configuration file analysis</li>
+<li><strong>Port Availability Testing</strong>: Network connectivity diagnostics</li>
+<li><strong>Process Detection</strong>: Service process identification and monitoring</li>
+<li><strong>Actionable Recommendations</strong>: Intelligent suggestions for issue resolution</li>
+</ul>
+
+<h2>File Location</h2>
+<pre>/Comserv/lib/Comserv/Util/StarmanDiagnostics.pm</pre>
+
+<h2>Dependencies</h2>
+<ul>
+<li>Moose - Object-oriented framework</li>
+<li>Try::Tiny - Exception handling</li>
+<li>POSIX - System utilities and time formatting</li>
+<li>File::Spec - Cross-platform path handling</li>
+<li>Cwd - Current working directory operations</li>
+</ul>
+
+<h2>Core Attributes</h2>
+
+<h3>logger</h3>
+<p>Optional logging object for diagnostic operation tracking:</p>
+<pre>has 'logger' =&gt; (
+    is =&gt; 'rw',
+    isa =&gt; 'Object',
+    required =&gt; 0,
+);</pre>
+
+<h2>Core Methods</h2>
+
+<h3>execute_diagnostics($app_root)</h3>
+<p>Executes comprehensive Starman service diagnostics.</p>
+
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>$app_root</code> - Application root directory path</li>
+</ul>
+
+<p><strong>Returns:</strong> HashRef with complete diagnostic results:</p>
+<pre>{
+    timestamp =&gt; '2025-01-15 10:30:00',
+    checks =&gt; [
+        {
+            name =&gt; 'Service File Check',
+            status =&gt; 'pass|fail|warning',
+            message =&gt; 'Detailed check result',
+            details =&gt; { ... }
+        },
+        # ... more checks
+    ],
+    summary =&gt; {
+        total_checks =&gt; 5,
+        passed =&gt; 3,
+        failed =&gt; 1,
+        warnings =&gt; 1,
+        overall_status =&gt; 'healthy|degraded|critical'
+    },
+    recommendations =&gt; [
+        'Specific action to take',
+        'Another recommendation'
+    ]
+}</pre>
+
+<h2>Diagnostic Checks</h2>
+
+<h3>Service File Existence Check</h3>
+<p><strong>Method:</strong> <code>check_service_file_exists()</code></p>
+<p><strong>Purpose:</strong> Verifies that Starman service files are present and accessible</p>
+<p><strong>Checks:</strong></p>
+<ul>
+<li>Service configuration files</li>
+<li>PSGI application files</li>
+<li>Required library files</li>
+<li>PID file locations</li>
+</ul>
+
+<h3>Port Availability Check</h3>
+<p><strong>Method:</strong> <code>check_port_availability()</code></p>
+<p><strong>Purpose:</strong> Tests network port availability and connectivity</p>
+<p><strong>Checks:</strong></p>
+<ul>
+<li>Default Starman ports (5000, 8080, etc.)</li>
+<li>Custom configured ports</li>
+<li>Port binding status</li>
+<li>Network interface availability</li>
+</ul>
+
+<h3>Configuration Validation</h3>
+<p><strong>Method:</strong> <code>check_configuration($app_root)</code></p>
+<p><strong>Purpose:</strong> Validates Starman and application configuration</p>
+<p><strong>Checks:</strong></p>
+<ul>
+<li>PSGI file syntax and accessibility</li>
+<li>Catalyst configuration files</li>
+<li>Database configuration</li>
+<li>Environment-specific settings</li>
+<li>Required modules and dependencies</li>
+</ul>
+
+<h3>Process Detection</h3>
+<p><strong>Method:</strong> <code>check_process_status()</code></p>
+<p><strong>Purpose:</strong> Identifies and analyzes running Starman processes</p>
+<p><strong>Checks:</strong></p>
+<ul>
+<li>Process identification by name</li>
+<li>PID file validation</li>
+<li>Process resource usage</li>
+<li>Process health indicators</li>
+</ul>
+
+<h3>File System Checks</h3>
+<p><strong>Method:</strong> <code>check_file_system()</code></p>
+<p><strong>Purpose:</strong> Validates file system requirements and permissions</p>
+<p><strong>Checks:</strong></p>
+<ul>
+<li>Directory permissions</li>
+<li>File accessibility</li>
+<li>Disk space availability</li>
+<li>Log file rotation status</li>
+</ul>
+
+<h2>Check Result Structure</h2>
+
+<p>Each diagnostic check returns a standardized result structure:</p>
+<pre>{
+    name =&gt; 'Human-readable check name',
+    status =&gt; 'pass|fail|warning',
+    message =&gt; 'Brief result description',
+    details =&gt; {
+        # Check-specific detailed information
+        files_checked =&gt; [...],
+        errors_found =&gt; [...],
+        warnings =&gt; [...],
+        recommendations =&gt; [...]
+    },
+    execution_time =&gt; 0.123,  # seconds
+    timestamp =&gt; '2025-01-15 10:30:00'
+}</pre>
+
+<h2>Status Levels</h2>
+
+<h3>Pass Status</h3>
+<ul>
+<li><strong>Meaning:</strong> Check completed successfully with no issues</li>
+<li><strong>Action:</strong> No action required</li>
+<li><strong>Color Code:</strong> Green</li>
+</ul>
+
+<h3>Warning Status</h3>
+<ul>
+<li><strong>Meaning:</strong> Check completed but found minor issues or suboptimal conditions</li>
+<li><strong>Action:</strong> Review recommendations for optimization</li>
+<li><strong>Color Code:</strong> Yellow/Orange</li>
+</ul>
+
+<h3>Fail Status</h3>
+<ul>
+<li><strong>Meaning:</strong> Check found critical issues that prevent proper operation</li>
+<li><strong>Action:</strong> Immediate attention required</li>
+<li><strong>Color Code:</strong> Red</li>
+</ul>
+
+<h2>Recommendation System</h2>
+
+<p>The diagnostics utility provides intelligent recommendations based on check results:</p>
+
+<h3>Configuration Recommendations</h3>
+<ul>
+<li>Configuration file corrections</li>
+<li>Performance optimization settings</li>
+<li>Security configuration improvements</li>
+<li>Environment-specific adjustments</li>
+</ul>
+
+<h3>System Recommendations</h3>
+<ul>
+<li>File permission corrections</li>
+<li>Directory structure improvements</li>
+<li>Resource allocation adjustments</li>
+<li>Monitoring setup suggestions</li>
+</ul>
+
+<h3>Operational Recommendations</h3>
+<ul>
+<li>Service restart procedures</li>
+<li>Maintenance scheduling</li>
+<li>Backup verification</li>
+<li>Update procedures</li>
+</ul>
+
+<h2>Web-Safe Design</h2>
+
+<h3>No Elevated Privileges Required</h3>
+<p>All diagnostic operations are designed to work without sudo:</p>
+<ul>
+<li><strong>Read-Only Operations</strong>: Only reads files and system state</li>
+<li><strong>Safe System Calls</strong>: Uses only non-privileged system calls</li>
+<li><strong>Permission Aware</strong>: Gracefully handles permission limitations</li>
+<li><strong>Alternative Methods</strong>: Provides fallback methods when direct access is limited</li>
+</ul>
+
+<h3>Security Considerations</h3>
+<ul>
+<li><strong>Information Filtering</strong>: Sensitive information is filtered from output</li>
+<li><strong>Path Validation</strong>: All file paths are validated for security</li>
+<li><strong>Error Sanitization</strong>: Error messages don't reveal system internals</li>
+<li><strong>Access Control</strong>: Respects existing file system permissions</li>
+</ul>
+
+<h2>Integration Points</h2>
+
+<h3>StarmanServiceManager Integration</h3>
+<p>Works closely with the StarmanServiceManager utility:</p>
+<ul>
+<li>Provides detailed diagnostic data for service status</li>
+<li>Supplies recommendations for service management</li>
+<li>Offers health check results for monitoring</li>
+</ul>
+
+<h3>Controller Integration</h3>
+<p>Integrates with admin controllers for web interface:</p>
+<ul>
+<li>Provides diagnostic data for web display</li>
+<li>Supports AJAX requests for real-time updates</li>
+<li>Formats results for template rendering</li>
+</ul>
+
+<h2>Usage Examples</h2>
+
+<h3>Basic Diagnostic Execution</h3>
+<pre>use Comserv::Util::StarmanDiagnostics;
+
+my $diagnostics = Comserv::Util::StarmanDiagnostics-&gt;new();
+my $results = $diagnostics-&gt;execute_diagnostics('/path/to/app');
+
+print "Overall Status: " . $results-&gt;{summary}-&gt;{overall_status} . "\n";
+print "Checks Passed: " . $results-&gt;{summary}-&gt;{passed} . "/" . 
+      $results-&gt;{summary}-&gt;{total_checks} . "\n";
+
+if (@{$results-&gt;{recommendations}}) {
+    print "Recommendations:\n";
+    for my $rec (@{$results-&gt;{recommendations}}) {
+        print "  - $rec\n";
+    }
+}</pre>
+
+<h3>Individual Check Execution</h3>
+<pre># Execute specific diagnostic checks
+my $port_check = $diagnostics-&gt;check_port_availability();
+my $config_check = $diagnostics-&gt;check_configuration('/app/root');
+
+if ($port_check-&gt;{status} eq 'fail') {
+    print "Port issues detected: " . $port_check-&gt;{message} . "\n";
+}</pre>
+
+<h3>Controller Integration</h3>
+<pre># In an admin controller
+sub diagnostics : Local {
+    my ($self, $c) = @_;
+    
+    my $diagnostics = Comserv::Util::StarmanDiagnostics-&gt;new(
+        logger =&gt; $self-&gt;logging
+    );
+    
+    my $results = $diagnostics-&gt;execute_diagnostics($c-&gt;config-&gt;{home});
+    
+    $c-&gt;stash(
+        diagnostic_results =&gt; $results,
+        template =&gt; 'admin/diagnostics.tt'
+    );
+}</pre>
+
+<h2>Performance Considerations</h2>
+
+<h3>Efficient Execution</h3>
+<ul>
+<li><strong>Parallel Checks</strong>: Independent checks can run concurrently</li>
+<li><strong>Timeout Handling</strong>: All checks have reasonable timeouts</li>
+<li><strong>Resource Conscious</strong>: Minimal system resource usage</li>
+<li><strong>Caching</strong>: Results can be cached for short periods</li>
+</ul>
+
+<h3>Scalability</h3>
+<ul>
+<li><strong>Lightweight Operations</strong>: Suitable for frequent execution</li>
+<li><strong>Minimal Dependencies</strong>: Reduced external dependencies</li>
+<li><strong>Memory Efficient</strong>: Low memory footprint</li>
+</ul>
+
+<h2>Error Handling</h2>
+
+<h3>Graceful Degradation</h3>
+<p>The utility handles various error conditions gracefully:</p>
+<ul>
+<li><strong>Permission Errors</strong>: Provides alternative check methods</li>
+<li><strong>File Access Errors</strong>: Reports issues without failing completely</li>
+<li><strong>Network Errors</strong>: Handles connectivity issues appropriately</li>
+<li><strong>System Errors</strong>: Provides meaningful error messages</li>
+</ul>
+
+<h3>Error Reporting</h3>
+<ul>
+<li><strong>Detailed Messages</strong>: Clear description of what went wrong</li>
+<li><strong>Context Information</strong>: Relevant system context for errors</li>
+<li><strong>Recovery Suggestions</strong>: Actionable steps to resolve issues</li>
+</ul>
+
+<h2>Monitoring and Alerting</h2>
+
+<h3>Health Monitoring</h3>
+<p>The diagnostics utility supports ongoing health monitoring:</p>
+<ul>
+<li>Regular diagnostic execution</li>
+<li>Trend analysis of check results</li>
+<li>Performance degradation detection</li>
+<li>Proactive issue identification</li>
+</ul>
+
+<h3>Alert Integration</h3>
+<p>Results can be integrated with alerting systems:</p>
+<ul>
+<li>Critical failure notifications</li>
+<li>Performance threshold alerts</li>
+<li>Configuration change detection</li>
+<li>Service availability monitoring</li>
+</ul>
+
+<h2>Troubleshooting</h2>
+
+<h3>Common Issues</h3>
+<ul>
+<li><strong>Permission Denied</strong>: Check file system permissions and user context</li>
+<li><strong>Network Timeouts</strong>: Verify network connectivity and firewall settings</li>
+<li><strong>Configuration Errors</strong>: Validate configuration file syntax and paths</li>
+<li><strong>Missing Dependencies</strong>: Ensure all required modules are installed</li>
+</ul>
+
+<h3>Debug Mode</h3>
+<p>Enable detailed logging to see:</p>
+<ul>
+<li>Individual check execution details</li>
+<li>System call results</li>
+<li>File access attempts</li>
+<li>Network connection tests</li>
+</ul>
+
+<h2>Related Documentation</h2>
+<ul>
+<li><a href="/Documentation/system/starman_service_manager">Starman Service Manager</a></li>
+<li><a href="/Documentation/system/system_info_utility">SystemInfo Utility</a></li>
+<li><a href="/Documentation/system/logging_utility">Logging System</a></li>
+<li><a href="/Documentation/controllers/admin_controllers">Admin Controllers Overview</a></li>
+</ul>
+
+[% END %]
