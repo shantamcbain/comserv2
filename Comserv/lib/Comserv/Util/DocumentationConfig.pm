@@ -68,7 +68,7 @@ sub instance {
 sub load_config {
     my ($self) = @_;
 
-    my $config_file = File::Spec->catfile('root', 'Documentation', 'config', 'documentation_config.json');
+    my $config_file = File::Spec->catfile('config', 'documentation_config.json');
 
     try {
         # Read the JSON file
@@ -233,6 +233,87 @@ sub get_filtered_categories {
     }
 
     return \%filtered_categories;
+}
+
+# Save configuration to JSON file
+sub save_config {
+    my ($self) = @_;
+    
+    my $config_file = File::Spec->catfile('config', 'documentation_config.json');
+    
+    try {
+        # Prepare data structure for JSON
+        my $config_data = {
+            categories => $self->{categories},
+            pages => $self->{pages}
+        };
+        
+        # Encode to JSON with pretty formatting
+        my $json_text = JSON->new->pretty->canonical->encode($config_data);
+        
+        # Write to file
+        open my $fh, '>:encoding(UTF-8)', $config_file or die "Cannot write to $config_file: $!";
+        print $fh $json_text;
+        close $fh;
+        
+        # Clear the singleton instance to force fresh reload
+        $instance = undef;
+        
+        # Force reload of the current instance data from the file we just wrote
+        $self->reload_config();
+        
+        Comserv::Util::Logging::log_to_file(
+            "Saved documentation configuration: " .
+                scalar(keys %{$self->{categories}}) . " categories, " .
+                scalar(@{$self->{pages}}) . " pages",
+            undef, 'INFO'
+        );
+        
+        return 1;
+    } catch {
+        Comserv::Util::Logging::log_to_file(
+            "Error saving documentation configuration: $_",
+            undef, 'ERROR'
+        );
+        return 0;
+    };
+}
+
+# Update a page's roles and save to file
+sub update_page_roles {
+    my ($self, $page_id, $new_roles) = @_;
+    
+    # Find the page in the pages array
+    foreach my $page (@{$self->{pages}}) {
+        if ($page->{id} eq $page_id) {
+            # Update roles
+            $page->{roles} = $new_roles;
+            
+            # Update the indexed version
+            $self->{pages_by_id}->{$page_id} = $page;
+            
+            # Save to file
+            my $success = $self->save_config();
+            
+            if ($success) {
+                # Note: save_config() now handles clearing singleton and reloading
+                
+                Comserv::Util::Logging::log_to_file(
+                    "Updated roles for page '$page_id': " . join(', ', @$new_roles),
+                    undef, 'INFO'
+                );
+            }
+            
+            return $success;
+        }
+    }
+    
+    # Page not found
+    Comserv::Util::Logging::log_to_file(
+        "Page '$page_id' not found for role update",
+        undef, 'WARN'
+    );
+    return 0;
 }
 
 # Reload configuration from JSON file

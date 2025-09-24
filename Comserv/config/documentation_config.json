@@ -1,0 +1,800 @@
+{
+   "categories" : {
+      "admin_guides" : {
+         "description" : "Documentation for system administrators",
+         "display_order" : 2,
+         "icon" : "fas fa-shield-alt",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site_specific" : false,
+         "title" : "Administrator Guides"
+      },
+      "changelog" : {
+         "description" : "System changes and updates",
+         "display_order" : 6,
+         "icon" : "fas fa-history",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site_specific" : false,
+         "title" : "Change Log"
+      },
+      "developer_guides" : {
+         "description" : "Documentation for developers",
+         "display_order" : 3,
+         "icon" : "fas fa-code",
+         "roles" : [
+            "developer"
+         ],
+         "site_specific" : false,
+         "title" : "Developer Documentation"
+      },
+      "proxmox" : {
+         "description" : "Proxmox VE management and configuration",
+         "display_order" : 4,
+         "icon" : "fas fa-server",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site_specific" : false,
+         "title" : "Proxmox Documentation"
+      },
+      "system_management" : {
+         "description" : "System configuration and management guides",
+         "display_order" : 5,
+         "icon" : "fas fa-cogs",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site_specific" : false,
+         "title" : "System Management"
+      },
+      "user_guides" : {
+         "description" : "Documentation for end users of the system",
+         "display_order" : 1,
+         "icon" : "fas fa-users",
+         "roles" : [
+            "normal",
+            "editor",
+            "admin",
+            "developer"
+         ],
+         "site_specific" : false,
+         "title" : "User Guides"
+      }
+   },
+   "pages" : [
+      {
+         "categories" : [
+            "proxmox",
+            "admin_guides"
+         ],
+         "description" : "Complete Proxmox VE API reference and usage guide",
+         "format" : "markdown",
+         "id" : "proxmox_api",
+         "path" : "Documentation/proxmox_api.md",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site" : "all",
+         "title" : "Proxmox API Documentation"
+      },
+      {
+         "categories" : [
+            "proxmox",
+            "admin_guides"
+         ],
+         "description" : "CLI commands for managing Proxmox VE",
+         "format" : "markdown",
+         "id" : "proxmox_commands",
+         "path" : "Documentation/proxmox_commands.md",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site" : "all",
+         "title" : "Proxmox Commands Reference"
+      },
+      {
+         "categories" : [
+            "proxmox",
+            "admin_guides"
+         ],
+         "description" : "Guide for configuring IP addresses in Proxmox",
+         "format" : "markdown",
+         "id" : "proxmox_ip_configuration",
+         "path" : "Documentation/proxmox_ip_configuration.md",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site" : "all",
+         "title" : "Proxmox IP Configuration"
+      },
+      {
+         "categories" : [
+            "proxmox",
+            "changelog"
+         ],
+         "description" : "Changes to Proxmox authentication system",
+         "format" : "markdown",
+         "id" : "proxmox_authentication_changes",
+         "path" : "Documentation/proxmox_authentication_changes.md",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site" : "all",
+         "title" : "Proxmox Authentication Changes"
+      },
+      {
+         "categories" : [
+            "admin_guides"
+         ],
+         "description" : "Guide for adding new sites to the system",
+         "format" : "template",
+         "id" : "adding_new_sites",
+         "path" : "Documentation/admin.tt",
+         "roles" : [
+            "editor",
+            "admin",
+            "developer"
+         ],
+         "site" : "all",
+         "title" : "Admin"
+      },
+      {
+         "categories" : [
+            "admin_guides"
+         ],
+         "description" : "Managing administrator access and permissions",
+         "format" : "markdown",
+         "id" : "admin_access_control",
+         "path" : "Documentation/admin/admin_access_control.md",
+         "roles" : [
+            "editor",
+            "admin",
+            "developer"
+         ],
+         "site" : "all",
+         "title" : "Admin/Admin Access Control"
+      },
+      {
+         "categories" : [
+            "admin_guides"
+         ],
+         "description" : "Step-by-step guide for updating software on the production server",
+         "format" : "template",
+         "id" : "server_update_procedure",
+         "path" : "Documentation/admin/server_update_procedure.tt",
+         "roles" : [
+            "editor",
+            "admin",
+            "developer"
+         ],
+         "site" : "all",
+         "title" : "Admin/Server Update Procedure"
+      },
+      {
+         "categories" : [
+            "user_guides",
+            "system_management"
+         ],
+         "description" : "Documentation for the project management features",
+         "format" : "markdown",
+         "id" : "project_management_system",
+         "path" : "Documentation/project_management_system.md",
+         "roles" : [
+            "normal",
+            "editor",
+            "admin",
+            "developer"
+         ],
+         "site" : "all",
+         "title" : "Project Management System"
+      },
+      {
+         "categories" : [
+            "developer_guides",
+            "system_management"
+         ],
+         "description" : "Database connection configuration and troubleshooting",
+         "format" : "markdown",
+         "id" : "database_connection",
+         "path" : "Documentation/database_connection.md",
+         "roles" : [
+            "developer",
+            "admin"
+         ],
+         "site" : "all",
+         "title" : "Database Connection"
+      },
+      {
+         "categories" : [
+            "developer_guides",
+            "changelog"
+         ],
+         "description" : "Recent changes to database connection handling",
+         "format" : "markdown",
+         "id" : "database_connection_changes",
+         "path" : "Documentation/database_connection_changes.md",
+         "roles" : [
+            "developer",
+            "admin"
+         ],
+         "site" : "all",
+         "title" : "Database Connection Changes"
+      },
+      {
+         "categories" : [
+            "admin_guides",
+            "developer_guides"
+         ],
+         "description" : "Checklist for deploying the application",
+         "format" : "markdown",
+         "id" : "deployment_checklist",
+         "path" : "Documentation/deployment_checklist.md",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site" : "all",
+         "title" : "Deployment Checklist"
+      },
+      {
+         "categories" : [
+            "developer_guides"
+         ],
+         "description" : "Future development plans and roadmap",
+         "format" : "markdown",
+         "id" : "development_plans",
+         "path" : "Documentation/development_plans.md",
+         "roles" : [
+            "developer",
+            "admin"
+         ],
+         "site" : "all",
+         "title" : "Development Plans"
+      },
+      {
+         "categories" : [
+            "developer_guides",
+            "system_management"
+         ],
+         "description" : "Guide for setting up NPM and Node.js components",
+         "format" : "markdown",
+         "id" : "npm_setup_guide",
+         "path" : "Documentation/npm_setup_guide.md",
+         "roles" : [
+            "developer",
+            "admin"
+         ],
+         "site" : "all",
+         "title" : "NPM Setup Guide"
+      },
+      {
+         "categories" : [
+            "developer_guides",
+            "system_management"
+         ],
+         "description" : "Configuration guide for NPM API integration",
+         "format" : "markdown",
+         "id" : "npm_api_configuration",
+         "path" : "Documentation/npm_api_configuration.md",
+         "roles" : [
+            "developer",
+            "admin"
+         ],
+         "site" : "all",
+         "title" : "NPM API Configuration"
+      },
+      {
+         "categories" : [
+            "developer_guides"
+         ],
+         "description" : "Standardization of controller routing patterns",
+         "format" : "markdown",
+         "id" : "controller_routing_standardization",
+         "path" : "Documentation/controller_routing_standardization.md",
+         "roles" : [
+            "developer"
+         ],
+         "site" : "all",
+         "title" : "Controller Routing Standardization"
+      },
+      {
+         "categories" : [
+            "admin_guides",
+            "system_management"
+         ],
+         "description" : "Troubleshooting guide for site configuration issues",
+         "format" : "markdown",
+         "id" : "site_configuration_troubleshooting",
+         "path" : "Documentation/site_configuration_troubleshooting.md",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site" : "all",
+         "title" : "Site Configuration Troubleshooting"
+      },
+      {
+         "categories" : [
+            "developer_guides",
+            "changelog"
+         ],
+         "description" : "Technical changes and system updates",
+         "format" : "markdown",
+         "id" : "technical_changes",
+         "path" : "Documentation/technical_changes.md",
+         "roles" : [
+            "developer",
+            "admin"
+         ],
+         "site" : "all",
+         "title" : "Technical Changes"
+      },
+      {
+         "categories" : [
+            "developer_guides"
+         ],
+         "description" : "Documentation for navigation table system",
+         "format" : "markdown",
+         "id" : "navigation_tables",
+         "path" : "Documentation/navigation_tables.md",
+         "roles" : [
+            "developer"
+         ],
+         "site" : "all",
+         "title" : "Navigation Tables"
+      },
+      {
+         "categories" : [
+            "developer_guides"
+         ],
+         "description" : "Guidelines for managing development sessions and handoffs",
+         "format" : "template",
+         "id" : "session_management_plan",
+         "path" : "Documentation/session_history/session_management_plan.tt",
+         "roles" : [
+            "developer",
+            "admin"
+         ],
+         "site" : "all",
+         "title" : "Session Management Plan"
+      },
+      {
+         "categories" : [
+            "developer_guides",
+            "changelog"
+         ],
+         "description" : "Documentation of bug fixes and resolutions",
+         "format" : "markdown",
+         "id" : "bug_fixes_documentation",
+         "path" : "Documentation/bug_fixes_documentation.md",
+         "roles" : [
+            "developer",
+            "admin"
+         ],
+         "site" : "all",
+         "title" : "Bug Fixes Documentation"
+      },
+      {
+         "categories" : [
+            "developer_guides",
+            "changelog"
+         ],
+         "description" : "Fix for MCOOP controller issues",
+         "format" : "markdown",
+         "id" : "mcoop_controller_fix",
+         "path" : "Documentation/mcoop_controller_fix.md",
+         "roles" : [
+            "developer",
+            "admin"
+         ],
+         "site" : "all",
+         "title" : "MCOOP Controller Fix"
+      },
+      {
+         "categories" : [
+            "admin_guides"
+         ],
+         "description" : "Setup guide for Weaverbeck site",
+         "format" : "markdown",
+         "id" : "weaverbeck_site_setup",
+         "path" : "Documentation/weaverbeck_site_setup.md",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site" : "all",
+         "title" : "Weaverbeck Site Setup"
+      },
+      {
+         "categories" : [
+            "changelog"
+         ],
+         "description" : "Main system changelog",
+         "format" : "markdown",
+         "id" : "changelog_main",
+         "path" : "Documentation/changelog/CHANGELOG.md",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site" : "all",
+         "title" : "Main Changelog"
+      },
+      {
+         "categories" : [
+            "changelog",
+            "proxmox"
+         ],
+         "description" : "Changelog for Proxmox authentication changes in July 2024",
+         "format" : "markdown",
+         "id" : "changelog_2024_07_proxmox",
+         "path" : "Documentation/changelog/2024-07-proxmox-authentication-changes.md",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site" : "all",
+         "title" : "Proxmox Authentication Changes (July 2024)"
+      },
+      {
+         "categories" : [
+            "changelog",
+            "developer_guides"
+         ],
+         "description" : "Changelog for controller fixes in August 2024",
+         "format" : "markdown",
+         "id" : "changelog_2024_08_controller",
+         "path" : "Documentation/changelog/2024-08-controller-fixes.md",
+         "roles" : [
+            "developer",
+            "admin"
+         ],
+         "site" : "all",
+         "title" : "Controller Fixes (August 2024)"
+      },
+      {
+         "categories" : [
+            "changelog",
+            "developer_guides"
+         ],
+         "description" : "Changelog for template error fixes and documentation organization",
+         "format" : "markdown",
+         "id" : "changelog_2025_05_20_template",
+         "path" : "Documentation/changelog/2025-05-20-template-error-fix-and-docs-organization.md",
+         "roles" : [
+            "developer",
+            "admin"
+         ],
+         "site" : "all",
+         "title" : "Template Error Fix and Docs Organization (May 2025)"
+      },
+      {
+         "categories" : [
+            "changelog",
+            "developer_guides"
+         ],
+         "description" : "Changelog for git pull debug message fix",
+         "format" : "markdown",
+         "id" : "changelog_2025_05_25_git_debug",
+         "path" : "Documentation/changelog/2025-05-25-git-pull-debug-msg-fix.md",
+         "roles" : [
+            "developer",
+            "admin"
+         ],
+         "site" : "all",
+         "title" : "Git Pull Debug Message Fix (May 2025)"
+      },
+      {
+         "categories" : [
+            "changelog",
+            "developer_guides"
+         ],
+         "description" : "Changelog for git pull routing fix",
+         "format" : "markdown",
+         "id" : "changelog_2025_05_25_git_routing",
+         "path" : "Documentation/changelog/2025-05-25-git-pull-routing-fix.md",
+         "roles" : [
+            "developer",
+            "admin"
+         ],
+         "site" : "all",
+         "title" : "Git Pull Routing Fix (May 2025)"
+      },
+      {
+         "categories" : [
+            "admin_guides"
+         ],
+         "description" : "Template-based administrator guides and documentation",
+         "format" : "template",
+         "id" : "admin_guides_tt",
+         "path" : "Documentation/admin_guides.tt",
+         "roles" : [
+            "editor",
+            "admin",
+            "developer"
+         ],
+         "site" : "all",
+         "title" : "Admin Guides"
+      },
+      {
+         "categories" : [
+            "developer_guides",
+            "system_management"
+         ],
+         "description" : "Complete documentation for the theme system",
+         "format" : "template",
+         "id" : "theme_system_tt",
+         "path" : "Documentation/theme_system.tt",
+         "roles" : [
+            "developer",
+            "admin"
+         ],
+         "site" : "all",
+         "title" : "Theme System Documentation"
+      },
+      {
+         "categories" : [
+            "proxmox",
+            "admin_guides"
+         ],
+         "description" : "Template-based Proxmox VE documentation",
+         "format" : "template",
+         "id" : "proxmox_tt",
+         "path" : "Documentation/proxmox.tt",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site" : "all",
+         "title" : "Proxmox Documentation (Template)"
+      },
+      {
+         "categories" : [
+            "admin_guides",
+            "system_management"
+         ],
+         "description" : "Guide for Cloudflare API authentication setup",
+         "format" : "template",
+         "id" : "cloudflare_api_authentication_tt",
+         "path" : "Documentation/cloudflare_api_authentication.tt",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site" : "all",
+         "title" : "Cloudflare API Authentication"
+      },
+      {
+         "categories" : [
+            "admin_guides"
+         ],
+         "description" : "Guidelines for AI-assisted development",
+         "format" : "template",
+         "id" : "ai_development_guidelines_tt",
+         "path" : "Documentation/AI.tt",
+         "roles" : [
+            "editor",
+            "admin",
+            "developer"
+         ],
+         "site" : "all",
+         "title" : "AI"
+      },
+      {
+         "categories" : [
+            "admin_guides",
+            "developer_guides"
+         ],
+         "description" : "Guidelines for AI-assisted documentation",
+         "format" : "markdown",
+         "id" : "ai_documentation_guidelines_tt",
+         "path" : "Documentation/AI_DOCUMENTATION_GUIDELINES.md",
+         "roles" : [
+            "editor",
+            "admin",
+            "developer"
+         ],
+         "site" : "all",
+         "title" : "AI DOCUMENTATION GUIDELINES"
+      },
+      {
+         "categories" : [
+            "developer_guides",
+            "admin_guides"
+         ],
+         "description" : "Complete system overview and architecture",
+         "format" : "template",
+         "id" : "system_overview_tt",
+         "path" : "Documentation/system_overview.tt",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site" : "all",
+         "title" : "System Overview"
+      },
+      {
+         "categories" : [
+            "admin_guides"
+         ],
+         "description" : "Complete installation guide",
+         "format" : "template",
+         "id" : "installation_tt",
+         "path" : "Documentation/Installation.tt",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site" : "all",
+         "title" : "Installation Guide (Template)"
+      },
+      {
+         "categories" : [
+            "developer_guides",
+            "system_management"
+         ],
+         "description" : "Complete Todo system documentation",
+         "format" : "template",
+         "id" : "todo_system_tt",
+         "path" : "Documentation/todo_system.tt",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site" : "all",
+         "title" : "Todo System Documentation"
+      },
+      {
+         "categories" : [
+            "developer_guides",
+            "admin_guides"
+         ],
+         "description" : "Complete comprehensive Todo system documentation",
+         "format" : "template",
+         "id" : "todo_system_comprehensive_tt",
+         "path" : "Documentation/todo_system_comprehensive.tt",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site" : "all",
+         "title" : "Todo System - Comprehensive Documentation"
+      },
+      {
+         "categories" : [
+            "admin_guides",
+            "system_management"
+         ],
+         "description" : "Complete mail system documentation",
+         "format" : "template",
+         "id" : "mail_system_tt",
+         "path" : "Documentation/mail_system.tt",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site" : "all",
+         "title" : "Mail System Documentation"
+      },
+      {
+         "categories" : [
+            "proxmox",
+            "developer_guides"
+         ],
+         "description" : "Template-based Proxmox API documentation",
+         "format" : "template",
+         "id" : "proxmox_api_tt",
+         "path" : "Documentation/proxmox/api.tt",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site" : "all",
+         "title" : "Proxmox API (Template)"
+      },
+      {
+         "categories" : [
+            "proxmox",
+            "admin_guides"
+         ],
+         "description" : "Template-based Proxmox commands reference",
+         "format" : "template",
+         "id" : "proxmox_commands_tt",
+         "path" : "Documentation/proxmox/commands.tt",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site" : "all",
+         "title" : "Proxmox Commands (Template)"
+      },
+      {
+         "categories" : [
+            "admin_guides"
+         ],
+         "description" : "Complete administrator guide",
+         "format" : "template",
+         "id" : "admin_guide_tt",
+         "path" : "Documentation/roles/admin/admin_guide.tt",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site" : "all",
+         "title" : "Administrator Guide (Template)"
+      },
+      {
+         "categories" : [
+            "admin_guides"
+         ],
+         "description" : "Complete Linux commands reference",
+         "format" : "template",
+         "id" : "linux_commands_tt",
+         "path" : "Documentation/roles/admin/linux_commands.tt",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site" : "all",
+         "title" : "Linux Commands Reference"
+      },
+      {
+         "categories" : [
+            "developer_guides"
+         ],
+         "description" : "Complete API reference documentation",
+         "format" : "template",
+         "id" : "api_reference_tt",
+         "path" : "Documentation/roles/developer/api_reference.tt",
+         "roles" : [
+            "developer"
+         ],
+         "site" : "all",
+         "title" : "API Reference (Template)"
+      },
+      {
+         "categories" : [
+            "user_guides"
+         ],
+         "description" : "Getting started guide",
+         "format" : "template",
+         "id" : "getting_started_tt",
+         "path" : "Documentation/roles/normal/getting_started.tt",
+         "roles" : [
+            "normal",
+            "editor",
+            "admin",
+            "developer"
+         ],
+         "site" : "all",
+         "title" : "Getting Started (Template)"
+      },
+      {
+         "categories" : [
+            "admin_guides",
+            "developer_guides"
+         ],
+         "description" : "Main documentation index page",
+         "format" : "template",
+         "id" : "documentation_index_tt",
+         "path" : "Documentation/index.tt",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site" : "all",
+         "title" : "Documentation Index"
+      }
+   ]
+}

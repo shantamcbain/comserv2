@@ -5,6 +5,7 @@ use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
 use Comserv::Util::AdminAuth;
+use Comserv::Util::BackupManager;
 use Comserv::Controller::Admin::Git;
 use Data::Dumper;
 use JSON;
@@ -29,6 +30,13 @@ sub logging {
 sub admin_auth {
     my ($self) = @_;
     return Comserv::Util::AdminAuth->new();
+}
+
+# Returns an instance of the backup manager utility
+sub backup_manager {
+    my ($self, $c) = @_;
+    my $app_dir = $c ? $c->config->{home} : undef;
+    return Comserv::Util::BackupManager->new($app_dir ? (app_dir => $app_dir) : ());
 }
 
 # Begin method to check if the user has admin role
@@ -785,20 +793,21 @@ sub emergency_restore :Chained('base') :PathPart('emergency-restore') :Args(0) {
     
     if ($c->req->method eq 'POST') {
         my $action = $c->req->param('action');
+        my $backup_manager = $self->backup_manager($c);
         
         if ($action eq 'restore_psgi') {
-            my $result = $self->restore_psgi_file($c);
+            my $result = $backup_manager->restore_psgi_file();
             $c->stash(%$result);
         } elsif ($action eq 'restore_file') {
             my $backup_path = $c->req->param('backup_path');
             my $target_file = $c->req->param('target_file');
-            my $result = $self->restore_file_from_backup($c, $backup_path, $target_file);
+            my $result = $backup_manager->restore_file_from_backup($backup_path, $target_file);
             $c->stash(%$result);
         }
     }
     
-    # Get backup directory contents
-    my $backup_contents = $self->get_backup_directory_contents($c);
+    # Get backup directory contents using BackupManager
+    my $backup_contents = $self->backup_manager($c)->get_backup_directory_contents();
     $c->stash(backup_contents => $backup_contents);
     
     # Check if comserv.psgi exists

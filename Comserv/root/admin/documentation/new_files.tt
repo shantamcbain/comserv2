@@ -1,0 +1,145 @@
+[%# New Files Template %]
+[% META title = 'New Documentation Files' %]
+[% PageVersion = 'Documentation/new_files.tt,v 1.0 2025/01/27 system Exp' %]
+
+<div class="documentation-container">
+    <h1>New Documentation Files</h1>
+    
+    [% IF c.session.debug_mode == 1 %]
+        [% PageVersion %]
+    [% END %]
+
+    [% IF error %]
+        <div class="alert alert-danger">
+            <strong>Error:</strong> [% error | html %]
+        </div>
+    [% END %]
+
+    [% IF success %]
+        <div class="alert alert-success">
+            <strong>Success:</strong> [% success | html %]
+        </div>
+    [% END %]
+
+    [% IF new_files.size == 0 %]
+        <div class="alert alert-info">
+            <p>No new documentation files found that aren't already in the system configuration.</p>
+        </div>
+        <p><a href="[% c.uri_for(c.controller('Documentation').action_for('index')) %]" class="btn btn-primary">Return to Documentation Index</a></p>
+    [% ELSE %]
+        <div class="alert alert-warning">
+            <p><strong>Found [% new_files.size %] new documentation files</strong> that are not configured in the documentation system.</p>
+            <p>Use the forms below to add them to the system so they become visible to users.</p>
+        </div>
+
+        <div class="new-files-list">
+            [% FOREACH file IN new_files %]
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5>New File: [% file.path | html %]</h5>
+                        <small class="text-muted">Format: [% file.format | html %]</small>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" action="[% c.uri_for(c.controller('Documentation').action_for('add_file')) %]" class="add-file-form">
+                            <input type="hidden" name="path" value="[% file.path | html %]">
+                            <input type="hidden" name="format" value="[% file.format | html %]">
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group mb-3">
+                                        <label for="id_[% loop.index %]">ID (URL identifier):</label>
+                                        <input type="text" class="form-control" name="id" id="id_[% loop.index %]" 
+                                               value="[% file.path | replace('Documentation/', '') | replace('.md', '') | replace('.tt', '') | replace('/', '_') %]" 
+                                               required>
+                                        <small class="form-text text-muted">Used in URLs - should be unique</small>
+                                    </div>
+                                    
+                                    <div class="form-group mb-3">
+                                        <label for="title_[% loop.index %]">Display Title:</label>
+                                        <input type="text" class="form-control" name="title" id="title_[% loop.index %]" 
+                                               value="[% file.title | html %]" required>
+                                    </div>
+                                    
+                                    <div class="form-group mb-3">
+                                        <label for="description_[% loop.index %]">Description:</label>
+                                        <textarea class="form-control" name="description" id="description_[% loop.index %]" rows="2">Documentation file</textarea>
+                                    </div>
+                                    
+                                    <div class="form-group mb-3">
+                                        <label for="site_[% loop.index %]">Site:</label>
+                                        <select class="form-control" name="site" id="site_[% loop.index %]">
+                                            <option value="all" selected>All Sites</option>
+                                            <option value="CSC">CSC Only</option>
+                                            <option value="mcoop">MCoop Only</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <div class="form-group mb-3">
+                                        <label>User Roles (who can access):</label>
+                                        <div class="form-check">
+                                            [% FOREACH role IN file.suggested_roles %]
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="roles" 
+                                                           value="[% role %]" id="role_[% role %]_[% loop.index %]" checked>
+                                                    <label class="form-check-label" for="role_[% role %]_[% loop.index %]">
+                                                        [% role | ucfirst %]
+                                                    </label>
+                                                </div>
+                                            [% END %]
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="form-group mb-3">
+                                        <label>Categories:</label>
+                                        <div class="form-check">
+                                            [% FOREACH cat_id IN config_categories.keys.sort %]
+                                                [% category = config_categories.$cat_id %]
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="categories" 
+                                                           value="[% cat_id %]" id="cat_[% cat_id %]_[% loop.index %]"
+                                                           [% IF file.suggested_categories.grep(cat_id).size > 0 %]checked[% END %]>
+                                                    <label class="form-check-label" for="cat_[% cat_id %]_[% loop.index %]">
+                                                        [% category.title | html %]
+                                                    </label>
+                                                </div>
+                                            [% END %]
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <button type="submit" class="btn btn-primary">Add to Documentation System</button>
+                                <button type="button" class="btn btn-secondary" onclick="this.closest('.card').style.display='none'">Skip This File</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            [% END %]
+        </div>
+
+        <div class="actions mt-4">
+            <p><a href="[% c.uri_for(c.controller('Documentation').action_for('index')) %]" class="btn btn-secondary">Return to Documentation Index</a></p>
+        </div>
+    [% END %]
+</div>
+
+<style>
+.new-files-list .card {
+    border-left: 4px solid #ffc107;
+}
+
+.add-file-form .form-group label {
+    font-weight: bold;
+}
+
+.form-check {
+    margin-bottom: 0.5rem;
+}
+
+.alert {
+    margin-bottom: 1rem;
+}
+</style>

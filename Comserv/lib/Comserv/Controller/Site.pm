@@ -599,8 +599,27 @@ sub modify :Local {
 sub fetch_available_sites :Private {
     my ($self, $c) = @_;
 
+    # Log entry into the method
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_available_sites',
+        'Fetching available sites for current user');
+
     # Get the current site name from the session
     my $current_site_name = $c->session->{SiteName};
+
+    # Check if user is admin
+    my $is_admin = 0;
+    if ($c->session->{roles}) {
+        foreach my $role (@{$c->session->{roles}}) {
+            if (lc($role) eq 'admin') {
+                $is_admin = 1;
+                last;
+            }
+        }
+    }
+
+    # Log user context
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_available_sites',
+        "Current site: $current_site_name, Is admin: $is_admin");
 
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
@@ -608,18 +627,33 @@ sub fetch_available_sites :Private {
     # Create a new Comserv::Model::Site object
     my $site_model = Comserv::Model::Site->new(schema => $schema);
 
-    # Determine which sites to fetch based on the current site name
+    # Determine which sites to fetch based on the current site name and admin status
     my $sites;
-    if (lc($current_site_name) eq 'csc') {
-        # If the current site is 'csc', fetch all sites
+    if (lc($current_site_name) eq 'csc' && $is_admin) {
+        # CSC admins can see all sites from the database
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_available_sites',
+            'CSC admin detected - fetching all sites from database');
+        $sites = $site_model->get_all_sites($c);
+    } elsif ($is_admin) {
+        # Non-CSC admins can see all sites but filtered differently if needed
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_available_sites',
+            'Non-CSC admin detected - fetching limited sites');
+        # For now, non-CSC admins still get all sites, but this can be changed
         $sites = $site_model->get_all_sites($c);
     } else {
-        # Otherwise, fetch only the current site
+        # Regular users only see their current site
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_available_sites',
+            'Regular user detected - fetching only current site');
         my $site = $site_model->get_site_details_by_name($c, $current_site_name);
         $sites = [$site] if $site;
     }
 
-    return $sites;
+    # Log the result
+    my $site_count = $sites ? scalar(@$sites) : 0;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_available_sites',
+        "Returning $site_count sites");
+
+    return $sites || [];
 }
 
 sub add_domain_post :Local {

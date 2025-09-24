@@ -24,6 +24,8 @@
             <p>[% page.description || 'Documentation file.' %]</p>
             [% IF page.site != 'all' %]<span class="site-badge">[% page.site %]</span>[% END %]
             [% IF page.file_type %]<span class="file-type-badge [% page.file_type %]">[% page.file_type %]</span>[% END %]
+            [% IF page.roles %]<span class="roles-badge">Roles: [% page.roles.join(', ') %]</span>[% END %]
+            <a href="/Documentation/edit_roles/[% page_name %]" class="edit-roles-link">Edit Roles</a>
         </a>
         [% END %]
     </div>
@@ -44,6 +46,8 @@
                 <p>[% page.description || 'Template documentation file.' %]</p>
                 [% IF page.site != 'all' %]<span class="site-badge">[% page.site %]</span>[% END %]
                 <span class="file-type-badge template">template</span>
+                [% IF page.roles %]<span class="roles-badge">Roles: [% page.roles.join(', ') %]</span>[% END %]
+                <a href="/Documentation/edit_roles/[% page_name %]" class="edit-roles-link">Edit Roles</a>
             </a>
             [% END %]
         [% ELSE %]
@@ -67,6 +71,8 @@
                 <p>[% page.description || 'Markdown documentation file.' %]</p>
                 [% IF page.site != 'all' %]<span class="site-badge">[% page.site %]</span>[% END %]
                 <span class="file-type-badge markdown">markdown</span>
+                [% IF page.roles %]<span class="roles-badge">Roles: [% page.roles.join(', ') %]</span>[% END %]
+                <a href="/Documentation/edit_roles/[% page_name %]" class="edit-roles-link">Edit Roles</a>
             </a>
             [% END %]
         [% ELSE %]
@@ -90,6 +96,8 @@
                 <p>[% page.description || 'Other documentation file.' %]</p>
                 [% IF page.site != 'all' %]<span class="site-badge">[% page.site %]</span>[% END %]
                 <span class="file-type-badge other">other</span>
+                [% IF page.roles %]<span class="roles-badge">Roles: [% page.roles.join(', ') %]</span>[% END %]
+                <a href="/Documentation/edit_roles/[% page_name %]" class="edit-roles-link">Edit Roles</a>
             </a>
             [% END %]
         [% ELSE %]

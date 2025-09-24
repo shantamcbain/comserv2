@@ -50,19 +50,21 @@ sub _scan_directories {
                     # Create a safe key for the documentation_pages hash
                     my $key;
 
+                    # Extract the path relative to Documentation directory
+                    my $rel_path = $path;
+                    $rel_path =~ s/^Documentation\///;  # Remove Documentation/ prefix
+
                     # Handle .tt files
                     if ($file =~ /\.tt$/) {
-                        $key = basename($file, '.tt');
+                        $key = $rel_path;
+                        $key =~ s/\.tt$//;  # Remove .tt extension
                     } elsif ($file =~ /\.md$/) {
-                        $key = basename($file, '.md');
+                        $key = $rel_path;
+                        $key =~ s/\.md$//;  # Remove .md extension
                     } else {
                         # Handle other file types (json, etc.)
-                        my ($name, $ext) = split(/\./, $basename, 2);
-                        if ($ext) {
-                            $key = "${name}";
-                        } else {
-                            $key = $basename;
-                        }
+                        $key = $rel_path;
+                        $key =~ s/\.[^.]+$//;  # Remove any extension
                     }
 
                     # Log the file being processed (only for debug level)
@@ -71,22 +73,30 @@ sub _scan_directories {
 
                     # Determine site and role requirements
                     my $site = 'all';
-                    my @roles = ('normal', 'editor', 'admin', 'developer');
+                    my @roles = ('normal', 'editor', 'admin', 'developer');  # Default roles
 
                     # Check if this is site-specific documentation
                     if ($path =~ m{Documentation/sites/([^/]+)/}) {
                         $site = uc($1); # Convert site name to uppercase to match SiteName format
                     }
 
-                    # Check if this is role-specific documentation
-                    if ($path =~ m{Documentation/roles/([^/]+)/}) {
-                        my $role = $1;
-                        if ($role eq 'admin') {
-                            @roles = ('admin', 'developer');
-                        } elsif ($role eq 'developer') {
-                            @roles = ('developer');
-                        } elsif ($role eq 'editor') {
-                            @roles = ('editor', 'admin', 'developer');
+                    # Check if this page has specific roles configured in JSON
+                    my $config_roles = _get_page_roles_from_config($key);
+                    if ($config_roles && @$config_roles) {
+                        @roles = @$config_roles;
+                        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_scan_directories',
+                            "Using JSON config roles for $key: " . join(', ', @roles));
+                    } else {
+                        # Check if this is role-specific documentation
+                        if ($path =~ m{Documentation/roles/([^/]+)/}) {
+                            my $role = $1;
+                            if ($role eq 'admin') {
+                                @roles = ('admin', 'developer');
+                            } elsif ($role eq 'developer') {
+                                @roles = ('developer');
+                            } elsif ($role eq 'editor') {
+                                @roles = ('editor', 'admin', 'developer');
+                            }
                         }
                     }
                     
@@ -99,12 +109,32 @@ sub _scan_directories {
                     }
 
                     # Store the path with metadata
-                    $self->documentation_pages->{$key} = {
-                        path => $path,
-                        site => $site,
-                        roles => \@roles,
-                        format => $format
-                    };
+                    # Prioritize .tt files over .md files when both exist
+                    my $existing_entry = $self->documentation_pages->{$key};
+                    my $should_store = 1;
+                    
+                    if ($existing_entry) {
+                        # If existing entry is a .tt file and current is .md, skip
+                        if ($existing_entry->{format} eq 'template' && $format eq 'markdown') {
+                            $should_store = 0;
+                            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_scan_directories',
+                                "Skipping .md file $path as .tt version already exists for key: $key");
+                        }
+                        # If existing entry is .md and current is .tt, replace
+                        elsif ($existing_entry->{format} eq 'markdown' && $format eq 'template') {
+                            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_scan_directories',
+                                "Replacing .md file with .tt version for key: $key");
+                        }
+                    }
+                    
+                    if ($should_store) {
+                        $self->documentation_pages->{$key} = {
+                            path => $path,
+                            site => $site,
+                            roles => \@roles,
+                            format => $format
+                        };
+                    }
                 },
                 no_chdir => 1,
             },
@@ -182,11 +212,88 @@ sub _categorize_pages {
                 $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_categorize_pages',
                     "Added '$page_id' to developer_guides category");
             }
+            
+            # Add to admin guides if it's in various admin-related directories
+            if ($category_key eq 'admin_guides' && (
+                $path =~ m{Documentation/admin/} ||
+                $path =~ m{Documentation/system/} ||
+                $path =~ m{Documentation/proxmox/} ||
+                $path =~ m{Documentation/cloudflare/} ||
+                $path =~ m{Documentation/session_history/}
+            )) {
+                push @{$category->{pages}}, $page_id unless grep { $_ eq $page_id } @{$category->{pages}};
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_categorize_pages',
+                    "Added '$page_id' to admin_guides category (directory-based)");
+            }
+            
+            # Add to developer guides if it's in various developer-related directories
+            if ($category_key eq 'developer_guides' && (
+                $path =~ m{Documentation/developer/} ||
+                $path =~ m{Documentation/controllers/} ||
+                $path =~ m{Documentation/models/} ||
+                $path =~ m{Documentation/features/} ||
+                $path =~ m{Documentation/changelog/} ||
+                $path =~ m{Documentation/scripts/} ||
+                $path =~ m{Documentation/ai_workflows/}
+            )) {
+                push @{$category->{pages}}, $page_id unless grep { $_ eq $page_id } @{$category->{pages}};
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_categorize_pages',
+                    "Added '$page_id' to developer_guides category (directory-based)");
+            }
+            
+            # Add to user guides if it's in general directories
+            if ($category_key eq 'user_guides' && (
+                $path =~ m{Documentation/general/} ||
+                ($path =~ m{^Documentation/[^/]+\.(md|tt)$} && $path !~ m{Documentation/(admin|developer|system|proxmox|cloudflare|session_history|controllers|models|features|changelog|scripts|ai_workflows|config|sites|roles|modules|tutorials)/})
+            )) {
+                push @{$category->{pages}}, $page_id unless grep { $_ eq $page_id } @{$category->{pages}};
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_categorize_pages',
+                    "Added '$page_id' to user_guides category (general files)");
+            }
         }
     }
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_categorize_pages',
         "Page categorization completed");
+}
+
+# Get page roles from JSON configuration
+sub _get_page_roles_from_config {
+    my ($self, $page_key) = @_;
+    
+    return unless $page_key;
+    
+    # Load the JSON configuration
+    eval {
+        require JSON;
+        require File::Spec;
+        require FindBin;
+        
+        my $config_file = File::Spec->catfile($FindBin::Bin, '..', 'config', 'documentation_config.json');
+        return unless -f $config_file;
+        
+        open(my $fh, '<', $config_file) or return;
+        my $json_text = do { local $/; <$fh> };
+        close($fh);
+        
+        my $json = JSON->new();
+        my $config = $json->decode($json_text);
+        
+        # Look through each category to find the page
+        foreach my $category_name (keys %{$config->{categories}}) {
+            my $category = $config->{categories}->{$category_name};
+            if ($category->{pages} && ref($category->{pages}) eq 'ARRAY') {
+                foreach my $page (@{$category->{pages}}) {
+                    if ($page eq $page_key) {
+                        # Found the page in this category, return the category's roles
+                        return $category->{roles} if $category->{roles};
+                    }
+                }
+            }
+        }
+    };
+    
+    return; # Return undef if not found or on error
 }
 
 # Return true value at the end of the module

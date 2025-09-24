@@ -118,7 +118,29 @@ sub create_backup :Local :Args(0) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_backup', 
                 "Protected files backup result: " . ($result->{success} ? 'SUCCESS' : 'FAILED'));
                 
+        } elsif ($backup_type eq 'full') {
+            # Full backup (files + database) - migrated from original Admin.pm
+            $result = $self->backup_manager($c)->create_full_backup($c, $username, $description);
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_backup', 
+                "Full backup result: " . ($result->{success} ? 'SUCCESS' : 'FAILED'));
+                
+        } elsif ($backup_type eq 'config') {
+            # Configuration files backup - migrated from original Admin.pm
+            $result = $self->backup_manager($c)->create_config_backup($c, $username, $description);
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_backup', 
+                "Config backup result: " . ($result->{success} ? 'SUCCESS' : 'FAILED'));
+                
+        } elsif ($backup_type eq 'database') {
+            # Database-only backup - migrated from original Admin.pm
+            $result = $self->backup_manager($c)->create_database_backup($c, $username, $description);
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_backup', 
+                "Database backup result: " . ($result->{success} ? 'SUCCESS' : 'FAILED'));
+                
         } else {
+            # Default to manual backup (protected files)
             $result = $self->backup_manager($c)->create_manual_backup($description, $username);
             
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_backup', 
