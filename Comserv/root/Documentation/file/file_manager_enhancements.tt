@@ -1,0 +1,139 @@
+[% PageVersion = 'Documentation/file/file_manager_enhancements.tt,v 0.01 2024/01/28 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+[% META title = 'File Manager Enhancement Plan' %]
+[% PageVersion = 'file_manager_enhancements.tt,v 2.0 2025/09/16 shanta Exp' %]
+
+<h1>File Manager Enhancement Implementation Plan</h1>
+
+<h2>Project Objective</h2>
+<p>Integrate backup/restore functionality and enhance upload/download capabilities in the existing File Manager system.</p>
+
+<h2>Current System Analysis</h2>
+<h3>Existing Components</h3>
+<ul>
+    <li><strong>File Model</strong> (<code>lib/Comserv/Model/File.pm</code>): Database operations, upload validation (.jpg/.png/.pdf), 10MB size limit, user access control</li>
+    <li><strong>File Controller</strong> (<code>lib/Comserv/Controller/File.pm</code>): Web interface, file browsing, search/insert functionality</li>
+    <li><strong>Templates</strong>: Basic directory browsing interface (<code>root/file/filemanagement.tt</code>), file upload capability</li>
+    <li><strong>Integration Points</strong>: BackupManager.pm utility, Admin::Backup controller, user authentication system</li>
+</ul>
+
+<h2>Implementation Plan - Four Phases</h2>
+
+<h3>Phase 1: File Backup Integration</h3>
+<h4>Objective</h4>
+<p>Add backup functionality to file manager interface using existing BackupManager.pm utility</p>
+
+<h4>Files to Modify</h4>
+<ul>
+    <li><code>Controller/File.pm</code>: Add backup action methods that call BackupManager.pm</li>
+    <li><code>root/file/filemanagement.tt</code>: Add backup buttons and interface elements</li>
+    <li><code>Model/File.pm</code>: Add backup integration methods</li>
+</ul>
+
+<h4>Implementation Steps</h4>
+<ol>
+    <li>Add backup action to File controller that calls BackupManager.pm</li>
+    <li>Create backup interface in file management template</li>
+    <li>Add individual file backup and bulk backup options</li>
+    <li>Integrate with existing backup history system</li>
+</ol>
+
+<h3>Phase 2: File Restore Integration</h3>
+<h4>Objective</h4>
+<p>Add restore functionality with version selection using existing Admin::Backup controller</p>
+
+<h4>Files to Modify</h4>
+<ul>
+    <li><code>Controller/File.pm</code>: Add restore action methods</li>
+    <li><code>root/file/filemanagement.tt</code>: Add restore interface</li>
+    <li><code>root/file/file_restore.tt</code>: NEW - Version selection and restore interface</li>
+</ul>
+
+<h4>Implementation Steps</h4>
+<ol>
+    <li>Add restore action that integrates with Admin::Backup controller</li>
+    <li>Create restore interface with version history display</li>
+    <li>Add file version browsing and selection</li>
+    <li>Implement restore confirmation and execution</li>
+</ol>
+
+<h3>Phase 3: Enhanced Upload/Download Capabilities</h3>
+<h4>Objective</h4>
+<p>Improve file upload interface and add secure download functionality</p>
+
+<h4>Files to Modify</h4>
+<ul>
+    <li><code>root/file/file_upload.tt</code>: Enhance upload interface with drag-and-drop</li>
+    <li><code>Controller/File.pm</code>: Add download methods and improved upload handling</li>
+    <li><code>Model/File.pm</code>: Enhance upload validation and processing</li>
+</ul>
+
+<h4>Implementation Steps</h4>
+<ol>
+    <li>Add drag-and-drop upload interface</li>
+    <li>Implement secure file download with proper user access control</li>
+    <li>Add upload progress indicators</li>
+    <li>Improve file validation and error handling</li>
+</ol>
+
+<h3>Phase 4: Navigation and User Interface</h3>
+<h4>Objective</h4>
+<p>Create clear navigation routes and improve user experience (CRITICAL - often forgotten)</p>
+
+<h4>Template Updates Required</h4>
+<ul>
+    <li><code>root/file/filemanagement.tt</code>: Add backup/restore buttons, improve layout</li>
+    <li><code>root/file/file_upload.tt</code>: Enhance for drag-and-drop, progress indicators</li>
+    <li><code>root/file/files.tt</code>: Update file listing with backup status</li>
+    <li><code>root/file/file_restore.tt</code>: NEW - Version selection and restore interface</li>
+</ul>
+
+<h4>Navigation Updates</h4>
+<ul>
+    <li><code>root/include/navigation.tt</code>: Add clear routes to file management tasks</li>
+    <li><code>root/admin/backup/index.tt</code>: Add file-specific backup options</li>
+    <li>User dashboard templates: Add quick access to file operations</li>
+</ul>
+
+<h4>Route Accessibility Requirements</h4>
+<p>Ensure clear navigation paths exist for:</p>
+<ul>
+    <li>File upload (<code>/file/upload</code>)</li>
+    <li>File backup (<code>/file/backup</code>)</li>
+    <li>File restore (<code>/file/restore</code>)</li>
+    <li>File management (<code>/file/manage</code>)</li>
+</ul>
+
+<h2>Critical Success Factors</h2>
+<ul>
+    <li><strong>Template Route Creation</strong>: Ensure users can easily access all file management functions</li>
+    <li><strong>Security Integration</strong>: Maintain user-based access control throughout</li>
+    <li><strong>Backup System Reuse</strong>: Leverage existing backup infrastructure, don't duplicate</li>
+    <li><strong>User Experience</strong>: Clear navigation and intuitive interface design</li>
+</ul>
+
+<h2>Technical Integration Notes</h2>
+<h3>Existing Security Model</h3>
+<ul>
+    <li>User-specific file directories (<code>uploads/$user_id</code>)</li>
+    <li>File type validation (.jpg, .png, .pdf)</li>
+    <li>File size limits (10MB maximum)</li>
+    <li>Access control per user (serve_file method with user verification)</li>
+</ul>
+
+<h3>Backup System Integration</h3>
+<ul>
+    <li>Use existing <code>BackupManager.pm</code> utility - DO NOT DUPLICATE</li>
+    <li>Integrate with <code>Admin::Backup</code> controller for restore operations</li>
+    <li>Maintain backup history compatibility</li>
+    <li>Follow existing backup naming and versioning conventions</li>
+</ul>
+
+<h2>Implementation Status</h2>
+<p><strong>Status:</strong> Planning Complete - Ready for Phase 1 Implementation</p>
+<p><strong>Next Step:</strong> Begin Phase 1 - File Backup Integration</p>
+<p><strong>Date:</strong> 2025-09-16</p>
+
+[%# Reminder: This is the official documentation format (.tt file) %]

@@ -1,0 +1,195 @@
+[% META title = 'Edit Roles' %]
+[% PageVersion = 'Documentation/edit_roles.tt,v 1.0 2025/09/18 zencoder Exp' %]
+
+<style>
+.role-editor {
+    max-width: 600px;
+    margin: 20px auto;
+    background: #f9f9f9;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.role-editor h1 {
+    color: #333;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.page-info {
+    background: #fff;
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+    border-left: 4px solid #007cba;
+}
+
+.role-form {
+    background: #fff;
+    padding: 20px;
+    border-radius: 5px;
+}
+
+.role-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.role-option {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    background: #f8f8f8;
+    transition: all 0.3s ease;
+}
+
+.role-option:hover {
+    background: #e8f4f8;
+    border-color: #007cba;
+}
+
+.role-option input[type="checkbox"] {
+    margin-right: 10px;
+    scale: 1.2;
+}
+
+.role-option.selected {
+    background: #e8f4f8;
+    border-color: #007cba;
+}
+
+.role-description {
+    font-size: 0.9em;
+    color: #666;
+    margin-top: 5px;
+}
+
+.form-actions {
+    margin-top: 30px;
+    text-align: center;
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+}
+
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    font-size: 16px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    transition: all 0.3s ease;
+}
+
+.btn-primary {
+    background: #007cba;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #005a87;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+}
+
+.current-roles {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 15px;
+}
+
+.warning {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    color: #856404;
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 15px;
+}
+</style>
+
+<div class="role-editor">
+    <h1>Edit Roles for Documentation</h1>
+    
+    <div class="page-info">
+        <h3>[% page_title %]</h3>
+        <p><strong>Page ID:</strong> [% page_name %]</p>
+        <p><strong>File Path:</strong> [% page_metadata.path %]</p>
+        <p><strong>File Type:</strong> [% page_metadata.format %]</p>
+        <p><strong>Site:</strong> [% page_metadata.site %]</p>
+    </div>
+
+    [% IF current_roles.size > 0 %]
+    <div class="current-roles">
+        <strong>Current Roles:</strong> [% current_roles.join(', ') %]
+    </div>
+    [% END %]
+
+    <div class="warning">
+        <strong>Warning:</strong> Changes to roles will affect who can access this documentation. 
+        Make sure you understand the implications before saving.
+    </div>
+
+    <form method="POST" class="role-form">
+        <h3>Select Allowed Roles:</h3>
+        <p>Choose which user roles should have access to this documentation:</p>
+        
+        <div class="role-options">
+            [% FOREACH role IN available_roles %]
+            <label class="role-option [% IF current_roles.grep(role).size %]selected[% END %]">
+                <input type="checkbox" 
+                       name="roles" 
+                       value="[% role %]" 
+                       [% IF current_roles.grep(role).size %]checked[% END %]
+                       onchange="this.parentNode.classList.toggle('selected', this.checked)">
+                <div>
+                    <strong>[% role.ucfirst %]</strong>
+                    <div class="role-description">
+                        [% IF role == 'normal' %]
+                            Regular users - basic access to public documentation
+                        [% ELSIF role == 'editor' %]
+                            Content editors - can access editing-related documentation
+                        [% ELSIF role == 'admin' %]
+                            Administrators - full access to system documentation
+                        [% ELSIF role == 'developer' %]
+                            Developers - access to technical and development documentation
+                        [% END %]
+                    </div>
+                </div>
+            </label>
+            [% END %]
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+            <a href="/Documentation" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<script>
+// Highlight selected checkboxes on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const checkboxes = document.querySelectorAll('.role-option input[type="checkbox"]');
+    checkboxes.forEach(function(checkbox) {
+        checkbox.parentNode.classList.toggle('selected', checkbox.checked);
+    });
+});
+</script>

@@ -43,6 +43,9 @@
                                 <span class="roles-badge">
                                     Roles: [% page.roles.join(', ') %]
                                 </span>
+                                [% IF is_admin %]
+                                    <a href="/Documentation/edit_roles/[% page_id %]" class="edit-roles-link">Edit Roles</a>
+                                [% END %]
                             [% END %]
                         </div>
                     </div>
@@ -62,6 +65,12 @@
             <div class="admin-info">
                 <h4>Administrator Information</h4>
                 <p>As an administrator, you can see all documentation regardless of site or role restrictions.</p>
+                <div class="admin-actions">
+                    <h5>Administrative Actions</h5>
+                    <ul>
+                        <li><a href="[% c.uri_for(c.controller('Documentation').action_for('check_for_new_files')) %]">Check for New Files</a> - Detect documentation files not yet in the system</li>
+                    </ul>
+                </div>
             </div>
         [% END %]
     </div>
@@ -178,6 +187,22 @@
     color: #7b1fa2;
 }
 
+.edit-roles-link {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 6px;
+    background: #28a745;
+    color: white;
+    text-decoration: none;
+    font-size: 0.8em;
+    border-radius: 3px;
+}
+
+.edit-roles-link:hover {
+    background: #1e7e34;
+    color: white;
+}
+
 .documentation-footer {
     text-align: center;
     padding: 20px;
@@ -202,5 +227,36 @@
 .admin-info p {
     color: #856404;
     margin: 0;
+}
+
+.admin-actions {
+    margin-top: 15px;
+    text-align: left;
+}
+
+.admin-actions h5 {
+    color: #856404;
+    margin-bottom: 10px;
+}
+
+.admin-actions ul {
+    list-style-type: disc;
+    padding-left: 20px;
+    margin: 0;
+}
+
+.admin-actions li {
+    margin-bottom: 5px;
+}
+
+.admin-actions a {
+    color: #0056b3;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.admin-actions a:hover {
+    color: #004494;
+    text-decoration: underline;
 }
 </style>

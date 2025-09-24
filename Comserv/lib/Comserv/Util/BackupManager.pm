@@ -11,6 +11,8 @@ use File::stat;
 use Archive::Tar;
 use JSON qw(encode_json decode_json);
 use POSIX qw(strftime);
+use File::Spec;
+use Cwd qw(getcwd);
 
 =head1 NAME
 
@@ -663,6 +665,481 @@ sub create_manual_backup {
         $result->{message} = "Manual backup failed: $error";
         $result->{output} .= "Backup error: $error\n";
     };
+    
+    return $result;
+}
+
+=head2 create_full_backup
+
+Create a full backup (files + database) - migrated from Admin.pm
+
+Args: $c (catalyst context), $username, $description (optional)
+Returns: HashRef with success, message, output, backup_path
+
+=cut
+
+sub create_full_backup {
+    my ($self, $c, $username, $description) = @_;
+    
+    my $result = {
+        success => 0,
+        message => '',
+        output => '',
+        files_backed_up => []
+    };
+    
+    $description ||= "Full backup (files + database)";
+    
+    try {
+        # Use the last (or only) backup directory
+        my $backup_dirs = $self->backup_dirs;
+        my $backup_dir = $backup_dirs->[-1];
+        make_path($backup_dir) unless -d $backup_dir;
+        
+        # Generate backup ID and filename
+        my $timestamp = strftime("%Y%m%d_%H%M%S", localtime);
+        my $backup_name = "full_backup_$timestamp";
+        my $backup_file = "$backup_dir/$backup_name.tar.gz";
+        $result->{backup_path} = $backup_file;
+        
+        $result->{output} .= "Starting full backup...\n";
+        
+        # Get the application root directory for proper tar execution
+        my $app_root = $c ? $c->path_to('.') : $self->app_dir;
+        
+        # Change to app root for tar command
+        my $original_dir = getcwd();
+        chdir($app_root);
+        
+        # Full backup command (files + database) - from original Admin.pm
+        my $backup_command = "tar -czf '$backup_file' --exclude='backups' --exclude='tmp' --exclude='logs/*.log' .";
+        
+        $result->{output} .= "Executing backup command from directory: $app_root\n";
+        $result->{output} .= "Command: $backup_command\n";
+        
+        # Execute backup command
+        my $cmd_result = system($backup_command);
+        chdir($original_dir);
+        
+        if ($cmd_result == 0) {
+            if (-f $backup_file && -s $backup_file) {
+                my $backup_size = -s $backup_file;
+                $result->{output} .= "Full backup created successfully: $backup_size bytes\n";
+                
+                # Create metadata file
+                my $meta_data = {
+                    description => $description,
+                    type => "full",
+                    filename => "$backup_name.tar.gz",
+                    created_by => $username || 'system',
+                    created_at => time(),
+                    includes_database => 1,
+                    branch_operation => 0
+                };
+                
+                my $meta_file = "$backup_file.meta";
+                open(my $fh, '>', $meta_file) or die "Cannot create metadata file: $!";
+                print $fh encode_json($meta_data);
+                close($fh);
+                
+                $result->{success} = 1;
+                $result->{message} = "Full backup created successfully";
+            } else {
+                $result->{message} = "Backup file was not created or is empty";
+                $result->{output} .= "ERROR: Backup file missing or empty\n";
+            }
+        } else {
+            $result->{message} = "Backup command failed with exit code: $cmd_result";
+            $result->{output} .= "ERROR: Command failed with exit code: $cmd_result\n";
+        }
+        
+    } catch {
+        my $error = $_;
+        $result->{message} = "Full backup failed: $error";
+        $result->{output} .= "Backup error: $error\n";
+    };
+    
+    return $result;
+}
+
+=head2 create_config_backup
+
+Create backup of configuration files only - migrated from Admin.pm
+
+Args: $c (catalyst context), $username, $description (optional)
+Returns: HashRef with success, message, output, backup_path
+
+=cut
+
+sub create_config_backup {
+    my ($self, $c, $username, $description) = @_;
+    
+    my $result = {
+        success => 0,
+        message => '',
+        output => '',
+        files_backed_up => []
+    };
+    
+    $description ||= "Configuration files backup";
+    
+    try {
+        # Use the last (or only) backup directory
+        my $backup_dirs = $self->backup_dirs;
+        my $backup_dir = $backup_dirs->[-1];
+        make_path($backup_dir) unless -d $backup_dir;
+        
+        # Generate backup ID and filename
+        my $timestamp = strftime("%Y%m%d_%H%M%S", localtime);
+        my $backup_name = "config_backup_$timestamp";
+        my $backup_file = "$backup_dir/$backup_name.tar.gz";
+        $result->{backup_path} = $backup_file;
+        
+        $result->{output} .= "Starting configuration backup...\n";
+        
+        # Get the application root directory for proper tar execution
+        my $app_root = $c ? $c->path_to('.') : $self->app_dir;
+        
+        # Change to app root for tar command
+        my $original_dir = getcwd();
+        chdir($app_root);
+        
+        # Configuration files backup command - from original Admin.pm
+        my $backup_command = "tar -czf '$backup_file' --exclude='backups' --exclude='tmp' config/ lib/Comserv.pm *.conf *.yml *.yaml 2>/dev/null || true";
+        
+        $result->{output} .= "Executing backup command from directory: $app_root\n";
+        $result->{output} .= "Command: $backup_command\n";
+        
+        # Execute backup command
+        my $cmd_result = system($backup_command);
+        chdir($original_dir);
+        
+        if ($cmd_result == 0) {
+            if (-f $backup_file && -s $backup_file) {
+                my $backup_size = -s $backup_file;
+                $result->{output} .= "Configuration backup created successfully: $backup_size bytes\n";
+                
+                # Create metadata file
+                my $meta_data = {
+                    description => $description,
+                    type => "config",
+                    filename => "$backup_name.tar.gz",
+                    created_by => $username || 'system',
+                    created_at => time(),
+                    includes_database => 0,
+                    branch_operation => 0
+                };
+                
+                my $meta_file = "$backup_file.meta";
+                open(my $fh, '>', $meta_file) or die "Cannot create metadata file: $!";
+                print $fh encode_json($meta_data);
+                close($fh);
+                
+                $result->{success} = 1;
+                $result->{message} = "Configuration backup created successfully";
+            } else {
+                $result->{message} = "Backup file was not created or is empty";
+                $result->{output} .= "ERROR: Backup file missing or empty\n";
+            }
+        } else {
+            $result->{message} = "Backup command failed with exit code: $cmd_result";
+            $result->{output} .= "ERROR: Command failed with exit code: $cmd_result\n";
+        }
+        
+    } catch {
+        my $error = $_;
+        $result->{message} = "Configuration backup failed: $error";
+        $result->{output} .= "Backup error: $error\n";
+    };
+    
+    return $result;
+}
+
+=head2 create_database_backup
+
+Create database-only backup - migrated from Admin.pm create_database_backup()
+
+Args: $c (catalyst context), $username, $description (optional)
+Returns: HashRef with success, message, output, backup_path
+
+=cut
+
+sub create_database_backup {
+    my ($self, $c, $username, $description) = @_;
+    
+    my $result = {
+        success => 0,
+        message => '',
+        output => '',
+        files_backed_up => []
+    };
+    
+    $description ||= "Database backup";
+    
+    try {
+        # Use the last (or only) backup directory
+        my $backup_dirs = $self->backup_dirs;
+        my $backup_dir = $backup_dirs->[-1];
+        make_path($backup_dir) unless -d $backup_dir;
+        
+        # Generate backup ID and filename
+        my $timestamp = strftime("%Y%m%d_%H%M%S", localtime);
+        my $backup_name = "database_backup_$timestamp";
+        
+        $result->{output} .= "Starting database backup...\n";
+        
+        # Call the migrated database backup method
+        my $db_backup_result = $self->_create_database_dump($c, $backup_dir, $backup_name);
+        
+        if ($db_backup_result->{success}) {
+            # Get the application root directory for relative path calculation
+            my $app_root = $c ? $c->path_to('.') : $self->app_dir;
+            
+            # Use relative path from app root for tar command
+            my $relative_dump_file = File::Spec->abs2rel($db_backup_result->{dump_file}, $app_root);
+            my $backup_file = "$backup_dir/$backup_name.tar.gz";
+            my $backup_command = "tar -czf '$backup_file' '$relative_dump_file' && rm '$db_backup_result->{dump_file}'";
+            
+            $result->{output} .= "Database dump created: $db_backup_result->{dump_file}\n";
+            $result->{output} .= "Relative dump file: $relative_dump_file\n";
+            
+            # Change to app root for tar command
+            my $original_dir = getcwd();
+            chdir($app_root);
+            
+            # Execute backup command
+            my $cmd_result = system($backup_command);
+            chdir($original_dir);
+            
+            if ($cmd_result == 0) {
+                if (-f $backup_file && -s $backup_file) {
+                    my $backup_size = -s $backup_file;
+                    $result->{output} .= "Database backup created successfully: $backup_size bytes\n";
+                    $result->{backup_path} = $backup_file;
+                    
+                    # Create metadata file
+                    my $meta_data = {
+                        description => $description,
+                        type => "database",
+                        filename => "$backup_name.tar.gz",
+                        created_by => $username || 'system',
+                        created_at => time(),
+                        includes_database => 1,
+                        databases_backed_up => $db_backup_result->{databases_backed_up},
+                        branch_operation => 0
+                    };
+                    
+                    my $meta_file = "$backup_file.meta";
+                    open(my $fh, '>', $meta_file) or die "Cannot create metadata file: $!";
+                    print $fh encode_json($meta_data);
+                    close($fh);
+                    
+                    $result->{success} = 1;
+                    $result->{message} = "Database backup created successfully";
+                } else {
+                    $result->{message} = "Database backup file was not created or is empty";
+                    $result->{output} .= "ERROR: Backup file missing or empty\n";
+                }
+            } else {
+                $result->{message} = "Database backup tar command failed with exit code: $cmd_result";
+                $result->{output} .= "ERROR: Tar command failed with exit code: $cmd_result\n";
+            }
+        } else {
+            $result->{message} = "Database dump failed: " . $db_backup_result->{error};
+            $result->{output} .= "Database dump error: " . $db_backup_result->{error} . "\n";
+        }
+        
+    } catch {
+        my $error = $_;
+        $result->{message} = "Database backup failed: $error";
+        $result->{output} .= "Backup error: $error\n";
+    };
+    
+    return $result;
+}
+
+=head2 _create_database_dump
+
+Multi-database dump functionality - migrated from Admin.pm create_database_backup()
+
+Args: $c (catalyst context), $backup_dir, $backup_name
+Returns: HashRef with success, error, dump_file, databases_backed_up
+
+=cut
+
+sub _create_database_dump {
+    my ($self, $c, $backup_dir, $backup_name) = @_;
+    
+    my $result = {
+        success => 0,
+        error => '',
+        dump_file => '',
+        databases_backed_up => []
+    };
+    
+    eval {
+        # Get all available database models
+        my @db_models = ('DBEncy', 'DBForager');
+        my @successful_backups = ();
+        my @backup_files = ();
+        
+        # For now, we'll use a simplified approach if no context is available
+        unless ($c) {
+            die "Catalyst context required for database backup";
+        }
+        
+        foreach my $model_name (@db_models) {
+            # Check if model exists
+            my $model = eval { $c->model($model_name) };
+            if (!$model) {
+                next;
+            }
+            
+            my $connect_info = $model->config->{connect_info};
+            my ($dsn, $user, $password);
+            
+            # The database models store connection info as a hash with dsn, user, password keys
+            if (ref($connect_info) eq 'HASH') {
+                $dsn = $connect_info->{dsn};
+                $user = $connect_info->{user};
+                $password = $connect_info->{password};
+            } else {
+                next;
+            }
+            
+            # Validate required connection parameters
+            unless ($dsn) {
+                next;
+            }
+            
+            # Ensure user and password are defined (even if empty)
+            $user = '' unless defined $user;
+            $password = '' unless defined $password;
+            
+            # Test database connection before attempting backup
+            eval {
+                my $test_schema = $model->schema;
+                my $test_dbh = $test_schema->storage->dbh;
+                # Simple test query
+                $test_dbh->do('SELECT 1');
+            };
+            if ($@) {
+                next;
+            }
+            
+            # Parse DSN to get database name and type
+            my ($db_type, $db_name, $host, $port);
+            
+            if ($dsn =~ /^dbi:mysql:database=([^;]+)(?:;host=([^;]+))?(?:;port=(\d+))?/i) {
+                $db_type = 'mysql';
+                $db_name = $1;
+                $host = $2 || 'localhost';
+                $port = $3 || 3306;
+                    
+            } elsif ($dsn =~ /^dbi:sqlite:(.+)$/i) {
+                $db_type = 'sqlite';
+                $db_name = $1;
+                    
+            } elsif ($dsn =~ /^dbi:(\w+):/i) {
+                next;
+            } else {
+                next;
+            }
+            
+            # Create individual dump file for this database
+            my $individual_dump_file = "$backup_dir/${backup_name}_${model_name}_${db_name}.sql";
+            push @backup_files, $individual_dump_file;
+            
+            # Create backup command based on database type
+            my $backup_command;
+            
+            if ($db_type eq 'mysql') {
+                # MySQL backup
+                my $host_param = ($host && $host ne 'localhost') ? "-h '$host'" : '';
+                my $port_param = ($port && $port != 3306) ? "-P $port" : '';
+                my $user_param = $user ? "-u '$user'" : '';
+                
+                # Handle password parameter more securely
+                my $password_param = '';
+                if ($password) {
+                    # Escape single quotes in password for shell safety
+                    my $escaped_password = $password;
+                    $escaped_password =~ s/'/'\"'\"'/g;
+                    $password_param = "-p'$escaped_password'";
+                }
+                
+                $backup_command = "mysqldump $host_param $port_param $user_param $password_param --single-transaction --routines --triggers '$db_name' > '$individual_dump_file' 2>&1";
+                
+                # Test mysqldump availability
+                my $mysqldump_test = `which mysqldump 2>/dev/null`;
+                chomp($mysqldump_test);
+                unless ($mysqldump_test) {
+                    next;
+                }
+                
+            } elsif ($db_type eq 'sqlite') {
+                # SQLite backup - just copy the database file
+                if (-f $db_name) {
+                    $backup_command = "cp '$db_name' '$individual_dump_file'";
+                } else {
+                    next;
+                }
+            }
+            
+            # Execute backup command for this database
+            my $backup_output = `$backup_command`;
+            my $backup_result = $?;
+            
+            if ($backup_result != 0) {
+                next; # Continue with next database instead of failing completely
+            }
+            
+            # Verify backup file was created
+            unless (-f $individual_dump_file && -s $individual_dump_file) {
+                next;
+            }
+            
+            # Record successful backup
+            push @successful_backups, {
+                model => $model_name,
+                database => $db_name,
+                file => $individual_dump_file,
+                size => -s $individual_dump_file
+            };
+        }
+        
+        # Check if we have any successful backups
+        if (@successful_backups == 0) {
+            die "No databases were successfully backed up";
+        }
+        
+        # Create a combined dump file containing all individual backups
+        my $combined_dump_file = "$backup_dir/${backup_name}_all_databases.sql";
+        
+        # Combine all individual backup files
+        my $combine_command = "cat " . join(' ', map { "'$_'" } @backup_files) . " > '$combined_dump_file'";
+        my $combine_result = system($combine_command);
+        
+        if ($combine_result == 0 && -f $combined_dump_file && -s $combined_dump_file) {
+            # Clean up individual files after successful combination
+            foreach my $individual_file (@backup_files) {
+                unlink $individual_file if -f $individual_file;
+            }
+            
+            $result->{dump_file} = $combined_dump_file;
+        } else {
+            # If combination failed, keep individual files and use the first one as primary
+            $result->{dump_file} = $backup_files[0] if @backup_files;
+        }
+        
+        $result->{success} = 1;
+        $result->{databases_backed_up} = \@successful_backups;
+        
+    };
+    
+    if ($@) {
+        $result->{error} = $@;
+    }
     
     return $result;
 }

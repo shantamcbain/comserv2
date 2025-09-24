@@ -1,120 +1,416 @@
-# AI Assistant Guidelines for Comserv System
+[% # Standard Template Toolkit header for AI Guidelines
+   # File: root/Documentation/AI_Guidelines.tt
+   # Purpose: Guidelines for AI-assisted development in the Comserv system
+   # Last Updated: 2025-09-22
+   # Version: 2.0.1
+%]
+[% PageVersion = 'Documentation/AI_Guidelines.tt,v 2.1 2025/09/22 shanta Exp shanta - AI Guidelines' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
 
-## IMPORTANT: File Modification Guidelines
+<div class="documentation-container">
+    <h1>AI Development Guidelines</h1>
+    
+    <div class="last-updated">
+        Last Updated: [% USE date; date.format(date.now, '%Y-%m-%d') %] | 
+        Version: 2.1
+    </div>
 
-**WARNING TO ALL AI ASSISTANTS**: Never replace or modify existing files without explicit permission from the user. Always ask for confirmation before making changes to the codebase.
+    <div class="info-box">
+        <h2>About This Document</h2>
+        <p>This guideline is for both developers and AI assistants. It aims to help navigate the complexities of using AI assistants in development, including choosing the right tool for the job, understanding limitations, and ensuring best practices are followed. All documentation is maintained in <code>.tt</code> files for browser-friendly viewing. <code>.md</code> files are used as a staging area for AI assistants and review before changes are applied to <code>.tt</code> files.</p>
+    </div>
 
-## Development Guidelines
+    <div class="info-box">
+        <h2>Documentation File Types</h2>
+        <ul>
+            <li><strong>.tt files:</strong> Official, browser-friendly documentation. All published documentation should be in <code>.tt</code> files.</li>
+            <li><strong>.md files:</strong> Used primarily for AI assistants (e.g., Zencoder) that require Markdown. These files serve as a staging area for edits and reviews before changes are applied to <code>.tt</code> files.</li>
+            <li><strong>Workflow:</strong> Make changes in the <code>.md</code> file, review them, then copy the approved content to the corresponding <code>.tt</code> file for publication.</li>
+        </ul>
+    </div>
 
-For comprehensive development guidelines specific to the Comserv2 system, refer to:
-- [AI Development Guidelines](/Documentation/AI_DEVELOPMENT_GUIDELINES.md)
+    <div class="info-box">
+        <h2>Glossary</h2>
+        <ul>
+            <li><strong>Session:</strong> The entire process to get code changes done, tracked in <code>current_session.md</code>. May last many days and covers all related issues.</li>
+            <li><strong>Chat:</strong> Each conversation between developer and AI (may be called differently by each assistant). For example, in GitHub Copilot, a chat refers to the interaction window where prompts and responses occur.</li>
+            <li><strong>Prompt:</strong> An exchange between the developer and the AI within a chat. Prompts are the individual questions or commands given to the AI.</li>
+            <li><strong>System:</strong> A group of code performing a function (e.g., file management system).</li>
+            <li><strong>GPT-4.1:</strong> The default AI model used for general-purpose tasks, including documentation, coding, and multi-step processes. It is highly capable and context-aware.</li>
+            <li><strong>GPT-0:</strong> A lightweight AI model optimized for quick, simple tasks with minimal resource usage. Best for straightforward operations.</li>
+            <li><strong>5 Miny:</strong> A specialized AI model designed for rapid, time-sensitive tasks. It prioritizes speed over deep context understanding.</li>
+        </ul>
+    </div>
 
-These guidelines cover:
-- Following existing code patterns
-- Reusing existing components
-- Respecting directory structure
-- Maintaining naming conventions
-- Proper workflow for limited-prompt sessions
+    <div class="info-box">
+        <h2>AI Assistant Comparison</h2>
+        <table class="standard-table">
+            <tr>
+                <th>Assistant</th>
+                <th>Strengths</th>
+                <th>Limitations</th>
+                <th>Best For</th>
+            </tr>
+            <tr>
+                <td>GitHub Copilot</td>
+                <td>Code completion, multi-language support</td>
+                <td>May generate generic code, context limits</td>
+                <td>General coding, boilerplate</td>
+            </tr>
+            <tr>
+                <td>Cascade</td>
+                <td>Good at refactoring, context awareness</td>
+                <td>Cannot edit untracked files</td>
+                <td>Refactoring, code review</td>
+            </tr>
+            <tr>
+                <td>Zencoder</td>
+                <td>Fast, concise suggestions</td>
+                <td>Short prompt window, loses context</td>
+                <td>Quick fixes, small changes</td>
+            </tr>
+            <tr>
+                <td>OllamAssist</td>
+                <td>Open-source, customizable</td>
+                <td>Requires local server</td>
+                <td>Custom workflows</td>
+            </tr>
+            <tr>
+                <td>ProxyAI</td>
+                <td>Acts as an intermediary for AI tasks, handles complex workflows, provides <code>+-</code> diffs for code and documentation changes</td>
+                <td>Cannot directly access files or codebase, relies on explicit input. Limited to the active file in the IDE and cannot read multiple files for context or duplication detection.</td>
+                <td>Generating prompts for other assistants, documentation updates, and task coordination</td>
+            </tr>
+        </table>
+        <h3>GitHub Copilot Details</h3>
+        <ul>
+            <li><strong>Chat:</strong> Refers to the interaction window where developers and the AI exchange prompts and responses.</li>
+            <li><strong>Edit:</strong> The process of modifying code or documentation based on developer instructions. GitHub Copilot excels at inline code suggestions and edits.</li>
+        </ul>
+    </div>
 
-## Filename and Package Consistency
+    <div class="info-box">
+        <h2>Choosing the Right Assistant</h2>
+        <ul>
+            <li>For documentation, guidelines, and complex multi-step tasks: <strong>GitHub copilot</strong> (or GPT-4) is recommended.</li>
+            <li>For code refactoring and context-aware changes: <strong>Cascade</strong>.</li>
+            <li>For quick, small code changes: <strong>Zencoder</strong>.</li>
+            <li>For custom workflows and open-source needs: <strong>OllamAssist</strong> (if installed).</li>
+        </ul>
+    </div>
 
-When working with Perl modules in the Comserv system, ensure that filenames match their package declarations:
+    <div class="reminder-box">
+        <h2>Guideline Maintenance</h2>
+        <p>Update this guideline as new assistants are added or existing ones change. All sub-guidelines and documentation should inherit from this primary document.</p>
+    </div>
 
-- **Correct**: A file named `Documentation.pm` should contain the package `Comserv::Controller::Documentation`
-- **Incorrect**: A file named `Documantation.pm` containing the package `Comserv::Controller::Documentation`
+    <div class="warning-box">
+        <h2>⚠️ IMPORTANT: File Modification Guidelines</h2>
+        <p><strong>WARNING TO ALL AI ASSISTANTS</strong>: Always modify existing files instead of creating new ones when possible. Only create new files when absolutely necessary and with explicit approval. Never modify existing files without explicit user confirmation.</p>
+    </div>
 
-### Known Issue Example
+    <nav class="toc">
+        <h2>Table of Contents</h2>
+        <ul>
+            <li><a href="#about-this-document">About This Document</a></li>
+            <li><a href="#documentation-file-types">Documentation File Types</a></li>
+            <li><a href="#glossary">Glossary</a></li>
+            <li><a href="#ai-assistant-comparison">AI Assistant Comparison</a></li>
+            <li><a href="#choosing-the-right-assistant">Choosing the Right Assistant</a></li>
+            <li><a href="#guideline-maintenance">Guideline Maintenance</a></li>
+            <li><a href="#file-management">File Management</a></li>
+            <li><a href="#code-standards">Code Standards</a></li>
+            <li><a href="#workflow">Development Workflow</a></li>
+            <li><a href="#documentation">Documentation</a></li>
+            <li><a href="#troubleshooting">Troubleshooting</a></li>
+            <li><a href="#ai-integration">AI Integration</a></li>
+            <li><a href="#usage-instructions">Usage Instructions</a></li>
+        </ul>
+    </nav>
 
-The system previously had an issue where:
-- The controller file was named `Documantation.pm` (with an 'a')
-- But the package inside was declared as `Comserv::Controller::Documentation` (with an 'o')
+    <section id="about-this-document" class="doc-section">
+        <h2>About This Document</h2>
+        <p>This guideline is for both developers and AI assistants. It aims to help navigate the complexities of using AI assistants in development, including choosing the right tool for the job, understanding limitations, and ensuring best practices are followed. All documentation is maintained in <code>.tt</code> files for browser-friendly viewing. <code>.md</code> files are used as a staging area for AI assistants and review before changes are applied to <code>.tt</code> files.</p>
+    </section>
 
-This mismatch caused both the `/documentation` and `/Documentation` routes to fail.
+    <section id="documentation-file-types" class="doc-section">
+        <h2>Documentation File Types</h2>
+        <ul>
+            <li><strong>.tt files:</strong> Official, browser-friendly documentation. All published documentation should be in <code>.tt</code> files.</li>
+            <li><strong>.md files:</strong> Used primarily for AI assistants (e.g., Zencoder) that require Markdown. These files serve as a staging area for edits and reviews before changes are applied to <code>.tt</code> files.</li>
+            <li><strong>Workflow:</strong> Make changes in the <code>.md</code> file, review them, then copy the approved content to the corresponding <code>.tt</code> file for publication.</li>
+        </ul>
+    </section>
 
-## Logging Best Practices
+    <section id="glossary" class="doc-section">
+        <h2>Glossary</h2>
+        <ul>
+            <li><strong>Session:</strong> The entire process to get code changes done, tracked in <code>current_session.md</code>. May last many days and covers all related issues.</li>
+            <li><strong>Chat:</strong> Each conversation between developer and AI (may be called differently by each assistant). For example, in GitHub Copilot, a chat refers to the interaction window where prompts and responses occur.</li>
+            <li><strong>Prompt:</strong> An exchange between the developer and the AI within a chat. Prompts are the individual questions or commands given to the AI.</li>
+            <li><strong>System:</strong> A group of code performing a function (e.g., file management system).</li>
+            <li><strong>GPT-4.1:</strong> The default AI model used for general-purpose tasks, including documentation, coding, and multi-step processes. It is highly capable and context-aware.</li>
+            <li><strong>GPT-0:</strong> A lightweight AI model optimized for quick, simple tasks with minimal resource usage. Best for straightforward operations.</li>
+            <li><strong>5 Miny:</strong> A specialized AI model designed for rapid, time-sensitive tasks. It prioritizes speed over deep context understanding.</li>
+        </ul>
+    </section>
 
-Always use the `log_with_details` method for comprehensive logging:
+    <section id="ai-assistant-comparison" class="doc-section">
+        <h2>AI Assistant Comparison</h2>
+        <table class="standard-table">
+            <tr>
+                <th>Assistant</th>
+                <th>Strengths</th>
+                <th>Limitations</th>
+                <th>Best For</th>
+            </tr>
+            <tr>
+                <td>GitHub Copilot</td>
+                <td>Code completion, multi-language support</td>
+                <td>May generate generic code, context limits</td>
+                <td>General coding, boilerplate</td>
+            </tr>
+            <tr>
+                <td>Cascade</td>
+                <td>Good at refactoring, context awareness</td>
+                <td>Cannot edit untracked files</td>
+                <td>Refactoring, code review</td>
+            </tr>
+            <tr>
+                <td>Zencoder</td>
+                <td>Fast, concise suggestions</td>
+                <td>Short prompt window, loses context</td>
+                <td>Quick fixes, small changes</td>
+            </tr>
+            <tr>
+                <td>OllamAssist</td>
+                <td>Open-source, customizable</td>
+                <td>Requires local server</td>
+                <td>Custom workflows</td>
+            </tr>
+            <tr>
+                <td>ProxyAI</td>
+                <td>Acts as an intermediary for AI tasks, handles complex workflows, provides <code>+-</code> diffs for code and documentation changes</td>
+                <td>Cannot directly access files or codebase, relies on explicit input. Limited to the active file in the IDE and cannot read multiple files for context or duplication detection.</td>
+                <td>Generating prompts for other assistants, documentation updates, and task coordination</td>
+            </tr>
+        </table>
+        <h3>GitHub Copilot Details</h3>
+        <ul>
+            <li><strong>Chat:</strong> Refers to the interaction window where developers and the AI exchange prompts and responses.</li>
+            <li><strong>Edit:</strong> The process of modifying code or documentation based on developer instructions. GitHub Copilot excels at inline code suggestions and edits.</li>
+        </ul>
+    </section>
 
-```perl
-$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'method_name',
-    "Detailed message with relevant information");
-```
+    <section id="choosing-the-right-assistant" class="doc-section">
+        <h2>Choosing the Right Assistant</h2>
+        <ul>
+            <li>For documentation, guidelines, and complex multi-step tasks: <strong>GPT-4.1</strong> (or GPT-4) is recommended.</li>
+            <li>For code refactoring and context-aware changes: <strong>Cascade</strong>.</li>
+            <li>For quick, small code changes: <strong>Zencoder</strong>.</li>
+            <li>For custom workflows and open-source needs: <strong>OllamAssist</strong> (if installed).</li>
+        </ul>
+    </section>
 
-This ensures that:
-1. The log level is properly set
-2. File and line information is captured
-3. The method name is recorded
-4. A detailed message is provided
+    <section id="guideline-maintenance" class="doc-section">
+        <h2>Guideline Maintenance</h2>
+        <p>Update this guideline as new assistants are added or existing ones change. All sub-guidelines and documentation should inherit from this primary document.</p>
+    </section>
 
-## Error Handling
+    <section id="file-management" class="doc-section">
+        <h2>File Management</h2>
 
-When encountering errors:
+        <h3>Modification Policy</h3>
+        <ul>
+            <li><strong>Always prefer modifying existing files</strong> over creating new ones</li>
+            <li>New files should only be created when:
+                <ul>
+                    <li>Adding completely new functionality that doesn't fit in existing files or will make the exiting file to large. the sugest which sub could be refracted into other file.</li>
+                    <li>Following the project's architectural patterns (e.g., new controllers, models, utils etc.)</li>
+                    <li>Those explicitly requested by the user</li>
+                </ul>
+            </li>
+            <li>Always create backups before making changes. These should be done by the user with the file manager system</li>
+            <li>Document all changes in the appropriate changelog</li>
+            <li>Keep the codebase clean and organized</li>
+            <li>New files should added to the Primary documentation file for the system</li>
+        </ul>
 
-1. Log the error with appropriate details
-2. Add the error message to the stash for display to the user
-3. Use debug messages for additional context
+        <h3>Naming Conventions</h3>
+        <table class="standard-table">
+            <tr>
+                <th>File Type</th>
+                <th>Naming Convention</th>
+                <th>Example</th>
+            </tr>
+            <tr>
+                <td>Controller</td>
+                <td>PascalCase.pm</td>
+                <td>Documentation.pm</td>
+            </tr>
+            <tr>
+                <td>Template</td>
+                <td>snake_case.tt</td>
+                <td>user_profile.tt</td>
+            </tr>
+            <tr>
+                <td>Test File use the browser to do this or the catalyst testing system.</td>
+                <td>descriptive_name.t</td>
+                <td>documentation_controller.t</td>
+            </tr>
+        </table>
+       <h3>If the name of a file is changed make sure it is refactored in all files that use the old naming.</h3>
+    </section>
 
-Example:
-```perl
-# Log the error
-$self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'method_name', 
-    "Error occurred: $error_message");
+    <section id="code-standards" class="doc-section">
+        <h2>Code Standards</h2>
 
-# Add to stash for display
-$c->stash(
-    error_msg => "An error occurred: $error_message",
-    debug_msg => "Technical details: $technical_details" # Only shown in debug mode
-);
-```
+        <h3>Logging</h3>
+        <p>Always use structured logging with context:</p>
+        <pre><code class="perl">$self->logging->log_with_details(
+    $c,                    # Catalyst context
+    'info',                # Log level (debug, info, warn, error)
+    __FILE__,              # File name
+    __LINE__,              # Line number
+    'method_name',         # Method or section name
+    "Descriptive message"  # Clear, actionable message
+);</code></pre>
+    </section>
 
-## Documentation System Structure
+    <section id="workflow" class="doc-section">
+        <h2>Development Workflow</h2>
 
-The documentation system is organized into categories:
-- User guides
-- Admin guides
-- Developer guides
-- Tutorials
-- Site-specific documentation
-- Module documentation
-- Controller documentation
-- Model documentation
-- Changelog
+        <h3>Adding New Features</h3>
+        <ol>
+            <li>Identify the problem or feature to be added</li>
+            <li>Read all existing documentation to see what was in place and that it matches the current state of the code.</li>
+            <li>Research and gather information</li>
+            <li>Design the solution</li>
+            <li>Implement the solution</li>
+            <li>Check for existing implementations that can be extended</li>
+            <li>Modify the appropriate controller, model etc or create new files sub only if absolutely necessary</li>
+            <li>Update or add templates as needed</li>
+            <li>Update routes if needed especially if new sub .tt are created.</li>
+            <li>Add tests only in the catalyst system or via the browser. </li>
+            <li>Record all session events in the current_session.md so we know what is happening in each prompt. Help tune the guidelines to over come problems.</li>
+            <li>Update the documentation</li>
+        </ol>
+            <li>Update documentation</li>
+        </ol>
+    </section>
 
-Each category has role-based access control to ensure users only see relevant documentation.
+    <section id="documentation" class="doc-section">
+        <h2>Documentation</h2>
 
-For more details, see:
-- [Documentation System Overview](/Documentation/documentation_system_overview)
-- [Documentation Filename Issue](/Documentation/documentation_filename_issue)
-- [Controller Routing Guidelines](/Documentation/controller_routing_guidelines)
-- [Controllers Documentation](/Documentation/controllers)
+        <h3>Code Comments</h3>
+        <ul>
+            <li>Document the "why" not just the "what" and "how"</li>
+            <li>Keep Documentation up to date with code changes</li>
+            <li>Fallow the documentation guidelines.</li>
+            <li>Reference related issues or documentation.</li>
+            <li>Make sure all files relating to the system are in the documentation.</li>
+            <li>Use consistent formatting</li>
+            <li>Reference related issues or documentation</li>
+        </ul>
+    </section>
 
-## File Naming Conventions
+    <section id="troubleshooting" class="doc-section">
+        <h2>Troubleshooting</h2>
 
-Follow these conventions for documentation files:
-- Use lowercase with underscores for filenames
-- Use `.md` for Markdown files
-- Use `.tt` for Template Toolkit files
-- Include the category in the filename when appropriate
+        <h3>Common Issues</h3>
+        <dl>
+            <dt>Mismatched file/package names</dt>
+            <dd>Verify case sensitivity matches exactly</dd>
 
-Example: `user_guide_login.md`, `admin_installation.tt`
+            <dt>Missing dependencies</dt>
+            <dd>Check <code>cpanfile</code> and <code>Makefile.PL</code></dd>
 
-## Data Storage Patterns
+            <dt>Template errors</dt>
+            <dd>Look for unclosed tags or syntax errors</dd>
+        </dl>
+    </section>
 
-### JSON to MySQL Transition Pattern
+    <section id="ai-integration" class="doc-section">
+        <h2>AI Integration</h2>
 
-The Comserv2 system uses a development pattern where:
+        <h3>Resource Management</h3>
+        <p><strong>All AI assistants must adhere to these resource guidelines:</strong></p>
+        <ul>
+            <li><strong>Operation Limits</strong>: 15-20 operations per conversation</li>
+            <li><strong>Prompt Limit</strong>: 3 prompts maximum before mandatory handoff</li>
+            <li><strong>Session Tracking</strong>: All session events must be recorded in current_session.md</li>
+        </ul>
 
-1. **Initial Implementation**: New features often start with JSON file storage
-   - Example: `NetworkMap.pm` uses JSON for storing network device information
-   - JSON files are typically stored in `Comserv/config/` directory
-   - This allows for rapid prototyping and iteration
+        <h3>File Editing Protocol</h3>
+        <p>When editing Template Toolkit (.tt) files:</p>
+        <ol>
+            <li>Check if a corresponding .md file exists</li>
+            <li>If not, create one: <code>cp target_file.tt target_file.md</code></li>
+            <li>Edit the .md file with proper Template Toolkit structure</li>
+            <li>Present the command to apply changes: <code>cp target_file.md target_file.tt</code></li>
+            <li>Let the user execute the final copy command</li>
+        </ol>
 
-2. **Database Migration**: As features mature, data is migrated to MySQL
-   - Database models are created in `Comserv/lib/Comserv/Model/`
-   - Database configuration is managed via `db_config.json`
-   - The application supports multiple database connections
+        <h3>Template Structure</h3>
+        <p>All .md files must include proper Template Toolkit structure:</p>
+        <pre><code>[% META title = 'Descriptive Page Title' %]
+[% PageVersion = 'path/to/file.tt,v 1.0 YYYY/MM/DD author Exp' %]
 
-When implementing new features:
-- Follow this pattern of starting with JSON if appropriate
-- Reuse existing JSON handling code (see `NetworkMap.pm` as an example)
-- Document the planned transition to database storage
+<!-- HTML content here -->
+[% IF condition %]
+    <div>Conditional content</div>
+[% END %]</code></pre>
+
+        <h3>Resource Conservation</h3>
+        <ul>
+            <li>Minimize shell command usage</li>
+            <li>Avoid redundant file operations</li>
+            <li>Combine operations where possible</li>
+            <li>Focus only on essential tasks</li>
+            <li>Stop before hitting limits to prevent lockouts</li>
+        </ul>
+    </section>
+
+    <section id="usage-instructions" class="doc-section">
+        <h2>Usage Instructions</h2>
+        <ul>
+            <li><strong>Code Editing</strong>:
+                <ol>
+                    <li>Provide context about the file or code section to be modified.</li>
+                    <li>ProxyAI will generate a <code>+-</code> diff showing the exact changes:
+                        <pre><code>- Old code to be removed
++ New code to be added</code></pre>
+                    </li>
+                    <li>Review the diff in the IDE plugin interface, with highlighted changes for clarity.</li>
+                    <li>Make any necessary adjustments to the code directly in the diff view.</li>
+                    <li>Click <code>Add AI_Guidelines.tt</code> to insert the changes at the cursor location or a specified block.</li>
+                    <li>Click <code>Apply</code> to confirm and apply the modifications.</li>
+                </ol>
+            </li>
+            <li><strong>Documentation Updates</strong>:
+                <ol>
+                    <li>Provide explicit input about the documentation to be updated.</li>
+                    <li>ProxyAI will generate a <code>+-</code> diff showing the exact changes:
+                        <pre><code>- Old documentation to be removed
++ New documentation to be added</code></pre>
+                    </li>
+                    <li>Review the diff in the IDE plugin interface, with highlighted changes for clarity.</li>
+                    <li>Make any necessary adjustments to the documentation directly in the diff view.</li>
+                    <li>Click <code>Add AI_Guidelines.tt</code> to insert the changes at the cursor location or a specified block.</li>
+                    <li>Click <code>Apply</code> to confirm and apply the modifications.</li>
+                </ol>
+            </li>
+        </ul>
+    </section>
+</div>
+
+[% # Include any necessary JavaScript or additional template components %]
+[% IF c.session.debug_mode == 1 %]
+    <div class="debug-footer">
+        <h3>Template Debug Info</h3>
+        <p>Template: [% template.name %]</p>
+        <p>Roles: [% c.user.roles.join(', ') %]</p>
+    </div>
+[% END %]

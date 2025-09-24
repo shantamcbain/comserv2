@@ -470,7 +470,7 @@ sub index :Path :Args(0) {
     }
     
     # Get configuration
-    my $config_file = Comserv->path_to('root', 'Documentation', 'config', 'documentation_config_new.json');
+    my $config_file = Comserv->path_to('root', 'Documentation', 'config', 'documentation_config.json');
     my $config = $self->_load_config($config_file);
     
     # Stash data for template
@@ -573,7 +573,7 @@ sub category :Path('category') :Args(1) {
     $docs = [sort { $a->{metadata}{title} cmp $b->{metadata}{title} } @$docs];
     
     # Get configuration
-    my $config_file = Comserv->path_to('root', 'Documentation', 'config', 'documentation_config_new.json');
+    my $config_file = Comserv->path_to('root', 'Documentation', 'config', 'documentation_config.json');
     my $config = $self->_load_config($config_file);
     
     # Stash data for template
@@ -612,7 +612,7 @@ sub tag :Path('tag') :Args(1) {
     $docs = [sort { $a->{metadata}{title} cmp $b->{metadata}{title} } @$docs];
     
     # Get configuration
-    my $config_file = Comserv->path_to('root', 'Documentation', 'config', 'documentation_config_new.json');
+    my $config_file = Comserv->path_to('root', 'Documentation', 'config', 'documentation_config.json');
     my $config = $self->_load_config($config_file);
     
     # Stash data for template

@@ -1,0 +1,75 @@
+# Create New Documentation Page Entry
+
+**Page:** `[% page_name %]`
+
+The documentation page you requested does not exist in the system configuration. As an administrator, you can create a new entry for this page.
+
+## Page Information
+
+- **Page Name:** [% page_name %]
+- **Suggested Path:** Documentation/[% page_name %].md
+- **Current Status:** Not configured
+
+## Create Page Entry
+
+Please fill out the following form to create a new documentation page entry:
+
+<form method="post" action="[% c.uri_for_action('Documentation/edit_roles', [url_page_name]) %]">
+    <input type="hidden" name="action" value="create_page_entry">
+    
+    <div class="form-group">
+        <label for="description">Page Description:</label>
+        <input type="text" id="description" name="description" value="[% suggested_description %]" class="form-control" required>
+        <small class="form-text text-muted">A brief description of what this documentation page covers.</small>
+    </div>
+
+    <div class="form-group">
+        <label for="site">Site Access:</label>
+        <select id="site" name="site" class="form-control">
+            [% FOR site IN available_sites %]
+                <option value="[% site %]"[% IF site == suggested_site %] selected[% END %]>[% site %]</option>
+            [% END %]
+        </select>
+        <small class="form-text text-muted">Which site(s) should have access to this documentation.</small>
+    </div>
+
+    <div class="form-group">
+        <label>Required Roles:</label>
+        <div class="checkbox-group">
+            [% FOR role IN available_roles %]
+                <div class="checkbox">
+                    <label>
+                        <input type="checkbox" name="roles" value="[% role %]"[% IF suggested_roles.grep(role).size > 0 %] checked[% END %]>
+                        [% role FILTER ucfirst %]
+                    </label>
+                </div>
+            [% END %]
+        </div>
+        <small class="form-text text-muted">Select which roles should have access to this documentation page.</small>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Create Page Entry</button>
+        <a href="[% c.uri_for('/Documentation') %]" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
+
+## What This Does
+
+Creating a page entry will:
+
+1. **Register the page** in the system so it appears in documentation listings
+2. **Set access permissions** based on the roles you select
+3. **Enable role editing** for this page in the future
+4. **Allow the page to be viewed** by users with the appropriate roles
+
+## Important Notes
+
+- This only creates the **configuration entry** for the page
+- The actual documentation file at `Documentation/[% page_name %].md` may or may not exist
+- If the file doesn't exist, users will see an error when trying to view the page content
+- You may need to create the actual documentation file separately
+
+---
+
+*This form is only available to administrators.*

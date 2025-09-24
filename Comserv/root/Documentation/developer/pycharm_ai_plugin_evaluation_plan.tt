@@ -1,0 +1,276 @@
+[% META title = 'PyCharm AI Plugin Evaluation Plan' %]
+[% PageVersion = 'pycharm_ai_plugin_evaluation_plan.tt,v 1.0 2025/09/21 shanta Exp shanta ' %]
+
+<div class="documentation-content">
+    <h1>PyCharm AI Plugin Evaluation Plan</h1>
+    
+    <div class="plan-overview">
+        <h2>Evaluation Overview</h2>
+        <p>This comprehensive 4-week evaluation plan will assess PyCharm AI assistant plugins to find a cost-effective solution for Template Toolkit (.tt) file support and Catalyst development productivity.</p>
+        
+        <div class="budget-constraints">
+            <h3>Budget Constraints</h3>
+            <ul>
+                <li><strong>Monthly Budget:</strong> $25-40 maximum</li>
+                <li><strong>Priority:</strong> Template Toolkit (.tt) file support</li>
+                <li><strong>Secondary:</strong> Perl/Catalyst framework assistance</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="plugin-candidates">
+        <h2>Plugin Candidates (Prioritized)</h2>
+        <table class="evaluation-table">
+            <thead>
+                <tr>
+                    <th>Plugin</th>
+                    <th>Cost/Month</th>
+                    <th>Status</th>
+                    <th>Priority</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Continue.dev</td>
+                    <td>Free</td>
+                    <td>Partially installed</td>
+                    <td>1 (Start here)</td>
+                </tr>
+                <tr>
+                    <td>GitHub Copilot</td>
+                    <td>$10/month</td>
+                    <td>Not tested</td>
+                    <td>2 (If Continue fails)</td>
+                </tr>
+                <tr>
+                    <td>Tabnine</td>
+                    <td>$12/month</td>
+                    <td>Not tested</td>
+                    <td>3 (Advanced features)</td>
+                </tr>
+                <tr>
+                    <td>Amazon CodeWhisperer</td>
+                    <td>Free tier available</td>
+                    <td>Not tested</td>
+                    <td>4 (Backup option)</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="evaluation-criteria">
+        <h2>Evaluation Criteria</h2>
+        
+        <div class="criteria-weights">
+            <h3>Scoring Weights</h3>
+            <ul>
+                <li><strong>Technical Capability (60%):</strong> Template Toolkit support, Perl recognition, Catalyst awareness</li>
+                <li><strong>Usability (25%):</strong> PyCharm integration, response quality, ease of use</li>
+                <li><strong>Economic Value (15%):</strong> Cost vs. productivity gain</li>
+            </ul>
+        </div>
+
+        <div class="detailed-criteria">
+            <h3>Technical Capability Breakdown</h3>
+            <table class="scoring-table">
+                <thead>
+                    <tr>
+                        <th>Feature</th>
+                        <th>Weight</th>
+                        <th>Max Score</th>
+                        <th>Testing Method</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Template Toolkit (.tt) Syntax</td>
+                        <td>25%</td>
+                        <td>25</td>
+                        <td>Code completion, syntax highlighting</td>
+                    </tr>
+                    <tr>
+                        <td>Perl Language Support</td>
+                        <td>20%</td>
+                        <td>20</td>
+                        <td>Controller suggestions, variable recognition</td>
+                    </tr>
+                    <tr>
+                        <td>Catalyst Framework Awareness</td>
+                        <td>10%</td>
+                        <td>10</td>
+                        <td>Route understanding, model suggestions</td>
+                    </tr>
+                    <tr>
+                        <td>Context Understanding</td>
+                        <td>5%</td>
+                        <td>5</td>
+                        <td>Project structure awareness</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="testing-phases">
+        <h2>4-Week Testing Schedule</h2>
+        
+        <div class="week-by-week">
+            <h3>Week 1: Continue.dev Intensive Testing</h3>
+            <ul>
+                <li><strong>Days 1-2:</strong> Complete setup and basic functionality</li>
+                <li><strong>Days 3-4:</strong> Template Toolkit testing scenarios</li>
+                <li><strong>Days 5-7:</strong> Catalyst development workflows</li>
+            </ul>
+
+            <h3>Week 2: Performance Evaluation & Decision Point</h3>
+            <ul>
+                <li><strong>Days 8-10:</strong> Score Continue.dev results</li>
+                <li><strong>Days 11-12:</strong> Decision: proceed with additional plugins or optimize Continue.dev</li>
+                <li><strong>Days 13-14:</strong> Begin GitHub Copilot setup (if needed)</li>
+            </ul>
+
+            <h3>Week 3: Secondary Plugin Testing (If Required)</h3>
+            <ul>
+                <li><strong>Days 15-17:</strong> GitHub Copilot evaluation</li>
+                <li><strong>Days 18-19:</strong> Tabnine testing (if budget allows)</li>
+                <li><strong>Days 20-21:</strong> CodeWhisperer testing</li>
+            </ul>
+
+            <h3>Week 4: Final Comparison & Implementation</h3>
+            <ul>
+                <li><strong>Days 22-24:</strong> Side-by-side comparisons</li>
+                <li><strong>Days 25-26:</strong> Final scoring and cost analysis</li>
+                <li><strong>Days 27-28:</strong> Implementation and configuration</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="testing-scenarios">
+        <h2>Standard Testing Scenarios</h2>
+        
+        <div class="scenario-list">
+            <h3>Template Toolkit Scenarios</h3>
+            <ol>
+                <li><strong>Basic .tt File Recognition:</strong> Open existing .tt files, check syntax highlighting</li>
+                <li><strong>Variable Completion:</strong> Test [% variable %] suggestions from controller context</li>
+                <li><strong>Template Directive Support:</strong> [% INCLUDE %], [% PROCESS %], [% BLOCK %] completion</li>
+                <li><strong>Loop and Conditional Logic:</strong> [% FOREACH %], [% IF %] statement assistance</li>
+                <li><strong>HTML Integration:</strong> Mixed HTML/TT syntax support</li>
+            </ol>
+
+            <h3>Catalyst Framework Scenarios</h3>
+            <ol>
+                <li><strong>Controller Method Recognition:</strong> Understanding $c->stash variables</li>
+                <li><strong>Model Suggestions:</strong> $c->model() completion with actual model names</li>
+                <li><strong>Route Understanding:</strong> Path to template mapping awareness</li>
+                <li><strong>Configuration Variables:</strong> Config parameter suggestions</li>
+                <li><strong>Database Integration:</strong> DBIx::Class method suggestions</li>
+            </ol>
+
+            <h3>Perl Language Scenarios</h3>
+            <ol>
+                <li><strong>Module Suggestions:</strong> use/require statement completion</li>
+                <li><strong>Method Completion:</strong> Object method suggestions</li>
+                <li><strong>Variable Recognition:</strong> Lexical variable tracking</li>
+                <li><strong>POD Documentation:</strong> Help with Perl documentation</li>
+                <li><strong>Debugging Assistance:</strong> Error identification and suggestions</li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="scoring-system">
+        <h2>Scoring System</h2>
+        
+        <div class="score-ranges">
+            <h3>Score Interpretation</h3>
+            <ul>
+                <li><strong>90-100:</strong> Excellent - Implement immediately</li>
+                <li><strong>75-89:</strong> Good - Implement with minor tweaks</li>
+                <li><strong>60-74:</strong> Acceptable - Consider with budget constraints</li>
+                <li><strong>45-59:</strong> Marginal - Only if no alternatives</li>
+                <li><strong>Below 45:</strong> Inadequate - Do not implement</li>
+            </ul>
+        </div>
+
+        <div class="decision-matrix">
+            <h3>Decision Matrix</h3>
+            <table class="scoring-table">
+                <thead>
+                    <tr>
+                        <th>Continue.dev Score</th>
+                        <th>Action</th>
+                        <th>Budget Impact</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>75+</td>
+                        <td>Stop testing, implement Continue.dev</td>
+                        <td>$0/month - Stay within budget</td>
+                    </tr>
+                    <tr>
+                        <td>60-74</td>
+                        <td>Test GitHub Copilot as comparison</td>
+                        <td>$10/month - Within budget</td>
+                    </tr>
+                    <tr>
+                        <td>45-59</td>
+                        <td>Test all candidates</td>
+                        <td>Evaluate each option carefully</td>
+                    </tr>
+                    <tr>
+                        <td>Below 45</td>
+                        <td>Focus on manual productivity improvements</td>
+                        <td>$0/month - No plugin investment</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="success-metrics">
+        <h2>Success Metrics</h2>
+        
+        <div class="productivity-measures">
+            <h3>Quantifiable Productivity Gains</h3>
+            <ul>
+                <li><strong>Time Savings:</strong> Measure completion time for standard .tt file modifications</li>
+                <li><strong>Error Reduction:</strong> Track syntax errors before/after plugin implementation</li>
+                <li><strong>Code Quality:</strong> Assess suggestion accuracy and relevance</li>
+                <li><strong>Learning Curve:</strong> Time to become proficient with the plugin</li>
+            </ul>
+        </div>
+
+        <div class="roi-calculation">
+            <h3>ROI Calculation</h3>
+            <p><strong>Formula:</strong> (Time Saved per Month × Hourly Rate) - Plugin Cost = Net Value</p>
+            <ul>
+                <li><strong>Baseline:</strong> Current .tt file editing time without AI assistance</li>
+                <li><strong>Target:</strong> 25% reduction in development time for template work</li>
+                <li><strong>Break-even:</strong> Plugin must save at least plugin_cost/hourly_rate hours per month</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="next-steps">
+        <h2>Implementation Next Steps</h2>
+        
+        <div class="immediate-actions">
+            <h3>Start Week 1 (Continue.dev Testing)</h3>
+            <ol>
+                <li>Follow the Continue.dev Testing Guide</li>
+                <li>Set up progress tracking using the evaluation tracking document</li>
+                <li>Establish baseline productivity metrics</li>
+                <li>Begin systematic testing scenarios</li>
+            </ol>
+        </div>
+        
+        <div class="documentation-links">
+            <h3>Related Documentation</h3>
+            <ul>
+                <li><a href="continue_dev_testing_guide.tt">Continue.dev Testing Guide</a></li>
+                <li><a href="ai_plugin_evaluation_tracking.tt">Progress Tracking Document</a></li>
+            </ul>
+        </div>
+    </div>
+</div>
