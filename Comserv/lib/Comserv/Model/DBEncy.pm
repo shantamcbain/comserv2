@@ -1,222 +1,146 @@
+
 package Comserv::Model::DBEncy;
 
 use strict;
 use base 'Catalyst::Model::DBIC::Schema';
-use Sys::Hostname;
-use Socket;
-use JSON;
-use Data::Dumper;
-use Catalyst::Utils;  # For path_to
+use Comserv::Util::Logging;
 
-# Load the database configuration from db_config.json
-my $config_file;
-my $json_text;
+# Store connection details for debugging
+my $startup_connection_info;
 
-# Try to load the config file using Catalyst::Utils if the application is initialized
-eval {
-    $config_file = Catalyst::Utils::path_to('db_config.json');
-};
 
-# Check for environment variable configuration path
-if ($@ || !defined $config_file) {
-    if ($ENV{COMSERV_CONFIG_PATH}) {
-        use File::Spec;
-        $config_file = File::Spec->catfile($ENV{COMSERV_CONFIG_PATH}, 'db_config.json');
-        warn "Using environment variable path for config file: $config_file";
-    }
-}
-
-# Fallback to FindBin if Catalyst::Utils fails (during application initialization)
-if ($@ || !defined $config_file) {
-    use FindBin;
-    use File::Spec;
-    
-    # Try multiple possible locations
-    my @possible_paths = (
-        File::Spec->catfile($FindBin::Bin, 'db_config.json'),         # In the same directory as the script
-        File::Spec->catfile($FindBin::Bin, '..', 'db_config.json'),   # One level up from the script
-        '/opt/comserv/db_config.json',                                # In the /opt/comserv directory
-        '/etc/comserv/db_config.json'                                 # In the /etc/comserv directory
-    );
-    
-    foreach my $path (@possible_paths) {
-        if (-f $path) {
-            $config_file = $path;
-            warn "Found config file at: $config_file";
-            last;
-        }
-    }
-    
-    # If still not found, use the default path but warn about it
-    if (!defined $config_file || !-f $config_file) {
-        $config_file = File::Spec->catfile($FindBin::Bin, '..', 'db_config.json');
-        warn "Using FindBin fallback for config file: $config_file (file may not exist)";
-    }
-}
-
-# Load the configuration file
-eval {
-    local $/; # Enable 'slurp' mode
-    open my $fh, "<", $config_file or die "Could not open $config_file: $!";
-    $json_text = <$fh>;
-    close $fh;
-};
-
-if ($@) {
-    my $error_message = "Error loading config file $config_file: $@";
-    warn $error_message;
-    
-    # Provide more helpful error message with instructions
-    die "$error_message\n\n" .
-        "Please ensure db_config.json exists in one of these locations:\n" .
-        "1. In the directory specified by COMSERV_CONFIG_PATH environment variable\n" .
-        "2. In the Comserv application root directory\n" .
-        "3. In /opt/comserv/db_config.json\n" .
-        "4. In /etc/comserv/db_config.json\n\n" .
-        "You can create the file by copying the example from DB_CONFIG_README.md\n" .
-        "or by setting COMSERV_CONFIG_PATH to point to the directory containing your config file.\n";
-}
-
-my $config = decode_json($json_text);
-
-# Function to test database connectivity
-sub test_connection {
-    my ($connection_config) = @_;
-    
-    eval {
-        require DBI;
-        my $dsn;
-        my $dbh;
-        
-        if ($connection_config->{db_type} eq 'sqlite') {
-            # SQLite connection
-            $dsn = "dbi:SQLite:dbname=" . $connection_config->{database_path};
-            $dbh = DBI->connect($dsn, "", "", {
-                RaiseError => 0,
-                PrintError => 0,
-                sqlite_timeout => 5000,
-            });
-        } else {
-            # MySQL connection
-            $dsn = "dbi:mysql:database=" . $connection_config->{database} . 
-                   ";host=" . $connection_config->{host} . 
-                   ";port=" . $connection_config->{port};
-            $dbh = DBI->connect($dsn, $connection_config->{username}, $connection_config->{password}, {
-                RaiseError => 0,
-                PrintError => 0,
-                mysql_connect_timeout => 5,
-            });
-        }
-        
-        if ($dbh) {
-            $dbh->disconnect();
-            return 1;
-        }
-    };
-    return 0;
-}
-
-# Function to select the best database connection for ENCY database
-sub select_ency_connection {
-    my $config = shift;
-    
-    # Get all connections that serve the ENCY database, sorted by priority
-    my @ency_connections = grep { 
-        ($config->{$_}->{database} && $config->{$_}->{database} eq 'ency') ||
-        ($config->{$_}->{db_type} eq 'sqlite' && $_ =~ /ency/)
-    } sort { 
-        $config->{$a}->{priority} <=> $config->{$b}->{priority} 
-    } keys %$config;
-    
-    # Check localhost override first if any connection has it enabled
-    my @localhost_override = grep { 
-        $config->{$_}->{localhost_override} && 
-        (($config->{$_}->{database} && $config->{$_}->{database} eq 'ency') ||
-         ($config->{$_}->{db_type} eq 'sqlite' && $_ =~ /ency/))
-    } @ency_connections;
-    
-    if (@localhost_override) {
-        # Try localhost first for connections with localhost_override
-        for my $conn_name (@localhost_override) {
-            my $conn = $config->{$conn_name};
-            # Create a test connection config for localhost override
-            my $test_config = { %$conn };
-            $test_config->{host} = 'localhost' if $test_config->{host};
-            
-            if (test_connection($test_config)) {
-                warn "DBEncy: Using localhost override for $conn_name";
-                if ($conn->{db_type} eq 'sqlite') {
-                    return (undef, undef, $conn->{database_path}, undef, undef, $conn_name, 'sqlite');
-                } else {
-                    return ('localhost', $conn->{port}, $conn->{database}, $conn->{username}, $conn->{password}, $conn_name, 'mysql');
-                }
-            }
-        }
-    }
-    
-    # Try connections in priority order
-    for my $conn_name (@ency_connections) {
-        my $conn = $config->{$conn_name};
-        
-        if (test_connection($conn)) {
-            warn "DBEncy: Using connection $conn_name ($conn->{description})";
-            if ($conn->{db_type} eq 'sqlite') {
-                return (undef, undef, $conn->{database_path}, undef, undef, $conn_name, 'sqlite');
-            } else {
-                return ($conn->{host}, $conn->{port}, $conn->{database}, $conn->{username}, $conn->{password}, $conn_name, 'mysql');
-            }
-        }
-    }
-    
-    # If no connection works, fall back to the first available (legacy behavior)
-    if (exists $config->{shanta_ency}) {
-        my $conn = $config->{shanta_ency};
-        warn "DBEncy: Falling back to legacy shanta_ency configuration";
-        return ($conn->{host}, $conn->{port}, $conn->{database}, $conn->{username}, $conn->{password}, 'shanta_ency', 'mysql');
-    }
-    
-    die "DBEncy: No working database connection found for ENCY database";
-}
-
-# Select the best connection
-my ($host, $port, $database, $username, $password, $connection_name, $db_type) = select_ency_connection($config);
-
-# Print the configuration for debugging
-print "DBEncy Configuration:\n";
-print "Selected Connection: $connection_name\n";
-print "Database Type: $db_type\n";
-if ($db_type eq 'sqlite') {
-    print "Database Path: $database\n";
-} else {
-    print "Host: $host\n";
-    print "Database: $database\n";
-    print "Username: $username\n";
-}
-
-# Set the schema_class and connect_info attributes
-my $connect_info;
-if ($db_type eq 'sqlite') {
-    $connect_info = {
-        dsn => "dbi:SQLite:dbname=$database",
-        user => "",
-        password => "",
-        sqlite_unicode => 1,
-        on_connect_do => ["PRAGMA foreign_keys = ON"],
-    };
-} else {
-    $connect_info = {
-        dsn => "dbi:mysql:database=$database;host=$host;port=$port",
-        user => $username,
-        password => $password,
-        mysql_enable_utf8 => 1,
-        on_connect_do => ["SET NAMES 'utf8'", "SET CHARACTER SET 'utf8'"],
-    };
-}
-
+# Set default schema_class - connect_info will be set at runtime
 __PACKAGE__->config(
-    schema_class => 'Comserv::Model::Schema::Ency',
-    connect_info => $connect_info
+    schema_class => 'Comserv::Model::Schema::Ency'
 );
+
+# COMPONENT method runs at application startup, not module compile time
+sub COMPONENT {
+    my ($self, $app, $args) = @_;
+
+    my $logger = Comserv::Util::Logging->instance();
+    
+    # Create a RemoteDB instance directly instead of relying on Catalyst's model()
+    # This avoids circular dependency issues during component initialization
+    my $remote_db;
+    eval {
+        require Comserv::Model::RemoteDB;
+        $remote_db = Comserv::Model::RemoteDB->new();
+    };
+    
+    if ($@ || !$remote_db) {
+        my $error = $@ || "Failed to create RemoteDB instance";
+        $logger->log_with_details(undef, 'error', __FILE__, __LINE__, 'COMPONENT',
+            "DBEncy: Failed to create RemoteDB instance: $error");
+        die "DBEncy: Cannot proceed without RemoteDB: $error";
+    }
+
+    # Use RemoteDB to select the best connection for 'ency' database
+    my $connection_info;
+    eval {
+        $connection_info = $remote_db->get_connection_info('ency');
+    };
+
+    if ($@ || !$connection_info) {
+        my $error = $@ || "No connection info returned from RemoteDB";
+        $logger->log_with_details(undef, 'error', __FILE__, __LINE__, 'COMPONENT',
+            "DBEncy: Failed to get connection from RemoteDB: $error");
+        die "DBEncy: Failed to establish database connection: $error";
+    }
+
+    # Extract connection details from RemoteDB
+    my $conn = $connection_info->{config};
+    my $connection_name = $connection_info->{connection_name};
+    my $db_type = $conn->{db_type} || 'mysql';
+    
+    # Enhanced startup logging to show which connection is being used
+    $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+        "============================================");
+    $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+        "DBEncy MODEL STARTUP - CONNECTION FROM RemoteDB:");
+    $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+        "Connection Name: $connection_name");
+    $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+        "Database Type: $db_type");
+    if ($db_type eq 'sqlite') {
+        $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+            "Database Path: " . $conn->{database_path});
+    } else {
+        $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+            "Host: " . $conn->{host} . ":" . $conn->{port});
+        $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+            "Database: " . $conn->{database});
+        $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+            "Username: " . $conn->{username});
+    }
+    $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+        "Description: " . ($conn->{description} || 'No description'));
+    $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+        "Priority: " . ($conn->{priority} || 'Not set'));
+    $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+        "============================================");
+
+    # Store connection info for debugging
+    $startup_connection_info = {
+        connection_name => $connection_name,
+        db_type => $db_type,
+        host => $conn->{host},
+        port => $conn->{port},
+        database => $conn->{database} || $conn->{database_path},
+        username => $conn->{username},
+        description => $conn->{description} || 'No description',
+        priority => $conn->{priority} || 'Not set',
+        timestamp => scalar(localtime())
+    };
+
+    # Set up the DBIx::Class connection
+    my $connect_info;
+    if ($db_type eq 'sqlite') {
+        $connect_info = {
+            dsn => "dbi:SQLite:dbname=" . $conn->{database_path},
+            user => "",
+            password => "",
+            sqlite_unicode => 1,
+            on_connect_do => ["PRAGMA foreign_keys = ON"],
+        };
+    } else {
+        $connect_info = {
+            dsn => "dbi:mysql:database=" . $conn->{database} . ";host=" . $conn->{host} . ";port=" . $conn->{port},
+            user => $conn->{username},
+            password => $conn->{password},
+            mysql_enable_utf8 => 1,
+            on_connect_do => ["SET NAMES 'utf8'", "SET CHARACTER SET 'utf8'"],
+        };
+    }
+
+    $args->{connect_info} = $connect_info;
+    return $self->next::method($app, $args);
+}
+
+# Method to get current connection info for debugging
+sub get_connection_info {
+    my ($self) = @_;
+    
+    my $storage = $self->schema->storage;
+    my $connect_info = $storage->connect_info;
+    
+    my $info = {
+        # Current runtime connection info
+        current_dsn => $connect_info->[0]{dsn} || $connect_info->[0] || 'Unknown',
+        current_username => $connect_info->[0]{user} || $connect_info->[1] || 'Unknown',
+        connection_type => ref($storage) || 'Unknown',
+        
+        # Startup connection selection info
+        startup_info => $startup_connection_info || 'Not available'
+    };
+    
+    return $info;
+}
+
+# Method to get detailed startup connection info
+sub get_startup_connection_info {
+    return $startup_connection_info;
+}
 sub list_tables {
     my $self = shift;
 

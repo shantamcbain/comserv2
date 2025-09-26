@@ -116,29 +116,79 @@ sub get_smtp_config {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_smtp_config', 
         "Retrieving SMTP config for site_id $site_id");
     
-    my $config_rs = $c->model('DBEncy')->resultset('SiteConfig');
+    # Use system database access through DBEncy model (database server connection)
+    my $config_rs;
+    eval {
+        $config_rs = $c->model('DBEncy')->resultset('SiteConfig');
+    };
+    
+    if ($@) {
+        # Enhanced error logging for specific database issues
+        my $error_msg = $@;
+        
+        if ($error_msg =~ /Table.*ency\.site_config.*doesn.*exist/i) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_smtp_config', 
+                "CRITICAL: Database connection error - Table 'ency.site_config' doesn't exist. " .
+                "This indicates the mail system is connecting to localhost instead of production database server (192.168.1.198). " .
+                "Full error: $error_msg");
+        } elsif ($error_msg =~ /Can.*t connect to.*server/i) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_smtp_config', 
+                "CRITICAL: Cannot connect to database server. " .
+                "Check if database server (192.168.1.198) is accessible. " .
+                "Full error: $error_msg");
+        } elsif ($error_msg =~ /Access denied for user/i) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_smtp_config', 
+                "CRITICAL: Database authentication failed. " .
+                "Check database credentials in db_config.json or fallback settings. " .
+                "Full error: $error_msg");
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_smtp_config', 
+                "Database access error when retrieving SMTP config: $error_msg");
+        }
+        
+        return $self->_get_fallback_smtp_config($c, $site_id);
+    }
 
     # Retrieve SMTP configuration for the given site_id
     my %smtp_config;
     for my $key (qw(host port username password from ssl)) {
-        my $config = $config_rs->find({ site_id => $site_id, config_key => "smtp_$key" });
+        my $config;
+        eval {
+            $config = $config_rs->find({ site_id => $site_id, config_key => "smtp_$key" });
+        };
+        
+        if ($@) {
+            my $error_msg = $@;
+            
+            if ($error_msg =~ /Table.*ency\.site_config.*doesn.*exist/i) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_smtp_config', 
+                    "CRITICAL: Table 'ency.site_config' doesn't exist when accessing smtp_$key for site_id $site_id. " .
+                    "Mail system is incorrectly connecting to localhost instead of production database server (192.168.1.198). " .
+                    "Full error: $error_msg");
+            } else {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_smtp_config', 
+                    "Database error accessing smtp_$key for site_id $site_id: $error_msg");
+            }
+            
+            return $self->_get_fallback_smtp_config($c, $site_id);
+        }
         
         # Skip optional fields like ssl
         next if !$config && $key eq 'ssl';
         
-        # Return undef if any required config is missing
+        # Return fallback if any required config is missing
         unless ($config) {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_smtp_config', 
                 "Missing SMTP config key: smtp_$key for site_id $site_id");
-            return;
+            return $self->_get_fallback_smtp_config($c, $site_id);
         }
         
         $smtp_config{$key} = $config->config_value;
         
-        # If host is mail1.ht.home, replace it with the IP address
+        # If host is mail1.ht.home, replace it with the mail server IP address
         if ($key eq 'host' && $smtp_config{$key} eq 'mail1.ht.home') {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_smtp_config', 
-                "Replacing mail1.ht.home with 192.168.1.129");
+                "Replacing mail1.ht.home with mail server IP 192.168.1.129");
             $smtp_config{$key} = '192.168.1.129';
         }
     }
@@ -149,6 +199,29 @@ sub get_smtp_config {
     return \%smtp_config;
 }
 
+# Fallback SMTP configuration when database config is unavailable
+sub _get_fallback_smtp_config {
+    my ($self, $c, $site_id) = @_;
+    
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_get_fallback_smtp_config', 
+        "Using fallback SMTP config for site_id $site_id");
+    
+    # Provide default mail server configuration
+    my $fallback_config = {
+        host => '192.168.1.129',  # Mail server IP
+        port => 587,
+        username => '',  # Will need to be configured
+        password => '',  # Will need to be configured  
+        from => "noreply\@comserv.local",
+        ssl => 'starttls'
+    };
+    
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_get_fallback_smtp_config', 
+        "Fallback config provided - mail server: " . $fallback_config->{host});
+    
+    return $fallback_config;
+}
+
 # New method to create mail accounts via Virtualmin API
 sub create_mail_account {
     my ($self, $c, $email, $password, $domain) = @_;
@@ -156,7 +229,7 @@ sub create_mail_account {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_mail_account', 
         "Creating mail account $email for domain $domain");
 
-    # Get Virtualmin credentials from configuration
+    # Get Virtualmin credentials from configuration - use mail server IP
     my $virtualmin_host = $c->config->{Virtualmin}->{host} // '192.168.1.129';
     my $virtualmin_user = $c->config->{Virtualmin}->{username} // 'admin';
     my $virtualmin_pass = $c->config->{Virtualmin}->{password};
@@ -168,10 +241,10 @@ sub create_mail_account {
         return;
     }
 
-    # Use IP address directly if hostname is mail1.ht.home
+    # Use mail server IP address directly if hostname is mail1.ht.home
     if ($virtualmin_host eq 'mail1.ht.home') {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_mail_account', 
-            "Replacing mail1.ht.home with 192.168.1.129 for Virtualmin API");
+            "Replacing mail1.ht.home with mail server IP 192.168.1.129 for Virtualmin API");
         $virtualmin_host = '192.168.1.129';
     }
     

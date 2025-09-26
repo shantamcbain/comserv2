@@ -120,6 +120,48 @@ sub index :Chained('base') :PathPart('') :Args(0) {
         "Completed Admin index action");
 }
 
+# Database connection status endpoint
+sub db_status :Chained('base') :PathPart('db-status') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'db_status', 
+        "Starting Admin db_status action");
+    
+    my $db_info = {};
+    
+    # Get DBEncy connection info
+    eval {
+        my $dbency = $c->model('DBEncy');
+        $db_info->{dbency} = $dbency->get_connection_info();
+        $db_info->{dbency_startup} = $dbency->get_startup_connection_info();
+    };
+    if ($@) {
+        $db_info->{dbency_error} = "Error getting DBEncy info: $@";
+    }
+    
+    # Get DBForager connection info if available
+    eval {
+        my $dbforager = $c->model('DBForager');
+        if ($dbforager && $dbforager->can('get_connection_info')) {
+            $db_info->{dbforager} = $dbforager->get_connection_info();
+        } else {
+            $db_info->{dbforager} = "Method not available";
+        }
+    };
+    if ($@) {
+        $db_info->{dbforager_error} = "Error getting DBForager info: $@";
+    }
+    
+    # Set content type for JSON output
+    $c->response->content_type('application/json; charset=utf-8');
+    
+    # Return JSON response
+    $c->response->body(JSON->new->pretty->encode($db_info));
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'db_status', 
+        "Completed Admin db_status action");
+}
+
 # Get system statistics for the admin dashboard
 sub get_system_stats {
     my ($self, $c) = @_;

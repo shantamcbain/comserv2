@@ -109,3 +109,5 @@ Thumbs.db
 /Comserv/root/src/admin/test_diagnostics.tt
 /Comserv/root/admin/backup/index.md
 /current_session.md
+/Comserv/data/ency_offline.db
+/Comserv/data/forager_offline.db

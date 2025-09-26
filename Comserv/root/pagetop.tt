@@ -11,7 +11,8 @@
     Domain: <strong>[% c.req.uri.host %]</strong> | 
     Client IP: <strong>[% c.req.address %]</strong> | 
     Server: <strong>[% server_hostname %]</strong> | 
-    Server IP: <strong>[% server_ip %]</strong>
+    Server IP: <strong>[% server_ip %]</strong>[% IF db_connections && db_connections.size > 0 %] | 
+    Databases: [% FOREACH db IN db_connections %]<strong>[% db.type %]([% db.name %])@[% db.ip %]</strong>[% UNLESS loop.last %], [% END %][% END %][% END %]
     [% IF c.session.debug_mode == 1 %] | [% PageVersion %][% END %]
 </div>
 [% END %]
