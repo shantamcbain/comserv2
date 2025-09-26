@@ -1,208 +1,150 @@
 package Comserv::Model::DBForager;
 
 use strict;
-use JSON;
 use base 'Catalyst::Model::DBIC::Schema';
-use Catalyst::Utils;  # For path_to
-use Data::Dumper;
+use Comserv::Util::Logging;
 
-# Load the database configuration from db_config.json
-my $config_file;
-my $json_text;
+# Store connection details for debugging
+my $startup_connection_info;
 
-# Try to load the config file using Catalyst::Utils if the application is initialized
-eval {
-    $config_file = Catalyst::Utils::path_to('db_config.json');
-};
 
-# Fallback to FindBin if Catalyst::Utils fails (during application initialization)
-if ($@ || !defined $config_file) {
-    use FindBin;
-    use File::Basename;
-    use Cwd 'abs_path';
-    
-    # Get the application root directory (one level up from script or lib)
-    my $bin_dir = $FindBin::Bin;
-    my $app_root;
-    
-    # If we're in a script directory, go up one level to find app root
-    if ($bin_dir =~ /\/script$/) {
-        $app_root = dirname($bin_dir);
-    }
-    # If we're somewhere else, try to find the app root
-    else {
-        # Check if we're already in the app root
-        if (-f "$bin_dir/db_config.json") {
-            $app_root = $bin_dir;
-        }
-        # Otherwise, try one level up
-        elsif (-f dirname($bin_dir) . "/db_config.json") {
-            $app_root = dirname($bin_dir);
-        }
-        # If all else fails, assume we're in lib and need to go up one level
-        else {
-            $app_root = dirname($bin_dir);
-        }
-    }
-    
-    $config_file = "$app_root/db_config.json";
-    warn "Using FindBin fallback for config file: $config_file";
-}
 
-# Load the configuration file
-eval {
-    local $/; # Enable 'slurp' mode
-    open my $fh, "<", $config_file or die "Could not open $config_file: $!";
-    $json_text = <$fh>;
-    close $fh;
-};
-
-if ($@) {
-    die "Error loading config file $config_file: $@";
-}
-
-my $config = decode_json($json_text);
-
-# Function to test database connectivity
-sub test_connection {
-    my ($connection_config) = @_;
-    
-    eval {
-        require DBI;
-        my $dsn;
-        my $dbh;
-        
-        if ($connection_config->{db_type} eq 'sqlite') {
-            # SQLite connection
-            $dsn = "dbi:SQLite:dbname=" . $connection_config->{database_path};
-            $dbh = DBI->connect($dsn, "", "", {
-                RaiseError => 0,
-                PrintError => 0,
-                sqlite_timeout => 5000,
-            });
-        } else {
-            # MySQL connection
-            $dsn = "dbi:mysql:database=" . $connection_config->{database} . 
-                   ";host=" . $connection_config->{host} . 
-                   ";port=" . $connection_config->{port};
-            $dbh = DBI->connect($dsn, $connection_config->{username}, $connection_config->{password}, {
-                RaiseError => 0,
-                PrintError => 0,
-                mysql_connect_timeout => 5,
-            });
-        }
-        
-        if ($dbh) {
-            $dbh->disconnect();
-            return 1;
-        }
-    };
-    return 0;
-}
-
-# Function to select the best database connection for Forager database
-sub select_forager_connection {
-    my $config = shift;
-    
-    # Get all connections that serve the Forager database, sorted by priority
-    my @forager_connections = grep { 
-        ($config->{$_}->{database} && $config->{$_}->{database} eq 'shanta_forager') ||
-        ($config->{$_}->{db_type} eq 'sqlite' && $_ =~ /forager/)
-    } sort { 
-        $config->{$a}->{priority} <=> $config->{$b}->{priority} 
-    } keys %$config;
-    
-    # Check localhost override first if any connection has it enabled
-    my @localhost_override = grep { 
-        $config->{$_}->{localhost_override} && 
-        (($config->{$_}->{database} && $config->{$_}->{database} eq 'shanta_forager') ||
-         ($config->{$_}->{db_type} eq 'sqlite' && $_ =~ /forager/))
-    } @forager_connections;
-    
-    if (@localhost_override) {
-        # Try localhost first for connections with localhost_override
-        for my $conn_name (@localhost_override) {
-            my $conn = $config->{$conn_name};
-            # Create a test connection config for localhost override
-            my $test_config = { %$conn };
-            $test_config->{host} = 'localhost' if $test_config->{host};
-            
-            if (test_connection($test_config)) {
-                warn "DBForager: Using localhost override for $conn_name";
-                if ($conn->{db_type} eq 'sqlite') {
-                    return (undef, undef, $conn->{database_path}, undef, undef, $conn_name, 'sqlite');
-                } else {
-                    return ('localhost', $conn->{port}, $conn->{database}, $conn->{username}, $conn->{password}, $conn_name, 'mysql');
-                }
-            }
-        }
-    }
-    
-    # Try connections in priority order
-    for my $conn_name (@forager_connections) {
-        my $conn = $config->{$conn_name};
-        
-        if (test_connection($conn)) {
-            warn "DBForager: Using connection $conn_name ($conn->{description})";
-            if ($conn->{db_type} eq 'sqlite') {
-                return (undef, undef, $conn->{database_path}, undef, undef, $conn_name, 'sqlite');
-            } else {
-                return ($conn->{host}, $conn->{port}, $conn->{database}, $conn->{username}, $conn->{password}, $conn_name, 'mysql');
-            }
-        }
-    }
-    
-    # If no connection works, fall back to the first available (legacy behavior)
-    if (exists $config->{shanta_forager}) {
-        my $conn = $config->{shanta_forager};
-        warn "DBForager: Falling back to legacy shanta_forager configuration";
-        return ($conn->{host}, $conn->{port}, $conn->{database}, $conn->{username}, $conn->{password}, 'shanta_forager', 'mysql');
-    }
-    
-    die "DBForager: No working database connection found for Forager database";
-}
-
-# Select the best connection
-my ($host, $port, $database, $username, $password, $connection_name, $db_type) = select_forager_connection($config);
-
-# Print the configuration for debugging
-print "DBForager Configuration:\n";
-print "Selected Connection: $connection_name\n";
-print "Database Type: $db_type\n";
-if ($db_type eq 'sqlite') {
-    print "Database Path: $database\n";
-} else {
-    print "Host: $host\n";
-    print "Database: $database\n";
-    print "Username: $username\n";
-}
-
-# Set the schema_class and connect_info attributes
-my $connect_info;
-if ($db_type eq 'sqlite') {
-    $connect_info = {
-        dsn => "dbi:SQLite:dbname=$database",
-        user => "",
-        password => "",
-        sqlite_unicode => 1,
-        on_connect_do => ["PRAGMA foreign_keys = ON"],
-        quote_char => '`',
-    };
-} else {
-    $connect_info = {
-        dsn => "dbi:mysql:database=$database;host=$host;port=$port",
-        user => $username,
-        password => $password,
-        mysql_enable_utf8 => 1,
-        on_connect_do => ["SET NAMES 'utf8'", "SET CHARACTER SET 'utf8'"],
-        quote_char => '`',
-    };
-}
-
+# Set default schema_class - connect_info will be set at runtime
 __PACKAGE__->config(
-    schema_class => 'Comserv::Model::Schema::Forager',
-    connect_info => $connect_info
+    schema_class => 'Comserv::Model::Schema::Forager'
 );
+
+# COMPONENT method runs at application startup, not module compile time
+sub COMPONENT {
+    my ($self, $app, $args) = @_;
+
+    my $logger = Comserv::Util::Logging->instance();
+    
+    # Create a RemoteDB instance directly instead of relying on Catalyst's model()
+    # This avoids circular dependency issues during component initialization
+    my $remote_db;
+    eval {
+        require Comserv::Model::RemoteDB;
+        $remote_db = Comserv::Model::RemoteDB->new();
+    };
+    
+    if ($@ || !$remote_db) {
+        my $error = $@ || "Failed to create RemoteDB instance";
+        $logger->log_with_details(undef, 'error', __FILE__, __LINE__, 'COMPONENT',
+            "DBForager: Failed to create RemoteDB instance: $error");
+        die "DBForager: Cannot proceed without RemoteDB: $error";
+    }
+
+    # Use RemoteDB to select the best connection for 'shanta_forager' database
+    my $connection_info;
+    eval {
+        $connection_info = $remote_db->get_connection_info('shanta_forager');
+    };
+
+    if ($@ || !$connection_info) {
+        my $error = $@ || "No connection info returned from RemoteDB";
+        $logger->log_with_details(undef, 'error', __FILE__, __LINE__, 'COMPONENT',
+            "DBForager: Failed to get connection from RemoteDB: $error");
+        die "DBForager: Failed to establish database connection: $error";
+    }
+
+    # Extract connection details from RemoteDB
+    my $conn = $connection_info->{config};
+    my $connection_name = $connection_info->{connection_name};
+    my $db_type = $conn->{db_type} || 'mysql';
+    
+    # Enhanced startup logging to show which connection is being used
+    $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+        "============================================");
+    $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+        "DBForager MODEL STARTUP - CONNECTION FROM RemoteDB:");
+    $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+        "Connection Name: $connection_name");
+    $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+        "Database Type: $db_type");
+    if ($db_type eq 'sqlite') {
+        $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+            "Database Path: " . $conn->{database_path});
+    } else {
+        $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+            "Host: " . $conn->{host} . ":" . $conn->{port});
+        $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+            "Database: " . $conn->{database});
+        $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+            "Username: " . $conn->{username});
+    }
+    $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+        "Description: " . ($conn->{description} || 'No description'));
+    $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+        "Priority: " . ($conn->{priority} || 'Not set'));
+    $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+        "============================================");
+
+    # Store connection info for debugging
+    $startup_connection_info = {
+        connection_name => $connection_name,
+        db_type => $db_type,
+        host => $conn->{host},
+        port => $conn->{port},
+        database => $conn->{database} || $conn->{database_path},
+        username => $conn->{username},
+        description => $conn->{description} || 'No description',
+        priority => $conn->{priority} || 'Not set',
+        timestamp => scalar(localtime())
+    };
+        
+    # Set up the DBIx::Class connection
+    my $connect_info;
+    if ($db_type eq 'sqlite') {
+        $connect_info = {
+            dsn => "dbi:SQLite:dbname=" . $conn->{database_path},
+            user => "",
+            password => "",
+            sqlite_unicode => 1,
+            on_connect_do => ["PRAGMA foreign_keys = ON"],
+            quote_char => '`',
+        };
+    } else {
+        $connect_info = {
+            dsn => "dbi:mysql:database=" . $conn->{database} . ";host=" . $conn->{host} . ";port=" . $conn->{port},
+            user => $conn->{username},
+            password => $conn->{password},
+            mysql_enable_utf8 => 1,
+            on_connect_do => ["SET NAMES 'utf8'", "SET CHARACTER SET 'utf8'"],
+            quote_char => '`',
+        };
+    }
+    
+    $args->{connect_info} = $connect_info;
+    
+    return $self->next::method($app, $args);
+}
+
+# Method to get current connection info for debugging
+sub get_connection_info {
+    my ($self) = @_;
+    
+    my $storage = $self->schema->storage;
+    my $connect_info = $storage->connect_info;
+    
+    my $info = {
+        # Current runtime connection info
+        current_dsn => $connect_info->[0]{dsn} || $connect_info->[0] || 'Unknown',
+        current_username => $connect_info->[0]{user} || $connect_info->[1] || 'Unknown',
+        connection_type => ref($storage) || 'Unknown',
+        
+        # Startup connection selection info
+        startup_info => $startup_connection_info || 'Not available'
+    };
+    
+    return $info;
+}
+
+# Method to get detailed startup connection info
+sub get_startup_connection_info {
+    return $startup_connection_info;
+}
+
 sub list_tables {
     my $self = shift;
 
@@ -343,3 +285,22 @@ sub trim {
     $s =~ s/^\s+|\s+$//g;
     return $s;
 }
+
+# Method to get current connection info for debugging (similar to DBEncy)
+sub get_connection_info {
+    my ($self) = @_;
+    
+    my $storage = $self->schema->storage;
+    my $connect_info = $storage->connect_info;
+    
+    my $info = {
+        dsn => $connect_info->[0]{dsn} || $connect_info->[0] || 'Unknown',
+        username => $connect_info->[0]{user} || $connect_info->[1] || 'Unknown',
+        # Don't expose password for security
+        connection_type => ref($storage) || 'Unknown'
+    };
+    
+    return $info;
+}
+
+1;
