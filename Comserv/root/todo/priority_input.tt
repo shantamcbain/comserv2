@@ -1,0 +1,30 @@
+[% META title = 'Todo Priority Input' %]
+[% PageVersion = 'todo/priority_input.tt,v 0.01 2025/10/09 Shanta Exp shanta' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+[%# 
+  Reusable priority input component
+  
+  Parameters:
+    - priority_value: The current priority value (optional, defaults to empty)
+    - build_priority: Hash mapping priority numbers to descriptive labels
+    - input_class: Additional CSS classes for the select element (optional)
+    - input_id: ID for the select element (defaults to 'priority')
+    - input_name: Name for the select element (defaults to 'priority')
+    - label: Label text (defaults to 'Priority:')
+    - label_class: Additional CSS classes for the label (optional)
+    - wrapper_class: Additional CSS classes for the wrapper div (optional)
+    
+  Usage in templates:
+    INCLUDE todo/priority_input.tt priority_value=todo.priority build_priority=build_priority
+    INCLUDE todo/priority_input.tt priority_value=record.get_column('priority') build_priority=build_priority
+%]
+<div class="form-group [% wrapper_class %]">
+    <label for="[% input_id || 'priority' %]" class="[% label_class %]">[% label || 'Priority:' %]</label>
+    <select id="[% input_id || 'priority' %]" name="[% input_name || 'priority' %]" class="form-select [% input_class %]">
+    [% FOREACH key IN build_priority.keys.sort %]
+        <option value="[% key %]" [% IF key == priority_value %]selected[% END %]>[% build_priority.$key %]</option>
+    [% END %]
+    </select>
+</div>
