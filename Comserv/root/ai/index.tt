@@ -1,0 +1,865 @@
+[% PageVersion = 'index.tt,v 0.1 2025/10/06 13:35 ai_assistant Exp ai_assistant' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="ai-chat-container">
+    <h1>AI Assistant Chat</h1>
+    
+    <!-- Model Selector (Admin/Developer Only) -->
+    [% IF can_select_model %]
+    <div class="model-selector-section">
+        <label for="model-select">Select Model:</label>
+        <select id="model-select" class="model-dropdown">
+            [% IF installed_models && installed_models.size > 0 %]
+                [% FOREACH model IN installed_models %]
+                    <option value="[% model.name %]" [% IF model.name == current_model %]selected[% END %]>
+                        [% model.name %]
+                        [% IF model.details && model.details.parameter_size %]
+                            ([% model.details.parameter_size %])
+                        [% END %]
+                    </option>
+                [% END %]
+            [% ELSE %]
+                <option value="">No models available</option>
+            [% END %]
+        </select>
+        <a href="/ai/models" class="manage-models-link">Manage Models</a>
+    </div>
+    [% ELSE %]
+    <div class="current-model-display">
+        <span class="model-label">Current Model:</span>
+        <span class="model-name">[% current_model || 'llama3.1' %]</span>
+    </div>
+    [% END %]
+    
+    <!-- Host Selector (Admin/Developer Only) -->
+    [% IF can_select_model %]
+    <div class="host-selector-section">
+        <label for="host-select">Ollama Server:</label>
+        <select id="host-select" class="host-dropdown">
+            <option value="localhost" [% IF current_host == 'localhost' || current_host == '127.0.0.1' %]selected[% END %]>
+                Localhost (127.0.0.1)
+            </option>
+            <option value="192.168.1.171" [% IF current_host == '192.168.1.171' %]selected[% END %]>
+                Remote Server (192.168.1.171)
+            </option>
+        </select>
+        <span id="connection-status" class="connection-status">
+            <span class="status-indicator" id="status-indicator"></span>
+            <span id="status-text">Connected to [% current_host || 'localhost' %]:[% current_port || '11434' %]</span>
+        </span>
+    </div>
+    [% ELSE %]
+    <div class="current-host-display">
+        <span class="host-label">Server:</span>
+        <span class="host-name">[% current_host || 'localhost' %]:[% current_port || '11434' %]</span>
+    </div>
+    [% END %]
+    
+    <!-- Chat Messages Container -->
+    <div class="chat-messages" id="chat-messages">
+        <div class="welcome-message">
+            <h2>Welcome to AI Assistant!</h2>
+            <p>Ask me anything. I'm here to help you with your questions.</p>
+        </div>
+    </div>
+    
+    <!-- Chat Input Form -->
+    <div class="chat-input-container">
+        <form id="chat-form" class="chat-form">
+            <textarea 
+                id="user-input" 
+                name="prompt" 
+                class="chat-input" 
+                placeholder="Type your message here..."
+                rows="3"
+                required
+            ></textarea>
+            <div class="chat-controls">
+                <button type="button" id="clear-chat" class="button secondary">Clear Chat</button>
+                <button type="submit" id="send-button" class="button primary">
+                    <span class="button-text">Send</span>
+                    <span class="button-spinner" style="display: none;">⏳</span>
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Status Messages -->
+    <div id="status-container" class="status-container"></div>
+</div>
+
+<style>
+.ai-chat-container {
+    max-width: 1200px;
+    margin: 20px auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 100px);
+}
+
+.ai-chat-container h1 {
+    margin: 0 0 20px 0;
+    color: #333;
+    text-align: center;
+}
+
+/* Model Selector Styles */
+.model-selector-section {
+    background: #f5f5f5;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.model-selector-section label {
+    font-weight: bold;
+    color: #555;
+}
+
+.model-dropdown {
+    flex: 1;
+    min-width: 200px;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    background: white;
+}
+
+.manage-models-link {
+    padding: 8px 16px;
+    background: #2196f3;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: background 0.3s;
+}
+
+.manage-models-link:hover {
+    background: #1976d2;
+}
+
+.current-model-display {
+    background: #e3f2fd;
+    padding: 12px 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border-left: 4px solid #2196f3;
+}
+
+.model-label {
+    font-weight: bold;
+    color: #555;
+    margin-right: 8px;
+}
+
+.model-name {
+    color: #1976d2;
+    font-family: monospace;
+    font-size: 14px;
+}
+
+/* Host Selector Styles */
+.host-selector-section {
+    margin: 15px 0;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.host-selector-section label {
+    font-weight: 600;
+    color: #495057;
+    margin-right: 5px;
+}
+
+.host-dropdown {
+    padding: 8px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 14px;
+    background-color: white;
+    cursor: pointer;
+    min-width: 200px;
+}
+
+.host-dropdown:hover {
+    border-color: #80bdff;
+}
+
+.host-dropdown:focus {
+    outline: none;
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+}
+
+.connection-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background-color: white;
+    border-radius: 4px;
+    font-size: 13px;
+    color: #495057;
+}
+
+.status-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: #28a745;
+    animation: pulse 2s infinite;
+}
+
+.status-indicator.connecting {
+    background-color: #ffc107;
+}
+
+.status-indicator.error {
+    background-color: #dc3545;
+    animation: none;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.current-host-display {
+    margin: 10px 0;
+    padding: 10px;
+    background-color: #e9ecef;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.current-host-display .host-label {
+    font-weight: 600;
+    color: #495057;
+    margin-right: 8px;
+}
+
+.current-host-display .host-name {
+    color: #212529;
+    font-family: monospace;
+}
+
+/* Chat Messages Styles */
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.welcome-message {
+    text-align: center;
+    color: #666;
+    padding: 40px 20px;
+}
+
+.welcome-message h2 {
+    color: #4caf50;
+    margin-bottom: 10px;
+}
+
+.chat-message {
+    display: flex;
+    flex-direction: column;
+    max-width: 80%;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.chat-message.user {
+    align-self: flex-end;
+}
+
+.chat-message.assistant {
+    align-self: flex-start;
+}
+
+.message-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+    font-size: 12px;
+    color: #666;
+}
+
+.message-role {
+    font-weight: bold;
+}
+
+.message-role.user {
+    color: #2196f3;
+}
+
+.message-role.assistant {
+    color: #4caf50;
+}
+
+.message-timestamp {
+    font-size: 11px;
+    color: #999;
+}
+
+.message-content {
+    padding: 12px 16px;
+    border-radius: 12px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.chat-message.user .message-content {
+    background: #2196f3;
+    color: white;
+    border-bottom-right-radius: 4px;
+}
+
+.chat-message.assistant .message-content {
+    background: #f5f5f5;
+    color: #333;
+    border: 1px solid #e0e0e0;
+    border-bottom-left-radius: 4px;
+}
+
+.message-loading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: #f5f5f5;
+    border-radius: 12px;
+    border-bottom-left-radius: 4px;
+    color: #666;
+    font-style: italic;
+}
+
+.loading-spinner {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Chat Input Styles */
+.chat-input-container {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 15px;
+}
+
+.chat-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.chat-input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 60px;
+}
+
+.chat-input:focus {
+    outline: none;
+    border-color: #4caf50;
+    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.1);
+}
+
+.chat-controls {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.button.primary {
+    background: #4caf50;
+    color: white;
+}
+
+.button.primary:hover:not(:disabled) {
+    background: #45a049;
+}
+
+.button.primary:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+}
+
+.button.secondary {
+    background: #f5f5f5;
+    color: #333;
+    border: 1px solid #ddd;
+}
+
+.button.secondary:hover {
+    background: #e0e0e0;
+}
+
+/* Status Messages */
+.status-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    max-width: 400px;
+}
+
+.status-message {
+    padding: 15px;
+    margin-bottom: 10px;
+    border-radius: 5px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    animation: slideIn 0.3s ease;
+}
+
+.status-message.success {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+
+.status-message.error {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}
+
+.status-message.info {
+    background: #d1ecf1;
+    border: 1px solid #bee5eb;
+    color: #0c5460;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(400px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Scrollbar Styles */
+.chat-messages::-webkit-scrollbar {
+    width: 8px;
+}
+
+.chat-messages::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+</style>
+
+<script>
+// Chat state management
+let conversationHistory = [];
+let isProcessing = false;
+
+// DOM elements
+const chatForm = document.getElementById('chat-form');
+const userInput = document.getElementById('user-input');
+const chatMessages = document.getElementById('chat-messages');
+const sendButton = document.getElementById('send-button');
+const clearChatButton = document.getElementById('clear-chat');
+const modelSelect = document.getElementById('model-select');
+const hostSelect = document.getElementById('host-select');
+const statusIndicator = document.getElementById('status-indicator');
+const statusText = document.getElementById('status-text');
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    // Load conversation history from sessionStorage
+    loadConversationHistory();
+    
+    // Set up event listeners
+    chatForm.addEventListener('submit', handleSubmit);
+    clearChatButton.addEventListener('click', clearChat);
+    
+    // Allow Ctrl+Enter to submit
+    userInput.addEventListener('keydown', function(e) {
+        if (e.ctrlKey && e.key === 'Enter') {
+            e.preventDefault();
+            chatForm.dispatchEvent(new Event('submit'));
+        }
+    });
+    
+    // Auto-resize textarea
+    userInput.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = (this.scrollHeight) + 'px';
+    });
+    
+    // Handle host selection change
+    if (hostSelect) {
+        hostSelect.addEventListener('change', handleHostChange);
+    }
+});
+
+// Handle host change
+async function handleHostChange() {
+    const newHost = hostSelect.value;
+    
+    // Update UI to show connecting state
+    if (statusIndicator) {
+        statusIndicator.classList.add('connecting');
+        statusIndicator.classList.remove('error');
+    }
+    if (statusText) {
+        statusText.textContent = `Connecting to ${newHost}...`;
+    }
+    
+    try {
+        const response = await fetch('/ai/set_host', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ host: newHost })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Update UI to show success
+            if (statusIndicator) {
+                statusIndicator.classList.remove('connecting', 'error');
+            }
+            if (statusText) {
+                const connInfo = data.connection_info;
+                statusText.textContent = `Connected to ${connInfo.host}:${connInfo.port}`;
+            }
+            
+            // Show success message
+            addMessage('system', `Successfully switched to ${newHost}. Model: ${data.connection_info.model}`);
+            
+            // Clear conversation history when switching hosts
+            conversationHistory = [];
+            saveConversationHistory();
+            
+        } else {
+            // Show error
+            if (statusIndicator) {
+                statusIndicator.classList.remove('connecting');
+                statusIndicator.classList.add('error');
+            }
+            if (statusText) {
+                statusText.textContent = `Connection failed: ${data.error}`;
+            }
+            
+            // Revert selection
+            const currentHost = '[% current_host || "localhost" %]';
+            hostSelect.value = currentHost;
+            
+            // Show error message
+            addMessage('system', `Failed to switch host: ${data.error}`);
+        }
+        
+    } catch (error) {
+        console.error('Error changing host:', error);
+        
+        // Update UI to show error
+        if (statusIndicator) {
+            statusIndicator.classList.remove('connecting');
+            statusIndicator.classList.add('error');
+        }
+        if (statusText) {
+            statusText.textContent = 'Connection error';
+        }
+        
+        // Revert selection
+        const currentHost = '[% current_host || "localhost" %]';
+        hostSelect.value = currentHost;
+        
+        // Show error message
+        addMessage('system', `Error changing host: ${error.message}`);
+    }
+}
+
+// Handle form submission
+async function handleSubmit(e) {
+    e.preventDefault();
+    
+    if (isProcessing) return;
+    
+    const prompt = userInput.value.trim();
+    if (!prompt) return;
+    
+    // Get selected model (if available)
+    const selectedModel = modelSelect ? modelSelect.value : null;
+    
+    // Add user message to chat
+    addMessage('user', prompt);
+    
+    // Clear input
+    userInput.value = '';
+    userInput.style.height = 'auto';
+    
+    // Show loading state
+    isProcessing = true;
+    updateSendButton(true);
+    const loadingId = addLoadingMessage();
+    
+    try {
+        // Send request to server
+        const response = await fetch('/ai/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                prompt: prompt,
+                model: selectedModel,
+                history: conversationHistory.slice(-10) // Send last 10 messages for context
+            })
+        });
+        
+        const data = await response.json();
+        
+        // Remove loading message
+        removeLoadingMessage(loadingId);
+        
+        if (data.success) {
+            // Add AI response to chat
+            addMessage('assistant', data.response, data.model);
+        } else {
+            showStatus('error', data.error || 'Failed to get response');
+            // Remove the user message if request failed
+            conversationHistory.pop();
+            renderMessages();
+        }
+    } catch (error) {
+        removeLoadingMessage(loadingId);
+        showStatus('error', 'Network error: ' + error.message);
+        // Remove the user message if request failed
+        conversationHistory.pop();
+        renderMessages();
+    } finally {
+        isProcessing = false;
+        updateSendButton(false);
+        userInput.focus();
+    }
+}
+
+// Add message to conversation
+function addMessage(role, content, model = null) {
+    const message = {
+        role: role,
+        content: content,
+        timestamp: new Date().toISOString(),
+        model: model
+    };
+    
+    conversationHistory.push(message);
+    saveConversationHistory();
+    renderMessages();
+    scrollToBottom();
+}
+
+// Render all messages
+function renderMessages() {
+    // Clear existing messages except welcome
+    const welcomeMessage = chatMessages.querySelector('.welcome-message');
+    chatMessages.innerHTML = '';
+    
+    if (conversationHistory.length === 0 && welcomeMessage) {
+        chatMessages.appendChild(welcomeMessage);
+        return;
+    }
+    
+    conversationHistory.forEach(message => {
+        const messageDiv = createMessageElement(message);
+        chatMessages.appendChild(messageDiv);
+    });
+}
+
+// Create message element
+function createMessageElement(message) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `chat-message ${message.role}`;
+    
+    const timestamp = new Date(message.timestamp).toLocaleTimeString();
+    
+    messageDiv.innerHTML = `
+        <div class="message-header">
+            <span class="message-role ${message.role}">
+                ${message.role === 'user' ? 'You' : 'AI Assistant'}
+            </span>
+            <span class="message-timestamp">${timestamp}</span>
+            ${message.model ? `<span class="message-model">(${message.model})</span>` : ''}
+        </div>
+        <div class="message-content">${escapeHtml(message.content)}</div>
+    `;
+    
+    return messageDiv;
+}
+
+// Add loading message
+function addLoadingMessage() {
+    const loadingId = 'loading-' + Date.now();
+    const loadingDiv = document.createElement('div');
+    loadingDiv.id = loadingId;
+    loadingDiv.className = 'chat-message assistant';
+    loadingDiv.innerHTML = `
+        <div class="message-loading">
+            <span class="loading-spinner">⏳</span>
+            <span>AI is thinking...</span>
+        </div>
+    `;
+    chatMessages.appendChild(loadingDiv);
+    scrollToBottom();
+    return loadingId;
+}
+
+// Remove loading message
+function removeLoadingMessage(loadingId) {
+    const loadingDiv = document.getElementById(loadingId);
+    if (loadingDiv) {
+        loadingDiv.remove();
+    }
+}
+
+// Update send button state
+function updateSendButton(loading) {
+    const buttonText = sendButton.querySelector('.button-text');
+    const buttonSpinner = sendButton.querySelector('.button-spinner');
+    
+    if (loading) {
+        sendButton.disabled = true;
+        buttonText.style.display = 'none';
+        buttonSpinner.style.display = 'inline';
+    } else {
+        sendButton.disabled = false;
+        buttonText.style.display = 'inline';
+        buttonSpinner.style.display = 'none';
+    }
+}
+
+// Clear chat
+function clearChat() {
+    if (confirm('Are you sure you want to clear the chat history?')) {
+        conversationHistory = [];
+        saveConversationHistory();
+        renderMessages();
+        showStatus('info', 'Chat history cleared');
+    }
+}
+
+// Save conversation to sessionStorage
+function saveConversationHistory() {
+    try {
+        sessionStorage.setItem('ai_chat_history', JSON.stringify(conversationHistory));
+    } catch (e) {
+        console.error('Failed to save conversation history:', e);
+    }
+}
+
+// Load conversation from sessionStorage
+function loadConversationHistory() {
+    try {
+        const saved = sessionStorage.getItem('ai_chat_history');
+        if (saved) {
+            conversationHistory = JSON.parse(saved);
+            renderMessages();
+        }
+    } catch (e) {
+        console.error('Failed to load conversation history:', e);
+    }
+}
+
+// Scroll to bottom of chat
+function scrollToBottom() {
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// Show status message
+function showStatus(type, message) {
+    const statusContainer = document.getElementById('status-container');
+    const statusDiv = document.createElement('div');
+    statusDiv.className = `status-message ${type}`;
+    statusDiv.textContent = message;
+    
+    statusContainer.appendChild(statusDiv);
+    
+    setTimeout(() => {
+        statusDiv.style.opacity = '0';
+        setTimeout(() => statusDiv.remove(), 300);
+    }, 5000);
+}
+
+// Escape HTML to prevent XSS
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+</script>
