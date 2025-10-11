@@ -13,7 +13,11 @@
 <p>We are also looking to add data on the effects of pollen's on the bees health. A spin off of this is the medicinal use for human and other animals.
      
         <h2>Bee forage plants by Botanical name.</h2>
-      
+  <!-- Display the Add Herb button only for admin users -->
+[% IF user.role == 'admin' %]
+    <button onclick="window.location.href='/ENCY/add_herb';">Add Herb</button>
+[% END %]
+
  <form action="/ENCY/search" method="POST">
     <label for="search">Search our herbal Database:</label>
     <input type="text" id="search" name="search_string" value="">

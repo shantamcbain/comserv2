@@ -1,0 +1,98 @@
+ThemeConfig Model
+
+Overview
+The ThemeConfig model manages theme configuration for the Comserv application. It handles loading theme definitions from JSON configuration files and provides site-specific theme selection with session caching.
+
+Key Features
+- Loads theme definitions from canonical JSON configuration file
+- Maps site names to specific themes using site_themes configuration
+- Provides session-based theme caching for performance
+- Handles fallback to default theme when no mapping exists
+- Comprehensive error handling and logging
+- Case-insensitive site name matching
+
+Methods
+
+get_theme_definitions_path($c)
+- Returns path to the canonical theme definitions JSON file
+- Location: /root/static/config/theme_definitions.json
+
+get_theme_mappings_path()
+- Legacy method for compatibility
+- Returns undef (mappings now read from theme_definitions.json)
+
+get_theme_css_directory()
+- Returns path to theme CSS directory
+- Location: /root/static/css/themes
+
+get_theme_definitions($c)
+- Loads and parses theme definitions from JSON file
+- Returns theme definitions hash or empty hash on error
+- Includes comprehensive error handling with logging
+
+get_all_themes($c)
+- Returns all available theme definitions
+- Loads from canonical theme_definitions.json file
+- Provides comprehensive logging for debugging
+
+get_site_theme($c, $site_name)
+- NEW: Gets the theme for a specific site
+- Parameters: Catalyst context object, site name string
+- Returns: theme name string (defaults to 'default')
+- Features:
+  - Checks session cache first for performance
+  - Uses site_themes mapping from JSON configuration
+  - Case-insensitive site name matching
+  - Validates theme exists in definitions
+  - Caches result in session for future requests
+  - Comprehensive logging for all decisions
+  - Graceful error handling
+
+Configuration Structure
+The model reads from /root/static/config/theme_definitions.json with this structure:
+
+{
+  "themes": {
+    "theme_name": {
+      "name": "Display Name",
+      "description": "Theme description",
+      "variables": { ... CSS variables ... },
+      "legacy_elements": { ... legacy CSS ... },
+      "special_styles": { ... special styling ... }
+    }
+  },
+  "site_themes": {
+    "site_name": "theme_name",
+    "default": "default",
+    "csc": "csc",
+    "usbm": "usbm"
+  }
+}
+
+Session Integration
+- Theme selections cached as session["theme_$site_name"]
+- Improves performance by avoiding repeated JSON parsing
+- Cache cleared when theme is explicitly changed
+
+Error Handling
+- JSON parsing errors logged and return default values
+- Missing theme definitions default to 'default' theme
+- File access errors handled gracefully
+- All errors logged with file/line context
+
+Dependencies
+- Moose for object system
+- JSON for configuration parsing
+- File::Slurp for file operations
+- Try::Tiny for error handling
+- Comserv::Util::Logging for structured logging
+
+Related Files
+- Theme definitions: /root/static/config/theme_definitions.json
+- Theme CSS files: /root/static/css/themes/
+- Controller integration: /lib/Comserv/Controller/Root.pm (line 1120)
+
+Usage Example
+my $theme_name = $c->model('ThemeConfig')->get_site_theme($c, 'CSC');
+# Returns 'csc' based on site_themes mapping
+# Caches result in session for subsequent requests

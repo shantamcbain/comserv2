@@ -1,0 +1,7 @@
+<section class="doc-section system-info">
+    <h2 class="section-toggle expanded">Documentation System</h2>
+    <div class="section-content expanded">
+        <p>The Comserv documentation system is transitioning to a modular structure. Legacy documentation is available below and will be migrated over time.</p>
+        <a href="/Documentation/Documentation" class="legacy-link">Access Legacy Documentation</a>
+    </div>
+</section>

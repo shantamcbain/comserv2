@@ -1,0 +1,83 @@
+/* CSS for VE7TIT Amateur Radio Equipment Pages */
+
+.equipment-details {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.equipment-details h2 {
+    color: #1a5276;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+.equipment-details h3 {
+    color: #2874a6;
+    margin-top: 25px;
+    margin-bottom: 15px;
+    border-left: 4px solid #3498db;
+    padding-left: 10px;
+}
+
+.equipment-details img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 0 auto 20px;
+    border-radius: 5px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.equipment-details ul {
+    padding-left: 20px;
+}
+
+.equipment-details li {
+    margin-bottom: 8px;
+    line-height: 1.5;
+}
+
+.equipment-details p {
+    line-height: 1.6;
+    margin-bottom: 15px;
+}
+
+.equipment-details a {
+    color: #2980b9;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s;
+}
+
+.equipment-details a:hover {
+    color: #1a5276;
+    text-decoration: underline;
+}
+
+/* Resource section styling */
+.equipment-details .resources {
+    background-color: #eaf2f8;
+    padding: 15px;
+    border-radius: 5px;
+    margin: 20px 0;
+}
+
+.equipment-details .resources h3 {
+    margin-top: 0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .equipment-details {
+        padding: 15px;
+    }
+    
+    .equipment-details img {
+        margin-bottom: 15px;
+    }
+}

@@ -1,0 +1,154 @@
+[% META title = 'Bee Health Monitoring System' %]
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>Bee Health Monitoring System</h1>
+            <p class="lead">Welcome to the Bee Health Monitoring System. This system helps beekeepers monitor and maintain the health of their colonies.</p>
+            
+            <div class="alert alert-info">
+                <strong>Note:</strong> This system is currently under development. More features will be added soon.
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3>Common Bee Health Issues</h3>
+                </div>
+                <div class="card-body">
+                    <div class="accordion" id="healthAccordion">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">
+                                    <button class="btn btn-link" type="button" data-toggle="collapse" data-target="#varroaCollapse">
+                                        Varroa Mites
+                                    </button>
+                                </h5>
+                            </div>
+                            <div id="varroaCollapse" class="collapse">
+                                <div class="card-body">
+                                    <p><strong>Signs:</strong> Deformed wings, reduced bee population, spotty brood pattern, visible mites on bees</p>
+                                    <p><strong>Monitoring:</strong> Sticky boards, alcohol wash, sugar roll, drone brood inspection</p>
+                                    <p><strong>Treatment Options:</strong> Formic acid, oxalic acid, thymol, apivar, powdered sugar dusting</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">
+                                    <button class="btn btn-link" type="button" data-toggle="collapse" data-target="#afbCollapse">
+                                        American Foulbrood (AFB)
+                                    </button>
+                                </h5>
+                            </div>
+                            <div id="afbCollapse" class="collapse">
+                                <div class="card-body">
+                                    <p><strong>Signs:</strong> Sunken, perforated cappings, ropey dead brood, foul odor</p>
+                                    <p><strong>Monitoring:</strong> Visual inspection, AFB test kits</p>
+                                    <p><strong>Treatment:</strong> Antibiotics (with veterinary prescription), burning infected equipment</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">
+                                    <button class="btn btn-link" type="button" data-toggle="collapse" data-target="#nosemaCollapse">
+                                        Nosema
+                                    </button>
+                                </h5>
+                            </div>
+                            <div id="nosemaCollapse" class="collapse">
+                                <div class="card-body">
+                                    <p><strong>Signs:</strong> Dysentery, weak colonies, reduced honey production</p>
+                                    <p><strong>Monitoring:</strong> Microscopic examination, field symptoms</p>
+                                    <p><strong>Treatment:</strong> Fumagilin-B, good ventilation, strong colonies</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">
+                                    <button class="btn btn-link" type="button" data-toggle="collapse" data-target="#shbCollapse">
+                                        Small Hive Beetle
+                                    </button>
+                                </h5>
+                            </div>
+                            <div id="shbCollapse" class="collapse">
+                                <div class="card-body">
+                                    <p><strong>Signs:</strong> Adult beetles in hive, slimed frames, fermented honey</p>
+                                    <p><strong>Monitoring:</strong> Visual inspection, beetle traps</p>
+                                    <p><strong>Treatment:</strong> Beetle traps, maintaining strong colonies, ground drench for pupae</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3>Preventative Measures</h3>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group">
+                        <li class="list-group-item">Maintain strong colonies</li>
+                        <li class="list-group-item">Regular hive inspections</li>
+                        <li class="list-group-item">Good apiary hygiene</li>
+                        <li class="list-group-item">Regular comb replacement</li>
+                        <li class="list-group-item">Proper nutrition and diverse forage</li>
+                        <li class="list-group-item">Genetic resistance through queen selection</li>
+                        <li class="list-group-item">Integrated Pest Management (IPM)</li>
+                        <li class="list-group-item">Proper ventilation and moisture control</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3>Monitoring Tools</h3>
+                </div>
+                <div class="card-body">
+                    <p>Regular monitoring is essential for maintaining bee health. Use these tools:</p>
+                    <ul>
+                        <li>Sticky boards for Varroa monitoring</li>
+                        <li>Alcohol wash kit</li>
+                        <li>Sugar roll test equipment</li>
+                        <li>Microscope for Nosema detection</li>
+                        <li>Hive scale for monitoring weight changes</li>
+                        <li>Temperature and humidity sensors</li>
+                        <li>Record keeping system</li>
+                    </ul>
+                    <p><strong>Coming Soon:</strong> Digital health monitoring system</p>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3>Bee Pasture Resources</h3>
+                </div>
+                <div class="card-body">
+                    <p>Proper nutrition is essential for bee health. Access our database of bee forage plants:</p>
+                    <a href="/ENCY/BeePastureView" class="btn btn-success">View Bee Pasture Plants</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3>Return to Apiary Management</h3>
+                </div>
+                <div class="card-body">
+                    <a href="/Apiary" class="btn btn-primary">Back to Apiary Management</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

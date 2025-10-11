@@ -1,0 +1,33 @@
+[% PageVersion = 'admin/view_archived_log.tt,v 0.01 2024/05/01 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+<div class="container">
+    <h1>Archived Log Viewer</h1>
+    
+    [% IF error_msg %]
+        <div class="alert alert-danger">
+            [% error_msg %]
+        </div>
+    [% ELSE %]
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                    [% log_name %] ([% log_size %] KB)
+                    [% IF log_name.match('_chunk\d+$') %]
+                        <span class="badge badge-warning">Chunk</span>
+                        <small class="text-muted">This is part of a large log file that was split into chunks</small>
+                    [% END %]
+                </h5>
+                    <a href="[% c.uri_for('/admin/view_log') %]" class="btn btn-light btn-sm">
+                        <i class="fas fa-arrow-left"></i> Back to Log Management
+                    </a>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <pre class="m-0 p-3" style="max-height: 700px; overflow-y: auto;">[% log_content %]</pre>
+            </div>
+        </div>
+    [% END %]
+</div>

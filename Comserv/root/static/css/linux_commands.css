@@ -1,0 +1,120 @@
+/* Linux Commands Reference - Minimal Enhancement CSS */
+
+/* Only enhance existing command cards without changing structure */
+.command-card {
+}
+
+.linux-commands-doc  
+    display: inline-block;
+    margin-top: 15px;
+    margin-bottom: 5px;
+}
+
+/* Enhance code blocks for better readability */
+.command-card code {
+    font-family: monospace;
+    padding: 2px 4px;
+    border-radius: 3px;
+    border: 1px solid #eee;/* Usage Notes */
+.linux-commands-doc .command-card ul {
+    padding-left: 20px;
+}
+
+.linux-commands-doc .command-card li {
+    margin-bottom: 5px;
+}
+
+/* Collapsible Sections - minimal styling to avoid conflicts */
+.linux-commands-doc details {
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 0;
+    margin-bottom: 20px;
+}
+
+.linux-commands-doc details summary {
+    padding: 10px 15px;
+    cursor: pointer;
+    border-left: 3px solid #ddd;
+    font-weight: bold;
+    list-style: none;
+}
+
+.linux-commands-doc details summary::-webkit-details-marker {
+ before: auto;
+}
+
+.linux-commands-doc details summary::before {
+    content: "▶";
+    display: inline-block;
+    margin-right: 10px;
+    transition: transform 0.3s;
+}
+
+.linux-commands-doc details[open] summary::before {
+    transform: rotate(90deg);
+}
+
+.linux-commands-doc details[open] summary {
+    border-bottom: 1px solid #ddd;
+}
+
+.linux-commands-doc details > div {
+    padding: 15px;
+}
+
+/* Responsive Design - minimal adjustments */
+@media (max-width: 768px) {
+    .linux-commands-doc .command-card {
+        padding: 10px;
+    }
+    
+    .linux-commands-doc .command-card pre {
+        padding: 10px;
+        font-size: 85%;
+    }
+}
+
+/* Print Styles - minimal and scoped */
+@media print {
+    .linux-commands-doc details {f0ad4e;
+    margin-top: 10px;
+}
+
+/* Improve print layout */
+@media print {
+    .command-card {
+        page-break-inside: avoid;
+        border: 1px solid #ddd;
+    }
+    
+    .kb-navigation {
+        display: none;
+    }
+    
+    .command-section {
+        page-break-before: always;
+    }
+    
+    .command-section:first-of-type {
+        border: none;
+    }
+    
+    .linux-commands-doc details summary {
+        border: none;
+    }
+    
+    .linux-commands-doc details summary::before {
+        display: none;
+    }
+    
+    .linux-commands-doc details[open] summary {
+        border: none;
+    }
+    
+    .linux-commands-doc .command-card {
+        box-shadow: none;
+        border: 1px solid #ddd;
+        break-inside: avoid;
+    }
+}

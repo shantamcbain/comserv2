@@ -1,0 +1,87 @@
+[% META title = 'Monashee Coop Server Room & Computer System' %]
+[% PageVersion = 'coop/server_room_landing.tt,v 0.01 2025/04/01 shanta Exp shanta' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+    [% # Use the standard debug message system %]
+    [% IF debug_msg.defined && debug_msg.size > 0 %]
+        <div class="debug-messages">
+            [% FOREACH msg IN debug_msg %]
+                <p class="debug">Debug: [% msg %]</p>
+            [% END %]
+        </div>
+    [% END %]
+[% END %]
+[% USE Date %]
+<div class="container">
+    <header>
+        <div class="header-banner">
+            <h2 class="header-logo">MONASHEE COOP</h2>
+        </div>
+        <h1>Server Room & Computer System Overview</h1>
+        <p>Date: [% Date.format(Date.now, '%Y-%m-%d') %]</p>
+    </header>
+
+    <div class="info-panel">
+        [% IF help_message %]
+            <div class="help-message">
+                <p>[% help_message %]</p>
+            </div>
+        [% END %]
+        [% IF account_message %]
+            <div class="account-message">
+                <p>[% account_message %]</p>
+            </div>
+        [% END %]
+    </div>
+
+    <main>
+        <h2>Our Computer System Landing Page</h2>
+        <p>Welcome to the Monashee Co-op's IT infrastructure hub. This page provides a general overview of our server room and computer system setup, designed to support our cooperative’s operations efficiently and reliably. Prepared by Shanta McBain, IT Department.</p>
+
+        <div class="features">
+            <h3>1. Server Room Setup</h3>
+            <p>Our server room is the backbone of Monashee Co-op’s digital operations, housing critical hardware in a rack-mounted configuration. Key components include:</p>
+            <ul>
+                <li><strong>Server Rack</strong>: A 19-inch, 42U rack to accommodate current and future equipment. <a href="https://www.startech.com/en-ca/server-management/4postrack42u" target="_blank">Example: StarTech 42U Rack</a>.</li>
+                <li><strong>Servers</strong>: 1-2 rack-mounted servers (e.g., Dell PowerEdge R350) running a mix of Windows Server and Linux for file storage, applications, and virtualization.</li>
+                <li><strong>Networking</strong>: A 24-port Gigabit switch (e.g., Cisco SG350) ensures robust connectivity across our systems.</li>
+                <li><strong>Power & Cooling</strong>: A 1500VA UPS and portable AC unit maintain uptime and temperature control.</li>
+            </ul>
+            <p>The setup is flexible, currently favoring a rolling rack for cost-efficiency, with plans to transition to a dedicated room as we grow.</p>
+            <img src="https://blog.networkprofile.org/content/images/2020/01/2020-01-25-11.52.48.JPG" alt="Server Rack Example" width="500" height="600">
+        </div>
+
+        <div class="features">
+            <h3>2. Workstations & Devices</h3>
+            <p>Our computer system supports a diverse range of devices to meet staff and operational needs:</p>
+            <ul>
+                <li><strong>Windows Workstations</strong>: Desktops and laptops running Windows 10/11 for administrative tasks, equipped with Microsoft Office and co-op-specific software.</li>
+                <li><strong>Linux Workstations</strong>: Select machines running Ubuntu or Fedora for technical staff, supporting development and system administration.</li>
+                <li><strong>Laptops</strong>: A mix of Windows and Linux laptops for mobility, used by staff for remote work and on-site flexibility.</li>
+                <li><strong>Phones</strong>: VoIP phones integrated with our network for internal and customer communication.</li>
+                <li><strong>Square Till Setups</strong>: Point-of-sale systems using Square hardware, connected to our servers for transaction processing and inventory management.</li>
+            </ul>
+            <p>This hybrid environment ensures compatibility and efficiency across all co-op functions.</p>
+        </div>
+
+        <div class="features">
+            <h3>3. System Goals</h3>
+            <p>Our IT infrastructure is designed to:</p>
+            <ul>
+                <li>Provide reliable access to shared resources (files, applications, and tills).</li>
+                <li>Support a growing workforce with scalable hardware and software solutions.</li>
+                <li>Ensure security through regular updates, backups, and physical safeguards.</li>
+            </ul>
+            <p>We aim to balance cost with capability, leveraging both new and used equipment where practical.</p>
+        </div>
+
+        <div class="features">
+            <h3>4. Next Steps</h3>
+            <p>To explore detailed plans or provide feedback, contact the IT department. Further documentation, including the full server room proposal, is available upon request.</p>
+        </div>
+    </main>
+
+    <footer>
+        <p>© [% Date.format(Date.now, '%Y') %] Monashee Coop. All rights reserved.</p>
+    </footer>
+</div>

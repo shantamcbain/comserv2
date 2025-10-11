@@ -1,0 +1,112 @@
+[% META title = 'Remote Database Example' %]
+
+<div class="container">
+    <h1>Remote Database Example</h1>
+    
+    [% IF error_msg %]
+    <div class="alert alert-danger">
+        [% error_msg %]
+    </div>
+    [% END %]
+    
+    [% IF data %]
+    <div class="card">
+        <div class="card-header">
+            <h2>Sample Data from [% table %] in [% connection %]</h2>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            [% FOREACH key IN data.0.keys.sort %]
+                                <th>[% key %]</th>
+                            [% END %]
+                        </tr>
+                    </thead>
+                    <tbody>
+                        [% FOREACH row IN data %]
+                            <tr>
+                                [% FOREACH key IN row.keys.sort %]
+                                    <td>[% row.$key %]</td>
+                                [% END %]
+                            </tr>
+                        [% END %]
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    [% END %]
+    
+    <div class="mt-4">
+        <h2>How to Use Remote Databases in Your Code</h2>
+        
+        <div class="card">
+            <div class="card-header">
+                <h3>Example Code</h3>
+            </div>
+            <div class="card-body">
+                <pre><code>
+# In your controller:
+use Comserv::Util::RemoteDB;
+
+has 'remote_db_util' => (
+    is => 'ro',
+    default => sub { Comserv::Util::RemoteDB->new }
+);
+
+sub my_action :Path :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Get data from a remote database
+    my $data = $self->remote_db_util->get_rows(
+        $c,
+        'connection_name',  # Name of the remote connection
+        'table_name',       # Table to query
+        { status => 'active' },  # WHERE conditions
+        { limit => 10, order_by => 'created_at DESC' }  # Additional parameters
+    );
+    
+    # Insert data into a remote database
+    my $result = $self->remote_db_util->insert_row(
+        $c,
+        'connection_name',
+        'table_name',
+        {
+            name => 'New Record',
+            status => 'active',
+            created_at => 'NOW()'
+        }
+    );
+    
+    # Update data in a remote database
+    $result = $self->remote_db_util->update_row(
+        $c,
+        'connection_name',
+        'table_name',
+        { status => 'inactive' },  # SET values
+        { id => 123 }              # WHERE conditions
+    );
+    
+    # Delete data from a remote database
+    $result = $self->remote_db_util->delete_row(
+        $c,
+        'connection_name',
+        'table_name',
+        { id => 123 }  # WHERE conditions
+    );
+    
+    # Execute a custom query
+    $result = $self->remote_db_util->execute_query(
+        $c,
+        'connection_name',
+        'SELECT * FROM table_name WHERE created_at > ? AND status = ?',
+        ['2023-01-01', 'active']
+    );
+}
+                </code></pre>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,401 @@
+<!-- File: /home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/index.tt -->
+[% PageVersion = 'Documentation/index.tt,v 1.7 2025/01/20 shanta Exp shanta ' %]
+[% META title = 'Comserv Documentation' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[%# Determine user role for display %]
+[% SET display_role = 'Guest' %]
+[% IF c.session.roles %]
+    [% IF c.session.roles.grep('admin').size %]
+        [% SET display_role = 'Administrator' %]
+    [% ELSIF c.session.roles.grep('developer').size %]
+        [% SET display_role = 'Developer' %]
+    [% ELSIF c.session.roles.grep('editor').size %]
+        [% SET display_role = 'Editor' %]
+    [% ELSIF c.session.roles.grep('user').size %]
+        [% SET display_role = 'User' %]
+    [% END %]
+[% END %]
+
+[% IF c.session.debug_mode == 1 %]
+<div class="debug">
+    <h3>Debug Information</h3>
+    <p>User Role from Controller: [% user_role %]</p>
+    <p>Display Role from Template: [% display_role %]</p>
+    <p>Session Roles: [% c.session.roles.join(', ') IF c.session.roles %]</p>
+    <p>Debug Message: [% debug_msg %]</p>
+    <p>Categories Available:</p>
+    <ul>
+        <li>user_guides: [% categories.user_guides ? 'Yes' : 'No' %]</li>
+        <li>tutorials: [% categories.tutorials ? 'Yes' : 'No' %]</li>
+        <li>site_specific: [% categories.site_specific ? 'Yes' : 'No' %]</li>
+        <li>admin_guides: [% categories.admin_guides ? 'Yes' : 'No' %]</li>
+        <li>proxmox: [% categories.proxmox ? 'Yes' : 'No' %]</li>
+        <li>controllers: [% categories.controllers ? 'Yes' : 'No' %]</li>
+        <li>models: [% categories.models ? 'Yes' : 'No' %]</li>
+        <li>changelog: [% categories.changelog ? 'Yes' : 'No' %]</li>
+        <li>general: [% categories.general ? 'Yes' : 'No' %]</li>
+    </ul>
+    
+    <h4>Changelog Entries:</h4>
+    <ul>
+        [% IF categories.changelog && categories.changelog.pages.size > 0 %]
+            [% FOREACH page_name IN categories.changelog.pages.sort.reverse %]
+                [% page = structured_pages.$page_name %]
+                <li>
+                    [% page_name %] - 
+                    Title: [% page.title %], 
+                    Description: [% page.description %], 
+                    Date: [% page.date %]
+                </li>
+            [% END %]
+        [% ELSE %]
+            <li>No changelog entries found.</li>
+        [% END %]
+    </ul>
+    
+    <h4>Controller Documentation Files:</h4>
+    <ul>
+        [% IF categories.controllers && categories.controllers.pages.size > 0 %]
+            [% FOREACH page_name IN categories.controllers.pages.sort %]
+                <li>[% page_name %] - [% structured_pages.$page_name ? 'Found' : 'Not Found' %]</li>
+            [% END %]
+        [% ELSE %]
+            <li>No controller documentation files found.</li>
+        [% END %]
+    </ul>
+    
+    <h4>Model Documentation Files:</h4>
+    <ul>
+        [% IF categories.models && categories.models.pages.size > 0 %]
+            [% FOREACH page_name IN categories.models.pages.sort %]
+                <li>[% page_name %] - [% structured_pages.$page_name ? 'Found' : 'Not Found' %]</li>
+            [% END %]
+        [% ELSE %]
+            <li>No model documentation files found.</li>
+        [% END %]
+    </ul>
+</div>
+[%# Enhanced hybrid approach with better error handling and fallbacks %]
+
+[%# Debug information for hybrid approach %]
+[% IF c.session.debug_mode == 1 %]
+<div class="debug">
+    <h3>Hybrid Documentation System Debug</h3>
+    <div class="debug-section">
+        <h4>Data Sources Status:</h4>
+        <ul>
+            <li><strong>Structured Pages:</strong> [% structured_pages ? structured_pages.keys.size _ ' pages loaded' : 'NOT AVAILABLE' %]</li>
+            <li><strong>Categories:</strong> [% categories ? categories.keys.size _ ' categories loaded' : 'NOT AVAILABLE' %]</li>
+            <li><strong>Total Pages:</strong> [% total_pages || 'Unknown' %]</li>
+        </ul>
+    </div>
+    
+    [% IF structured_pages %]
+    <div class="debug-section">
+        <h4>Sample Structured Pages:</h4>
+        <ul>
+            [% count = 0 %]
+            [% FOREACH page_id IN structured_pages.keys.sort %]
+                [% LAST IF count >= 5 %]
+                [% page = structured_pages.$page_id %]
+                <li><strong>[% page_id %]:</strong> [% page.title || 'No title' %] ([% page.path || 'No path' %])</li>
+                [% count = count + 1 %]
+            [% END %]
+            [% IF structured_pages.keys.size > 5 %]
+                <li><em>... and [% structured_pages.keys.size - 5 %] more</em></li>
+            [% END %]
+        </ul>
+    </div>
+    [% END %]
+    
+    [% IF categories %]
+    <div class="debug-section">
+        <h4>Categories with Page Counts:</h4>
+        <ul>
+            [% FOREACH cat_key IN categories.keys.sort %]
+                [% cat = categories.$cat_key %]
+                <li><strong>[% cat_key %]:</strong> [% cat.pages ? cat.pages.size _ ' pages' : '0 pages' %]
+                    [% IF cat.pages && cat.pages.size > 0 %]
+                        <ul>
+                            [% FOREACH page_id IN cat.pages %]
+                                [% page_exists = structured_pages.$page_id ? 'EXISTS' : 'MISSING' %]
+                                <li>[% page_id %] - [% page_exists %]</li>
+                            [% END %]
+                        </ul>
+                    [% END %]
+                </li>
+            [% END %]
+        </ul>
+    </div>
+    [% END %]
+</div>
+[% END %]
+
+[%# Enhanced page rendering with fallback handling %]
+[% MACRO render_page_link(page_id, category_name) BLOCK %]
+    [% IF structured_pages && structured_pages.$page_id %]
+        [% page = structured_pages.$page_id %]
+        <div class="admin-card">
+            <h4><i class="fas fa-file-alt"></i>[% page.title || page_id.replace('_', ' ').replace('-', ' ') | ucfirst %]</h4>
+            [% IF page.description %]
+                <p>[% page.description %]</p>
+            [% END %]
+            <div class="page-meta">
+                [% IF page.date %]<span class="date"><strong>Date:</strong> [% page.date %]</span>[% END %]
+                [% IF page.site && page.site != 'all' %]<span class="site"><strong>Site:</strong> [% page.site %]</span>[% END %]
+            </div>
+            <ul>
+                <li><a href="[% c.uri_for('/Documentation/view/' _ page_id) %]">View Documentation</a></li>
+            </ul>
+        </div>
+    [% ELSE %]
+        [%# Fallback for missing structured page data %]
+        <div class="admin-card missing-page">
+            <h4><i class="fas fa-exclamation-triangle"></i>[% page_id.replace('_', ' ').replace('-', ' ') | ucfirst %]</h4>
+            <p class="text-muted">Documentation file referenced in [% category_name %] but not found in auto-discovery.</p>
+            [% IF c.session.debug_mode == 1 %]
+                <p class="debug-info"><small>Page ID: [% page_id %]</small></p>
+            [% END %]
+            <ul>
+                <li><a href="[% c.uri_for('/Documentation/view/' _ page_id) %]" class="text-muted">Attempt to View</a></li>
+            </ul>
+        </div>
+    [% END %]
+[% END %]
+
+[%# Enhanced category rendering with better error handling %]
+[% MACRO render_category_section(category_key, category_data, section_id, icon_class) BLOCK %]
+    [% RETURN UNLESS category_data %]
+    [% page_count = category_data.pages ? category_data.pages.size : 0 %]
+    [% RETURN UNLESS page_count > 0 %]
+    
+    <div class="section">
+        <div class="section-header collapsible-header" onclick="toggleSection('[% section_id %]')">
+            <h3><i class="[% icon_class || 'fas fa-folder' %]"></i>[% category_data.title || category_key.replace('_', ' ') | ucfirst %] 
+                <span class="page-count">([% page_count %])</span>
+                <span class="toggle-icon"></span>
+            </h3>
+        </div>
+        <div id="[% section_id %]" class="section-content collapsible-content" style="display: none;">
+            [% IF category_data.description %]
+                <p>[% category_data.description %]</p>
+            [% END %]
+            
+            <div class="admin-grid">
+                [% FOREACH page_id IN category_data.pages %]
+                    [% render_page_link(page_id, category_data.title || category_key) %]
+                [% END %]
+            </div>
+        </div>
+    </div>
+[% END %]
+[% END %]
+
+<div class="apiary-container">
+    <header class="apiary-header">
+        <h1><i class="fas fa-book"></i>Comserv Documentation</h1>
+        <div class="apiary-context">
+            <span class="context-item"><strong>Site:</strong> [% site_name || 'Comserv' %]</span>
+            <span class="context-item"><strong>Role:</strong> [% display_role %]</span>
+            [% IF is_admin %]
+                <span class="context-item status-active"><strong>Access:</strong> Administrator</span>
+            [% END %]
+        </div>
+    </header>
+    
+    <!-- Directory Normalization Notice -->
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i>
+        <div>
+            <h3>Directory Structure Update</h3>
+            <p>We are normalizing to a single <code>Documentation</code> directory (capitalized) to reduce confusion. 
+            Legacy references to lowercase <code>documentation</code> directories are being updated to use this standardized structure.</p>
+        </div>
+    </div>
+    
+    <!-- Search Box Section -->
+    <div class="section">
+        <div class="section-header collapsible-header" onclick="toggleSection('search-section')">
+            <h2><i class="fas fa-search"></i>Search Documentation <span class="toggle-icon"></span></h2>
+        </div>
+        <div id="search-section" class="section-content collapsible-content" style="display: none;">
+            <div class="admin-container">
+                <input type="text" id="doc-search-input" placeholder="Search all documentation..." class="search-input">
+                <button type="button" id="doc-search-btn" class="search-button">
+                    <i class="fas fa-search"></i>Search
+                </button>
+                <button type="button" id="doc-clear-btn" class="clear-button">
+                    <i class="fas fa-times"></i>Clear
+                </button>
+            </div>
+            <div id="search-results" class="admin-container" style="display: none;">
+                <h3><i class="fas fa-list"></i>Search Results</h3>
+                <div id="search-results-list" class="admin-grid"></div>
+            </div>
+        </div>
+    </div>
+    
+    [% IF is_admin %]
+    <!-- Quick Access Links for Administrators -->
+    <div class="section">
+        <div class="section-header collapsible-header" onclick="toggleSection('quick-access-section')">
+            <h3><i class="fas fa-tools"></i>Quick Access for Administrators <span class="toggle-icon"></span></h3>
+        </div>
+        <div id="quick-access-section" class="section-content collapsible-content" style="display: none;">
+            <div class="admin-grid">
+                <div class="admin-card">
+                    <h4><i class="fas fa-server"></i>System Management</h4>
+                    <ul>
+                        <li><a href="[% c.uri_for('/Documentation/view/proxmox_commands') %]">Proxmox Command Reference</a></li>
+                        <li><a href="[% c.uri_for('/api_credentials') %]">API Credentials Management</a></li>
+                        <li><a href="[% c.uri_for('/admin') %]">System Administration</a></li>
+                    </ul>
+                </div>
+                <div class="admin-card">
+                    <h4><i class="fas fa-code"></i>Developer Resources</h4>
+                    <ul>
+                        <li><a href="[% c.uri_for('/Documentation/view/css_theme_system_rules') %]">CSS Theme System Rules</a></li>
+                        <li><a href="[% c.uri_for('/Documentation/api') %]">API Documentation</a></li>
+                        <li><a href="[% c.uri_for('/Documentation/view/architecture') %]">System Architecture</a></li>
+                    </ul>
+                </div>
+                <div class="admin-card">
+                    <h4><i class="fas fa-cogs"></i>Documentation Management</h4>
+                    <ul>
+                        <li><a href="[% c.uri_for('/Documentation/AutoDiscovery') %]"><i class="fas fa-search"></i> Auto-Discovery Tool</a></li>
+                        <li><span class="text-muted">Scan for unconfigured documentation files</span></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    [% END %]
+
+    [%# User-facing sections %]
+    [% render_category_section('user_guides', categories.user_guides, 'user-guides-section', 'fas fa-users') %]
+    [% render_category_section('tutorials', categories.tutorials, 'tutorials-section', 'fas fa-graduation-cap') %]
+    [% render_category_section('site_specific', categories.site_specific, 'site-specific-section', 'fas fa-building') %]
+    [% render_category_section('developer_guides', categories.developer_guides, 'developer-guides-section', 'fas fa-code') %]
+
+    [%# Admin-only sections %]
+    [% # Use the is_admin flag passed from the controller %]
+    [% IF is_admin %]
+        [% # Debug output %]
+        [% IF c.session.debug_mode == 1 %]
+            <div class="debug">
+                <p>Admin sections visible: user_role=[% user_role %], session roles=[% c.session.roles.join(',') IF c.session.roles %]</p>
+            </div>
+        [% END %]
+        [% render_category_section('admin_guides', categories.admin_guides, 'admin-guides-section', 'fas fa-shield-alt') %]
+        [% render_category_section('proxmox', categories.proxmox, 'proxmox-section', 'fas fa-server') %]
+        [% render_category_section('controllers', categories.controllers, 'controllers-section', 'fas fa-cogs') %]
+        [% render_category_section('models', categories.models, 'models-section', 'fas fa-database') %]
+
+        <!-- Enhanced Hybrid Changelog Section -->
+        [% render_category_section('changelog', categories.changelog, 'changelog-section', 'fas fa-history') %]
+        
+        [%# Fallback: If no changelog category, try to find changelog pages directly %]
+        [% IF !categories.changelog || !categories.changelog.pages.size %]
+            [% IF structured_pages %]
+                [% changelog_pages = [] %]
+                [% FOREACH page_id IN structured_pages.keys %]
+                    [% IF page_id.match('changelog') || structured_pages.$page_id.path.match('changelog') %]
+                        [% changelog_pages.push(page_id) %]
+                    [% END %]
+                [% END %]
+                
+                [% IF changelog_pages.size > 0 %]
+                    <div class="section">
+                        <div class="section-header collapsible-header" onclick="toggleSection('changelog-fallback-section')">
+                            <h3><i class="fas fa-history"></i>System Changelog (Auto-discovered) <span class="toggle-icon"></span></h3>
+                        </div>
+                        <div id="changelog-fallback-section" class="section-content collapsible-content" style="display: none;">
+                            <p>System updates and changes (found via auto-discovery). <span class="admin-badge">Admin Only</span></p>
+                            <div class="admin-grid">
+                                [% FOREACH page_id IN changelog_pages.sort.reverse %]
+                                    [% render_page_link(page_id, 'Changelog') %]
+                                [% END %]
+                            </div>
+                        </div>
+                    </div>
+                [% END %]
+            [% END %]
+        [% END %]
+    [% END %]
+</div>
+
+<style>
+/* Enhanced hybrid documentation styles */
+.missing-page {
+    border-left: 4px solid #f39c12;
+    background-color: #fdf6e3;
+}
+
+.missing-page h4 {
+    color: #e67e22;
+}
+
+.page-count {
+    font-size: 0.8em;
+    color: #666;
+    font-weight: normal;
+}
+
+.debug-section {
+    margin: 10px 0;
+    padding: 10px;
+    background-color: #f8f9fa;
+    border-left: 3px solid #007bff;
+}
+
+.debug-section h4 {
+    margin-top: 0;
+    color: #007bff;
+}
+
+.page-meta {
+    margin: 10px 0;
+    font-size: 0.9em;
+}
+
+.page-meta span {
+    margin-right: 15px;
+    color: #666;
+}
+
+.debug-info {
+    font-family: monospace;
+    background-color: #f1f1f1;
+    padding: 5px;
+    border-radius: 3px;
+}
+</style>
+
+<script>
+function toggleSection(sectionId) {
+    var content = document.getElementById(sectionId);
+    var header = content.previousElementSibling;
+    var icon = header.querySelector(".toggle-icon");
+    
+    if (content.style.display === "none" || content.style.display === "") {
+        content.style.display = "block";
+        icon.innerHTML = "▼";
+        header.classList.add("active");
+    } else {
+        content.style.display = "none";
+        icon.innerHTML = "▶";
+        header.classList.remove("active");
+    }
+}
+
+// Initialize toggle icons
+document.addEventListener("DOMContentLoaded", function() {
+    var toggleIcons = document.querySelectorAll(".toggle-icon");
+    toggleIcons.forEach(function(icon) {
+        icon.innerHTML = "▶";
+    });
+});
+</script>

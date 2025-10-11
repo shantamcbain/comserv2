@@ -1,0 +1,131 @@
+[% META title = 'Monashee Coop Server Room Proposal' %]
+[% PageVersion = 'coop/server_room_plan.tt,v 0.02 2025/04/01 shanta Exp shanta' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+    [% # Use the standard debug message system %]
+    [% IF debug_msg.defined && debug_msg.size > 0 %]
+        <div class="debug-messages">
+            [% FOREACH msg IN debug_msg %]
+                <p class="debug">Debug: [% msg %]</p>
+            [% END %]
+        </div>
+    [% END %]
+[% END %]
+[% USE Date %]
+<div class="container">
+    <header>
+        <div class="header-banner">
+            <h2 class="header-logo">MONASHEE COOP</h2>
+        </div>
+        <h1>Server Room Plan Proposal</h1>
+        <p>Date: [% Date.format(Date.now, '%Y-%m-%d') %]</p>
+    </header>
+    <div class="info-panel">
+        [% IF help_message %]
+            <div class="help-message">
+                <p>[% help_message %]</p>
+            </div>
+        [% END %]
+        [% IF account_message %]
+            <div class="account-message">
+                <p>[% account_message %]</p>
+            </div>
+        [% END %]
+    </div>
+
+    <main>
+        <h2>Transition Team: Server Infrastructure Plan</h2>
+        <p>This proposal outlines a rack-mounted server solution for Monashee Co-op, balancing current needs with future growth. Prepared for the Transition Team by Shanta McBain, IT Department.</p>
+        <div class="features">
+            <h3>1. Equipment Requirements</h3>
+            <p>The following rack-mounted components are recommended:</p>
+            <ul>
+                <li><strong>Server Rack</strong>: 19-inch, 42U for scalability.
+                    <ul>
+                        <li><em>New</em>: $1,500–$2,500 CND (<a href="https://www.startech.com/en-ca/server-management/4postrack42u" target="_blank">StarTech.com</a>)</li>
+                        <li><em>Used</em>: $800–$1,200 CND (<a href="https://www.sysracks.ca" target="_blank">SysRacks</a>)</li>
+                        <li><img src="https://blog.networkprofile.org/content/images/2020/01/2020-01-25-11.52.48.JPG" width="500" height="600"> >View Example Rack</a></li>
+                    </ul>
+                </li>
+                <li><strong>Servers</strong>: 1-2 units (e.g., Dell PowerEdge R350).
+                    <ul>
+                        <li><em>New</em>: $3,000–$5,000 CND/unit (<a href="https://www.dell.com/en-ca" target="_blank">Dell Canada</a>)</li>
+                        <li><em>Used</em>: $1,200–$2,000 CND/unit (<a href="https://www.usedservers.ca" target="_blank">UsedServers.ca</a>)</li>
+                        <li><a href="[Insert link to server image]" target="_blank">View Example Server</a></li>
+                    </ul>
+                </li>
+                <li><strong>Networking Gear</strong>: 24-port Gigabit switch.
+                    <ul>
+                        <li><em>New</em>: $500–$1,000 CND (<a href="https://www.cisco.com" target="_blank">Cisco SG350</a>)</li>
+                        <li><em>Used</em>: $200–$400 CND (<a href="https://www.usedservers.ca" target="_blank">Refurbished</a>)</li>
+                    </ul>
+                </li>
+                <li><strong>UPS</strong>: 1500VA rack-mounted.
+                    <ul>
+                        <li><em>New</em>: $700–$1,200 CND (<a href="https://www.apc.com" target="_blank">APC Smart-UPS</a>)</li>
+                        <li><em>Used</em>: $300–$500 CND (<a href="https://www.pc-canada.com" target="_blank">PC-Canada</a>)</li>
+                        <li><a href="[Insert link to UPS image]" target="_blank">View Example UPS</a></li>
+                    </ul>
+                </li>
+                <li><strong>Cooling</strong>: Portable AC or fans (100-200 BTU/server).
+                    <ul>
+                        <li><em>New</em>: $1,000–$2,000 CND (<a href="https://www.tripplite.com" target="_blank">Tripp Lite SRCOOL12K</a>)</li>
+                        <li><em>Used</em>: $500–$800 CND</li>
+                    </ul>
+                </li>
+                <li><strong>Cabling</strong>: Cat6 with patch panel.
+                    <ul>
+                        <li><em>New</em>: $300–$500 CND (<a href="https://www.cabletiesandmore.ca" target="_blank">CableTiesAndMore</a>)</li>
+                        <li><em>Used</em>: $100–$200 CND</li>
+                    </ul>
+                </li>
+                <li><strong>PDU</strong>: Power Distribution Unit.
+                    <ul>
+                        <li><em>New</em>: $200–$400 CND (<a href="https://www.eaton.com" target="_blank">Eaton PDU</a>)</li>
+                        <li><em>Used</em>: $80–$150 CND</li>
+                    </ul>
+                </li>
+                <li><strong>Monitoring</strong>: Temperature/humidity sensors.
+                    <ul>
+                        <li><em>New</em>: $50–$150 CND (<a href="https://www.startech.com" target="_blank">StarTech ENV Sensor</a>)</li>
+                        <li><em>Used</em>: $20–$50 CND</li>
+                    </ul>
+                </li>
+            </ul>
+            <p><strong>Total Cost (1 Server)</strong>: <em>New</em>: $7,250–$12,750 CND | <em>Used</em>: $3,400–$5,300 CND</p>
+        </div>
+        <div class="features">
+            <h3>2. Options Analysis</h3>
+            <h4>Dedicated Server Room</h4>
+            <p><strong>Pros</strong>: Secure, scalable, noise-isolated. <strong>Cons</strong>: Higher cost, fixed space.</p>
+            <ul>
+                <li><em>Build Cost</em>: $5,000–$15,000 CND (new) | $2,000–$5,000 CND (repurposed)</li>
+                <li><em>Total (New)</em>: $12,250–$27,750 CND | <em>Total (Used)</em>: $5,400–$10,300 CND</li>
+                <li><a href="[Insert link to server room image]" target="_blank">View Example Room</a></li>
+            </ul>
+            <h4>Rolling Rack</h4>
+            <p><strong>Pros</strong>: Flexible, low-cost. <strong>Cons</strong>: Exposed, limited cooling.</p>
+            <ul>
+                <li><em>Rack Cost</em>: $1,500–$2,500 CND (new) | $800–$1,200 CND (used)</li>
+                <li><em>Total (New)</em>: $7,250–$12,750 CND | <em>Total (Used)</em>: $3,400–$5,300 CND</li>
+                <li><a href="[Insert link to rolling rack image]" target="_blank">View Example Rack</a></li>
+            </ul>
+        </div>
+        <div class="features">
+            <h3>3. Common Practices</h3>
+            <ul>
+                <li><strong>Starter</strong>: Rolling rack in office ($3,000–$10,000 CND).</li>
+                <li><strong>Growth</strong>: Dedicated room ($5,000–$20,000 CND).</li>
+                <li><strong>Hybrid</strong>: Rolling rack transitions to room.</li>
+            </ul>
+        </div>
+        <div class="features">
+            <h3>4. Recommendation</h3>
+            <p><strong>Short-Term</strong>: Rolling rack ($3,400–$12,750 CND). <strong>Long-Term</strong>: Dedicated room ($5,400–$27,750 CND).</p>
+            <p>Please provide budget and growth details to refine this plan.</p>
+        </div>
+    </main>
+    <footer>
+        <p>© [% Date.format(Date.now, '%Y') %] Monashee Coop. All rights reserved.</p>
+    </footer>
+</div>

@@ -1,0 +1,128 @@
+/* Special CSS for theme previews in the ThemeAdmin interface */
+
+/* Default theme preview */
+.theme-default {
+    background-color: #ffffff !important;
+    color: #333333 !important;
+    font-family: Arial, sans-serif !important;
+}
+.theme-default button {
+    background-color: #3498db !important;
+    color: #ffffff !important;
+    border: 1px solid #2980b9 !important;
+    padding: 8px 16px !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+}
+.theme-default a {
+    color: #3498db !important;
+    text-decoration: none !important;
+}
+.theme-default a:hover {
+    text-decoration: underline !important;
+}
+
+/* CSC theme preview */
+.theme-csc {
+    background-color: #0066cc !important;
+    color: #ffffff !important;
+    font-family: 'Arial', sans-serif !important;
+}
+.theme-csc button {
+    background-color: #0066cc !important;
+    color: #ffffff !important;
+    border: 1px solid #004d99 !important;
+    padding: 8px 16px !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+}
+.theme-csc a {
+    color: #ffffff !important;
+    text-decoration: underline !important;
+}
+
+/* APIS theme preview */
+.theme-apis {
+    background-color: #FFF8E1 !important;
+    color: #2C2C2C !important;
+    font-family: 'Verdana', sans-serif !important;
+    background-image: linear-gradient(30deg, #FFF8E1 12%, transparent 12.5%, transparent 87%, #FFF8E1 87.5%, #FFF8E1),
+                    linear-gradient(150deg, #FFF8E1 12%, transparent 12.5%, transparent 87%, #FFF8E1 87.5%, #FFF8E1),
+                    linear-gradient(30deg, #FFF8E1 12%, transparent 12.5%, transparent 87%, #FFF8E1 87.5%, #FFF8E1),
+                    linear-gradient(150deg, #FFF8E1 12%, transparent 12.5%, transparent 87%, #FFF8E1 87.5%, #FFF8E1),
+                    linear-gradient(60deg, #FFE8B8 25%, transparent 25.5%, transparent 75%, #FFE8B8 75%, #FFE8B8),
+                    linear-gradient(60deg, #FFE8B8 25%, transparent 25.5%, transparent 75%, #FFE8B8 75%, #FFE8B8) !important;
+    background-size: 40px 70px !important;
+    background-position: 0 0, 0 0, 20px 35px, 20px 35px, 0 0, 20px 35px !important;
+}
+.theme-apis button {
+    background-color: #FFB900 !important;
+    color: #ffffff !important;
+    border: 1px solid #B88A00 !important;
+    padding: 8px 16px !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+}
+.theme-apis a {
+    color: #B88A00 !important;
+    text-decoration: none !important;
+}
+.theme-apis a:hover {
+    color: #996E00 !important;
+    text-decoration: underline !important;
+}
+
+/* USBM theme preview */
+.theme-usbm {
+    background-color: #009933 !important;
+    color: #ffffff !important;
+    font-family: Arial, sans-serif !important;
+}
+.theme-usbm button {
+    background-color: #009933 !important;
+    color: #ffffff !important;
+    border: 1px solid #006622 !important;
+    padding: 8px 16px !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+}
+.theme-usbm a {
+    color: #ffffff !important;
+    text-decoration: underline !important;
+}
+
+/* Preview box styling */
+.theme-preview-box {
+    padding: 15px !important;
+    border: 1px solid #cccccc !important;
+    margin-bottom: 20px !important;
+    border-radius: 5px !important;
+    height: 250px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+}
+
+.preview-controls {
+    display: flex !important;
+    gap: 10px !important;
+    margin: 15px 0 !important;
+}
+
+.preview-button {
+    padding: 8px 16px !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+}
+
+.preview-link {
+    display: inline-block !important;
+    padding: 8px 0 !important;
+}
+
+.preview-info {
+    margin-top: 10px !important;
+    font-size: 0.9em !important;
+    border-top: 1px dashed rgba(0,0,0,0.1) !important;
+    padding-top: 10px !important;
+}

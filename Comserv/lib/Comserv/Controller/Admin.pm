@@ -1,387 +1,1119 @@
 package Comserv::Controller::Admin;
+
+
 use Moose;
 use namespace::autoclean;
-use Data::Dumper;
-use DBIx::Class::Migration;
 use Comserv::Util::Logging;
+use Comserv::Util::AdminAuth;
+use Comserv::Controller::Admin::Git;
+use Data::Dumper;
+use JSON;
+use Try::Tiny;
+use MIME::Base64;
+use File::Slurp;
+use File::Basename;
+use File::Path qw(make_path);
+use File::Copy;
+use Digest::SHA qw(sha256_hex);
+use POSIX qw(strftime);
+
 BEGIN { extends 'Catalyst::Controller'; }
 
-has 'logging' => (
-    is => 'ro',
-    default => sub { Comserv::Util::Logging->instance }
-);
+# Returns an instance of the logging utility
+sub logging {
+    my ($self) = @_;
+    return Comserv::Util::Logging->instance();
+}
 
-# Authentication check at the beginning of each request
+# Returns an instance of the admin auth utility
+sub admin_auth {
+    my ($self) = @_;
+    return Comserv::Util::AdminAuth->new();
+}
+
+# Begin method to check if the user has admin role
 sub begin : Private {
-    my ( $self, $c ) = @_;
-    # Debug logging for begin action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "Starting begin action");
+    my ($self, $c) = @_;
+    
+    # Add detailed logging
+    my $root_controller = $c->controller('Root');
+    my $username = $root_controller->user_exists($c) ? ($c->session->{username} || 'Guest') : 'Guest';
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', 
+        "Admin controller begin method called by user: $username");
+    
+    # Initialize debug_msg array if it doesn't exist
+    $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
+    
+    # Add the debug message to the array
+    push @{$c->stash->{debug_msg}}, "Admin controller loaded successfully";
+    
+    return 1; # Allow the request to proceed
+}
 
-    $c->stash->{debug_errors} //= [];  # Ensure debug_errors is initialized
-
-    # Check if the user is logged in
-    if ( !$c->user_exists ) {
-        $self->index($c);
-    } else {
-        # Fetch the roles from the session
-        my $roles = $c->session->{roles};
-
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', "Roles: " . Dumper($roles));
-
-        # Check if roles is defined and is an array reference
-        if ( defined $roles && ref $roles eq 'ARRAY' ) {
-            if ( !grep { $_ eq 'admin' } @$roles ) {
-                $self->index($c);
-            }
-        } else {
-            $self->index($c);
-        }
+# Base method for chained actions
+sub base :Chained('/') :PathPart('admin') :CaptureArgs(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'base', 
+        "Starting Admin base action");
+    
+    # Common setup for all admin pages
+    $c->stash(section => 'admin');
+    
+    # STANDARDIZED ADMIN ACCESS CHECK - DO NOT MODIFY
+    # Use centralized AdminAuth utility for consistent authentication
+    # This ensures all admin controllers use the same authentication logic
+    unless ($self->admin_auth->check_admin_access($c, 'admin_base')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'base', 
+            "Access denied: User does not have admin access");
+        
+        # Set error message in flash
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        
+        # Redirect to login page with destination parameter
+        $c->response->redirect($c->uri_for('/user/login', {
+            destination => $c->req->uri
+        }));
+        return 0;
     }
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'base', 
+        "Completed Admin base action - access granted");
+    
+    return 1;
 }
 
-# Main admin page
-sub index :Path :Args(0) {
-    my ( $self, $c ) = @_;
-    # Debug logging for index action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Starting index action");
-
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Template path: " . $c->path_to('root'));
-    $c->stash(template => 'admin/index.tt');
-    $c->forward($c->view('TT'));
+# Admin dashboard
+sub index :Chained('base') :PathPart('') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
+        "Starting Admin index action");
+    
+    # Get system stats
+    my $stats = $self->get_system_stats($c);
+    
+    # Get recent user activity
+    my $recent_activity = $self->get_recent_activity($c);
+    
+    # Get system notifications
+    my $notifications = $self->get_system_notifications($c);
+    
+    # Get software management status for dashboard
+    my $software_status = $self->get_software_management_status($c);
+    
+    # Use the standard debug message system
+    if ($c->session->{debug_mode}) {
+        push @{$c->stash->{debug_msg}}, "Admin controller index view - Template: admin/index.tt";
+    }
+    
+    # Pass data to the template
+    $c->stash(
+        template => 'admin/index.tt',
+        stats => $stats,
+        recent_activity => $recent_activity,
+        notifications => $notifications,
+        software_status => $software_status
+    );
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
+        "Completed Admin index action");
 }
 
-# Add a new schema
-sub add_schema :Path('add_schema') :Args(0) {
-    my ( $self, $c ) = @_;
-    # Debug logging for add_schema action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_schema', "Starting add_schema action");
+# Database connection status endpoint
+sub db_status :Chained('base') :PathPart('db-status') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'db_status', 
+        "Starting Admin db_status action");
+    
+    my $db_info = {};
+    
+    # Get DBEncy connection info
+    eval {
+        my $dbency = $c->model('DBEncy');
+        $db_info->{dbency} = $dbency->get_connection_info();
+        $db_info->{dbency_startup} = $dbency->get_startup_connection_info();
+    };
+    if ($@) {
+        $db_info->{dbency_error} = "Error getting DBEncy info: $@";
+    }
+    
+    # Get DBForager connection info if available
+    eval {
+        my $dbforager = $c->model('DBForager');
+        if ($dbforager && $dbforager->can('get_connection_info')) {
+            $db_info->{dbforager} = $dbforager->get_connection_info();
+        } else {
+            $db_info->{dbforager} = "Method not available";
+        }
+    };
+    if ($@) {
+        $db_info->{dbforager_error} = "Error getting DBForager info: $@";
+    }
+    
+    # Set content type for JSON output
+    $c->response->content_type('application/json; charset=utf-8');
+    
+    # Return JSON response
+    $c->response->body(JSON->new->pretty->encode($db_info));
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'db_status', 
+        "Completed Admin db_status action");
+}
 
-    if ( $c->request->method eq 'POST' ) {
-        my $migration = DBIx::Class::Migration->new(
-            schema_class => 'Comserv::Model::Schema::Ency',
-            target_dir   => $c->path_to('root', 'migrations')->stringify
+# Get system statistics for the admin dashboard
+sub get_system_stats {
+    my ($self, $c) = @_;
+    
+    my $stats = {
+        user_count => 'N/A',
+        content_count => 'N/A', 
+        comment_count => 'N/A',
+        disk_usage => 'Unknown',
+        db_size => 'Unknown',
+        uptime => 'Unknown',
+        memory_usage => 'Unknown',
+        load_average => 'Unknown',
+        git_commits => 'Unknown',
+        app_version => 'Unknown'
+    };
+    
+    # Get actual disk usage
+    eval {
+        my $df_output = `df -h . 2>/dev/null | tail -1`;
+        if ($df_output =~ /\s+(\d+%)\s+/) {
+            $stats->{disk_usage} = $1;
+        } elsif ($df_output =~ /\s+(\d+\.\d+[KMGT])\s+(\d+\.\d+[KMGT])\s+(\d+\.\d+[KMGT])\s+(\d+%)/) {
+            $stats->{disk_usage} = "$4 ($2 used of $1)";
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_system_stats', 
+            "Error getting disk usage: $@");
+    }
+    
+    # Get system uptime
+    eval {
+        my $uptime_output = `uptime 2>/dev/null`;
+        chomp $uptime_output;
+        if ($uptime_output =~ /up\s+(.*?),\s+\d+\s+users?/) {
+            $stats->{uptime} = $1;
+        } elsif ($uptime_output =~ /up\s+(.*?),\s+load/) {
+            $stats->{uptime} = $1;
+        }
+        
+        # Extract load average
+        if ($uptime_output =~ /load average:\s*([\d\.]+),\s*([\d\.]+),\s*([\d\.]+)/) {
+            $stats->{load_average} = "$1, $2, $3";
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_system_stats', 
+            "Error getting uptime: $@");
+    }
+    
+    # Get memory usage
+    eval {
+        my $free_output = `free -h 2>/dev/null | grep '^Mem:'`;
+        if ($free_output =~ /Mem:\s+(\S+)\s+(\S+)\s+(\S+)/) {
+            my ($total, $used, $free) = ($1, $2, $3);
+            $stats->{memory_usage} = "$used used of $total";
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_system_stats', 
+            "Error getting memory usage: $@");
+    }
+    
+    # Get Git repository information
+    eval {
+        my $git_log_count = `git -C ${\$c->path_to()} rev-list --count HEAD 2>/dev/null`;
+        chomp $git_log_count;
+        $stats->{git_commits} = $git_log_count || 'Unknown';
+        
+        # Get app version from git tag or commit
+        my $git_version = `git -C ${\$c->path_to()} describe --tags --always 2>/dev/null`;
+        chomp $git_version;
+        $stats->{app_version} = $git_version || 'Unknown';
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_system_stats', 
+            "Error getting git info: $@");
+    }
+    
+    # Try to get database statistics (only if models exist)
+    eval {
+        # Check if we have any database models available
+        my $schema = $c->model('DBEncy');
+        if ($schema) {
+            # Try to get table counts from information_schema or equivalent
+            my $dbh = $schema->storage->dbh;
+            if ($dbh) {
+                # Get database size (works for MySQL/PostgreSQL)
+                my $db_name = $schema->storage->connect_info->[0];
+                if ($db_name =~ /database=([^;]+)/ || $db_name =~ /dbname=([^;]+)/) {
+                    my $database = $1;
+                    
+                    # Try MySQL approach first
+                    my $size_query = "SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS 'DB Size in MB' FROM information_schema.tables WHERE table_schema='$database'";
+                    my $sth = $dbh->prepare($size_query);
+                    $sth->execute();
+                    my ($size) = $sth->fetchrow_array();
+                    if ($size) {
+                        $stats->{db_size} = "${size} MB";
+                    }
+                }
+                
+                # Get table counts if specific tables exist
+                my @tables = $dbh->tables();
+                my $table_count = scalar(@tables);
+                $stats->{content_count} = "$table_count tables";
+                
+                # Try to get user count from common user table names
+                foreach my $table_pattern ('user', 'users', 'account', 'accounts') {
+                    eval {
+                        my $count_query = "SELECT COUNT(*) FROM $table_pattern";
+                        my $sth = $dbh->prepare($count_query);
+                        $sth->execute();
+                        my ($count) = $sth->fetchrow_array();
+                        if (defined $count) {
+                            $stats->{user_count} = $count;
+                            last;
+                        }
+                    };
+                }
+            }
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_system_stats', 
+            "Database stats not available: $@");
+    }
+    
+    return $stats;
+}
+
+# Get recent user activity for the admin dashboard
+sub get_recent_activity {
+    my ($self, $c) = @_;
+    
+    my @activity = ();
+    
+    # Try to get recent logins
+    eval {
+        my @logins = $c->model('DBEncy::UserLogin')->search(
+            {},
+            {
+                order_by => { -desc => 'login_time' },
+                rows => 5
+            }
         );
-
-        my $schema_name        = $c->request->params->{schema_name} // '';
-        my $schema_description = $c->request->params->{schema_description} // '';
-
-        if ( $schema_name ne '' && $schema_description ne '' ) {
-            eval {
-                $migration->make_schema;
-                $c->stash(message => 'Migration script created successfully.');
+        
+        foreach my $login (@logins) {
+            push @activity, {
+                type => 'login',
+                user => $login->user->username,
+                time => $login->login_time,
+                details => $login->ip_address
             };
-            if ($@) {
-                $c->stash(error_msg => 'Failed to create migration script: ' . $@);
-            }
-        } else {
-            $c->stash(error_msg => 'Schema name and description cannot be empty.');
         }
-    }
-
-    $c->stash(template => 'admin/add_schema.tt');
-    $c->forward($c->view('TT'));
-}
-
-sub schema_manager :Path('/admin/schema_manager') :Args(0) {
-    my ($self, $c) = @_;
-
-    # Log the beginning of the schema_manager action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_manager', "Starting schema_manager action");
-
-    # Get the selected database (default to 'ENCY')
-    my $selected_db = $c->req->param('database') || 'ENCY';
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_manager', "Selected database: $selected_db");
-
-    # Determine the model to use
-    my $model = $selected_db eq 'FORAGER' ? 'DBForager' : 'DBEncy';
-
-    # Attempt to fetch list of tables from the selected model
-    my $tables;
-    eval {
-        # Corrected line to pass the selected database to list_tables
-$tables = $c->model('DBSchemaManager')->list_tables($c, $selected_db);
-
     };
-    if ($@) {
-        # Log the table retrieval error
-        $self->logging->log_with_details(
-            $c,
-            'error',
-            __FILE__,
-            __LINE__,
-            'schema_manager',
-            "Failed to list tables for database '$selected_db': $@"
-        );
-
-        # Set error message in stash and render error template
-        $c->stash(
-            error_msg => "Failed to list tables for database '$selected_db': $@",
-            template  => 'admin/SchemaManager.tt',
-        );
-        $c->forward($c->view('TT'));
-        return;
-    }
-
-    # Log successful table retrieval
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_manager', "Successfully retrieved tables for '$selected_db'");
-
-    # Pass data to the stash for rendering the SchemaManager template
-    $c->stash(
-        database  => $selected_db,
-        tables    => $tables,
-        template  => 'admin/SchemaManager.tt',
-    );
-
-    $c->forward($c->view('TT'));
-}
-
-sub map_table_to_result :Path('/admin/map_table_to_result') :Args(0) {
-    my ($self, $c) = @_;
-
-    # Get database and table from request
-    my $selected_db = $c->req->param('database') || 'ENCY';
-    my $table       = $c->req->param('table');
-    my $model       = $selected_db eq 'FORAGER' ? 'DBForager' : 'DBEncy';
-
-    # Fetch table columns
-    my $columns;
+    
+    # Try to get recent content changes
     eval {
-        $columns = $c->model($model)->get_table_columns($table);
-    };
-    if ($@) {
-        # Handle error if column retrieval fails
-        $c->stash(
-            error_msg => "Failed to fetch columns for table '$table': $@",
-            template  => 'admin/SchemaManager.tt',
+        my @changes = $c->model('DBEncy::ContentHistory')->search(
+            {},
+            {
+                order_by => { -desc => 'change_time' },
+                rows => 5
+            }
         );
-        return;
+        
+        foreach my $change (@changes) {
+            push @activity, {
+                type => 'content',
+                user => $change->user->username,
+                time => $change->change_time,
+                details => "Updated " . $change->content->title
+            };
+        }
+    };
+    
+    # Sort all activity by time (most recent first)
+    @activity = sort { $b->{time} cmp $a->{time} } @activity;
+    
+    # Limit to 10 items
+    if (scalar(@activity) > 10) {
+        @activity = @activity[0..9];
     }
-
-    # Generate or update result file for the table
-    my $result_file = "lib/Comserv/Model/Result/" . ucfirst($table) . ".pm";
-    if (!-e $result_file || $c->req->param('update')) {
-        $self->generate_result_file($table, $columns, $result_file);
-    }
-
-    # Set success message and redirect
-    $c->flash->{success} = "Result file for table '$table' updated successfully!";
-    $c->response->redirect('/Admin/schema_manager?database=' . $selected_db);
+    
+    return \@activity;
 }
 
-# Generate or update a result file
-sub generate_result_file {
-    my ($self, $table, $columns, $file_path) = @_;
-
-    my $content = <<"EOF";
-package Comserv::Model::Result::${table};
-use base qw/DBIx::Class::Core/;
-
-__PACKAGE__->table('$table');
-
-# Define columns
-EOF
-
-    foreach my $column (@$columns) {
-        my $nullable = $column->{nullable} eq 'YES' ? '1' : '0';
-        $content .= "__PACKAGE__->add_columns(q{$column->{name}}, { data_type => q{$column->{type}}, is_nullable => $nullable });\n";
-    }
-
-    $content .= "\n1;\n";
-
-    # Write the result file
-    open my $fh, '>', $file_path or die $!;
-    print $fh $content;
-    close $fh;
-}
-
-# Action to handle table-to-result mapping
-sub map_table_to_result :Path('/Admin/map_table_to_result') :Args(0) {
+# Get system notifications for the admin dashboard
+sub get_system_notifications {
     my ($self, $c) = @_;
-
-    my $database = $c->req->param('database');
-    my $table    = $c->req->param('table');
-
-    # Check if the result file exists
-    my $result_file = "lib/Comserv/Model/Result/" . ucfirst($table) . ".pm";
-    my $file_exists = -e $result_file;
-
-    # Fetch table columns
-    my $columns = $c->model('DBSchemaManager')->get_table_columns($database, $table);
-
-    # Generate or update the result file based on the table schema
-    if (!$file_exists || $c->req->param('update')) {
-        $self->generate_result_file($table, $columns, $result_file);
-    }
-
-    $c->flash->{success} = "Result file for table '$table' has been successfully updated!";
-    $c->response->redirect('/Admin/schema_manager');
-}
-
-# Helper to generate or update a result file
-sub generate_result_file {
-    my ($self, $table, $columns, $file_path) = @_;
-
-    my $content = <<"EOF";
-package Comserv::Model::Result::${table};
-use base qw/DBIx::Class::Core/;
-
-__PACKAGE__->table('$table');
-
-# Define columns
-EOF
-
-    foreach my $column (@$columns) {
-        $content .= "__PACKAGE__->add_columns(q{$column->{name}});\n";
-    }
-
-    $content .= "\n1;\n";
-
-    # Write the file
-    open my $fh, '>', $file_path or die $!;
-    print $fh $content;
-    close $fh;
-}
-
-sub map_table_to_result :Path('/Admin/map_table_to_result') :Args(0) {
-    my ($self, $c) = @_;
-
-    my $database = $c->req->param('database');
-    my $table    = $c->req->param('table');
-
-    # Check if the result file exists
-    my $result_file = "lib/Comserv/Model/Result/" . ucfirst($table) . ".pm";
-    my $file_exists = -e $result_file;
-
-    # Fetch table columns
-    my $columns = $c->model('DBSchemaManager')->get_table_columns($database, $table);
-
-    # Generate or update the result file based on the table schema
-    if (!$file_exists || $c->req->param('update')) {
-        $self->generate_result_file($table, $columns, $result_file);
-    }
-
-    $c->flash->{success} = "Result file for table '$table' has been successfully updated!";
-    $c->response->redirect('/Admin/schema_manager');
-}
-
-# Helper to generate or update a result file
-sub generate_result_file {
-    my ($self, $table, $columns, $file_path) = @_;
-
-    my $content = <<"EOF";
-package Comserv::Model::Result::${table};
-use base qw/DBIx::Class::Core/;
-
-__PACKAGE__->table('$table');
-
-# Define columns
-EOF
-
-    foreach my $column (@$columns) {
-        $content .= "__PACKAGE__->add_columns(q{$column->{name}});\n";
-    }
-
-    $content .= "\n1;\n";
-
-    # Write the file
-    open my $fh, '>', $file_path or die $!;
-    print $fh $content;
-    close $fh;
-}
-
-
-# Compare schema versions
-sub compare_schema :Path('compare_schema') :Args(0) {
-    my ($self, $c) = @_;
-    # Debug logging for compare_schema action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'compare_schema', "Starting compare_schema action");
-
-    my $migration = DBIx::Class::Migration->new(
-        schema_class => 'Comserv::Model::Schema::Ency',
-        target_dir   => $c->path_to('root', 'migrations')->stringify
-    );
-
-    my $current_version = $migration->version;
-    my $db_version;
-
+    
+    my @notifications = ();
+    
+    # Check for pending user registrations
     eval {
-        $db_version = $migration->schema->resultset('dbix_class_schema_versions')->find({ version => { '!=' => '' } })->version;
+        my $pending_count = $c->model('DBEncy::User')->search({ status => 'pending' })->count();
+        if ($pending_count > 0) {
+            push @notifications, {
+                type => 'warning',
+                message => "$pending_count pending user registration(s) require approval",
+                link => $c->uri_for('/admin/users', { filter => 'pending' })
+            };
+        }
     };
-
-    $db_version ||= '0';  # Default if no migrations have been run
-    my $changes = ( $current_version != $db_version )
-        ? "Schema version mismatch detected. Check migration scripts for changes from $db_version to $current_version."
-        : "No changes detected between schema and database.";
-
-    $c->stash(
-        current_version => $current_version,
-        db_version      => $db_version,
-        changes         => $changes,
-        template        => 'admin/compare_schema.tt'
-    );
-
-    $c->forward($c->view('TT'));
+    
+    # Check for low disk space
+    eval {
+        my $df_output = `df -h . | tail -1`;
+        if ($df_output =~ /(\d+)%/ && $1 > 90) {
+            push @notifications, {
+                type => 'danger',
+                message => "Disk space is critically low ($1% used)",
+                link => undef
+            };
+        }
+        elsif ($df_output =~ /(\d+)%/ && $1 > 80) {
+            push @notifications, {
+                type => 'warning',
+                message => "Disk space is running low ($1% used)",
+                link => undef
+            };
+        }
+    };
+    
+    # Check for pending comments
+    eval {
+        my $pending_count = $c->model('DBEncy::Comment')->search({ status => 'pending' })->count();
+        if ($pending_count > 0) {
+            push @notifications, {
+                type => 'info',
+                message => "$pending_count pending comment(s) require moderation",
+                link => $c->uri_for('/admin/comments', { filter => 'pending' })
+            };
+        }
+    };
+    
+    return \@notifications;
 }
 
-# Migrate schema if changes are confirmed
-sub migrate_schema :Path('migrate_schema') :Args(0) {
+# Get software management status for the admin dashboard
+sub get_software_management_status {
     my ($self, $c) = @_;
-    # Debug logging for migrate_schema action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'migrate_schema', "Starting migrate_schema action");
+    
+    my $status = {
+        git_status => {},
+        starman_status => {},
+        deployment_status => {},
+        recommendations => []
+    };
+    
+    try {
+        # Get Git status (no sudo required)
+        my $current_branch = `git -C ${\$c->path_to()} branch --show-current 2>&1`;
+        chomp $current_branch;
+        $status->{git_status}->{current_branch} = $current_branch || 'unknown';
+        
+        # Check if there are uncommitted changes (exclude untracked files)
+        my $git_status_output = `git -C ${\$c->path_to()} status --porcelain 2>&1`;
+        my $has_uncommitted_changes = 0;
+        my $has_untracked_files = 0;
+        my @untracked_files = ();
+        
+        # Parse git status output to distinguish between uncommitted changes and untracked files
+        # Uncommitted changes have prefixes like: M (modified), A (added), D (deleted), R (renamed), C (copied)
+        # Untracked files have prefix: ?? (untracked)
+        if ($git_status_output) {
+            for my $line (split /\n/, $git_status_output) {
+                # Check if line indicates actual uncommitted changes (not untracked files)
+                if ($line =~ /^[MADRCU]/) {
+                    $has_uncommitted_changes = 1;
+                } elsif ($line =~ /^\?\?\s+(.+)$/) {
+                    $has_untracked_files = 1;
+                    push @untracked_files, $1;
+                }
+            }
+        }
+        
+        $status->{git_status}->{has_uncommitted_changes} = $has_uncommitted_changes;
+        $status->{git_status}->{has_untracked_files} = $has_untracked_files;
+        $status->{git_status}->{untracked_files} = \@untracked_files;
+        
+        # Check if we're behind origin (no sudo required)
+        my $behind_count = `git -C ${\$c->path_to()} rev-list HEAD..origin/$current_branch --count 2>/dev/null`;
+        chomp $behind_count;
+        $status->{git_status}->{commits_behind} = $behind_count || 0;
+        
+        # Get last commit info
+        my $last_commit = `git -C ${\$c->path_to()} log -1 --pretty=format:"%h - %s (%cr)" 2>&1`;
+        chomp $last_commit;
+        $status->{git_status}->{last_commit} = $last_commit || 'No commits';
+        
+        # Get Starman process status (no sudo required)
+        my $starman_processes = `ps aux | grep starman | grep -v grep`;
+        chomp $starman_processes;
+        $status->{starman_status}->{is_active} = $starman_processes ? 'active' : 'inactive';
+        $status->{starman_status}->{status_class} = $starman_processes ? 'success' : 'warning';
+        $status->{starman_status}->{process_info} = $starman_processes || 'No processes found';
+        
+        # Generate deployment status summary
+        $status->{deployment_status}->{needs_update} = $status->{git_status}->{commits_behind} > 0;
+        $status->{deployment_status}->{has_local_changes} = $status->{git_status}->{has_uncommitted_changes};
+        $status->{deployment_status}->{service_healthy} = $starman_processes ? 1 : 0;
+        
+        # Generate recommendations
+        if ($status->{git_status}->{commits_behind} > 0) {
+            push @{$status->{recommendations}}, {
+                type => 'warning',
+                icon => 'fas fa-code-branch',
+                message => "Your code is $status->{git_status}->{commits_behind} commit(s) behind origin/$current_branch",
+                action => 'Consider updating with Git Pull',
+                link => undef
+            };
+        }
+        
+        if (!$starman_processes) {
+            push @{$status->{recommendations}}, {
+                type => 'info',
+                icon => 'fas fa-server',
+                message => "No Starman processes detected",
+                action => 'Use the diagnostic system to check service status',
+                link => $c->uri_for('/admin/starman_diagnostics')
+            };
+        }
+        
+        if ($status->{git_status}->{has_uncommitted_changes}) {
+            push @{$status->{recommendations}}, {
+                type => 'info',
+                icon => 'fas fa-edit',
+                message => "You have uncommitted local changes",
+                action => 'Review changes before deploying',
+                link => undef
+            };
+        }
+        
+        if ($status->{git_status}->{has_untracked_files}) {
+            my $file_count = scalar @{$status->{git_status}->{untracked_files}};
+            push @{$status->{recommendations}}, {
+                type => 'info',
+                icon => 'fas fa-file-plus',
+                message => "You have $file_count untracked file(s)",
+                action => 'Add files to Git if needed, or add to .gitignore',
+                link => undef
+            };
+        }
+        
+        # If everything looks good
+        if (!@{$status->{recommendations}}) {
+            push @{$status->{recommendations}}, {
+                type => 'success',
+                icon => 'fas fa-check-circle',
+                message => "Software management status looks good",
+                action => 'All systems operational',
+                link => undef
+            };
+        }
+        
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_software_management_status', 
+            "Error getting software management status: $error");
+        
+        push @{$status->{recommendations}}, {
+            type => 'danger',
+            icon => 'fas fa-exclamation-triangle',
+            message => "Error checking software status",
+            action => "Check system logs for details",
+            link => undef
+        };
+    };
+    
+    return $status;
+}
 
-    if ( $c->request->method eq 'POST' ) {
-        my $migration = DBIx::Class::Migration->new(
-            schema_class => 'Comserv::Model::Schema::Ency',
-            target_dir   => $c->path_to('root', 'migrations')->stringify
-        );
-
-        my $confirm = $c->request->params->{confirm};
+# Update existing restart_starman to be web-safe
+sub restart_starman :Path('/admin/restart_starman') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', 
+        "Starting web-safe Starman restart action");
+    
+    # Use centralized admin authentication
+    return unless $self->admin_auth->require_admin_access($c, 'restart_starman');
+    
+    # Initialize debug_msg array if it doesn't exist
+    $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
+    
+    # Handle POST requests for restart action
+    if ($c->req->method eq 'POST') {
+        my $confirm = $c->req->param('confirm');
+        my $show_credentials_form = $c->req->param('show_credentials_form');
+        
         if ($confirm) {
-            eval {
-                $migration->install;
-                $c->stash(message => 'Schema migration completed successfully.');
-            };
-            if ($@) {
-                $c->stash(error_msg => "An error occurred during migration: $@");
+            my $sudo_username = $c->req->param('sudo_username');
+            my $sudo_password = $c->req->param('sudo_password');
+            
+            # Check if sudo credentials are provided
+            if (!$sudo_username || !$sudo_password) {
+                $c->stash->{error_msg} = "System credentials required. Please provide the username and password of a system user with sudo privileges on this server.";
+                $c->stash->{show_password_form} = 1;
+            } else {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', 
+                    "Executing Starman restart with sudo user: $sudo_username");
+                
+                my ($success, $output) = $self->execute_starman_restart($c, $sudo_username, $sudo_password);
+                
+                $c->stash(
+                    output => $output,
+                    restart_success => $success,
+                    success_msg => $success ? "Starman service restarted successfully." : undef,
+                    error_msg => $success ? undef : "Starman restart failed. See output for details."
+                );
+                
+                # Clear the password from memory for security
+                delete $c->req->params->{sudo_password};
             }
-        } else {
-            $c->res->redirect($c->uri_for($self->action_for('compare_schema')));
+        } elsif ($show_credentials_form) {
+            $c->stash->{show_password_form} = 1;
         }
     }
-
+    
+    # Get current service status using the StarmanServiceManager utility
+    my $service_manager = $self->get_starman_service_manager($c);
+    my $service_status = $service_manager->get_service_status($c->path_to());
+    
+    # Use the standard debug message system
+    if ($c->session->{debug_mode}) {
+        push @{$c->stash->{debug_msg}}, "Admin controller restart_starman view - Template: admin/restart_starman.tt";
+    }
+    
     $c->stash(
-        message   => $c->stash->{message} || '',
-        error_msg => $c->stash->{error_msg} || '',
-        template  => 'admin/migrate_schema.tt'
+        template => 'admin/restart_starman.tt',
+        service_status => $service_status
     );
-
-    $c->forward($c->view('TT'));
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman', 
+        "Completed Starman restart action");
 }
 
-# Edit documentation action
-sub edit_documentation :Path('admin/edit_documentation') :Args(0) {
-    my ( $self, $c ) = @_;
-    # Debug logging for edit_documentation action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_documentation', "Starting edit_documentation action");
-    $c->stash(template => 'admin/edit_documentation.tt');
-    $c->forward($c->view('TT'));
+# Execute Starman service restart
+sub execute_starman_restart {
+    my ($self, $c, $sudo_username, $sudo_password) = @_;
+    my $output = '';
+    my $success = 0;
+    
+    try {
+        # Get current service status using sudo with password
+        $output .= "Checking current service status...\n";
+        my $status_before = $self->_execute_sudo_command($sudo_password, 'systemctl is-active starman');
+        chomp $status_before;
+        $output .= "Service status before restart: $status_before\n\n";
+        
+        # Restart the service
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_starman_restart', 
+            "Executing systemctl restart starman with sudo user: $sudo_username");
+        
+        $output .= "Restarting Starman service...\n";
+        my $restart_output = $self->_execute_sudo_command($sudo_password, 'systemctl restart starman');
+        my $restart_status = $?;
+        
+        $output .= "Restart command output:\n$restart_output\n";
+        
+        if ($restart_status == 0) {
+            $success = 1;
+            $output .= "\n✓ Starman service restart command completed successfully\n";
+            
+            # Wait a moment for service to start
+            $output .= "Waiting for service to start...\n";
+            sleep(3);
+            
+            # Check service status after restart
+            my $status_after = $self->_execute_sudo_command($sudo_password, 'systemctl is-active starman');
+            chomp $status_after;
+            $output .= "Service status after restart: $status_after\n";
+            
+            # Get detailed status
+            my $detailed_status = $self->_execute_sudo_command($sudo_password, 'systemctl status starman --no-pager -l');
+            $output .= "\nDetailed service status:\n$detailed_status\n";
+            
+            if ($status_after eq 'active') {
+                $output .= "\n✓ Starman service is now active and running\n";
+            } else {
+                $success = 0;
+                $output .= "\n⚠ Starman service may not have started properly (status: $status_after)\n";
+            }
+        } else {
+            $output .= "\n✗ Starman restart command failed with exit code: $restart_status\n";
+        }
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_starman_restart', 
+            "Starman restart completed with success: $success");
+            
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_starman_restart', 
+            "Starman restart failed: $error");
+        $output .= "\n✗ Restart failed: $error\n";
+        $success = 0;
+    };
+    
+    return ($success, $output);
 }
 
-# Get table information
-sub get_table_info :Path('admin/get_table_info') :Args(1) {
-    my ($self, $c, $table_name) = @_;
-    # Debug logging for get_table_info action
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, "Starting get_table_info action");
+# Helper method to execute sudo commands with password
+sub _execute_sudo_command {
+    my ($self, $sudo_password, $command) = @_;
+    
+    # Use a pipe to send the password to sudo
+    my $full_command = "sudo -S $command";
+    my $output = '';
+    
+    # Open pipe to sudo command
+    open(my $sudo_pipe, '|-', $full_command) or do {
+        return "Failed to execute sudo command: $!";
+    };
+    
+    # Send password to sudo
+    print $sudo_pipe "$sudo_password\n";
+    close $sudo_pipe;
+    
+    # Capture the output using backticks with the same command
+    # This is a bit of a workaround since we can't easily capture output from the pipe
+    my $temp_script = "/tmp/starman_sudo_$$.sh";
+    
+    # Create a temporary script
+    open(my $script_fh, '>', $temp_script) or do {
+        return "Failed to create temporary script: $!";
+    };
+    
+    print $script_fh "#!/bin/bash\n";
+    print $script_fh "echo '$sudo_password' | sudo -S $command 2>&1\n";
+    close $script_fh;
+    
+    chmod 0700, $temp_script;
+    
+    # Execute the script and capture output
+    $output = `$temp_script 2>&1`;
+    
+    # Clean up
+    unlink $temp_script;
+    
+    return $output;
+}
 
-    my $table_info = $c->model('DBEncy')->get_table_info($table_name);
+# Web-Safe Starman Service Diagnostic System
+sub starman_diagnostics :Path('/admin/starman_diagnostics') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'starman_diagnostics', 
+        "Starting Starman diagnostics action");
+    
+    # Use centralized admin authentication
+    return unless $self->admin_auth->require_admin_access($c, 'starman_diagnostics');
+    
+    # Handle POST requests for diagnostic actions
+    if ($c->req->method eq 'POST') {
+        my $action = $c->req->param('action') || '';
+        
+        if ($action eq 'run_diagnostics') {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'starman_diagnostics', 
+                "Running Starman diagnostics");
+            
+            my $output = $self->run_starman_diagnostics($c);
+            $c->stash(output => $output);
+            $c->stash(success_msg => "Diagnostics completed successfully");
+        }
+    }
+    
+    # Get current service status using the StarmanServiceManager utility
+    my $service_manager = $self->get_starman_service_manager($c);
+    my $service_status = $service_manager->get_service_status($c->path_to());
+    
+    # Use the standard debug message system
+    if ($c->session->{debug_mode}) {
+        push @{$c->stash->{debug_msg}}, "Admin controller starman_diagnostics view - Template: admin/starman_diagnostics.tt";
+    }
+    
     $c->stash(
-        table_info => $table_info,
-        error      => $table_info ? undef : "The table $table_name does not exist.",
-        template   => 'admin/get_table_info.tt'
+        template => 'admin/starman_diagnostics.tt',
+        service_status => $service_status
     );
-
-    $c->forward($c->view('TT'));
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'starman_diagnostics', 
+        "Completed Starman diagnostics action");
 }
+
+# Get Starman diagnostics utility instance
+sub get_starman_diagnostics_util {
+    my ($self, $c) = @_;
+    
+    require Comserv::Util::StarmanDiagnostics;
+    return Comserv::Util::StarmanDiagnostics->new(
+        logger => $self->logging
+    );
+}
+
+# Get Starman service manager utility instance
+sub get_starman_service_manager {
+    my ($self, $c) = @_;
+    
+    require Comserv::Util::StarmanServiceManager;
+    return Comserv::Util::StarmanServiceManager->new(
+        logger => $self->logging
+    );
+}
+
+
+
+# Run basic Starman diagnostics
+sub run_starman_diagnostics {
+    my ($self, $c) = @_;
+    
+    my $output = "=== Starman Service Diagnostics ===\n\n";
+    
+    # Check service status
+    $output .= "1. Service Status Check:\n";
+    my $status_cmd = `systemctl status starman 2>&1`;
+    $output .= $status_cmd . "\n";
+    
+    # Check if PSGI file exists
+    $output .= "2. PSGI File Check:\n";
+    my $app_dir = '/home/shanta/PycharmProjects/comserv2';
+    my $psgi_file = "$app_dir/Comserv/comserv.psgi";
+    if (-f $psgi_file) {
+        $output .= "✓ PSGI file exists: $psgi_file\n";
+        my $psgi_perms = sprintf("%04o", (stat($psgi_file))[2] & 07777);
+        $output .= "  Permissions: $psgi_perms\n";
+    } else {
+        $output .= "✗ PSGI file missing: $psgi_file\n";
+    }
+    
+    # Check process information
+    $output .= "\n3. Process Information:\n";
+    my $ps_output = `ps aux | grep starman | grep -v grep 2>/dev/null`;
+    if ($ps_output) {
+        $output .= $ps_output;
+    } else {
+        $output .= "No Starman processes found\n";
+    }
+    
+    # Check port usage
+    $output .= "\n4. Port Usage Check:\n";
+    my $port_check = `netstat -tlnp 2>/dev/null | grep :5000 || echo "Port 5000 not in use"`;
+    $output .= $port_check;
+    
+    # Check recent logs
+    $output .= "\n5. Recent Service Logs:\n";
+    my $log_output = `journalctl -u starman --no-pager -n 10 2>/dev/null || echo "Could not access service logs"`;
+    $output .= $log_output;
+    
+    $output .= "\n=== Diagnostics Complete ===\n";
+    
+    return $output;
+}
+
+# Emergency backup directory browser and restore functionality
+sub emergency_restore :Chained('base') :PathPart('emergency-restore') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'emergency_restore', 
+        "Starting emergency restore interface");
+    
+    if ($c->req->method eq 'POST') {
+        my $action = $c->req->param('action');
+        
+        if ($action eq 'restore_psgi') {
+            my $result = $self->restore_psgi_file($c);
+            $c->stash(%$result);
+        } elsif ($action eq 'restore_file') {
+            my $backup_path = $c->req->param('backup_path');
+            my $target_file = $c->req->param('target_file');
+            my $result = $self->restore_file_from_backup($c, $backup_path, $target_file);
+            $c->stash(%$result);
+        }
+    }
+    
+    # Get backup directory contents
+    my $backup_contents = $self->get_backup_directory_contents($c);
+    $c->stash(backup_contents => $backup_contents);
+    
+    # Check if comserv.psgi exists
+    my $app_dir = '/home/shanta/PycharmProjects/comserv2';
+    my $psgi_exists = -f "$app_dir/Comserv/comserv.psgi";
+    $c->stash(psgi_exists => $psgi_exists);
+    
+    if ($c->session->{debug_mode}) {
+        push @{$c->stash->{debug_msg}}, "Admin controller emergency_restore view - Using simple output";
+    }
+    
+    # Get Starman status using existing functionality
+    my $software_status = $self->get_software_management_status($c);
+    
+    $c->stash(
+        template => 'admin/emergency_restore.tt',
+        backup_contents => $backup_contents,
+        software_status => $software_status
+    );
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'emergency_restore', 
+        "Completed emergency restore interface");
+}
+
+# Get contents of backup directories (both /Comserv/backup and /Comserv/backups)
+sub get_backup_directory_contents {
+    my ($self, $c) = @_;
+    
+    my $contents = {
+        backup_singular => [],  # /Comserv/backup/
+        backup_plural => [],    # /Comserv/backups/
+        error => ''
+    };
+    
+    my $app_dir = '/home/shanta/PycharmProjects/comserv2';
+    
+    # Check /Comserv/backup/ directory (mentioned by user)
+    my $backup_dir_singular = "$app_dir/Comserv/backup";
+    if (-d $backup_dir_singular) {
+        $contents->{backup_singular} = $self->scan_backup_directory($c, $backup_dir_singular, 'backup');
+    }
+    
+    # Check /Comserv/backups/ directory (used by existing Git controller)
+    my $backup_dir_plural = "$app_dir/Comserv/backups";
+    if (-d $backup_dir_plural) {
+        $contents->{backup_plural} = $self->scan_backup_directory($c, $backup_dir_plural, 'backups');
+    }
+    
+    if (!@{$contents->{backup_singular}} && !@{$contents->{backup_plural}}) {
+        $contents->{error} = "No backup directories found. Checked: $backup_dir_singular and $backup_dir_plural";
+    }
+    
+    return $contents;
+}
+
+# Scan a backup directory for files
+sub scan_backup_directory {
+    my ($self, $c, $backup_dir, $dir_type) = @_;
+    
+    my @files = ();
+    
+    eval {
+        opendir(my $dh, $backup_dir) or die "Cannot open directory: $!";
+        my @entries = readdir($dh);
+        closedir($dh);
+        
+        for my $entry (@entries) {
+            next if $entry =~ /^\.\.?$/;  # Skip . and ..
+            
+            my $full_path = "$backup_dir/$entry";
+            my $stat = stat($full_path);
+            
+            push @files, {
+                name => $entry,
+                full_path => $full_path,
+                is_directory => -d $full_path,
+                size => $stat ? $stat->size : 0,
+                modified => $stat ? strftime("%Y-%m-%d %H:%M:%S", localtime($stat->mtime)) : 'Unknown',
+                dir_type => $dir_type
+            };
+        }
+        
+        # Sort by modification time (newest first)
+        @files = sort { 
+            my $a_stat = stat($a->{full_path});
+            my $b_stat = stat($b->{full_path});
+            ($b_stat ? $b_stat->mtime : 0) <=> ($a_stat ? $a_stat->mtime : 0)
+        } @files;
+        
+    } or do {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'scan_backup_directory', 
+            "Error scanning backup directory $backup_dir: $@");
+    };
+    
+    return \@files;
+}
+
+# Emergency restore of comserv.psgi file
+sub restore_psgi_file {
+    my ($self, $c) = @_;
+    
+    my $result = {
+        success => 0,
+        message => '',
+        output => ''
+    };
+    
+    my $app_dir = '/home/shanta/PycharmProjects/comserv2';
+    my $target_file = "$app_dir/Comserv/comserv.psgi";
+    
+    # Look for comserv.psgi in backup directories
+    my @backup_dirs = (
+        "$app_dir/Comserv/backup",
+        "$app_dir/Comserv/backups"
+    );
+    
+    my $source_file = undef;
+    
+    for my $backup_dir (@backup_dirs) {
+        next unless -d $backup_dir;
+        
+        # Look for comserv.psgi directly
+        my $psgi_backup = "$backup_dir/comserv.psgi";
+        if (-f $psgi_backup) {
+            $source_file = $psgi_backup;
+            last;
+        }
+        
+        # Look for comserv.psgi in subdirectories
+        eval {
+            opendir(my $dh, $backup_dir) or die "Cannot open directory: $!";
+            my @entries = readdir($dh);
+            closedir($dh);
+            
+            for my $entry (@entries) {
+                next if $entry =~ /^\.\.?$/;
+                my $subdir = "$backup_dir/$entry";
+                next unless -d $subdir;
+                
+                my $psgi_in_subdir = "$subdir/comserv.psgi";
+                if (-f $psgi_in_subdir) {
+                    $source_file = $psgi_in_subdir;
+                    last;
+                }
+                
+                # Also check Comserv subdirectory
+                my $psgi_in_comserv = "$subdir/Comserv/comserv.psgi";
+                if (-f $psgi_in_comserv) {
+                    $source_file = $psgi_in_comserv;
+                    last;
+                }
+            }
+        };
+        
+        last if $source_file;
+    }
+    
+    if (!$source_file) {
+        $result->{message} = "comserv.psgi not found in any backup directory";
+        $result->{output} = "Searched directories: " . join(", ", @backup_dirs);
+        $result->{error_msg} = $result->{message};
+        return $result;
+    }
+    
+    # Create backup of current file if it exists
+    if (-f $target_file) {
+        my $backup_current = "$target_file.backup." . time();
+        if (copy($target_file, $backup_current)) {
+            $result->{output} .= "Created backup of existing file: $backup_current\n";
+        }
+    }
+    
+    # Copy the backup file to target location
+    eval {
+        copy($source_file, $target_file) or die "Copy failed: $!";
+        chmod(0755, $target_file);  # Make executable
+        
+        $result->{success} = 1;
+        $result->{message} = "comserv.psgi restored successfully";
+        $result->{output} .= "Restored comserv.psgi from: $source_file\n";
+        $result->{output} .= "Target location: $target_file\n";
+        $result->{success_msg} = "comserv.psgi has been restored. Starman should now be able to accept calls.";
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restore_psgi_file', 
+            "Successfully restored comserv.psgi from $source_file to $target_file");
+            
+    } or do {
+        $result->{message} = "Failed to restore comserv.psgi: $@";
+        $result->{output} .= "Restore error: $@\n";
+        $result->{error_msg} = $result->{message};
+        
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'restore_psgi_file', 
+            "Failed to restore comserv.psgi: $@");
+    };
+    
+    return $result;
+}
+
+# Generic file restore from backup
+sub restore_file_from_backup {
+    my ($self, $c, $backup_path, $target_file) = @_;
+    
+    my $result = {
+        success => 0,
+        message => '',
+        output => ''
+    };
+    
+    return $result unless $backup_path && $target_file;
+    
+    unless (-f $backup_path) {
+        $result->{message} = "Backup file not found: $backup_path";
+        $result->{error_msg} = $result->{message};
+        return $result;
+    }
+    
+    my $app_dir = '/home/shanta/PycharmProjects/comserv2';
+    my $full_target_path = "$app_dir/$target_file";
+    
+    # Create backup of current file if it exists
+    if (-f $full_target_path) {
+        my $backup_current = "$full_target_path.backup." . time();
+        if (copy($full_target_path, $backup_current)) {
+            $result->{output} .= "Created backup of existing file: $backup_current\n";
+        }
+    }
+    
+    # Ensure target directory exists
+    my $target_dir = dirname($full_target_path);
+    unless (-d $target_dir) {
+        make_path($target_dir) or do {
+            $result->{message} = "Failed to create target directory: $target_dir";
+            $result->{error_msg} = $result->{message};
+            return $result;
+        };
+    }
+    
+    # Copy the backup file to target location
+    eval {
+        copy($backup_path, $full_target_path) or die "Copy failed: $!";
+        
+        $result->{success} = 1;
+        $result->{message} = "File restored successfully";
+        $result->{output} .= "Restored file from: $backup_path\n";
+        $result->{output} .= "Target location: $full_target_path\n";
+        $result->{success_msg} = "File '$target_file' has been restored from backup.";
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restore_file_from_backup', 
+            "Successfully restored $target_file from $backup_path");
+            
+    } or do {
+        $result->{message} = "Failed to restore file: $@";
+        $result->{output} .= "Restore error: $@\n";
+        $result->{error_msg} = $result->{message};
+        
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'restore_file_from_backup', 
+            "Failed to restore file: $@");
+    };
+    
+    return $result;
+}
+
+=head1 AUTHOR
+
+Shanta McBain
+
+=head1 LICENSE
+
+This library is free software. You can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=cut
 
 __PACKAGE__->meta->make_immutable;
+
 1;

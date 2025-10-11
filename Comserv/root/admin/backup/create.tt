@@ -1,0 +1,135 @@
+[% META title = 'Create Backup' %]
+[% PageVersion = 'admin/backup/create.tt,v 1.0 2025/01/27 comserv Exp comserv' %]
+
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+<div class="debug-info">
+  <p>Template: admin/backup/create.tt</p>
+  <p>Last Modified: [% PageVersion %]</p>
+</div>
+[% END %]
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>Create Backup</h1>
+            <p class="lead">Create a new backup of protected files or manual backup.</p>
+        </div>
+    </div>
+
+    <!-- Status Messages -->
+    [% IF success_msg %]
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <strong>Success:</strong> [% success_msg %]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    [% END %]
+
+    [% IF error_msg %]
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <strong>Error:</strong> [% error_msg %]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    [% END %]
+
+    <!-- Navigation -->
+    <div class="row mb-3">
+        <div class="col-md-12">
+            <a href="[% c.uri_for('/admin/backup') %]" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Backup Management
+            </a>
+        </div>
+    </div>
+
+    <!-- Create Backup Form -->
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Backup Options</h3>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="[% c.uri_for('/admin/backup_create') %]">
+                        <div class="mb-3">
+                            <label for="backup_type" class="form-label">Backup Type</label>
+                            <select class="form-select" id="backup_type" name="backup_type" required>
+                                <option value="manual">Manual Backup</option>
+                                <option value="protected_files">Protected Files Backup</option>
+                            </select>
+                            <div class="form-text">
+                                <strong>Manual Backup:</strong> Create a custom backup with your own description.<br>
+                                <strong>Protected Files:</strong> Backup critical system files automatically.
+                            </div>
+                        </div>
+
+                        <div class="mb-3" id="description_field">
+                            <label for="description" class="form-label">Description</label>
+                            <input type="text" class="form-control" id="description" name="description" 
+                                   placeholder="Enter backup description" maxlength="255">
+                            <div class="form-text">Optional description for this backup (max 255 characters).</div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="[% c.uri_for('/admin/backup') %]" class="btn btn-secondary me-md-2">Cancel</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-plus"></i> Create Backup
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Protected Files</h4>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">The following files are included in protected files backups:</p>
+                    <ul class="list-group list-group-flush">
+                        [% FOREACH file IN protected_files %]
+                        <li class="list-group-item">
+                            <code>[% file.path %]</code>
+                            <br><small class="text-muted">[% file.description %]</small>
+                        </li>
+                        [% END %]
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var backupTypeSelect = document.getElementById('backup_type');
+    var descriptionField = document.getElementById('description_field');
+    var descriptionInput = document.getElementById('description');
+    
+    function toggleDescriptionField() {
+        if (backupTypeSelect.value === 'protected_files') {
+            descriptionField.style.display = 'none';
+            descriptionInput.required = false;
+        } else {
+            descriptionField.style.display = 'block';
+            descriptionInput.required = true;
+        }
+    }
+    
+    backupTypeSelect.addEventListener('change', toggleDescriptionField);
+    toggleDescriptionField(); // Initial call
+});
+</script>
+
+<style>
+.debug-info {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+</style>

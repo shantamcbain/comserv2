@@ -1,0 +1,164 @@
+[% META title = 'Docker Installation Guide' %]
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="page-header">Docker Installation Guide</h1>
+            <p class="lead">Follow these instructions to install Docker on your system.</p>
+            
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="[% c.uri_for('/') %]">Home</a></li>
+                    <li class="breadcrumb-item"><a href="[% c.uri_for('/proxymanager') %]">Proxy Manager</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Docker Installation</li>
+                </ol>
+            </nav>
+            
+            [% IF docker_installed %]
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle"></i> <strong>Docker is already installed!</strong> You can now return to the Proxy Manager and continue setting up your proxies.
+                </div>
+                
+                <div class="text-center mt-4 mb-4">
+                    <a href="[% c.uri_for('/proxymanager') %]" class="btn btn-primary btn-lg">
+                        <i class="fas fa-arrow-left"></i> Return to Proxy Manager
+                    </a>
+                </div>
+            [% ELSE %]
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> <strong>Docker is not installed.</strong> Follow the instructions below to install Docker on your system.
+                </div>
+            [% END %]
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">System Information</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <tbody>
+                            <tr>
+                                <th>Operating System:</th>
+                                <td>[% os_info.name || 'Unknown' %]</td>
+                            </tr>
+                            <tr>
+                                <th>Version:</th>
+                                <td>[% os_info.version || 'Unknown' %]</td>
+                            </tr>
+                            <tr>
+                                <th>Kernel:</th>
+                                <td>[% os_info.kernel || 'Unknown' %]</td>
+                            </tr>
+                            <tr>
+                                <th>Architecture:</th>
+                                <td>[% os_info.arch || 'Unknown' %]</td>
+                            </tr>
+                            <tr>
+                                <th>Docker Status:</th>
+                                <td>
+                                    [% IF docker_installed %]
+                                        <span class="badge badge-success">Installed</span>
+                                    [% ELSE %]
+                                        <span class="badge badge-danger">Not Installed</span>
+                                    [% END %]
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">Installation Instructions</h5>
+                </div>
+                <div class="card-body">
+                    <h6>Quick Install Command</h6>
+                    <div class="bg-light p-3 mb-3 rounded">
+                        <code>[% installation_instructions | html %]</code>
+                    </div>
+                    
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i> <strong>Note:</strong> You may need to run these commands with sudo privileges.
+                    </div>
+                    
+                    <h6>Post-Installation Steps</h6>
+                    <ol>
+                        <li>Start the Docker service: <code>sudo systemctl start docker</code></li>
+                        <li>Enable Docker to start on boot: <code>sudo systemctl enable docker</code></li>
+                        <li>Add your user to the docker group (optional): <code>sudo usermod -aG docker $USER</code></li>
+                        <li>Log out and log back in for the group changes to take effect</li>
+                        <li>Verify Docker is running: <code>docker --version</code></li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">Detailed Installation Guide</h5>
+                </div>
+                <div class="card-body">
+                    <h5>Official Docker Documentation</h5>
+                    <p>For detailed installation instructions specific to your operating system, please refer to the official Docker documentation:</p>
+                    
+                    <ul>
+                        <li><a href="https://docs.docker.com/engine/install/ubuntu/" target="_blank">Ubuntu Installation Guide</a></li>
+                        <li><a href="https://docs.docker.com/engine/install/debian/" target="_blank">Debian Installation Guide</a></li>
+                        <li><a href="https://docs.docker.com/engine/install/centos/" target="_blank">CentOS Installation Guide</a></li>
+                        <li><a href="https://docs.docker.com/engine/install/fedora/" target="_blank">Fedora Installation Guide</a></li>
+                        <li><a href="https://docs.docker.com/engine/install/rhel/" target="_blank">RHEL Installation Guide</a></li>
+                        <li><a href="https://docs.docker.com/desktop/install/mac-install/" target="_blank">macOS Installation Guide</a></li>
+                        <li><a href="https://docs.docker.com/desktop/install/windows-install/" target="_blank">Windows Installation Guide</a></li>
+                    </ul>
+                    
+                    <h5>Installing Docker Compose</h5>
+                    <p>After installing Docker, you'll also need Docker Compose to run multi-container applications like Nginx Proxy Manager:</p>
+                    
+                    <div class="bg-light p-3 mb-3 rounded">
+                        <code>sudo apt-get install -y docker-compose</code>
+                    </div>
+                    
+                    <p>Or install the latest version using pip:</p>
+                    
+                    <div class="bg-light p-3 mb-3 rounded">
+                        <code>pip install docker-compose</code>
+                    </div>
+                    
+                    <h5>Troubleshooting</h5>
+                    <p>If you encounter issues during installation, check the following:</p>
+                    
+                    <ul>
+                        <li>Ensure your system meets the <a href="https://docs.docker.com/engine/install/#prerequisites" target="_blank">prerequisites</a> for Docker installation</li>
+                        <li>Check if your user has sufficient permissions</li>
+                        <li>Verify that the Docker daemon is running: <code>sudo systemctl status docker</code></li>
+                        <li>Check Docker logs for errors: <code>sudo journalctl -u docker</code></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4 mb-4">
+        <div class="col-12 text-center">
+            <a href="[% c.uri_for('/proxymanager') %]" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Proxy Manager
+            </a>
+            
+            [% IF !docker_installed %]
+                <a href="[% c.uri_for('/proxymanager/install_docker') %]" class="btn btn-primary ml-2">
+                    <i class="fas fa-sync"></i> Check Installation Status
+                </a>
+            [% END %]
+        </div>
+    </div>
+</div>

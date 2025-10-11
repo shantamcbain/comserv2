@@ -1,0 +1,125 @@
+[% META title = 'Changelog' %]
+[% PageVersion = 'Documentation/changelog/CHANGELOG.tt,v 1.01 2025/01/21 system Exp system ' %]
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+
+<h1>Changelog</h1>
+
+<h2>[2025-01-21] - Documentation System Overhaul</h2>
+
+<h3>Major Enhancement</h3>
+<ul>
+<li><strong>Documentation System Overhaul</strong> - Complete transformation from config-based to file scanning system
+  <ul>
+  <li><strong>Accessibility Improvement</strong>: Increased accessible documentation from 45 to 270+ files</li>
+  <li><strong>Dynamic Discovery</strong>: Automatic detection of all documentation files without config updates</li>
+  <li><strong>Proper Logging Integration</strong>: Fixed logging system to use centralized logging utility</li>
+  <li><strong>Enhanced Categorization</strong>: Intelligent categorization based on directory structure</li>
+  <li><strong>Zero Maintenance</strong>: New documentation files automatically discovered and categorized</li>
+  <li><strong>Error Elimination</strong>: Resolved "Failed to open file" errors from missing config entries</li>
+  </ul>
+</li>
+</ul>
+
+<h2>[2025-01-20] - Admin Authentication System Refactor</h2>
+
+<h3>Major Enhancement</h3>
+<ul>
+<li><strong><a href="/Documentation/changelog/2025-01-20-admin-authentication-refactor">Admin Authentication System Refactor</a></strong> - Complete overhaul of admin authentication with centralized AdminAuth utility and dedicated Git controller
+  <ul>
+  <li>Fixed CSC admin access issues</li>
+  <li>Created centralized authentication utility</li>
+  <li>Separated Git operations into dedicated controller</li>
+  <li>Enhanced branch selection and file protection</li>
+  <li>Improved code maintainability and consistency</li>
+  </ul>
+</li>
+</ul>
+
+<h2>[Unreleased] - Bug Fix Update</h2>
+
+<h3>Fixed</h3>
+
+<h4>Proxmox Module</h4>
+<ul>
+<li>Fixed duplicate method declarations in the Proxmox model that were causing unexpected behavior</li>
+<li>Corrected indentation errors in the <code>_get_real_vms_new</code> method</li>
+<li>Added missing <code>token</code> attribute for backward compatibility</li>
+<li>Improved token handling consistency across methods</li>
+</ul>
+
+<h4>Admin Controller</h4>
+<ul>
+<li>Fixed undeclared <code>$output</code> variable in the <code>add_schema</code> method</li>
+<li>Resolved duplicate <code>edit_documentation</code> method definition</li>
+<li>Added proper import for Fcntl constants (O_WRONLY, O_APPEND, O_CREAT)</li>
+<li>Enhanced debug logging in the <code>edit_documentation</code> method</li>
+</ul>
+
+<h4>Dependency Management</h4>
+<ul>
+<li>Identified issue with <code>Net::CIDR</code> module not being automatically installed despite being listed in cpanfile</li>
+<li>Manual installation was required to resolve "Can't locate Net/CIDR.pm" error</li>
+<li><strong>TODO</strong>: Fix cpanfile dependency resolution in a future update</li>
+</ul>
+
+<h3>Added</h3>
+<ul>
+<li>Added comprehensive documentation for bug fixes</li>
+<li>Created technical documentation for developers</li>
+<li>Added this changelog to track future changes</li>
+</ul>
+
+<h3>Changed</h3>
+<ul>
+<li>Updated the <code>edit_documentation</code> method to include debug messages in the stash</li>
+<li>Improved error handling in the <code>add_schema</code> method</li>
+</ul>
+
+<h2>How to Verify the Fixes</h2>
+
+<ol>
+<li><strong>Proxmox Integration</strong>:
+   <ul>
+   <li>Log in to the admin interface</li>
+   <li>Navigate to any Proxmox-related functionality</li>
+   <li>Verify that VM listings and operations work correctly</li>
+   </ul>
+</li>
+
+<li><strong>Schema Management</strong>:
+   <ul>
+   <li>Go to the schema management page</li>
+   <li>Try to add a new schema</li>
+   <li>Verify that success/error messages are displayed correctly</li>
+   </ul>
+</li>
+
+<li><strong>Documentation Editing</strong>:
+   <ul>
+   <li>Navigate to the documentation editing page at <code>/admin/edit_documentation</code></li>
+   <li>Verify that the page loads correctly</li>
+   <li>Check that any changes can be saved properly</li>
+   </ul>
+</li>
+
+<li><strong>Log Rotation</strong>:
+   <ul>
+   <li>Access the log viewing page</li>
+   <li>Try rotating the logs</li>
+   <li>Verify that the operation completes without errors</li>
+   </ul>
+</li>
+</ol>
+
+<h2>Notes for Administrators</h2>
+
+<p>These fixes address several issues that were causing errors in the application logs. No database changes or configuration changes are required. Simply deploy the updated code to your server.</p>
+
+<p>If you encounter any issues after deploying these fixes, please check the application logs for any new error messages and report them to the development team.</p>
+
+[% END %]

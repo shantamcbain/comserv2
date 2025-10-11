@@ -1,0 +1,284 @@
+[% META title = 'Git Branch Management' %]
+[% PageVersion = 'admin/branch_management.tt,v 0.01 2025/01/27 shanta Exp shanta' %]
+
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<!-- Quick Navigation -->
+<div class="quick-nav">
+    <a href="[% c.uri_for('/admin') %]" class="btn btn-sm btn-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Admin Dashboard
+    </a>
+    <a href="[% c.uri_for('/admin/git_pull') %]" class="btn btn-sm btn-info">
+        <i class="fas fa-download"></i> Git Pull
+    </a>
+</div>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1><i class="fas fa-code-branch"></i> Git Branch Management</h1>
+            
+            [% IF debug_msg || c.session.debug_mode == 1 %]
+                <div class="alert alert-info">
+                    <strong>Debug Information:</strong>
+                    [% IF debug_msg %]
+                        [% FOREACH msg IN debug_msg %]
+                            <p>[% msg %]</p>
+                        [% END %]
+                    [% END %]
+                </div>
+            [% END %]
+            
+            [% IF error_msg %]
+                <div class="alert alert-danger">
+                    <strong>Error:</strong> [% error_msg %]
+                </div>
+            [% END %]
+            
+            [% IF success_msg %]
+                <div class="alert alert-success">
+                    <strong>Success:</strong> [% success_msg %]
+                </div>
+            [% END %]
+            
+            [% IF output %]
+                <div class="card mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h3 class="mb-0">Git Command Output</h3>
+                    </div>
+                    <div class="card-body">
+                        <pre class="git-output">[% output | html %]</pre>
+                    </div>
+                </div>
+            [% END %]
+            
+            <!-- Current Branch Status -->
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h3 class="mb-0"><i class="fas fa-info-circle"></i> Current Branch Status</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h5>Current Branch:</h5>
+                                    <span class="badge badge-success badge-lg">[% current_branch || 'Unknown' %]</span>
+                                </div>
+                                <div class="col-md-6">
+                                    <h5>Available Remote Branches:</h5>
+                                    <p class="text-muted">[% available_branches.size || 0 %] branches available</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Branch Operations -->
+            <div class="row">
+                <!-- Switch Branch -->
+                <div class="col-md-4 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header bg-info text-white">
+                            <h4 class="mb-0"><i class="fas fa-exchange-alt"></i> Switch Branch</h4>
+                        </div>
+                        <div class="card-body">
+                            <p>Switch to a different branch. This will stash any uncommitted changes.</p>
+                            <form method="POST" action="[% c.uri_for('/admin/branch_management') %]">
+                                <input type="hidden" name="action" value="switch_branch">
+                                <div class="form-group">
+                                    <label for="switch_branch_name">Select Branch:</label>
+                                    <select name="branch_name" id="switch_branch_name" class="form-control" required>
+                                        <option value="">-- Select Branch --</option>
+                                        [% FOREACH branch IN available_branches %]
+                                            [% UNLESS branch == current_branch %]
+                                                <option value="[% branch %]">[% branch %]</option>
+                                            [% END %]
+                                        [% END %]
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-info btn-block" onclick="return confirm('Are you sure you want to switch branches? Any uncommitted changes will be stashed.')">
+                                    <i class="fas fa-exchange-alt"></i> Switch Branch
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Create Branch -->
+                <div class="col-md-4 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header bg-success text-white">
+                            <h4 class="mb-0"><i class="fas fa-plus"></i> Create Branch</h4>
+                        </div>
+                        <div class="card-body">
+                            <p>Create a new branch from an existing branch.</p>
+                            <form method="POST" action="[% c.uri_for('/admin/branch_management') %]">
+                                <input type="hidden" name="action" value="create_branch">
+                                <div class="form-group">
+                                    <label for="new_branch_name">New Branch Name:</label>
+                                    <input type="text" name="branch_name" id="new_branch_name" class="form-control" 
+                                           placeholder="feature/new-feature" pattern="[a-zA-Z0-9_\-\/]+" required>
+                                    <small class="form-text text-muted">Use letters, numbers, underscores, hyphens, and forward slashes only.</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="source_branch">Source Branch:</label>
+                                    <select name="source_branch" id="source_branch" class="form-control">
+                                        [% FOREACH branch IN available_branches %]
+                                            <option value="[% branch %]" [% IF branch == 'main' %]selected[% END %]>[% branch %]</option>
+                                        [% END %]
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-success btn-block" onclick="return confirm('Are you sure you want to create this new branch?')">
+                                    <i class="fas fa-plus"></i> Create Branch
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Delete Branch -->
+                <div class="col-md-4 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header bg-danger text-white">
+                            <h4 class="mb-0"><i class="fas fa-trash"></i> Delete Branch</h4>
+                        </div>
+                        <div class="card-body">
+                            <p>Delete a branch (both local and remote). <strong>This action cannot be undone!</strong></p>
+                            <form method="POST" action="[% c.uri_for('/admin/branch_management') %]">
+                                <input type="hidden" name="action" value="delete_branch">
+                                <div class="form-group">
+                                    <label for="delete_branch_name">Select Branch to Delete:</label>
+                                    <select name="branch_name" id="delete_branch_name" class="form-control" required>
+                                        <option value="">-- Select Branch --</option>
+                                        [% FOREACH branch IN available_branches %]
+                                            [% UNLESS branch == current_branch || branch == 'main' || branch == 'Production' %]
+                                                <option value="[% branch %]">[% branch %]</option>
+                                            [% END %]
+                                        [% END %]
+                                    </select>
+                                    <small class="form-text text-muted">Protected branches (main, Production, current) cannot be deleted.</small>
+                                </div>
+                                <button type="submit" class="btn btn-danger btn-block" onclick="return confirm('Are you ABSOLUTELY SURE you want to delete this branch? This action cannot be undone and will delete both local and remote branches!')">
+                                    <i class="fas fa-trash"></i> Delete Branch
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Branch List -->
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header bg-secondary text-white">
+                            <h3 class="mb-0"><i class="fas fa-list"></i> All Available Branches</h3>
+                        </div>
+                        <div class="card-body">
+                            [% IF available_branches && available_branches.size > 0 %]
+                                <div class="row">
+                                    [% FOREACH branch IN available_branches %]
+                                        <div class="col-md-3 mb-2">
+                                            <span class="badge [% IF branch == current_branch %]badge-success[% ELSE %]badge-secondary[% END %] badge-lg">
+                                                [% IF branch == current_branch %]<i class="fas fa-check"></i> [% END %]
+                                                [% branch %]
+                                            </span>
+                                        </div>
+                                    [% END %]
+                                </div>
+                                <hr>
+                                <p class="text-muted">
+                                    <small>
+                                        <i class="fas fa-info-circle"></i> 
+                                        Total: [% available_branches.size %] branches | 
+                                        Current: <strong>[% current_branch %]</strong> | 
+                                        Excluded: master, master2 (as requested)
+                                    </small>
+                                </p>
+                            [% ELSE %]
+                                <div class="alert alert-warning">
+                                    <i class="fas fa-exclamation-triangle"></i> No branches found. This might indicate a Git configuration issue.
+                                </div>
+                            [% END %]
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Quick Actions -->
+            <div class="row mt-4">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header bg-dark text-white">
+                            <h3 class="mb-0"><i class="fas fa-bolt"></i> Quick Actions</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="btn-group" role="group">
+                                <a href="[% c.uri_for('/admin/git_pull') %]" class="btn btn-primary">
+                                    <i class="fas fa-download"></i> Git Pull
+                                </a>
+                                <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">
+                                    <i class="fas fa-tachometer-alt"></i> Admin Dashboard
+                                </a>
+                                <button type="button" class="btn btn-info" onclick="location.reload()">
+                                    <i class="fas fa-sync"></i> Refresh Branch List
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .git-output {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 4px;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        max-height: 400px;
+        overflow-y: auto;
+        font-family: monospace;
+        margin: 0;
+    }
+    .quick-nav {
+        margin-bottom: 15px;
+        padding: 10px 0;
+        border-bottom: 1px solid #eee;
+    }
+    .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+        line-height: 1.5;
+        border-radius: 0.2rem;
+    }
+    .badge-lg {
+        font-size: 0.9em;
+        padding: 0.5em 0.75em;
+        margin: 0.2em;
+    }
+    .card {
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        border: 1px solid rgba(0, 0, 0, 0.125);
+    }
+    .card-header {
+        border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+    }
+    .form-group {
+        margin-bottom: 1rem;
+    }
+    .btn-block {
+        display: block;
+        width: 100%;
+    }
+    .h-100 {
+        height: 100% !important;
+    }
+</style>

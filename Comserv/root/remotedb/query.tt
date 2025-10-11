@@ -1,0 +1,76 @@
+[% META title = 'Run Query on ' _ conn_name %]
+
+<div class="container">
+    <h1>Run SQL Query</h1>
+    <h3>Database: [% conn_name %]</h3>
+    
+    [% IF error_msg %]
+    <div class="alert alert-danger">
+        [% error_msg %]
+    </div>
+    [% END %]
+    
+    <div class="mb-3">
+        <a href="[% c.uri_for(c.controller('RemoteDB').action_for('view'), [conn_name]) %]" class="btn btn-secondary">
+            Back to Tables
+        </a>
+    </div>
+    
+    <div class="card mb-4">
+        <div class="card-header">
+            <h2>SQL Query</h2>
+        </div>
+        <div class="card-body">
+            <form method="post" action="[% c.uri_for(c.controller('RemoteDB').action_for('query'), [conn_name]) %]">
+                <div class="form-group">
+                    <textarea class="form-control" name="query" rows="5" placeholder="Enter your SQL query here...">[% c.req.param('query') %]</textarea>
+                </div>
+                <div class="form-group mt-3">
+                    <button type="submit" class="btn btn-primary">Execute Query</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    [% IF query_result %]
+        <div class="card">
+            <div class="card-header">
+                <h2>Query Results</h2>
+            </div>
+            <div class="card-body">
+                [% IF result_type == 'select' %]
+                    [% IF query_result.size > 0 %]
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        [% FOREACH key IN query_result.0.keys.sort %]
+                                            <th>[% key %]</th>
+                                        [% END %]
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    [% FOREACH row IN query_result %]
+                                        <tr>
+                                            [% FOREACH key IN row.keys.sort %]
+                                                <td>[% row.$key %]</td>
+                                            [% END %]
+                                        </tr>
+                                    [% END %]
+                                </tbody>
+                            </table>
+                        </div>
+                    [% ELSE %]
+                        <div class="alert alert-info">
+                            Query executed successfully, but returned no results.
+                        </div>
+                    [% END %]
+                [% ELSIF result_type == 'update' %]
+                    <div class="alert alert-success">
+                        Query executed successfully. [% query_result.rows_affected %] row(s) affected.
+                    </div>
+                [% END %]
+            </div>
+        </div>
+    [% END %]
+</div>

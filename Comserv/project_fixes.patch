@@ -1,0 +1,51 @@
+diff --git a/lib/Comserv/Controller/Project.pm b/lib/Comserv/Controller/Project.pm
+index a123456..b123456 100644
+--- a/lib/Comserv/Controller/Project.pm
++++ b/lib/Comserv/Controller/Project.pm
+@@ -95,7 +95,6 @@ sub create_project :Path('create_project') :Args(0) {
+     my $date_time_posted = DateTime->now;
+-    my $record_id = $parent_id || 0;
+
+     my $project = eval {
+         $project_rs->create({
+@@ -118,18 +117,21 @@ sub create_project :Path('create_project') :Args(0) {
+         });
+     };
+     if ($@) {
++        # Extract specific error message
++        my $error_msg = $@;
++        $error_msg =~ s/\s+at\s+.*//s;
++
+         # Log the error
+         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_project',
+-            "Error creating project: $@\nForm data: " . Dumper($form_data));
++            "Error creating project: $error_msg\nForm data: " . Dumper($form_data));
+
+         # Get fresh lists for the form
+         my $site_controller = $c->controller('Site');
+         my $sites = $site_controller->fetch_available_sites($c);
+         my $projects = $self->fetch_projects_with_subprojects($c);
+
+-        # Ensure the correct template is set for error handling
+         $c->stash(
+-            form_data => $form_data,
++            form_data => { %$form_data, selected_parent => $parent_id },
+             sites => $sites,
+             projects => $projects,
+-            error_message => 'There was an error creating the project. Please check all fields and try again.',
++            error_message => "Failed to create project: $error_msg",
+             template => 'todo/add_project.tt'
+         );
+diff --git a/root/todo/add_project.tt b/root/todo/add_project.tt
+index c123456..d123456 100644
+--- a/root/todo/add_project.tt
++++ b/root/todo/add_project.tt
+@@ -15,7 +15,7 @@
+     <select name="parent_id" id="parent_id">
+         <option value="">Select Parent Project</option>
+         [% FOREACH proj IN projects %]
+-            <option value="[% proj.id %]">[% proj.name %]</option>
++            <option value="[% proj.id %]" [% IF form_data.selected_parent == proj.id %]selected="selected"[% END %]>[% proj.name %]</option>
+         [% END %]
+     </select>
+ </div>

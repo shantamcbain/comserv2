@@ -1,0 +1,167 @@
+[% PageVersion = 'Documentation/architecture.tt,v 0.01 2024/05/30 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="documentation-page">
+    <h1>System Architecture</h1>
+    
+    <div class="section">
+        <h2>Overview</h2>
+        <p>
+            The Comserv system is built on the Catalyst framework and follows the Model-View-Controller (MVC) 
+            architectural pattern. This document provides a detailed explanation of the system architecture,
+            component interactions, and design principles.
+        </p>
+    </div>
+    
+    <div class="section">
+        <h2>Architectural Layers</h2>
+        <p>The system is organized into the following architectural layers:</p>
+        
+        <h3>Presentation Layer</h3>
+        <p>
+            The presentation layer handles the user interface and is primarily implemented using:
+        </p>
+        <ul>
+            <li><strong>Template Toolkit</strong> - For rendering HTML templates</li>
+            <li><strong>CSS</strong> - For styling and theming</li>
+            <li><strong>JavaScript</strong> - For client-side interactivity</li>
+        </ul>
+        
+        <h3>Application Layer</h3>
+        <p>
+            The application layer contains the business logic and is implemented using:
+        </p>
+        <ul>
+            <li><strong>Catalyst Controllers</strong> - Handle user requests and coordinate responses</li>
+            <li><strong>Service Classes</strong> - Implement business logic and domain rules</li>
+            <li><strong>Utility Classes</strong> - Provide common functionality across the application</li>
+        </ul>
+        
+        <h3>Data Access Layer</h3>
+        <p>
+            The data access layer manages database interactions and is implemented using:
+        </p>
+        <ul>
+            <li><strong>Catalyst Models</strong> - Represent data entities and relationships</li>
+            <li><strong>DBIx::Class</strong> - Object-Relational Mapping (ORM) for database access</li>
+            <li><strong>Schema Classes</strong> - Define database structure and relationships</li>
+        </ul>
+    </div>
+    
+    <div class="section">
+        <h2>Component Interactions</h2>
+        <p>
+            The components in the Comserv system interact as follows:
+        </p>
+        <ol>
+            <li>User requests are received by the web server and passed to Catalyst</li>
+            <li>Catalyst routes the request to the appropriate controller action</li>
+            <li>The controller processes the request, interacting with models as needed</li>
+            <li>Models retrieve or update data in the database</li>
+            <li>The controller prepares data for the view and selects a template</li>
+            <li>The view renders the template with the provided data</li>
+            <li>The response is sent back to the user</li>
+        </ol>
+    </div>
+    
+    <div class="section">
+        <h2>Key Subsystems</h2>
+        
+        <h3>Authentication and Authorization</h3>
+        <p>
+            The authentication system verifies user identities and controls access to resources
+            based on user roles and permissions.
+        </p>
+        
+        <h3>Theme System</h3>
+        <p>
+            The theme system allows customization of the application's appearance through
+            configurable themes, layouts, and style sheets.
+        </p>
+        
+        <h3>Documentation System</h3>
+        <p>
+            The documentation system provides comprehensive information about the application,
+            including user guides, technical documentation, and API references.
+        </p>
+        
+        <h3>Schema Management</h3>
+        <p>
+            The schema management system allows administrators to create, compare, and migrate
+            database schemas through a web interface.
+        </p>
+    </div>
+    
+    <div class="section">
+        <h2>Directory Structure</h2>
+        <p>The main directories in the Comserv system include:</p>
+        <ul>
+            <li><strong>/lib</strong> - Contains Perl modules and application code</li>
+            <li><strong>/root</strong> - Contains templates, static files, and documentation</li>
+            <li><strong>/script</strong> - Contains utility scripts and tools</li>
+            <li><strong>/t</strong> - Contains test files</li>
+        </ul>
+    </div>
+    
+    <div class="section">
+        <h2>Related Documentation</h2>
+        <ul>
+            <li><a href="[% c.uri_for('/Documentation/system_overview') %]">System Overview</a></li>
+            <li><a href="[% c.uri_for('/Documentation/theme_system') %]">Theme System</a></li>
+            <li><a href="[% c.uri_for('/Documentation/admin') %]">Admin Module</a></li>
+        </ul>
+    </div>
+</div>
+
+<style>
+    .documentation-page {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+    }
+    
+    .section {
+        margin-bottom: 30px;
+    }
+    
+    h1 {
+        color: #333;
+        border-bottom: 2px solid #eee;
+        padding-bottom: 10px;
+    }
+    
+    h2 {
+        color: #0066cc;
+        margin-top: 20px;
+    }
+    
+    h3 {
+        color: #333;
+        margin-top: 15px;
+    }
+    
+    ul, ol {
+        padding-left: 25px;
+    }
+    
+    li {
+        margin-bottom: 8px;
+    }
+    
+    strong {
+        color: #333;
+    }
+    
+    a {
+        color: #0066cc;
+        text-decoration: none;
+    }
+    
+    a:hover {
+        text-decoration: underline;
+    }
+</style>

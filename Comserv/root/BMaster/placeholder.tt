@@ -1,0 +1,21 @@
+[% META title = title || 'Under Development' %]
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>[% title %]</h1>
+            <div class="alert alert-info">
+                <strong>Note:</strong> [% message %]
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3>Return to BMaster Home</h3>
+                </div>
+                <div class="card-body">
+                    <a href="/BMaster" class="btn btn-primary">Back to BMaster Home</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

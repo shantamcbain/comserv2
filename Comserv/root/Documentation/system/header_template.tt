@@ -1,0 +1,184 @@
+[% META title = 'Header Template Documentation' %]
+[% PageVersion = 'system/header_template.tt,v 0.01 2025/09/15 shanta Exp shanta ' %]
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+
+<h1>Header Template Documentation</h1>
+
+<h2>Overview</h2>
+
+<p>The Header.tt template provides the HTML head section for all pages in the Comserv application. It includes meta tags, CSS stylesheets, JavaScript dependencies, and theme management functionality.</p>
+
+<h2>Location</h2>
+
+<p><strong>File:</strong> <code>Comserv/root/Header.tt</code></p>
+<p><strong>Type:</strong> Template Toolkit include file</p>
+<p><strong>Usage:</strong> Included in page templates via <code>[% INCLUDE 'Header.tt' %]</code></p>
+
+<h2>Key Features</h2>
+
+<h3>1. Meta Tags and SEO</h3>
+<ul>
+<li>Character encoding (UTF-8)</li>
+<li>Viewport configuration for responsive design</li>
+<li>SEO meta tags (keywords, description, robots)</li>
+<li>Dynamic title generation based on site and page context</li>
+</ul>
+
+<h3>2. Theme System Integration</h3>
+<ul>
+<li>JSON-based theme system with fallback logic</li>
+<li>Site-specific theme selection</li>
+<li>Session-based theme preferences</li>
+<li>Dynamic CSS loading based on selected theme</li>
+<li>Theme class application to body element</li>
+</ul>
+
+<h3>3. CSS Architecture</h3>
+<ul>
+<li>Base CSS with CSS variables</li>
+<li>Theme-specific stylesheets</li>
+<li>Component-specific CSS (ApiCredentials, todo)</li>
+<li>Icon system with SVG support</li>
+<li>Menu theming integration</li>
+</ul>
+
+<h3>4. JavaScript Dependencies</h3>
+<ul>
+<li>jQuery 3.5.1 for AJAX functionality</li>
+<li>Custom menu and sub-menu JavaScript</li>
+<li>Page switching utility function</li>
+</ul>
+
+<h2>Theme Selection Logic</h2>
+
+<p>The template implements a sophisticated theme selection system:</p>
+
+<pre>
+1. Site-specific session theme (theme_[sitename])
+2. Stash theme_name
+3. Session theme_name
+4. Site model theme property
+5. Default theme fallback
+</pre>
+
+<h2>Debug Mode Features</h2>
+
+<p>When debug mode is enabled (<code>c.session.debug_mode == 1</code>):</p>
+<ul>
+<li>Displays PageVersion information</li>
+<li>Shows HostName warnings if undefined</li>
+<li>Logs theme selection details</li>
+<li>Displays site name information</li>
+<li>Shows removed CSS reference comments</li>
+</ul>
+
+<h2>Dynamic Title Generation</h2>
+
+<p>Page titles follow the format:</p>
+<pre>[% HostName _ ': ' _ ScriptDisplayName _ ': ' _ page_title %]</pre>
+
+<p>With automatic HostName detection if not defined:</p>
+<pre>[% HostName = "http://" _ c.req.uri.host %]</pre>
+
+<h2>Site-Specific Features</h2>
+
+<h3>CSC Site Integration</h3>
+<p>Special handling for CSC site with WHMCS interface embedding:</p>
+<pre>[% IF SiteName == "CSC" %]
+    [% embed('CSCWHMCSInterface') %]
+[% END %]</pre>
+
+<h2>Component-Specific CSS Loading</h2>
+
+<p>Conditional CSS loading based on template path:</p>
+<ul>
+<li><strong>ApiCredentials:</strong> <code>/static/css/themes/api_credentials.css</code></li>
+<li><strong>Todo System:</strong> <code>/static/css/todo.css</code></li>
+</ul>
+
+<h2>Version History</h2>
+
+<ul>
+<li><strong>v0.01 (2023/08/30):</strong> Initial header template with theme system</li>
+<li><strong>Current:</strong> Enhanced with JSON-based theme system and debug features</li>
+</ul>
+
+<h2>Dependencies</h2>
+
+<h3>CSS Files</h3>
+<ul>
+<li><code>/static/css/base.css</code> - Base styles with CSS variables</li>
+<li><code>/static/css/themes/[theme_name].css</code> - Theme-specific styles</li>
+<li><code>/static/css/theme-overrides.css</code> - Theme override styles</li>
+<li><code>/static/css/menu-theme.css</code> - Menu theming</li>
+<li><code>/static/css/svg-icons.css</code> - SVG icon system</li>
+<li><code>/static/css/icon-fix.css</code> - Icon theme color fixes</li>
+</ul>
+
+<h3>JavaScript Files</h3>
+<ul>
+<li><code>https://code.jquery.com/jquery-3.5.1.min.js</code> - jQuery library</li>
+<li><code>/static/js/sub-menu.js</code> - Sub-menu functionality</li>
+<li><code>/static/js/menu.js</code> - Main menu functionality</li>
+</ul>
+
+<h2>Usage Examples</h2>
+
+<h3>Basic Template Inclusion</h3>
+<pre>
+[% INCLUDE 'Header.tt' %]
+&lt;body&gt;
+    &lt;!-- Page content --&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre>
+
+<h3>With Custom Page Title</h3>
+<pre>
+[% page_title = 'Custom Page Title' %]
+[% INCLUDE 'Header.tt' %]
+</pre>
+
+<h3>With Custom Keywords and Description</h3>
+<pre>
+[% keywords = 'custom, keywords, here' %]
+[% description = 'Custom page description' %]
+[% INCLUDE 'Header.tt' %]
+</pre>
+
+<h2>Troubleshooting</h2>
+
+<h3>Theme Not Loading</h3>
+<ul>
+<li>Check theme_name variable in stash or session</li>
+<li>Verify theme CSS file exists in <code>/static/css/themes/</code></li>
+<li>Enable debug mode to see theme selection logic</li>
+</ul>
+
+<h3>Missing Styles</h3>
+<ul>
+<li>Ensure base.css is loading properly</li>
+<li>Check theme-overrides.css for conflicts</li>
+<li>Verify component-specific CSS conditions</li>
+</ul>
+
+<h3>JavaScript Errors</h3>
+<ul>
+<li>Check jQuery loading from CDN</li>
+<li>Verify local JavaScript files exist</li>
+<li>Check browser console for specific errors</li>
+</ul>
+
+<h2>Related Documentation</h2>
+
+<ul>
+<li><a href="../system/backup_and_update_system_overview.tt">System Overview</a> - Complete system architecture</li>
+<li><a href="../general/logging_best_practices.tt">Logging Best Practices</a> - Debug mode implementation</li>
+</ul>
+
+[% END %]

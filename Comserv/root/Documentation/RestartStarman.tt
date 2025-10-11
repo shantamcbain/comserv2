@@ -1,0 +1,148 @@
+[% META title = 'Restart Starman Server Documentation' %]
+[% PageVersion = 'Documentation/RestartStarman.tt,v 0.01 2025/09/10 Shanta Exp shanta ' %]
+
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<h1 id="restart-starman-top">Restart Starman Server</h1>
+
+<nav>
+    <a href="#overview">1. Overview</a> |
+    <a href="#usage">2. Usage</a> |
+    <a href="#security">3. Security</a> |
+    <a href="#troubleshooting">4. Troubleshooting</a> |
+    <a href="#workflow">5. Workflow</a>
+</nav>
+
+<!-- SECTION 1: OVERVIEW -->
+<h2 id="overview">1. Overview</h2>
+
+<p>The Restart Starman Server feature allows administrators to restart the Starman application server directly from the web interface. This is particularly useful after pulling new code from the Git repository or when troubleshooting application issues.</p>
+
+<p>Starman is a high-performance PSGI/Plack web server that runs our Catalyst application. Occasionally, it needs to be restarted to apply code changes or configuration updates.</p>
+
+<!-- SECTION 2: USAGE -->
+<h2 id="usage">2. Usage</h2>
+
+<p>To restart the Starman server:</p>
+
+<ol>
+    <li>Log in with an account that has the 'admin' role</li>
+    <li>Navigate to the Admin Dashboard</li>
+    <li>Under System Management, click on "Restart Starman Server"</li>
+    <li>Review the warning about service interruption</li>
+    <li>Click "Yes, Restart Starman Server" to confirm</li>
+    <li>Wait for the restart process to complete</li>
+    <li>Review the command output and service status</li>
+</ol>
+
+<div class="alert alert-warning">
+    <strong>Warning:</strong> Restarting the Starman server will temporarily interrupt service to all users. The application will be unavailable for a few seconds during the restart process.
+</div>
+
+<!-- SECTION 3: SECURITY -->
+<h2 id="security">3. Security</h2>
+
+<p>The Restart Starman feature includes several security measures:</p>
+
+<ul>
+    <li><strong>Role-based access control:</strong> Only users with the 'admin' role in their session can access this feature</li>
+    <li><strong>Confirmation page:</strong> A confirmation step prevents accidental restarts</li>
+    <li><strong>Detailed logging:</strong> All restart attempts are logged with user information for accountability</li>
+    <li><strong>Sudo configuration:</strong> The web server user must have sudo privileges specifically for the systemctl restart starman command</li>
+</ul>
+
+<p>To configure sudo properly, add the following to your sudoers file (using visudo):</p>
+
+<pre>
+www-data ALL=(ALL) NOPASSWD: /bin/systemctl restart starman
+www-data ALL=(ALL) NOPASSWD: /bin/systemctl status starman
+</pre>
+
+<p>Replace www-data with the user your web server runs as (e.g., apache, nginx, etc.).</p>
+
+<!-- SECTION 4: TROUBLESHOOTING -->
+<h2 id="troubleshooting">4. Troubleshooting</h2>
+
+<p>If you encounter issues with the Restart Starman feature:</p>
+
+<ul>
+    <li><strong>Permission denied errors:</strong> Check that the web server user has the necessary sudo privileges</li>
+    <li><strong>Command not found:</strong> Ensure that systemctl is in the PATH for the web server user</li>
+    <li><strong>Service not found:</strong> Verify that the Starman service is properly installed and named 'starman'</li>
+    <li><strong>Timeout errors:</strong> If the restart takes too long, the web request might time out. Check the server logs for the actual status</li>
+</ul>
+
+<p>For more detailed troubleshooting, check the application logs at:</p>
+<pre>/home/shanta/PycharmProjects/comserv2/Comserv/logs/application.log</pre>
+
+<!-- SECTION 5: WORKFLOW -->
+<h2 id="workflow">5. Workflow</h2>
+
+<p>The typical workflow for updating the application is:</p>
+
+<ol>
+    <li>Use the Git Pull feature to update the codebase:
+        <ul>
+            <li>Navigate to Admin Dashboard → System Management → Pull from Git Repository</li>
+            <li>Confirm and execute the git pull</li>
+            <li>Review the output to ensure the update was successful</li>
+        </ul>
+    </li>
+    <li>Use the Restart Starman Server feature to apply the changes:
+        <ul>
+            <li>Navigate to Admin Dashboard → System Management → Restart Starman Server</li>
+            <li>Confirm and execute the restart</li>
+            <li>Verify that the service is active after restart</li>
+        </ul>
+    </li>
+    <li>Check the application logs for any errors:
+        <ul>
+            <li>Navigate to Admin Dashboard → System Management → View Application Log</li>
+            <li>Look for any errors that might have occurred after the restart</li>
+        </ul>
+    </li>
+</ol>
+
+<p>This workflow ensures that code updates are properly applied and that the application is running correctly after changes.</p>
+
+<div class="alert alert-info">
+    <strong>Tip:</strong> It's a good practice to perform these operations during low-traffic periods to minimize disruption to users.
+</div>
+
+<style>
+    nav {
+        margin: 20px 0;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 5px;
+    }
+    h2 {
+        margin-top: 30px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #eee;
+    }
+    .alert {
+        padding: 15px;
+        margin-bottom: 20px;
+        border: 1px solid transparent;
+        border-radius: 4px;
+    }
+    .alert-warning {
+        color: #8a6d3b;
+        background-color: #fcf8e3;
+        border-color: #faebcc;
+    }
+    .alert-info {
+        color: #31708f;
+        background-color: #d9edf7;
+        border-color: #bce8f1;
+    }
+    pre {
+        background-color: #f5f5f5;
+        padding: 10px;
+        border-radius: 4px;
+        overflow-x: auto;
+    }
+</style>

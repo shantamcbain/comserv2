@@ -1,0 +1,32 @@
+[% WRAPPER 'layout.tt' %]
+<div class="container">
+    <h1>Proxy Manager</h1>
+
+    [% IF proxies.size %]
+    <table class="table">
+        <thead>
+        <tr>
+            <th>Domain</th>
+            <th>Backend</th>
+            <th>SSL</th>
+        </tr>
+        </thead>
+        <tbody>
+            [% FOREACH proxy IN proxies %]
+            <tr>
+                <td>[% proxy.domain_names.join(', ') %]</td>
+                <td>[% proxy.forward_scheme %]://[% proxy.forward_host %]:[% proxy.forward_port %]</td>
+                <td>[% proxy.ssl_forced ? 'Yes' : 'No' %]</td>
+            </tr>
+            [% END %]
+        </tbody>
+    </table>
+    [% ELSE %]
+    <div class="alert alert-info">No proxies configured</div>
+    [% END %]
+
+    <a href="[% c.uri_for('/proxymanager/create') %]" class="btn btn-primary">
+        Add New Proxy
+    </a>
+</div>
+[% END %]

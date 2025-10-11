@@ -1,0 +1,761 @@
+/**
+ * SVG Icons CSS
+ * Uses locally hosted SVG files for icons
+ */
+
+/* Remove all emoji fallback content from icon elements */
+[class*="icon-"]::before,
+[class*="fas"]::before {
+  content: none !important;
+}
+
+/* Base icon class */
+.icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  margin-right: 0.5em;
+  vertical-align: -0.125em;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+/* Common styling for all icons */
+.icon, .fas {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  margin-right: 0.5em;
+  vertical-align: -0.125em;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  /* Use currentColor to inherit the text color */
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  background-color: currentColor;
+}
+
+/* SVG mask technique for color inheritance - User Menu Icons */
+.icon-user, .fas.fa-user {
+  -webkit-mask-image: url('/static/images/icons/user.svg');
+  mask-image: url('/static/images/icons/user.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-cog, .fas.fa-cog {
+  -webkit-mask-image: url('/static/images/icons/cog.svg');
+  mask-image: url('/static/images/icons/cog.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-tachometer-alt, .fas.fa-tachometer-alt {
+  -webkit-mask-image: url('/static/images/icons/tachometer-alt.svg');
+  mask-image: url('/static/images/icons/tachometer-alt.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-sync, .fas.fa-sync {
+  -webkit-mask-image: url('/static/images/icons/sync.svg');
+  mask-image: url('/static/images/icons/sync.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-sign-out-alt, .fas.fa-sign-out-alt {
+  -webkit-mask-image: url('/static/images/icons/sign-out-alt.svg');
+  mask-image: url('/static/images/icons/sign-out-alt.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-sign-in-alt, .fas.fa-sign-in-alt {
+  -webkit-mask-image: url('/static/images/icons/sign-in-alt.svg');
+  mask-image: url('/static/images/icons/sign-in-alt.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-user-plus, .fas.fa-user-plus {
+  -webkit-mask-image: url('/static/images/icons/user-plus.svg');
+  mask-image: url('/static/images/icons/user-plus.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-key, .fas.fa-key {
+  -webkit-mask-image: url('/static/images/icons/key.svg');
+  mask-image: url('/static/images/icons/key.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+/* Main Navigation Icons */
+.icon-back, .fas.fa-arrow-circle-left {
+  -webkit-mask-image: url('/static/images/icons/back.svg');
+  mask-image: url('/static/images/icons/back.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-main, .fas.fa-credit-card {
+  -webkit-mask-image: url('/static/images/icons/main.svg');
+  mask-image: url('/static/images/icons/main.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-home, .fas.fa-home {
+  -webkit-mask-image: url('/static/images/icons/home.svg');
+  mask-image: url('/static/images/icons/home.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-mail, .fas.fa-envelope {
+  -webkit-mask-image: url('/static/images/icons/mail.svg');
+  mask-image: url('/static/images/icons/mail.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-workshop, .fas.fa-chalkboard-teacher {
+  -webkit-mask-image: url('/static/images/icons/workshop.svg');
+  mask-image: url('/static/images/icons/workshop.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-admin, .fas.fa-user-shield {
+  -webkit-mask-image: url('/static/images/icons/admin.svg');
+  mask-image: url('/static/images/icons/admin.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-todo, .fas.fa-tasks {
+  -webkit-mask-image: url('/static/images/icons/todo.svg');
+  mask-image: url('/static/images/icons/todo.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-file, .fas.fa-file {
+  -webkit-mask-image: url('/static/images/icons/file.svg');
+  mask-image: url('/static/images/icons/file.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-upload, .fas.fa-upload {
+  -webkit-mask-image: url('/static/images/icons/upload.svg');
+  mask-image: url('/static/images/icons/upload.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-log, .fas.fa-list {
+  -webkit-mask-image: url('/static/images/icons/log.svg');
+  mask-image: url('/static/images/icons/log.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-user-list, .fas.fa-users {
+  -webkit-mask-image: url('/static/images/icons/user-list.svg');
+  mask-image: url('/static/images/icons/user-list.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-setup, .fas.fa-cogs {
+  -webkit-mask-image: url('/static/images/icons/setup.svg');
+  mask-image: url('/static/images/icons/setup.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-domain, .fas.fa-globe-americas {
+  -webkit-mask-image: url('/static/images/icons/domain.svg');
+  mask-image: url('/static/images/icons/domain.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-system, .fas.fa-rocket {
+  -webkit-mask-image: url('/static/images/icons/system.svg');
+  mask-image: url('/static/images/icons/system.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-ttml, .fas.fa-code {
+  -webkit-mask-image: url('/static/images/icons/ttml.svg');
+  mask-image: url('/static/images/icons/ttml.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-mcoop, .fas.fa-cloud {
+  -webkit-mask-image: url('/static/images/icons/mcoop.svg');
+  mask-image: url('/static/images/icons/mcoop.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-debug, .fas.fa-bug {
+  -webkit-mask-image: url('/static/images/icons/debug.svg');
+  mask-image: url('/static/images/icons/debug.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-server, .fas.fa-server {
+  -webkit-mask-image: url('/static/images/icons/server.svg');
+  mask-image: url('/static/images/icons/server.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-network, .fas.fa-network-wired {
+  -webkit-mask-image: url('/static/images/icons/network.svg');
+  mask-image: url('/static/images/icons/network.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-services, .fas.fa-concierge-bell {
+  -webkit-mask-image: url('/static/images/icons/services.svg');
+  mask-image: url('/static/images/icons/services.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-infrastructure, .fas.fa-user-cog {
+  -webkit-mask-image: url('/static/images/icons/infrastructure.svg');
+  mask-image: url('/static/images/icons/infrastructure.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-reports, .fas.fa-chart-line {
+  -webkit-mask-image: url('/static/images/icons/reports.svg');
+  mask-image: url('/static/images/icons/reports.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-planning, .fas.fa-calendar-alt {
+  -webkit-mask-image: url('/static/images/icons/planning.svg');
+  mask-image: url('/static/images/icons/planning.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-toggle, .fas.fa-toggle-on {
+  -webkit-mask-image: url('/static/images/icons/toggle.svg');
+  mask-image: url('/static/images/icons/toggle.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-documentation, .fas.fa-file-alt {
+  -webkit-mask-image: url('/static/images/icons/documentation.svg');
+  mask-image: url('/static/images/icons/documentation.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-css, .fas.fa-css3 {
+  -webkit-mask-image: url('/static/images/icons/css.svg');
+  mask-image: url('/static/images/icons/css.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-schema, .fas.fa-database {
+  -webkit-mask-image: url('/static/images/icons/schema.svg');
+  mask-image: url('/static/images/icons/schema.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-mail-config, .fas.fa-envelope-open {
+  -webkit-mask-image: url('/static/images/icons/mail-config.svg');
+  mask-image: url('/static/images/icons/mail-config.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-global, .fas.fa-globe {
+  -webkit-mask-image: url('/static/images/icons/global.svg');
+  mask-image: url('/static/images/icons/global.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-hosted, .fas.fa-server {
+  -webkit-mask-image: url('/static/images/icons/hosted.svg');
+  mask-image: url('/static/images/icons/hosted.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-member, .fas.fa-users {
+  -webkit-mask-image: url('/static/images/icons/member.svg');
+  mask-image: url('/static/images/icons/member.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-helpdesk, .fas.fa-question-circle {
+  -webkit-mask-image: url('/static/images/icons/helpdesk.svg');
+  mask-image: url('/static/images/icons/helpdesk.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+/* Additional utility icons */
+.icon-profile, .fas.fa-id-card {
+  -webkit-mask-image: url('/static/images/icons/profile.svg');
+  mask-image: url('/static/images/icons/profile.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-settings, .fas.fa-sliders-h {
+  -webkit-mask-image: url('/static/images/icons/settings.svg');
+  mask-image: url('/static/images/icons/settings.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-dashboard, .fas.fa-tachometer {
+  -webkit-mask-image: url('/static/images/icons/dashboard.svg');
+  mask-image: url('/static/images/icons/dashboard.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-reset, .fas.fa-redo {
+  -webkit-mask-image: url('/static/images/icons/reset.svg');
+  mask-image: url('/static/images/icons/reset.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-logout, .fas.fa-sign-out {
+  -webkit-mask-image: url('/static/images/icons/logout.svg');
+  mask-image: url('/static/images/icons/logout.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-login, .fas.fa-sign-in {
+  -webkit-mask-image: url('/static/images/icons/login.svg');
+  mask-image: url('/static/images/icons/login.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-register, .fas.fa-user-plus {
+  -webkit-mask-image: url('/static/images/icons/register.svg');
+  mask-image: url('/static/images/icons/register.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-forgot-password, .fas.fa-unlock {
+  -webkit-mask-image: url('/static/images/icons/forgot-password.svg');
+  mask-image: url('/static/images/icons/forgot-password.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-add, .fas.fa-plus {
+  -webkit-mask-image: url('/static/images/icons/add.svg');
+  mask-image: url('/static/images/icons/add.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-edit, .fas.fa-edit {
+  -webkit-mask-image: url('/static/images/icons/edit.svg');
+  mask-image: url('/static/images/icons/edit.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-delete, .fas.fa-trash {
+  -webkit-mask-image: url('/static/images/icons/delete.svg');
+  mask-image: url('/static/images/icons/delete.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-search, .fas.fa-search {
+  -webkit-mask-image: url('/static/images/icons/search.svg');
+  mask-image: url('/static/images/icons/search.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-calendar, .fas.fa-calendar {
+  -webkit-mask-image: url('/static/images/icons/calendar.svg');
+  mask-image: url('/static/images/icons/calendar.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-day, .fas.fa-sun {
+  -webkit-mask-image: url('/static/images/icons/day.svg');
+  mask-image: url('/static/images/icons/day.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-week, .fas.fa-calendar-week {
+  -webkit-mask-image: url('/static/images/icons/week.svg');
+  mask-image: url('/static/images/icons/week.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-month, .fas.fa-calendar-alt {
+  -webkit-mask-image: url('/static/images/icons/month.svg');
+  mask-image: url('/static/images/icons/month.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-tables, .fas.fa-table {
+  -webkit-mask-image: url('/static/images/icons/tables.svg');
+  mask-image: url('/static/images/icons/tables.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+/* Missing icons that need to be added */
+.icon-list, .fas.fa-list-ul {
+  -webkit-mask-image: url('/static/images/icons/list.svg');
+  mask-image: url('/static/images/icons/list.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-user-guide, .fas.fa-book {
+  -webkit-mask-image: url('/static/images/icons/user-guide.svg');
+  mask-image: url('/static/images/icons/user-guide.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-admin-guide, .fas.fa-user-shield {
+  -webkit-mask-image: url('/static/images/icons/admin-guide.svg');
+  mask-image: url('/static/images/icons/admin-guide.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-tutorial, .fas.fa-graduation-cap {
+  -webkit-mask-image: url('/static/images/icons/tutorial.svg');
+  mask-image: url('/static/images/icons/tutorial.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-changelog, .fas.fa-history {
+  -webkit-mask-image: url('/static/images/icons/changelog.svg');
+  mask-image: url('/static/images/icons/changelog.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-terminal, .fas.fa-terminal {
+  -webkit-mask-image: url('/static/images/icons/terminal.svg');
+  mask-image: url('/static/images/icons/terminal.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-link, .fas.fa-link {
+  -webkit-mask-image: url('/static/images/icons/link.svg');
+  mask-image: url('/static/images/icons/link.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-view, .fas.fa-eye {
+  -webkit-mask-image: url('/static/images/icons/view.svg');
+  mask-image: url('/static/images/icons/view.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-manage, .fas.fa-cog {
+  -webkit-mask-image: url('/static/images/icons/manage.svg');
+  mask-image: url('/static/images/icons/manage.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-user-admin, .fas.fa-user-cog {
+  -webkit-mask-image: url('/static/images/icons/user-admin.svg');
+  mask-image: url('/static/images/icons/user-admin.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-theme, .fas.fa-palette {
+  -webkit-mask-image: url('/static/images/icons/theme.svg');
+  mask-image: url('/static/images/icons/theme.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-git, .fas.fa-git {
+  -webkit-mask-image: url('/static/images/icons/git.svg');
+  mask-image: url('/static/images/icons/git.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-cloud, .fas.fa-cloud {
+  -webkit-mask-image: url('/static/images/icons/cloud.svg');
+  mask-image: url('/static/images/icons/cloud.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-service, .fas.fa-wrench {
+  -webkit-mask-image: url('/static/images/icons/service.svg');
+  mask-image: url('/static/images/icons/service.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-report, .fas.fa-chart-bar {
+  -webkit-mask-image: url('/static/images/icons/report.svg');
+  mask-image: url('/static/images/icons/report.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-toggle-on, .fas.fa-toggle-on {
+  -webkit-mask-image: url('/static/images/icons/toggle-on.svg');
+  mask-image: url('/static/images/icons/toggle-on.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-toggle-off, .fas.fa-toggle-off {
+  -webkit-mask-image: url('/static/images/icons/toggle-off.svg');
+  mask-image: url('/static/images/icons/toggle-off.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+/* Additional icons generated from usage */
+
+.icon-3d, .fas.fa-3d {
+  -webkit-mask-image: url('/static/images/icons/3d.svg');
+  mask-image: url('/static/images/icons/3d.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-accounts, .fas.fa-accounts {
+  -webkit-mask-image: url('/static/images/icons/accounts.svg');
+  mask-image: url('/static/images/icons/accounts.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-admin-links, .fas.fa-admin-links {
+  -webkit-mask-image: url('/static/images/icons/admin-links.svg');
+  mask-image: url('/static/images/icons/admin-links.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-apply, .fas.fa-apply {
+  -webkit-mask-image: url('/static/images/icons/apply.svg');
+  mask-image: url('/static/images/icons/apply.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-briefcase, .fas.fa-briefcase {
+  -webkit-mask-image: url('/static/images/icons/briefcase.svg');
+  mask-image: url('/static/images/icons/briefcase.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-contact, .fas.fa-contact {
+  -webkit-mask-image: url('/static/images/icons/contact.svg');
+  mask-image: url('/static/images/icons/contact.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-development, .fas.fa-development {
+  -webkit-mask-image: url('/static/images/icons/development.svg');
+  mask-image: url('/static/images/icons/development.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-docs, .fas.fa-docs {
+  -webkit-mask-image: url('/static/images/icons/docs.svg');
+  mask-image: url('/static/images/icons/docs.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-drive, .fas.fa-drive {
+  -webkit-mask-image: url('/static/images/icons/drive.svg');
+  mask-image: url('/static/images/icons/drive.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-faq, .fas.fa-faq {
+  -webkit-mask-image: url('/static/images/icons/faq.svg');
+  mask-image: url('/static/images/icons/faq.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-folder, .fas.fa-folder {
+  -webkit-mask-image: url('/static/images/icons/folder.svg');
+  mask-image: url('/static/images/icons/folder.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-globe, .fas.fa-globe {
+  -webkit-mask-image: url('/static/images/icons/globe.svg');
+  mask-image: url('/static/images/icons/globe.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-herb, .fas.fa-herb {
+  -webkit-mask-image: url('/static/images/icons/herb.svg');
+  mask-image: url('/static/images/icons/herb.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-image, .fas.fa-image {
+  -webkit-mask-image: url('/static/images/icons/image.svg');
+  mask-image: url('/static/images/icons/image.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-info, .fas.fa-info {
+  -webkit-mask-image: url('/static/images/icons/info.svg');
+  mask-image: url('/static/images/icons/info.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-it, .fas.fa-it {
+  -webkit-mask-image: url('/static/images/icons/it.svg');
+  mask-image: url('/static/images/icons/it.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-kb, .fas.fa-kb {
+  -webkit-mask-image: url('/static/images/icons/kb.svg');
+  mask-image: url('/static/images/icons/kb.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-production, .fas.fa-production {
+  -webkit-mask-image: url('/static/images/icons/production.svg');
+  mask-image: url('/static/images/icons/production.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-resources, .fas.fa-resources {
+  -webkit-mask-image: url('/static/images/icons/resources.svg');
+  mask-image: url('/static/images/icons/resources.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-security, .fas.fa-security {
+  -webkit-mask-image: url('/static/images/icons/security.svg');
+  mask-image: url('/static/images/icons/security.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-site, .fas.fa-site {
+  -webkit-mask-image: url('/static/images/icons/site.svg');
+  mask-image: url('/static/images/icons/site.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-special, .fas.fa-special {
+  -webkit-mask-image: url('/static/images/icons/special.svg');
+  mask-image: url('/static/images/icons/special.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-status, .fas.fa-status {
+  -webkit-mask-image: url('/static/images/icons/status.svg');
+  mask-image: url('/static/images/icons/status.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-store, .fas.fa-store {
+  -webkit-mask-image: url('/static/images/icons/store.svg');
+  mask-image: url('/static/images/icons/store.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-support, .fas.fa-support {
+  -webkit-mask-image: url('/static/images/icons/support.svg');
+  mask-image: url('/static/images/icons/support.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-ticket, .fas.fa-ticket {
+  -webkit-mask-image: url('/static/images/icons/ticket.svg');
+  mask-image: url('/static/images/icons/ticket.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-tool, .fas.fa-tool {
+  -webkit-mask-image: url('/static/images/icons/tool.svg');
+  mask-image: url('/static/images/icons/tool.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-tools, .fas.fa-tools {
+  -webkit-mask-image: url('/static/images/icons/tools.svg');
+  mask-image: url('/static/images/icons/tools.svg');
+  background-color: currentColor;
+  background-image: none;
+}

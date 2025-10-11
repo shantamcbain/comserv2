@@ -1,0 +1,151 @@
+[% PageVersion = 'add_link.tt,v 0.01 2025/08/19 shanta Exp shanta ' %]
+[% IF debug == 1 %]
+    [% PageVersion %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+
+<div class="container">
+    <h2>Add Link</h2>
+    
+    [% IF error_msg %]
+        <div class="alert alert-danger">
+            [% error_msg %]
+        </div>
+    [% END %]
+    
+    [% IF success_msg %]
+        <div class="alert alert-success">
+            [% success_msg %]
+        </div>
+    [% END %]
+    
+    <form method="POST" action="/navigation/add_link" id="add-link-form">
+        <div class="form-group">
+            <label for="name">Link Name:</label>
+            <input type="text" id="name" name="name" class="form-control" 
+                   value="[% form_data.name | html %]" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="url">URL:</label>
+            <input type="url" id="url" name="url" class="form-control" 
+                   value="[% form_data.url | html %]" required placeholder="https://example.com">
+        </div>
+        
+        <div class="form-group">
+            <label for="target">Target:</label>
+            <select id="target" name="target" class="form-control">
+                <option value="_self" [% IF (form_data.target == '_self' || !form_data.target) %]selected[% END %]>Same Window</option>
+                <option value="_blank" [% IF form_data.target == '_blank' %]selected[% END %]>New Window</option>
+            </select>
+        </div>
+        
+        [% IF permissions.can_create_public %]
+            <div class="form-group">
+                <label for="link_type">Link Type:</label>
+                <select id="link_type" name="link_type" class="form-control" onchange="updateFormFields()">
+                    <option value="private" [% IF (form_data.link_type == 'private' || !form_data.link_type) %]selected[% END %]>Private Link (Only You)</option>
+                    <option value="public" [% IF form_data.link_type == 'public' %]selected[% END %]>Public Link (All Users)</option>
+                </select>
+            </div>
+        [% ELSE %]
+            <input type="hidden" name="link_type" value="private">
+            <div class="info-note">
+                <strong>Note:</strong> You can only create private links. Contact an administrator to create public links.
+            </div>
+        [% END %]
+        
+        <div class="form-group">
+            <label for="category">Menu/Category:</label>
+            <select id="category" name="category" class="form-control" required>
+                [% FOREACH cat IN permissions.available_categories %]
+                    [% IF cat == 'Private_links' %]
+                        <option value="[% cat %]" 
+                                [% IF (form_data.category == cat || preset_category == cat || cat == 'Private_links') %]selected[% END %]>
+                            Private Links
+                        </option>
+                    [% ELSE %]
+                        <option value="[% cat %]" 
+                                [% IF (form_data.category == cat || preset_category == cat) %]selected[% END %]
+                                data-public-only="true" style="display: none;">
+                            [% cat.replace('_', ' ') | ucfirst %]
+                        </option>
+                    [% END %]
+                [% END %]
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="sitename">Site:</label>
+            <select id="sitename" name="sitename" class="form-control" required>
+                [% FOREACH site IN permissions.available_sites %]
+                    <option value="[% site %]" 
+                            [% IF (form_data.sitename == site || preset_sitename == site || site == permissions.available_sites.0) %]selected[% END %]>
+                        [% site %]
+                    </option>
+                [% END %]
+            </select>
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Add Link</button>
+            <a href="/navigation/manage_links" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<script>
+function updateFormFields() {
+    const linkType = document.getElementById('link_type').value;
+    const categorySelect = document.getElementById('category');
+    const publicOptions = categorySelect.querySelectorAll('[data-public-only="true"]');
+    
+    if (linkType === 'public') {
+        // Show public categories
+        publicOptions.forEach(option => {
+            option.style.display = 'block';
+        });
+        // If currently selected is Private_links, change to first public option
+        if (categorySelect.value === 'Private_links') {
+            const firstPublic = categorySelect.querySelector('[data-public-only="true"]');
+            if (firstPublic) {
+                categorySelect.value = firstPublic.value;
+            }
+        }
+    } else {
+        // Hide public categories
+        publicOptions.forEach(option => {
+            option.style.display = 'none';
+        });
+        // Force selection to Private_links
+        categorySelect.value = 'Private_links';
+    }
+}
+
+// Initialize form on page load
+[% IF permissions.can_create_public %]
+document.addEventListener('DOMContentLoaded', function() {
+    updateFormFields();
+});
+[% END %]
+</script>
+
+<style>
+.info-note {
+    background-color: #e7f3ff;
+    border: 1px solid #b8daff;
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 15px;
+}
+
+.form-actions {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #ddd;
+}
+
+.form-actions .btn {
+    margin-right: 10px;
+}
+</style>

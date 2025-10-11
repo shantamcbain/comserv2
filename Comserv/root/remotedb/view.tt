@@ -1,0 +1,56 @@
+[% META title = 'View Remote Database: ' _ conn_name %]
+
+<div class="container">
+    <h1>Remote Database: [% conn_name %]</h1>
+    
+    [% IF c.flash.error_msg %]
+    <div class="alert alert-danger">
+        [% c.flash.error_msg %]
+    </div>
+    [% END %]
+    
+    <div class="mb-3">
+        <a href="[% c.uri_for(c.controller('RemoteDB').action_for('index')) %]" class="btn btn-secondary">
+            Back to Connections
+        </a>
+        <a href="[% c.uri_for(c.controller('RemoteDB').action_for('query'), [conn_name]) %]" class="btn btn-primary">
+            Run Custom Query
+        </a>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h2>Tables in [% conn_name %]</h2>
+        </div>
+        <div class="card-body">
+            [% IF tables.size > 0 %]
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Table Name</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            [% FOREACH table IN tables.sort %]
+                                <tr>
+                                    <td>[% table %]</td>
+                                    <td>
+                                        <a href="[% c.uri_for(c.controller('RemoteDB').action_for('table'), [conn_name, table]) %]" class="btn btn-sm btn-info">
+                                            View Structure & Data
+                                        </a>
+                                    </td>
+                                </tr>
+                            [% END %]
+                        </tbody>
+                    </table>
+                </div>
+            [% ELSE %]
+                <div class="alert alert-info">
+                    No tables found in this database.
+                </div>
+            [% END %]
+        </div>
+    </div>
+</div>

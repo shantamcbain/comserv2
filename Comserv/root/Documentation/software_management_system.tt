@@ -1,0 +1,453 @@
+[% META title = 'Software Management System Documentation' %]
+
+<div class="documentation-content">
+
+<h1>Software Management System Documentation</h1>
+
+<h2>Overview</h2>
+
+<p>The Comserv application includes a comprehensive software management system that provides administrators with tools to monitor, update, and deploy the application. This system is integrated into the Admin controller and provides both web-based interfaces and backend functionality for managing software updates.</p>
+
+<h2>Current Features</h2>
+
+<h3>1. Software Management Status Dashboard</h3>
+
+<div class="feature-details">
+    <p><strong>Location:</strong> Admin Dashboard (<code>/admin</code>)</p>
+    <p><strong>Method:</strong> <code>get_software_management_status()</code> in <code>Admin.pm</code></p>
+
+    <p>The dashboard provides real-time status information about:</p>
+
+    <h4>Git Status</h4>
+    <ul>
+        <li>Current branch</li>
+        <li>Uncommitted changes detection</li>
+        <li>Commits behind origin</li>
+        <li>Last commit information</li>
+    </ul>
+
+    <h4>Starman Service Status</h4>
+    <ul>
+        <li>Service active/inactive status</li>
+        <li>Service uptime information</li>
+        <li>Health monitoring</li>
+    </ul>
+
+    <h4>Deployment Status Summary</h4>
+    <ul>
+        <li>Update requirements</li>
+        <li>Local changes detection</li>
+        <li>Service health status</li>
+    </ul>
+
+    <h4>Automated Recommendations</h4>
+    <ul>
+        <li>Update notifications when behind origin</li>
+        <li>Service restart alerts</li>
+        <li>Local changes warnings</li>
+        <li>System health confirmations</li>
+    </ul>
+</div>
+
+<h3>2. Git Pull Functionality</h3>
+
+<div class="feature-details">
+    <p><strong>Endpoint:</strong> <code>/admin/git_pull</code></p>
+    <p><strong>Method:</strong> <code>git_pull()</code> and <code>execute_git_pull()</code> in <code>Admin.pm</code></p>
+
+    <h4>Features:</h4>
+    
+    <h5>Smart Theme Mappings Handling</h5>
+    <ul>
+        <li>Automatic backup of <code>theme_mappings.json</code> before pull</li>
+        <li>Stashing of local changes to prevent conflicts</li>
+        <li>Automatic restoration from backup if conflicts occur</li>
+        <li>Conflict detection and resolution</li>
+    </ul>
+
+    <h5>Safety Measures</h5>
+    <ul>
+        <li>Admin role verification</li>
+        <li>Confirmation required before execution</li>
+        <li>Comprehensive logging of all operations</li>
+        <li>Rollback capabilities for theme mappings</li>
+    </ul>
+
+    <h5>Output Reporting</h5>
+    <ul>
+        <li>Detailed git operation output</li>
+        <li>Success/failure status reporting</li>
+        <li>Warning messages for potential issues</li>
+    </ul>
+</div>
+
+<h3>3. Production Deployment System</h3>
+
+<div class="feature-details">
+    <p><strong>Endpoint:</strong> <code>/admin/production_deploy</code></p>
+    <p><strong>Method:</strong> <code>production_deploy()</code> and <code>execute_production_deploy()</code> in <code>Admin.pm</code></p>
+
+    <h4>Features:</h4>
+    
+    <h5>Branch Management</h5>
+    <ul>
+        <li>Support for deploying from any branch</li>
+        <li>Current branch detection and switching</li>
+        <li>Available branches listing</li>
+    </ul>
+
+    <h5>Backup System</h5>
+    <ul>
+        <li>Optional backup branch creation before deployment</li>
+        <li>Timestamped backup branches</li>
+        <li>Automatic branch switching and restoration</li>
+    </ul>
+
+    <h5>Deployment Process</h5>
+    <ul>
+        <li>Git fetch and pull operations</li>
+        <li>Version tagging support</li>
+        <li>Automatic Starman service restart</li>
+        <li>Service status verification</li>
+    </ul>
+
+    <h5>Safety and Monitoring</h5>
+    <ul>
+        <li>Pre-deployment status checks</li>
+        <li>Comprehensive logging</li>
+        <li>Error detection and reporting</li>
+        <li>Service health verification</li>
+    </ul>
+</div>
+
+<h3>4. Deployment Status Monitoring</h3>
+
+<div class="feature-details">
+    <p><strong>Method:</strong> <code>get_deployment_status()</code> in <code>Admin.pm</code></p>
+
+    <p>Provides:</p>
+    <ul>
+        <li>Current branch information</li>
+        <li>Current commit hash and message</li>
+        <li>Last commit timestamp</li>
+        <li>Available branches list</li>
+        <li>Repository status summary</li>
+    </ul>
+</div>
+
+<h3>5. System Statistics Integration</h3>
+
+<div class="feature-details">
+    <p><strong>Method:</strong> <code>get_system_stats()</code> in <code>Admin.pm</code></p>
+
+    <p>Software-related statistics:</p>
+    <ul>
+        <li>Git commit count</li>
+        <li>Application version from git tags</li>
+        <li>Repository health metrics</li>
+        <li>Integration with overall system monitoring</li>
+    </ul>
+</div>
+
+<h2>Technical Implementation</h2>
+
+<h3>Architecture</h3>
+
+<p>The software management system follows these architectural principles:</p>
+
+<ol>
+    <li><strong>Separation of Concerns</strong>
+        <ul>
+            <li>Status monitoring methods separate from action methods</li>
+            <li>UI logic separated from business logic</li>
+            <li>Error handling centralized</li>
+        </ul>
+    </li>
+    
+    <li><strong>Safety First</strong>
+        <ul>
+            <li>All operations require admin privileges</li>
+            <li>Confirmation steps for destructive operations</li>
+            <li>Comprehensive backup and rollback mechanisms</li>
+            <li>Detailed logging for audit trails</li>
+        </ul>
+    </li>
+    
+    <li><strong>User Experience</strong>
+        <ul>
+            <li>Clear status indicators on dashboard</li>
+            <li>Actionable recommendations</li>
+            <li>Detailed operation feedback</li>
+            <li>Progressive disclosure of information</li>
+        </ul>
+    </li>
+</ol>
+
+<h3>Security Model</h3>
+
+<ul>
+    <li><strong>Authentication:</strong> All endpoints require valid user session</li>
+    <li><strong>Authorization:</strong> Admin role verification for all operations</li>
+    <li><strong>Special Access:</strong> Hardcoded access for 'Shanta' user (temporary)</li>
+    <li><strong>Audit Trail:</strong> Comprehensive logging of all operations</li>
+</ul>
+
+<h3>Error Handling</h3>
+
+<p>The system implements multiple layers of error handling:</p>
+
+<ol>
+    <li><strong>Try-Catch Blocks:</strong> All operations wrapped in try-catch</li>
+    <li><strong>Git Operation Validation:</strong> Output parsing to detect failures</li>
+    <li><strong>Service Status Verification:</strong> Post-operation health checks</li>
+    <li><strong>User Feedback:</strong> Clear error messages and warnings</li>
+    <li><strong>Logging:</strong> Detailed error logging for debugging</li>
+</ol>
+
+<h3>File Management</h3>
+
+<p>Special handling for critical configuration files:</p>
+
+<ul>
+    <li><strong>Theme Mappings:</strong> Automatic backup and restoration</li>
+    <li><strong>Local Changes:</strong> Stashing and conflict resolution</li>
+    <li><strong>Backup Creation:</strong> Timestamped backup files</li>
+    <li><strong>Permission Handling:</strong> Proper file permissions maintained</li>
+</ul>
+
+<h2>Integration Points</h2>
+
+<h3>Dashboard Integration</h3>
+
+<p>The software management system is prominently featured on the admin dashboard:</p>
+
+<ul>
+    <li><strong>Status Section:</strong> Real-time system status</li>
+    <li><strong>Recommendations:</strong> Actionable items for administrators</li>
+    <li><strong>Quick Actions:</strong> Direct links to management functions</li>
+    <li><strong>Visual Indicators:</strong> Color-coded status displays</li>
+</ul>
+
+<h3>Logging Integration</h3>
+
+<p>All operations integrate with the centralized logging system:</p>
+
+<ul>
+    <li><strong>Structured Logging:</strong> Consistent log format across operations</li>
+    <li><strong>Context Information:</strong> File, line, and method information</li>
+    <li><strong>Severity Levels:</strong> Appropriate log levels for different events</li>
+    <li><strong>Audit Trail:</strong> Complete operation history</li>
+</ul>
+
+<h3>Service Integration</h3>
+
+<p>The system integrates with system services:</p>
+
+<ul>
+    <li><strong>Starman Management:</strong> Service start/stop/restart operations</li>
+    <li><strong>System Commands:</strong> Git operations and system status checks</li>
+    <li><strong>Permission Management:</strong> Sudo operations for service control</li>
+</ul>
+
+<h2>Configuration</h2>
+
+<h3>Required Permissions</h3>
+
+<p>The system requires the following permissions:</p>
+
+<h4>1. Git Operations</h4>
+<ul>
+    <li>Read access to git repository</li>
+    <li>Write access for pull operations</li>
+    <li>Branch creation and switching permissions</li>
+</ul>
+
+<h4>2. Service Management</h4>
+<ul>
+    <li>Sudo access for systemctl operations</li>
+    <li>Starman service control permissions</li>
+</ul>
+
+<h4>3. File System</h4>
+<ul>
+    <li>Read/write access to application directory</li>
+    <li>Backup file creation permissions</li>
+    <li>Log file write permissions</li>
+</ul>
+
+<h3>Dependencies</h3>
+
+<p>The software management system depends on:</p>
+
+<ul>
+    <li><strong>Git:</strong> Version control operations</li>
+    <li><strong>Systemctl:</strong> Service management</li>
+    <li><strong>Perl Modules:</strong> File::Copy, File::Slurp, POSIX, Try::Tiny</li>
+    <li><strong>System Commands:</strong> Available git, sudo, systemctl commands</li>
+</ul>
+
+<h2>Usage Guidelines</h2>
+
+<h3>For Administrators</h3>
+
+<h4>1. Regular Monitoring</h4>
+<ul>
+    <li>Check dashboard status regularly</li>
+    <li>Review recommendations and act on warnings</li>
+    <li>Monitor service health indicators</li>
+</ul>
+
+<h4>2. Update Procedures</h4>
+<ul>
+    <li>Use Production Deploy for major updates</li>
+    <li>Use Git Pull for simple code updates</li>
+    <li>Always review changes before deployment</li>
+</ul>
+
+<h4>3. Safety Practices</h4>
+<ul>
+    <li>Create backups before major deployments</li>
+    <li>Test deployments in development first</li>
+    <li>Monitor logs after deployments</li>
+</ul>
+
+<h3>For Developers</h3>
+
+<h4>1. Code Changes</h4>
+<ul>
+    <li>Ensure all changes are committed before deployment</li>
+    <li>Test theme mappings changes carefully</li>
+    <li>Document any new configuration requirements</li>
+</ul>
+
+<h4>2. Deployment Considerations</h4>
+<ul>
+    <li>Consider impact on running services</li>
+    <li>Plan for potential rollback scenarios</li>
+    <li>Coordinate with administrators for major changes</li>
+</ul>
+
+<h2>Troubleshooting</h2>
+
+<h3>Common Issues</h3>
+
+<h4>1. Git Pull Failures</h4>
+<ul>
+    <li>Check for uncommitted local changes</li>
+    <li>Verify network connectivity to git repository</li>
+    <li>Review git repository permissions</li>
+</ul>
+
+<h4>2. Service Restart Failures</h4>
+<ul>
+    <li>Check Starman service configuration</li>
+    <li>Verify sudo permissions for service control</li>
+    <li>Review system logs for service errors</li>
+</ul>
+
+<h4>3. Theme Mappings Conflicts</h4>
+<ul>
+    <li>System automatically handles most conflicts</li>
+    <li>Manual resolution may be needed for complex conflicts</li>
+    <li>Backup files are always created for safety</li>
+</ul>
+
+<h3>Diagnostic Steps</h3>
+
+<h4>1. Check System Status</h4>
+<ul>
+    <li>Review dashboard recommendations</li>
+    <li>Check git repository status</li>
+    <li>Verify service health</li>
+</ul>
+
+<h4>2. Review Logs</h4>
+<ul>
+    <li>Check application logs for errors</li>
+    <li>Review system logs for service issues</li>
+    <li>Examine git operation output</li>
+</ul>
+
+<h4>3. Verify Permissions</h4>
+<ul>
+    <li>Confirm admin role assignment</li>
+    <li>Check file system permissions</li>
+    <li>Verify sudo access for service operations</li>
+</ul>
+
+<h2>Future Enhancements</h2>
+
+<p>See the Development Plans document for planned improvements to the software management system, including:</p>
+
+<ul>
+    <li>Enhanced error handling and recovery</li>
+    <li>Automated backup and rollback capabilities</li>
+    <li>Dependency management integration</li>
+    <li>Advanced deployment strategies</li>
+    <li>Monitoring and alerting improvements</li>
+</ul>
+
+<h2>Related Documentation</h2>
+
+<ul>
+    <li><a href="[% c.uri_for('/documentation/development_plans') %]">Development Plans</a> - Future enhancement plans</li>
+    <li><a href="[% c.uri_for('/documentation/deployment_checklist') %]">Deployment Checklist</a> - Manual deployment procedures</li>
+    <li><a href="[% c.uri_for('/documentation/technical_changes') %]">Technical Changes</a> - Recent fixes and improvements</li>
+    <li><a href="[% c.uri_for('/documentation/admin/admin_access_control') %]">Admin Access Control</a> - Security and permissions</li>
+</ul>
+
+</div>
+
+<style>
+.documentation-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.6;
+}
+
+.feature-details {
+    background: #f8f9fa;
+    border-left: 4px solid #007bff;
+    padding: 15px;
+    margin: 15px 0;
+}
+
+.feature-details h4, .feature-details h5 {
+    color: #495057;
+    margin-top: 15px;
+    margin-bottom: 10px;
+}
+
+code {
+    background: #e9ecef;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+ul, ol {
+    margin-bottom: 15px;
+}
+
+li {
+    margin-bottom: 5px;
+}
+
+h1, h2, h3 {
+    color: #212529;
+    margin-top: 30px;
+    margin-bottom: 15px;
+}
+
+h1 {
+    border-bottom: 2px solid #dee2e6;
+    padding-bottom: 10px;
+}
+
+h2 {
+    border-bottom: 1px solid #dee2e6;
+    padding-bottom: 5px;
+}
+</style>

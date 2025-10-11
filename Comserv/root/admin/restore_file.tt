@@ -1,0 +1,425 @@
+[% PageVersion = 'admin/restore_file.tt,v 1.0 2025/01/20 shanta Exp shanta ' %]
+[% META title = 'Restore Individual File from Backup' %]
+
+<div class="admin-container">
+    <div class="admin-header">
+        <h1><i class="fas fa-undo"></i> Restore Individual File</h1>
+        <p class="admin-description">
+            Restore a specific file from any available backup. Useful for recovering individual 
+            configuration files or reverting specific changes.
+        </p>
+    </div>
+
+    [% IF success_msg %]
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle"></i> [% success_msg %]
+        </div>
+    [% END %]
+
+    [% IF error_msg %]
+        <div class="alert alert-danger">
+            <i class="fas fa-times-circle"></i> [% error_msg %]
+        </div>
+    [% END %]
+
+    [% IF available_backups.size > 0 %]
+        <div class="admin-section">
+            <h2><i class="fas fa-archive"></i> Available Backups</h2>
+            <div class="backups-grid">
+                [% FOREACH backup IN available_backups %]
+                    <div class="backup-card">
+                        <div class="backup-header">
+                            <h3>[% backup.description || 'Backup' %]</h3>
+                            <span class="backup-date">[% backup.created_date %]</span>
+                        </div>
+                        <div class="backup-details">
+                            <div class="backup-info">
+                                <span class="backup-type">[% backup.type %]</span>
+                                <span class="backup-creator">by [% backup.created_by %]</span>
+                            </div>
+                            [% IF backup.files %]
+                                <div class="backup-files">
+                                    <strong>Files in backup:</strong>
+                                    <ul class="file-list">
+                                        [% FOREACH file IN backup.files %]
+                                            <li>
+                                                <code>[% file %]</code>
+                                                <button type="button" class="btn btn-sm btn-outline-primary restore-file-btn" 
+                                                        data-backup-id="[% backup.backup_id %]" 
+                                                        data-file-path="[% file %]">
+                                                    <i class="fas fa-undo"></i> Restore
+                                                </button>
+                                            </li>
+                                        [% END %]
+                                    </ul>
+                                </div>
+                            [% END %]
+                        </div>
+                    </div>
+                [% END %]
+            </div>
+        </div>
+
+        <div class="admin-section">
+            <h2><i class="fas fa-tools"></i> Manual Restore</h2>
+            <p>If you know the exact backup ID and file path, you can restore manually:</p>
+            <form method="POST" action="[% c.uri_for('/admin/restore_file') %]" class="restore-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="backup_id">Backup ID:</label>
+                        <select name="backup_id" id="backup_id" class="form-control" required>
+                            <option value="">Select a backup...</option>
+                            [% FOREACH backup IN available_backups %]
+                                <option value="[% backup.backup_id %]">
+                                    [% backup.backup_id %] - [% backup.description %] ([% backup.created_date %])
+                                </option>
+                            [% END %]
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="file_path">File Path:</label>
+                        <input type="text" name="file_path" id="file_path" class="form-control" 
+                               placeholder="e.g., Comserv/comserv.psgi" required>
+                        <small class="form-text">Enter the relative path from project root</small>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-undo"></i> Restore File
+                    </button>
+                </div>
+            </form>
+        </div>
+    [% ELSE %]
+        <div class="admin-section">
+            <div class="no-backups">
+                <i class="fas fa-archive" style="font-size: 48px; color: #ccc; margin-bottom: 15px;"></i>
+                <h3>No Backups Available</h3>
+                <p>No backup files were found. Backups are created automatically when using Safe Git Pull.</p>
+                <a href="[% c.uri_for('/admin/safe_git_pull') %]" class="btn btn-primary">
+                    <i class="fas fa-shield-alt"></i> Create Backup with Safe Git Pull
+                </a>
+            </div>
+        </div>
+    [% END %]
+
+    [% IF output %]
+        <div class="admin-section">
+            <h2><i class="fas fa-terminal"></i> Restore Output</h2>
+            <div class="output-container">
+                <pre class="command-output">[% output %]</pre>
+            </div>
+        </div>
+    [% END %]
+
+    <div class="admin-section">
+        <h2><i class="fas fa-link"></i> Related Operations</h2>
+        <div class="related-links">
+            <a href="[% c.uri_for('/admin/safe_git_pull') %]" class="btn btn-outline-primary">
+                <i class="fas fa-shield-alt"></i> Safe Git Pull
+            </a>
+            <a href="[% c.uri_for('/admin/git_stash') %]" class="btn btn-outline-info">
+                <i class="fas fa-archive"></i> Git Stash Management
+            </a>
+            <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Admin
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden form for quick restore -->
+<form id="quickRestoreForm" method="POST" action="[% c.uri_for('/admin/restore_file') %]" style="display: none;">
+    <input type="hidden" name="backup_id" id="quickBackupId">
+    <input type="hidden" name="file_path" id="quickFilePath">
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle quick restore buttons
+    document.querySelectorAll('.restore-file-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const backupId = this.getAttribute('data-backup-id');
+            const filePath = this.getAttribute('data-file-path');
+            
+            if (confirm('Are you sure you want to restore "' + filePath + '" from backup "' + backupId + '"?')) {
+                document.getElementById('quickBackupId').value = backupId;
+                document.getElementById('quickFilePath').value = filePath;
+                document.getElementById('quickRestoreForm').submit();
+            }
+        });
+    });
+});
+</script>
+
+<style>
+.admin-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.admin-header {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border-left: 4px solid #28a745;
+}
+
+.admin-header h1 {
+    margin: 0 0 10px 0;
+    color: #333;
+}
+
+.admin-description {
+    margin: 0;
+    color: #666;
+    font-size: 14px;
+}
+
+.admin-section {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.admin-section h2 {
+    margin: 0 0 15px 0;
+    color: #333;
+    font-size: 18px;
+}
+
+.backups-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 20px;
+}
+
+.backup-card {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 15px;
+    background: #f8f9fa;
+}
+
+.backup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.backup-header h3 {
+    margin: 0;
+    font-size: 16px;
+    color: #333;
+}
+
+.backup-date {
+    font-size: 12px;
+    color: #666;
+    background: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+}
+
+.backup-info {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.backup-type, .backup-creator {
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    background: white;
+    color: #666;
+}
+
+.backup-files {
+    margin-top: 10px;
+}
+
+.file-list {
+    list-style: none;
+    padding: 0;
+    margin: 10px 0 0 0;
+}
+
+.file-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px;
+    background: white;
+    border-radius: 4px;
+    margin-bottom: 5px;
+}
+
+.file-list code {
+    background: #e9ecef;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+.restore-form {
+    max-width: 600px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.form-control {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.form-text {
+    font-size: 12px;
+    color: #666;
+    margin-top: 5px;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-sm {
+    padding: 4px 8px;
+    font-size: 12px;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-outline-primary {
+    border: 1px solid #007bff;
+    color: #007bff;
+    background: white;
+}
+
+.btn-outline-info {
+    border: 1px solid #17a2b8;
+    color: #17a2b8;
+    background: white;
+}
+
+.no-backups {
+    text-align: center;
+    padding: 40px 20px;
+    color: #666;
+}
+
+.no-backups h3 {
+    margin: 0 0 10px 0;
+    color: #333;
+}
+
+.output-container {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 15px;
+}
+
+.command-output {
+    margin: 0;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.related-links {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.alert {
+    padding: 12px 16px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.alert-success {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+
+.alert-danger {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}
+
+@media (max-width: 768px) {
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .backups-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .file-list li {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+}
+</style>

@@ -1,0 +1,88 @@
+[% META title = 'NPM Proxy Hosts' %]
+
+<div class="container">
+    <h1>NPM Proxy Hosts</h1>
+    
+    <div class="mb-4">
+        <a href="[% c.uri_for('/npm') %]" class="btn btn-secondary">
+            <i class="fa fa-arrow-left"></i> Back to Dashboard
+        </a>
+        
+        [% IF access_scope != 'read-only' %]
+        <a href="[% c.uri_for('/npm/create-proxy-host') %]" class="btn btn-primary">
+            <i class="fa fa-plus"></i> Create New Proxy Host
+        </a>
+        [% END %]
+    </div>
+    
+    [% IF error_message %]
+    <div class="alert alert-danger">
+        [% error_message %]
+    </div>
+    [% END %]
+    
+    <div class="card">
+        <div class="card-header">
+            <h2>Proxy Hosts</h2>
+        </div>
+        <div class="card-body">
+            [% IF proxy_hosts.size > 0 %]
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Domain Names</th>
+                            <th>Forward Target</th>
+                            <th>SSL</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        [% FOREACH host IN proxy_hosts %]
+                        <tr>
+                            <td>[% host.id %]</td>
+                            <td>
+                                [% FOREACH domain IN host.domain_names %]
+                                <div>[% domain %]</div>
+                                [% END %]
+                            </td>
+                            <td>[% host.forward_scheme %]://[% host.forward_host %]:[% host.forward_port %]</td>
+                            <td>
+                                [% IF host.ssl_forced %]
+                                <span class="badge badge-success">Enabled</span>
+                                [% ELSE %]
+                                <span class="badge badge-secondary">Disabled</span>
+                                [% END %]
+                            </td>
+                            <td>
+                                [% IF host.enabled %]
+                                <span class="badge badge-success">Active</span>
+                                [% ELSE %]
+                                <span class="badge badge-danger">Inactive</span>
+                                [% END %]
+                            </td>
+                            <td>
+                                <div class="btn-group">
+                                    <a href="[% c.uri_for('/npm/edit-proxy-host', host.id) %]" class="btn btn-sm btn-primary">
+                                        <i class="fa fa-edit"></i> Edit
+                                    </a>
+                                    <a href="[% c.uri_for('/npm/delete-proxy-host', host.id) %]" class="btn btn-sm btn-danger">
+                                        <i class="fa fa-trash"></i> Delete
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        [% END %]
+                    </tbody>
+                </table>
+            </div>
+            [% ELSE %]
+            <div class="alert alert-info">
+                No proxy hosts found.
+            </div>
+            [% END %]
+        </div>
+    </div>
+</div>

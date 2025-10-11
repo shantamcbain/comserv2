@@ -1,0 +1,108 @@
+[% META title = 'Changelog Entry Title' %]
+[% PageVersion = 'Documentation/changelog/changelog_template.tt,v 0.01 2025/10/20 Shanta Exp shanta ' %]
+[% # Set metadata for this changelog entry %]
+[% SET 
+   entry_date = '2025-10-20'
+   entry_author = 'Your Name'
+   entry_description = 'Brief description of the changes'
+%]
+
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<h1>[% template.title %]</h1>
+<div class="changelog-meta">
+    <span class="date">[% entry_date.replace('-', '/') %]</span>
+    <span class="author">by [% entry_author %]</span>
+</div>
+
+<div class="changelog-content">
+    <h2>Overview</h2>
+    <p>[% entry_description %]</p>
+    
+    <h2>Changes Made</h2>
+    <ul>
+        <li>Change item 1</li>
+        <li>Change item 2</li>
+        <li>Change item 3</li>
+    </ul>
+    
+    <h2>Technical Details</h2>
+    <p>Detailed explanation of the changes, including code snippets if relevant.</p>
+    
+    <pre><code>
+    # Example code
+    def example_function():
+        return "This is an example"
+    </code></pre>
+    
+    <h2>Impact</h2>
+    <p>Description of how these changes affect the system and users.</p>
+</div>
+
+<div class="back-link">
+    <a href="[% c.uri_for('/Documentation/all_changelog') %]">← Back to All Changelogs</a>
+</div>
+
+<style>
+    .changelog-meta {
+        color: #666;
+        font-size: 0.9em;
+        margin-bottom: 20px;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 10px;
+    }
+    
+    .changelog-meta .date {
+        font-weight: bold;
+        margin-right: 10px;
+    }
+    
+    .changelog-meta .author {
+        font-style: italic;
+    }
+    
+    .changelog-content {
+        line-height: 1.6;
+    }
+    
+    .changelog-content h2 {
+        margin-top: 25px;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 5px;
+    }
+    
+    .changelog-content ul {
+        margin-left: 20px;
+    }
+    
+    .changelog-content pre {
+        background-color: #f5f5f5;
+        padding: 15px;
+        border-radius: 5px;
+        overflow-x: auto;
+    }
+    
+    .back-link {
+        margin-top: 30px;
+        padding-top: 15px;
+        border-top: 1px solid #eee;
+    }
+    
+    .back-link a {
+        display: inline-block;
+        padding: 8px 15px;
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        color: #495057;
+        text-decoration: none;
+        transition: all 0.3s;
+    }
+    
+    .back-link a:hover {
+        background-color: #e9ecef;
+        color: #212529;
+    }
+</style>

@@ -1,7 +1,5 @@
 #!/usr/bin/env perl
 
-use FindBin;
-
 BEGIN {
     $ENV{CATALYST_SCRIPT_GEN} = 40;
 
@@ -92,12 +90,7 @@ unless (-d "$FindBin::Bin/../local") {
 }
 
 # Automatically install dependencies locally
-unless ($ENV{SKIP_DEPS}) {
-    print "Installing dependencies from cpanfile...\n";
-} else {
-    print "Skipping dependency installation (SKIP_DEPS=1)...\n";
-    goto SKIP_DEPENDENCY_INSTALLATION;
-}
+print "Installing dependencies from cpanfile...\n";
 my $cpanfile_path = "$FindBin::Bin/../cpanfile";
 if (-e $cpanfile_path) {
     print "Found cpanfile at: $cpanfile_path\n";
@@ -228,8 +221,6 @@ if (-e $cpanfile_path) {
     warn "cpanfile not found at $cpanfile_path. Skipping dependency installation.\n";
 }
 
-SKIP_DEPENDENCY_INSTALLATION:
-
 # Specifically install Catalyst::ScriptRunner if not already installed
 eval { require Catalyst::ScriptRunner; };
 if ($@) {
@@ -271,11 +262,7 @@ my @required_modules = (
     'Email::MIME',
     'Email::Sender::Simple',
     'Catalyst::View::Email',
-    'Catalyst::View::Email::Template',
-    'GD',           # For image manipulation
-    'GD::Text',
-    'PDF::API2',
-    'PDF::TextBlock'
+    'Catalyst::View::Email::Template'
 );
 
 my @missing_modules = ();
@@ -323,47 +310,11 @@ foreach my $module (@other_modules) {
 if (@missing_modules && !$already_tried_install) {
     print "Installing missing modules: " . join(', ', @missing_modules) . "\n";
 
-    # Special handling for GD module which requires system libraries
-    if (grep { $_ eq 'GD' } @missing_modules) {
-        print "GD module requires system libraries. Checking if they're installed...\n";
-
-        # Try to detect Linux distribution
-        my $is_debian_based = -f '/etc/debian_version' || -f '/etc/ubuntu_version';
-        my $is_redhat_based = -f '/etc/redhat-release' || -f '/etc/centos-release';
-
-        if ($is_debian_based) {
-            print "Detected Debian/Ubuntu-based system. The following command may need to be run with sudo:\n";
-            print "sudo apt-get install -y libgd-dev libpng-dev libjpeg-dev libfreetype6-dev\n";
-            print "Please run this command if the installation fails, then restart the application.\n";
-        } elsif ($is_redhat_based) {
-            print "Detected RedHat/CentOS-based system. The following command may need to be run with sudo:\n";
-            print "sudo yum install -y gd-devel libpng-devel libjpeg-devel freetype-devel\n";
-            print "Please run this command if the installation fails, then restart the application.\n";
-        } else {
-            print "Could not detect Linux distribution. You may need to install GD development libraries manually.\n";
-            print "Common package names: libgd-dev, gd-devel, libpng-dev, libjpeg-dev, freetype-dev\n";
-        }
-    }
-
     foreach my $module (@missing_modules) {
         print "Installing $module...\n";
-        my $result;
-
-        if ($module eq 'GD') {
-            # Use force flag for GD module and increase timeout
-            print "Installing GD module with extended timeout and force flag...\n";
-            $result = system("cpanm --local-lib=$FindBin::Bin/../local --force --verbose --timeout 600 $module");
-        } else {
-            $result = system("cpanm --local-lib=$FindBin::Bin/../local --force $module");
-        }
-
+        my $result = system("cpanm --local-lib=$FindBin::Bin/../local --force $module");
         if ($result != 0) {
-            if ($module eq 'GD') {
-                warn "Failed to install GD module. This often requires system libraries.\n";
-                warn "Please install the required system libraries as mentioned above and retry.\n";
-            } else {
-                warn "Failed to install $module. Some functionality may be limited.\n";
-            }
+            warn "Failed to install $module. Some functionality may be limited.\n";
         } else {
             print "Successfully installed $module\n";
             $need_restart = 1;
@@ -392,4 +343,52 @@ Catalyst::ScriptRunner->run('Comserv', 'Server');
 
 1;
 
-# ... (rest of your POD documentation)
+=head1 NAME
+
+comserv_server.pl - Catalyst Test Server
+
+=head1 SYNOPSIS
+
+comserv_server.pl [options]
+
+   -d --debug           force debug mode
+   -f --fork            handle each request in a new process
+                        (defaults to false)
+   -? --help            display this help and exits
+   -h --host            host (defaults to all)
+   -p --port            port (defaults to 3000)
+   -k --keepalive       enable keep-alive connections
+   -r --restart         restart when files get modified
+                        (defaults to false)
+   -rd --restart_delay  delay between file checks
+                        (ignored if you have Linux::Inotify2 installed)
+   -rr --restart_regex  regex match files that trigger
+                        a restart when modified
+                        (defaults to '\.yml$|\.yaml$|\.conf|\.pm$')
+   --restart_directory  the directory to search for
+                        modified files, can be set multiple times
+                        (defaults to '[SCRIPT_DIR]/..')
+   --follow_symlinks    follow symlinks in search directories
+                        (defaults to false. this is a no-op on Win32)
+   --background         run the process in the background
+   --pidfile            specify filename for pid file
+
+ See also:
+   perldoc Catalyst::Manual
+   perldoc Catalyst::Manual::Intro
+
+=head1 DESCRIPTION
+
+Run a Catalyst Testserver for this application.
+
+=head1 AUTHORS
+
+Catalyst Contributors, see Catalyst.pm
+
+=head1 COPYRIGHT
+
+This library is free software. You can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=cut
+

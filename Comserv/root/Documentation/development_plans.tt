@@ -1,0 +1,323 @@
+[% META title = 'Comserv Development Plans' %]
+
+<div class="documentation-content">
+
+<h1>Comserv Development Plans</h1>
+
+<p>This document serves as an index for all ongoing and planned development initiatives for the Comserv application.</p>
+
+<h2>Current Initiatives</h2>
+
+<div class="initiative">
+    <h3>1. Controller Routing Standardization</h3>
+    
+    <div class="initiative-meta">
+        <p><strong>Status:</strong> In Progress</p>
+        <p><strong>Priority:</strong> High</p>
+        <p><strong>Lead:</strong> Development Team</p>
+        <p><strong>Documentation:</strong> <a href="[% c.uri_for('/documentation/controller_routing_standardization') %]">Controller Routing Standardization</a></p>
+    </div>
+    
+    <div class="initiative-description">
+        <p><strong>Description:</strong><br>
+        Standardizing controller routing across the application using Catalyst's chained actions for better organization, maintainability, and scalability.</p>
+    </div>
+    
+    <div class="initiative-progress">
+        <p><strong>Progress:</strong></p>
+        <ul class="task-list">
+            <li class="completed">✅ MCoop controller updated as pilot implementation</li>
+            <li class="pending">⬜ Update high-traffic controllers (CSC, USBM, BMaster)</li>
+            <li class="pending">⬜ Update remaining controllers</li>
+            <li class="pending">⬜ Add automated tests to verify routing functionality</li>
+        </ul>
+    </div>
+</div>
+
+<div class="initiative">
+    <h3>2. Software Management System Enhancements</h3>
+    
+    <div class="initiative-meta">
+        <p><strong>Status:</strong> Planned</p>
+        <p><strong>Priority:</strong> High</p>
+        <p><strong>Lead:</strong> Development Team</p>
+        <p><strong>Documentation:</strong> <a href="[% c.uri_for('/documentation/software_management_system') %]">Software Management System</a></p>
+    </div>
+    
+    <div class="initiative-description">
+        <p><strong>Description:</strong><br>
+        Enhancing the existing software management system with improved error handling, automated backups, rollback capabilities, and advanced deployment features.</p>
+    </div>
+    
+    <div class="initiative-progress">
+        <p><strong>Planned Tasks:</strong></p>
+        <ul class="task-list">
+            <li class="pending">⬜ Enhanced error handling and recovery mechanisms</li>
+            <li class="pending">⬜ Automated backup system with configurable retention</li>
+            <li class="pending">⬜ One-click rollback functionality</li>
+            <li class="pending">⬜ Dependency management integration</li>
+            <li class="pending">⬜ Pre-deployment validation and testing</li>
+            <li class="pending">⬜ Advanced deployment strategies (blue-green, canary)</li>
+            <li class="pending">⬜ Monitoring and alerting improvements</li>
+            <li class="pending">⬜ Integration with CI/CD pipelines</li>
+            <li class="pending">⬜ Database migration management</li>
+            <li class="pending">⬜ Configuration management and validation</li>
+        </ul>
+    </div>
+</div>
+
+<div class="initiative">
+    <h3>3. Theme Handling Improvements</h3>
+    
+    <div class="initiative-meta">
+        <p><strong>Status:</strong> Planned</p>
+        <p><strong>Priority:</strong> Medium</p>
+        <p><strong>Lead:</strong> TBD</p>
+        <p><strong>Documentation:</strong> TBD</p>
+    </div>
+    
+    <div class="initiative-description">
+        <p><strong>Description:</strong><br>
+        Improving theme handling to ensure consistent theme application across the application, including updating theme_mappings.json to use consistent case for site names.</p>
+    </div>
+    
+    <div class="initiative-progress">
+        <p><strong>Planned Tasks:</strong></p>
+        <ul class="task-list">
+            <li class="pending">⬜ Audit current theme handling across controllers</li>
+            <li class="pending">⬜ Update theme_mappings.json for consistent case</li>
+            <li class="pending">⬜ Centralize theme handling logic</li>
+            <li class="pending">⬜ Add theme validation and error handling</li>
+        </ul>
+    </div>
+</div>
+
+<h2>Completed Initiatives</h2>
+
+<div class="initiative completed">
+    <h3>1. MCoop Controller Fix</h3>
+    
+    <div class="initiative-meta">
+        <p><strong>Status:</strong> Completed</p>
+        <p><strong>Priority:</strong> High</p>
+        <p><strong>Lead:</strong> Development Team</p>
+        <p><strong>Documentation:</strong> <a href="[% c.uri_for('/documentation/mcoop_controller_fix') %]">MCoop Controller Fix</a></p>
+    </div>
+    
+    <div class="initiative-description">
+        <p><strong>Description:</strong><br>
+        Fixed site name case handling and routing in the MCoop controller, implementing chained routing as a pilot for the Controller Routing Standardization initiative.</p>
+    </div>
+    
+    <div class="initiative-progress">
+        <p><strong>Completed Tasks:</strong></p>
+        <ul class="task-list">
+            <li class="completed">✅ Fixed site name case handling</li>
+            <li class="completed">✅ Implemented chained routing</li>
+            <li class="completed">✅ Removed redundant SiteName setting</li>
+            <li class="completed">✅ Added backward compatibility methods</li>
+            <li class="completed">✅ Documented changes and standardization plan</li>
+        </ul>
+    </div>
+</div>
+
+<h2>Planned Future Initiatives</h2>
+
+<div class="initiative future">
+    <h3>1. API Standardization</h3>
+    
+    <div class="initiative-meta">
+        <p><strong>Status:</strong> Planned</p>
+        <p><strong>Priority:</strong> Medium</p>
+        <p><strong>Lead:</strong> TBD</p>
+        <p><strong>Documentation:</strong> TBD</p>
+    </div>
+    
+    <div class="initiative-description">
+        <p><strong>Description:</strong><br>
+        Standardizing API endpoints and response formats across the application for better integration with frontend and third-party systems.</p>
+    </div>
+</div>
+
+<div class="initiative future">
+    <h3>2. Performance Optimization</h3>
+    
+    <div class="initiative-meta">
+        <p><strong>Status:</strong> Planned</p>
+        <p><strong>Priority:</strong> Medium</p>
+        <p><strong>Lead:</strong> TBD</p>
+        <p><strong>Documentation:</strong> TBD</p>
+    </div>
+    
+    <div class="initiative-description">
+        <p><strong>Description:</strong><br>
+        Identifying and addressing performance bottlenecks in the application, including database queries, template rendering, and API calls.</p>
+    </div>
+</div>
+
+<div class="initiative future">
+    <h3>3. Security Enhancements</h3>
+    
+    <div class="initiative-meta">
+        <p><strong>Status:</strong> Planned</p>
+        <p><strong>Priority:</strong> High</p>
+        <p><strong>Lead:</strong> TBD</p>
+        <p><strong>Documentation:</strong> TBD</p>
+    </div>
+    
+    <div class="initiative-description">
+        <p><strong>Description:</strong><br>
+        Enhancing security measures across the application, including input validation, authentication, authorization, and data protection.</p>
+    </div>
+</div>
+
+<h2>How to Contribute</h2>
+
+<p>If you would like to contribute to any of these initiatives or propose a new one, please follow these steps:</p>
+
+<ol>
+    <li>Review the existing documentation for the initiative</li>
+    <li>Discuss your ideas with the development team</li>
+    <li>Create a detailed proposal for your contribution</li>
+    <li>Submit a pull request with your changes</li>
+</ol>
+
+<h2>Initiative Template</h2>
+
+<p>When proposing a new initiative, please use the following template:</p>
+
+<div class="template-example">
+    <h4>Initiative Name</h4>
+    
+    <p><strong>Status:</strong> [Planned/In Progress/Completed]<br>
+    <strong>Priority:</strong> [Low/Medium/High]<br>
+    <strong>Lead:</strong> [Name or Team]<br>
+    <strong>Documentation:</strong> [Link to Documentation]</p>
+    
+    <p><strong>Description:</strong><br>
+    [Brief description of the initiative]</p>
+    
+    <p><strong>Tasks:</strong></p>
+    <ul>
+        <li>⬜ [Task 1]</li>
+        <li>⬜ [Task 2]</li>
+        <li>⬜ [Task 3]</li>
+    </ul>
+    
+    <p><strong>Success Criteria:</strong></p>
+    <ul>
+        <li>[Criterion 1]</li>
+        <li>[Criterion 2]</li>
+        <li>[Criterion 3]</li>
+    </ul>
+</div>
+
+</div>
+
+<style>
+.documentation-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.6;
+}
+
+.initiative {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.initiative.completed {
+    background: #d4edda;
+    border-color: #c3e6cb;
+}
+
+.initiative.future {
+    background: #fff3cd;
+    border-color: #ffeaa7;
+}
+
+.initiative-meta {
+    background: #e9ecef;
+    padding: 10px;
+    border-radius: 4px;
+    margin: 10px 0;
+}
+
+.initiative-meta p {
+    margin: 5px 0;
+}
+
+.initiative-description {
+    margin: 15px 0;
+}
+
+.initiative-progress {
+    margin: 15px 0;
+}
+
+.task-list {
+    list-style: none;
+    padding-left: 0;
+}
+
+.task-list li {
+    padding: 5px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.task-list li.completed {
+    color: #28a745;
+    text-decoration: line-through;
+}
+
+.task-list li.pending {
+    color: #6c757d;
+}
+
+.template-example {
+    background: #f1f3f4;
+    border: 1px solid #dadce0;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+    font-family: monospace;
+}
+
+h1, h2, h3 {
+    color: #212529;
+    margin-top: 30px;
+    margin-bottom: 15px;
+}
+
+h1 {
+    border-bottom: 2px solid #dee2e6;
+    padding-bottom: 10px;
+}
+
+h2 {
+    border-bottom: 1px solid #dee2e6;
+    padding-bottom: 5px;
+}
+
+a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+code {
+    background: #e9ecef;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+</style>

@@ -1,0 +1,81 @@
+[% META title = 'Grant Proxy Management Access' %]
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4>Grant Proxy Management Access</h4>
+                </div>
+                <div class="card-body">
+                    [% IF debug_msg %]
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> [% debug_msg %]
+                    </div>
+                    [% END %]
+                    
+                    [% IF error_msg %]
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle"></i> [% error_msg %]
+                    </div>
+                    [% END %]
+                    
+                    <p>You are granting proxy management access as administrator <strong>[% admin_username %]</strong>.</p>
+                    
+                    <form method="POST" action="[% c.uri_for('/proxy_manager/grant_access') %]">
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Username:</label>
+                            <input type="text" class="form-control" id="username" name="username" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="user_id" class="form-label">User ID:</label>
+                            <input type="number" class="form-control" id="user_id" name="user_id" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="duration" class="form-label">Access Duration:</label>
+                            <select class="form-select" id="duration" name="duration" onchange="toggleDurationHours()">
+                                <option value="temporary">Temporary</option>
+                                <option value="project">Project-based</option>
+                                <option value="permanent">Permanent</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3" id="duration_hours_div">
+                            <label for="duration_hours" class="form-label">Duration (hours):</label>
+                            <input type="number" class="form-control" id="duration_hours" name="duration_hours" value="1" min="1" max="168">
+                            <div class="form-text">For temporary access, specify the number of hours (1-168).</div>
+                        </div>
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="[% c.uri_for('/proxy_manager') %]" class="btn btn-secondary me-md-2">Cancel</a>
+                            <button type="submit" class="btn btn-primary">Grant Access</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="card-footer text-muted">
+                    <small>All access grants are logged for security purposes.</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleDurationHours() {
+    var durationType = document.getElementById('duration').value;
+    var durationHoursDiv = document.getElementById('duration_hours_div');
+    
+    if (durationType === 'temporary') {
+        durationHoursDiv.style.display = 'block';
+    } else {
+        durationHoursDiv.style.display = 'none';
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    toggleDurationHours();
+});
+</script>

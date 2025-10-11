@@ -1,6 +1,10 @@
 
 
-
+[% PageVersion = 'CSC/AppToolsView.tt,v 1.0 2025/05/31 shanta Exp shanta' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [% INCLUDE 'debug.tt' %]
+[% END %]
 
 
 

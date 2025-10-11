@@ -1,0 +1,657 @@
+[% PageVersion = 'admin/git_commit.tt,v 1.0 2025/01/20 shanta Exp shanta ' %]
+[% META title = 'Git Commit Management' %]
+
+<div class="admin-container">
+    <div class="admin-header">
+        <h1><i class="fas fa-code-branch"></i> Git Commit Management</h1>
+        <p class="admin-description">
+            Stage files and create commits directly from the web interface. 
+            Review your changes, add files to staging, and commit with descriptive messages.
+        </p>
+    </div>
+
+    [% IF success_msg %]
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle"></i> [% success_msg %]
+        </div>
+    [% END %]
+
+    [% IF error_msg %]
+        <div class="alert alert-danger">
+            <i class="fas fa-times-circle"></i> [% error_msg %]
+        </div>
+    [% END %]
+
+    <div class="admin-section">
+        <h2><i class="fas fa-info-circle"></i> Current Git Status</h2>
+        [% IF git_status.has_changes %]
+            <div class="git-status-changes">
+                <div class="status-indicator status-changes">
+                    <i class="fas fa-exclamation-circle"></i>
+                    You have uncommitted changes
+                </div>
+                
+                [% IF git_status.staged_files.size > 0 %]
+                    <div class="file-group">
+                        <h4><i class="fas fa-plus-circle text-success"></i> Staged Files ([% git_status.staged_files.size %])</h4>
+                        <p class="file-group-desc">These files are ready to be committed:</p>
+                        <ul class="file-list">
+                            [% FOREACH file IN git_status.staged_files %]
+                                <li><code>[% file %]</code></li>
+                            [% END %]
+                        </ul>
+                    </div>
+                [% END %]
+                
+                [% IF git_status.modified_files.size > 0 %]
+                    <div class="file-group">
+                        <h4><i class="fas fa-edit text-warning"></i> Modified Files ([% git_status.modified_files.size %])</h4>
+                        <p class="file-group-desc">These files have changes but are not staged:</p>
+                        <form method="POST" action="[% c.uri_for('/admin/git_commit') %]" class="add-files-form">
+                            <input type="hidden" name="action" value="add_files">
+                            <ul class="file-list selectable">
+                                [% FOREACH file IN git_status.modified_files %]
+                                    <li>
+                                        <label class="file-checkbox">
+                                            <input type="checkbox" name="files" value="[% file %]">
+                                            <code>[% file %]</code>
+                                        </label>
+                                    </li>
+                                [% END %]
+                            </ul>
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-plus"></i> Add Selected Files to Staging
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" onclick="selectAllFiles(this.form)">
+                                    <i class="fas fa-check-square"></i> Select All
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                [% END %]
+                
+                [% IF git_status.untracked_files.size > 0 %]
+                    <div class="file-group">
+                        <h4><i class="fas fa-question-circle text-info"></i> Untracked Files ([% git_status.untracked_files.size %])</h4>
+                        <p class="file-group-desc">These files are not tracked by git:</p>
+                        <form method="POST" action="[% c.uri_for('/admin/git_commit') %]" class="add-files-form">
+                            <input type="hidden" name="action" value="add_files">
+                            <ul class="file-list selectable">
+                                [% FOREACH file IN git_status.untracked_files %]
+                                    <li>
+                                        <label class="file-checkbox">
+                                            <input type="checkbox" name="files" value="[% file %]">
+                                            <code>[% file %]</code>
+                                        </label>
+                                    </li>
+                                [% END %]
+                            </ul>
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-plus"></i> Add Selected Files to Staging
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" onclick="selectAllFiles(this.form)">
+                                    <i class="fas fa-check-square"></i> Select All
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                [% END %]
+            </div>
+        [% ELSE %]
+            <div class="status-indicator status-clean">
+                <i class="fas fa-check-circle"></i>
+                Working directory is clean - no uncommitted changes
+            </div>
+        [% END %]
+    </div>
+
+    [% IF git_status.staged_files.size > 0 %]
+        <div class="admin-section">
+            <h2><i class="fas fa-save"></i> Create Commit</h2>
+            <p>You have [% git_status.staged_files.size %] file(s) staged and ready to commit.</p>
+            <form method="POST" action="[% c.uri_for('/admin/git_commit') %]" class="commit-form">
+                <input type="hidden" name="action" value="commit">
+                <div class="form-group">
+                    <label for="commit_message">Commit Message:</label>
+                    <textarea name="commit_message" id="commit_message" class="form-control" rows="3" 
+                              placeholder="Describe your changes..." required></textarea>
+                    <small class="form-text">Write a clear, descriptive message about what changes you made</small>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-success btn-lg">
+                        <i class="fas fa-save"></i> Create Commit
+                    </button>
+                </div>
+            </form>
+        </div>
+    [% END %]
+
+    [% IF git_status.modified_files.size > 0 OR git_status.untracked_files.size > 0 %]
+        <div class="admin-section">
+            <h2><i class="fas fa-rocket"></i> Quick Add & Commit</h2>
+            <p>Add selected files and commit them in one operation:</p>
+            <form method="POST" action="[% c.uri_for('/admin/git_commit') %]" class="quick-commit-form">
+                <input type="hidden" name="action" value="add_and_commit">
+                
+                <div class="form-group">
+                    <label>Select Files to Add & Commit:</label>
+                    <div class="files-selection">
+                        [% FOREACH file IN git_status.modified_files %]
+                            <label class="file-checkbox">
+                                <input type="checkbox" name="files" value="[% file %]">
+                                <i class="fas fa-edit text-warning"></i>
+                                <code>[% file %]</code>
+                                <span class="file-status">modified</span>
+                            </label>
+                        [% END %]
+                        [% FOREACH file IN git_status.untracked_files %]
+                            <label class="file-checkbox">
+                                <input type="checkbox" name="files" value="[% file %]">
+                                <i class="fas fa-question-circle text-info"></i>
+                                <code>[% file %]</code>
+                                <span class="file-status">untracked</span>
+                            </label>
+                        [% END %]
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selectAllFiles(this.form)">
+                        <i class="fas fa-check-square"></i> Select All
+                    </button>
+                </div>
+                
+                <div class="form-group">
+                    <label for="quick_commit_message">Commit Message:</label>
+                    <textarea name="commit_message" id="quick_commit_message" class="form-control" rows="3" 
+                              placeholder="Describe your changes..." required></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-success btn-lg">
+                        <i class="fas fa-rocket"></i> Add & Commit Selected Files
+                    </button>
+                </div>
+            </form>
+        </div>
+    [% END %]
+
+    <div class="admin-section">
+        <h2><i class="fas fa-history"></i> Recent Commits</h2>
+        [% IF recent_commits.size > 0 %]
+            <div class="commits-list">
+                [% FOREACH commit IN recent_commits %]
+                    <div class="commit-item">
+                        <div class="commit-hash">
+                            <i class="fas fa-code-branch"></i>
+                            <code>[% commit.hash %]</code>
+                        </div>
+                        <div class="commit-message">[% commit.message %]</div>
+                    </div>
+                [% END %]
+            </div>
+        [% ELSE %]
+            <div class="no-commits">
+                <i class="fas fa-history" style="font-size: 48px; color: #ccc; margin-bottom: 15px;"></i>
+                <h3>No Recent Commits</h3>
+                <p>No commit history available or repository not initialized.</p>
+            </div>
+        [% END %]
+    </div>
+
+    [% IF output %]
+        <div class="admin-section">
+            <h2><i class="fas fa-terminal"></i> Command Output</h2>
+            <div class="output-container">
+                <pre class="command-output">[% output %]</pre>
+            </div>
+        </div>
+    [% END %]
+
+    <div class="admin-section">
+        <h2><i class="fas fa-info-circle"></i> Git Workflow Guide</h2>
+        <div class="guide-grid">
+            <div class="guide-item">
+                <h4><i class="fas fa-plus text-primary"></i> Add Files</h4>
+                <p>Stage modified or untracked files to prepare them for commit. Only staged files will be included in the commit.</p>
+            </div>
+            <div class="guide-item">
+                <h4><i class="fas fa-save text-success"></i> Commit</h4>
+                <p>Create a commit with staged files and a descriptive message. This saves a snapshot of your changes to the repository.</p>
+            </div>
+            <div class="guide-item">
+                <h4><i class="fas fa-rocket text-warning"></i> Quick Add & Commit</h4>
+                <p>Add selected files and commit them in one operation. Useful for committing multiple related changes quickly.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="admin-section">
+        <h2><i class="fas fa-link"></i> Related Operations</h2>
+        <div class="related-links">
+            <a href="[% c.uri_for('/admin/git_stash') %]" class="btn btn-outline-info">
+                <i class="fas fa-archive"></i> Git Stash Management
+            </a>
+            <a href="[% c.uri_for('/admin/safe_git_pull') %]" class="btn btn-outline-primary">
+                <i class="fas fa-shield-alt"></i> Safe Git Pull
+            </a>
+            <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Admin
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+function selectAllFiles(form) {
+    const checkboxes = form.querySelectorAll('input[type="checkbox"][name="files"]');
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    
+    checkboxes.forEach(cb => {
+        cb.checked = !allChecked;
+    });
+    
+    // Update button text
+    const button = form.querySelector('button[onclick*="selectAllFiles"]');
+    if (button) {
+        if (allChecked) {
+            button.innerHTML = '<i class="fas fa-check-square"></i> Select All';
+        } else {
+            button.innerHTML = '<i class="fas fa-square"></i> Deselect All';
+        }
+    }
+}
+</script>
+
+<style>
+.admin-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.admin-header {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border-left: 4px solid #28a745;
+}
+
+.admin-header h1 {
+    margin: 0 0 10px 0;
+    color: #333;
+}
+
+.admin-description {
+    margin: 0;
+    color: #666;
+    font-size: 14px;
+}
+
+.admin-section {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.admin-section h2 {
+    margin: 0 0 15px 0;
+    color: #333;
+    font-size: 18px;
+}
+
+.status-indicator {
+    padding: 12px 16px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: bold;
+    margin-bottom: 15px;
+}
+
+.status-clean {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+
+.status-changes {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    color: #856404;
+}
+
+.git-status-changes {
+    space-y: 20px;
+}
+
+.file-group {
+    margin-bottom: 25px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.file-group h4 {
+    margin: 0 0 8px 0;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.file-group-desc {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    color: #666;
+}
+
+.file-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 15px 0;
+}
+
+.file-list li {
+    padding: 8px 0;
+}
+
+.file-list.selectable li {
+    padding: 0;
+}
+
+.file-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    margin-bottom: 5px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.file-checkbox:hover {
+    background: #f8f9fa;
+    border-color: #007bff;
+}
+
+.file-checkbox input[type="checkbox"] {
+    margin: 0;
+}
+
+.file-checkbox code {
+    background: #e9ecef;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 12px;
+    flex: 1;
+}
+
+.file-status {
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    background: #dee2e6;
+    color: #666;
+}
+
+.files-selection {
+    margin-bottom: 10px;
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 10px;
+}
+
+.commit-form, .quick-commit-form {
+    max-width: 600px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+}
+
+.form-control {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 14px;
+    font-family: inherit;
+}
+
+.form-control[rows] {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.form-text {
+    font-size: 12px;
+    color: #666;
+    margin-top: 5px;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.commits-list {
+    space-y: 10px;
+}
+
+.commit-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 12px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    margin-bottom: 8px;
+}
+
+.commit-hash {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: bold;
+    min-width: 120px;
+}
+
+.commit-hash code {
+    background: #e9ecef;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+.commit-message {
+    flex: 1;
+    color: #666;
+    font-size: 14px;
+}
+
+.no-commits {
+    text-align: center;
+    padding: 40px 20px;
+    color: #666;
+}
+
+.no-commits h3 {
+    margin: 0 0 10px 0;
+    color: #333;
+}
+
+.guide-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.guide-item {
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    border-left: 3px solid #dee2e6;
+}
+
+.guide-item h4 {
+    margin: 0 0 10px 0;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.guide-item p {
+    margin: 0;
+    font-size: 14px;
+    color: #666;
+}
+
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.btn-sm {
+    padding: 4px 8px;
+    font-size: 12px;
+}
+
+.btn-lg {
+    padding: 12px 24px;
+    font-size: 16px;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-success {
+    background: #28a745;
+    color: white;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-outline-secondary {
+    border: 1px solid #6c757d;
+    color: #6c757d;
+    background: white;
+}
+
+.btn-outline-info {
+    border: 1px solid #17a2b8;
+    color: #17a2b8;
+    background: white;
+}
+
+.btn-outline-primary {
+    border: 1px solid #007bff;
+    color: #007bff;
+    background: white;
+}
+
+.output-container {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 15px;
+}
+
+.command-output {
+    margin: 0;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.related-links {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.alert {
+    padding: 12px 16px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.alert-success {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+
+.alert-danger {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}
+
+.text-success { color: #28a745; }
+.text-warning { color: #ffc107; }
+.text-info { color: #17a2b8; }
+.text-primary { color: #007bff; }
+
+@media (max-width: 768px) {
+    .commit-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .commit-hash {
+        min-width: auto;
+    }
+    
+    .guide-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .files-selection {
+        max-height: 200px;
+    }
+}
+</style>

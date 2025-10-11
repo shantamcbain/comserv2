@@ -1,0 +1,320 @@
+[% META title = 'FAQ Category' %]
+[% PageVersion = 'CSC/FAQ/category.tt,v 0.01 2024/04/24 shanta Exp shanta ' %]
+
+[% IF c.session.debug_mode == 1 %]
+ <br>[% PageVersion %]</br>
+ [% IF debug_msg.size %]
+   <div class="debug-message">
+     <ul>
+     [% FOREACH msg IN debug_msg %]
+       <li>[% msg %]</li>
+     [% END %]
+     </ul>
+   </div>
+ [% END %]
+[% END %]
+
+<div class="faq-container">
+    [% # Define category information based on category_id %]
+    [% 
+        SWITCH category_id;
+            CASE '1';
+                category_name = 'Account Management';
+                category_icon = 'icon-account';
+            CASE '2';
+                category_name = 'Site Configuration';
+                category_icon = 'icon-site';
+            CASE '3';
+                category_name = 'Email System';
+                category_icon = 'icon-mail';
+            CASE '4';
+                category_name = 'Hosting Services';
+                category_icon = 'icon-hosting';
+            CASE '5';
+                category_name = 'Billing & Payments';
+                category_icon = 'icon-billing';
+            CASE '6';
+                category_name = 'Technical Issues';
+                category_icon = 'icon-technical';
+            DEFAULT;
+                category_name = 'Unknown Category';
+                category_icon = 'icon-question';
+        END;
+    %]
+
+    <div class="category-header">
+        <a href="/faq" class="back-link">&larr; Back to All Categories</a>
+        <h1><i class="[% category_icon %]"></i> [% category_name %] FAQs</h1>
+    </div>
+    
+    [% IF error_msg %]
+    <div class="error-message">
+        <p>[% error_msg %]</p>
+    </div>
+    [% END %]
+    
+    [% IF success_msg %]
+    <div class="success-message">
+        <p>[% success_msg %]</p>
+    </div>
+    [% END %]
+    
+    <div class="faq-section">
+        [% # Display different FAQs based on category_id %]
+        [% SWITCH category_id %]
+            [% CASE '1' %]
+                <div class="faq-accordion">
+                    <div class="faq-item">
+                        <div class="faq-question">
+                            <h3>How do I create a new account?</h3>
+                            <span class="toggle-icon">+</span>
+                        </div>
+                        <div class="faq-answer">
+                            <p>To create a new account:</p>
+                            <ol>
+                                <li>Click on "Login" in the top menu</li>
+                                <li>Click on "Register" or "Create Account"</li>
+                                <li>Fill out the registration form with your information</li>
+                                <li>Click "Create Account"</li>
+                                <li>Check your email for a verification link</li>
+                                <li>Click the verification link to activate your account</li>
+                            </ol>
+                        </div>
+                    </div>
+                    
+                    <div class="faq-item">
+                        <div class="faq-question">
+                            <h3>How do I reset my password?</h3>
+                            <span class="toggle-icon">+</span>
+                        </div>
+                        <div class="faq-answer">
+                            <p>To reset your password:</p>
+                            <ol>
+                                <li>Click on the "Login" link in the top menu</li>
+                                <li>Click on "Forgot Password"</li>
+                                <li>Enter your email address</li>
+                                <li>Check your email for reset instructions</li>
+                                <li>Follow the link in the email to create a new password</li>
+                            </ol>
+                            <p>If you don't receive the email within a few minutes, please check your spam folder.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="faq-item">
+                        <div class="faq-question">
+                            <h3>How do I update my profile information?</h3>
+                            <span class="toggle-icon">+</span>
+                        </div>
+                        <div class="faq-answer">
+                            <p>To update your profile:</p>
+                            <ol>
+                                <li>Log in to your account</li>
+                                <li>Click on your username in the top right corner</li>
+                                <li>Select "My Profile" from the dropdown menu</li>
+                                <li>Click "Edit Profile"</li>
+                                <li>Update your information</li>
+                                <li>Click "Save Changes"</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+                
+            [% CASE '3' %]
+                <div class="faq-accordion">
+                    <div class="faq-item">
+                        <div class="faq-question">
+                            <h3>How do I configure email for my site?</h3>
+                            <span class="toggle-icon">+</span>
+                        </div>
+                        <div class="faq-answer">
+                            <p>Email configuration is managed through the Mail Configuration page:</p>
+                            <ol>
+                                <li>Log in with your admin account</li>
+                                <li>Navigate to "System Setup" in the admin menu</li>
+                                <li>Select "Mail Configuration"</li>
+                                <li>Enter your SMTP server details</li>
+                                <li>Click "Save Configuration"</li>
+                            </ol>
+                            <p>For detailed instructions, please refer to our <a href="/Documentation/mail_system">Mail System Documentation</a>.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="faq-item">
+                        <div class="faq-question">
+                            <h3>Why am I not receiving emails from the system?</h3>
+                            <span class="toggle-icon">+</span>
+                        </div>
+                        <div class="faq-answer">
+                            <p>If you're not receiving emails, please check the following:</p>
+                            <ol>
+                                <li>Check your spam/junk folder</li>
+                                <li>Verify that your email address is correct in your profile</li>
+                                <li>Make sure the site's SMTP settings are configured correctly</li>
+                                <li>Check if your email provider is blocking emails from our domain</li>
+                            </ol>
+                            <p>If you're an administrator, you can check the application logs for any email sending errors.</p>
+                        </div>
+                    </div>
+                </div>
+                
+            [% DEFAULT %]
+                <div class="faq-message">
+                    <p>FAQs for this category are coming soon. Please check back later or contact support if you have specific questions.</p>
+                </div>
+        [% END %]
+    </div>
+    
+    <div class="faq-contact">
+        <h2>Still Have Questions?</h2>
+        <p>If you couldn't find the answer to your question, please contact our support team.</p>
+        <a href="/HelpDesk/contact" class="btn btn-primary">Contact Support</a>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Add click event listeners to FAQ questions
+        const faqQuestions = document.querySelectorAll('.faq-question');
+        
+        faqQuestions.forEach(question => {
+            question.addEventListener('click', function() {
+                // Toggle the active class on the question
+                this.classList.toggle('active');
+                
+                // Toggle the display of the answer
+                const answer = this.nextElementSibling;
+                if (answer.style.display === 'block') {
+                    answer.style.display = 'none';
+                    this.querySelector('.toggle-icon').textContent = '+';
+                } else {
+                    answer.style.display = 'block';
+                    this.querySelector('.toggle-icon').textContent = '-';
+                }
+            });
+        });
+    });
+</script>
+
+<style>
+    .faq-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .category-header {
+        margin-bottom: 30px;
+    }
+    
+    .back-link {
+        display: inline-block;
+        margin-bottom: 10px;
+        color: #007bff;
+        text-decoration: none;
+    }
+    
+    .back-link:hover {
+        text-decoration: underline;
+    }
+    
+    .category-header h1 {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .category-header h1 i {
+        color: #007bff;
+    }
+    
+    .faq-section {
+        margin-bottom: 40px;
+    }
+    
+    .faq-accordion {
+        margin-top: 20px;
+    }
+    
+    .faq-item {
+        margin-bottom: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        overflow: hidden;
+    }
+    
+    .faq-question {
+        background-color: #f8f9fa;
+        padding: 15px;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .faq-question h3 {
+        margin: 0;
+        font-size: 1.1rem;
+    }
+    
+    .toggle-icon {
+        font-size: 1.5rem;
+        font-weight: bold;
+    }
+    
+    .faq-answer {
+        padding: 15px;
+        display: none;
+        border-top: 1px solid #ddd;
+    }
+    
+    .faq-message {
+        padding: 20px;
+        background-color: #f8f9fa;
+        border-radius: 5px;
+        text-align: center;
+    }
+    
+    .faq-contact {
+        text-align: center;
+        padding: 30px;
+        background-color: #f8f9fa;
+        border-radius: 5px;
+    }
+    
+    .btn {
+        display: inline-block;
+        padding: 10px 20px;
+        text-decoration: none;
+        border-radius: 4px;
+        margin-top: 10px;
+    }
+    
+    .btn-primary {
+        background-color: #007bff;
+        color: white;
+    }
+    
+    .error-message {
+        background-color: #f8d7da;
+        color: #721c24;
+        padding: 10px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+    }
+    
+    .success-message {
+        background-color: #d4edda;
+        color: #155724;
+        padding: 10px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+    }
+    
+    .debug-message {
+        background-color: #f8d7da;
+        color: #721c24;
+        padding: 10px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+    }
+</style>

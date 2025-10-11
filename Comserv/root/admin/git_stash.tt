@@ -1,0 +1,504 @@
+[% PageVersion = 'admin/git_stash.tt,v 1.0 2025/01/20 shanta Exp shanta ' %]
+[% META title = 'Git Stash Management' %]
+
+<div class="admin-container">
+    <div class="admin-header">
+        <h1><i class="fas fa-archive"></i> Git Stash Management</h1>
+        <p class="admin-description">
+            Manage your git stashes - temporarily save changes, apply them later, or clean up unwanted stashes.
+            Useful for switching branches or pulling updates when you have uncommitted changes.
+        </p>
+    </div>
+
+    [% IF success_msg %]
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle"></i> [% success_msg %]
+        </div>
+    [% END %]
+
+    [% IF error_msg %]
+        <div class="alert alert-danger">
+            <i class="fas fa-times-circle"></i> [% error_msg %]
+        </div>
+    [% END %]
+
+    <div class="admin-section">
+        <h2><i class="fas fa-info-circle"></i> Current Git Status</h2>
+        [% IF git_status.has_changes %]
+            <div class="git-status-changes">
+                <div class="status-indicator status-changes">
+                    <i class="fas fa-exclamation-circle"></i>
+                    You have uncommitted changes
+                </div>
+                
+                [% IF git_status.staged_files.size > 0 %]
+                    <div class="file-group">
+                        <h4><i class="fas fa-plus-circle text-success"></i> Staged Files ([% git_status.staged_files.size %])</h4>
+                        <ul class="file-list">
+                            [% FOREACH file IN git_status.staged_files %]
+                                <li><code>[% file %]</code></li>
+                            [% END %]
+                        </ul>
+                    </div>
+                [% END %]
+                
+                [% IF git_status.modified_files.size > 0 %]
+                    <div class="file-group">
+                        <h4><i class="fas fa-edit text-warning"></i> Modified Files ([% git_status.modified_files.size %])</h4>
+                        <ul class="file-list">
+                            [% FOREACH file IN git_status.modified_files %]
+                                <li><code>[% file %]</code></li>
+                            [% END %]
+                        </ul>
+                    </div>
+                [% END %]
+                
+                [% IF git_status.untracked_files.size > 0 %]
+                    <div class="file-group">
+                        <h4><i class="fas fa-question-circle text-info"></i> Untracked Files ([% git_status.untracked_files.size %])</h4>
+                        <ul class="file-list">
+                            [% FOREACH file IN git_status.untracked_files %]
+                                <li><code>[% file %]</code></li>
+                            [% END %]
+                        </ul>
+                    </div>
+                [% END %]
+            </div>
+        [% ELSE %]
+            <div class="status-indicator status-clean">
+                <i class="fas fa-check-circle"></i>
+                Working directory is clean - no uncommitted changes
+            </div>
+        [% END %]
+    </div>
+
+    [% IF git_status.has_changes %]
+        <div class="admin-section">
+            <h2><i class="fas fa-save"></i> Stash Current Changes</h2>
+            <p>Save your current changes to a stash so you can work on something else, then come back and re-apply them later.</p>
+            <form method="POST" action="[% c.uri_for('/admin/git_stash') %]" class="stash-form">
+                <input type="hidden" name="action" value="stash_push">
+                <div class="form-group">
+                    <label for="stash_message">Stash Message:</label>
+                    <input type="text" name="stash_message" id="stash_message" class="form-control" 
+                           placeholder="Describe what you're stashing..." required>
+                    <small class="form-text">A descriptive message helps you identify this stash later</small>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Create Stash
+                    </button>
+                </div>
+            </form>
+        </div>
+    [% END %]
+
+    <div class="admin-section">
+        <h2><i class="fas fa-list"></i> Current Stashes</h2>
+        [% IF stash_list.size > 0 %]
+            <div class="stashes-container">
+                [% FOREACH stash IN stash_list %]
+                    <div class="stash-item">
+                        <div class="stash-info">
+                            <div class="stash-ref">
+                                <i class="fas fa-archive"></i>
+                                <strong>[% stash.ref %]</strong>
+                            </div>
+                            <div class="stash-message">[% stash.message %]</div>
+                        </div>
+                        <div class="stash-actions">
+                            <form method="POST" action="[% c.uri_for('/admin/git_stash') %]" style="display: inline;">
+                                <input type="hidden" name="action" value="stash_pop">
+                                <input type="hidden" name="stash_index" value="[% stash.index %]">
+                                <button type="submit" class="btn btn-sm btn-success" 
+                                        onclick="return confirm('Apply and remove stash [% stash.ref %]?')">
+                                    <i class="fas fa-undo"></i> Pop
+                                </button>
+                            </form>
+                            <form method="POST" action="[% c.uri_for('/admin/git_stash') %]" style="display: inline;">
+                                <input type="hidden" name="action" value="stash_drop">
+                                <input type="hidden" name="stash_index" value="[% stash.index %]">
+                                <button type="submit" class="btn btn-sm btn-danger" 
+                                        onclick="return confirm('Permanently delete stash [% stash.ref %]?')">
+                                    <i class="fas fa-trash"></i> Drop
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                [% END %]
+            </div>
+        [% ELSE %]
+            <div class="no-stashes">
+                <i class="fas fa-archive" style="font-size: 48px; color: #ccc; margin-bottom: 15px;"></i>
+                <h3>No Stashes Found</h3>
+                <p>You don't have any stashes yet. Stashes are created when you have uncommitted changes and want to temporarily save them.</p>
+            </div>
+        [% END %]
+    </div>
+
+    [% IF output %]
+        <div class="admin-section">
+            <h2><i class="fas fa-terminal"></i> Command Output</h2>
+            <div class="output-container">
+                <pre class="command-output">[% output %]</pre>
+            </div>
+        </div>
+    [% END %]
+
+    <div class="admin-section">
+        <h2><i class="fas fa-info-circle"></i> Stash Operations Guide</h2>
+        <div class="guide-grid">
+            <div class="guide-item">
+                <h4><i class="fas fa-save text-primary"></i> Stash Push</h4>
+                <p>Saves your current changes (both staged and unstaged) to a new stash and reverts your working directory to a clean state.</p>
+            </div>
+            <div class="guide-item">
+                <h4><i class="fas fa-undo text-success"></i> Stash Pop</h4>
+                <p>Applies the changes from a stash to your working directory and removes the stash from the stash list.</p>
+            </div>
+            <div class="guide-item">
+                <h4><i class="fas fa-trash text-danger"></i> Stash Drop</h4>
+                <p>Permanently deletes a stash without applying its changes. Use this to clean up stashes you no longer need.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="admin-section">
+        <h2><i class="fas fa-link"></i> Related Operations</h2>
+        <div class="related-links">
+            <a href="[% c.uri_for('/admin/git_commit') %]" class="btn btn-outline-success">
+                <i class="fas fa-code-branch"></i> Git Commit Management
+            </a>
+            <a href="[% c.uri_for('/admin/safe_git_pull') %]" class="btn btn-outline-primary">
+                <i class="fas fa-shield-alt"></i> Safe Git Pull
+            </a>
+            <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Admin
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+.admin-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.admin-header {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border-left: 4px solid #17a2b8;
+}
+
+.admin-header h1 {
+    margin: 0 0 10px 0;
+    color: #333;
+}
+
+.admin-description {
+    margin: 0;
+    color: #666;
+    font-size: 14px;
+}
+
+.admin-section {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.admin-section h2 {
+    margin: 0 0 15px 0;
+    color: #333;
+    font-size: 18px;
+}
+
+.status-indicator {
+    padding: 12px 16px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: bold;
+    margin-bottom: 15px;
+}
+
+.status-clean {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+
+.status-changes {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    color: #856404;
+}
+
+.git-status-changes {
+    space-y: 15px;
+}
+
+.file-group {
+    margin-bottom: 15px;
+}
+
+.file-group h4 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.file-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    background: #f8f9fa;
+    border-radius: 4px;
+    padding: 10px;
+}
+
+.file-list li {
+    padding: 4px 0;
+}
+
+.file-list code {
+    background: #e9ecef;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+.stash-form {
+    max-width: 500px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.form-control {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.form-text {
+    font-size: 12px;
+    color: #666;
+    margin-top: 5px;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.stashes-container {
+    space-y: 10px;
+}
+
+.stash-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    margin-bottom: 10px;
+}
+
+.stash-info {
+    flex: 1;
+}
+
+.stash-ref {
+    font-weight: bold;
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.stash-message {
+    color: #666;
+    font-size: 14px;
+}
+
+.stash-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.no-stashes {
+    text-align: center;
+    padding: 40px 20px;
+    color: #666;
+}
+
+.no-stashes h3 {
+    margin: 0 0 10px 0;
+    color: #333;
+}
+
+.guide-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.guide-item {
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    border-left: 3px solid #dee2e6;
+}
+
+.guide-item h4 {
+    margin: 0 0 10px 0;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.guide-item p {
+    margin: 0;
+    font-size: 14px;
+    color: #666;
+}
+
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-sm {
+    padding: 4px 8px;
+    font-size: 12px;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-success {
+    background: #28a745;
+    color: white;
+}
+
+.btn-danger {
+    background: #dc3545;
+    color: white;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-outline-success {
+    border: 1px solid #28a745;
+    color: #28a745;
+    background: white;
+}
+
+.btn-outline-primary {
+    border: 1px solid #007bff;
+    color: #007bff;
+    background: white;
+}
+
+.output-container {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 15px;
+}
+
+.command-output {
+    margin: 0;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.related-links {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.alert {
+    padding: 12px 16px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.alert-success {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+
+.alert-danger {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}
+
+.text-success { color: #28a745; }
+.text-warning { color: #ffc107; }
+.text-info { color: #17a2b8; }
+.text-primary { color: #007bff; }
+.text-danger { color: #dc3545; }
+
+@media (max-width: 768px) {
+    .stash-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+    
+    .stash-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+    
+    .guide-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>

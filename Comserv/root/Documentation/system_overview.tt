@@ -1,0 +1,125 @@
+[% PageVersion = 'Documentation/system_overview.tt,v 0.01 2024/05/30 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="documentation-page">
+    <h1>System Overview</h1>
+    
+    <div class="section">
+        <h2>Introduction</h2>
+        <p>
+            The Comserv system is a comprehensive web application framework built on Catalyst.
+            This document provides an overview of the system architecture, components, and functionality.
+        </p>
+    </div>
+    
+    <div class="section">
+        <h2>Core Components</h2>
+        <p>The Comserv system consists of the following core components:</p>
+        <ul>
+            <li><strong>Web Interface</strong> - User-facing frontend built with Template Toolkit</li>
+            <li><strong>Application Logic</strong> - Catalyst controllers and models</li>
+            <li><strong>Database Layer</strong> - Database schema and access methods</li>
+            <li><strong>Authentication System</strong> - User authentication and authorization</li>
+            <li><strong>Theme System</strong> - Customizable appearance and layouts</li>
+            <li><strong>Documentation</strong> - Comprehensive system documentation</li>
+        </ul>
+    </div>
+    
+    <div class="section">
+        <h2>System Architecture</h2>
+        <p>
+            Comserv follows the Model-View-Controller (MVC) architecture pattern:
+        </p>
+        <ul>
+            <li><strong>Models</strong> - Handle data access and business logic</li>
+            <li><strong>Views</strong> - Present data to users using Template Toolkit</li>
+            <li><strong>Controllers</strong> - Process user input and coordinate responses</li>
+        </ul>
+        <p>
+            For more detailed information about the system architecture, please refer to the
+            <a href="[% c.uri_for('/Documentation/architecture') %]">Architecture Documentation</a>.
+        </p>
+    </div>
+    
+    <div class="section">
+        <h2>Key Features</h2>
+        <p>The Comserv system provides the following key features:</p>
+        <ul>
+            <li>User authentication and role-based access control</li>
+            <li>Dynamic theme management</li>
+            <li>Database schema management and migration</li>
+            <li>Comprehensive documentation system</li>
+            <li>Extensible plugin architecture</li>
+            <li>Logging and monitoring capabilities</li>
+        </ul>
+    </div>
+    
+    <div class="section">
+        <h2>System Requirements</h2>
+        <p>The Comserv system requires the following components:</p>
+        <ul>
+            <li>Perl 5.10 or higher</li>
+            <li>Catalyst Framework</li>
+            <li>Template Toolkit</li>
+            <li>Database (MySQL, PostgreSQL, or SQLite)</li>
+            <li>Web server (Apache, Nginx, or standalone)</li>
+        </ul>
+    </div>
+    
+    <div class="section">
+        <h2>Related Documentation</h2>
+        <ul>
+            <li><a href="[% c.uri_for('/Documentation/architecture') %]">System Architecture</a></li>
+            <li><a href="[% c.uri_for('/Documentation/admin') %]">Admin Module</a></li>
+            <li><a href="[% c.uri_for('/Documentation/theme_system') %]">Theme System</a></li>
+        </ul>
+    </div>
+</div>
+
+<style>
+    .documentation-page {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+    }
+    
+    .section {
+        margin-bottom: 30px;
+    }
+    
+    h1 {
+        color: #333;
+        border-bottom: 2px solid #eee;
+        padding-bottom: 10px;
+    }
+    
+    h2 {
+        color: #0066cc;
+        margin-top: 20px;
+    }
+    
+    ul, ol {
+        padding-left: 25px;
+    }
+    
+    li {
+        margin-bottom: 8px;
+    }
+    
+    strong {
+        color: #333;
+    }
+    
+    a {
+        color: #0066cc;
+        text-decoration: none;
+    }
+    
+    a:hover {
+        text-decoration: underline;
+    }
+</style>

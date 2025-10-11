@@ -1,0 +1,206 @@
+[% META title = 'Documentation' %]
+
+<div class="documentation-container">
+    <div class="documentation-header">
+        <h1>Documentation System</h1>
+        <p class="documentation-subtitle">
+            Welcome to the Comserv Documentation System. 
+            [% IF user_role == 'admin' %]
+                You have administrator access and can view all documentation.
+            [% ELSIF user_role == 'developer' %]
+                You have developer access and can view technical documentation.
+            [% ELSE %]
+                You have user access to general documentation.
+            [% END %]
+        </p>
+        
+        [% IF page_count > 0 %]
+            <p class="page-count">Found [% page_count %] documentation pages available for your role.</p>
+        [% ELSE %]
+            <p class="no-pages">No documentation pages are currently available for your role.</p>
+        [% END %]
+    </div>
+
+    [% IF page_count > 0 %]
+        <div class="documentation-grid">
+            [% FOREACH page_id IN sorted_pages %]
+                [% page = pages.$page_id %]
+                <div class="documentation-card">
+                    <div class="card-header">
+                        <h3><a href="[% page.url %]">[% page.title %]</a></h3>
+                    </div>
+                    <div class="card-body">
+                        [% IF page.description %]
+                            <p class="description">[% page.description %]</p>
+                        [% END %]
+                        
+                        <div class="card-meta">
+                            [% IF page.site != 'all' %]
+                                <span class="site-badge">Site: [% page.site %]</span>
+                            [% END %]
+                            
+                            [% IF page.roles.size > 0 %]
+                                <span class="roles-badge">
+                                    Roles: [% page.roles.join(', ') %]
+                                </span>
+                            [% END %]
+                        </div>
+                    </div>
+                </div>
+            [% END %]
+        </div>
+    [% END %]
+    
+    <div class="documentation-footer">
+        <p>
+            <strong>Current Site:</strong> [% site_name %] | 
+            <strong>Your Role:</strong> [% user_role %]
+            [% IF is_admin %] (Administrator)[% END %]
+        </p>
+        
+        [% IF is_admin %]
+            <div class="admin-info">
+                <h4>Administrator Information</h4>
+                <p>As an administrator, you can see all documentation regardless of site or role restrictions.</p>
+            </div>
+        [% END %]
+    </div>
+</div>
+
+<style>
+.documentation-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.documentation-header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.documentation-header h1 {
+    color: #2c3e50;
+    margin-bottom: 10px;
+}
+
+.documentation-subtitle {
+    color: #6c757d;
+    font-size: 1.1em;
+    margin-bottom: 15px;
+}
+
+.page-count {
+    color: #28a745;
+    font-weight: bold;
+}
+
+.no-pages {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.documentation-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.documentation-card {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    background: white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.documentation-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.card-header {
+    padding: 15px;
+    border-bottom: 1px solid #dee2e6;
+    background: #f8f9fa;
+}
+
+.card-header h3 {
+    margin: 0;
+    font-size: 1.2em;
+}
+
+.card-header h3 a {
+    color: #2c3e50;
+    text-decoration: none;
+}
+
+.card-header h3 a:hover {
+    color: #3498db;
+    text-decoration: underline;
+}
+
+.card-body {
+    padding: 15px;
+}
+
+.description {
+    color: #6c757d;
+    margin-bottom: 15px;
+    line-height: 1.5;
+}
+
+.card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.site-badge, .roles-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-weight: bold;
+}
+
+.site-badge {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.roles-badge {
+    background: #f3e5f5;
+    color: #7b1fa2;
+}
+
+.documentation-footer {
+    text-align: center;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin-top: 30px;
+}
+
+.admin-info {
+    margin-top: 15px;
+    padding: 15px;
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 4px;
+}
+
+.admin-info h4 {
+    color: #856404;
+    margin-bottom: 8px;
+}
+
+.admin-info p {
+    color: #856404;
+    margin: 0;
+}
+</style>

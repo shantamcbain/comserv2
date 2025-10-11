@@ -1,0 +1,327 @@
+[% META title = 'Starman Service Manager Documentation' %]
+[% PageVersion = 'system/starman_service_manager.tt,v 1.0 2025/01/15 admin Exp' %]
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+
+<h1>Starman Service Manager Documentation</h1>
+
+<h2>Overview</h2>
+<p>The <code>Comserv::Util::StarmanServiceManager</code> utility provides web-safe Starman service management capabilities. This utility focuses on operations that can be performed safely from a web interface without requiring interactive sudo commands, while providing clear instructions for system administrators when elevated privileges are needed.</p>
+
+<h2>Key Features</h2>
+<ul>
+<li><strong>Web-Safe Operations</strong>: Service management without requiring sudo from web interface</li>
+<li><strong>Comprehensive Status Reporting</strong>: Detailed service state analysis</li>
+<li><strong>Process Information</strong>: Real-time process monitoring and diagnostics</li>
+<li><strong>Actionable Recommendations</strong>: Intelligent suggestions for service issues</li>
+<li><strong>Integration with Diagnostics</strong>: Works with StarmanDiagnostics utility</li>
+<li><strong>Safe Error Handling</strong>: Graceful handling of permission and system errors</li>
+</ul>
+
+<h2>File Location</h2>
+<pre>/Comserv/lib/Comserv/Util/StarmanServiceManager.pm</pre>
+
+<h2>Dependencies</h2>
+<ul>
+<li>Moose - Object-oriented framework</li>
+<li>Try::Tiny - Exception handling</li>
+<li>POSIX - System utilities and time formatting</li>
+<li>File::Spec - Cross-platform path handling</li>
+<li>File::Path - Directory operations</li>
+<li>Cwd - Current working directory</li>
+<li>Comserv::Util::StarmanDiagnostics - Service diagnostics</li>
+</ul>
+
+<h2>Core Attributes</h2>
+
+<h3>logger</h3>
+<p>Optional logging object for operation tracking:</p>
+<pre>has 'logger' =&gt; (
+    is =&gt; 'rw',
+    isa =&gt; 'Object',
+    required =&gt; 0,
+);</pre>
+
+<h3>diagnostics</h3>
+<p>Lazy-loaded StarmanDiagnostics instance for service analysis:</p>
+<pre>has 'diagnostics' =&gt; (
+    is =&gt; 'ro',
+    isa =&gt; 'Comserv::Util::StarmanDiagnostics',
+    lazy =&gt; 1,
+    default =&gt; sub {
+        require Comserv::Util::StarmanDiagnostics;
+        return Comserv::Util::StarmanDiagnostics-&gt;new();
+    }
+);</pre>
+
+<h2>Core Methods</h2>
+
+<h3>get_service_status($app_root)</h3>
+<p>Retrieves comprehensive service status information in a web-safe manner.</p>
+
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>$app_root</code> - Application root directory path</li>
+</ul>
+
+<p><strong>Returns:</strong> HashRef with detailed service information:</p>
+<pre>{
+    timestamp =&gt; '2025-01-15 10:30:00',
+    service_state =&gt; 'running|stopped|unknown',
+    process_info =&gt; {
+        pid =&gt; 12345,
+        cpu_usage =&gt; '2.5%',
+        memory_usage =&gt; '150MB',
+        uptime =&gt; '2 days, 3 hours'
+    },
+    recommendations =&gt; [
+        'Service is running normally',
+        'Consider restarting if memory usage is high'
+    ],
+    available_actions =&gt; [
+        'check_logs',
+        'view_configuration',
+        'test_connectivity'
+    ]
+}</pre>
+
+<h3>Service State Detection</h3>
+<p>The service manager uses multiple methods to determine service state:</p>
+<ul>
+<li><strong>Process Detection</strong>: Checks for running Starman processes</li>
+<li><strong>Port Monitoring</strong>: Verifies service is listening on configured ports</li>
+<li><strong>PID File Checking</strong>: Validates PID files if present</li>
+<li><strong>Response Testing</strong>: Tests service responsiveness</li>
+</ul>
+
+<h2>Web-Safe Operations</h2>
+
+<h3>Status Checking</h3>
+<p>Operations that can be performed without elevated privileges:</p>
+<ul>
+<li>Process status checking</li>
+<li>Port availability testing</li>
+<li>Log file reading (if accessible)</li>
+<li>Configuration file validation</li>
+<li>Resource usage monitoring</li>
+</ul>
+
+<h3>Information Gathering</h3>
+<p>Safe information collection includes:</p>
+<ul>
+<li>Service configuration details</li>
+<li>Process resource usage</li>
+<li>Network connectivity status</li>
+<li>Application file integrity</li>
+<li>System resource availability</li>
+</ul>
+
+<h2>Recommendations System</h2>
+
+<p>The service manager provides intelligent recommendations based on service state:</p>
+
+<h3>Running Service Recommendations</h3>
+<ul>
+<li>Performance optimization suggestions</li>
+<li>Resource usage warnings</li>
+<li>Configuration improvement tips</li>
+<li>Maintenance scheduling advice</li>
+</ul>
+
+<h3>Stopped Service Recommendations</h3>
+<ul>
+<li>Startup troubleshooting steps</li>
+<li>Configuration validation checks</li>
+<li>Dependency verification</li>
+<li>System administrator contact information</li>
+</ul>
+
+<h3>Unknown State Recommendations</h3>
+<ul>
+<li>Diagnostic steps to determine actual state</li>
+<li>Permission checking procedures</li>
+<li>Alternative monitoring methods</li>
+<li>Escalation procedures</li>
+</ul>
+
+<h2>Available Actions</h2>
+
+<p>The service manager identifies actions available to the current user:</p>
+
+<h3>User-Level Actions</h3>
+<ul>
+<li><code>check_logs</code> - View accessible log files</li>
+<li><code>view_configuration</code> - Display service configuration</li>
+<li><code>test_connectivity</code> - Test service connectivity</li>
+<li><code>validate_files</code> - Check application file integrity</li>
+</ul>
+
+<h3>Admin-Level Actions</h3>
+<ul>
+<li><code>restart_service</code> - Restart Starman service</li>
+<li><code>stop_service</code> - Stop Starman service</li>
+<li><code>start_service</code> - Start Starman service</li>
+<li><code>reload_configuration</code> - Reload service configuration</li>
+</ul>
+
+<h2>Integration with StarmanDiagnostics</h2>
+
+<p>The service manager integrates closely with the StarmanDiagnostics utility:</p>
+<ul>
+<li><strong>Process Detection</strong>: Uses diagnostics for process identification</li>
+<li><strong>Health Checking</strong>: Leverages diagnostic health checks</li>
+<li><strong>Performance Monitoring</strong>: Utilizes diagnostic performance metrics</li>
+<li><strong>Error Analysis</strong>: Incorporates diagnostic error detection</li>
+</ul>
+
+<h2>Error Handling</h2>
+
+<h3>Permission Errors</h3>
+<p>Graceful handling of permission-related issues:</p>
+<ul>
+<li>Clear error messages for insufficient privileges</li>
+<li>Alternative information gathering methods</li>
+<li>Instructions for system administrators</li>
+<li>Fallback to read-only operations</li>
+</ul>
+
+<h3>System Errors</h3>
+<p>Robust handling of system-level problems:</p>
+<ul>
+<li>Network connectivity issues</li>
+<li>File system access problems</li>
+<li>Process communication failures</li>
+<li>Resource exhaustion scenarios</li>
+</ul>
+
+<h2>Security Considerations</h2>
+
+<h3>Privilege Separation</h3>
+<ul>
+<li><strong>Web-Safe Design</strong>: No operations requiring elevated privileges</li>
+<li><strong>Read-Only Operations</strong>: Focus on information gathering</li>
+<li><strong>Safe Defaults</strong>: Conservative approach to system interaction</li>
+</ul>
+
+<h3>Information Disclosure</h3>
+<ul>
+<li><strong>Filtered Output</strong>: Sensitive information is filtered</li>
+<li><strong>Access Control</strong>: Respects file system permissions</li>
+<li><strong>Error Sanitization</strong>: Error messages don't reveal system details</li>
+</ul>
+
+<h2>Usage Examples</h2>
+
+<h3>Basic Service Status Check</h3>
+<pre>use Comserv::Util::StarmanServiceManager;
+
+my $service_manager = Comserv::Util::StarmanServiceManager-&gt;new();
+my $status = $service_manager-&gt;get_service_status('/path/to/app');
+
+if ($status-&gt;{service_state} eq 'running') {
+    print "Service is running normally\n";
+    print "PID: " . $status-&gt;{process_info}-&gt;{pid} . "\n";
+} else {
+    print "Service issues detected\n";
+    print "Recommendations:\n";
+    for my $rec (@{$status-&gt;{recommendations}}) {
+        print "  - $rec\n";
+    }
+}</pre>
+
+<h3>Controller Integration</h3>
+<pre># In a controller
+sub service_status : Local {
+    my ($self, $c) = @_;
+    
+    my $service_manager = Comserv::Util::StarmanServiceManager-&gt;new(
+        logger =&gt; $self-&gt;logging
+    );
+    
+    my $status = $service_manager-&gt;get_service_status($c-&gt;config-&gt;{home});
+    
+    $c-&gt;stash(
+        service_status =&gt; $status,
+        template =&gt; 'admin/service_status.tt'
+    );
+}</pre>
+
+<h2>Configuration</h2>
+
+<p>The service manager uses configuration from multiple sources:</p>
+<ul>
+<li><strong>Application Config</strong>: Catalyst application configuration</li>
+<li><strong>System Config</strong>: System service configuration files</li>
+<li><strong>Environment Variables</strong>: Runtime environment settings</li>
+<li><strong>Default Values</strong>: Built-in sensible defaults</li>
+</ul>
+
+<h2>Performance Considerations</h2>
+
+<h3>Efficient Operations</h3>
+<ul>
+<li><strong>Lazy Loading</strong>: Diagnostics loaded only when needed</li>
+<li><strong>Caching</strong>: Status information cached for short periods</li>
+<li><strong>Minimal System Calls</strong>: Optimized system interaction</li>
+<li><strong>Timeout Handling</strong>: Operations have reasonable timeouts</li>
+</ul>
+
+<h3>Resource Management</h3>
+<ul>
+<li><strong>Memory Efficient</strong>: Minimal memory footprint</li>
+<li><strong>CPU Conscious</strong>: Low CPU usage for status checks</li>
+<li><strong>Network Aware</strong>: Minimal network operations</li>
+</ul>
+
+<h2>Maintenance and Monitoring</h2>
+
+<h3>Health Monitoring</h3>
+<p>The service manager supports ongoing health monitoring:</p>
+<ul>
+<li>Regular status checks</li>
+<li>Performance trend analysis</li>
+<li>Resource usage tracking</li>
+<li>Error pattern detection</li>
+</ul>
+
+<h3>Maintenance Operations</h3>
+<p>Supports maintenance activities:</p>
+<ul>
+<li>Configuration validation</li>
+<li>Log rotation coordination</li>
+<li>Performance optimization</li>
+<li>Capacity planning</li>
+</ul>
+
+<h2>Troubleshooting</h2>
+
+<h3>Common Issues</h3>
+<ul>
+<li><strong>Service Not Detected</strong>: Check process names and PID files</li>
+<li><strong>Permission Denied</strong>: Verify file system permissions</li>
+<li><strong>Network Issues</strong>: Test port connectivity</li>
+<li><strong>Configuration Problems</strong>: Validate configuration files</li>
+</ul>
+
+<h3>Debug Information</h3>
+<p>Enable detailed logging to see:</p>
+<ul>
+<li>Process detection methods</li>
+<li>System call results</li>
+<li>Configuration parsing</li>
+<li>Error details</li>
+</ul>
+
+<h2>Related Documentation</h2>
+<ul>
+<li><a href="/Documentation/system/starman_diagnostics">Starman Diagnostics Utility</a></li>
+<li><a href="/Documentation/system/system_info_utility">SystemInfo Utility</a></li>
+<li><a href="/Documentation/system/backup_manager_utility">BackupManager Utility</a></li>
+<li><a href="/Documentation/controllers/admin_controllers">Admin Controllers Overview</a></li>
+</ul>
+
+[% END %]

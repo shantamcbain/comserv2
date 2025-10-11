@@ -1,0 +1,17 @@
+<h2>Welcome to Comserv!</h2>
+
+<p>Hello [% first_name %] [% last_name %],</p>
+
+<p>Thank you for creating an account with Comserv. Your account has been successfully created with the following details:</p>
+
+<ul>
+    <li><strong>Username:</strong> [% username %]</li>
+    <li><strong>Email:</strong> [% email %]</li>
+</ul>
+
+<p>You can now log in to your account using your username and password.</p>
+
+<p>If you have any questions or need assistance, please don't hesitate to contact our support team.</p>
+
+<p>Best regards,<br>
+The Comserv Team</p>

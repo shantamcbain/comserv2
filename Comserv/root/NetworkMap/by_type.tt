@@ -1,0 +1,230 @@
+[% META title = 'Network Map - By Device Type' %]
+[% PageVersion = 'NetworkMap/by_type.tt,v 0.01 2025/04/20 shanta Exp shanta ' %]
+
+[% IF c.session.debug_mode == 1 %]
+ <br>[% PageVersion %]</br>
+ [% IF debug_msg.size %]
+   <div class="debug-message">
+     <ul>
+     [% FOREACH msg IN debug_msg %]
+       <li>[% msg %]</li>
+     [% END %]
+     </ul>
+   </div>
+ [% END %]
+[% END %]
+
+<div class="network-map-container">
+    <h1>Network Map - By Device Type</h1>
+    
+    <div class="network-map-actions">
+        <div class="action-buttons">
+            <a href="[% c.uri_for('/NetworkMap') %]" class="btn btn-secondary">Back to Network Map</a>
+            <a href="[% c.uri_for('/NetworkMap/by_network') %]" class="btn btn-info">View by Network</a>
+            <a href="[% c.uri_for('/NetworkMap/by_service') %]" class="btn btn-info">View by Service</a>
+        </div>
+    </div>
+    
+    [% IF status_msg %]
+        <div class="alert alert-success">[% status_msg %]</div>
+    [% END %]
+    
+    [% IF error_msg %]
+        <div class="alert alert-danger">[% error_msg %]</div>
+    [% END %]
+    
+    <div class="type-summary">
+        [% IF types.keys.size %]
+            [% FOREACH type IN types.keys.sort %]
+                [% devices = types.$type %]
+                <div class="type-card">
+                    <div class="type-header">
+                        <h2>[% type | ucfirst | html %] Devices</h2>
+                        <div class="device-count">[% devices.keys.size %] devices</div>
+                    </div>
+                    
+                    <table class="device-table">
+                        <tr>
+                            <th>Name</th>
+                            <th>IP Address</th>
+                            <th>Network</th>
+                            <th>Services</th>
+                            <th>Actions</th>
+                        </tr>
+                        
+                        [% FOREACH device_name IN devices.keys.sort %]
+                            [% device = devices.$device_name %]
+                            [% network_name = networks.$device.network.name || 'Unknown' %]
+                            <tr>
+                                <td>[% device_name | html %]</td>
+                                <td>[% device.ip | html %]</td>
+                                <td>[% network_name | html %]</td>
+                                <td>[% device.services.join(', ') | html %]</td>
+                                <td>
+                                    <a href="[% c.uri_for('/NetworkMap/view_device', device_name) %]" class="btn btn-sm btn-info">View</a>
+                                    <a href="[% c.uri_for('/NetworkMap/remove_device', device_name) %]" class="btn btn-sm btn-danger">Remove</a>
+                                </td>
+                            </tr>
+                        [% END %]
+                    </table>
+                </div>
+            [% END %]
+        [% ELSE %]
+            <div class="no-devices">
+                <p>No devices defined in the network map.</p>
+                <a href="[% c.uri_for('/NetworkMap/add_device') %]" class="btn btn-primary">Add Device</a>
+            </div>
+        [% END %]
+    </div>
+</div>
+
+<style>
+    .network-map-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .network-map-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    
+    .action-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    
+    .btn {
+        display: inline-block;
+        padding: 8px 16px;
+        text-decoration: none;
+        border-radius: 4px;
+        font-weight: 500;
+    }
+    
+    .btn-sm {
+        padding: 4px 8px;
+        font-size: 14px;
+    }
+    
+    .btn-primary {
+        background-color: #007bff;
+        color: white;
+    }
+    
+    .btn-secondary {
+        background-color: #6c757d;
+        color: white;
+    }
+    
+    .btn-info {
+        background-color: #17a2b8;
+        color: white;
+    }
+    
+    .btn-danger {
+        background-color: #dc3545;
+        color: white;
+    }
+    
+    .alert {
+        padding: 12px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+    }
+    
+    .alert-success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .alert-danger {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+    
+    .type-summary {
+        display: flex;
+        flex-direction: column;
+        gap: 30px;
+    }
+    
+    .type-card {
+        background-color: #f8f9fa;
+        padding: 20px;
+        border-radius: 5px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .type-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        border-bottom: 1px solid #dee2e6;
+        padding-bottom: 10px;
+    }
+    
+    .type-header h2 {
+        margin: 0;
+        color: #343a40;
+        font-size: 1.5rem;
+    }
+    
+    .device-count {
+        font-weight: 500;
+        background-color: #e9ecef;
+        padding: 5px 10px;
+        border-radius: 20px;
+        color: #495057;
+    }
+    
+    .device-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    .device-table th {
+        background-color: #e9ecef;
+        text-align: left;
+        padding: 10px;
+        border-bottom: 2px solid #dee2e6;
+    }
+    
+    .device-table td {
+        padding: 10px;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .device-table tr:hover {
+        background-color: #f1f3f5;
+    }
+    
+    .no-devices {
+        text-align: center;
+        padding: 30px;
+        background-color: #ffffff;
+        border-radius: 4px;
+        border: 1px solid #dee2e6;
+    }
+    
+    .no-devices p {
+        margin-top: 0;
+        margin-bottom: 15px;
+        color: #6c757d;
+    }
+    
+    .debug-message {
+        background-color: #f8d7da;
+        color: #721c24;
+        padding: 10px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+    }
+</style>

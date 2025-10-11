@@ -2,11 +2,15 @@ package Comserv::Model::Log;
 use Moose;
 use namespace::autoclean;
 use Data::Dumper; # Import Data::Dumper for debugging
-
+use Comserv::Util::Logging;
 has 'record_id' => (is => 'rw', isa => 'Str');
 has 'priority' => (is => 'rw', isa => 'HashRef');
 has 'status' => (is => 'rw', isa => 'HashRef');
-
+BEGIN { extends 'Catalyst::Controller'; }
+has 'logging' => (
+    is => 'ro',
+    default => sub { Comserv::Util::Logging->instance }
+);
 sub BUILD {
     my $self = shift;
     $self->priority({ map { $_ => $_ } (1..10) });
@@ -48,19 +52,37 @@ sub get_logs {
 }
 
 sub modify {
-    my ($self, $log, $new_values) = @_;
+    my ($self, $c, $log_id, $new_values) = @_;
+
+    # Fetch the log object using the log_id
+    # Ensure we are using the correct model and method to find the log record
+    my $log_record = $c->model('DBEncy')->resultset('Log')->find($log_id);
+
+    # Log the input parameters for debugging
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'modify', 'Input log record: ' . Dumper($log_record));
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'modify', 'New values: ' . Dumper($new_values));
+
+    # Ensure $log_record is a blessed object
+    unless (blessed($log_record) && $log_record->can('update')) {
+        $self->logging->log_with_details($c, __FILE__, __LINE__, 'modify', 'Error: $log_record is not a valid object');
+        die "Error: \$log_record is not a valid object";
+    }
 
     # Iterate over each key-value pair in the new values hash
     while (my ($key, $value) = each %$new_values) {
         # Update the corresponding field in the log record
-        $log->$key($value);
+        $log_record->$key($value);
     }
 
-    # Save the updated log record
-    $log->update;
+    # Log the updated log record for debugging
+    $self->logging->log_with_details($c, __FILE__, __LINE__, 'modify', 'Updated log record: ' . Dumper($log_record));
 
-    return $log;
+    # Save the updated log record
+    $log_record->update;
+
+    return $log_record;
 }
+
 
 sub calculate_accumulative_time {
     my ($self, $c, $todo_record_id) = @_;

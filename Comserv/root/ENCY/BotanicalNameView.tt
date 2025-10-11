@@ -1,10 +1,10 @@
-[% ViewVersion = 'v 1.21 2022/08/28 /cgi-bin/HTMLTemplates/ENCY/BotanicalNameView.ttml,'%]
-[%
 
-# the ENCY template
-#	$Id: BotanicalNameView.ttml,v 1.2 2011/09/21 19:25:15 shanta Exp $	
-#file location/cgi-bin/HTMLTemplates/ENCY
-%]
+[% ViewVersion = 'v 1.23 2025/01/14 /cgi-bin/HTMLTemplates/ENCY/BotanicalNameView.ttml,'%]
+
+
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
 
 
 
@@ -16,9 +16,9 @@
 [% END %]
 
 
-	[% IF username %]
+	[% IF c.session.username %]
 
-<h3 > Hello  [% firstname%]  [% lastname%]! Welcome to The Encyclopaedia of Biological life!</h3>
+<h3 > Hello  [% first_name%]  [% last_name%]! Welcome to The Encyclopaedia of Biological life!</h3>
 	  
 
 	[% ELSE %]
@@ -105,6 +105,5 @@
       
  <a href="http://helpdesk.computersystemconsulting.ca" target="_Blank" > HelpDesk</a>
 
-[%# embed('CSCCopyRight') %]
-[% embed(data.page_bottom_view) %]
+
 

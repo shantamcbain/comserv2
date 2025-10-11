@@ -1,0 +1,18 @@
+[% IF categories.site_specific %]
+<section class="doc-section site-specific">
+    <h2 class="section-toggle">[% site_name || 'Comserv' %] Documentation</h2>
+    <p>Documentation specific to [% site_name || 'Comserv' %].</p>
+    <div class="section-content">
+        [% FOREACH page_name IN categories.site_specific.pages.sort %]
+            [% IF structured_pages.$page_name %]
+                [% page = structured_pages.$page_name %]
+            <a href="[% page.url %]" class="doc-card">
+                <h3>[% page.title %]</h3>
+                <p>[% page.description || 'Site-specific documentation.' %]</p>
+                <span class="site-badge">[% page.site %]</span>
+            </a>
+            [% END %]
+        [% END %]
+    </div>
+</section>
+[% END %]

@@ -1,0 +1,69 @@
+[% META title = 'Email Test Form' %]
+[% PageVersion = 'CSC/email_test.tt,v 0.01 2025/04/12 shanta Exp shanta ' %]
+
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    <div class="debug-info">
+        <h3>Debug Information</h3>
+        <p>Site Name: [% c.stash.SiteName %]</p>
+        <p>Mail From: [% c.stash.mail_from %]</p>
+        <p>Mail Reply-To: [% c.stash.mail_replyto %]</p>
+        <p>Mail To Admin: [% c.stash.mail_to_admin %]</p>
+    </div>
+[% END %]
+
+<div class="container">
+    <h1>Email Test Form</h1>
+    
+    <p>Use this form to test the email functionality of the system. This will help verify that emails are being sent correctly.</p>
+    
+    <div class="card">
+        <div class="card-header">
+            <h2>Send Test Email</h2>
+        </div>
+        <div class="card-body">
+            <form method="post" action="[% c.uri_for('/CSC/email_test') %]">
+                <div class="form-group">
+                    <label for="to">Recipient Email:</label>
+                    <input type="email" id="to" name="to" class="form-control" required>
+                    <small class="form-text text-muted">Enter the email address where you want to send the test email.</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="subject">Subject:</label>
+                    <input type="text" id="subject" name="subject" class="form-control" value="Test Email from Comserv">
+                </div>
+                
+                <div class="form-group">
+                    <label for="message">Message:</label>
+                    <textarea id="message" name="message" class="form-control" rows="5">This is a test email from the Comserv system.</textarea>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">Send Test Email</button>
+            </form>
+        </div>
+    </div>
+    
+    <div class="mt-4">
+        <h3>Email Configuration</h3>
+        <p>The system is configured to send emails using the following settings:</p>
+        <ul>
+            <li><strong>From Address:</strong> [% c.stash.mail_from || 'Not configured (will use default)' %]</li>
+            <li><strong>Reply-To Address:</strong> [% c.stash.mail_replyto || 'Not configured (will use default)' %]</li>
+            <li><strong>Admin Email:</strong> [% c.stash.mail_to_admin || 'Not configured' %]</li>
+        </ul>
+        
+        <p>These settings are configured in the site setup for the current site ([% c.stash.SiteName || 'Unknown' %]).</p>
+    </div>
+    
+    <div class="mt-4">
+        <h3>Troubleshooting</h3>
+        <p>If you encounter issues with email delivery:</p>
+        <ol>
+            <li>Check that the recipient email address is valid</li>
+            <li>Verify that the site email configuration is correct</li>
+            <li>Check the application logs for any error messages</li>
+            <li>Ensure your mail server is properly configured</li>
+        </ol>
+    </div>
+</div>

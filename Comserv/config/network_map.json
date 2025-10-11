@@ -1,0 +1,76 @@
+{
+  "networks": {
+    "lan": {
+      "name": "Local Area Network",
+      "cidr": "192.168.1.0/24",
+      "description": "Main office network"
+    },
+    "mcoop": {
+      "name": "MCOOP Network",
+      "cidr": "10.0.0.0/24",
+      "description": "MCOOP office network"
+    }
+  },
+  "devices": {
+    "main_router": {
+      "ip": "192.168.1.1",
+      "mac": "00:11:22:33:44:55",
+      "network": "lan",
+      "type": "Router",
+      "location": "Server Room",
+      "purpose": "Main internet gateway",
+      "notes": "Cisco router providing internet access and firewall",
+      "site_name": "CSC",
+      "services": ["DHCP", "DNS"],
+      "added_date": "Fri Sep 20 14:30:45 2025"
+    },
+    "core_switch": {
+      "ip": "192.168.1.2",
+      "mac": "00:11:22:33:44:56",
+      "network": "lan",
+      "type": "Switch",
+      "location": "Server Room",
+      "purpose": "Core network switch",
+      "notes": "Cisco Catalyst 9300 Series",
+      "site_name": "CSC",
+      "services": ["VLAN"],
+      "added_date": "Fri Sep 20 14:35:12 2025"
+    },
+    "office_ap": {
+      "ip": "192.168.1.3",
+      "mac": "00:11:22:33:44:57",
+      "network": "lan",
+      "type": "Access Point",
+      "location": "Main Office",
+      "purpose": "Wireless access",
+      "notes": "Cisco Meraki MR Series",
+      "site_name": "CSC",
+      "services": ["WiFi"],
+      "added_date": "Fri Sep 20 14:40:33 2025"
+    },
+    "mcoop_router": {
+      "ip": "10.0.0.1",
+      "mac": "00:11:22:33:44:58",
+      "network": "mcoop",
+      "type": "Router",
+      "location": "MCOOP Office",
+      "purpose": "Main router for MCOOP",
+      "notes": "Ubiquiti EdgeRouter",
+      "site_name": "MCOOP",
+      "services": ["DHCP", "DNS"],
+      "added_date": "Fri Sep 20 14:45:21 2025"
+    },
+    "mcoop_switch": {
+      "ip": "10.0.0.2",
+      "mac": "00:11:22:33:44:59",
+      "network": "mcoop",
+      "type": "Switch",
+      "location": "MCOOP Office",
+      "purpose": "Network switch for MCOOP",
+      "notes": "Ubiquiti EdgeSwitch",
+      "site_name": "MCOOP",
+      "services": ["VLAN"],
+      "added_date": "Fri Sep 20 14:50:09 2025"
+    }
+  }
+}

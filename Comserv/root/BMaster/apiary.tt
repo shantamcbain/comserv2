@@ -1,95 +1,33 @@
-[% PageVersion = 'Bmaster/apiary.tt,v 0.01 2023/08/30 shanta Exp shanta ' %]
+[% PageVersion = 'Bmaster/apiary.tt,v 0.02 2025/05/259 shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
      [% PageVersion %]
 [% END %]
 
-<h1>Apiary Management System</h1>
+<h1>Welcome to the Apiary Management System</h1>
 
-<!-- Include the Chart.js library -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<p>This system is designed to provide you with a comprehensive overview of your beekeeping operation. It allows you to track, manage, and plan your apiary activities effectively.</p>
 
-<!-- Create a div with a border around the canvas element where the graph will be displayed -->
-<div style="border: 1px solid black; padding: 10px; margin: 10px;">
-    <canvas id="framesChart"></canvas>
+<!-- Check if data is available -->
+<div style="border: 1px solid black; padding: 10px; margin: 10px; position: static; z-index: auto;">
+[% IF no_data %]
+ <!-- If no data, display a clickable message to add a yard -->
+<a href="/BMaster/yards" >Please add a Yard
+
+</a>
+[% ELSE %]
+    <!-- If data is available, display the graph -->
+
+    <iframe src="http://localhost:5000/graph" width="100%" height="600px"></iframe>
+[% END %]
 </div>
-<script>
-window.onload = function() {
-    if (typeof Chart === 'undefined') {
-        console.log("Chart.js is not loaded");
-    } else {
-        console.log("Chart.js is loaded");
-    }
-}
-</script>
-<script>
-// Fetch the data from the server
-fetch('/BMaster/api/frames')
-    .then(response => response.json())
-    .then(data => {
-        // Create a new chart
-var chart = new Chart(document.getElementById('framesChart'), {
-    type: 'bar',
-    data: {
-        labels: ['Brood', 'Honey', 'Foundation', 'Comb', 'Empty'],
-        datasets: [{
-            label: 'Number of Frames',
-            data: [
-                data.brood,
-                data.honey,
-                data.foundation,
-                data.comb,
-                data.empty
-            ],
-            backgroundColor: [
-                'rgba(255, 99, 132, 0.2)',
-                'rgba(54, 162, 235, 0.2)',
-                'rgba(255, 206, 86, 0.2)',
-                'rgba(75, 192, 192, 0.2)',
-                'rgba(153, 102, 255, 0.2)'
-            ],
-            borderColor: [
-                'rgba(255, 99, 132, 1)',
-                'rgba(54, 162, 235, 1)',
-                'rgba(255, 206, 86, 1)',
-                'rgba(75, 192, 192, 1)',
-                'rgba(153, 102, 255, 1)'
-            ],
-            borderWidth: 1
-        }]
-    },
-    options: {
-        scales: {
-            y: {
-                beginAtZero: true
-            }
-        },
-        tooltips: {
-            enabled: true,
-            callbacks: {
-                title: function() {
-                    return 'Click the graph to see information by yards';
-                }
-            }
-        },
-        onHover: (event, chartElement) => {
-            event.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
-        },
-        onClick: function() {
-            window.location.href = '/BMaster/yards';
-        }
-    }
-});
-</script>
 
-<a href="/BMaster/Queens">Go to Queens Page</a>
-<a href="/BMaster/yards">Go to Yards Page</a>
+<p>Start your beekeeping day by checking the graph above. It shows the changes in the number of frames of bees, brood, and other elements over the course of the season. This visual representation helps you understand the dynamics of your apiary at a glance.</p>
 
+<h2>Key Features of Our System</h2>
 
-<p>Welcome to our Apiary Management System. This system is designed to help you track and manage your apiary effectively.</p>
+<h3>Hive Tracking</h3>
 
-<h2>Hive Tracking</h2>
-
-<p>Our system allows you to track various aspects of your hives, including:</p>
+<p>Our system allows you to monitor various aspects of your hives, such as:</p>
 
 <ul>
     <li>Hive condition</li>
@@ -101,9 +39,9 @@ var chart = new Chart(document.getElementById('framesChart'), {
     <li>Temperament</li>
 </ul>
 
-<h2>Inventory Management</h2>
+<h3>Inventory Management</h3>
 
-<p>Keep track of your apiary equipment inventory, including:</p>
+<p>Keep track of your apiary equipment inventory. This feature helps you plan what is needed for your next visit to the yard. You can track items like:</p>
 
 <ul>
     <li>Tops</li>
@@ -115,8 +53,11 @@ var chart = new Chart(document.getElementById('framesChart'), {
     <li>Frame feeders</li>
 </ul>
 
-<p>This information will help you plan what is needed for your next visit to the yard.</p>
+<h3>Seasonal Calendar</h3>
 
-<h2>Seasonal Calendar</h2>
+<p>Plan your activities for the season with our integrated calendar. It helps you schedule and manage your tasks effectively.</p>
 
-<p>Plan your activities for the season with our integrated calendar.</p>
+<p>Explore more features by visiting the following pages:</p>
+
+<a href="/BMaster/Queens">Queens Page</a>
+<a href="/BMaster/yards">Yards Page</a>

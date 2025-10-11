@@ -17,5 +17,6 @@ __PACKAGE__->add_columns(
 );
 __PACKAGE__->set_primary_key('id');
 __PACKAGE__->belongs_to(site => 'Comserv::Model::Schema::Ency::Result::Site', 'site_id');
+__PACKAGE__->has_one(mail_domain => 'Comserv::Model::Schema::Ency::Result::MailDomain', 'domain_id');
 
 1;

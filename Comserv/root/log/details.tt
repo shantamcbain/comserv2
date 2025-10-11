@@ -3,9 +3,10 @@
     [% PageVersion %]
 [% END %]
 
-<h2>Edit Log Entry</h2>
 
-<form method="post" action="/log/update">
+<h2>Log Entry Details</h2>
+
+<form method="post" action="[% c.uri_for('/log/update') %]" class="log-form">
     <input type="hidden" name="record_id" value="[% log.record_id %]">
 
     <label for="sitename">Site Name:</label><br>
@@ -32,8 +33,8 @@
     <label for="end_time">End Time:</label><br>
     <input type="time" id="end_time" name="end_time" value="[% log.end_time %]"><br>
 
-    <input type="text" id="group_of_poster" name="group_of_poster" value="[% log.group_of_poster %]" readonly><br>
-
+<label for="group_of_poster">Group of Poster:</label><br>
+<input type="text" id="group_of_poster" name="group_of_poster" value="[% log.group_of_poster %]"><br>
     <label for="priority">Priority:</label><br>
     <select id="priority" name="priority">
         [% FOREACH key IN build_priority.keys.sort %]
@@ -51,5 +52,10 @@
     <label for="comments">Comments:</label><br>
     <textarea id="comments" name="comments" rows="4" cols="50">[% log.comments %]</textarea><br>
 
-    <input type="submit" value="Update">
+    <div class="form-actions">
+        <input type="submit" value="Update" class="btn btn-primary">
+        <button type="button" onclick="window.history.back()" class="btn btn-secondary">Cancel</button>
+    </div>
 </form>
+
+<link rel="stylesheet" href="/static/css/log.css">

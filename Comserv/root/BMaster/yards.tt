@@ -1,70 +1,21 @@
 <head>
-    [% PageVersion = 'yards.tt,v 0.01 2023/11/03 shanta Exp shanta ' %]
+    [% PageVersion = 'BMaster/yards.tt,v 0.01 2023/11/03 shanta Exp shanta ' %]
     <meta charset="utf-8">
     [% IF debug_mode == 1 %]
         [% PageVersion %]
-        [% INCLUDE 'debug.tt' %]
     [% END %]
-</head>
 
+</head>
 <h2>Yards</h2>
 
-<p>Here is a list of yards in the operation:</p>
+[% IF yards.size %]
+    <p>Here is a list of yards in the operation:</p>
 
-
-<li>
-    <a href="/yard/[% yard.record_id %]">[% yard.sitename %]</a>
-    <p>Status: [% yard.status %]</p>
-    <p>Yard Code: [% yard.yard_code %]</p>
-    <p>Yard Name: [% yard.yard_name %]</p>
-    <p>Yard Size: [% yard.yard_size %]</p>
-    <p>Current: [% yard.current %]</p>
-    <p>Total Yard Size: [% yard.total_yard_size %]</p>
-    <p>Date: [% yard.date %]</p>
-</li>
-
-<h2>Yard Detail</h2>
-<p>Click on a yard to view its details.</p>
-<p>The yard detail view will include:</p>
-<ul>
-    <li>A picture of the yard showing each pallet in its position</li>
-    <li>A graph of the yard production based on the total number of frames</li>
-    <li>Number of queens in the yard</li>
-</ul>
-<p>Plan:</p>
-<ol>
-    <li>Retrieve yard details from the database using the yard ID</li>
-    <li>Display the yard's picture and position of each pallet</li>
-    <li>Calculate and display the yard's production graph based on frame count</li>
-    <li>Show the number of queens present in the yard</li>
-</ol>
-
-<h2>Pallet Detail</h2>
-<p>Click on a pallet in the yard to view its details.</p>
-<p>The pallet detail view will include:</p>
-<ul>
-    <li>A picture of the pallet showing each hive in its position</li>
-    <li>A graph of the pallet status based on the number of frames</li>
-</ul>
-<p>Plan:</p>
-<ol>
-    <li>Retrieve pallet details from the database using the pallet ID</li>
-    <li>Display the pallet's picture and position of each hive</li>
-    <li>Calculate and display the pallet's status graph based on frame count</li>
-</ol>
-
-<h2>Hive Detail</h2>
-<p>Click on a hive in the pallet to view its details.</p>
-<p>The hive detail view will include:</p>
-<ul>
-    <li>Information about the queen in the hive</li>
-    <li>A graph of the queen's status based on various metrics</li>
-    <li>A link to add frame types to the queen's frame type table</li>
-</ul>
-<p>Plan:</p>
-<ol>
-    <li>Retrieve hive details from the database using the hive ID</li>
-    <li>Display information about the queen in the hive</li>
-    <li>Calculate and display a graph of the queen's status based on metrics</li>
-    <li>Provide a link to add frame types to the queen's frame type table</li>
-</ol>
+    [% FOREACH yard IN yards %]
+        <h3><a href="/yards/[% yard.id %]">[% yard.name %]</a></h3>
+        <p><a href="/yards/[% yard.id %]/edit">Modify yard</a></p>
+        <p><a href="/yards/[% yard.id %]/delete">Delete yard</a></p>
+    [% END %]
+[% ELSE %]
+    <p>No yards found. <a href="/BMaster/add_yard">Add a new yard</a></p>
+[% END %]

@@ -1,0 +1,83 @@
+/* Table styles */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: var(--spacing-large);
+}
+
+.data-table th,
+.data-table td {
+  padding: var(--spacing-small);
+  border: 1px solid var(--border-color);
+  text-align: left;
+}
+
+.data-table th {
+  background-color: var(--table-header-bg);
+  font-weight: bold;
+}
+
+.data-table tr:nth-child(even) {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.data-table tr:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Project details table */
+.project-details-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: var(--spacing-large);
+}
+
+.project-details-table th, 
+.project-details-table td {
+  border: 1px solid var(--border-color);
+  padding: var(--spacing-small);
+  text-align: left;
+}
+
+.project-details-table th {
+  background-color: var(--table-header-bg);
+  font-weight: bold;
+}
+
+.project-details-table tr:nth-child(even) {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.project-details-table tr:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Calendar tables */
+.month_title_header {
+  font-family: var(--header-font);
+  color: var(--text-color);
+  background: var(--secondary-color);
+  vertical-align: top;
+  text-align: center;
+}
+
+.month_wday_header {
+  font-family: var(--header-font);
+  color: var(--text-color);
+  background: var(--accent-color);
+  vertical-align: top;
+  text-align: center;
+  font-size: var(--font-size-large);
+}
+
+.month_day_cell {
+  background: rgba(0, 0, 0, 0.05);
+  vertical-align: top;
+  text-align: center;
+}
+
+.month_day_cell_selected {
+  background: var(--secondary-color);
+  vertical-align: top;
+  text-align: center;
+}

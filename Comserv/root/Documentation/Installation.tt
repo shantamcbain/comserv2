@@ -1,7 +1,3 @@
-[% PageVersion = 'Documentation/Installation.tt,v 0.02 2024/11/18 Shanta Exp shanta ' %]
-[% IF c.session.debug_mode == 1 %]
-[% END %]
-
 <h1>Installation Guide</h1>
 
 <nav>
@@ -12,47 +8,75 @@
     <a href="#module-installation">Module Installation</a>
 </nav>
 
-<h2 id="module-installation">Module Installation with Perlbrew</h2>
-
+<h2 id="module-installation">Automated Setup with install_comserv.pl</h2>
+<h3>Running the Installation Script</h3>
 <ol>
-    <li><strong>Switch to Perl 5.40.0:</strong>
-        <pre><code>perlbrew switch perl-5.40.0</code></pre>
+    <li><strong>Download the installation script:</strong>
+        <pre><code>curl -O https://raw.githubusercontent.com/comserv2/Comserv/main/install_comserv.pl</code></pre>
+    </li>
+    <li><strong>Make the script executable:</strong>
+        <pre><code>chmod +x install_comserv.pl</code></pre>
+    </li>
+    <li><strong>Run the script:</strong>
+        <pre><code>./install_comserv.pl</code></pre>
+        Follow the prompts to input your database connection details when prompted.
+    </li>
+    <li><strong>Verify the setup was successful:</strong>
+        <pre><code>perl -MModule::Name -e 'print $Module::Name::VERSION'</code></pre>
+        Replace <code>Module::Name</code> with the module you wish to verify.
     </li>
 
+<h3>Installing Perl on Windows</h3>
+<ol>
+    <li><strong>Ensure Strawberry Perl is installed:</strong>
+        Download and install from:
+        <pre><code>https://strawberryperl.com/</code></pre>
+    </li>
+    <li><strong>Run the `install_comserv.pl` script:</strong>
+        Open Command Prompt and execute:
+        <pre><code>perl install_comserv.pl</code></pre>
+        Follow the prompts to input appropriate database connection details.
+    </li>
+</ol>
+    </ol>
+<h3>Installing Module Dependencies</h3>
+    <li><strong>Use the correct Perl version:</strong>
+        The `install_comserv.pl` script automatically configures the proper Perl version for you.
+    </li>
     <li><strong>Ensure PATH includes Perlbrew's bin:</strong>
-        <pre><code>echo $PATH</code></pre>
-        Ensure `/home/comserv/perl5/perlbrew/bin` and `/home/comserv/perl5/perlbrew/perls/perl-5.40.0/bin` are included.
+        Ensure `~/perl5/perlbrew/bin` and
+`~/perl5/perlbrew/perls/perl-5.40.0/bin` are included.
+`/home/comserv/perl5/perlbrew/perls/perl-5.40.0/bin` are included.
     </li>
 
-    <li><strong>Set up local::lib for user-level installations:</strong>
-        <pre><code>cpanm --local-lib=~/perl5 local::lib && eval $(perl -I ~/perl5/lib/perl5 -Mlocal::lib)</code></pre>
-        Add this to your shell configuration file (e.g., `.bashrc` or `.zshrc`) for persistence across sessions.
+    <li><strong>Set up user-level modules:</strong>
+        Local module management is handled automatically by the `install_comserv.pl` script.
+        Ensure you follow the input prompts during setup for best results.
     </li>
 
     <li><strong>Check Perl library paths:</strong>
         <pre><code>perl -e 'print join "\n", @INC'</code></pre>
-        Verify paths like `/home/comserv/perl5/perlbrew/perls/perl-5.40.0/lib/site_perl/5.40.0` are listed.
+        Verify paths like
+`/home/comserv/perl5/perlbrew/perls/perl-5.40.0/lib/site_perl/5.40.0` are
+listed.
     </li>
 
-    <li><strong>Install Dependencies from cpanfile:</strong>
-        <pre><code>cpanm --installdeps .</code></pre>
-        This command reads your `cpanfile` and installs all listed dependencies
+    <li><strong>Install Dependencies:</strong>
+        The `install_comserv.pl` script automatically handles all required dependency installations.
     </li>
     <li>Create a directory for Comserv:
         <pre><code>mkdir /path/to/Comserv</code></pre>
     </li>
     <li>Clone the repository into the created directory:
-        <pre><code>git clone git@github.com:comserv2/Comserv.git /path/to/Comserv</code></pre>
+        <pre><code>git clone git@github.com:comserv2/Comserv.git
+/path/to/Comserv</code></pre>
     <li>Navigate to the cloned directory:
         <pre><code>cd /path/to/Comserv</code></pre>
-    <li>Install required modules from cpanfile:
-        <pre><code>cpan
     <li>Install required modules using cpanfile:
-        <pre><code>cd /path/to/Comserv
-cpanm --installdeps .</code></pre>
+        <pre><code>cpanm --installdeps .</code></pre>
     </li>
-    <li>Verify installations:
-        <pre><code>perl -MModule::Name -e 'print $Module::Name::VERSION'</code></pre>
+    <li>Verify installations (e.g., of Module::Name):
+        <pre><code>perl -MModule::Name -e 'print
+$Module::Name::VERSION'</code></pre>
     </li>
 </ol>
-<p>Remember to always test each step in a safe environment before applying them to the production server.</p>

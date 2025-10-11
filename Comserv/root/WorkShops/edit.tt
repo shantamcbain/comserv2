@@ -1,4 +1,4 @@
-f[% PageVersion = 'WorkShops/edit.tt,v 0.01 2024/03/11 shanta Exp shanta ' %]
+[% PageVersion = 'WorkShops/edit.tt,v 0.01 2024/03/11 shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
  [% PageVersion %]
 [% END %]
@@ -10,9 +10,11 @@ f[% PageVersion = 'WorkShops/edit.tt,v 0.01 2024/03/11 shanta Exp shanta ' %]
     <label for="description">Description:</label>
     <textarea id="description" name="description">[% workshop.description %]</textarea>
     <br>
-   <label for="date">Date:</label>
-<input type="date" id="date" name="date" value="[% workshop.date %]">[% workshop.date %]
+<label for="date">Date:</label>
+<input type="date" id="date" name="date" value="[% formatted_date %]">
 <br>
+
+
      <label for="time">Time:</label>
     <input type="time" id="time" name="time" value="[% workshop.time %]">
     <br>

@@ -4,3 +4,7 @@ workspace.xml
 .idea/workspace.xml
 .idea/vcs.xml
 /db_config.json
+
+# AI session history and working files (not tracked)
+root/Documentation/session_history/
+*.md

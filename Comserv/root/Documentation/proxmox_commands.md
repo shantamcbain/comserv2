@@ -1,0 +1,645 @@
+# Proxmox VE Command Reference
+
+This document provides a comprehensive list of command-line operations for managing Proxmox VE environments, including virtual machines, containers, networking, storage, backups, and more.
+
+## Table of Contents
+
+1. [Virtual Machine Management (QEMU/KVM)](#virtual-machine-management-qemukvm)
+2. [Container Management (LXC)](#container-management-lxc)
+3. [Network Configuration](#network-configuration)
+4. [Storage Management](#storage-management)
+5. [Backup and Restore](#backup-and-restore)
+6. [Cluster Management](#cluster-management)
+7. [Firewall Management](#firewall-management)
+8. [API and Shell Interface](#api-and-shell-interface)
+9. [System Administration](#system-administration)
+
+## Virtual Machine Management (QEMU/KVM)
+
+The `qm` command is used to manage QEMU/KVM virtual machines.
+
+### Basic VM Operations
+
+```bash
+# List all VMs
+qm list
+
+# Show VM configuration
+qm config <vmid>
+
+# Start a VM
+qm start <vmid>
+
+# Stop a VM (immediate power off)
+qm stop <vmid>
+
+# Gracefully shutdown a VM
+qm shutdown <vmid>
+
+# Reset a VM
+qm reset <vmid>
+
+# Suspend a VM
+qm suspend <vmid>
+
+# Resume a suspended VM
+qm resume <vmid>
+
+# Reboot a VM
+qm reboot <vmid>
+
+# Delete a VM
+qm destroy <vmid>
+```
+
+### VM Creation and Cloning
+
+```bash
+# Create a new VM with ID 100
+qm create 100
+
+# Create a VM with basic configuration
+qm create 101 --name "web-server" --memory 2048 --cores 2 --net0 virtio,bridge=vmbr0
+
+# Create a VM with an OS disk
+qm create 102 --name "db-server" --memory 4096 --cores 4 --net0 virtio,bridge=vmbr0 --scsi0 local-lvm:20
+
+# Clone a VM
+qm clone <source-vmid> <target-vmid> --name "clone-name"
+
+# Create a template from a VM
+qm template <vmid>
+```
+
+### VM Configuration
+
+```bash
+# Set VM name
+qm set <vmid> --name <name>
+
+# Set memory (in MB)
+qm set <vmid> --memory <memory>
+
+# Set CPU cores
+qm set <vmid> --cores <cores>
+
+# Set CPU type
+qm set <vmid> --cpu <cputype>
+
+# Add a network interface
+qm set <vmid> --net0 virtio,bridge=vmbr0
+
+# Set IP address for a VM (requires QEMU guest agent)
+qm set <vmid> --ipconfig0 ip=192.168.1.100/24,gw=192.168.1.1
+
+# Add a virtual disk
+qm set <vmid> --scsi0 local-lvm:20
+
+# Resize a disk (increase to 40GB)
+qm resize <vmid> scsi0 40G
+
+# Set boot order
+qm set <vmid> --boot c --bootdisk scsi0
+
+# Enable/disable QEMU guest agent
+qm set <vmid> --agent enabled=1,fstrim_cloned_disks=1
+
+# Set VM to start on boot
+qm set <vmid> --onboot 1
+
+# Set VM startup/shutdown order
+qm set <vmid> --startup order=1,up=120,down=60
+```
+
+### VM Migration
+
+```bash
+# Migrate a VM to another node
+qm migrate <vmid> <target-node>
+
+# Migrate with specific options
+qm migrate <vmid> <target-node> --online --with-local-disks
+```
+
+### VM Snapshots
+
+```bash
+# Create a snapshot
+qm snapshot <vmid> <snapshot-name> --description "Description"
+
+# List snapshots
+qm listsnapshot <vmid>
+
+# Rollback to a snapshot
+qm rollback <vmid> <snapshot-name>
+
+# Delete a snapshot
+qm delsnapshot <vmid> <snapshot-name>
+```
+
+## Container Management (LXC)
+
+The `pct` command is used to manage Linux Containers (LXC).
+
+### Basic Container Operations
+
+```bash
+# List all containers
+pct list
+
+# Show container configuration
+pct config <ctid>
+
+# Start a container
+pct start <ctid>
+
+# Stop a container
+pct stop <ctid>
+
+# Restart a container
+pct restart <ctid>
+
+# Enter a container (get shell)
+pct enter <ctid>
+
+# Delete a container
+pct destroy <ctid>
+```
+
+### Container Creation and Cloning
+
+```bash
+# Create a container from a template
+pct create <ctid> <storage>:vztmpl/<template> --hostname <hostname> --memory <memory> --net0 name=eth0,bridge=vmbr0,ip=dhcp
+
+# Create a container with static IP
+pct create <ctid> <storage>:vztmpl/<template> --hostname <hostname> --memory <memory> --net0 name=eth0,bridge=vmbr0,ip=192.168.1.100/24,gw=192.168.1.1
+
+# Clone a container
+pct clone <source-ctid> <target-ctid> --name <name>
+```
+
+### Container Configuration
+
+```bash
+# Set container hostname
+pct set <ctid> --hostname <hostname>
+
+# Set memory limit (in MB)
+pct set <ctid> --memory <memory>
+
+# Set CPU cores
+pct set <ctid> --cores <cores>
+
+# Set container to start on boot
+pct set <ctid> --onboot 1
+
+# Set container startup/shutdown order
+pct set <ctid> --startup order=1,up=120,down=60
+
+# Add a network interface with DHCP
+pct set <ctid> --net0 name=eth0,bridge=vmbr0,ip=dhcp
+
+# Set static IP address for a container
+pct set <ctid> --net0 name=eth0,bridge=vmbr0,ip=192.168.1.100/24,gw=192.168.1.1
+
+# Add a mount point
+pct set <ctid> --mp0 <host_path>,mp=<container_path>
+
+# Resize a container disk
+pct resize <ctid> rootfs 20G
+```
+
+### Container Migration
+
+```bash
+# Migrate a container to another node
+pct migrate <ctid> <target-node>
+
+# Migrate with specific options
+pct migrate <ctid> <target-node> --online
+```
+
+### Container Snapshots
+
+```bash
+# Create a snapshot
+pct snapshot <ctid> <snapshot-name> --description "Description"
+
+# List snapshots
+pct listsnapshot <ctid>
+
+# Rollback to a snapshot
+pct rollback <ctid> <snapshot-name>
+
+# Delete a snapshot
+pct delsnapshot <ctid> <snapshot-name>
+```
+
+## Network Configuration
+
+### Host Network Configuration
+
+```bash
+# View network interfaces
+ip addr show
+
+# View routing table
+ip route show
+
+# Restart networking service
+systemctl restart networking
+
+# Apply network changes without reboot
+ifreload -a
+```
+
+### Bridge Management
+
+```bash
+# Create a bridge
+echo "auto vmbr1
+iface vmbr1 inet static
+    address 192.168.2.1/24
+    bridge-ports none
+    bridge-stp off
+    bridge-fd 0" >> /etc/network/interfaces
+
+# Activate a bridge
+ifup vmbr1
+
+# Deactivate a bridge
+ifdown vmbr1
+```
+
+### VLAN Configuration
+
+```bash
+# Create a VLAN interface
+echo "auto vmbr0.10
+iface vmbr0.10 inet static
+    address 10.10.10.1/24
+    vlan-raw-device vmbr0" >> /etc/network/interfaces
+
+# Activate a VLAN interface
+ifup vmbr0.10
+```
+
+### Bond Configuration
+
+```bash
+# Create a bond interface
+echo "auto bond0
+iface bond0 inet manual
+    bond-slaves eno1 eno2
+    bond-miimon 100
+    bond-mode 802.3ad
+    bond-xmit-hash-policy layer2+3
+
+auto vmbr0
+iface vmbr0 inet static
+    address 192.168.1.1/24
+    gateway 192.168.1.254
+    bridge-ports bond0
+    bridge-stp off
+    bridge-fd 0" >> /etc/network/interfaces
+```
+
+## Storage Management
+
+The `pvesm` command is used to manage Proxmox VE storage.
+
+### Storage Operations
+
+```bash
+# List all storage
+pvesm status
+
+# Show storage configuration
+pvesm config <storage>
+
+# Add a directory storage
+pvesm add dir <storage> --path <path>
+
+# Add an NFS storage
+pvesm add nfs <storage> --server <server> --export <export> --path <path>
+
+# Add an iSCSI storage
+pvesm add iscsi <storage> --portal <portal> --target <target>
+
+# Add a Ceph RBD storage
+pvesm add rbd <storage> --pool <pool> --monhost <monhost>
+
+# Add an LVM storage
+pvesm add lvmthin <storage> --vgname <vgname> --thinpool <thinpool>
+
+# Add a ZFS storage
+pvesm add zfspool <storage> --pool <pool>
+
+# Remove a storage
+pvesm remove <storage>
+```
+
+### Content Management
+
+```bash
+# List storage content
+pvesm list <storage>
+
+# List available ISO images
+pvesm list <storage> --content iso
+
+# List available VM templates
+pvesm list <storage> --content vztmpl
+
+# List available backups
+pvesm list <storage> --content backup
+
+# Allocate disk image
+pvesm alloc <storage> <vmid> <name> <size>
+
+# Free disk image
+pvesm free <volume>
+```
+
+## Backup and Restore
+
+### VZDump Backup
+
+```bash
+# Backup a single VM
+vzdump <vmid> --compress zstd --mode snapshot --storage <storage>
+
+# Backup multiple VMs
+vzdump <vmid1>,<vmid2>,<vmid3> --compress zstd --mode snapshot --storage <storage>
+
+# Backup all VMs
+vzdump --all --compress zstd --mode snapshot --storage <storage>
+
+# Backup with specific options
+vzdump <vmid> --compress zstd --mode snapshot --storage <storage> --maxfiles 5 --mailto admin@example.com
+```
+
+### Restore from Backup
+
+```bash
+# Restore a VM from backup
+qmrestore /var/lib/vz/dump/vzdump-qemu-<vmid>-<date>.vma.zst <vmid> --storage <storage>
+
+# Restore a container from backup
+pct restore <ctid> /var/lib/vz/dump/vzdump-lxc-<ctid>-<date>.tar.zst --storage <storage>
+```
+
+### Proxmox Backup Server
+
+```bash
+# Configure PBS repository
+proxmox-backup-manager repository create <repo> --datastore <datastore> --fingerprint <fingerprint> --server <server> --user <user>
+
+# Backup to PBS
+proxmox-backup-client backup <vmid>.pxar:/etc --repository <repo>
+
+# Restore from PBS
+proxmox-backup-client restore <vmid>.pxar:/etc --repository <repo> --target /tmp/restore
+```
+
+## Cluster Management
+
+The `pvecm` command is used to manage Proxmox VE clusters.
+
+### Cluster Operations
+
+```bash
+# Create a new cluster
+pvecm create <clustername>
+
+# Add a node to a cluster
+pvecm add <hostname>
+
+# Show cluster status
+pvecm status
+
+# Show cluster nodes
+pvecm nodes
+
+# Remove a node from the cluster
+pvecm delnode <nodename>
+```
+
+### Quorum Management
+
+```bash
+# Show quorum status
+pvecm expected <expected-votes>
+
+# Set expected votes
+pvecm expected <expected-votes>
+```
+
+### HA Management
+
+```bash
+# List HA resources
+ha-manager status
+
+# Enable HA for a VM
+ha-manager add vm:<vmid> --state started
+
+# Disable HA for a VM
+ha-manager remove vm:<vmid>
+
+# Migrate a HA resource
+ha-manager migrate vm:<vmid> <node>
+
+# Show HA resource configuration
+ha-manager config
+```
+
+## Firewall Management
+
+### Firewall Operations
+
+```bash
+# Show firewall status
+pve-firewall status
+
+# Start firewall
+pve-firewall start
+
+# Stop firewall
+pve-firewall stop
+
+# Reload firewall configuration
+pve-firewall reload
+```
+
+### Firewall Rules Management
+
+```bash
+# List firewall rules
+pvesh get /cluster/firewall/rules
+
+# Add a firewall rule to allow SSH
+pvesh create /cluster/firewall/rules --action accept --proto tcp --dport 22 --enable 1
+
+# Add a firewall rule to allow HTTP
+pvesh create /cluster/firewall/rules --action accept --proto tcp --dport 80 --enable 1
+
+# Add a firewall rule to allow HTTPS
+pvesh create /cluster/firewall/rules --action accept --proto tcp --dport 443 --enable 1
+
+# Delete a firewall rule
+pvesh delete /cluster/firewall/rules/<pos>
+```
+
+### VM/Container Firewall
+
+```bash
+# Enable firewall for a VM
+pvesh set /nodes/<node>/qemu/<vmid>/firewall/options --enable 1
+
+# Add a rule to a VM firewall
+pvesh create /nodes/<node>/qemu/<vmid>/firewall/rules --action accept --proto tcp --dport 80 --enable 1
+
+# Enable firewall for a container
+pvesh set /nodes/<node>/lxc/<ctid>/firewall/options --enable 1
+
+# Add a rule to a container firewall
+pvesh create /nodes/<node>/lxc/<ctid>/firewall/rules --action accept --proto tcp --dport 80 --enable 1
+```
+
+## API and Shell Interface
+
+The `pvesh` command provides a shell interface to the Proxmox VE API.
+
+### API Operations
+
+```bash
+# Get API version
+pvesh get /version
+
+# List all API paths
+pvesh get /
+
+# Get cluster resources
+pvesh get /cluster/resources
+
+# Get node status
+pvesh get /nodes/<node>/status
+
+# Get VM list
+pvesh get /nodes/<node>/qemu
+
+# Get container list
+pvesh get /nodes/<node>/lxc
+
+# Get storage list
+pvesh get /storage
+
+# Get task list
+pvesh get /nodes/<node>/tasks
+```
+
+### API Usage
+
+```bash
+# Show API command usage
+pvesh usage <path>
+
+# Show API command usage with verbose output
+pvesh usage <path> -v
+```
+
+## System Administration
+
+### System Operations
+
+```bash
+# Show system status
+pveversion -v
+
+# Show node status
+pvesh get /nodes/<node>/status
+
+# Show subscription status
+pvesh get /nodes/<node>/subscription
+
+# Update package lists
+apt update
+
+# Upgrade packages
+apt dist-upgrade
+
+# Reboot node
+reboot
+
+# Shutdown node
+shutdown -h now
+```
+
+### Task Management
+
+```bash
+# Show running tasks
+pvesh get /nodes/<node>/tasks?running=1
+
+# Show task details
+pvesh get /nodes/<node>/tasks/<upid>
+
+# Show task log
+pvesh get /nodes/<node>/tasks/<upid>/log
+```
+
+### User Management
+
+```bash
+# List users
+pveum user list
+
+# Add a user
+pveum user add <userid> --password <password>
+
+# Modify a user
+pveum user modify <userid> --email <email>
+
+# Delete a user
+pveum user delete <userid>
+
+# List groups
+pveum group list
+
+# Add a group
+pveum group add <groupid>
+
+# Add a user to a group
+pveum user modify <userid> --groups <groupid>
+
+# List roles
+pveum role list
+
+# Add a role
+pveum role add <roleid> --privs <privs>
+
+# Add ACL
+pveum acl modify / --users <userid> --roles <roleid>
+```
+
+### API Token Management
+
+```bash
+# List API tokens
+pveum user token list <userid>
+
+# Create API token
+pveum user token add <userid> <tokenid> --privsep 0
+
+# Remove API token
+pveum user token remove <userid> <tokenid>
+```
+
+## Additional Resources
+
+- [Official Proxmox VE Documentation](https://pve.proxmox.com/pve-docs/)
+- [Proxmox VE Wiki](https://pve.proxmox.com/wiki/)
+- [Proxmox VE API Documentation](https://pve.proxmox.com/pve-docs/api-viewer/)
+- [Proxmox VE Forum](https://forum.proxmox.com/)

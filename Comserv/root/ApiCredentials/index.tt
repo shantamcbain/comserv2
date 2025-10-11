@@ -1,0 +1,320 @@
+[% PageVersion = 'ApiCredentials/index.tt,v 1.0 2024/05/30 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="api-credentials-container">
+    <h1>API Credentials Management</h1>
+    
+    <div class="description">
+        <p>This page allows you to manage API credentials for various services used by the Comserv system. 
+        These credentials are stored in a secure JSON file and are used for integrations with external services.</p>
+        <p><strong>Note:</strong> Only administrators can access and modify these credentials.</p>
+        <p><strong>Important:</strong> After updating credentials, services using these APIs may need to be restarted to apply the changes.</p>
+    </div>
+    
+    [% IF success_message %]
+    <div class="alert alert-success">
+        [% success_message %]
+    </div>
+    [% END %]
+    
+    [% IF error_message %]
+    <div class="alert alert-danger">
+        [% error_message %]
+    </div>
+    [% END %]
+    
+    <form method="post" action="[% c.uri_for('/ApiCredentials/update') %]" class="api-credentials-form">
+        [% FOREACH service_name IN credentials.keys.sort %]
+            <div class="service-section">
+                <h2>[% service_name | ucfirst %]</h2>
+                
+                [% # Service descriptions %]
+                [% IF service_name == 'virtualmin' %]
+                <div class="service-description">
+                    <p>Virtualmin is a web hosting control panel used for managing virtual hosts, domains, and web servers. These credentials are used for automating server management tasks.</p>
+                    <p><strong>Used by:</strong> Server provisioning, domain management, and backup systems</p>
+                    <p><strong>Documentation:</strong> 
+                        <a href="[% c.uri_for('/Documentation/api_credentials') %]#virtualmin" target="_blank">Internal Documentation</a> | 
+                        <a href="https://www.virtualmin.com/documentation/developer/http-api/" target="_blank">Virtualmin API Documentation</a>
+                    </p>
+                    <p><a href="[% c.uri_for('/Documentation/api_credentials') %]#virtualmin" target="_blank" class="btn btn-sm btn-info">How to obtain these credentials</a></p>
+                </div>
+                [% ELSIF service_name == 'cloudflare' %]
+                <div class="service-description">
+                    <p>Cloudflare provides CDN, DNS, and security services. These credentials are used to manage DNS records, security settings, and cache configurations.</p>
+                    <p><strong>Used by:</strong> DNS management, SSL certificate provisioning, and security modules</p>
+                    <p><strong>Documentation:</strong> 
+                        <a href="[% c.uri_for('/Documentation/api_credentials') %]#cloudflare" target="_blank">Internal Documentation</a> | 
+                        <a href="https://developers.cloudflare.com/api/" target="_blank">Cloudflare API Documentation</a>
+                    </p>
+                    <div class="service-actions">
+                        <a href="[% c.uri_for('/Documentation/api_credentials') %]#cloudflare" target="_blank" class="btn btn-sm btn-info">How to obtain these credentials</a>
+                        <a href="[% c.uri_for('/cloudflareapi') %]" class="btn btn-sm btn-success">Go to DNS Management</a>
+                    </div>
+                </div>
+                [% ELSIF service_name == 'opnsense' %]
+                <div class="service-description">
+                    <p>OPNsense is an open-source firewall and routing platform. These credentials are used to manage firewall rules, VPN configurations, and network settings.</p>
+                    <p><strong>Used by:</strong> Network management, firewall configuration, and VPN setup modules</p>
+                    <p><strong>Documentation:</strong> 
+                        <a href="[% c.uri_for('/Documentation/api_credentials') %]#opnsense" target="_blank">Internal Documentation</a> | 
+                        <a href="https://docs.opnsense.org/development/api.html" target="_blank">OPNsense API Documentation</a>
+                    </p>
+                    <p><a href="[% c.uri_for('/Documentation/api_credentials') %]#opnsense" target="_blank" class="btn btn-sm btn-info">How to obtain these credentials</a></p>
+                </div>
+                [% ELSIF service_name == 'proxmox' %]
+                <div class="service-description">
+                    <p>Proxmox is a virtualization platform for managing VMs and containers. These credentials are used to create, modify, and monitor virtual machines.</p>
+                    <p><strong>Used by:</strong> VM provisioning, container management, and resource monitoring</p>
+                    <p><strong>Documentation:</strong> 
+                        <a href="[% c.uri_for('/Documentation/api_credentials') %]#proxmox" target="_blank">Internal Documentation</a> | 
+                        <a href="https://pve.proxmox.com/wiki/Proxmox_VE_API" target="_blank">Proxmox API Documentation</a>
+                    </p>
+                    <p><a href="[% c.uri_for('/Documentation/api_credentials') %]#proxmox" target="_blank" class="btn btn-sm btn-info">How to obtain these credentials</a></p>
+                </div>
+                [% ELSIF service_name == 'stripe' %]
+                <div class="service-description">
+                    <p>Stripe is a payment processing platform. These credentials are used to process payments, manage subscriptions, and handle invoices.</p>
+                    <p><strong>Used by:</strong> Payment processing, subscription management, and billing modules</p>
+                    <p><strong>Documentation:</strong> 
+                        <a href="[% c.uri_for('/Documentation/api_credentials') %]#stripe" target="_blank">Internal Documentation</a> | 
+                        <a href="https://stripe.com/docs/api" target="_blank">Stripe API Documentation</a>
+                    </p>
+                    <p><a href="[% c.uri_for('/Documentation/api_credentials') %]#stripe" target="_blank" class="btn btn-sm btn-info">How to obtain these credentials</a></p>
+                </div>
+                [% ELSIF service_name == 'mailchimp' %]
+                <div class="service-description">
+                    <p>Mailchimp is an email marketing platform. These credentials are used to manage mailing lists, send campaigns, and track email metrics.</p>
+                    <p><strong>Used by:</strong> Newsletter management, email campaigns, and subscriber tracking</p>
+                    <p><strong>Documentation:</strong> 
+                        <a href="[% c.uri_for('/Documentation/api_credentials') %]#mailchimp" target="_blank">Internal Documentation</a> | 
+                        <a href="https://mailchimp.com/developer/marketing/api/root/" target="_blank">Mailchimp API Documentation</a>
+                    </p>
+                    <p><a href="[% c.uri_for('/Documentation/api_credentials') %]#mailchimp" target="_blank" class="btn btn-sm btn-info">How to obtain these credentials</a></p>
+                </div>
+                [% ELSIF service_name == 'twilio' %]
+                <div class="service-description">
+                    <p>Twilio provides communication APIs for SMS, voice, and video. These credentials are used to send notifications and enable communication features.</p>
+                    <p><strong>Used by:</strong> SMS notifications, voice calls, and two-factor authentication</p>
+                    <p><strong>Documentation:</strong> 
+                        <a href="[% c.uri_for('/Documentation/api_credentials') %]#twilio" target="_blank">Internal Documentation</a> | 
+                        <a href="https://www.twilio.com/docs/api" target="_blank">Twilio API Documentation</a>
+                    </p>
+                    <p><a href="[% c.uri_for('/Documentation/api_credentials') %]#twilio" target="_blank" class="btn btn-sm btn-info">How to obtain these credentials</a></p>
+                </div>
+                [% ELSE %]
+                <div class="service-description">
+                    <p>These credentials are used for integration with [% service_name | ucfirst %] services.</p>
+                </div>
+                [% END %]
+                
+                <div class="service-fields">
+                    [% FOREACH field_name IN credentials.$service_name.keys.sort %]
+                        <div class="form-group">
+                            <label for="[% service_name %]_[% field_name %]">
+                                [% field_name | replace('_', ' ') | ucfirst %]:
+                            </label>
+                            
+                            [% # Field descriptions %]
+                            <div class="field-description">
+                                [% IF service_name == 'virtualmin' %]
+                                    [% IF field_name == 'host' %]
+                                        <small>The hostname or IP address of your Virtualmin server (e.g., virtualmin.example.com)</small>
+                                    [% ELSIF field_name == 'username' %]
+                                        <small>The administrative username for Virtualmin access</small>
+                                    [% ELSIF field_name == 'password' %]
+                                        <small>The password for the administrative user</small>
+                                    [% END %]
+                                [% ELSIF service_name == 'cloudflare' %]
+                                    [% IF field_name == 'api_token' %]
+                                        <small>API token generated from the Cloudflare dashboard with appropriate permissions</small>
+                                    [% ELSIF field_name == 'application_id' %]
+                                        <small>
+                                            <strong>What is the Application ID?</strong> This is a unique identifier for your application in Cloudflare's system. It's required for API authentication and rate limiting.
+                                            <div class="help-box">
+                                                <h4>How to Find Your Cloudflare Application ID</h4>
+                                                <div class="help-content">
+                                                    <div class="method">
+                                                        <h5>Method 1: From the API Tokens Page</h5>
+                                                        <ol>
+                                                            <li>Log in to your <a href="https://dash.cloudflare.com" target="_blank">Cloudflare Dashboard</a></li>
+                                                            <li>Click on your profile icon in the top-right corner</li>
+                                                            <li>Select <strong>"My Profile"</strong> from the dropdown menu</li>
+                                                            <li>In the left sidebar, click on <strong>"API Tokens"</strong></li>
+                                                            <li>Look at the top of the page for your <strong>"Account ID"</strong> - this is your Application ID</li>
+                                                        </ol>
+                                                        <div class="visual-cue">
+                                                            <span class="icon">🔍</span> Look for a string like: <code>a1b2c3d4e5f6g7h8i9j0</code>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div class="method">
+                                                        <h5>Method 2: From the Developer Documentation</h5>
+                                                        <ol>
+                                                            <li>Log in to your <a href="https://dash.cloudflare.com" target="_blank">Cloudflare Dashboard</a></li>
+                                                            <li>Click on <strong>"Workers & Pages"</strong> in the sidebar</li>
+                                                            <li>Click on <strong>"Overview"</strong></li>
+                                                            <li>Scroll down to find your <strong>"Account ID"</strong> - this is your Application ID</li>
+                                                        </ol>
+                                                    </div>
+                                                    
+                                                    <div class="method">
+                                                        <h5>Method 3: From the URL</h5>
+                                                        <ol>
+                                                            <li>Log in to your <a href="https://dash.cloudflare.com" target="_blank">Cloudflare Dashboard</a></li>
+                                                            <li>Go to any page in your account</li>
+                                                            <li>Look at the URL in your browser's address bar</li>
+                                                            <li>Find the segment that looks like: <code>https://dash.cloudflare.com/<strong>a1b2c3d4e5f6g7h8i9j0</strong>/...</code></li>
+                                                            <li>The highlighted part is your Application ID</li>
+                                                        </ol>
+                                                    </div>
+                                                    
+                                                    <div class="note">
+                                                        <strong>Important:</strong> The Application ID is sometimes called "Account ID" in the Cloudflare interface. It's a 32-character hexadecimal string.
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </small>
+                                    [% ELSIF field_name == 'email' %]
+                                        <small>Email address associated with your Cloudflare account</small>
+                                    [% END %]
+                                [% ELSIF service_name == 'opnsense' %]
+                                    [% IF field_name == 'host' %]
+                                        <small>The hostname or IP address of your OPNsense firewall</small>
+                                    [% ELSIF field_name == 'api_key' %]
+                                        <small>The API key created in the OPNsense dashboard</small>
+                                    [% ELSIF field_name == 'api_secret' %]
+                                        <small>The API secret associated with your API key</small>
+                                    [% END %]
+                                [% ELSIF service_name == 'proxmox' %]
+                                    [% IF field_name == 'host' %]
+                                        <small>The hostname or IP address of your Proxmox server</small>
+                                    [% ELSIF field_name == 'username' %]
+                                        <small>Username with API access permissions (format: user@pam or user@pve)</small>
+                                    [% ELSIF field_name == 'password' %]
+                                        <small>Password for the Proxmox user</small>
+                                    [% ELSIF field_name == 'token_name' %]
+                                        <small>API token name (if using token authentication)</small>
+                                    [% ELSIF field_name == 'token_value' %]
+                                        <small>API token value (if using token authentication)</small>
+                                    [% END %]
+                                [% ELSIF service_name == 'stripe' %]
+                                    [% IF field_name == 'publishable_key' %]
+                                        <small>Stripe publishable key for client-side integration</small>
+                                    [% ELSIF field_name == 'secret_key' %]
+                                        <small>Stripe secret key for server-side API calls</small>
+                                    [% ELSIF field_name == 'webhook_secret' %]
+                                        <small>Secret for validating webhook signatures</small>
+                                    [% END %]
+                                [% END %]
+                            </div>
+                            
+                            <input 
+                                type="[% IF field_name.match('password|secret|key|token') %]password[% ELSE %]text[% END %]" 
+                                id="[% service_name %]_[% field_name %]" 
+                                name="[% service_name %]_[% field_name %]" 
+                                value="[% credentials.$service_name.$field_name %]"
+                                class="form-control"
+                                [% IF field_name.match('password|secret|key|token') %]autocomplete="new-password"[% END %]
+                            >
+                            [% IF field_name.match('password|secret|key|token') %]
+                            <button type="button" class="toggle-password" data-target="[% service_name %]_[% field_name %]">
+                                Show
+                            </button>
+                            [% END %]
+                        </div>
+                    [% END %]
+                </div>
+            </div>
+        [% END %]
+        
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+            <a href="[% c.uri_for('/Documentation') %]" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+    
+    <div class="api-docs-link">
+        <h3>How API Credentials Are Used</h3>
+        <p>These API credentials are used by various modules in the Comserv system to interact with external services. The credentials are stored in a secure JSON file at <code>config/api_credentials.json</code> and are loaded when needed by the application.</p>
+        
+        <h4>Security Considerations</h4>
+        <ul>
+            <li>All sensitive credentials (passwords, tokens, keys) are stored securely and are only accessible to administrators.</li>
+            <li>The credentials file is not included in version control to prevent accidental exposure.</li>
+            <li>API requests using these credentials are logged for security auditing purposes.</li>
+        </ul>
+        
+        <h4>Troubleshooting</h4>
+        <p>If you encounter issues with API integrations:</p>
+        <ol>
+            <li>Verify that the credentials are correct and up-to-date.</li>
+            <li>Check that the external service is operational and accessible from the server.</li>
+            <li>Review the application logs for any API-related errors.</li>
+            <li>Ensure that the API permissions are correctly configured on the external service.</li>
+        </ol>
+        
+        <p>For more detailed information, check out the <a href="[% c.uri_for('/Documentation/api_credentials') %]" class="btn btn-primary" target="_blank">Complete API Credentials Documentation</a> or contact the system administrator.</p>
+        
+        <div class="related-tools">
+            <h5>Related Tools:</h5>
+            <ul class="tools-list">
+                <li><a href="[% c.uri_for('/cloudflareapi') %]"><i class="icon-dns"></i> Cloudflare DNS Management</a></li>
+                <li><a href="[% c.uri_for('/admin/servers') %]"><i class="icon-server"></i> Server Management</a></li>
+            </ul>
+        </div>
+        
+        <div class="documentation-links">
+            <h5>Quick Documentation Links:</h5>
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>General Information:</h6>
+                    <ul>
+                        <li><a href="[% c.uri_for('/Documentation/admin/api_credentials') %]#overview" target="_blank">Overview</a></li>
+                        <li><a href="[% c.uri_for('/Documentation/admin/api_credentials') %]#credential-storage" target="_blank">Credential Storage</a></li>
+                        <li><a href="[% c.uri_for('/Documentation/admin/api_credentials') %]#supported-services" target="_blank">Supported Services</a></li>
+                        <li><a href="[% c.uri_for('/Documentation/admin/api_credentials') %]#security-considerations" target="_blank">Security Considerations</a></li>
+                        <li><a href="[% c.uri_for('/Documentation/admin/api_credentials') %]#troubleshooting" target="_blank">Troubleshooting</a></li>
+                        <li><a href="[% c.uri_for('/Documentation/admin/api_credentials') %]#best-practices" target="_blank">Best Practices</a></li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h6>Service-Specific Information:</h6>
+                    <ul>
+                        <li><a href="[% c.uri_for('/Documentation/admin/api_credentials') %]#virtualmin" target="_blank">Virtualmin</a></li>
+                        <li><a href="[% c.uri_for('/Documentation/admin/api_credentials') %]#cloudflare" target="_blank">Cloudflare</a></li>
+                        <li><a href="[% c.uri_for('/Documentation/admin/api_credentials') %]#opnsense" target="_blank">OPNsense</a></li>
+                        <li><a href="[% c.uri_for('/Documentation/admin/api_credentials') %]#proxmox" target="_blank">Proxmox</a></li>
+                        <li><a href="[% c.uri_for('/Documentation/admin/api_credentials') %]#stripe" target="_blank">Stripe</a></li>
+                        <li><a href="[% c.uri_for('/Documentation/admin/api_credentials') %]#mailchimp" target="_blank">Mailchimp</a></li>
+                        <li><a href="[% c.uri_for('/Documentation/admin/api_credentials') %]#twilio" target="_blank">Twilio</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Toggle password visibility
+        document.querySelectorAll('.toggle-password').forEach(button => {
+            button.addEventListener('click', function() {
+                const targetId = this.getAttribute('data-target');
+                const inputField = document.getElementById(targetId);
+                
+                if (inputField.type === 'password') {
+                    inputField.type = 'text';
+                    this.textContent = 'Hide';
+                } else {
+                    inputField.type = 'password';
+                    this.textContent = 'Show';
+                }
+            });
+        });
+    });
+</script>
+
+<link rel="stylesheet" href="[% c.uri_for('/static/css/components/api_credentials.css') %]">

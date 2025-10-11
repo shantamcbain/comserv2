@@ -1,0 +1,59 @@
+/* Generated CSS for theme: apis */
+
+:root {
+  --accent-color: #FF9900;
+  --background-color: #f9f06b;
+  --body-font: Arial, sans-serif;
+  --border-color: #e5a50a;
+  --button-bg: #e5a50a;
+  --button-border: #ffa348;
+  --button-hover-bg: #d49509;
+  --button-text: #000000;
+  --font-size-base: 16px;
+  --font-size-large: 24px;
+  --font-size-small: 15px;
+  --font-size-xlarge: 28px;
+  --header-color: #000000;
+  --header-font: Arial, sans-serif;
+  --link-color: #f9f06b;
+  --link-decoration: none;
+  --link-hover-color: #f8e45c;
+  --nav-bg: #ff9900;
+  --nav-hover-bg: #f6d32d;
+  --nav-text: #000000;
+  --primary-color: #ccffff;
+  --secondary-color: #4A4A4A;
+  --site-name-color: #000000;
+  --site-name-font: Arial, sans-serif;
+  --site-name-size: 24px;
+  --site-name-weight: normal;
+  --success-color: #4CAF50;
+  --table-header-bg: #f2f2f2;
+  --text-color: #000000;
+  --warning-color: red;
+}
+
+body {
+  background-image: url(../images/BMaster/honey2.jpg);
+}
+
+.dropdown-content {
+  background-color: #f9f9f9;
+}
+
+.dropdown-content a {
+  color: black;
+}
+
+.nav {
+  background-color: #ccffff;
+}
+
+.submenu {
+  background-color: #f9f9f9;
+}
+
+.submenu a {
+  color: black;
+}
+

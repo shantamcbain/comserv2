@@ -39,10 +39,6 @@
         <td>[% workshop.instructor %]</td>
     </tr>
     <tr>
-        <td>Share</td>
-        <td>[% workshop.share %]</td>
-    </tr>
-    <tr>
         <td>Max Participants</td>
         <td>[% workshop.max_participants %]</td>
     </tr>

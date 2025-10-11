@@ -12,7 +12,6 @@
 
 
 <form method="POST" action="/ENCY/add_herb">
-    <!-- Existing form fields -->
     <label for="botanical_name">Botanical Name:</label><br>
     <input type="text" id="botanical_name" name="botanical_name" required><br>
 
@@ -20,7 +19,7 @@
     <input type="text" id="common_names" name="common_names" required><br>
 
     <label for="therapeutic_action">Therapeutic Action:</label><br>
-    <input type="text" id="therapeutic_action" name="therapeutic_action" maxlength="250" required><br>
+    <textarea id="therapeutic_action" name="therapeutic_action"></textarea><br>
 
     <label for="parts_used">Parts Used:</label><br>
     <textarea id="parts_used" name="parts_used"></textarea><br>
@@ -43,12 +42,20 @@
     <label for="stem">Stem:</label><br>
     <textarea id="stem" name="stem"></textarea><br>
 
+    <label for="nectar">Nectar:</label><br>
+    <textarea id="nectar" name="nectar"></textarea><br>
+
+    <label for="pollinator">Pollinator:</label><br>
+    <textarea id="pollinator" name="pollinator"></textarea><br>
+
+    <label for="pollen">Pollen:</label><br>
+    <textarea id="pollen" name="pollen"></textarea><br>
 
     <label for="leaves">Leaves:</label><br>
     <textarea id="leaves" name="leaves"></textarea><br>
 
     <label for="flowers">Flowers:</label><br>
-    <input type="text" id="flowers" name="flowers" maxlength="150" required><br>
+    <textarea id="flowers" name="flowers"></textarea><br>
 
     <label for="fruit">Fruit:</label><br>
     <textarea id="fruit" name="fruit"></textarea><br>
@@ -104,7 +111,7 @@
     <textarea id="chinese" name="chinese"></textarea><br>
 
     <label for="culinary">Culinary Uses:</label><br>
-    <input type="text" id="culinary" name="culinary" maxlength="500" required><br>
+    <textarea id="culinary" name="culinary"></textarea><br>
 
     <label for="contra_indications">Contra Indications:</label><br>
     <input type="text" id="contra_indications" name="contra_indications" maxlength="150" required><br>

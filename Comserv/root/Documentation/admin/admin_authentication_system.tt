@@ -1,0 +1,339 @@
+[% META title = 'Admin Authentication System Documentation' %]
+[% PageVersion = 'admin_authentication_system.tt,v 1.0 2025/01/20 Development Team Exp Development Team' %]
+
+<h1>Admin Authentication System</h1>
+<p><strong>Module:</strong> <code>Comserv::Util::AdminAuth</code></p>
+<p><strong>Purpose:</strong> Centralized authentication utility for admin access control</p>
+<p><strong>Location:</strong> <code>/Comserv/lib/Comserv/Util/AdminAuth.pm</code></p>
+
+<div class="alert alert-info">
+<h2>Overview</h2>
+<p>The AdminAuth utility provides a single, consistent way to verify admin access across all controllers. It handles both standard admin users and CSC admin users (SiteName = 'CSC' with admin role), replacing the previous inconsistent authentication patterns.</p>
+</div>
+
+<h2>Authentication Types Supported</h2>
+
+<div class="row">
+<div class="col-md-4">
+<div class="card">
+<div class="card-header"><strong>Standard Admin</strong></div>
+<div class="card-body">
+<ul>
+<li>Has 'admin' role</li>
+<li>Any SiteName value</li>
+<li>Full admin access</li>
+</ul>
+</div>
+</div>
+</div>
+
+<div class="col-md-4">
+<div class="card">
+<div class="card-header"><strong>CSC Admin</strong></div>
+<div class="card-body">
+<ul>
+<li>Has 'admin' role</li>
+<li>SiteName = 'CSC'</li>
+<li>Full admin access</li>
+</ul>
+</div>
+</div>
+</div>
+
+<div class="col-md-4">
+<div class="card">
+<div class="card-header"><strong>Special User</strong></div>
+<div class="card-body">
+<ul>
+<li>Username = 'Shanta'</li>
+<li>Legacy support</li>
+<li>Full admin access</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+
+<h2>Core Methods</h2>
+
+<h3>check_admin_access($c, $action_name)</h3>
+<div class="method-details">
+<p><strong>Purpose:</strong> Check if a user has admin access</p>
+<p><strong>Returns:</strong> 1 if user has access, 0 if not</p>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>$c</code> - Catalyst context object</li>
+<li><code>$action_name</code> - Name of the action being accessed (for logging)</li>
+</ul>
+
+<h4>Authentication Logic:</h4>
+<ol>
+<li><strong>Session Validation:</strong> Checks for valid session username</li>
+<li><strong>Special User Check:</strong> Grants access if username = 'Shanta'</li>
+<li><strong>Admin Role Check:</strong> Verifies 'admin' role in session data</li>
+<li><strong>CSC Admin Recognition:</strong> Identifies CSC admin users for logging</li>
+</ol>
+
+<div class="code-example">
+<h4>Usage Example:</h4>
+<pre><code>my $admin_auth = Comserv::Util::AdminAuth->new();
+if ($admin_auth->check_admin_access($c, 'git_pull')) {
+    # User has admin access
+    # Proceed with admin operation
+} else {
+    # User does not have admin access
+    # Handle denial (redirect, error message, etc.)
+}</code></pre>
+</div>
+</div>
+
+<h3>require_admin_access($c, $action_name)</h3>
+<div class="method-details">
+<p><strong>Purpose:</strong> Check admin access and redirect to login if denied</p>
+<p><strong>Returns:</strong> 1 if access granted, 0 if redirected to login</p>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>$c</code> - Catalyst context object</li>
+<li><code>$action_name</code> - Name of the action being accessed</li>
+</ul>
+
+<h4>Behavior:</h4>
+<ul>
+<li><strong>Access Granted:</strong> Returns 1, allows method to continue</li>
+<li><strong>Access Denied:</strong> Sets error message, redirects to login, returns 0</li>
+<li><strong>Destination Preservation:</strong> Includes current URI as destination parameter</li>
+</ul>
+
+<div class="code-example">
+<h4>Usage Example:</h4>
+<pre><code>sub admin_function :Path('/admin/some_function') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Check admin access - will redirect if denied
+    return unless $self->admin_auth->require_admin_access($c, 'some_function');
+    
+    # Admin access confirmed - proceed with function
+    # ... admin functionality here ...
+}</code></pre>
+</div>
+</div>
+
+<h3>is_csc_admin($c)</h3>
+<div class="method-details">
+<p><strong>Purpose:</strong> Helper method to check if user is specifically a CSC admin</p>
+<p><strong>Returns:</strong> 1 if CSC admin, 0 if not</p>
+<p><strong>Note:</strong> This method still uses <code>$c->check_user_roles('admin')</code> and may need updating for full session compatibility</p>
+
+<div class="code-example">
+<h4>Usage Example:</h4>
+<pre><code>if ($admin_auth->is_csc_admin($c)) {
+    # User is specifically a CSC admin
+    # May have CSC-specific functionality
+}</code></pre>
+</div>
+</div>
+
+<h3>get_admin_type($c)</h3>
+<div class="method-details">
+<p><strong>Purpose:</strong> Determine the type of admin user</p>
+<p><strong>Returns:</strong> String - 'standard', 'csc', 'special', or 'none'</p>
+
+<h4>Return Values:</h4>
+<ul>
+<li><strong>'special':</strong> Username = 'Shanta'</li>
+<li><strong>'csc':</strong> SiteName = 'CSC' and has admin role</li>
+<li><strong>'standard':</strong> Has admin role but not CSC</li>
+<li><strong>'none':</strong> No admin access</li>
+</ul>
+
+<div class="code-example">
+<h4>Usage Example:</h4>
+<pre><code>my $admin_type = $admin_auth->get_admin_type($c);
+$c->stash->{admin_type} = $admin_type;
+
+# In template:
+[% IF admin_type == 'csc' %]
+    &lt;p&gt;Welcome, CSC Administrator&lt;/p&gt;
+[% ELSIF admin_type == 'special' %]
+    &lt;p&gt;Welcome, Special User&lt;/p&gt;
+[% ELSIF admin_type == 'standard' %]
+    &lt;p&gt;Welcome, Administrator&lt;/p&gt;
+[% END %]</code></pre>
+</div>
+</div>
+
+<h2>Integration with Controllers</h2>
+
+<h3>Controller Setup</h3>
+<div class="code-example">
+<pre><code>package Comserv::Controller::SomeController;
+
+use Moose;
+use namespace::autoclean;
+use Comserv::Util::AdminAuth;
+
+BEGIN { extends 'Catalyst::Controller'; }
+
+# Create admin_auth helper method
+sub admin_auth {
+    my ($self) = @_;
+    return Comserv::Util::AdminAuth->new();
+}</code></pre>
+</div>
+
+<h3>Method Protection Pattern</h3>
+<div class="code-example">
+<pre><code>sub admin_method :Path('/admin/some_action') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Single line admin access check
+    return unless $self->admin_auth->require_admin_access($c, 'some_action');
+    
+    # Admin functionality continues here...
+    $c->stash(template => 'admin/some_template.tt');
+}</code></pre>
+</div>
+
+<h2>Session Data Requirements</h2>
+
+<div class="alert alert-warning">
+<h3>Required Session Variables</h3>
+<p>The AdminAuth utility relies on session data. Ensure these variables are set during login:</p>
+</div>
+
+<ul>
+<li><strong>username:</strong> User's login name (required)</li>
+<li><strong>roles:</strong> Array or string of user roles (must include 'admin' for admin access)</li>
+<li><strong>SiteName:</strong> Site identifier (required for CSC admin detection)</li>
+</ul>
+
+<div class="code-example">
+<h4>Session Setup Example:</h4>
+<pre><code># During login process
+$c->session->{username} = $user->username;
+$c->session->{roles} = ['admin', 'user'];  # or just 'admin'
+$c->session->{SiteName} = 'CSC';  # or other site identifier</code></pre>
+</div>
+
+<h2>Logging and Debugging</h2>
+
+<h3>Log Messages</h3>
+<p>AdminAuth provides comprehensive logging for debugging authentication issues:</p>
+
+<ul>
+<li><strong>Access Granted:</strong> Logs successful authentication with user details</li>
+<li><strong>Access Denied:</strong> Logs failed authentication with reason</li>
+<li><strong>Session Debug:</strong> Logs session data for troubleshooting</li>
+<li><strong>Admin Type Detection:</strong> Logs detected admin type (standard/csc/special)</li>
+</ul>
+
+<h3>Log Search</h3>
+<div class="code-example">
+<pre><code># Search application logs for AdminAuth messages
+grep "AdminAuth" /path/to/application.log
+
+# Search for specific action authentication
+grep "check_admin_access.*action_name" /path/to/application.log</code></pre>
+</div>
+
+<h2>Migration from Old Authentication</h2>
+
+<h3>Old Pattern (Before AdminAuth)</h3>
+<div class="code-example">
+<pre><code>unless ($c->user_exists && ($c->check_user_roles('admin') || $c->session->{username} eq 'Shanta')) {
+    $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+    $c->response->redirect($c->uri_for('/user/login', {
+        destination => $c->req->uri
+    }));
+    return;
+}</code></pre>
+</div>
+
+<h3>New Pattern (With AdminAuth)</h3>
+<div class="code-example">
+<pre><code>return unless $self->admin_auth->require_admin_access($c, 'action_name');</code></pre>
+</div>
+
+<h3>Migration Benefits</h3>
+<ul>
+<li>✅ <strong>Consistency:</strong> Same authentication logic across all controllers</li>
+<li>✅ <strong>Maintainability:</strong> Single place to update authentication logic</li>
+<li>✅ <strong>Debugging:</strong> Comprehensive logging for troubleshooting</li>
+<li>✅ <strong>CSC Admin Support:</strong> Proper handling of CSC admin users</li>
+<li>✅ <strong>Session Compatibility:</strong> Works with session-based authentication</li>
+</ul>
+
+<h2>Troubleshooting</h2>
+
+<h3>Common Issues</h3>
+
+<div class="troubleshooting-section">
+<h4>Issue: CSC Admin Users Redirected to Login</h4>
+<p><strong>Symptoms:</strong> CSC admin users see login page instead of admin interface</p>
+<p><strong>Cause:</strong> Session data missing or incorrect</p>
+<p><strong>Solution:</strong></p>
+<ul>
+<li>Check session data: username, roles, SiteName</li>
+<li>Verify SiteName = 'CSC' for CSC admin users</li>
+<li>Ensure 'admin' role is in roles array/string</li>
+</ul>
+</div>
+
+<div class="troubleshooting-section">
+<h4>Issue: Authentication Logs Show "No valid session username"</h4>
+<p><strong>Symptoms:</strong> Users redirected to login despite being logged in</p>
+<p><strong>Cause:</strong> Session username not set or empty</p>
+<p><strong>Solution:</strong></p>
+<ul>
+<li>Check login process sets <code>$c->session->{username}</code></li>
+<li>Verify session is not expired</li>
+<li>Clear browser cookies and re-login</li>
+</ul>
+</div>
+
+<div class="troubleshooting-section">
+<h4>Issue: Standard Admin Users Cannot Access Admin Functions</h4>
+<p><strong>Symptoms:</strong> Non-CSC admin users redirected to login</p>
+<p><strong>Cause:</strong> Roles not properly set in session</p>
+<p><strong>Solution:</strong></p>
+<ul>
+<li>Verify <code>$c->session->{roles}</code> contains 'admin'</li>
+<li>Check if roles is array or string format</li>
+<li>Ensure login process sets roles correctly</li>
+</ul>
+</div>
+
+<h3>Debug Steps</h3>
+<ol>
+<li><strong>Check Application Logs:</strong> Search for AdminAuth messages</li>
+<li><strong>Verify Session Data:</strong> Add debug output for session variables</li>
+<li><strong>Test Different User Types:</strong> Try standard admin, CSC admin, and special user</li>
+<li><strong>Check Network Connectivity:</strong> Ensure session cookies are being sent</li>
+</ol>
+
+<h2>Related Documentation</h2>
+
+<ul>
+<li><a href="/documentation/admin/git_operations.tt">Git Operations Documentation</a></li>
+<li><a href="/documentation/changelog/2025-01-20-admin-authentication-refactor.tt">Authentication Refactor Changelog</a></li>
+<li><a href="/documentation/admin/admin_access_control.md">Admin Access Control (Legacy)</a></li>
+<li><a href="/documentation/developer/session_management.tt">Session Management Documentation</a></li>
+</ul>
+
+<div class="alert alert-info">
+<h2>Support</h2>
+<p>For technical support with the AdminAuth system, contact the Development Team with:</p>
+<ul>
+<li>Relevant log entries from application.log</li>
+<li>User type attempting access (standard admin, CSC admin, special user)</li>
+<li>Specific admin function being accessed</li>
+<li>Session data (username, roles, SiteName) if available</li>
+</ul>
+</div>
+
+[% IF c.session.debug_mode == 1 %]
+<div class="debug-info">
+  <p>Template: admin_authentication_system.tt</p>
+  <p>Last Modified: [% PageVersion %]</p>
+</div>
+[% END %]

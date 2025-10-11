@@ -1,50 +1,54 @@
-[% PageVersion	= 'WorkShops/workshops.tt,v 0.01 2024/01/08 shanta Exp shanta '	%]
+[% PageVersion = 'WorkShops/workshops.tt,v 0.01 2024/01/08 shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
- [%	PageVersion %]
+ [% PageVersion %]
 [% END %]
 
 <h1>Workshops</h1>
 <a href="/workshop/add">Add Workshop</a>
 <table>
     <tr>
-
         <th>SiteName</th>
         <th>Date of Workshop</th>
         <th>Time</th>
         <th>End Time</th>
         <th>Location</th>
         <th>Title</th>
-        <th>Details</th>
-        <th>Max/Min Attendees</th>
+        <th>Max Participants</th>
         <th>Actions</th>
     </tr>
     [% FOREACH workshop IN workshops %]
     <tr>
-
         <td>[% workshop.sitename %]</td>
-        <td>[% workshop.date %]</td>
+        <td>[% workshop.date.split(' ').0 %]</td> <!-- Extract only the date part -->
         <td>[% workshop.time %]</td>
+        <td>[% workshop.end_time %]</td>
         <td>[% workshop.location %]</td>
         <td>[% workshop.title %]</td>
-        <td>[% workshop.discription %]</td>
-        <td>[% workshop.6 %]</td>
-        <td>[% workshop.7 %]</td>
- <td>
-   [% IF c.session.roles == 'admin' %]
-    <form action="/workshop/details" method="POST">
-        <input type="hidden" name="id" value="[% workshop.id %]">
-        <input type="submit" value="Edit">
-    </form>
-    <form action="/workshop/delete" method="POST">
-        <input type="hidden" name="id" value="[% workshop.id %]">
-        <input type="submit" value="Delete">
-    </form>
-[% END %]
-</td>   </tr>
+        <td>[% workshop.max_participants || 'N/A' %]</td> <!-- Display 'N/A' if undefined -->
+        <td>
+            <form action="/workshop/details" method="GET" style="display:inline;">
+                <input type="hidden" name="id" value="[% workshop.id %]">
+                <input type="submit" value="Details">
+            </form>
+            [% IF c.session.roles.grep('admin').size %]
+            <form method="GET" action="/workshop/edit/[% workshop.id %]">
+                <input type="hidden" name="id" value="[% workshop.id %]">
+                <input type="submit" value="Edit">
+            </form>
+            <form action="/workshop/delete" method="POST" style="display:inline;">
+                <input type="hidden" name="id" value="[% workshop.id %]">
+                <input type="submit" value="Delete">
+            </form>
+            [% END %]
+        </td>
+    </tr>
     [% END %]
 </table>
+
 [% IF error %]
     <p class="error">[% error %]</p>
 [% END %]
 
-<!-- Rest of your template code -->
+[% IF c.flash.success_msg %]
+    <p class="success">[% c.flash.success_msg %]</p>
+[% END %]
