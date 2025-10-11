@@ -1,0 +1,108 @@
+[% META title = 'Log Controller Fix and Todo Documentation Update' %]
+[% PageVersion = 'changelog/2025-01-15-log-controller-fix-and-todo-documentation.tt,v 0.01 2025/01/15 shanta Exp shanta ' %]
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+
+# Log Controller Fix and Todo Documentation Update - January 2025
+
+## Overview
+
+This update fixes a critical error in the Log controller that prevented users from saving log entries and updates the Todo system documentation to the correct .tt format as required by the documentation guidelines.
+
+## Primary Fix: Log Controller Method Call Error
+
+### Problem
+Users encountered the following error when trying to update log entries:
+"Can't locate object method 'model' via package 'Comserv::Model::DBEncy::Log' at /home/shanta/PycharmProjects/comserv2/Comserv/script/../lib/Comserv/Model/Log.pm line 59."
+
+### Root Cause
+In the Log controller's update method (line 196), the code was incorrectly calling:
+```perl
+$log_model->modify($log, $new_values);
+```
+
+However, the Log.pm model's modify method expects:
+```perl
+sub modify {
+    my ($self, $c, $log_id, $new_values) = @_;
+```
+
+The controller was passing the actual $log object instead of the Catalyst context ($c) and log ID ($log_id).
+
+### Solution
+Fixed the method call in /home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Log.pm:
+
+**Before:**
+```perl
+$log_model->modify($log, $new_values);
+```
+
+**After:**
+```perl
+$log_model->modify($c, $record_id, $new_values);
+```
+
+### Result
+- Users can now successfully save log entries in the application
+- The error no longer occurs when updating log records
+- Full log functionality is restored
+
+## Secondary Fix: Todo Documentation Format Update
+
+### Problem
+Multiple Todo system documentation files were in .md format instead of the required .tt format for browser display, violating the AI documentation guidelines.
+
+### Files Affected
+- todo_system.md
+- todo_edit_functionality.md  
+- todo_filtering_and_views.md
+- enhanced_todo_navigation.md
+
+### Solution
+1. Converted todo_system.md to proper .tt format
+2. Created comprehensive Todo.tt documentation in /models/ directory
+3. Added proper Template Toolkit headers with META title and PageVersion
+4. Included the recent Log controller fix in the documentation
+5. Maintained all existing content while following .tt format guidelines
+
+### New Documentation Structure
+- **File:** /home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/models/Todo.tt
+- **Format:** Template Toolkit (.tt) format for browser display
+- **Content:** Complete Todo system documentation including recent fixes
+- **Organization:** Placed in models/ directory as per documentation guidelines
+
+## Files Modified
+
+### Core Fix
+- `/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Log.pm` - Fixed method call on line 196
+
+### Documentation Updates  
+- `/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/models/Todo.tt` - New comprehensive Todo documentation
+- `/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/changelog/2025-01-15-log-controller-fix-and-todo-documentation.tt` - This changelog
+
+## Testing
+- Verified Perl syntax: `perl -c lib/Comserv/Controller/Log.pm` 
+- Confirmed by user that log entries can now be saved successfully
+- Documentation follows proper .tt format with Template Toolkit headers
+
+## Impact
+1. **Critical functionality restored**: Users can save log entries without errors
+2. **Documentation compliance**: Todo documentation now follows required .tt format guidelines  
+3. **Improved maintainability**: Proper documentation structure for future updates
+4. **User experience**: No more blocking errors when working with log entries
+
+## Future Considerations
+- Monitor for any related issues with log entry creation or modification
+- Continue converting remaining .md documentation files to .tt format as needed
+- Ensure all new documentation follows .tt format guidelines from creation
+
+## Developer Notes
+This fix demonstrates the importance of:
+- Matching method signatures between models and controllers
+- Following documentation format standards consistently
+- Testing critical user workflows after code changes
+- Maintaining comprehensive changelog entries for tracking fixes

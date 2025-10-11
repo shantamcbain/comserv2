@@ -1,5 +1,5 @@
 
-[% PageVersion = 'ENCY/HerbView.tt,v 0.01 2025/01/19 Shanta Exp shanta ' %]
+[% PageVersion = 'admin/SchemaManager.tt,v 0.01 2025/01/19 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]

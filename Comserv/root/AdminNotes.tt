@@ -53,5 +53,5 @@
 
 
 [% body   %]
- 			[% INCLUDE 'todo/todo.tt' %]
+ 			[%# INCLUDE 'todo/todo.tt' %]
 			[% END %]

@@ -1,0 +1,130 @@
+[% META title = 'WeaverBeck Services' %]
+[% PageVersion = '/weaverbeck/services.tt,v 1.0 2025/04/16 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container mt-5">
+  <h1 class="mb-4">Our Services</h1>
+  <p class="lead">WeaverBeck offers a comprehensive range of services designed to meet your specific needs.</p>
+  
+  <div class="row mt-5">
+    <div class="col-md-4 mb-4">
+      <div class="card h-100">
+        <div class="card-header bg-primary text-white">
+          <h3 class="card-title">Consulting Services</h3>
+        </div>
+        <div class="card-body">
+          <p class="card-text">Our expert consultants provide strategic guidance and solutions to help your business overcome challenges and achieve its goals.</p>
+          <h5 class="mt-4">Key Features:</h5>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">Strategic business planning</li>
+            <li class="list-group-item">Process optimization</li>
+            <li class="list-group-item">Technology assessment</li>
+            <li class="list-group-item">Market analysis</li>
+            <li class="list-group-item">Risk management</li>
+          </ul>
+        </div>
+        <div class="card-footer">
+          <a href="[% c.uri_for('/weaverbeck/contact') %]" class="btn btn-primary">Learn More</a>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-md-4 mb-4">
+      <div class="card h-100">
+        <div class="card-header bg-success text-white">
+          <h3 class="card-title">Development Services</h3>
+        </div>
+        <div class="card-body">
+          <p class="card-text">Our development team creates custom software solutions tailored to your specific requirements and business needs.</p>
+          <h5 class="mt-4">Key Features:</h5>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">Custom software development</li>
+            <li class="list-group-item">Web application development</li>
+            <li class="list-group-item">Mobile app development</li>
+            <li class="list-group-item">API integration</li>
+            <li class="list-group-item">Database design and optimization</li>
+          </ul>
+        </div>
+        <div class="card-footer">
+          <a href="[% c.uri_for('/weaverbeck/contact') %]" class="btn btn-success">Learn More</a>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-md-4 mb-4">
+      <div class="card h-100">
+        <div class="card-header bg-info text-white">
+          <h3 class="card-title">Support Services</h3>
+        </div>
+        <div class="card-body">
+          <p class="card-text">Our dedicated support team provides reliable assistance to ensure your systems run smoothly and efficiently.</p>
+          <h5 class="mt-4">Key Features:</h5>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">24/7 technical support</li>
+            <li class="list-group-item">System maintenance</li>
+            <li class="list-group-item">Performance monitoring</li>
+            <li class="list-group-item">Security updates</li>
+            <li class="list-group-item">User training and documentation</li>
+          </ul>
+        </div>
+        <div class="card-footer">
+          <a href="[% c.uri_for('/weaverbeck/contact') %]" class="btn btn-info">Learn More</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="row mt-5">
+    <div class="col-md-6 mb-4">
+      <div class="card h-100">
+        <div class="card-header bg-warning text-dark">
+          <h3 class="card-title">Training Services</h3>
+        </div>
+        <div class="card-body">
+          <p class="card-text">Our comprehensive training programs help your team develop the skills and knowledge needed to succeed in today's competitive environment.</p>
+          <h5 class="mt-4">Key Features:</h5>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">Customized training programs</li>
+            <li class="list-group-item">On-site and remote options</li>
+            <li class="list-group-item">Hands-on workshops</li>
+            <li class="list-group-item">Certification preparation</li>
+            <li class="list-group-item">Ongoing skill development</li>
+          </ul>
+        </div>
+        <div class="card-footer">
+          <a href="[% c.uri_for('/weaverbeck/contact') %]" class="btn btn-warning">Learn More</a>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-md-6 mb-4">
+      <div class="card h-100">
+        <div class="card-header bg-danger text-white">
+          <h3 class="card-title">Managed Services</h3>
+        </div>
+        <div class="card-body">
+          <p class="card-text">Our managed services provide end-to-end solutions for your IT infrastructure, allowing you to focus on your core business activities.</p>
+          <h5 class="mt-4">Key Features:</h5>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">Infrastructure management</li>
+            <li class="list-group-item">Cloud services</li>
+            <li class="list-group-item">Network administration</li>
+            <li class="list-group-item">Security management</li>
+            <li class="list-group-item">Disaster recovery planning</li>
+          </ul>
+        </div>
+        <div class="card-footer">
+          <a href="[% c.uri_for('/weaverbeck/contact') %]" class="btn btn-danger">Learn More</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="text-center mt-5 mb-5">
+    <h2>Ready to get started?</h2>
+    <p class="lead">Contact us today to discuss how we can help you achieve your goals.</p>
+    <a href="[% c.uri_for('/weaverbeck/contact') %]" class="btn btn-lg btn-primary">Contact Us</a>
+  </div>
+</div>

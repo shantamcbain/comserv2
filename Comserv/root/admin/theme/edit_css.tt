@@ -1,0 +1,472 @@
+[% META title = 'Edit Theme CSS' %]
+
+<div class="container">
+    <h1>Edit Theme CSS: [% theme_name %]</h1>
+
+    <div class="alert alert-info">
+        <strong>Tip:</strong> To add a background image, include <code>background-image: url('../images/BMaster/honey2.jpg');</code> in the body section.
+        <a href="[% c.uri_for('/admin/theme/help') %]" class="btn btn-sm btn-info float-end">View Help</a>
+    </div>
+
+[% IF c.flash.message %]
+<div class="alert alert-success">[% c.flash.message %]</div>
+[% END %]
+
+[% IF c.flash.error %]
+<div class="alert alert-danger">[% c.flash.error %]</div>
+[% END %]
+
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h3 class="card-title mb-0">CSS Editor</h3>
+        </div>
+        <div class="card-body">
+            <form action="[% c.uri_for('/admin/theme/update_css', theme_name) %]" method="POST">
+                <div class="form-group">
+                    <textarea name="css_content" id="css_content" class="form-control" rows="20" style="font-family: monospace;">[% css_content %]</textarea>
+                </div>
+                <div class="mt-3">
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                    <a href="[% c.uri_for('/admin/theme') %]" class="btn btn-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+
+
+
+    <!-- Special section for adding background images -->
+    <div class="card mt-3">
+        <div class="card-header bg-success text-white">
+            <h4 class="card-title mb-0">Add Background Image</h4>
+        </div>
+        <div class="card-body">
+            <p>To add a background image to your theme, select an image and element below:</p>
+
+            <!-- Image Browser -->
+            <div class="accordion mb-3" id="imageBrowserAccordion">
+            [% FOREACH dir IN available_images.keys.sort %]
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading[% dir %]">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse[% dir %]" aria-expanded="false" aria-controls="collapse[% dir %]">
+                        Images in [% dir %] directory
+                    </button>
+                </h2>
+                <div id="collapse[% dir %]" class="accordion-collapse collapse" aria-labelledby="heading[% dir %]" data-bs-parent="#imageBrowserAccordion">
+                    <div class="accordion-body">
+                        [% IF available_images.$dir.size > 0 %]
+                        <div class="row">
+                            [% FOREACH image IN available_images.$dir %]
+                            <div class="col-md-3 mb-3">
+                                <div class="card">
+                                    <img src="[% c.uri_for('/static/images/' _ dir _ '/' _ image) %]" class="card-img-top" alt="[% image %]" style="height: 100px; object-fit: cover;">
+                                    <div class="card-body p-2">
+                                        <p class="card-text small">[% image %]</p>
+                                        <button type="button" class="btn btn-sm btn-primary select-image" data-image="../images/[% dir %]/[% image %]">
+                                            Select
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            [% END %]
+                        </div>
+                        [% ELSE %]
+                        <div class="alert alert-info">No images found in this directory.</div>
+                        [% END %]
+                    </div>
+                </div>
+            </div>
+            [% END %]
+            </div>
+
+            <!-- Element Selector -->
+            <div class="mb-3">
+                <label for="elementSelector" class="form-label">Select Element to Apply Background Image:</label>
+                <select id="elementSelector" class="form-select">
+                    <option value="body">Body (Full Page Background)</option>
+                    <option value="header, .header">Header</option>
+                    <option value=".sidebar">Sidebar</option>
+                    <option value=".footer">Footer</option>
+                    <option value=".card">Cards</option>
+                    <option value=".navbar">Navigation Bar</option>
+                    <option value="custom">Custom Selector...</option>
+                </select>
+            </div>
+
+            <!-- Custom Selector (shown when "Custom Selector" is selected) -->
+            <div class="mb-3" id="customSelectorGroup" style="display: none;">
+                <label for="customSelector" class="form-label">Enter Custom CSS Selector:</label>
+                <input type="text" id="customSelector" class="form-control" placeholder=".my-custom-class">
+            </div>
+
+            <!-- Background Options -->
+            <div class="mb-3">
+                <label class="form-label">Background Options:</label>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="bgCover" checked>
+                    <label class="form-check-label" for="bgCover">
+                        Cover (fill element)
+                    </label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="bgNoRepeat" checked>
+                    <label class="form-check-label" for="bgNoRepeat">
+                        No Repeat
+                    </label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="bgFixed">
+                    <label class="form-check-label" for="bgFixed">
+                        Fixed (doesn't scroll)
+                    </label>
+                </div>
+            </div>
+
+            <!-- Preview and Generate Code -->
+            <div class="mb-3">
+                <div id="imagePreview" class="alert alert-info">
+                    Select an image and element to generate CSS code.
+                </div>
+                <button type="button" id="generateImageCode" class="btn btn-primary" disabled>
+                    Generate CSS Code
+                </button>
+            </div>
+
+            <!-- Example Templates -->
+            <div class="mt-4">
+                <h5>Example Templates</h5>
+                <div class="mb-3">
+                    <h6>Body Background Image</h6>
+                    <pre class="bg-light p-2">body {
+  background-image: url('../images/BMaster/background.jpg');
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}</pre>
+                    <button type="button" class="btn btn-sm btn-primary copy-code" data-code="body {
+  background-image: url('../images/BMaster/background.jpg');
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}">Copy to Editor</button>
+                </div>
+
+                <div class="mb-3">
+                    <h6>Header Background Image</h6>
+                    <pre class="bg-light p-2">header, .header {
+  background-image: url('../images/BMaster/header-bg.jpg');
+  background-size: cover;
+  background-position: center;
+}</pre>
+                    <button type="button" class="btn btn-sm btn-primary copy-code" data-code="header, .header {
+  background-image: url('../images/BMaster/header-bg.jpg');
+  background-size: cover;
+  background-position: center;
+}">Copy to Editor</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- All Theme Attributes -->
+    <div class="card mt-3">
+        <div class="card-header bg-secondary text-white">
+            <h3 class="card-title mb-0">All Theme Attributes</h3>
+        </div>
+        <div class="card-body">
+            <p>Here are all the attributes available in the theme_definitions.json file for this theme:</p>
+
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                    <tr>
+                        <th>Attribute</th>
+                        <th>Value</th>
+                        <th>Preview</th>
+                        <th>Action</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <!-- Basic attributes -->
+                    <tr>
+                        <td><code>name</code></td>
+                        <td><code>[% theme_data.name %]</code></td>
+                        <td class="text-center">-</td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-primary copy-var" data-var="/* Theme Name: [% theme_data.name %] */">
+                                Copy to Editor
+                            </button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><code>description</code></td>
+                        <td><code>[% theme_data.description %]</code></td>
+                        <td class="text-center">-</td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-primary copy-var" data-var="/* Description: [% theme_data.description %] */">
+                                Copy to Editor
+                            </button>
+                        </td>
+                    </tr>
+
+                    <!-- CSS Variables -->
+                    [% FOREACH var_key IN theme_data.variables.keys.sort %]
+                        [% var_value = theme_data.variables.$var_key %]
+                    <tr>
+                        <td><code>--[% var_key %]</code></td>
+                        <td><code>[% var_value %]</code></td>
+                        <td class="text-center">
+                            [% IF var_value.match('^#') || var_value.match('rgb') || var_value.match('hsl') || var_value.match('rgba') %]
+                            <div style="width: 30px; height: 30px; background-color: [% var_value %]; border: 1px solid #ccc; margin: 0 auto;"></div>
+                            [% ELSIF var_key.match('color') %]
+                            <div style="width: 30px; height: 30px; background-color: [% var_value %]; border: 1px solid #ccc; margin: 0 auto;"></div>
+                            [% ELSIF var_key.match('font') || var_key.match('size') %]
+                            <span style="font: [% var_value %]">Aa</span>
+                            [% ELSE %]
+                            <span class="text-muted">-</span>
+                            [% END %]
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-primary copy-var" data-var="--[% var_key %]: [% var_value %];">
+                                Copy to Editor
+                            </button>
+                        </td>
+                    </tr>
+                    [% END %]
+
+                    <!-- Special Styles -->
+                    [% IF theme_data.special_styles.defined && theme_data.special_styles.keys.size > 0 %]
+                        [% FOREACH selector IN theme_data.special_styles.keys.sort %]
+                        <tr>
+                            <td><code>[% selector %]</code></td>
+                            <td><code>[% theme_data.special_styles.$selector %]</code></td>
+                            <td class="text-center">-</td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-primary copy-code" data-code="[% selector %] {
+  [% theme_data.special_styles.$selector %]
+}">Copy to Editor</button>
+                            </td>
+                        </tr>
+                        [% END %]
+                    [% END %]
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="alert alert-info mt-3">
+                <strong>Tip:</strong> To use CSS variables in your CSS, write: <code>property: var(--variable-name);</code><br>
+                Example: <code>color: var(--text-color);</code>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript to handle the copy buttons and image selection -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Function to insert text at cursor position in textarea
+        function insertAtCursor(textarea, text) {
+            const startPos = textarea.selectionStart;
+            const endPos = textarea.selectionEnd;
+            const scrollTop = textarea.scrollTop;
+
+            textarea.value = textarea.value.substring(0, startPos) + text + textarea.value.substring(endPos, textarea.value.length);
+
+            // Move cursor position after the inserted text
+            textarea.selectionStart = startPos + text.length;
+            textarea.selectionEnd = startPos + text.length;
+
+            // Restore scroll position
+            textarea.scrollTop = scrollTop;
+
+            // Focus the textarea
+            textarea.focus();
+        }
+
+        // Handle variable copy buttons
+        const copyVarButtons = document.querySelectorAll('.copy-var');
+        copyVarButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const varText = this.getAttribute('data-var');
+                const textarea = document.getElementById('css_content');
+
+                // Insert at cursor or append to end
+                insertAtCursor(textarea, varText + '\n');
+
+                // Show feedback
+                const originalText = this.textContent;
+                this.textContent = 'Copied!';
+                this.classList.remove('btn-primary');
+                this.classList.add('btn-success');
+
+                // Reset button after 2 seconds
+                setTimeout(() => {
+                    this.textContent = originalText;
+                    this.classList.remove('btn-success');
+                    this.classList.add('btn-primary');
+                }, 2000);
+            });
+        });
+
+        // Handle code copy buttons
+        const copyCodeButtons = document.querySelectorAll('.copy-code');
+        copyCodeButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const codeText = this.getAttribute('data-code');
+                const textarea = document.getElementById('css_content');
+
+                // Insert at cursor or append to end
+                insertAtCursor(textarea, codeText + '\n\n');
+
+                // Show feedback
+                const originalText = this.textContent;
+                this.textContent = 'Copied!';
+                this.classList.remove('btn-primary');
+                this.classList.add('btn-success');
+
+                // Reset button after 2 seconds
+                setTimeout(() => {
+                    this.textContent = originalText;
+                    this.classList.remove('btn-success');
+                    this.classList.add('btn-primary');
+                }, 2000);
+            });
+        });
+
+        // Variables for image background generator
+        let selectedImage = null;
+        const imagePreview = document.getElementById('imagePreview');
+        const generateButton = document.getElementById('generateImageCode');
+        const elementSelector = document.getElementById('elementSelector');
+        const customSelectorGroup = document.getElementById('customSelectorGroup');
+        const customSelector = document.getElementById('customSelector');
+        const bgCover = document.getElementById('bgCover');
+        const bgNoRepeat = document.getElementById('bgNoRepeat');
+        const bgFixed = document.getElementById('bgFixed');
+
+        // Handle image selection
+        const selectImageButtons = document.querySelectorAll('.select-image');
+        selectImageButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                // Reset all buttons
+                selectImageButtons.forEach(btn => {
+                    btn.classList.remove('btn-success');
+                    btn.classList.add('btn-primary');
+                    btn.textContent = 'Select';
+                });
+
+                // Mark this button as selected
+                this.classList.remove('btn-primary');
+                this.classList.add('btn-success');
+                this.textContent = 'Selected';
+
+                // Store the selected image path
+                selectedImage = this.getAttribute('data-image');
+
+                // Update preview
+                updatePreview();
+
+                // Enable generate button
+                generateButton.disabled = false;
+            });
+        });
+
+        // Handle element selector change
+        elementSelector.addEventListener('change', function() {
+            if (this.value === 'custom') {
+                customSelectorGroup.style.display = 'block';
+            } else {
+                customSelectorGroup.style.display = 'none';
+            }
+            updatePreview();
+        });
+
+        // Handle custom selector input
+        customSelector.addEventListener('input', updatePreview);
+
+        // Handle background options
+        bgCover.addEventListener('change', updatePreview);
+        bgNoRepeat.addEventListener('change', updatePreview);
+        bgFixed.addEventListener('change', updatePreview);
+
+        // Update preview
+        function updatePreview() {
+            if (!selectedImage) {
+                imagePreview.textContent = 'Select an image to preview CSS code.';
+                return;
+            }
+
+            // Get the current element selector
+            let selector = elementSelector.value;
+            if (selector === 'custom') {
+                selector = customSelector.value || '.custom-element';
+            }
+
+            // Build CSS properties
+            let css = `${selector} {\n  background-image: url('${selectedImage}');\n`;
+
+            if (bgCover.checked) {
+                css += '  background-size: cover;\n';
+            }
+
+            if (bgNoRepeat.checked) {
+                css += '  background-repeat: no-repeat;\n';
+            }
+
+            if (bgFixed.checked) {
+                css += '  background-attachment: fixed;\n';
+            }
+
+            css += '  background-position: center;\n}';
+
+            // Update preview
+            imagePreview.innerHTML = `<strong>Preview:</strong><br><pre>${css}</pre>`;
+        }
+
+        // Handle generate button
+        generateButton.addEventListener('click', function() {
+            if (!selectedImage) return;
+
+            // Get the current element selector
+            let selector = elementSelector.value;
+            if (selector === 'custom') {
+                selector = customSelector.value || '.custom-element';
+            }
+
+            // Build CSS properties
+            let css = `${selector} {\n  background-image: url('${selectedImage}');\n`;
+
+            if (bgCover.checked) {
+                css += '  background-size: cover;\n';
+            }
+
+            if (bgNoRepeat.checked) {
+                css += '  background-repeat: no-repeat;\n';
+            }
+
+            if (bgFixed.checked) {
+                css += '  background-attachment: fixed;\n';
+            }
+
+            css += '  background-position: center;\n}';
+
+            // Insert into textarea
+            const textarea = document.getElementById('css_content');
+            insertAtCursor(textarea, css + '\n\n');
+
+            // Show feedback
+            this.textContent = 'Added to Editor!';
+            this.classList.remove('btn-primary');
+            this.classList.add('btn-success');
+
+            // Reset button after 2 seconds
+            setTimeout(() => {
+                this.textContent = 'Generate CSS Code';
+                this.classList.remove('btn-success');
+                this.classList.add('btn-primary');
+            }, 2000);
+        });
+    });
+</script>

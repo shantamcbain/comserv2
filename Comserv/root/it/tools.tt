@@ -1,0 +1,159 @@
+[% PageVersion = 'it/tools.tt,v 1.0 2025/05/15 Shanta Exp Shanta' %]
+[% IF c.session.debug_mode == 1 %]
+    [%	PageVersion %]
+
+    [% INCLUDE 'debug.tt' %]
+[% END %]
+
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>IT Tools</h1>
+            <p class="lead">Access IT tools and utilities.</p>
+            
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="[% c.uri_for('/it') %]">IT Home</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Tools</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h4>Available Tools</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-4">
+                            <div class="card h-100">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-network-wired fa-3x mb-3 text-primary"></i>
+                                    <h5 class="card-title">Network Diagnostics</h5>
+                                    <p class="card-text">Tools for diagnosing network issues and connectivity problems.</p>
+                                    <a href="#" class="btn btn-primary">Access Tool</a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4 mb-4">
+                            <div class="card h-100">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-desktop fa-3x mb-3 text-success"></i>
+                                    <h5 class="card-title">System Information</h5>
+                                    <p class="card-text">View detailed information about your computer system.</p>
+                                    <a href="#" class="btn btn-success">Access Tool</a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4 mb-4">
+                            <div class="card h-100">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-key fa-3x mb-3 text-info"></i>
+                                    <h5 class="card-title">Password Manager</h5>
+                                    <p class="card-text">Securely manage and reset your passwords.</p>
+                                    <a href="#" class="btn btn-info">Access Tool</a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4 mb-4">
+                            <div class="card h-100">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-hdd fa-3x mb-3 text-warning"></i>
+                                    <h5 class="card-title">Disk Space Analyzer</h5>
+                                    <p class="card-text">Analyze disk space usage and identify large files.</p>
+                                    <a href="#" class="btn btn-warning">Access Tool</a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4 mb-4">
+                            <div class="card h-100">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-shield-alt fa-3x mb-3 text-danger"></i>
+                                    <h5 class="card-title">Security Scanner</h5>
+                                    <p class="card-text">Scan your system for security vulnerabilities.</p>
+                                    <a href="#" class="btn btn-danger">Access Tool</a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4 mb-4">
+                            <div class="card h-100">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-sync fa-3x mb-3 text-secondary"></i>
+                                    <h5 class="card-title">System Update</h5>
+                                    <p class="card-text">Check for and install system updates.</p>
+                                    <a href="#" class="btn btn-secondary">Access Tool</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h4>Remote Support Tools</h4>
+                </div>
+                <div class="card-body">
+                    <p>For remote support sessions, please use one of the following tools:</p>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <h5 class="card-title">TeamViewer</h5>
+                                    <p class="card-text">Secure remote desktop access for IT support.</p>
+                                    <a href="#" class="btn btn-primary">Download TeamViewer</a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <h5 class="card-title">AnyDesk</h5>
+                                    <p class="card-text">Alternative remote support tool.</p>
+                                    <a href="#" class="btn btn-primary">Download AnyDesk</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+[% IF debug_mode == 1 %]
+    <div class="container mt-4">
+        <div class="card">
+            <div class="card-header bg-dark text-white">
+                Debug Information
+            </div>
+            <div class="card-body">
+                <p>Page Version: [% PageVersion %]</p>
+                [% IF debug_msg.defined && debug_msg.size > 0 %]
+                    <div class="debug-messages">
+                        [% FOREACH msg IN debug_msg %]
+                            <p class="debug">Debug: [% msg %]</p>
+                        [% END %]
+                    </div>
+                [% END %]
+            </div>
+        </div>
+    </div>
+[% END %]
+
+[% PROCESS footer.tt %]

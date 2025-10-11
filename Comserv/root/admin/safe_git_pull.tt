@@ -1,0 +1,335 @@
+[% PageVersion = 'admin/safe_git_pull.tt,v 1.0 2025/01/20 shanta Exp shanta ' %]
+[% META title = 'Safe Git Pull with Backup/Restore' %]
+
+<div class="admin-container">
+    <div class="admin-header">
+        <h1><i class="fas fa-shield-alt"></i> Safe Git Pull</h1>
+        <p class="admin-description">
+            Safely pull git updates with automatic backup and restore of protected files.
+            This prevents environment-specific files (.psgi, configs) from being overwritten.
+        </p>
+    </div>
+
+    [% IF success_msg %]
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle"></i> [% success_msg %]
+        </div>
+    [% END %]
+
+    [% IF warning_msg %]
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle"></i> [% warning_msg %]
+        </div>
+    [% END %]
+
+    [% IF error_msg %]
+        <div class="alert alert-danger">
+            <i class="fas fa-times-circle"></i> [% error_msg %]
+        </div>
+    [% END %]
+
+    <div class="admin-section">
+        <h2><i class="fas fa-info-circle"></i> Current Status</h2>
+        <div class="status-grid">
+            <div class="status-item">
+                <label>Current Branch:</label>
+                <span class="badge badge-primary">[% current_branch || 'Unknown' %]</span>
+            </div>
+            <div class="status-item">
+                <label>Protected Files:</label>
+                <span class="badge badge-info">[% protected_files.size %] files</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="admin-section">
+        <h2><i class="fas fa-shield-alt"></i> Protected Files</h2>
+        <p>These files will be automatically backed up before git pull and restored afterward:</p>
+        <div class="protected-files-list">
+            [% FOREACH file IN protected_files %]
+                <div class="protected-file-item">
+                    <div class="file-path">
+                        <i class="fas fa-file-code"></i>
+                        <code>[% file.path %]</code>
+                    </div>
+                    <div class="file-description">
+                        [% file.description %]
+                    </div>
+                </div>
+            [% END %]
+        </div>
+    </div>
+
+    <div class="admin-section">
+        <h2><i class="fas fa-download"></i> Execute Safe Git Pull</h2>
+        <form method="POST" action="[% c.uri_for('/admin/safe_git_pull') %]" class="git-pull-form">
+            <div class="form-group">
+                <label for="branch">Select Branch:</label>
+                <select name="branch" id="branch" class="form-control">
+                    [% FOREACH branch IN available_branches %]
+                        <option value="[% branch %]" [% IF branch == current_branch %]selected[% END %]>
+                            [% branch %] [% IF branch == current_branch %](current)[% END %]
+                        </option>
+                    [% END %]
+                </select>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" name="confirm" value="1" class="btn btn-primary btn-lg">
+                    <i class="fas fa-shield-alt"></i> Execute Safe Git Pull
+                </button>
+                <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Admin
+                </a>
+            </div>
+        </form>
+    </div>
+
+    [% IF output %]
+        <div class="admin-section">
+            <h2><i class="fas fa-terminal"></i> Operation Output</h2>
+            <div class="output-container">
+                <pre class="command-output">[% output %]</pre>
+            </div>
+        </div>
+    [% END %]
+
+    <div class="admin-section">
+        <h2><i class="fas fa-link"></i> Related Operations</h2>
+        <div class="related-links">
+            <a href="[% c.uri_for('/admin/restore_file') %]" class="btn btn-outline-primary">
+                <i class="fas fa-undo"></i> Restore Individual File
+            </a>
+            <a href="[% c.uri_for('/admin/git_stash') %]" class="btn btn-outline-info">
+                <i class="fas fa-archive"></i> Git Stash Management
+            </a>
+            <a href="[% c.uri_for('/admin/git_commit') %]" class="btn btn-outline-success">
+                <i class="fas fa-code-branch"></i> Git Commit Management
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+.admin-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.admin-header {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border-left: 4px solid #007bff;
+}
+
+.admin-header h1 {
+    margin: 0 0 10px 0;
+    color: #333;
+}
+
+.admin-description {
+    margin: 0;
+    color: #666;
+    font-size: 14px;
+}
+
+.admin-section {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.admin-section h2 {
+    margin: 0 0 15px 0;
+    color: #333;
+    font-size: 18px;
+}
+
+.status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+.status-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.protected-files-list {
+    space-y: 10px;
+}
+
+.protected-file-item {
+    padding: 12px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    border-left: 3px solid #28a745;
+    margin-bottom: 10px;
+}
+
+.file-path {
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.file-path code {
+    background: #e9ecef;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 13px;
+}
+
+.file-description {
+    font-size: 13px;
+    color: #666;
+}
+
+.git-pull-form {
+    max-width: 500px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.form-control {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-outline-primary {
+    border: 1px solid #007bff;
+    color: #007bff;
+    background: white;
+}
+
+.btn-outline-info {
+    border: 1px solid #17a2b8;
+    color: #17a2b8;
+    background: white;
+}
+
+.btn-outline-success {
+    border: 1px solid #28a745;
+    color: #28a745;
+    background: white;
+}
+
+.output-container {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 15px;
+}
+
+.command-output {
+    margin: 0;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.related-links {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.alert {
+    padding: 12px 16px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.alert-success {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+
+.alert-warning {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    color: #856404;
+}
+
+.alert-danger {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}
+
+.badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.badge-primary {
+    background: #007bff;
+    color: white;
+}
+
+.badge-info {
+    background: #17a2b8;
+    color: white;
+}
+</style>

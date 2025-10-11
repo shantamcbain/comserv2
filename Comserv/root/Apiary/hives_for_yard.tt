@@ -1,0 +1,39 @@
+[% META title = 'Hives for Yard ' _ yard_id %]
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>Hives for Yard [% yard_id %]</h1>
+            
+            [% IF hives && hives.size > 0 %]
+                <div class="row">
+                    [% FOREACH hive IN hives %]
+                        <div class="col-md-4 mb-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>Hive #[% hive.hive_number %]</h3>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Type:</strong> [% hive.hive_type %]</p>
+                                    <p><strong>Status:</strong> [% hive.status %]</p>
+                                    <p><strong>Installed:</strong> [% hive.date_installed %]</p>
+                                    <p><strong>Last Inspection:</strong> [% hive.last_inspection_date %]</p>
+                                    <a href="/Apiary/queens_for_hive/[% hive.hive_id %]" class="btn btn-primary">View Queens</a>
+                                </div>
+                            </div>
+                        </div>
+                    [% END %]
+                </div>
+            [% ELSE %]
+                <div class="alert alert-info">
+                    No hives found for this yard.
+                </div>
+            [% END %]
+            
+            <div class="mt-4">
+                <a href="/Apiary/yards_for_site/[% yard.site_name %]" class="btn btn-secondary">Back to Yards</a>
+                <a href="/Apiary/HiveManagement" class="btn btn-primary">Back to Hive Management</a>
+            </div>
+        </div>
+    </div>
+</div>

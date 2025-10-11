@@ -1,0 +1,144 @@
+[% META 
+   title = "Documentation Template Toolkit (.tt) Template"
+   description = "Template for creating new documentation using Template Toolkit format"
+   roles = "admin,developer"
+   category = "documentation"
+%]
+
+<div class="doc-page">
+    <h1>Documentation Template Toolkit (.tt) Template</h1>
+    
+    <div class="doc-section">
+        <h2>Overview</h2>
+        <p>
+            This template provides the structure and format for creating new documentation files using 
+            Template Toolkit (.tt) format. Use this as a starting point for all new documentation.
+        </p>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Basic Template Structure</h2>
+        <p>Copy and modify the following template for new documentation files:</p>
+        
+        <pre class="code-block">
+[% META 
+   title = "Your Document Title"
+   description = "Brief description of the document"
+   roles = "comma,separated,roles"  # e.g., "normal,admin,developer"
+   category = "category_name"       # e.g., "user_guides", "admin_guides", etc.
+%]
+
+&lt;div class="doc-page"&gt;
+    &lt;h1&gt;Your Document Title&lt;/h1&gt;
+    
+    &lt;div class="doc-section"&gt;
+        &lt;h2&gt;First Section Title&lt;/h2&gt;
+        &lt;p&gt;
+            Your content goes here. You can use HTML formatting for:
+            &lt;strong&gt;bold text&lt;/strong&gt;, &lt;em&gt;italic text&lt;/em&gt;, 
+            &lt;code&gt;inline code&lt;/code&gt;, etc.
+        &lt;/p&gt;
+        
+        &lt;ul&gt;
+            &lt;li&gt;List item one&lt;/li&gt;
+            &lt;li&gt;List item two&lt;/li&gt;
+        &lt;/ul&gt;
+    &lt;/div&gt;
+    
+    &lt;div class="doc-section"&gt;
+        &lt;h2&gt;Second Section Title&lt;/h2&gt;
+        &lt;p&gt;More content here...&lt;/p&gt;
+        
+        &lt;pre class="code-block"&gt;
+# Code block example
+function example() {
+    return "This is a code example";
+}
+        &lt;/pre&gt;
+    &lt;/div&gt;
+    
+    &lt;!-- Add more sections as needed --&gt;
+&lt;/div&gt;
+        </pre>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Metadata Explanation</h2>
+        <p>The META block at the top of the file contains important metadata:</p>
+        
+        <ul>
+            <li><strong>title</strong>: The document title (appears in navigation and browser title)</li>
+            <li><strong>description</strong>: Brief description of the document (used in listings and search results)</li>
+            <li><strong>roles</strong>: Comma-separated list of roles that can access this document:
+                <ul>
+                    <li>normal - Regular users</li>
+                    <li>editor - Content editors</li>
+                    <li>admin - System administrators</li>
+                    <li>developer - System developers</li>
+                </ul>
+            </li>
+            <li><strong>category</strong>: The category this document belongs to (must match one of the defined categories in documentation_config.json)</li>
+        </ul>
+    </div>
+    
+    <div class="doc-section">
+        <h2>CSS Classes</h2>
+        <p>Use these CSS classes for consistent styling:</p>
+        
+        <ul>
+            <li><code>doc-page</code> - Main container for the entire document</li>
+            <li><code>doc-section</code> - Container for each major section</li>
+            <li><code>section-toggle</code> - For collapsible section headers</li>
+            <li><code>section-content</code> - Content of collapsible sections</li>
+            <li><code>code-block</code> - For code examples</li>
+            <li><code>note-box</code> - For important notes or warnings</li>
+            <li><code>admin-only</code> - For content visible only to admins</li>
+            <li><code>developer-only</code> - For content visible only to developers</li>
+        </ul>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Template Toolkit Features</h2>
+        <p>You can use Template Toolkit directives for dynamic content:</p>
+        
+        <pre class="code-block">
+[% IF c.check_user_roles('admin') %]
+    &lt;div class="admin-only"&gt;
+        This content is only visible to administrators.
+    &lt;/div&gt;
+[% END %]
+
+[% # Include another template file %]
+[% INCLUDE 'path/to/another/template.tt' %]
+
+[% # Loop through items %]
+[% FOREACH item IN items %]
+    &lt;div&gt;[% item.name %]&lt;/div&gt;
+[% END %]
+        </pre>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Adding to Documentation System</h2>
+        <p>After creating a new .tt file:</p>
+        
+        <ol>
+            <li>Save it in the appropriate directory under <code>/Documentation/</code></li>
+            <li>Add the file key to the appropriate category in <code>documentation_config.json</code></li>
+            <li>Add the file path to the <code>default_paths</code> section in <code>documentation_config.json</code></li>
+        </ol>
+        
+        <p>Example addition to documentation_config.json:</p>
+        
+        <pre class="code-block">
+"categories": {
+  "your_category": {
+    "pages": ["existing_page_1", "existing_page_2", "your_new_page"]
+  }
+},
+"default_paths": {
+  "your_new_page": "Documentation/path/to/your_new_page.tt"
+}
+        </pre>
+    </div>
+</div>

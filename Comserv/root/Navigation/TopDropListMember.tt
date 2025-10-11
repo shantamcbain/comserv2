@@ -1,48 +1,215 @@
-[% PageVersion = 'Navigation/TopDropListMember.tt,v 0.01 2024/01/01hanta Exp shanta ' %]
+[% PageVersion = 'Navigation/TopDropListMember.tt,v 0.03 2025/09/03 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [%# PageVersion %]
     [%# "Debugging HostName: " _ HostName %]
     [%# INCLUDE 'debug.tt' %]
 [% END %]
-       <!-- Member menu -->
-        <li class="horizontal-dropdown">
-            <a href="/membership" class="dropbtn">Member</a>
-            <div class="dropdown-content">
-                <a href="/membership">Membership Information</a>
-                <a href="/applymembership">Apply for Membership</a>
-   [% FOREACH link = c.stash.dbi.query("SELECT * FROM internal_links_tb
-                                  WHERE  category = 'Member_links'
-                                   AND (sitename =  '$SiteName')
-                                  ORDER BY link_order
-                                  ")%]
 
-
-       <a href="[% link.url %]?site=[% SiteName %]&amp;[% session_string %]&amp;[% link.view_name %]" name="Contact" target="[% link.target %]" title=" [% link.name %] ">[% link.name %]</a>
-
- 	  [% END %]
- [% FOREACH link = c.stash.dbi.query("SELECT * FROM page_tb
-	                                  WHERE  menu = 'member'
-	                                  AND share  = 2
-	                                  AND (sitename =  '$SiteName' )
-	                                  ORDER BY link_order
-	                                  ")%]
-
-	    <a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=[% link.page_code %]" name="Contact" target="[% link.target %]" title=" [% linkview_.name %] ">[% link.view_name %]</a>
-         [% IF c.session.group == 'admin' %]
-        <a href="/edit_link?link_id=[% link.id %]">Edit/Delete</a>
+<!-- Member menu -->
+<li class="horizontal-dropdown">
+    <a href="/membership" class="dropbtn"><i class="icon-member"></i>Member</a>
+    <div class="dropdown-content">
+        <!-- Core Membership Services -->
+        <a href="/membership" class="menu-item"><i class="icon-info"></i>Membership Information</a>
+        <a href="/applymembership" class="menu-item"><i class="icon-apply"></i>Apply for Membership</a>
+        
+        [% IF c.session.username %]
+        <div class="dropdown-divider"></div>
+        <a href="/navigation/add_link?menu=Member" class="menu-item"><i class="icon-add"></i>Add Member Link</a>
         [% END %]
-       	 [% END %]
-                <!-- Add more member options -->
-                [% IF c.session.member_links.size %]
-                    [% FOREACH link IN c.session.member_links %]
-                        <a href="[% link.url %]">[% link.name %]</a>
-                        [% IF c.session.group == 'admin' %]
-                            <a href="/edit_link?link_id=[% link.id %]">Edit/Delete</a>
-                        [% END %]
+        
+        <!-- Public Member Links from database -->
+        [% SET member_db_links = c.stash.dbi.query("SELECT * FROM internal_links_tb WHERE category = 'Member_links' AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
+        [% IF member_db_links.size %]
+        <div class="dropdown-divider"></div>
+        <div class="submenu-item">
+            <span class="submenu-header"><i class="icon-services"></i>Member Services</span>
+            <div class="submenu">
+                [% FOREACH link IN member_db_links %]
+                    <a href="[% link.url %]" target="[% link.target || '_self' %]" title="[% link.name %]" class="submenu-link">
+                        [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
+                        [% link.name %]
+                    </a>
+                    [% IF c.session.roles.grep('admin').size %]
+                        <a href="/navigation/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
                     [% END %]
                 [% END %]
-                [% IF c.session.group == 'admin' %]
-                    <a href="/add_link?menu=member">Add</a>
+            </div>
+        </div>
+        [% END %]
+        
+        <!-- Legacy Member Links Support -->
+        [% IF member_links.defined && member_links.size %]
+        <div class="dropdown-divider"></div>
+        <div class="submenu-item">
+            <span class="submenu-header"><i class="icon-legacy"></i>Member Resources</span>
+            <div class="submenu">
+                [% FOREACH link IN member_links %]
+                    <a href="[% link.url %]?site=[% SiteName %]&amp;[% session_string %]&amp;[% link.view_name %]" name="Contact" target="[% link.target %]" title="[% link.name %]" class="submenu-link">
+                        [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
+                        [% link.name %]
+                    </a>
+                    [% IF c.session.roles.grep('admin').size %]
+                        <a href="/navigation/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
+                    [% END %]
                 [% END %]
             </div>
-        </li>
+        </div>
+        [% END %]
+        
+        <!-- Legacy Member Pages Support -->
+        [% IF member_pages.defined && member_pages.size %]
+        <div class="dropdown-divider"></div>
+        <div class="submenu-item">
+            <span class="submenu-header"><i class="icon-pages"></i>Member Pages</span>
+            <div class="submenu">
+                [% FOREACH link IN member_pages %]
+                    <a href="/page?site=[% SiteName %]&amp;session=[% session_string %]&amp;page=[% link.page_code %]" name="Contact" target="[% link.target %]" title="[% link.view_name %]" class="submenu-link">
+                        [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
+                        [% link.view_name %]
+                    </a>
+                    [% IF c.session.group == 'admin' %]
+                        <a href="/pages/edit?page_id=[% link.id %]" class="edit-link">Edit</a>
+                    [% END %]
+                [% END %]
+            </div>
+        </div>
+        [% END %]
+        
+        <!-- Private Member Links for logged in users -->
+        [% IF c.session.username && c.stash.private_links %]
+            [% SET has_private_member_links = 0 %]
+            [% FOREACH link IN c.stash.private_links %]
+                [% IF link.category == 'Member_links' || link.menu == 'Member' %]
+                    [% SET has_private_member_links = 1 %]
+                [% END %]
+            [% END %]
+            
+            [% IF has_private_member_links %]
+            <div class="dropdown-divider"></div>
+            <div class="submenu-item">
+                <span class="submenu-header"><i class="icon-user-member"></i>My Member Links</span>
+                <div class="submenu">
+                    [% FOREACH link IN c.stash.private_links %]
+                        [% IF link.category == 'Member_links' || link.menu == 'Member' %]
+                            <a href="[% link.url %]" target="[% link.target || '_self' %]" title="[% link.name %]" class="submenu-link">
+                                [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
+                                [% link.name %]
+                            </a>
+                            <a href="/navigation/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
+                        [% END %]
+                    [% END %]
+                </div>
+            </div>
+            [% END %]
+        [% END %]
+        
+        <!-- Special Features -->
+        <div class="dropdown-divider"></div>
+        <div class="submenu-item">
+            <span class="submenu-header"><i class="icon-special"></i>Special Features</span>
+            <div class="submenu">
+                <!-- Link to the list of herbs -->
+                <a href="/ENCY/BotanicalNameView" class="submenu-link"><i class="icon-herb"></i>List of Herbs</a>
+            </div>
+        </div>
+        
+        [% IF c.session.roles.grep('admin').size %]
+        <div class="dropdown-divider"></div>
+        <a href="/navigation/manage_links?menu=Member" class="menu-item"><i class="icon-manage"></i>Manage Member Menu</a>
+        [% END %]
+    </div>
+</li>
+
+<style>
+    /* Member Menu Specific Styles */
+    .submenu-item {
+        position: relative;
+    }
+
+    .submenu-header {
+        display: block;
+        padding: 8px 15px;
+        background-color: #e9ecef;
+        color: #495057;
+        font-weight: bold;
+        font-size: 0.9em;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .submenu {
+        background-color: #f8f9fa;
+    }
+
+    .submenu-link {
+        padding: 8px 25px;
+        display: flex;
+        align-items: center;
+        text-decoration: none;
+        color: #495057;
+        font-size: 0.9em;
+        transition: background-color 0.2s;
+    }
+
+    .submenu-link:hover {
+        background-color: #e9ecef;
+    }
+
+    .submenu-link i {
+        margin-right: 6px;
+        width: 14px;
+        text-align: center;
+    }
+
+    .menu-item {
+        padding: 10px 15px;
+        display: flex;
+        align-items: center;
+        text-decoration: none;
+        color: #333;
+        transition: background-color 0.2s;
+    }
+
+    .menu-item:hover {
+        background-color: #f8f9fa;
+    }
+
+    .menu-item i {
+        margin-right: 8px;
+        width: 16px;
+        text-align: center;
+    }
+
+    .dropdown-divider {
+        height: 1px;
+        margin: 5px 0;
+        overflow: hidden;
+        background-color: #e9ecef;
+    }
+
+    .edit-link {
+        font-size: 0.8em;
+        color: #6c757d;
+        margin-left: 10px;
+        text-decoration: none;
+        padding: 2px 5px;
+    }
+
+    .edit-link:hover {
+        color: #495057;
+        text-decoration: underline;
+    }
+
+    /* Icons for Member menu */
+    .icon-member:before { content: "👥"; }
+    .icon-info:before { content = "ℹ️"; }
+    .icon-apply:before { content: "📝"; }
+    .icon-add:before { content: "➕"; }
+    .icon-services:before { content: "⚙️"; }
+    .icon-legacy:before { content: "📋"; }
+    .icon-pages:before { content: "📄"; }
+    .icon-user-member:before { content: "👤👥"; }
+    .icon-special:before { content: "⭐"; }
+    .icon-herb:before { content: "🌿"; }
+    .icon-manage:before { content = "⚙️"; }
+</style>

@@ -1,9 +1,7 @@
+
 [% META title = 'Project Management' %]
-[% PageVersion = 'todo/project.tt,v 0.10 2025/10/10 shanta Exp shanta - Compact project summary with time data in headers, collapsed containers by default ' %]
+[% PageVersion = 'todo/project.tt,v 0.08 2024/08/25 shanta Exp shanta ' %]
 [% # Note: additional_css is now set in the controller with a timestamp to force reload %]
-[% IF debug_mode == 1 %]
-    [% PageVersion %]
-[% END %]
 
 <!-- Critical inline styles to ensure cards display correctly -->
 <style>
@@ -78,28 +76,14 @@
     
     /* Sub-project styles */
     .sub-projects-container { padding-left: 1.5rem; border-left: 2px solid #dee2e6; margin-top: 1rem; }
-    
-    /* Table styles */
-    .table { width: 100%; margin-bottom: 1rem; color: #212529; }
-    .table th, .table td { padding: 0.75rem; vertical-align: top; border-top: 1px solid #dee2e6; }
-    .table thead th { vertical-align: bottom; border-bottom: 2px solid #dee2e6; }
-    .table-responsive { display: block; width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    .table-sm th, .table-sm td { padding: 0.3rem; }
-    .table-striped tbody tr:nth-of-type(odd) { background-color: rgba(0,0,0,0.05); }
-    .thead-light th { color: #495057; background-color: #e9ecef; border-color: #dee2e6; }
-    
-    /* Border utilities */
-    .border-left { border-left: 1px solid #dee2e6 !important; }
-    .border-primary { border-left-color: #007bff !important; }
-    
-    /* Text decoration */
-    .text-decoration-none { text-decoration: none !important; }
-    
-    /* Additional spacing */
-    .ml-2 { margin-left: 0.5rem !important; }
-    .ml-3 { margin-left: 1rem !important; }
-    .mr-2 { margin-right: 0.5rem !important; }
 </style>
+
+[% IF debug_mode == 1 %]
+    <div class="alert alert-info">
+        <small>Template version: [% PageVersion %]</small><br>
+        <small>CSS file: [% additional_css.0 %]</small>
+    </div>
+[% END %]
 
 <h1 class="mb-4">Projects</h1>
 
@@ -112,22 +96,6 @@
     <div class="alert alert-success" role="alert">
         <i class="fas fa-check-circle"></i> [% message %]
     </div>
-[% END %]
-
-<!-- Overall Project Summary -->
-[% IF overall_summary %]
-<div class="card mb-4 border-primary">
-    <div class="card-header bg-primary text-white">
-        <div class="d-flex justify-content-between align-items-center">
-            <h5 class="mb-0"><i class="fas fa-chart-pie"></i> Project Summary Overview</h5>
-            <div class="d-flex align-items-center">
-                <span class="mr-3"><i class="fas fa-project-diagram"></i> [% overall_summary.total_projects %] projects</span>
-                <span class="mr-3"><i class="fas fa-tasks"></i> [% overall_summary.total_todos %] todos</span>
-                <span><i class="fas fa-clock"></i> [% overall_summary.total_accumulated_time %]</span>
-            </div>
-        </div>
-    </div>
-</div>
 [% END %]
 
 <!-- Filter Panel -->
@@ -176,58 +144,19 @@
         
         <div class="collapsible-card" id="project-[% project.id %]">
             <div class="card">
-                <!-- Card header with priority badge, project summary, and collapse toggle -->
+                <!-- Card header with priority badge and collapse toggle -->
                 <div class="card-header" onclick="toggleCollapse('project-body-[% project.id %]')" aria-expanded="false">
                     <div class="d-flex justify-content-between align-items-center">
-                        <div class="d-flex align-items-center">
+                        <div>
                             <i class="fas fa-chevron-down collapse-icon mr-2"></i>
-                            <span class="card-title mb-0 mr-3">[% project.name %]</span>
-                            
-                            <!-- Compact Project Summary -->
-                            <div class="d-flex align-items-center text-muted">
-                                [% 
-                                    # Use calculated project summary data if available, otherwise calculate manually
-                                    IF project.summary && project.id == project.summary.project_id;
-                                        project_todos = project.summary.todo_count;
-                                        project_time = project.summary.accumulated_time;
-                                    ELSE;
-                                        # Fallback calculation
-                                        project_todos = 0;
-                                        project_time = 0;
-                                        
-                                        IF project.todos;
-                                            project_todos = project.todos.size;
-                                            FOREACH todo IN project.todos;
-                                                IF todo.accumulative_time;
-                                                    project_time = project_time + todo.accumulative_time;
-                                                END;
-                                            END;
-                                        END;
-                                    END;
-                                %]
-                                <small class="mr-3">
-                                    <i class="fas fa-tasks"></i> [% project_todos %] todos
-                                </small>
-                                [% IF project.sub_projects.size %]
-                                    <small class="mr-3">
-                                        <i class="fas fa-project-diagram"></i> [% project.sub_projects.size %] sub-projects
-                                    </small>
-                                [% END %]
-                                [% IF project_time && project_time != '00:00:00' %]
-                                    <small>
-                                        <i class="fas fa-clock"></i> [% project_time %]
-                                    </small>
-                                [% END %]
-                            </div>
+                            <span class="card-title mb-0">[% project.name %]</span>
                         </div>
-                        <div class="d-flex align-items-center">
-                            [% SWITCH project.priority %]
-                                [% CASE 1 %]<span class="badge badge-danger"><i class="fas fa-arrow-up"></i> High</span>
-                                [% CASE 2 %]<span class="badge badge-warning"><i class="fas fa-equals"></i> Medium</span>
-                                [% CASE 3 %]<span class="badge badge-info"><i class="fas fa-arrow-down"></i> Low</span>
-                                [% CASE DEFAULT %]<span class="badge badge-warning"><i class="fas fa-equals"></i> Medium</span>
-                            [% END %]
-                        </div>
+                        [% SWITCH project.priority %]
+                            [% CASE 1 %]<span class="badge badge-danger"><i class="fas fa-arrow-up"></i> High</span>
+                            [% CASE 2 %]<span class="badge badge-warning"><i class="fas fa-equals"></i> Medium</span>
+                            [% CASE 3 %]<span class="badge badge-info"><i class="fas fa-arrow-down"></i> Low</span>
+                            [% CASE DEFAULT %]<span class="badge badge-warning"><i class="fas fa-equals"></i> Medium</span>
+                        [% END %]
                     </div>
                 </div>
                 
@@ -312,255 +241,55 @@
         <!-- Skip this subproject if filtering by priority and it doesn't match -->
         [% NEXT IF priority_filter && priority_filter != subproject.priority %]
         
-        <div class="collapsible-card mb-3" id="subproject-[% subproject.id %]">
-            <div class="card">
-                <!-- Card header with priority badge, subproject summary, and collapse toggle -->
-                <div class="card-header" onclick="toggleCollapse('subproject-body-[% subproject.id %]')" aria-expanded="false">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div class="d-flex align-items-center">
-                            <i class="fas fa-chevron-down collapse-icon mr-2"></i>
-                            <span class="card-title mb-0 mr-3">[% subproject.name %]</span>
-                            
-                            <!-- Compact Subproject Summary -->
-                            <div class="d-flex align-items-center text-muted">
-                                [% 
-                                    # Use calculated subproject summary data if available
-                                    IF subproject.summary && subproject.id == subproject.summary.project_id;
-                                        sub_total_todos = subproject.summary.todo_count;
-                                        sub_total_time = subproject.summary.accumulated_time;
-                                    ELSE;
-                                        # Calculate subproject summary data
-                                        sub_total_todos = 0;
-                                        sub_total_time = 0;
-                                        
-                                        # Count todos and time from this subproject
-                                        IF subproject.todos;
-                                            sub_total_todos = subproject.todos.size;
-                                            FOREACH todo IN subproject.todos;
-                                                IF todo.accumulated_time;
-                                                    sub_total_time = sub_total_time + todo.accumulated_time;
-                                                END;
-                                            END;
-                                        END;
-                                        
-                                        # Count todos and time from nested sub-projects if they exist
-                                        IF subproject.sub_projects;
-                                            FOREACH nested_sub IN subproject.sub_projects;
-                                                IF nested_sub.todos;
-                                                    sub_total_todos = sub_total_todos + nested_sub.todos.size;
-                                                    FOREACH todo IN nested_sub.todos;
-                                                        IF todo.accumulated_time;
-                                                            sub_total_time = sub_total_time + todo.accumulated_time;
-                                                        END;
-                                                    END;
-                                                END;
-                                            END;
-                                        END;
-                                    END;
-                                %]
-                                <small class="mr-3">
-                                    <i class="fas fa-tasks"></i> [% sub_total_todos %] todos
-                                </small>
-                                [% IF sub_total_time && sub_total_time != '00:00:00' %]
-                                    <small>
-                                        <i class="fas fa-clock"></i> [% sub_total_time %]
-                                    </small>
-                                [% END %]
-                            </div>
-                        </div>
-                        <div class="d-flex align-items-center">
-                            [% SWITCH subproject.priority %]
-                                [% CASE 1 %]<span class="badge badge-danger"><i class="fas fa-arrow-up"></i> High</span>
-                                [% CASE 2 %]<span class="badge badge-warning"><i class="fas fa-equals"></i> Medium</span>
-                                [% CASE 3 %]<span class="badge badge-info"><i class="fas fa-arrow-down"></i> Low</span>
-                                [% CASE DEFAULT %]<span class="badge badge-warning"><i class="fas fa-equals"></i> Medium</span>
-                            [% END %]
-                        </div>
-                    </div>
+        <div class="card mb-3">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span>[% subproject.name %]</span>
+                    [% SWITCH subproject.priority %]
+                        [% CASE 1 %]<span class="badge badge-danger"><i class="fas fa-arrow-up"></i> High</span>
+                        [% CASE 2 %]<span class="badge badge-warning"><i class="fas fa-equals"></i> Medium</span>
+                        [% CASE 3 %]<span class="badge badge-info"><i class="fas fa-arrow-down"></i> Low</span>
+                        [% CASE DEFAULT %]<span class="badge badge-warning"><i class="fas fa-equals"></i> Medium</span>
+                    [% END %]
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- Status badge -->
+                <div class="mb-2">
+                    [% SWITCH subproject.status %]
+                        [% CASE 1 %]<span class="badge badge-info">New</span>
+                        [% CASE 2 %]<span class="badge badge-primary">In Progress</span>
+                        [% CASE 3 %]<span class="badge badge-success">Completed</span>
+                        [% CASE DEFAULT %]<span class="badge badge-secondary">Unknown</span>
+                    [% END %]
                 </div>
                 
-                <!-- Card body with subproject details (collapsed by default) -->
-                <div class="card-body" id="subproject-body-[% subproject.id %]">
+                <!-- Action buttons -->
+                <div class="d-flex justify-content-between mt-2">
+                    <form action="/project/details" method="POST">
+                        <input type="hidden" name="project_id" value="[% subproject.id %]">
+                        <button type="submit" class="btn btn-sm btn-info">
+                            <i class="fas fa-eye"></i> Details
+                        </button>
+                    </form>
                     
-                    <!-- Comprehensive Project Information -->
-                    <div class="row mb-4">
-                        <div class="col-md-6">
-                            <!-- Description -->
-                            <div class="mb-3">
-                                <h6><i class="fas fa-align-left"></i> Description</h6>
-                                [% IF subproject.description %]
-                                    <p class="card-text">[% subproject.description %]</p>
-                                [% ELSE %]
-                                    <p class="card-text text-muted">No description available</p>
-                                [% END %]
-                            </div>
-                            
-                            <!-- Status Information -->
-                            <div class="mb-3">
-                                <h6><i class="fas fa-info-circle"></i> Status</h6>
-                                [% SWITCH subproject.status %]
-                                    [% CASE 1 %]<span class="badge badge-info"><i class="fas fa-plus-circle"></i> New</span>
-                                    [% CASE 2 %]<span class="badge badge-primary"><i class="fas fa-spinner"></i> In Progress</span>
-                                    [% CASE 3 %]<span class="badge badge-success"><i class="fas fa-check-circle"></i> Completed</span>
-                                    [% CASE DEFAULT %]<span class="badge badge-secondary"><i class="fas fa-question-circle"></i> Unknown</span>
-                                [% END %]
-                            </div>
-
-                            <!-- Project Metrics -->
-                            [% IF subproject.project_size || subproject.estimated_man_hours %]
-                            <div class="mb-3">
-                                <h6><i class="fas fa-chart-bar"></i> Project Metrics</h6>
-                                <ul class="list-unstyled">
-                                    [% IF subproject.project_size %]
-                                        <li><i class="fas fa-expand-arrows-alt"></i> <strong>Size:</strong> [% subproject.project_size %]</li>
-                                    [% END %]
-                                    [% IF subproject.estimated_man_hours %]
-                                        <li><i class="fas fa-clock"></i> <strong>Estimated Hours:</strong> [% subproject.estimated_man_hours %]</li>
-                                    [% END %]
-                                </ul>
-                            </div>
-                            [% END %]
-                        </div>
-                        
-                        <div class="col-md-6">
-                            <!-- Timeline Information -->
-                            <div class="mb-3">
-                                <h6><i class="fas fa-calendar"></i> Timeline</h6>
-                                <ul class="list-unstyled">
-                                    [% IF subproject.start_date %]
-                                        <li><i class="far fa-calendar-alt"></i> <strong>Start:</strong> [% subproject.start_date %]</li>
-                                    [% END %]
-                                    
-                                    [% IF subproject.end_date %]
-                                        <li><i class="far fa-calendar-check"></i> <strong>Due:</strong> [% subproject.end_date %]</li>
-                                    [% END %]
-                                    
-                                    [% IF subproject.date_time_posted %]
-                                        <li><i class="far fa-calendar-plus"></i> <strong>Created:</strong> [% subproject.date_time_posted %]</li>
-                                    [% END %]
-                                </ul>
-                            </div>
-                            
-                            <!-- Personnel -->
-                            <div class="mb-3">
-                                <h6><i class="fas fa-users"></i> Personnel</h6>
-                                <ul class="list-unstyled">
-                                    [% IF subproject.developer_name %]
-                                        <li><i class="fas fa-user-cog"></i> <strong>Developer:</strong> [% subproject.developer_name %]</li>
-                                    [% END %]
-                                    
-                                    [% IF subproject.client_name %]
-                                        <li><i class="fas fa-user-tie"></i> <strong>Client:</strong> [% subproject.client_name %]</li>
-                                    [% END %]
-                                    
-                                    [% IF subproject.username_of_poster %]
-                                        <li><i class="fas fa-user-plus"></i> <strong>Created by:</strong> [% subproject.username_of_poster %]</li>
-                                    [% END %]
-                                </ul>
-                            </div>
-
-                            <!-- Project Codes -->
-                            [% IF subproject.project_code %]
-                            <div class="mb-3">
-                                <h6><i class="fas fa-code"></i> Project Code</h6>
-                                <span class="badge badge-secondary">[% subproject.project_code %]</span>
-                            </div>
-                            [% END %]
-                        </div>
-                    </div>
-
-                    <!-- Comments Section -->
-                    [% IF subproject.comments %]
-                    <div class="mb-3">
-                        <h6><i class="fas fa-comments"></i> Comments</h6>
-                        <div class="bg-light p-3 border-left border-primary">
-                            [% subproject.comments %]
-                        </div>
-                    </div>
-                    [% END %]
-
-                    <!-- Associated Todos Section -->
-                    [% IF subproject.todos && subproject.todos.size > 0 %]
-                    <div class="mb-3">
-                        <h6><i class="fas fa-tasks"></i> Associated Todos ([% subproject.todos.size %])</h6>
-                        <div class="table-responsive">
-                            <table class="table table-sm table-striped">
-                                <thead class="thead-light">
-                                    <tr>
-                                        <th>Todo</th>
-                                        <th>Status</th>
-                                        <th>Priority</th>
-                                        <th>Due Date</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    [% FOREACH todo IN subproject.todos %]
-                                    <tr>
-                                        <td>
-                                            <a href="/todo/details/[% todo.id %]" class="text-decoration-none">
-                                                [% todo.todo_text.substr(0, 50) %][% IF todo.todo_text.length > 50 %]...[% END %]
-                                            </a>
-                                        </td>
-                                        <td>
-                                            [% SWITCH todo.status %]
-                                                [% CASE 1 %]<span class="badge badge-info">New</span>
-                                                [% CASE 2 %]<span class="badge badge-warning">In Progress</span>
-                                                [% CASE 3 %]<span class="badge badge-success">Completed</span>
-                                                [% CASE DEFAULT %]<span class="badge badge-secondary">Unknown</span>
-                                            [% END %]
-                                        </td>
-                                        <td>
-                                            [% INCLUDE todo/priority_display.tt priority_value=todo.priority %]
-                                        </td>
-                                        <td>
-                                            [% IF todo.end_date %]
-                                                [% todo.end_date %]
-                                            [% ELSE %]
-                                                <span class="text-muted">No due date</span>
-                                            [% END %]
-                                        </td>
-                                    </tr>
-                                    [% END %]
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    [% ELSE %]
-                    <div class="mb-3">
-                        <h6><i class="fas fa-tasks"></i> Associated Todos</h6>
-                        <p class="text-muted">No todos associated with this sub-project.</p>
-                    </div>
-                    [% END %]
-                    
-                    <!-- Action buttons -->
-                    <div class="d-flex justify-content-between mt-3">
-                        <!-- Details Button -->
-                        <form action="/project/details" method="POST">
+                    [% IF c.session.roles.grep('admin').size %]
+                        <form action="/project/editproject" method="POST">
                             <input type="hidden" name="project_id" value="[% subproject.id %]">
-                            <button type="submit" class="btn btn-sm btn-info">
-                                <i class="fas fa-eye"></i> Details
+                            <button type="submit" class="btn btn-sm btn-primary">
+                                <i class="fas fa-edit"></i> Edit
                             </button>
                         </form>
-                        
-                        <!-- Edit Button (Visible only to admin users) -->
-                        [% IF c.session.roles.grep('admin').size %]
-                            <form action="/project/editproject" method="POST">
-                                <input type="hidden" name="project_id" value="[% subproject.id %]">
-                                <button type="submit" class="btn btn-sm btn-primary">
-                                    <i class="fas fa-edit"></i> Edit
-                                </button>
-                            </form>
-                        [% END %]
-                    </div>
-                    
-                    <!-- Display sub-sub-projects if they exist -->
-                    [% IF subproject.sub_projects.size %]
-                        <div class="sub-projects-container mt-4">
-                            <h6><i class="fas fa-project-diagram"></i> Sub-projects</h6>
-                            [% display_subprojects(subproject.sub_projects, project_filter, priority_filter) %]
-                        </div>
                     [% END %]
                 </div>
+                
+                <!-- Display sub-sub-projects if they exist -->
+                [% IF subproject.sub_projects.size %]
+                    <div class="sub-projects-container mt-3">
+                        <h6><i class="fas fa-project-diagram"></i> Sub-projects</h6>
+                        [% display_subprojects(subproject.sub_projects, project_filter, priority_filter) %]
+                    </div>
+                [% END %]
             </div>
         </div>
     [% END %]
@@ -633,35 +362,18 @@
             if (projectElement) {
                 toggleCollapse('project-body-' + projectFilter);
             } else {
-                // Check if it's a subproject
-                const subprojectElement = document.getElementById('subproject-body-' + projectFilter);
-                if (subprojectElement) {
-                    toggleCollapse('subproject-body-' + projectFilter);
-                    // Also expand its parent project
-                    const parentCard = subprojectElement.closest('.collapsible-card[id^="project-"]');
-                    if (parentCard) {
-                        const parentId = parentCard.id.replace('project-', '');
-                        const parentBody = document.getElementById('project-body-' + parentId);
-                        if (parentBody && !parentBody.classList.contains('show')) {
-                            toggleCollapse('project-body-' + parentId);
-                        }
+                // If it's a subproject, find and expand its parent
+                const allProjects = document.querySelectorAll('.collapsible-card');
+                allProjects.forEach(function(projectCard) {
+                    const projectId = projectCard.id.replace('project-', '');
+                    const projectBody = document.getElementById('project-body-' + projectId);
+                    
+                    // Check if this project contains the filtered subproject
+                    const hasFilteredSubproject = projectBody.innerHTML.includes('name="project_id" value="' + projectFilter + '"');
+                    if (hasFilteredSubproject) {
+                        toggleCollapse('project-body-' + projectId);
                     }
-                } else {
-                    // If it's nested deeper, find and expand all parent containers
-                    const allProjects = document.querySelectorAll('.collapsible-card');
-                    allProjects.forEach(function(projectCard) {
-                        const projectId = projectCard.id.replace('project-', '').replace('subproject-', '');
-                        const projectBody = document.getElementById('project-body-' + projectId);
-                        
-                        // Check if this project contains the filtered subproject
-                        if (projectBody) {
-                            const hasFilteredSubproject = projectBody.innerHTML.includes('name="project_id" value="' + projectFilter + '"');
-                            if (hasFilteredSubproject) {
-                                toggleCollapse('project-body-' + projectId);
-                            }
-                        }
-                    });
-                }
+                });
             }
         }
     });

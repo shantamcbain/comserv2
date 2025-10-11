@@ -1,0 +1,87 @@
+[% META title = 'About WeaverBeck' %]
+[% PageVersion = '/weaverbeck/about.tt,v 1.0 2025/04/16 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container mt-5">
+  <div class="row">
+    <div class="col-lg-8">
+      <h1 class="mb-4">About WeaverBeck</h1>
+      <p class="lead">WeaverBeck is our family home.</p>
+      
+      <div class="card mb-4">
+        <div class="card-body">
+          <h2 class="card-title">Our Mission</h2>
+          <p class="card-text">Our mission is to deliver exceptional value to our clients through innovative solutions, professional expertise, and unwavering commitment to quality.</p>
+        </div>
+      </div>
+      
+      <div class="card mb-4">
+        <div class="card-body">
+          <h2 class="card-title">Our Vision</h2>
+          <p class="card-text">We strive to be the most trusted partner for our clients, helping them achieve their goals through our expertise, dedication, and innovative approach.</p>
+        </div>
+      </div>
+      
+      <div class="card mb-4">
+        <div class="card-body">
+          <h2 class="card-title">Our Values</h2>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item"><strong>Integrity:</strong> We conduct our business with honesty, transparency, and ethical standards.</li>
+            <li class="list-group-item"><strong>Excellence:</strong> We strive for excellence in everything we do, delivering high-quality solutions and services.</li>
+            <li class="list-group-item"><strong>Innovation:</strong> We embrace innovation and continuously seek new ways to improve and add value.</li>
+            <li class="list-group-item"><strong>Collaboration:</strong> We believe in the power of teamwork and collaboration to achieve the best results.</li>
+            <li class="list-group-item"><strong>Customer Focus:</strong> We put our customers at the center of everything we do, ensuring their success.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-lg-4">
+      <div class="card mb-4">
+        <div class="card-body">
+          <h3 class="card-title">Company Information</h3>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item"><strong>Founded:</strong> 2010</li>
+            <li class="list-group-item"><strong>Headquarters:</strong> Vancouver, BC</li>
+            <li class="list-group-item"><strong>Employees:</strong> 50+</li>
+            <li class="list-group-item"><strong>Clients:</strong> 200+ worldwide</li>
+          </ul>
+        </div>
+      </div>
+      
+      <div class="card mb-4">
+        <div class="card-body">
+          <h3 class="card-title">Leadership Team</h3>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item"><strong>CEO:</strong> John Weaver</li>
+            <li class="list-group-item"><strong>CTO:</strong> Sarah Beck</li>
+            <li class="list-group-item"><strong>COO:</strong> Michael Thompson</li>
+            <li class="list-group-item"><strong>CFO:</strong> Lisa Chen</li>
+          </ul>
+        </div>
+      </div>
+      
+      <div class="card">
+        <div class="card-body">
+          <h3 class="card-title">Contact Us</h3>
+          <p class="card-text">Have questions about our company? We'd love to hear from you!</p>
+          <a href="[% c.uri_for('/weaverbeck/contact') %]" class="btn btn-primary">Contact Us</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="row mt-5">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-body">
+          <h2 class="card-title">Our History</h2>
+          <p class="card-text">WeaverBeck was founded in 2010 by John Weaver and Sarah Beck with a vision to provide innovative solutions to businesses of all sizes. What started as a small consulting firm has grown into a comprehensive service provider with clients across multiple industries.</p>
+          <p class="card-text">Over the years, we have expanded our service offerings, built a team of talented professionals, and established a reputation for excellence and reliability. Today, we continue to grow and evolve, always staying true to our core values and commitment to our clients' success.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

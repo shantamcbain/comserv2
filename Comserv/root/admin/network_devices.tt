@@ -1,0 +1,237 @@
+[% PageVersion = 'network_devices.tt,v 1.0 2025/05/31 shanta Exp shanta' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [% INCLUDE 'debug.tt' %]
+[% END %]
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>Network Device Management</h1>
+            <p class="lead">View and manage network devices across all sites</p>
+            
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="[% c.uri_for('/admin') %]">Admin Home</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Network Devices</li>
+                </ol>
+            </nav>
+            
+            [% IF c.flash.success_msg %]
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    [% c.flash.success_msg %]
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+            [% END %]
+            
+            [% IF c.flash.error_msg %]
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    [% c.flash.error_msg %]
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+            [% END %]
+        </div>
+    </div>
+    
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <a href="[% c.uri_for('/admin/add_network_device') %]" class="btn btn-primary">
+                <i class="fas fa-plus-circle"></i> Add New Device
+            </a>
+        </div>
+        <div class="col-md-6">
+            <form method="get" action="[% c.uri_for('/admin/network_devices') %]" class="form-inline justify-content-end">
+                <label for="site" class="mr-2">Filter by Site:</label>
+                <select name="site" id="site" class="form-control mr-2" onchange="this.form.submit()">
+                    <option value="">All Sites</option>
+                    [% FOREACH site IN sites %]
+                        <option value="[% site.name %]" [% IF site_filter == site.name %]selected[% END %]>[% site.name %]</option>
+                    [% END %]
+                </select>
+                <button type="submit" class="btn btn-outline-secondary">Apply</button>
+            </form>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4>Network Devices [% IF site_filter %]for [% site_filter %][% ELSE %](All Sites)[% END %]</h4>
+                </div>
+                <div class="card-body">
+                    [% IF devices.size %]
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead class="thead-dark">
+                                    <tr>
+                                        <th>Device Name</th>
+                                        <th>IP Address</th>
+                                        <th>MAC Address</th>
+                                        <th>Type</th>
+                                        <th>Location</th>
+                                        <th>Site</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    [% FOREACH device IN devices %]
+                                        <tr>
+                                            <td>[% device.device_name %]</td>
+                                            <td>[% device.ip_address %]</td>
+                                            <td>[% device.mac_address %]</td>
+                                            <td>[% device.device_type %]</td>
+                                            <td>[% device.location %]</td>
+                                            <td>[% device.site_name %]</td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm" role="group">
+                                                    <button type="button" class="btn btn-info" data-toggle="modal" data-target="#deviceModal[% device.id %]">
+                                                        <i class="fas fa-info-circle"></i> Details
+                                                    </button>
+                                                    <a href="[% c.uri_for('/admin/edit_network_device', device.id) %]" class="btn btn-warning">
+                                                        <i class="fas fa-edit"></i> Edit
+                                                    </a>
+                                                    <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#deleteModal[% device.id %]">
+                                                        <i class="fas fa-trash-alt"></i> Delete
+                                                    </button>
+                                                </div>
+                                                
+                                                <!-- Device Details Modal -->
+                                                <div class="modal fade" id="deviceModal[% device.id %]" tabindex="-1" role="dialog" aria-labelledby="deviceModalLabel[% device.id %]" aria-hidden="true">
+                                                    <div class="modal-dialog modal-lg" role="document">
+                                                        <div class="modal-content">
+                                                            <div class="modal-header bg-info text-white">
+                                                                <h5 class="modal-title" id="deviceModalLabel[% device.id %]">Device Details: [% device.device_name %]</h5>
+                                                                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                                                    <span aria-hidden="true">&times;</span>
+                                                                </button>
+                                                            </div>
+                                                            <div class="modal-body">
+                                                                <div class="row">
+                                                                    <div class="col-md-6">
+                                                                        <p><strong>Device Name:</strong> [% device.device_name %]</p>
+                                                                        <p><strong>IP Address:</strong> [% device.ip_address %]</p>
+                                                                        <p><strong>MAC Address:</strong> [% device.mac_address %]</p>
+                                                                        <p><strong>Device Type:</strong> [% device.device_type %]</p>
+                                                                    </div>
+                                                                    <div class="col-md-6">
+                                                                        <p><strong>Location:</strong> [% device.location %]</p>
+                                                                        <p><strong>Site:</strong> [% device.site_name %]</p>
+                                                                        <p><strong>Purpose:</strong> [% device.purpose %]</p>
+                                                                        <p><strong>Created:</strong> [% device.created_at %]</p>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="row mt-3">
+                                                                    <div class="col-md-12">
+                                                                        <h6>Notes:</h6>
+                                                                        <p>[% device.notes || 'No notes available' %]</p>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="modal-footer">
+                                                                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                                                                <a href="[% c.uri_for('/admin/edit_network_device', device.id) %]" class="btn btn-warning">
+                                                                    <i class="fas fa-edit"></i> Edit
+                                                                </a>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <!-- Delete Confirmation Modal -->
+                                                <div class="modal fade" id="deleteModal[% device.id %]" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel[% device.id %]" aria-hidden="true">
+                                                    <div class="modal-dialog" role="document">
+                                                        <div class="modal-content">
+                                                            <div class="modal-header bg-danger text-white">
+                                                                <h5 class="modal-title" id="deleteModalLabel[% device.id %]">Confirm Delete</h5>
+                                                                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                                                    <span aria-hidden="true">&times;</span>
+                                                                </button>
+                                                            </div>
+                                                            <div class="modal-body">
+                                                                <p>Are you sure you want to delete the device <strong>[% device.device_name %]</strong>?</p>
+                                                                <p>This action cannot be undone.</p>
+                                                            </div>
+                                                            <div class="modal-footer">
+                                                                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                                                                <a href="[% c.uri_for('/admin/delete_network_device', device.id) %]" class="btn btn-danger">
+                                                                    <i class="fas fa-trash-alt"></i> Delete
+                                                                </a>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    [% END %]
+                                </tbody>
+                            </table>
+                        </div>
+                    [% ELSE %]
+                        <div class="alert alert-info">
+                            <p>No devices found[% IF site_filter %] for site [% site_filter %][% END %].</p>
+                            <p>Click "Add New Device" to add a device.</p>
+                        </div>
+                    [% END %]
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h4>Network Device Management Help</h4>
+                </div>
+                <div class="card-body">
+                    <p>This page allows you to manage network devices across all sites. You can:</p>
+                    <ul>
+                        <li>View all devices or filter by site</li>
+                        <li>Add new devices</li>
+                        <li>Edit existing devices</li>
+                        <li>Delete devices</li>
+                        <li>View detailed information about each device</li>
+                    </ul>
+                    <p>For each device, you should record:</p>
+                    <ul>
+                        <li>Device name - A descriptive name for the device</li>
+                        <li>IP address - The static IP address assigned to the device</li>
+                        <li>MAC address - The hardware MAC address of the device</li>
+                        <li>Device type - The type of device (router, switch, access point, etc.)</li>
+                        <li>Location - Where the device is physically located</li>
+                        <li>Site - Which site/client the device belongs to</li>
+                        <li>Purpose - What the device is used for</li>
+                        <li>Notes - Any additional information about the device</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+[% IF c.session.debug_mode == 1 %]
+    <div class="container mt-4">
+        <div class="card">
+            <div class="card-header bg-dark text-white">
+                Debug Information
+            </div>
+            <div class="card-body">
+                <p>Page Version: [% PageVersion %]</p>
+                <p>Site Filter: [% site_filter || 'None' %]</p>
+                <p>Device Count: [% devices.size %]</p>
+                [% IF debug_msg.defined && debug_msg.size > 0 %]
+                    <div class="debug-messages">
+                        [% FOREACH msg IN debug_msg %]
+                            <p class="debug">Debug: [% msg %]</p>
+                        [% END %]
+                    </div>
+                [% END %]
+            </div>
+        </div>
+    </div>
+[% END %]

@@ -34,7 +34,8 @@ sub get_projects {
         )->all;
     }
 
-    Comserv::Util::Logging->instance->log_with_details($self, __FILE__, __LINE__, 'get_projects', Dumper(@projects));
+    # Use log_to_file directly since we don't have $c context
+    Comserv::Util::Logging::log_to_file("DEBUG: get_projects - " . Dumper(@projects));
 
     return \@projects;
 }

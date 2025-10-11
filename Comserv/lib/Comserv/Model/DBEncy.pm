@@ -1,118 +1,146 @@
+
 package Comserv::Model::DBEncy;
 
 use strict;
 use base 'Catalyst::Model::DBIC::Schema';
-use Sys::Hostname;
-use Socket;
-use JSON;
-use Data::Dumper;
-use FindBin;
-use File::Spec;
+use Comserv::Util::Logging;
 
-my $json_text;
-{
-    local $/; # Enable 'slurp' mode
-    # Find db_config.json relative to the application root
-    my $config_path = File::Spec->catfile($FindBin::Bin, '..', 'db_config.json');
-    open my $fh, "<", $config_path or die "Could not open $config_path: $!";
-    $json_text = <$fh>;
-    close $fh;
-}
-my $config = decode_json($json_text);
+# Store connection details for debugging
+my $startup_connection_info;
 
-# Function to test database connectivity
-sub test_connection {
-    my ($dsn, $user, $password) = @_;
-    
-    my $success = 0;
-    eval {
-        require DBI;
-        my $dbh = DBI->connect($dsn, $user, $password, { 
-            RaiseError => 0, 
-            PrintError => 0,
-            mysql_connect_timeout => 5,
-            timeout => 5 
-        });
-        if ($dbh) {
-            $success = 1;
-            $dbh->disconnect;
-        }
-    };
-    
-    return $success;
-}
 
-# Function to select best database connection based on priority
-sub get_best_connection {
-    my @connections;
-    
-    # Collect all non-template connections and sort by priority
-    for my $key (keys %$config) {
-        next if $key =~ /^_/; # Skip template/metadata entries
-        my $conn = $config->{$key};
-        next unless ref($conn) eq 'HASH' && exists $conn->{priority};
-        push @connections, { key => $key, %$conn };
-    }
-    
-    # Sort by priority (lower number = higher priority)
-    @connections = sort { $a->{priority} <=> $b->{priority} } @connections;
-    
-    print "🔍 Testing database connections in priority order...\n";
-    
-    # Test each connection in priority order
-    for my $conn (@connections) {
-        my $dsn;
-        if ($conn->{db_type} eq 'mysql') {
-            $dsn = "dbi:mysql:dbname=$conn->{database};host=$conn->{host};port=$conn->{port}";
-        } elsif ($conn->{db_type} eq 'sqlite') {
-            $dsn = "dbi:SQLite:dbname=$conn->{database_path}";
-        }
-        
-        print "  Priority $conn->{priority}: Testing $conn->{key} ($conn->{description})... ";
-        
-        if (test_connection($dsn, $conn->{username}, $conn->{password})) {
-            print "✅ Success!\n";
-            return {
-                dsn => $dsn,
-                user => $conn->{username} // '',
-                password => $conn->{password} // '',
-                connection_name => $conn->{key},
-                description => $conn->{description}
-            };
-        } else {
-            print "❌ Failed\n";
-        }
-    }
-    
-    # If all connections failed, return the highest priority one anyway
-    print "⚠️  All connections failed, using highest priority configuration anyway\n";
-    my $fallback = $connections[0];
-    my $dsn = $fallback->{db_type} eq 'mysql' 
-        ? "dbi:mysql:dbname=$fallback->{database};host=$fallback->{host};port=$fallback->{port}"
-        : "dbi:SQLite:dbname=$fallback->{database_path}";
-    
-    return {
-        dsn => $dsn,
-        user => $fallback->{username} // '',
-        password => $fallback->{password} // '',
-        connection_name => $fallback->{key},
-        description => $fallback->{description}
-    };
-}
-
-# Get the best available connection
-my $best_conn = get_best_connection();
-print "📡 Using database connection: $best_conn->{connection_name} - $best_conn->{description}\n\n";
-
-# Set the schema_class and connect_info attributes
+# Set default schema_class - connect_info will be set at runtime
 __PACKAGE__->config(
-    schema_class => 'Comserv::Model::Schema::Ency',
-    connect_info => {
-        dsn => $best_conn->{dsn},
-        user => $best_conn->{user},
-        password => $best_conn->{password},
-    }
+    schema_class => 'Comserv::Model::Schema::Ency'
 );
+
+# COMPONENT method runs at application startup, not module compile time
+sub COMPONENT {
+    my ($self, $app, $args) = @_;
+
+    my $logger = Comserv::Util::Logging->instance();
+    
+    # Create a RemoteDB instance directly instead of relying on Catalyst's model()
+    # This avoids circular dependency issues during component initialization
+    my $remote_db;
+    eval {
+        require Comserv::Model::RemoteDB;
+        $remote_db = Comserv::Model::RemoteDB->new();
+    };
+    
+    if ($@ || !$remote_db) {
+        my $error = $@ || "Failed to create RemoteDB instance";
+        $logger->log_with_details(undef, 'error', __FILE__, __LINE__, 'COMPONENT',
+            "DBEncy: Failed to create RemoteDB instance: $error");
+        die "DBEncy: Cannot proceed without RemoteDB: $error";
+    }
+
+    # Use RemoteDB to select the best connection for 'ency' database
+    my $connection_info;
+    eval {
+        $connection_info = $remote_db->get_connection_info('ency');
+    };
+
+    if ($@ || !$connection_info) {
+        my $error = $@ || "No connection info returned from RemoteDB";
+        $logger->log_with_details(undef, 'error', __FILE__, __LINE__, 'COMPONENT',
+            "DBEncy: Failed to get connection from RemoteDB: $error");
+        die "DBEncy: Failed to establish database connection: $error";
+    }
+
+    # Extract connection details from RemoteDB
+    my $conn = $connection_info->{config};
+    my $connection_name = $connection_info->{connection_name};
+    my $db_type = $conn->{db_type} || 'mysql';
+    
+    # Enhanced startup logging to show which connection is being used
+    $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+        "============================================");
+    $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+        "DBEncy MODEL STARTUP - CONNECTION FROM RemoteDB:");
+    $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+        "Connection Name: $connection_name");
+    $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+        "Database Type: $db_type");
+    if ($db_type eq 'sqlite') {
+        $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+            "Database Path: " . $conn->{database_path});
+    } else {
+        $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+            "Host: " . $conn->{host} . ":" . $conn->{port});
+        $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+            "Database: " . $conn->{database});
+        $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+            "Username: " . $conn->{username});
+    }
+    $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+        "Description: " . ($conn->{description} || 'No description'));
+    $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+        "Priority: " . ($conn->{priority} || 'Not set'));
+    $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+        "============================================");
+
+    # Store connection info for debugging
+    $startup_connection_info = {
+        connection_name => $connection_name,
+        db_type => $db_type,
+        host => $conn->{host},
+        port => $conn->{port},
+        database => $conn->{database} || $conn->{database_path},
+        username => $conn->{username},
+        description => $conn->{description} || 'No description',
+        priority => $conn->{priority} || 'Not set',
+        timestamp => scalar(localtime())
+    };
+
+    # Set up the DBIx::Class connection
+    my $connect_info;
+    if ($db_type eq 'sqlite') {
+        $connect_info = {
+            dsn => "dbi:SQLite:dbname=" . $conn->{database_path},
+            user => "",
+            password => "",
+            sqlite_unicode => 1,
+            on_connect_do => ["PRAGMA foreign_keys = ON"],
+        };
+    } else {
+        $connect_info = {
+            dsn => "dbi:mysql:database=" . $conn->{database} . ";host=" . $conn->{host} . ";port=" . $conn->{port},
+            user => $conn->{username},
+            password => $conn->{password},
+            mysql_enable_utf8 => 1,
+            on_connect_do => ["SET NAMES 'utf8'", "SET CHARACTER SET 'utf8'"],
+        };
+    }
+
+    $args->{connect_info} = $connect_info;
+    return $self->next::method($app, $args);
+}
+
+# Method to get current connection info for debugging
+sub get_connection_info {
+    my ($self) = @_;
+    
+    my $storage = $self->schema->storage;
+    my $connect_info = $storage->connect_info;
+    
+    my $info = {
+        # Current runtime connection info
+        current_dsn => $connect_info->[0]{dsn} || $connect_info->[0] || 'Unknown',
+        current_username => $connect_info->[0]{user} || $connect_info->[1] || 'Unknown',
+        connection_type => ref($storage) || 'Unknown',
+        
+        # Startup connection selection info
+        startup_info => $startup_connection_info || 'Not available'
+    };
+    
+    return $info;
+}
+
+# Method to get detailed startup connection info
+sub get_startup_connection_info {
+    return $startup_connection_info;
+}
 sub list_tables {
     my $self = shift;
 
@@ -157,4 +185,64 @@ sub get_table_info {
     }
 }
 
+sub create_table_from_result {
+    my ($self, $table_name, $schema, $c) = @_;
+
+    # Log the table name at the beginning of the method
+    $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Starting method for table: $table_name");
+
+    # Check if the required fields are present and in the correct format
+    unless ($schema && $schema->isa('DBIx::Class::Schema')) {
+        $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Schema is not a DBIx::Class::Schema object. Table name: $table_name");
+        return;
+    }
+
+    # Get a DBI database handle
+    my $dbh = $schema->storage->dbh;
+
+    # Execute a SHOW TABLES LIKE 'table_name' SQL statement
+    my $sth = $dbh->prepare("SHOW TABLES LIKE ?");
+    $sth->execute($table_name);
+
+    # Fetch the result
+    my $result = $sth->fetch;
+
+    # Check if the table exists
+    if (!$result) {
+        # The table does not exist, create it
+        my $result_class = "Comserv::Model::Schema::Ency::Result::$table_name";
+        eval "require $result_class";
+        if ($@) {
+            $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Could not load $result_class: $@. Table name: $table_name");
+            return;
+        }
+
+        # Get the columns from the result class
+        my $columns_info = $result_class->columns_info;
+        my %columns = %$columns_info if ref $columns_info eq 'HASH';
+
+        # Log the table properties before the table creation process starts
+        $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Table properties for $table_name: " . Dumper($columns_info));
+
+        # Define the structure of the table
+        my $source = $schema->source($table_name);
+        $source->add_columns(%columns);
+        $source->set_primary_key($result_class->primary_columns);
+
+        # Deploy the table
+        my $deploy_result = $schema->deploy({ sources => [$table_name] });
+
+        if ($deploy_result) {
+            $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Table $table_name deployed successfully.");
+            return 1;  # Return 1 to indicate that the table creation was successful
+        } else {
+            $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Failed to deploy table $table_name.");
+            $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Deployment details: " . Dumper($deploy_result) . ". Table name: $table_name");
+            return 0;  # Return 0 to indicate that the table creation failed but didn't raise an exception
+        }
+    } else {
+        $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Table $table_name already exists.");
+        return 1;  # Return 1 to indicate that the table already exists
+    }
+}
 1;

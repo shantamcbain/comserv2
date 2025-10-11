@@ -1,0 +1,166 @@
+[% PageVersion = 'Documentation/cloudflare_api_token_guide.tt,v 1.0 2025/07/15 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Cloudflare API Token Guide' %]
+
+<div class="documentation-container">
+    <h1>Cloudflare API Token Guide</h1>
+    
+    <div class="toc">
+        <h2>Table of Contents</h2>
+        <ul>
+            <li><a href="#overview">Overview</a></li>
+            <li><a href="#issue">Issue</a></li>
+            <li><a href="#solution">Solution</a></li>
+            <li><a href="#steps">Steps to Create a New API Token</a></li>
+            <li><a href="#updating">Updating the Configuration</a></li>
+            <li><a href="#testing">Testing the New Token</a></li>
+            <li><a href="#troubleshooting">Troubleshooting</a></li>
+        </ul>
+    </div>
+    
+    <section id="overview">
+        <h2>Overview</h2>
+        <p>This guide explains how to create a Cloudflare API token with the correct permissions for use with the Comserv2 application.</p>
+    </section>
+    
+    <section id="issue">
+        <h2>Issue</h2>
+        <p>The current API token has IP address restrictions and cannot be used from the server where Comserv2 is running. This results in 403 Forbidden errors with the message "Cannot use the access token from location: [IP address]".</p>
+    </section>
+    
+    <section id="solution">
+        <h2>Solution</h2>
+        <p>Create a new Cloudflare API token without IP restrictions and with the correct permissions.</p>
+    </section>
+    
+    <section id="steps">
+        <h2>Steps to Create a New API Token</h2>
+        <ol>
+            <li>Log in to your Cloudflare account at <a href="https://dash.cloudflare.com/" target="_blank">https://dash.cloudflare.com/</a></li>
+            <li>Click on your profile icon in the top right corner and select "My Profile"</li>
+            <li>In the left sidebar, click on "API Tokens"</li>
+            <li>Click the "Create Token" button</li>
+            <li>You can either:
+                <ul>
+                    <li>Select the "Edit zone DNS" template, or</li>
+                    <li>Create a custom token with the following permissions:</li>
+                </ul>
+            </li>
+        </ol>
+        
+        <h3>Custom Token Permissions</h3>
+        <p>If creating a custom token, use these settings:</p>
+        
+        <div class="settings-box">
+            <p><strong>Token name:</strong> Comserv2 DNS Management</p>
+            
+            <p><strong>Permissions:</strong></p>
+            <ul>
+                <li>Zone > DNS > Edit</li>
+                <li>Zone > Zone > Read</li>
+                <li>Zone > SSL and Certificates > Read (optional)</li>
+                <li>Zone > Cache Purge > Purge (optional)</li>
+            </ul>
+            
+            <p><strong>Zone Resources:</strong></p>
+            <ul>
+                <li>Include > Specific zone > computersystemconsulting.ca</li>
+                <li>Include > Specific zone > beemaster.ca</li>
+                <li>(Add any other domains you need to manage)</li>
+            </ul>
+            
+            <p><strong>Client IP Address Filtering:</strong></p>
+            <ul>
+                <li>Leave this section blank to allow access from any IP address</li>
+            </ul>
+        </div>
+        
+        <ol start="6">
+            <li>Click "Continue to summary" and review the permissions</li>
+            <li>Click "Create Token"</li>
+            <li>Copy the generated token (you will only see it once)</li>
+        </ol>
+    </section>
+    
+    <section id="updating">
+        <h2>Updating the Configuration</h2>
+        <p>After creating the new token, update the <code>cloudflare_config.json</code> file with the new token:</p>
+        
+        <pre>
+{
+  "cloudflare": {
+    "api_token": "your-new-token-here",
+    "email": "shantamcbain@gmail.com",
+    "application_id": "comserv2"
+  },
+  ...
+}
+        </pre>
+    </section>
+    
+    <section id="testing">
+        <h2>Testing the New Token</h2>
+        <p>You can test the new token using the provided test script:</p>
+        
+        <pre>
+perl /home/shanta/PycharmProjects/comserv2/Comserv/script/test_cloudflare_domain.pl
+        </pre>
+        
+        <p>This script will verify that the token is valid and has the correct permissions to access your domains.</p>
+    </section>
+    
+    <section id="troubleshooting">
+        <h2>Troubleshooting</h2>
+        <p>If you continue to experience issues with the new token:</p>
+        
+        <ol>
+            <li>Verify that the token has the correct permissions</li>
+            <li>Check that there are no IP restrictions on the token</li>
+            <li>Ensure the token is active and has not expired</li>
+            <li>Check the Cloudflare API status at <a href="https://www.cloudflarestatus.com/" target="_blank">https://www.cloudflarestatus.com/</a></li>
+        </ol>
+        
+        <p>For more information on Cloudflare API tokens, see the <a href="https://developers.cloudflare.com/api/tokens/" target="_blank">Cloudflare API documentation</a>.</p>
+    </section>
+</div>
+
+<style>
+    .documentation-container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .toc {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 30px;
+    }
+    
+    .toc ul {
+        list-style-type: none;
+        padding-left: 20px;
+    }
+    
+    section {
+        margin-bottom: 40px;
+    }
+    
+    pre {
+        background-color: #f5f5f5;
+        padding: 15px;
+        border-radius: 5px;
+        overflow-x: auto;
+    }
+    
+    .settings-box {
+        background-color: #f5f5f5;
+        padding: 15px;
+        border-radius: 5px;
+        margin: 15px 0;
+    }
+</style>

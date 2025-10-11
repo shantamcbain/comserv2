@@ -1,0 +1,85 @@
+/* Generated CSS for theme: usbm */
+
+:root {
+  --accent-color: #FFCC66;
+  --background-color: #009933;
+  --body-font: Verdana, Helvetica, sans-serif;
+  --border-color: #cccccc;
+  --button-bg: #009933;
+  --button-border: #006622;
+  --button-hover-bg: #006622;
+  --button-text: #ffffff;
+  --font-size-base: 20px;
+  --font-size-large: 24px;
+  --font-size-small: 15px;
+  --font-size-xlarge: 28px;
+  --header-font: Verdana, Helvetica, sans-serif;
+  --link-color: black;
+  --link-hover-color: black;
+  --nav-bg: #009933;
+  --nav-hover-bg: rgba(0, 0, 0, 0.1);
+  --nav-text: #ffffff;
+  --primary-color: #009933;
+  --secondary-color: #f0f0f0;
+  --success-color: #339933;
+  --table-header-bg: #e6e6e6;
+  --text-color: black;
+  --warning-color: red;
+}
+
+.LeftNavTableStyle {
+  background: #FFCC66;
+  border: 0;
+  width: 150%;
+}
+
+.NavtableHeaderCellStyle {
+  background: #FF9900;
+  color: black;
+  text-align: center;
+  vertical-align: top;
+}
+
+.applicationSubMenuStyle {
+  background: white;
+  color: black;
+  font-family: Verdana, Helvetica, sans-serif;
+  font-size: 15px;
+}
+
+.day_title_header {
+  background: #FFCC66;
+  color: black;
+  font-family: Verdana, Helvetica, sans-serif;
+  text-align: center;
+  vertical-align: top;
+}
+
+.month_title_header {
+  background: #FFCC66;
+  color: black;
+  font-family: Verdana, Helvetica, sans-serif;
+  text-align: center;
+  vertical-align: top;
+}
+
+.month_wday_header {
+  background: #FF9900;
+  color: black;
+  font-family: Verdana, Helvetica, sans-serif;
+  font-size: 20px;
+  text-align: center;
+  vertical-align: top;
+}
+
+.warning {
+  background: #E5E5E5;
+  border: medium green;
+  border-style: dashed;
+  color: red;
+  font-family: Verdana, Helvetica, sans-serif;
+  font-size: 18px;
+  text-align: center;
+  vertical-align: top;
+}
+

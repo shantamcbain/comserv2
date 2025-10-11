@@ -1,0 +1,114 @@
+[% META title = 'Virtualmin Coexistence Guide' %]
+[% PageVersion = 'Documentation/Virtualmin_Integration.tt,v 0.12 2024/05/20 Admin Exp admin ' %]
+
+<h1 id="virt-top">Virtualmin/Proxmox/Starman Coexistence</h1>
+
+<nav>
+    <a href="#conflict-areas">Conflict Areas</a> |
+    <a href="#safe-zones">Safe Zones</a> |
+    <a href="#best-practices">Best Practices</a> |
+    <a href="#recovery">Conflict Recovery</a>
+</nav>
+
+<h2 id="conflict-areas">Potential Conflict Areas</h2>
+<table class="table">
+    <tr>
+        <th>Component</th>
+        <th>Virtualmin Default</th>
+        <th>Manual Setup Risk</th>
+    </tr>
+    <tr>
+        <td>Web Services</td>
+        <td>Apache + Nginx proxy</td>
+        <td>Port collision if Starman uses 80/443 directly</td>
+    </tr>
+    <tr>
+        <td>Firewall</td>
+        <td>Webmin Firewall Module</td>
+        <td>UFW rules may override Virtualmin's config</td>
+    </tr>
+    <tr>
+        <td>SSL Certificates</td>
+        <td>Let's Encrypt via Webmin</td>
+        <td>Manual certs might break auto-renewal</td>
+    </tr>
+    <tr>
+        <td>User Accounts</td>
+        <td>Virtualmin-managed users</td>
+        <td>Manual system users won't appear in Virtualmin</td>
+    </tr>
+</table>
+
+<h2 id="safe-zones">Safe Configuration Zones</h2>
+<ol class="steps">
+    <li><strong>Starman as Backend Server</strong>
+        <pre>
+# Use high ports outside Virtualmin's range
+--listen :5000  # Safe (Virtualmin uses 80/443/21/etc)</pre>
+    </li>
+    <li><strong>Proxmox Network Isolation</strong>
+        <pre>
+qm set &lt;VMID&gt; -net0 virtio,bridge=vmbr2  # Separate from Virtualmin's vmbr0</pre>
+    </li>
+    <li><strong>Virtualmin Proxy Integration</strong>
+        <pre>
+# In Virtualmin: Services → Configure Website → Proxy to URL
+http://localhost:5000/  # Reverse proxy setup</pre>
+    </li>
+</ol>
+
+<h2 id="best-practices">Integration Best Practices</h2>
+<h3>File System Layout</h3>
+<pre>
+/home/
+├── virtualmin/  # Virtualmin-managed
+│   └── domains/
+└── starman/     # Manual installations
+    └── apps/</pre>
+
+<h3>Service User Isolation</h3>
+<pre>
+# Virtualmin users: web_*
+# Manual users: starman_*
+sudo useradd --system --shell /usr/sbin/nologin starman_svc</pre>
+
+<h3>Backup Coordination</h3>
+<ol>
+    <li>Virtualmin Backup:
+        <pre>Exclude /home/starman/</pre>
+    </li>
+    <li>Proxmox Backup:
+        <pre>Include /home/starman/ in VM backups</pre>
+    </li>
+</ol>
+
+<h2 id="recovery">Conflict Recovery Steps</h2>
+<ol class="steps">
+    <li><strong>Port Conflict Resolution</strong>
+        <pre>
+sudo ss -tulpn | grep '80\|443'
+sudo systemctl stop starman  # If conflicting</pre>
+    </li>
+    <li><strong>Firewall Reset</strong>
+        <pre>
+sudo ufw disable
+sudo webmin-firewall --reset
+sudo ufw enable</pre>
+    </li>
+    <li><strong>User Permission Repair</strong>
+        <pre>
+sudo virtualmin fix-permissions --all-domains
+sudo chown -R starman_svc:starman_svc /home/starman</pre>
+    </li>
+</ol>
+
+<h3>Emergency Rollback Procedure</h3>
+<pre>
+# Restore Virtualmin core services
+sudo virtualmin restore-backup --all-features --force
+
+# Preserve manual configurations
+mv /home/starman /home/starman.bak
+# Restore from Proxmox backup</pre>
+
+<p><a href="#virt-top">Back to top</a></p>

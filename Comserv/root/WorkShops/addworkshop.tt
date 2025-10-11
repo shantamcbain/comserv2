@@ -1,4 +1,5 @@
-[% PageVersion = 'WorkShops/addworkshop.tt,v 0.01 2024/01/08 shanta Exp shanta ' %]
+
+[% PageVersion = 'WorkShops/addworkshop.tt,v 0.02 2025/02/27 shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
 [% END %]
  [% PageVersion %]
@@ -10,15 +11,14 @@
     <label for="siteName">Site Name:</label>
     <input type="text" id="sitename" name="sitename" value="[% SiteName OR '' %]"> <br>
 
-
     <label for="dateOfWorkshop">Date of Workshop:</label>
     <input type="date" id="dateOfWorkshop" name="dateOfWorkshop" value="[% todo.start_date OR '' %]"><br>
 
     <label for="time">Time:</label>
     <input type="time" id="time" name="time"><br>
 
-    <label for="time">End Time:</label>
-    <input type="time" id="end_time" name="time"><br>
+    <label for="end_time">End Time:</label>
+    <input type="time" id="end_time" name="end_time"><br>
 
     <label for="location">Location:</label>
     <input type="text" id="location" name="location"><br>
@@ -26,16 +26,20 @@
     <label for="title">Title:</label>
     <input type="text" id="title" name="title"><br>
 
-    <label for="details">Details:</label>
-    <input type="text" id="description" name="details"><br>
+    <label for="description">Description:</label>
+    <textarea id="description" name="description"></textarea><br>
 
-    <label for="maxMinAttendees">Max/Min Attendees:</label>
-    <input type="text" id="maxMinAttendees" name="maxMinAttendees"><br>
-   <label for="share">Share: Private will share only on your site. </label>
+    <label for="instructor">Instructor:</label>
+    <input type="text" id="instructor" name="instructor"><br>
+
+    <label for="max_participants">Max Participants:</label>
+    <input type="number" id="max_participants" name="max_participants"><br>
+
+    <label for="share">Share: Private will share only on your site.</label>
     <select id="share" name="share">
         <option value="public" [% IF record.share == 'public' %]selected[% END %]>Public</option>
         <option value="private" [% IF record.share == 'private' %]selected[% END %]>Private</option>
-        <option value="member" [% IF record.share == 'member' %]selected[% END %]>Member</option>
-    </select>
+    </select><br>
+
     <input type="submit" value="Add Workshop">
 </form>

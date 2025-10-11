@@ -1,0 +1,32 @@
+
+[% PageVersion	= 'CSC/demo.tt,v 0.01 2025/02/02 shanta Exp shanta '	%]
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+ <br>[%	PageVersion %] <br>
+    [%# "Debugging HostName: " _ HostName %]
+	[%# INCLUDE 'debug.tt' %]
+[% END %]
+[%# PROCESS 'setup/DefaultDBI.ttml' %]
+
+ <table><tr><td><!-- HelpDesk View -->
+
+	<!--	<p>Server name [% data.HostName %]</p>-->
+
+	[% IF c.session.username %]
+
+<h3> Hello  [% c.session.firstname%]&nbsp;  [% c.session.lastname%]! Welcome to  Our Application demo!</h3>
+
+
+	[% ELSE %]
+
+	<h3>  Hello! Welcome to [% c.session.domain %] Our Application demo!</h3>
+    [% END %]
+
+
+<A NAME="PageTop"></A>
+
+<p>This is a demo page for the Comserv application.</p>
+<p>Here you can explore the various features of the application.</p>
+</td>
+</tr></table>
+<!-- End HelpDesk View -->

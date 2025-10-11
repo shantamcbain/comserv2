@@ -1,52 +1,138 @@
-[% PageVersion	= 'CSC/voip.tt,v 0.01 2023/08/30 shanta Exp shanta '	%]
-[% debug %]
-[% IF c.session.debug_mode == 1 %]
- [%	PageVersion %]
-    [% "Debugging HostName: " _ HostName %]
-	[%# INCLUDE 'debug.tt' %]
-[% END %]
+[% META title = 'VOIP Services' %]
+[% PageVersion = 'CSC/voip.tt,v 0.02 2025/04/12 shanta Exp shanta ' %]
 
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
 
 <A NAME="PageTop"></A>
 
 <table>
 <tr>
-	<td>
+    <td>
 
-<h1>Join our VOIP Phone System</h1>
-<p>Save LOTS of money on your monthly phone bills.
+<h1>Our VOIP Services</h1>
 
-<ul>
-	<li><a createyouraccount='' href='http://www.voipinterface.net/interface/signup.php?UID=141935' onclick='window
-	.open(this.href, \"\", \"resizable=yes,status=no,location=no,toolbar=no,menubar=no,fullscreen=no,scrollbars=no,
-	dependent=no\" target=_blank); return false;'><h2>Create an account</h2></a>
-<p>Return here for the next step. You must access your account to attach a did (Phone number) to your account. Remember your email address and password you will need them to access your account in the next step</p>
-</li>
+<div class="row">
+  <div class="col-md-4 mb-4">
+    <div class="card h-100">
+      <div class="card-header bg-primary text-white">
+        <h3 class="card-title">Basic VOIP</h3>
+      </div>
+      <div class="card-body">
+        <h4 class="card-subtitle mb-3">$19.95/month</h4>
+        <ul class="list-group list-group-flush">
+          <li class="list-group-item">1 Phone Line</li>
+          <li class="list-group-item">Unlimited Local Calls</li>
+          <li class="list-group-item">Voicemail</li>
+          <li class="list-group-item">Call Waiting</li>
+          <li class="list-group-item">24/7 Support</li>
+        </ul>
+      </div>
+      <div class="card-footer">
+        <a href="http://www.voipinterface.net/interface/signup.php?UID=141935" onclick='window.open(this.href, "", "resizable=yes,status=no,location=no,toolbar=no,menubar=no,fullscreen=no,scrollbars=no,dependent=no"); return false;' class="btn btn-primary btn-block">Sign Up Now</a>
+      </div>
+    </div>
+  </div>
 
-<li>
-<a href='http://www.voipinterface.net/site/access/uid/141935' onclick='window.open(this.href, \"\", \"resizable=no,status=no,location=no,toolbar=no,menubar=no,fullscreen=no,scrollbars=no,dependent=no\"); return false;'><h2>Access your voip account.</h2></a>
-<p>Use the email address and password you gave in creating your account. Charge your account with some money. Paypal accepted by default. Look for the services link then Order did to order your did. </p>
-<p>
-Browse around the interface to see your available services and how to set them up and access them. Key ones are the user name and password you use to connect your client. Creating a voice mail account and activating it or two of the many features available with your account.
-</p></li>
+  <div class="col-md-4 mb-4">
+    <div class="card h-100">
+      <div class="card-header bg-success text-white">
+        <h3 class="card-title">Business VOIP</h3>
+      </div>
+      <div class="card-body">
+        <h4 class="card-subtitle mb-3">$49.95/month</h4>
+        <ul class="list-group list-group-flush">
+          <li class="list-group-item">5 Phone Lines</li>
+          <li class="list-group-item">Unlimited North America Calls</li>
+          <li class="list-group-item">Advanced Voicemail</li>
+          <li class="list-group-item">Call Forwarding</li>
+          <li class="list-group-item">Auto Attendant</li>
+          <li class="list-group-item">24/7 Priority Support</li>
+        </ul>
+      </div>
+      <div class="card-footer">
+        <a href="/contact" class="btn btn-success btn-block">Contact Sales</a>
+      </div>
+    </div>
+  </div>
 
+  <div class="col-md-4 mb-4">
+    <div class="card h-100">
+      <div class="card-header bg-info text-white">
+        <h3 class="card-title">Enterprise VOIP</h3>
+      </div>
+      <div class="card-body">
+        <h4 class="card-subtitle mb-3">$99.95/month</h4>
+        <ul class="list-group list-group-flush">
+          <li class="list-group-item">Unlimited Phone Lines</li>
+          <li class="list-group-item">Unlimited Global Calls</li>
+          <li class="list-group-item">Advanced Call Center Features</li>
+          <li class="list-group-item">CRM Integration</li>
+          <li class="list-group-item">Custom IVR</li>
+          <li class="list-group-item">24/7 Dedicated Support</li>
+        </ul>
+      </div>
+      <div class="card-footer">
+        <a href="/contact" class="btn btn-info btn-block">Contact Sales</a>
+      </div>
+    </div>
+  </div>
+</div>
 
-<li><a href='https://voip.computersystemconsulting.ca/cgi-bin/index.cgi' target='_blank'><h2>Application</h2></a></li>
+<div class="row mt-5">
+  <div class="col-12">
+    <h2>Manage Your VOIP Account</h2>
+    <hr>
+  </div>
+  
+  <div class="col-md-4 mb-4">
+    <div class="card h-100">
+      <div class="card-header bg-primary text-white">
+        <h3 class="card-title">Account Access</h3>
+      </div>
+      <div class="card-body">
+        <p>Access your VOIP account to manage settings, view call history, and more.</p>
+        <a href="http://www.voipinterface.net/site/access/uid/141935" onclick='window.open(this.href, "", "resizable=no,status=no,location=no,toolbar=no,menubar=no,fullscreen=no,scrollbars=no,dependent=no"); return false;' class="btn btn-primary">Access Account</a>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-md-4 mb-4">
+    <div class="card h-100">
+      <div class="card-header bg-success text-white">
+        <h3 class="card-title">Web Application</h3>
+      </div>
+      <div class="card-body">
+        <p>Use our web-based application to make and receive calls directly from your browser.</p>
+        <a href="https://voip.computersystemconsulting.ca/cgi-bin/index.cgi" target="_blank" class="btn btn-success">Launch Application</a>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-md-4 mb-4">
+    <div class="card h-100">
+      <div class="card-header bg-info text-white">
+        <h3 class="card-title">Support</h3>
+      </div>
+      <div class="card-body">
+        <p>Need help? Our support team is available to assist you with any questions or issues.</p>
+        <a href="https://helpdesk.computersystemconsulting.ca" onclick='window.open(this.href, "HelpDesk", "resizable=yes,status=no,location=no,toolbar=no,menubar=no,fullscreen=no,scrollbars=no,dependent=no"); return false;' class="btn btn-info">Contact Support</a>
+      </div>
+    </div>
+  </div>
+</div>
 
-	<li><a href='https://helpdesk.computersystemconsulting.ca' onclick='window.open(this.href, \"HelpDesk\", \"resizable=yes,status=no,location=no,toolbar=no,menubar=no,fullscreen=no,scrollbars=no,dependent=no\"); return false;'><h2>HelpDesk</h2></a></li>
-
-<li><a href='/webphone/mobile.html' onclick='window.open(this.href, \"Mobile\", \"resizable=yes,status=no,location=no,toolbar=no,menubar=no,fullscreen=no,scrollbars=no,dependent=no,width=500,height=1000\"); return false;'>Mobile phone </a>Not working</li>
-	<li>
-	<h2>Voice Mail</h2>
-
-<p> All accounts come with voice mail services. Create your voice mail account by clicking Voice mail in the services menu. This page explains setup and how to access.</p>
-
-	</li>
-
-</ul>
-
-
-
+<div class="row mt-4">
+  <div class="col-12 text-center">
+    <h2>Ready to Get Started?</h2>
+    <p class="lead">Choose the plan that's right for your business and start saving today.</p>
+    <a href="http://www.voipinterface.net/interface/signup.php?UID=141935" onclick='window.open(this.href, "", "resizable=yes,status=no,location=no,toolbar=no,menubar=no,fullscreen=no,scrollbars=no,dependent=no"); return false;' class="btn btn-primary btn-lg me-3">Sign Up Now</a>
+    <a href="/contact" class="btn btn-outline-secondary btn-lg">Contact Sales</a>
+  </div>
+</div>
 
 </td></tr>
 </table>

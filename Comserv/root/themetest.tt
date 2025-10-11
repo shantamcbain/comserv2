@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Theme Test Page</title>
+    <link rel="stylesheet" href="/static/css/themes/apis.css">
+    <script src="/static/js/theme-test.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        .theme-info {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .theme-actions {
+            margin-top: 20px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 10px 15px;
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-right: 10px;
+        }
+        .file-content {
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Theme Test Page</h1>
+
+        <div class="theme-info">
+            <h2>Current Theme Information</h2>
+            <p><strong>Theme Name:</strong> apis</p>
+            <p><strong>CSS File:</strong> <span id="css-info">/static/css/themes/apis.css</span></p>
+            <p><strong>Background Image:</strong> <span id="bg-info">Checking...</span></p>
+        </div>
+
+        <div class="theme-actions">
+            <a href="/themetest/edit_css/apis" class="btn">Edit APIS Theme CSS</a>
+            <a href="/themetest/help" class="btn">View Help</a>
+        </div>
+
+        <div class="debug-info">
+            <h2>Debug Information</h2>
+            <p>This page is a simple test to check if the theme system is working properly.</p>
+            <p>If you can see this page with the honeycomb background, the theme system is working.</p>
+
+            <h3>CSS File Content</h3>
+            <div class="file-content">/* Theme: apis */
+:root {
+  --accent-color: #FFB900;
+  --background-color: #FFF8E1;
+  --border-color: #FFD54F;
+  --footer-bg: #FFE082;
+  --footer-text-color: #2C2C2C;
+  --header-bg: #FFE082;
+  --link-color: #B88A00;
+  --link-hover-color: #805F00;
+  --nav-bg: #FFE082;
+  --nav-link-color: #2C2C2C;
+  --nav-text: #2C2C2C;
+  --primary-color: #FFF8E1;
+  --secondary-color: #FFE8B8;
+  --success-color: #27ae60;
+  --table-header-bg: #FFE082;
+  --text-color: #2C2C2C;
+  --warning-color: #f39c12;
+}
+
+body {
+  background-image: url('../images/BMaster/honey2.jpg');
+  font-family: Verdana, Helvetica, sans-serif;
+  font-size: 20px;
+  color: black;
+}</div>
+
+            <h3>Troubleshooting</h3>
+            <ul>
+                <li>Open your browser's developer tools (F12) to see if there are any errors</li>
+                <li>Check if the CSS file is being loaded correctly</li>
+                <li>Verify that the image path is correct</li>
+                <li>Try clearing your browser cache (Ctrl+F5)</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

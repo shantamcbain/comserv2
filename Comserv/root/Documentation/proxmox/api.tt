@@ -1,0 +1,350 @@
+[% META 
+   title = "Proxmox VE API Documentation"
+   description = "Overview of the Proxmox VE API endpoints used in the Comserv application"
+   roles = "admin,developer"
+   category = "infrastructure"
+%]
+
+<div class="doc-page">
+    <h1>Proxmox VE API Documentation</h1>
+    
+    <div class="doc-section">
+        <h2 class="section-toggle expanded">API Overview</h2>
+        <div class="section-content expanded">
+            <p>
+                This document provides an overview of the Proxmox VE (Virtual Environment) API endpoints used in the Comserv application. 
+                The Proxmox VE API is a RESTful API that provides a wide range of endpoints for managing virtual machines, containers, nodes, storage, and more.
+            </p>
+            
+            <h3>Related Documentation</h3>
+            <ul>
+                <li><a href="[% c.uri_for('/Documentation/proxmox/commands') %]">Proxmox Command Reference</a> - Comprehensive list of CLI commands for managing Proxmox VE</li>
+                <li><a href="[% c.uri_for('/Documentation/proxmox/ip_configuration') %]">Proxmox IP Configuration Guide</a> - Detailed guide for configuring IP addresses in Proxmox</li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="doc-section">
+        <h2 class="section-toggle expanded">API Base URL</h2>
+        <div class="section-content expanded">
+            <p>The Proxmox VE API is accessible via HTTPS on port 8006:</p>
+            
+            <pre class="code-block">
+https://<proxmox-host>:8006/api2/json
+            </pre>
+            
+            <p>All endpoints return JSON by default unless specified otherwise.</p>
+        </div>
+    </div>
+    
+    <div class="doc-section">
+        <h2 class="section-toggle expanded">Authentication</h2>
+        <div class="section-content expanded">
+            <h3>Using API Tokens (Required)</h3>
+            <p>
+                As of the latest update, our application exclusively uses API tokens for Proxmox authentication. 
+                This eliminates the need for user login to access Proxmox functionality. API tokens don't require 
+                CSRF tokens for write operations and provide a more secure and streamlined authentication method.
+            </p>
+            
+            <pre class="code-block">
+Authorization: PVEAPIToken=USER@REALM!TOKENID=UUID
+            </pre>
+            
+            <p>Example in our application:</p>
+            <pre class="code-block">
+my $token = "PVEAPIToken=" . $self->{token_user} . "=" . $self->{token_value};
+$req->header('Authorization' => $token);
+            </pre>
+            
+            <p>The API tokens are stored in the <code>proxmox_credentials.json</code> configuration file and are automatically loaded and used by the application.</p>
+            
+            <h3>Token Configuration</h3>
+            <ol>
+                <li>Log in to the Proxmox VE web interface</li>
+                <li>Navigate to Datacenter → Permissions → API Tokens</li>
+                <li>Create a new token for the desired user</li>
+                <li>Assign appropriate permissions (at minimum, VM.Audit for viewing VMs)</li>
+                <li>Store the token ID and value in the <code>proxmox_credentials.json</code> file</li>
+            </ol>
+        </div>
+    </div>
+    
+    <div class="doc-section">
+        <h2 class="section-toggle expanded">VM IP Address Management</h2>
+        <div class="section-content expanded">
+            <h3>Reading VM IP Configuration</h3>
+            <p>To retrieve the current IP configuration of a VM, you can use the following API endpoint:</p>
+            
+            <pre class="code-block">
+GET /api2/json/nodes/{node}/qemu/{vmid}/config
+            </pre>
+            
+            <p>This will return the complete VM configuration, including network interfaces and IP settings if configured via QEMU guest agent.</p>
+            
+            <p>Example response (partial):</p>
+            <pre class="code-block">
+{
+  "data": {
+    "cores": 2,
+    "memory": 2048,
+    "name": "vm-example",
+    "net0": "virtio=XX:XX:XX:XX:XX:XX,bridge=vmbr0",
+    "ipconfig0": "ip=192.168.1.100/24,gw=192.168.1.1"
+  }
+}
+            </pre>
+            
+            <h3>Reading IP Address via QEMU Guest Agent</h3>
+            <p>If the VM has the QEMU guest agent installed and running, you can get more detailed network information:</p>
+            
+            <pre class="code-block">
+GET /api2/json/nodes/{node}/qemu/{vmid}/agent/network-get-interfaces
+            </pre>
+            
+            <p>Example response:</p>
+            <pre class="code-block">
+{
+  "data": [
+    {
+      "name": "lo",
+      "ip-addresses": [
+        {
+          "ip-address": "127.0.0.1",
+          "prefix": 8,
+          "ip-address-type": "ipv4"
+        }
+      ]
+    },
+    {
+      "name": "eth0",
+      "ip-addresses": [
+        {
+          "ip-address": "192.168.1.100",
+          "prefix": 24,
+          "ip-address-type": "ipv4"
+        }
+      ],
+      "hardware-address": "XX:XX:XX:XX:XX:XX"
+    }
+  ]
+}
+            </pre>
+            
+            <h3>Modifying VM IP Configuration</h3>
+            <p>To change the IP address of a VM, you can use the following API endpoint:</p>
+            
+            <pre class="code-block">
+PUT /api2/json/nodes/{node}/qemu/{vmid}/config
+            </pre>
+            
+            <p>Parameters:</p>
+            <ul>
+                <li><code>ipconfig0</code>: IP configuration for the first network interface</li>
+                <li><code>ipconfig1</code>: IP configuration for the second network interface (if present)</li>
+                <li>And so on for additional interfaces...</li>
+            </ul>
+            
+            <p>Example request to set a static IP:</p>
+            <pre class="code-block">
+PUT /api2/json/nodes/proxmox/qemu/100/config
+Content-Type: application/x-www-form-urlencoded
+
+ipconfig0=ip=192.168.1.200/24,gw=192.168.1.1
+            </pre>
+            
+            <p>Example request to set DHCP:</p>
+            <pre class="code-block">
+PUT /api2/json/nodes/proxmox/qemu/100/config
+Content-Type: application/x-www-form-urlencoded
+
+ipconfig0=ip=dhcp
+            </pre>
+            
+            <h3>Using curl to Modify IP Address</h3>
+            <p>You can use curl to test or automate IP address changes:</p>
+            
+            <pre class="code-block">
+# Set static IP for VM 100
+curl -k -X PUT \
+  "https://proxmox-host:8006/api2/json/nodes/proxmox/qemu/100/config" \
+  -H "Authorization: PVEAPIToken=USER@REALM!TOKENID=UUID" \
+  -d "ipconfig0=ip=192.168.1.200/24,gw=192.168.1.1"
+
+# Set DHCP for VM 100
+curl -k -X PUT \
+  "https://proxmox-host:8006/api2/json/nodes/proxmox/qemu/100/config" \
+  -H "Authorization: PVEAPIToken=USER@REALM!TOKENID=UUID" \
+  -d "ipconfig0=ip=dhcp"
+            </pre>
+            
+            <div class="note-box">
+                <strong>Note:</strong> IP configuration changes via the API require the QEMU guest agent to be installed and running in the VM. The changes will be applied the next time the VM boots.
+            </div>
+            
+            <h3>Applying IP Changes to a Running VM</h3>
+            <p>
+                To apply IP changes to a running VM, you need to reboot the VM after changing the configuration:
+            </p>
+            
+            <pre class="code-block">
+# First, update the IP configuration
+PUT /api2/json/nodes/proxmox/qemu/100/config
+Content-Type: application/x-www-form-urlencoded
+
+ipconfig0=ip=192.168.1.200/24,gw=192.168.1.1
+
+# Then, reboot the VM to apply changes
+POST /api2/json/nodes/proxmox/qemu/100/status/reboot
+            </pre>
+            
+            <p>Using curl:</p>
+            <pre class="code-block">
+# Update IP configuration
+curl -k -X PUT \
+  "https://proxmox-host:8006/api2/json/nodes/proxmox/qemu/100/config" \
+  -H "Authorization: PVEAPIToken=USER@REALM!TOKENID=UUID" \
+  -d "ipconfig0=ip=192.168.1.200/24,gw=192.168.1.1"
+
+# Reboot VM to apply changes
+curl -k -X POST \
+  "https://proxmox-host:8006/api2/json/nodes/proxmox/qemu/100/status/reboot" \
+  -H "Authorization: PVEAPIToken=USER@REALM!TOKENID=UUID"
+            </pre>
+        </div>
+    </div>
+    
+    <div class="doc-section">
+        <h2 class="section-toggle expanded">Key API Endpoints</h2>
+        <div class="section-content expanded">
+            <h3>Cluster Management</h3>
+            <pre class="code-block">
+GET /api2/json/cluster/status
+            </pre>
+            <p>Get the status of the cluster (nodes, quorum, etc.).</p>
+            
+            <pre class="code-block">
+GET /api2/json/cluster/resources?type=vm
+            </pre>
+            <p>List all resources in the cluster, filtered by type (e.g., vm for VMs only).</p>
+            
+            <h3>Node Management</h3>
+            <pre class="code-block">
+GET /api2/json/nodes
+            </pre>
+            <p>List all nodes in the cluster.</p>
+            
+            <pre class="code-block">
+GET /api2/json/nodes/{node}/status
+            </pre>
+            <p>Get the status of a specific node (e.g., CPU, memory usage).</p>
+            
+            <h3>Virtual Machines (QEMU/KVM)</h3>
+            <pre class="code-block">
+GET /api2/json/nodes/{node}/qemu
+            </pre>
+            <p>List all QEMU VMs on a specific node.</p>
+            
+            <pre class="code-block">
+GET /api2/json/nodes/{node}/qemu/{vmid}/status/current
+            </pre>
+            <p>Get the current status of a specific VM.</p>
+            
+            <pre class="code-block">
+POST /api2/json/nodes/{node}/qemu/{vmid}/status/start
+            </pre>
+            <p>Start a VM.</p>
+            
+            <pre class="code-block">
+POST /api2/json/nodes/{node}/qemu/{vmid}/status/stop
+            </pre>
+            <p>Stop a VM.</p>
+            
+            <pre class="code-block">
+POST /api2/json/nodes/{node}/qemu/{vmid}/status/shutdown
+            </pre>
+            <p>Gracefully shut down a VM.</p>
+            
+            <h3>Containers (LXC)</h3>
+            <pre class="code-block">
+GET /api2/json/nodes/{node}/lxc
+            </pre>
+            <p>List all LXC containers on a specific node.</p>
+            
+            <pre class="code-block">
+GET /api2/json/nodes/{node}/lxc/{vmid}/status/current
+            </pre>
+            <p>Get the current status of a container.</p>
+        </div>
+    </div>
+    
+    <div class="doc-section">
+        <h2 class="section-toggle expanded">Implementation in Comserv</h2>
+        <div class="section-content expanded">
+            <p>In our Comserv application, we primarily use the following endpoints:</p>
+            <ol>
+                <li><code>/nodes</code> - To get a list of all nodes in the cluster</li>
+                <li><code>/cluster/resources?type=vm</code> - To get a list of all VMs in the cluster</li>
+                <li><code>/cluster/resources?type=qemu</code> - Alternative endpoint to get QEMU VMs</li>
+                <li><code>/cluster/resources</code> - To get all resources (including VMs and containers)</li>
+                <li><code>/nodes/{node}/qemu</code> - To get QEMU VMs on a specific node</li>
+                <li><code>/nodes/{node}/lxc</code> - To get LXC containers on a specific node</li>
+                <li><code>/version</code> - To check connectivity and get Proxmox version information</li>
+            </ol>
+            
+            <p>Our implementation includes fallback mechanisms to try different endpoints if the primary ones fail, ensuring robust operation even with different Proxmox configurations.</p>
+        </div>
+    </div>
+    
+    <div class="doc-section">
+        <h2 class="section-toggle expanded">Error Handling</h2>
+        <div class="section-content expanded">
+            <p>The Proxmox API returns standard HTTP status codes:</p>
+            <ul>
+                <li>200 OK - Request successful</li>
+                <li>400 Bad Request - Invalid parameters</li>
+                <li>401 Unauthorized - Authentication failed</li>
+                <li>403 Forbidden - Permission denied</li>
+                <li>404 Not Found - Resource not found</li>
+                <li>500 Internal Server Error - Server-side error</li>
+            </ul>
+            
+            <p>In our application, we handle these errors and provide detailed logging to help diagnose issues.</p>
+        </div>
+    </div>
+    
+    <div class="doc-section">
+        <h2 class="section-toggle expanded">Further Resources</h2>
+        <div class="section-content expanded">
+            <ul>
+                <li><a href="https://pve.proxmox.com/pve-docs/api-viewer/" target="_blank">Official Proxmox VE API Documentation</a></li>
+                <li>Access the API Viewer on your Proxmox instance: <code>https://&lt;your-proxmox-host&gt;:8006/pve-docs/api-viewer/</code></li>
+                <li>Use the <code>pvesh</code> command-line tool on a Proxmox node (e.g., <code>pvesh get / --output-format json</code>) to inspect available paths dynamically</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.section-toggle').forEach(header => {
+            header.addEventListener('click', function() {
+                this.classList.toggle('expanded');
+                const content = this.nextElementSibling;
+                
+                if (content.classList.contains('expanded')) {
+                    content.classList.remove('expanded');
+                    content.style.maxHeight = '0';
+                } else {
+                    content.classList.add('expanded');
+                    content.style.maxHeight = content.scrollHeight + 'px';
+                }
+            });
+        });
+        
+        // Initialize all expanded sections
+        document.querySelectorAll('.section-content.expanded').forEach(content => {
+            content.style.maxHeight = content.scrollHeight + 'px';
+        });
+    });
+</script>

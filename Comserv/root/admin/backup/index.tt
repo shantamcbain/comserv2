@@ -1,0 +1,469 @@
+<!-- THIS IS A WORKING COPY OF A .TT FILE -->
+<!-- REMEMBER: cp file.md file.tt && rm file.md -->
+<!-- DO NOT TREAT AS DOCUMENTATION -->
+[% META title = 'Backup Management' %]
+[% PageVersion = 'admin/backup/index.tt,v 1.0 2025/01/27 comserv Exp comserv' %]
+
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+<!-- Debug info block -->
+<div class="debug-info">
+  <p>Template: admin/backup/index.tt</p>
+  <p>Last Modified: [% PageVersion %]</p>
+</div>
+[% END %]
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>Backup Management</h1>
+            <p class="lead">Comprehensive backup and restore functionality for Comserv application files.</p>
+        </div>
+    </div>
+
+    <!-- Status Messages -->
+    [% IF success_msg %]
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <strong>Success:</strong> [% success_msg %]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    [% END %]
+
+    [% IF error_msg %]
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <strong>Error:</strong> [% error_msg %]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    [% END %]
+
+    <!-- Quick Actions -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Quick Actions</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <a href="[% c.uri_for('/admin/backup/create_backup') %]" 
+                               class="btn btn-primary btn-lg w-100"
+                               title="Create a new backup of protected files or manual backup">
+                                <i class="fas fa-plus"></i> Create Backup
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="[% c.uri_for('/admin/emergency-restore') %]" 
+                               class="btn btn-warning btn-lg w-100"
+                               title="Emergency restore interface for critical files">
+                                <i class="fas fa-exclamation-triangle"></i> Emergency Restore
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="[% c.uri_for('/admin/backup/restore_backup') %]" 
+                               class="btn btn-info btn-lg w-100"
+                               title="Restore files from existing backups">
+                                <i class="fas fa-undo"></i> Restore from Backup
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            [% IF !psgi_exists %]
+                            <form method="post" action="[% c.uri_for('/admin/emergency-restore') %]" style="display: inline;">
+                                <input type="hidden" name="action" value="restore_psgi">
+                                <button type="submit" 
+                                        class="btn btn-danger btn-lg w-100"
+                                        title="PSGI file is missing - click to restore from backup">
+                                    <i class="fas fa-first-aid"></i> Restore PSGI
+                                </button>
+                            </form>
+                            [% ELSE %]
+                            <button type="button" 
+                                    class="btn btn-success btn-lg w-100" 
+                                    disabled
+                                    title="PSGI file exists and is accessible - no action needed">
+                                <i class="fas fa-check"></i> PSGI OK
+                            </button>
+                            [% END %]
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Tooltip CSS and JavaScript -->
+    <style>
+    .custom-tooltip {
+        position: absolute;
+        background-color: #333;
+        color: white;
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        z-index: 1000;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.3s;
+        max-width: 200px;
+        word-wrap: break-word;
+    }
+
+    .custom-tooltip.show {
+        opacity: 1;
+    }
+
+    .custom-tooltip::after {
+        content: '';
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        margin-left: -5px;
+        border-width: 5px;
+        border-style: solid;
+        border-color: #333 transparent transparent transparent;
+    }
+    </style>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Create tooltip element
+        var tooltip = document.createElement('div');
+        tooltip.className = 'custom-tooltip';
+        document.body.appendChild(tooltip);
+        
+        // Add event listeners to all elements with title attribute
+        var elementsWithTitle = document.querySelectorAll('[title]');
+        
+        elementsWithTitle.forEach(function(element) {
+            element.addEventListener('mouseenter', function(e) {
+                var titleText = e.target.getAttribute('title');
+                if (titleText) {
+                    tooltip.textContent = titleText;
+                    tooltip.classList.add('show');
+                    
+                    // Position tooltip
+                    var rect = e.target.getBoundingClientRect();
+                    tooltip.style.left = (rect.left + rect.width / 2 - tooltip.offsetWidth / 2) + 'px';
+                    tooltip.style.top = (rect.top - tooltip.offsetHeight - 10) + 'px';
+                    
+                    // Remove title to prevent default tooltip
+                    e.target.setAttribute('data-original-title', titleText);
+                    e.target.removeAttribute('title');
+                }
+            });
+            
+            element.addEventListener('mouseleave', function(e) {
+                tooltip.classList.remove('show');
+                
+                // Restore title attribute
+                var originalTitle = e.target.getAttribute('data-original-title');
+                if (originalTitle) {
+                    e.target.setAttribute('title', originalTitle);
+                    e.target.removeAttribute('data-original-title');
+                }
+            });
+        });
+    });
+    </script>
+
+    <!-- Protected Files Status -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Protected Files Status</h3>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>File Path</th>
+                                    <th>Description</th>
+                                    <th>Status</th>
+                                    <th>Last Modified</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                [% FOREACH file IN protected_files %]
+                                <tr>
+                                    <td><code>[% file.path %]</code></td>
+                                    <td>[% file.description %]</td>
+                                    <td>
+                                        [% SET full_path = c.config.home _ '/' _ file.path %]
+                                        [% IF File.exists(full_path) %]
+                                            <span class="badge bg-success">Exists</span>
+                                        [% ELSE %]
+                                            <span class="badge bg-danger">Missing</span>
+                                        [% END %]
+                                    </td>
+                                    <td>
+                                        [% SET full_path = c.config.home _ '/' _ file.path %]
+                                        [% IF File.exists(full_path) %]
+                                            [% USE date %]
+                                            [% date.format(File.stat(full_path).mtime, '%Y-%m-%d %H:%M:%S') %]
+                                        [% ELSE %]
+                                            N/A
+                                        [% END %]
+                                    </td>
+                                </tr>
+                                [% END %]
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Available Backups -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Available Backups</h3>
+                </div>
+                <div class="card-body">
+                    [% IF available_backups.size > 0 %]
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Filename</th>
+                                    <th>Type</th>
+                                    <th>Description</th>
+                                    <th>Created By</th>
+                                    <th>Created</th>
+                                    <th>Size</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                [% FOREACH backup IN available_backups %]
+                                <tr>
+                                    <td><code>[% backup.filename %]</code></td>
+                                    <td>
+                                        [% IF backup.metadata %]
+                                            <span class="badge bg-info">[% backup.metadata.type %]</span>
+                                        [% ELSE %]
+                                            <span class="badge bg-secondary">unknown</span>
+                                        [% END %]
+                                    </td>
+                                    <td>
+                                        [% IF backup.metadata %]
+                                            [% backup.metadata.description %]
+                                        [% ELSE %]
+                                            No description available
+                                        [% END %]
+                                    </td>
+                                    <td>
+                                        [% IF backup.metadata %]
+                                            [% backup.metadata.created_by %]
+                                        [% ELSE %]
+                                            Unknown
+                                        [% END %]
+                                    </td>
+                                    <td>[% backup.modified %]</td>
+                                    <td>[% backup.size %] bytes</td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="[% c.uri_for('/admin/backup/view_backup', backup.filename) %]" 
+                                               class="btn btn-sm btn-outline-info"
+                                               title="View backup details and contents">
+                                                <i class="fas fa-eye"></i> View
+                                            </a>
+                                            <a href="[% c.uri_for('/admin/backup/delete_backup', backup.filename) %]" 
+                                               class="btn btn-sm btn-outline-danger"
+                                               title="Delete this backup file permanently">
+                                                <i class="fas fa-trash"></i> Delete
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                [% END %]
+                            </tbody>
+                        </table>
+                    </div>
+                    [% ELSE %]
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> No backups found. Create your first backup using the "Create Backup" button above.
+                    </div>
+                    [% END %]
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Backup Directory Contents -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Backup Directory Contents</h3>
+                </div>
+                <div class="card-body">
+                    [% IF backup_contents.error %]
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i> [% backup_contents.error %]
+                    </div>
+                    [% ELSE %]
+                    
+                    <!-- /Comserv/backup directory -->
+                    [% IF backup_contents.backup_singular.size > 0 %]
+                    <h4>/Comserv/backup Directory</h4>
+                    <div class="table-responsive mb-4">
+                        <table class="table table-sm table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Size</th>
+                                    <th>Modified</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                [% FOREACH file IN backup_contents.backup_singular %]
+                                <tr>
+                                    <td>
+                                        [% IF file.is_directory %]
+                                            <i class="fas fa-folder"></i> [% file.name %]
+                                        [% ELSE %]
+                                            <i class="fas fa-file"></i> [% file.name %]
+                                        [% END %]
+                                    </td>
+                                    <td>
+                                        [% IF file.is_directory %]
+                                            Directory
+                                        [% ELSE %]
+                                            File
+                                        [% END %]
+                                    </td>
+                                    <td>[% file.size %] bytes</td>
+                                    <td>[% file.modified %]</td>
+                                </tr>
+                                [% END %]
+                            </tbody>
+                        </table>
+                    </div>
+                    [% END %]
+                    
+                    <!-- /Comserv/backups directory -->
+                    [% IF backup_contents.backup_plural.size > 0 %]
+                    <h4>/Comserv/backups Directory</h4>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Size</th>
+                                    <th>Modified</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                [% FOREACH file IN backup_contents.backup_plural %]
+                                <tr>
+                                    <td>
+                                        [% IF file.is_directory %]
+                                            <i class="fas fa-folder"></i> [% file.name %]
+                                        [% ELSE %]
+                                            <i class="fas fa-file"></i> [% file.name %]
+                                        [% END %]
+                                    </td>
+                                    <td>
+                                        [% IF file.is_directory %]
+                                            Directory
+                                        [% ELSE %]
+                                            File
+                                        [% END %]
+                                    </td>
+                                    <td>[% file.size %] bytes</td>
+                                    <td>[% file.modified %]</td>
+                                </tr>
+                                [% END %]
+                            </tbody>
+                        </table>
+                    </div>
+                    [% END %]
+                    
+                    [% IF backup_contents.backup_singular.size == 0 && backup_contents.backup_plural.size == 0 %]
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> No files found in backup directories.
+                    </div>
+                    [% END %]
+                    
+                    [% END %]
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.debug-info {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+</style>
+
+<script>
+// Custom tooltip implementation (no Bootstrap required)
+document.addEventListener('DOMContentLoaded', function() {
+    // Create tooltip element
+    var tooltip = document.createElement('div');
+    tooltip.className = 'custom-tooltip';
+    tooltip.style.cssText = `
+        position: absolute;
+        background: #333;
+        color: white;
+        padding: 8px 12px;
+        border-radius: 4px;
+        font-size: 14px;
+        z-index: 1000;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.3s;
+        max-width: 300px;
+        word-wrap: break-word;
+    `;
+    document.body.appendChild(tooltip);
+
+    // Add event listeners to all elements with title attribute
+    var tooltipElements = document.querySelectorAll('[title]');
+    
+    tooltipElements.forEach(function(element) {
+        element.addEventListener('mouseenter', function(e) {
+            var title = e.target.getAttribute('title');
+            if (title) {
+                tooltip.textContent = title;
+                tooltip.style.opacity = '1';
+                
+                // Position tooltip
+                var rect = e.target.getBoundingClientRect();
+                tooltip.style.left = (rect.left + rect.width / 2 - tooltip.offsetWidth / 2) + 'px';
+                tooltip.style.top = (rect.top - tooltip.offsetHeight - 8) + 'px';
+                
+                // Prevent default browser tooltip
+                e.target.setAttribute('data-original-title', title);
+                e.target.removeAttribute('title');
+            }
+        });
+        
+        element.addEventListener('mouseleave', function(e) {
+            tooltip.style.opacity = '0';
+            
+            // Restore original title
+            var originalTitle = e.target.getAttribute('data-original-title');
+            if (originalTitle) {
+                e.target.setAttribute('title', originalTitle);
+                e.target.removeAttribute('data-original-title');
+            }
+        });
+    });
+});
+</script>

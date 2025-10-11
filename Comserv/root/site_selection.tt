@@ -1,0 +1,22 @@
+<select id="sitename" name="sitename" required>
+    <option value="" disabled [% IF !form_data.sitename %]selected[% END %]>Select a site</option>
+    [% FOREACH site IN sites %]
+        <option value="[% site.name %]"
+                [% IF site.name == current_site %]selected[% END %]>
+            [% site.name %]
+        </option>
+    [% END %]
+</select>
+    <button type="button" onclick="openAddSiteForm()">Add Site</button><br>
+
+[% IF show_add_button %]
+<button type="button" onclick="openAddSiteForm()" class="add-site-btn">Add Site</button>
+[% END %]
+
+<div id="site-error" class="error-message" style="display:none;"></div>
+
+[% IF show_add_button %]
+<button type="button" onclick="openAddSiteForm()" class="add-site-btn">Add Site</button>
+[% END %]
+
+<div id="site-error" class="error-message" style="display:none;"></div>

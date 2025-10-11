@@ -1,0 +1,61 @@
+[% META title = 'Confirm Site Deletion' %]
+
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header bg-danger text-white">
+            <h2>Confirm Site Deletion</h2>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-warning">
+                <h4 class="alert-heading">Warning!</h4>
+                <p>You are about to delete the site <strong>[% site.name | html %]</strong> ([% site.site_display_name | html %]).</p>
+                <p>This action cannot be undone. All data associated with this site will be permanently deleted, including:</p>
+                <ul>
+                    <li>Site configuration</li>
+                    <li>Domain associations</li>
+                    <li>Controller files</li>
+                    <li>Template files</li>
+                </ul>
+            </div>
+            
+            <h4>Site Details</h4>
+            <table class="table table-bordered">
+                <tr>
+                    <th>ID</th>
+                    <td>[% site.id | html %]</td>
+                </tr>
+                <tr>
+                    <th>Name</th>
+                    <td>[% site.name | html %]</td>
+                </tr>
+                <tr>
+                    <th>Display Name</th>
+                    <td>[% site.site_display_name | html %]</td>
+                </tr>
+                <tr>
+                    <th>Description</th>
+                    <td>[% site.description | html %]</td>
+                </tr>
+            </table>
+            
+            <form method="post" action="[% form_action %]" class="mt-4">
+                <input type="hidden" name="id" value="[% site.id | html %]">
+                <input type="hidden" name="confirm" value="1">
+                
+                <div class="form-group">
+                    <div class="custom-control custom-checkbox">
+                        <input type="checkbox" class="custom-control-input" id="confirmCheck" required>
+                        <label class="custom-control-label" for="confirmCheck">
+                            I understand that this action cannot be undone
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="form-group mt-4">
+                    <button type="submit" class="btn btn-danger">Delete Site</button>
+                    <a href="[% c.uri_for('/site/details', { id = site.id }) %]" class="btn btn-secondary ml-2">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

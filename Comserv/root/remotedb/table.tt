@@ -1,0 +1,76 @@
+[% META title = 'Table: ' _ table_name _ ' in ' _ conn_name %]
+
+<div class="container">
+    <h1>Table: [% table_name %]</h1>
+    <h3>Database: [% conn_name %]</h3>
+    
+    <div class="mb-3">
+        <a href="[% c.uri_for(c.controller('RemoteDB').action_for('view'), [conn_name]) %]" class="btn btn-secondary">
+            Back to Tables
+        </a>
+    </div>
+    
+    <div class="card mb-4">
+        <div class="card-header">
+            <h2>Table Structure</h2>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Column Name</th>
+                            <th>Type</th>
+                            <th>Size</th>
+                            <th>Nullable</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        [% FOREACH column IN schema %]
+                            <tr>
+                                <td>[% column.name %]</td>
+                                <td>[% column.type %]</td>
+                                <td>[% column.size %]</td>
+                                <td>[% IF column.nullable %]Yes[% ELSE %]No[% END %]</td>
+                            </tr>
+                        [% END %]
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h2>Sample Data (First 10 rows)</h2>
+        </div>
+        <div class="card-body">
+            [% IF data.size > 0 %]
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                [% FOREACH column IN schema %]
+                                    <th>[% column.name %]</th>
+                                [% END %]
+                            </tr>
+                        </thead>
+                        <tbody>
+                            [% FOREACH row IN data %]
+                                <tr>
+                                    [% FOREACH column IN schema %]
+                                        <td>[% row.${column.name} %]</td>
+                                    [% END %]
+                                </tr>
+                            [% END %]
+                        </tbody>
+                    </table>
+                </div>
+            [% ELSE %]
+                <div class="alert alert-info">
+                    No data found in this table.
+                </div>
+            [% END %]
+        </div>
+    </div>
+</div>

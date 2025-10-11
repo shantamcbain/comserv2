@@ -1,24 +1,113 @@
-Comserv2.iml
+
+# Perl build files
+!Build/
+.last_cover_stats
+/META.yml
+/META.json
+/MYMETA.*
+*.o
+*.pm.tdy
+*.bs
+
+# Devel::Cover
+cover_db/
+
+# Devel::NYTProf
+nytprof.out
+
+# Dist::Zilla
+/.build/
+
+# Module::Build
+_build/
+Build
+Build.bat
+
+# Module::Install
+inc/
+
+# ExtUtils::MakeMaker
+/blib/
+/_eumm/
+/*.gz
+/Makefile
+/Makefile.old
+/MANIFEST.bak
+/pm_to_blib
+/*.zip
+
+# IDE files
+.idea/
+*.iml
 workspace.xml
+
+# Local Perl installation
+/local/
+Comserv/local/
+
+# Configuration files
+/Comserv/db_config.json
+/Comserv/db_config.json.template
+/Comserv/config/api_credentials.json
 /Comserv/comserv.psgi
+
+# Logs
+Comserv/logs/
+Comserv/script/logs/
+*.log
+
+# Temporary files
+_deparsed_XSubs.pm
+_Deparsed_XSubs.pm
 DefaultDBI.tt
-Comserv/comserv.psgi
-.idea/workspace.xml
-.idea.*
-/Comserv/lib/Comserv/Model/DBEncy.pm
-/.idea/dbnavigator.xml
-/.idea/ComServ2.iml
-/.idea/git_toolbox_prj.xml
-/.idea/misc.xml
-/.idea/modules.xml
-/.idea/inspectionProfiles/profiles_settings.xml
-/.idea/vcs.xml
-/.idea/perl5local.xml
-/aimanager/__init__.py
-/aimanager/__init__.py
-/aimanager/__init__.py
-/aimanager/__init__.py
-/.idea/comserv2.iml
-/Comserv/root/static/errormessages
-/.idea/git_toolbox_blame.xml
-/.codebuddy/summary.md
+*.tmp
+*.bak
+
+# Development files
+/main.py
+/aimanager/
+/.codebuddy/
+/AI_ASSISTANT_GUIDELINES.md
+/db_config.json
+/git_commit_message.txt
+/grokpromts.txt
+
+# Zencoder chat history and conversation summaries
+/.zencoder/
+
+# Server logs
+server.log
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor files
+*~
+*.swp
+*.swo
+.vscode/
+*.sublime-*
+
+# Runtime files
+*.pid
+*.socket
+
+/logs/archive/application.*
+/Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.md
+/Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.tt
+/Comserv/root/Documentation/AI_DOCUMENTATION_GUIDELINES.md
+/Comserv/root/Documentation/AI_DOCUMENTATION_GUIDELINES.tt
+/Comserv/root/admin/git_pull_new.tt
+/improved_login.tt
+/test_diagnostics.pl
+/Comserv/root/src/admin/test_diagnostics.tt
+/Comserv/root/admin/backup/index.md
+/current_session.md
+/Comserv/data/ency_offline.db
+/Comserv/data/forager_offline.db

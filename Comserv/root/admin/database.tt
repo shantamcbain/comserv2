@@ -1,0 +1,136 @@
+[% META title = 'Database Management' %]
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>Database Management</h1>
+            
+            [% IF success_msg %]
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    [% success_msg %]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            [% END %]
+            
+            [% IF error_msg %]
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    [% error_msg %]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            [% END %]
+            
+            [% IF database_error %]
+                <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                    <strong>Database Connection Warning:</strong> [% database_error %]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            [% END %]
+            
+            <!-- Table Status Section -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3>Table Status</h3>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Table Name</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>pages_content</code></td>
+                                    <td>
+                                        [% IF table_status.pages_content %]
+                                            <span class="badge bg-success">Exists</span>
+                                        [% ELSE %]
+                                            <span class="badge bg-danger">Missing</span>
+                                        [% END %]
+                                    </td>
+                                    <td>
+                                        [% UNLESS table_status.pages_content %]
+                                            <form method="post" style="display: inline;">
+                                                <input type="hidden" name="action" value="create_pages_table">
+                                                <button type="submit" class="btn btn-primary btn-sm" 
+                                                        onclick="return confirm('Are you sure you want to create the pages_content table?')">
+                                                    Create Table
+                                                </button>
+                                            </form>
+                                        [% ELSE %]
+                                            <span class="text-muted">Table exists</span>
+                                        [% END %]
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Database Operations Section -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3>Database Operations</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <form method="post">
+                                <input type="hidden" name="action" value="check_tables">
+                                <button type="submit" class="btn btn-info">
+                                    <i class="fas fa-search"></i> Check All Tables
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Current Database Tables -->
+            [% IF database_tables %]
+            <div class="card">
+                <div class="card-header">
+                    <h3>Current Database Tables ([% database_tables.size %] tables)</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        [% FOREACH table IN database_tables %]
+                            <div class="col-md-3 mb-2">
+                                <span class="badge bg-secondary">[% table %]</span>
+                            </div>
+                        [% END %]
+                    </div>
+                </div>
+            </div>
+            [% END %]
+            
+            <!-- Debug Information -->
+            [% IF c.session.debug_mode && debug_msg %]
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h4>Debug Information</h4>
+                </div>
+                <div class="card-body">
+                    <pre class="bg-light p-3">[% FOREACH msg IN debug_msg %][% msg %]
+[% END %]</pre>
+                </div>
+            </div>
+            [% END %]
+        </div>
+    </div>
+</div>
+
+<style>
+.badge {
+    font-size: 0.9em;
+}
+.table code {
+    background-color: #f8f9fa;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+</style>

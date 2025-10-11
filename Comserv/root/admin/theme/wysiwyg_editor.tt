@@ -1,0 +1,317 @@
+[% META title = 'Theme Visual Editor' %]
+
+<div class="container-fluid">
+    <h1 class="editable" data-property="heading-color">Theme Visual Editor: [% theme_name %]</h1>
+
+    [% IF c.flash.message %]
+        <div class="alert alert-success">[% c.flash.message %]</div>
+    [% END %]
+
+    [% IF c.flash.error %]
+        <div class="alert alert-danger">[% c.flash.error %]</div>
+    [% END %]
+
+    <div class="row">
+        <div class="col-md-3">
+            <!-- Control Panel -->
+            <div class="card mb-4 sticky-top" style="top: 20px; z-index: 1000;">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="card-title mb-0">Theme Controls</h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> Click on any element in the preview to edit its properties.
+                    </div>
+                    <button id="save-theme-btn" class="btn btn-success btn-lg w-100 mb-3">Save Theme</button>
+                    <a href="[% c.uri_for('/themeadmin') %]" class="btn btn-secondary w-100">Cancel</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-9">
+            <!-- Live Preview Area -->
+            <form id="theme-editor-form" action="[% c.uri_for('/themeadmin/update_theme_visual') %]" method="POST" class="d-none">
+                <input type="hidden" name="theme_name" value="[% theme_name %]">
+                <input type="hidden" id="theme-variables" name="theme-variables" value="">
+            </form>
+
+            <!-- Live Preview of the site with the theme -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="card-title mb-0">Live Preview</h3>
+                </div>
+                <div class="card-body p-0">
+                    <div id="live-preview" class="theme-preview">
+                        <!-- Site Header -->
+                        <header class="editable" data-property="header-bg" data-element="header">
+                            <div class="container">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h1 class="editable" data-property="heading-color" data-element="site-title">Site Title</h1>
+                                    </div>
+                                    <div class="col-md-6 text-end">
+                                        <div class="editable" data-property="login-area-bg" data-element="login-area">
+                                            <a href="#" class="editable" data-property="link-color" data-element="login-link">Login</a> | 
+                                            <a href="#" class="editable" data-property="link-color" data-element="register-link">Register</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </header>
+
+                        <!-- Navigation Menu -->
+                        <nav class="editable" data-property="nav-bg" data-element="navigation">
+                            <div class="container">
+                                <ul class="nav">
+                                    <li class="nav-item">
+                                        <a class="nav-link editable" data-property="nav-link-color" data-element="nav-link" href="#">Home</a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link editable" data-property="nav-link-color" data-element="nav-link" href="#">About</a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link editable" data-property="nav-link-color" data-element="nav-link" href="#">Services</a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link editable" data-property="nav-link-color" data-element="nav-link" href="#">Contact</a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </nav>
+
+                        <!-- Main Content Area -->
+                        <main class="editable" data-property="main-bg" data-element="main-content">
+                            <div class="container">
+                                <div class="row">
+                                    <div class="col-md-8">
+                                        <article class="editable" data-property="article-bg" data-element="article">
+                                            <h2 class="editable" data-property="heading-color" data-element="article-title">Article Title</h2>
+                                            <p class="editable" data-property="text-color" data-element="article-text">
+                                                This is a sample article text. The content here would typically be the main content of your page.
+                                                You can edit this text by clicking on it. You can also change the background color, text color,
+                                                and other properties of this article.
+                                            </p>
+                                            <a href="#" class="btn editable" data-property="button-bg" data-element="button">Read More</a>
+                                        </article>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <aside class="editable" data-property="sidebar-bg" data-element="sidebar">
+                                            <h3 class="editable" data-property="heading-color" data-element="sidebar-title">Sidebar</h3>
+                                            <ul>
+                                                <li><a href="#" class="editable" data-property="link-color" data-element="sidebar-link">Link 1</a></li>
+                                                <li><a href="#" class="editable" data-property="link-color" data-element="sidebar-link">Link 2</a></li>
+                                                <li><a href="#" class="editable" data-property="link-color" data-element="sidebar-link">Link 3</a></li>
+                                            </ul>
+                                        </aside>
+                                    </div>
+                                </div>
+                            </div>
+                        </main>
+
+                        <!-- Footer -->
+                        <footer class="editable" data-property="footer-bg" data-element="footer">
+                            <div class="container">
+                                <p class="editable" data-property="footer-text-color" data-element="footer-text">
+                                    &copy; 2024 Your Company. All rights reserved.
+                                </p>
+                            </div>
+                        </footer>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Property Editor Modal -->
+<div class="modal fade property-editor-modal" id="propertyEditorModal" tabindex="-1" aria-labelledby="propertyEditorModalLabel" aria-hidden="true">
+    <!-- Modal content will be dynamically generated by JavaScript -->
+</div>
+
+<!-- Include the theme editor JavaScript -->
+<script src="[% c.uri_for('/static/js/theme-editor.js') %]"></script>
+
+<script>
+    // Update preview when color inputs change
+    document.addEventListener('DOMContentLoaded', () => {
+        // Initialize theme editor with default values
+        const themeVariables = {
+            'primary-color': '[% theme.variables.item("primary-color") || "#ffffff" %]',
+            'secondary-color': '[% theme.variables.item("secondary-color") || "#f9f9f9" %]',
+            'accent-color': '[% theme.variables.item("accent-color") || "#FF9900" %]',
+            'text-color': '[% theme.variables.item("text-color") || "#000000" %]',
+            'link-color': '[% theme.variables.item("link-color") || "#0000FF" %]',
+            'button-bg': '[% theme.variables.item("button-bg") || "#FF9900" %]',
+            'button-text': '[% theme.variables.item("button-text") || "#ffffff" %]',
+            'nav-bg': '[% theme.variables.item("nav-bg") || "#ccffff" %]',
+            'nav-text': '[% theme.variables.item("nav-text") || "#000000" %]',
+            'nav-link-color': '[% theme.variables.item("nav-link-color") || "#000000" %]',
+            'heading-color': '[% theme.variables.item("heading-color") || "#000000" %]',
+            'background-color': '[% theme.variables.item("background-color") || "#ffffff" %]',
+            'border-color': '[% theme.variables.item("border-color") || "#dddddd" %]',
+            'header-bg': '[% theme.variables.item("header-bg") || "#ffffff" %]',
+            'footer-bg': '[% theme.variables.item("footer-bg") || "#f8f9fa" %]',
+            'footer-text-color': '[% theme.variables.item("footer-text-color") || "#000000" %]',
+            'sidebar-bg': '[% theme.variables.item("sidebar-bg") || "#f8f9fa" %]',
+            'article-bg': '[% theme.variables.item("article-bg") || "#ffffff" %]',
+            'main-bg': '[% theme.variables.item("main-bg") || "#ffffff" %]'
+        };
+
+        // Save button functionality
+        document.getElementById('save-theme-btn').addEventListener('click', () => {
+            // Set the theme variables to the hidden input
+            document.getElementById('theme-variables').value = JSON.stringify(themeVariables);
+            // Submit the form
+            document.getElementById('theme-editor-form').submit();
+        });
+    });
+</script>
+
+<style>
+    .editable {
+        transition: outline 0.2s ease;
+    }
+
+    /* Live Preview Styles */
+    #live-preview {
+        border: 1px solid var(--border-color, #dddddd);
+        min-height: 600px;
+        background-color: var(--background-color, #ffffff);
+    }
+
+    #live-preview header {
+        background-color: var(--header-bg, #ffffff);
+        background-image: var(--header-bg-image, none);
+        background-repeat: var(--header-bg-repeat, repeat);
+        background-position: var(--header-bg-position, center center);
+        background-size: var(--header-bg-size, auto);
+        padding: 20px 0;
+        border-bottom: 1px solid var(--border-color, #dddddd);
+    }
+
+    #live-preview nav {
+        background-color: var(--nav-bg, #ccffff);
+        background-image: var(--nav-bg-image, none);
+        background-repeat: var(--nav-bg-repeat, repeat);
+        background-position: var(--nav-bg-position, center center);
+        background-size: var(--nav-bg-size, auto);
+        padding: 10px 0;
+        margin-bottom: 20px;
+    }
+
+    #live-preview nav .nav-link {
+        color: var(--nav-link-color, #000000);
+    }
+
+    #live-preview main {
+        background-color: var(--main-bg, #ffffff);
+        background-image: var(--main-bg-image, none);
+        background-repeat: var(--main-bg-repeat, repeat);
+        background-position: var(--main-bg-position, center center);
+        background-size: var(--main-bg-size, auto);
+        padding: 20px 0;
+        min-height: 400px;
+    }
+
+    #live-preview article {
+        background-color: var(--article-bg, #ffffff);
+        background-image: var(--article-bg-image, none);
+        background-repeat: var(--article-bg-repeat, repeat);
+        background-position: var(--article-bg-position, center center);
+        background-size: var(--article-bg-size, auto);
+        padding: 15px;
+        border: 1px solid var(--border-color, #dddddd);
+        margin-bottom: 20px;
+    }
+
+    #live-preview aside {
+        background-color: var(--sidebar-bg, #f8f9fa);
+        background-image: var(--sidebar-bg-image, none);
+        background-repeat: var(--sidebar-bg-repeat, repeat);
+        background-position: var(--sidebar-bg-position, center center);
+        background-size: var(--sidebar-bg-size, auto);
+        padding: 15px;
+        border: 1px solid var(--border-color, #dddddd);
+    }
+
+    #live-preview footer {
+        background-color: var(--footer-bg, #f8f9fa);
+        background-image: var(--footer-bg-image, none);
+        background-repeat: var(--footer-bg-repeat, repeat);
+        background-position: var(--footer-bg-position, center center);
+        background-size: var(--footer-bg-size, auto);
+        padding: 20px 0;
+        margin-top: 20px;
+        color: var(--footer-text-color, #000000);
+    }
+
+    /* Button styles in preview */
+    #live-preview .btn {
+        background-color: var(--button-bg, #FF9900);
+        color: var(--button-text, #ffffff);
+        border-color: var(--button-border, #FF9900);
+        border-radius: var(--button-radius, 4px);
+        padding: 6px 12px;
+        cursor: pointer;
+        display: inline-block;
+        text-align: center;
+        text-decoration: none;
+    }
+
+    /* Control panel styles */
+    .sticky-top {
+        position: sticky;
+        top: 20px;
+        z-index: 1000;
+    }
+
+    /* Property editor modal */
+    .property-editor-modal .modal-dialog {
+        max-width: 600px;
+    }
+
+    .property-editor-modal .modal-content {
+        border-radius: 8px;
+    }
+
+    .property-editor-modal .modal-header {
+        background-color: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .property-editor-modal .modal-footer {
+        background-color: #f8f9fa;
+        border-top: 1px solid #dee2e6;
+    }
+
+    /* Background image preview */
+    .bg-image-preview {
+        width: 100%;
+        height: 150px;
+        border: 1px solid #dee2e6;
+        margin-top: 10px;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-size: cover;
+    }
+
+    /* Color picker enhancements */
+    input[type="color"] {
+        width: 100%;
+        height: 40px;
+        padding: 2px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+    }
+
+    /* Save button animation */
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+    }
+
+    #save-theme-btn {
+        animation: pulse 2s infinite;
+    }
+</style>

@@ -1,0 +1,160 @@
+[% META title = 'Theme Preview' %]
+
+<style>
+    /* This is just for the preview page to show different components */
+    .preview-section {
+        margin-bottom: 30px;
+        padding: 20px;
+        border: 1px solid var(--border-color);
+    }
+    
+    .preview-section h3 {
+        margin-top: 0;
+    }
+</style>
+
+<h1>Theme Preview: [% theme.name %]</h1>
+
+<div class="preview-section">
+    <h3>Typography</h3>
+    <h1>Heading 1</h1>
+    <h2>Heading 2</h2>
+    <h3>Heading 3</h3>
+    <h4>Heading 4</h4>
+    <p>This is a paragraph of text. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam auctor, nisl eget ultricies tincidunt, nisl nisl aliquam nisl, eget ultricies nisl nisl eget nisl.</p>
+    <a href="#">This is a link</a>
+</div>
+
+<div class="preview-section">
+    <h3>Buttons</h3>
+    <button>Default Button</button>
+    <button class="button-primary">Primary Button</button>
+    <button class="button-secondary">Secondary Button</button>
+    <button class="button-warning">Warning Button</button>
+    <button class="button-success">Success Button</button>
+</div>
+
+<div class="preview-section">
+    <h3>Forms</h3>
+    <form>
+        <div class="form-group">
+            <label for="name">Name</label>
+            <input type="text" id="name" name="name" placeholder="Enter your name">
+        </div>
+        
+        <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" placeholder="Enter your email">
+        </div>
+        
+        <div class="form-group">
+            <label for="message">Message</label>
+            <textarea id="message" name="message" placeholder="Enter your message"></textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="country">Country</label>
+            <select id="country" name="country">
+                <option value="">Select a country</option>
+                <option value="us">United States</option>
+                <option value="ca">Canada</option>
+                <option value="uk">United Kingdom</option>
+            </select>
+        </div>
+        
+        <button type="submit">Submit</button>
+    </form>
+</div>
+
+<div class="preview-section">
+    <h3>Tables</h3>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Country</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>John Doe</td>
+                <td>john@example.com</td>
+                <td>United States</td>
+                <td>
+                    <button>Edit</button>
+                    <button class="button-warning">Delete</button>
+                </td>
+            </tr>
+            <tr>
+                <td>Jane Smith</td>
+                <td>jane@example.com</td>
+                <td>Canada</td>
+                <td>
+                    <button>Edit</button>
+                    <button class="button-warning">Delete</button>
+                </td>
+            </tr>
+            <tr>
+                <td>Bob Johnson</td>
+                <td>bob@example.com</td>
+                <td>United Kingdom</td>
+                <td>
+                    <button>Edit</button>
+                    <button class="button-warning">Delete</button>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="preview-section">
+    <h3>Navigation</h3>
+    <nav>
+        <ul class="horizontal-menu">
+            <li class="horizontal-dropdown">
+                <a href="#" class="dropbtn">Home</a>
+            </li>
+            <li class="horizontal-dropdown">
+                <a href="#" class="dropbtn">Products</a>
+                <div class="dropdown-content">
+                    <a href="#">Product 1</a>
+                    <a href="#">Product 2</a>
+                    <a href="#">Product 3</a>
+                </div>
+            </li>
+            <li class="horizontal-dropdown">
+                <a href="#" class="dropbtn">Services</a>
+                <div class="dropdown-content">
+                    <a href="#">Service 1</a>
+                    <a href="#">Service 2</a>
+                    <div class="submenu-item">
+                        <a href="#" class="submenu-header">More Services</a>
+                        <div class="submenu">
+                            <a href="#">Subservice 1</a>
+                            <a href="#">Subservice 2</a>
+                            <a href="#">Subservice 3</a>
+                        </div>
+                    </div>
+                </div>
+            </li>
+            <li class="horizontal-dropdown">
+                <a href="#" class="dropbtn">About</a>
+            </li>
+            <li class="horizontal-dropdown">
+                <a href="#" class="dropbtn">Contact</a>
+            </li>
+        </ul>
+    </nav>
+</div>
+
+<div class="preview-section">
+    <h3>Messages</h3>
+    <div class="form-success">This is a success message.</div>
+    <div class="warning">This is a warning message.</div>
+</div>
+
+<div class="button-group">
+    <a href="[% c.uri_for('/admin/theme/details', { theme_id = theme.id }) %]" class="button">Back to Theme Details</a>
+</div>

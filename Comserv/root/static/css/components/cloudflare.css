@@ -1,0 +1,512 @@
+/* 
+ * Cloudflare DNS Management Styles
+ * 
+ * This stylesheet contains all the styles for the Cloudflare DNS Management interface.
+ * It includes styles for:
+ * - Site and domain listing
+ * - Cloudflare domain highlighting
+ * - DNS record management interface
+ * - Modal forms for creating and editing DNS records
+ *
+ * Updated: 2025-07-15
+ * - Added styles for Cloudflare domain badges
+ * - Added visual distinction between Cloudflare and non-Cloudflare domains
+ * - Improved responsive design for mobile devices
+ */
+
+/* CSS Variables fallbacks */
+:root {
+    --primary-color: #007bff;
+    --primary-color-dark: #0056b3;
+    --heading-color: #343a40;
+    --text-color: #212529;
+    --text-muted: #6c757d;
+    --border-color: #dee2e6;
+    --border-color-light: #e9ecef;
+    --card-bg: #ffffff;
+    --box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    --box-shadow-hover: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    --border-radius: 0.375rem;
+    --border-radius-sm: 0.25rem;
+    --table-header-bg: #f8f9fa;
+    --table-header-color: #495057;
+    --table-hover-bg: #f5f5f5;
+    --font-family-sans-serif: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.cloudflare-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: var(--font-family-sans-serif);
+}
+
+.cloudflare-container h1 {
+    color: var(--primary-color);
+    margin-bottom: 1.5rem;
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 0.5rem;
+}
+
+.cloudflare-container h2 {
+    color: var(--heading-color);
+    margin-bottom: 1rem;
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 0.5rem;
+}
+
+.description {
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+    font-style: italic;
+}
+
+/* Admin actions styles */
+.admin-actions {
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.update-domains-btn {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: var(--border-radius);
+    padding: 8px 15px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.update-domains-btn:hover {
+    background-color: var(--primary-color-dark);
+    text-decoration: none;
+    color: white;
+}
+
+.alert {
+    padding: 12px 15px;
+    margin-bottom: 20px;
+    border-radius: var(--border-radius);
+}
+
+.alert-success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.alert-danger {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.debug-info {
+    margin: 10px 0;
+    padding: 10px;
+    background-color: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+/* Cloudflare zones section styles */
+.cloudflare-zones-section {
+    margin-bottom: 40px;
+}
+
+.cloudflare-zones-section h2 {
+    color: var(--heading-color);
+    margin-bottom: 1rem;
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 0.5rem;
+}
+
+.zone-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.zone-card {
+    background-color: rgba(243, 128, 32, 0.05); /* Light Cloudflare orange background */
+    border-radius: var(--border-radius);
+    padding: 15px;
+    box-shadow: var(--box-shadow);
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: 1px solid #f38020; /* Cloudflare orange */
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.zone-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--box-shadow-hover);
+}
+
+.zone-info {
+    margin-bottom: 15px;
+}
+
+.zone-name {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: var(--heading-color);
+    font-size: 1.2rem;
+}
+
+.zone-status {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.8rem;
+    margin-top: 5px;
+}
+
+.zone-status.active {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.zone-status.pending {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.zone-status.inactive {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.zone-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.no-zones {
+    grid-column: 1 / -1;
+    padding: 20px;
+    text-align: center;
+    background-color: var(--card-bg);
+    border-radius: var(--border-radius);
+    border: 1px dashed var(--border-color);
+    color: var(--text-muted);
+}
+
+/* Site selector styles */
+.site-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.site-card {
+    background-color: var(--card-bg);
+    border-radius: var(--border-radius);
+    padding: 15px;
+    box-shadow: var(--box-shadow);
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: 1px solid var(--border-color);
+}
+
+.site-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--box-shadow-hover);
+}
+
+.site-card h3 {
+    margin-top: 0;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 10px;
+    color: var(--heading-color);
+}
+
+.domains {
+    margin-top: 10px;
+}
+
+.domain-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-color-light);
+}
+
+.domain-item:last-child {
+    border-bottom: none;
+}
+
+.domain-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.domain-name {
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+.cloudflare-domain {
+    background-color: rgba(var(--primary-rgb), 0.05);
+    border-radius: var(--border-radius-sm);
+    padding: 8px 12px;
+    margin: 4px 0;
+    border-left: 3px solid var(--primary-color);
+}
+
+.cloudflare-badge {
+    display: inline-block;
+    background-color: #f38020; /* Cloudflare orange */
+    color: white;
+    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: var(--border-radius-sm);
+    margin-top: 4px;
+}
+
+.non-cloudflare-badge {
+    display: inline-block;
+    background-color: var(--text-muted);
+    color: var(--card-bg);
+    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: var(--border-radius-sm);
+    margin-top: 4px;
+}
+
+.no-domains {
+    color: var(--text-muted);
+    padding: 10px 0;
+    font-style: italic;
+}
+
+/* DNS records container styles */
+.dns-records-container {
+    display: none; /* Hidden by default, shown via JavaScript */
+}
+
+.dns-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.dns-header h2 {
+    color: var(--heading-color);
+    margin: 0;
+}
+
+#current-domain {
+    color: var(--primary-color);
+    font-weight: bold;
+}
+
+.dns-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.dns-records-table {
+    margin-top: 20px;
+    background-color: var(--card-bg);
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+    overflow: hidden;
+}
+
+.dns-records-table table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.dns-records-table th {
+    background-color: var(--table-header-bg);
+    color: var(--table-header-color);
+    padding: 12px 15px;
+    text-align: left;
+    font-weight: 600;
+}
+
+.dns-records-table td {
+    padding: 10px 15px;
+    border-top: 1px solid var(--border-color-light);
+}
+
+.dns-records-table tr:hover {
+    background-color: var(--table-hover-bg);
+}
+
+/* Button styles */
+.btn {
+    display: inline-block;
+    padding: 6px 12px;
+    margin-bottom: 0;
+    font-size: 14px;
+    font-weight: normal;
+    line-height: 1.42857143;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: middle;
+    cursor: pointer;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    text-decoration: none;
+    transition: all 0.2s ease-in-out;
+}
+
+.btn-primary {
+    color: #fff;
+    background-color: #007bff;
+    border-color: #007bff;
+}
+
+.btn-primary:hover {
+    color: #fff;
+    background-color: #0056b3;
+    border-color: #004085;
+    text-decoration: none;
+}
+
+.btn-secondary {
+    color: #fff;
+    background-color: #6c757d;
+    border-color: #6c757d;
+}
+
+.btn-secondary:hover {
+    color: #fff;
+    background-color: #545b62;
+    border-color: #4e555b;
+    text-decoration: none;
+}
+
+.btn-info {
+    color: #fff;
+    background-color: #17a2b8;
+    border-color: #17a2b8;
+}
+
+.btn-info:hover {
+    color: #fff;
+    background-color: #117a8b;
+    border-color: #10707f;
+    text-decoration: none;
+}
+
+.btn-warning {
+    color: #212529;
+    background-color: #ffc107;
+    border-color: #ffc107;
+}
+
+.btn-warning:hover {
+    color: #212529;
+    background-color: #e0a800;
+    border-color: #d39e00;
+    text-decoration: none;
+}
+
+.btn-danger {
+    color: #fff;
+    background-color: #dc3545;
+    border-color: #dc3545;
+}
+
+.btn-danger:hover {
+    color: #fff;
+    background-color: #c82333;
+    border-color: #bd2130;
+    text-decoration: none;
+}
+
+.btn-sm {
+    padding: 5px 10px;
+    font-size: 12px;
+    line-height: 1.5;
+    border-radius: 3px;
+}
+
+.view-dns-btn {
+    background-color: var(--primary-color, #007bff);
+    color: white;
+    border: none;
+    border-radius: var(--border-radius-sm, 4px);
+    padding: 5px 10px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.view-dns-btn:hover {
+    background-color: var(--primary-color-dark, #0056b3);
+}
+
+/* Modal styles */
+.modal-content {
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+}
+
+.modal-header {
+    background-color: var(--primary-color);
+    color: white;
+    border-radius: var(--border-radius) var(--border-radius) 0 0;
+}
+
+.modal-title {
+    font-weight: 600;
+}
+
+.modal-footer {
+    border-top: 1px solid var(--border-color);
+    padding: 15px;
+}
+
+/* Form styles */
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-control {
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    padding: 8px 12px;
+    width: 100%;
+}
+
+.form-control:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.form-text {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    margin-top: 5px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .dns-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .dns-actions {
+        margin-top: 10px;
+    }
+    
+    .site-grid {
+        grid-template-columns: 1fr;
+    }
+}

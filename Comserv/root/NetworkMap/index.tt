@@ -1,0 +1,180 @@
+[% META title = 'Network Map' %]
+[% PageVersion = 'NetworkMap/index.tt,v 0.01 2025/04/20 shanta Exp shanta ' %]
+
+[% IF c.session.debug_mode == 1 %]
+ <br>[% PageVersion %]</br>
+ [% IF debug_msg.size %]
+   <div class="debug-message">
+     <ul>
+     [% FOREACH msg IN debug_msg %]
+       <li>[% msg %]</li>
+     [% END %]
+     </ul>
+   </div>
+ [% END %]
+[% END %]
+
+<div class="network-map-container">
+    <h1>Network Map</h1>
+    
+    <div class="network-map-actions">
+        <div class="action-buttons">
+            <a href="[% c.uri_for('/NetworkMap/add_network') %]" class="btn btn-primary">Add Network</a>
+            <a href="[% c.uri_for('/NetworkMap/add_device') %]" class="btn btn-primary">Add Device</a>
+            <a href="[% c.uri_for('/NetworkMap/by_network') %]" class="btn btn-info">View by Network</a>
+            <a href="[% c.uri_for('/NetworkMap/by_type') %]" class="btn btn-info">View by Type</a>
+            <a href="[% c.uri_for('/NetworkMap/by_service') %]" class="btn btn-info">View by Service</a>
+            <a href="[% c.uri_for('/NetworkMap/export_json') %]" class="btn btn-secondary">Export JSON</a>
+            <a href="[% c.uri_for('/NetworkMap/export_text') %]" class="btn btn-secondary">Export Text</a>
+        </div>
+        
+        <div class="search-form">
+            <form action="[% c.uri_for('/NetworkMap/search') %]" method="get">
+                <div class="input-group">
+                    <input type="text" name="q" class="form-control" placeholder="Search devices..." value="[% query | html %]">
+                    <div class="input-group-append">
+                        <button type="submit" class="btn btn-primary">Search</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    [% IF status_msg %]
+        <div class="alert alert-success">[% status_msg %]</div>
+    [% END %]
+    
+    [% IF error_msg %]
+        <div class="alert alert-danger">[% error_msg %]</div>
+    [% END %]
+    
+    [% IF c.flash.status_msg %]
+        <div class="alert alert-success">[% c.flash.status_msg %]</div>
+    [% END %]
+    
+    [% IF c.flash.error_msg %]
+        <div class="alert alert-danger">[% c.flash.error_msg %]</div>
+    [% END %]
+    
+    <div class="network-map-content">
+        [% network_map_html %]
+    </div>
+</div>
+
+<style>
+    .network-map-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .network-map-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+    
+    .action-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 10px;
+    }
+    
+    .search-form {
+        min-width: 300px;
+        margin-bottom: 10px;
+    }
+    
+    .btn {
+        display: inline-block;
+        padding: 8px 16px;
+        text-decoration: none;
+        border-radius: 4px;
+        font-weight: 500;
+    }
+    
+    .btn-primary {
+        background-color: #007bff;
+        color: white;
+    }
+    
+    .btn-info {
+        background-color: #17a2b8;
+        color: white;
+    }
+    
+    .btn-secondary {
+        background-color: #6c757d;
+        color: white;
+    }
+    
+    .alert {
+        padding: 12px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+    }
+    
+    .alert-success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .alert-danger {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+    
+    .network-map-content {
+        margin-top: 30px;
+    }
+    
+    .network-table, .device-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+    }
+    
+    .network-table th, .device-table th {
+        background-color: #f8f9fa;
+        text-align: left;
+        padding: 10px;
+        border-bottom: 2px solid #dee2e6;
+    }
+    
+    .network-table td, .device-table td {
+        padding: 10px;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .network-table tr:hover, .device-table tr:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .debug-message {
+        background-color: #f8d7da;
+        color: #721c24;
+        padding: 10px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+    }
+    
+    .input-group {
+        display: flex;
+    }
+    
+    .form-control {
+        flex: 1;
+        padding: 8px;
+        border: 1px solid #ced4da;
+        border-radius: 4px 0 0 4px;
+    }
+    
+    .input-group-append .btn {
+        border-radius: 0 4px 4px 0;
+    }
+</style>

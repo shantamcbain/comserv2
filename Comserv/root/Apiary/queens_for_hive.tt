@@ -1,0 +1,42 @@
+[% META title = 'Queens for Hive ' _ hive_id %]
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>Queens for Hive [% hive_id %]</h1>
+            
+            [% IF queens && queens.size > 0 %]
+                <div class="row">
+                    [% FOREACH queen IN queens %]
+                        <div class="col-md-6 mb-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>Queen [% queen.tag_number %]</h3>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Breed:</strong> [% queen.breed %]</p>
+                                    <p><strong>Color:</strong> [% queen.color %]</p>
+                                    <p><strong>Hatched:</strong> [% queen.hatch_date %]</p>
+                                    <p><strong>Installed:</strong> [% queen.installation_date %]</p>
+                                    <p><strong>Source:</strong> [% queen.source %]</p>
+                                    <p><strong>Status:</strong> [% queen.status %]</p>
+                                    <p><strong>Notes:</strong> [% queen.notes %]</p>
+                                    <a href="/Apiary/frames_for_queen/[% queen.tag_number %]" class="btn btn-primary">View Frames</a>
+                                </div>
+                            </div>
+                        </div>
+                    [% END %]
+                </div>
+            [% ELSE %]
+                <div class="alert alert-info">
+                    No queens found for this hive.
+                </div>
+            [% END %]
+            
+            <div class="mt-4">
+                <a href="/Apiary/hives_for_yard/[% hive.yard_id %]" class="btn btn-secondary">Back to Hives</a>
+                <a href="/Apiary/QueenRearing" class="btn btn-primary">Back to Queen Rearing</a>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,490 @@
+<!-- File: /home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/features/todo_system.tt -->
+[% META title = 'Todo System Documentation' %]
+[% PageVersion = 'Documentation/features/todo_system.tt,v 1.01 2025/09/12 system Exp system ' %]
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+
+<h1>Todo System Documentation</h1>
+
+<div class="doc-metadata">
+    <p><strong>File:</strong> /home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/features/todo_system.tt</p>
+    <p><strong>Date:</strong> January 20, 2025</p>
+    <p><strong>Author:</strong> System Documentation</p>
+    <p><strong>Status:</strong> Current</p>
+</div>
+
+<h2>Overview</h2>
+
+<p>The Todo System is a comprehensive task management module within the Comserv application that allows administrators to create, manage, and track tasks with advanced filtering, time tracking, and project integration capabilities.</p>
+
+<h2>System Architecture</h2>
+
+<h3>Controller: <code>Comserv::Controller::Todo</code></h3>
+<p><strong>Location:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Todo.pm</code></p>
+
+<p>The Todo controller handles all HTTP requests related to todo management and implements the following key features:</p>
+
+<ul>
+    <li><strong>Access Control:</strong> Admin-only access with session validation (Legacy authentication - needs AdminAuth migration)</li>
+    <li><strong>CRUD Operations:</strong> Create, Read, Update, Delete functionality</li>
+    <li><strong>Advanced Filtering:</strong> Date-based, project-based, and status-based filtering</li>
+    <li><strong>Time Tracking Integration:</strong> Integration with the logging system for time accumulation</li>
+    <li><strong>Enhanced Logging:</strong> Uses Comserv::Util::Logging for detailed operation tracking</li>
+</ul>
+
+<h3>Model: <code>Comserv::Model::Todo</code></h3>
+<p><strong>Location:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Todo.pm</code></p>
+
+<p>The Todo model provides business logic for:</p>
+<ul>
+    <li>Fetching todos with role-based access control</li>
+    <li>Date-based todo retrieval</li>
+    <li>Individual todo record fetching</li>
+</ul>
+
+<h3>Database Schema: <code>Comserv::Model::Schema::Ency::Result::Todo</code></h3>
+<p><strong>Location:</strong> <code>/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema/Ency/Result/Todo.pm</code></p>
+
+<h2>Database Structure</h2>
+
+<p>The <code>todo</code> table contains the following fields:</p>
+
+<table class="doc-table">
+    <thead>
+        <tr>
+            <th>Field</th>
+            <th>Type</th>
+            <th>Description</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr><td><code>record_id</code></td><td>integer (PK, auto_increment)</td><td>Unique identifier</td></tr>
+        <tr><td><code>sitename</code></td><td>varchar(255)</td><td>Site association</td></tr>
+        <tr><td><code>start_date</code></td><td>date</td><td>When the todo should start</td></tr>
+        <tr><td><code>parent_todo</code></td><td>varchar</td><td>Parent todo reference</td></tr>
+        <tr><td><code>due_date</code></td><td>date</td><td>When the todo is due</td></tr>
+        <tr><td><code>subject</code></td><td>varchar(255)</td><td>Todo title/subject</td></tr>
+        <tr><td><code>description</code></td><td>text</td><td>Detailed description</td></tr>
+        <tr><td><code>estimated_man_hours</code></td><td>integer</td><td>Estimated time to complete</td></tr>
+        <tr><td><code>comments</code></td><td>text (nullable)</td><td>Additional comments</td></tr>
+        <tr><td><code>accumulative_time</code></td><td>time</td><td>Total time spent</td></tr>
+        <tr><td><code>reporter</code></td><td>varchar(50, nullable)</td><td>Who reported the todo</td></tr>
+        <tr><td><code>company_code</code></td><td>varchar(30, nullable)</td><td>Company association</td></tr>
+        <tr><td><code>owner</code></td><td>varchar(30, nullable)</td><td>Todo owner</td></tr>
+        <tr><td><code>project_code</code></td><td>varchar(255)</td><td>Project code reference</td></tr>
+        <tr><td><code>developer</code></td><td>varchar(50, nullable)</td><td>Assigned developer</td></tr>
+        <tr><td><code>username_of_poster</code></td><td>varchar(30, nullable)</td><td>Who created the todo</td></tr>
+        <tr><td><code>status</code></td><td>varchar(255)</td><td>Current status</td></tr>
+        <tr><td><code>priority</code></td><td>integer</td><td>Priority level</td></tr>
+        <tr><td><code>share</code></td><td>integer</td><td>Sharing flag</td></tr>
+        <tr><td><code>last_mod_by</code></td><td>varchar(255)</td><td>Last modifier</td></tr>
+        <tr><td><code>last_mod_date</code></td><td>date</td><td>Last modification date</td></tr>
+        <tr><td><code>group_of_poster</code></td><td>varchar(255)</td><td>Group of creator</td></tr>
+        <tr><td><code>user_id</code></td><td>integer</td><td>User association</td></tr>
+        <tr><td><code>project_id</code></td><td>integer</td><td>Project association</td></tr>
+        <tr><td><code>date_time_posted</code></td><td>varchar(30, nullable)</td><td>Creation timestamp</td></tr>
+    </tbody>
+</table>
+
+<h3>Relationships</h3>
+
+<ul>
+    <li><strong>User Relationship:</strong> <code>belongs_to user => 'Comserv::Model::Schema::Ency::Result::User'</code></li>
+    <li><strong>Project Relationship:</strong> <code>belongs_to project => 'Comserv::Model::Schema::Ency::Result::Project'</code></li>
+    <li><strong>Log Relationship:</strong> <code>has_many logs => 'Comserv::Model::Schema::Ency::Result::Log'</code></li>
+</ul>
+
+<h2>Available Routes and Actions</h2>
+
+<h3>Main Todo Management</h3>
+
+<h4><code>/todo</code> - Main Todo List</h4>
+<ul>
+    <li><strong>Method:</strong> GET</li>
+    <li><strong>Access:</strong> Admin only</li>
+    <li><strong>Features:</strong>
+        <ul>
+            <li>Displays all todos for the current site</li>
+            <li>Advanced filtering by date, project, status, and search terms</li>
+            <li>Pagination and sorting by priority and start date</li>
+            <li>Status filtering (new, in progress, completed, all)</li>
+            <li>Project-based filtering with dropdown</li>
+            <li>Search functionality across subject, description, and comments</li>
+        </ul>
+    </li>
+</ul>
+
+<p><strong>Query Parameters:</strong></p>
+<ul>
+    <li><code>filter</code>: Date filter (all, day, today, week, month)</li>
+    <li><code>search</code>: Search term for subject/description/comments</li>
+    <li><code>project_id</code>: Filter by specific project</li>
+    <li><code>status</code>: Filter by status (new, in_progress, completed, all)</li>
+</ul>
+
+<h4><code>/todo/details</code> - Todo Details View</h4>
+<ul>
+    <li><strong>Method:</strong> GET</li>
+    <li><strong>Parameters:</strong> <code>record_id</code> (query parameter)</li>
+    <li><strong>Features:</strong>
+        <ul>
+            <li>Displays detailed todo information</li>
+            <li>Shows accumulated time from log entries</li>
+            <li>Formatted time display (HH:MM format)</li>
+        </ul>
+    </li>
+</ul>
+
+<h4><code>/todo/addtodo</code> - Add New Todo Form</h4>
+<ul>
+    <li><strong>Method:</strong> GET</li>
+    <li><strong>Features:</strong>
+        <ul>
+            <li>Form for creating new todos</li>
+            <li>Project dropdown with hierarchical display</li>
+            <li>User selection dropdown</li>
+            <li>Pre-population from query parameters</li>
+        </ul>
+    </li>
+</ul>
+
+<h4><code>/todo/edit/{record_id}</code> - Edit Todo Form</h4>
+<ul>
+    <li><strong>Method:</strong> GET</li>
+    <li><strong>Parameters:</strong> <code>record_id</code> (URL parameter)</li>
+    <li><strong>Features:</strong>
+        <ul>
+            <li>Pre-populated form with existing todo data</li>
+            <li>Project and user dropdowns</li>
+            <li>Accumulated time display</li>
+            <li>Error handling for invalid record IDs</li>
+        </ul>
+    </li>
+</ul>
+
+<h4><code>/todo/modify/{record_id}</code> - Update Todo</h4>
+<ul>
+    <li><strong>Method:</strong> POST</li>
+    <li><strong>Parameters:</strong> <code>record_id</code> (URL parameter)</li>
+    <li><strong>Features:</strong>
+        <ul>
+            <li>Updates existing todo records</li>
+            <li>Form validation</li>
+            <li>Error handling and user feedback</li>
+            <li>Automatic last modification tracking</li>
+        </ul>
+    </li>
+</ul>
+
+<h4><code>/todo/create</code> - Create New Todo</h4>
+<ul>
+    <li><strong>Method:</strong> POST</li>
+    <li><strong>Features:</strong>
+        <ul>
+            <li>Creates new todo records</li>
+            <li>Handles manual project ID input</li>
+            <li>Automatic project code resolution</li>
+            <li>Default value assignment</li>
+            <li>Session-based user tracking</li>
+        </ul>
+    </li>
+</ul>
+
+<h3>Time-Based Views</h3>
+
+<h4><code>/todo/day/{date}</code> - Daily Todo View</h4>
+<ul>
+    <li><strong>Method:</strong> GET</li>
+    <li><strong>Parameters:</strong> <code>date</code> (optional, ISO format)</li>
+    <li><strong>Features:</strong>
+        <ul>
+            <li>Shows todos due or starting on specific date</li>
+            <li>Navigation to previous/next day</li>
+            <li>Defaults to current date if none specified</li>
+            <li>Date validation with fallback</li>
+        </ul>
+    </li>
+</ul>
+
+<h4><code>/todo/week/{date}</code> - Weekly Todo View</h4>
+<ul>
+    <li><strong>Method:</strong> GET</li>
+    <li><strong>Parameters:</strong> <code>date</code> (optional, ISO format)</li>
+    <li><strong>Features:</strong>
+        <ul>
+            <li>Shows todos for the current week</li>
+            <li>Includes overdue but incomplete todos</li>
+            <li>Week navigation (previous/next)</li>
+            <li>Automatic week boundary calculation</li>
+        </ul>
+    </li>
+</ul>
+
+<h4><code>/todo/month/{date}</code> - Monthly Todo View</h4>
+<ul>
+    <li><strong>Method:</strong> GET</li>
+    <li><strong>Parameters:</strong> <code>date</code> (optional, ISO format)</li>
+    <li><strong>Features:</strong>
+        <ul>
+            <li>Calendar-style monthly view</li>
+            <li>Todos organized by day</li>
+            <li>Month navigation</li>
+            <li>Visual calendar layout with todo counts per day</li>
+        </ul>
+    </li>
+</ul>
+
+<h3>Utility Routes</h3>
+
+<h4><code>/todo/debug</code> - Debug Information</h4>
+<ul>
+    <li><strong>Method:</strong> GET</li>
+    <li><strong>Access:</strong> Admin only</li>
+    <li><strong>Features:</strong>
+        <ul>
+            <li>Displays system debugging information</li>
+            <li>Template plugin availability checking</li>
+            <li>INC path information</li>
+        </ul>
+    </li>
+</ul>
+
+<h2>Status Values</h2>
+
+<p>The system uses the following status values:</p>
+
+<ul>
+    <li><strong>1:</strong> New</li>
+    <li><strong>2:</strong> In Progress</li>
+    <li><strong>3:</strong> Completed</li>
+</ul>
+
+<p>Status 3 (Completed) todos are excluded from most views by default unless explicitly requested.</p>
+
+<h2>Priority System</h2>
+
+<p>Todos are sorted by priority (ascending) where lower numbers indicate higher priority.</p>
+
+<h2>Integration Features</h2>
+
+<h3>Project Integration</h3>
+<ul>
+    <li>Full integration with the Project management system</li>
+    <li>Hierarchical project display in dropdowns</li>
+    <li>Automatic project code resolution</li>
+    <li>Project-based filtering and reporting</li>
+</ul>
+
+<h3>User Management Integration</h3>
+<ul>
+    <li>User assignment and tracking</li>
+    <li>Session-based user identification</li>
+    <li>Role-based access control (admin only)</li>
+</ul>
+
+<h3>Time Tracking Integration</h3>
+<ul>
+    <li>Integration with the Log system for time tracking</li>
+    <li>Automatic accumulative time calculation</li>
+    <li>Time display in HH:MM format</li>
+    <li>Historical time tracking through log entries</li>
+</ul>
+
+<h3>Logging Integration</h3>
+<ul>
+    <li>Comprehensive logging using <code>log_with_details</code> method</li>
+    <li>Action tracking and debugging information</li>
+    <li>Error logging and user feedback</li>
+    <li>Performance monitoring</li>
+</ul>
+
+<h2>Security Features</h2>
+
+<h3>Access Control</h3>
+<ul>
+    <li><strong>Admin-only access:</strong> All todo operations require admin role</li>
+    <li><strong>Session validation:</strong> Comprehensive session checking in <code>begin</code> and <code>auto</code> methods</li>
+    <li><strong>Role verification:</strong> Multiple layers of role checking</li>
+    <li><strong>Site isolation:</strong> Todos are filtered by site name from session</li>
+</ul>
+
+<h3>Data Validation</h3>
+<ul>
+    <li><strong>Record ID validation:</strong> Proper handling of missing or invalid IDs</li>
+    <li><strong>Form validation:</strong> Required field checking (e.g., sitename)</li>
+    <li><strong>Date validation:</strong> ISO8601 date format validation with fallbacks</li>
+    <li><strong>Input sanitization:</strong> Proper parameter handling and validation</li>
+</ul>
+
+<h2>Error Handling</h2>
+
+<p>The system implements comprehensive error handling:</p>
+
+<ul>
+    <li><strong>Database errors:</strong> Try/catch blocks with user-friendly error messages</li>
+    <li><strong>Missing records:</strong> Graceful handling of non-existent todos</li>
+    <li><strong>Invalid parameters:</strong> Validation with appropriate error responses</li>
+    <li><strong>Session issues:</strong> Automatic redirect to login for session problems</li>
+    <li><strong>Permission errors:</strong> Clear messaging for unauthorized access</li>
+</ul>
+
+<h2>Templates and UI</h2>
+
+<p>The system expects the following template files:</p>
+
+<ul>
+    <li><code>todo/todo.tt</code> - Main todo list view</li>
+    <li><code>todo/details.tt</code> - Todo details and edit form</li>
+    <li><code>todo/addtodo.tt</code> - New todo creation form</li>
+    <li><code>todo/edit.tt</code> - Todo editing form</li>
+    <li><code>todo/day.tt</code> - Daily todo view</li>
+    <li><code>todo/week.tt</code> - Weekly todo view</li>
+    <li><code>todo/month.tt</code> - Monthly calendar view</li>
+</ul>
+
+<h3>CSS Styling</h3>
+<ul>
+    <li><strong>CSS File:</strong> <code>/static/css/todo.css</code></li>
+    <li><strong>Conditional Loading:</strong> CSS is loaded only for todo-related pages</li>
+    <li><strong>Responsive Design:</strong> Templates support responsive layouts</li>
+</ul>
+
+<h2>Configuration</h2>
+
+<h3>Session Requirements</h3>
+<ul>
+    <li><code>username</code>: Current user identification</li>
+    <li><code>roles</code>: User roles (must include 'admin')</li>
+    <li><code>SiteName</code>: Site context for todo filtering</li>
+    <li><code>user_id</code>: User ID for todo assignment</li>
+    <li><code>debug_mode</code>: Controls debug information display</li>
+</ul>
+
+<h3>Default Values</h3>
+<ul>
+    <li><strong>Due Date:</strong> 7 days from creation if not specified</li>
+    <li><strong>Status:</strong> Configurable default status</li>
+    <li><strong>Priority:</strong> Configurable default priority</li>
+    <li><strong>Share:</strong> Defaults to 0 (not shared)</li>
+    <li><strong>Accumulative Time:</strong> Defaults to 0</li>
+</ul>
+
+<h2>Performance Considerations</h2>
+
+<h3>Database Optimization</h3>
+<ul>
+    <li><strong>Indexed Fields:</strong> Primary key and foreign key indexing</li>
+    <li><strong>Query Optimization:</strong> Efficient filtering and sorting queries</li>
+    <li><strong>Result Limiting:</strong> Top 10 todos in model methods</li>
+    <li><strong>Site-based Filtering:</strong> Reduces query scope</li>
+</ul>
+
+<h3>Caching</h3>
+<ul>
+    <li><strong>Session Caching:</strong> Todo data cached in session where appropriate</li>
+    <li><strong>Template Caching:</strong> Template Toolkit caching for performance</li>
+</ul>
+
+<h2>Maintenance and Monitoring</h2>
+
+<h3>Logging</h3>
+<p>All todo operations are logged with detailed information including:</p>
+<ul>
+    <li>User actions and access attempts</li>
+    <li>Database operations and errors</li>
+    <li>Performance metrics</li>
+    <li>Security events</li>
+</ul>
+
+<h3>Debugging</h3>
+<ul>
+    <li><strong>Debug Mode:</strong> Comprehensive debugging information available</li>
+    <li><strong>Error Tracking:</strong> Detailed error logging and user feedback</li>
+    <li><strong>Performance Monitoring:</strong> Action timing and resource usage</li>
+</ul>
+
+<h2>Authentication Migration Status</h2>
+
+<p><strong>Current Status:</strong> The Todo controller uses legacy authentication patterns and needs migration to the centralized AdminAuth system.</p>
+
+<h3>Required Migration Steps</h3>
+<ol>
+    <li><strong>Add AdminAuth Import:</strong> <code>use Comserv::Util::AdminAuth;</code></li>
+    <li><strong>Add admin_auth Method:</strong> 
+        <pre><code>sub admin_auth {
+    my ($self) = @_;
+    return Comserv::Util::AdminAuth->new();
+}</code></pre>
+    </li>
+    <li><strong>Replace begin Method:</strong> Replace custom authentication logic with:
+        <pre><code>sub begin :Private {
+    my ($self, $c) = @_;
+    return unless $self->admin_auth->require_admin_access($c, 'todo_access');
+}</code></pre>
+    </li>
+    <li><strong>Update auto Method:</strong> Simplify authentication checks using centralized utility</li>
+    <li><strong>Remove Custom Logic:</strong> Remove manual role checking and session validation code</li>
+</ol>
+
+<h3>Benefits of Migration</h3>
+<ul>
+    <li><strong>Consistent Authentication:</strong> Same authentication logic as other admin controllers</li>
+    <li><strong>Enhanced Session Validation:</strong> Multi-source username checking and fallback handling</li>
+    <li><strong>Better Debugging:</strong> Centralized authentication logging and error handling</li>
+    <li><strong>CSC Admin Support:</strong> Proper support for CSC admin users</li>
+    <li><strong>Reduced Code:</strong> Elimination of duplicate authentication code</li>
+</ul>
+
+<h2>Future Enhancements</h2>
+
+<p>Potential areas for system enhancement:</p>
+
+<ol>
+    <li><strong>Authentication Migration:</strong> Migrate to centralized AdminAuth system (Priority 1)</li>
+    <li><strong>Notification System:</strong> Email/SMS notifications for due dates</li>
+    <li><strong>Attachment Support:</strong> File attachments to todos</li>
+    <li><strong>Subtask Management:</strong> Hierarchical todo relationships</li>
+    <li><strong>Reporting Dashboard:</strong> Analytics and reporting features</li>
+    <li><strong>API Integration:</strong> REST API for external integrations</li>
+    <li><strong>Mobile Optimization:</strong> Enhanced mobile interface</li>
+    <li><strong>Collaboration Features:</strong> Comments and collaboration tools</li>
+    <li><strong>Workflow Management:</strong> Custom workflow states and transitions</li>
+</ol>
+
+<h2>Troubleshooting</h2>
+
+<h3>Common Issues</h3>
+
+<ol>
+    <li><strong>Access Denied:</strong> Ensure user has admin role in session</li>
+    <li><strong>Session Expired:</strong> Check session validity and re-login</li>
+    <li><strong>Missing Todos:</strong> Verify site name in session matches todo records</li>
+    <li><strong>Date Format Errors:</strong> Ensure dates are in ISO8601 format (YYYY-MM-DD)</li>
+    <li><strong>Project Integration:</strong> Verify project controller availability</li>
+</ol>
+
+<h3>Debug Mode</h3>
+<p>Enable debug mode in session to see:</p>
+<ul>
+    <li>Detailed logging information</li>
+    <li>Template debugging data</li>
+    <li>Database query information</li>
+    <li>Performance metrics</li>
+</ul>
+
+<h2>Related Documentation</h2>
+
+<ul>
+    <li><a href="../general/logging_best_practices.tt">Logging Best Practices</a></li>
+    <li><a href="../project_management_system.tt">Project Management System</a></li>
+    <li><a href="../user_management.tt">User Management Documentation</a></li>
+    <li><a href="../database_schema.tt">Database Schema Documentation</a></li>
+</ul>
+
+<hr>
+
+<p><em>This documentation reflects the current state of the Todo system as of January 20, 2025. For the most up-to-date information, refer to the source code and changelog.</em></p>

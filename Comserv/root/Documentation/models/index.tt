@@ -1,0 +1,78 @@
+[% PageVersion = 'Documentation/models/index.tt,v 1.0 2025/04/08 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<h1>Model Documentation</h1>
+
+<p>This page lists all models in the Comserv application.</p>
+
+<div class="model-list">
+    <h2>Core Models</h2>
+    <ul>
+        <li><a href="[% c.uri_for('/Documentation/models/User') %]">User Model</a></li>
+        <li><a href="[% c.uri_for('/Documentation/models/Site') %]">Site Model</a></li>
+        <li><a href="[% c.uri_for('/Documentation/models/Theme') %]">Theme Model</a></li>
+        <li><a href="[% c.uri_for('/Documentation/models/ThemeConfig') %]">ThemeConfig Model</a></li>
+    </ul>
+
+    <h2>Module Models</h2>
+    <ul>
+        <li><a href="[% c.uri_for('/Documentation/models/Todo') %]">Todo Model</a></li>
+        <li><a href="[% c.uri_for('/Documentation/models/Project') %]">Project Model</a></li>
+        <li><a href="[% c.uri_for('/Documentation/models/Proxmox') %]">Proxmox Model</a></li>
+        <li><a href="[% c.uri_for('/Documentation/models/Calendar') %]">Calendar Model</a></li>
+    </ul>
+
+    <h2>Utility Models</h2>
+    <ul>
+        <li><a href="[% c.uri_for('/Documentation/models/File') %]">File Model</a></li>
+        <li><a href="[% c.uri_for('/Documentation/models/Mail') %]">Mail Model</a></li>
+        <li><a href="[% c.uri_for('/Documentation/models/Log') %]">Log Model</a></li>
+    </ul>
+
+    <h2>Database Models</h2>
+    <ul>
+        <li><a href="[% c.uri_for('/Documentation/models/DBSchemaManager') %]">DBSchemaManager Model</a></li>
+        <li><a href="[% c.uri_for('/Documentation/models/DBEncy') %]">DBEncy Model</a></li>
+        <li><a href="[% c.uri_for('/Documentation/models/DBForager') %]">DBForager Model</a></li>
+    </ul>
+
+    <h2>Site-Specific Models</h2>
+    <ul>
+        <li><a href="[% c.uri_for('/Documentation/models/ENCYModel') %]">ENCYModel Model</a></li>
+        <li><a href="[% c.uri_for('/Documentation/models/BMaster') %]">BMaster Model</a></li>
+        <li><a href="[% c.uri_for('/Documentation/models/BMasterModel') %]">BMasterModel Model</a></li>
+        <li><a href="[% c.uri_for('/Documentation/models/ApiaryModel') %]">ApiaryModel Model</a></li>
+        <li><a href="[% c.uri_for('/Documentation/models/WorkShop') %]">WorkShop Model</a></li>
+    </ul>
+</div>
+
+<style>
+    .model-list {
+        margin: 20px 0;
+    }
+    .model-list h2 {
+        color: #0056b3;
+        margin: 20px 0 10px 0;
+        border-bottom: 1px solid #ddd;
+        padding-bottom: 5px;
+    }
+    .model-list ul {
+        list-style-type: none;
+        padding: 0;
+        margin: 0;
+    }
+    .model-list li {
+        margin: 5px 0;
+        padding: 5px 0;
+    }
+    .model-list a {
+        color: #0056b3;
+        text-decoration: none;
+        font-weight: bold;
+    }
+    .model-list a:hover {
+        text-decoration: underline;
+    }
+</style>

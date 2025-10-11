@@ -1,0 +1,150 @@
+[% PageVersion = 'Documentation/Pages.tt,v 1.0 2024/12/29 Pages Controller Documentation' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<h1>Pages Controller Documentation</h1>
+
+<p><strong>Last Updated:</strong> December 29, 2024<br>
+<strong>Author:</strong> Shanta<br>
+<strong>Status:</strong> Active</p>
+
+<h2>Overview</h2>
+<p>The Pages controller manages the content management system for the Ency schema. It provides a simple, practical approach to storing and delivering page content sorted by SiteName and roles, following existing Catalyst patterns and practices.</p>
+
+<h2>Routes and Testing</h2>
+<div class="route-info">
+    <h3>Public Routes:</h3>
+    <ul>
+        <li><code>/page/{page_code}</code> - View a single page (e.g., /page/home)</li>
+        <li><code>/pages</code> - List pages for current site</li>
+        <li><code>/pages?menu=Main</code> - List pages by menu</li>
+    </ul>
+    
+    <h3>Admin Routes (require admin role):</h3>
+    <ul>
+        <li><code>/pages/create</code> - Create new page form</li>
+        <li><code>/pages/edit/{page_code}</code> - Edit existing page (e.g., /pages/edit/home)</li>
+    </ul>
+</div>
+
+<h2>Key Features</h2>
+<ul>
+    <li>Site-specific content management (CSC, MCOOP, USBM, etc.)</li>
+    <li>Role-based access control (public, member, admin)</li>
+    <li>Simple CRUD operations for page management</li>
+    <li>SEO meta tag support (description, keywords)</li>
+    <li>Navigation ordering system</li>
+    <li>Template Toolkit integration</li>
+    <li>Logging integration using existing patterns</li>
+    <li>Session-based authentication and authorization</li>
+</ul>
+
+<h2>Data Model</h2>
+<p>The Pages controller uses a single <code>pages</code> table in the Ency schema:</p>
+
+<h3>Table Structure</h3>
+<table border="1" cellpadding="5">
+    <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+    <tr><td>id</td><td>INT AUTO_INCREMENT</td><td>Primary key</td></tr>
+    <tr><td>sitename</td><td>VARCHAR(255)</td><td>Site identifier (CSC, MCOOP, etc.)</td></tr>
+    <tr><td>menu</td><td>VARCHAR(255)</td><td>Menu category (Main, member, Admin)</td></tr>
+    <tr><td>page_code</td><td>VARCHAR(255)</td><td>Unique page identifier</td></tr>
+    <tr><td>title</td><td>VARCHAR(255)</td><td>Page display title</td></tr>
+    <tr><td>body</td><td>TEXT</td><td>HTML content body</td></tr>
+    <tr><td>description</td><td>TEXT</td><td>Meta description for SEO</td></tr>
+    <tr><td>keywords</td><td>TEXT</td><td>Meta keywords for SEO</td></tr>
+    <tr><td>link_order</td><td>INT</td><td>Display order in navigation</td></tr>
+    <tr><td>status</td><td>VARCHAR(50)</td><td>Page status (active, inactive, draft)</td></tr>
+    <tr><td>roles</td><td>VARCHAR(255)</td><td>Required access roles (public, member, admin)</td></tr>
+    <tr><td>created_by</td><td>VARCHAR(255)</td><td>Username who created the page</td></tr>
+    <tr><td>created_at</td><td>DATETIME</td><td>Creation timestamp</td></tr>
+    <tr><td>updated_at</td><td>DATETIME</td><td>Last modification timestamp</td></tr>
+</table>
+
+<h2>Controller Methods</h2>
+
+<h3>Public Methods</h3>
+<ul>
+    <li><strong>view</strong>: Display a single page by page_code
+        <ul>
+            <li>Path: <code>/page/{page_code}</code></li>
+            <li>Args: 1 (page_code)</li>
+            <li>Access: Based on page roles</li>
+            <li>Template: <code>pages/view.tt</code></li>
+        </ul>
+    </li>
+    <li><strong>list</strong>: Display list of pages for current site and menu
+        <ul>
+            <li>Path: <code>/pages</code></li>
+            <li>Args: 0</li>
+            <li>Parameters: <code>menu</code> (optional, defaults to 'Main')</li>
+            <li>Access: Based on individual page roles</li>
+            <li>Template: <code>pages/list.tt</code></li>
+        </ul>
+    </li>
+</ul>
+
+<h3>Administrative Methods</h3>
+<ul>
+    <li><strong>create</strong>: Create new page (admin only)
+        <ul>
+            <li>Path: <code>/pages/create</code></li>
+            <li>Args: 0</li>
+            <li>Access: Admin role required</li>
+            <li>Methods: GET (form), POST (submit)</li>
+            <li>Template: <code>pages/create.tt</code></li>
+        </ul>
+    </li>
+    <li><strong>edit</strong>: Edit existing page (admin only)
+        <ul>
+            <li>Path: <code>/pages/edit/{page_code}</code></li>
+            <li>Args: 1 (page_code)</li>
+            <li>Access: Admin role required</li>
+            <li>Methods: GET (form), POST (submit)</li>
+            <li>Template: <code>pages/edit.tt</code></li>
+        </ul>
+    </li>
+</ul>
+
+<h2>Access Control</h2>
+<p>The controller implements role-based access control:</p>
+<ul>
+    <li><strong>Public Pages:</strong> Accessible to all users</li>
+    <li><strong>Member Pages:</strong> Require 'member' role in session</li>
+    <li><strong>Admin Pages:</strong> Require 'admin' role in session</li>
+    <li><strong>Site Filtering:</strong> Pages filtered by current SiteName from stash/session</li>
+</ul>
+
+<h2>Templates</h2>
+<p>All templates follow existing TT patterns with PageVersion tracking:</p>
+<ul>
+    <li><code>pages/view.tt</code>: Single page display with admin controls</li>
+    <li><code>pages/list.tt</code>: Page listing with filtering and admin controls</li>
+    <li><code>pages/create.tt</code>: Page creation form with validation</li>
+    <li><code>pages/edit.tt</code>: Page editing form with metadata display</li>
+</ul>
+
+<h2>Setup Instructions</h2>
+<ol>
+    <li>Create the database table: <code>mysql ency &lt; sql/pages_ency.sql</code></li>
+    <li>Migrate existing data: <code>perl script/migrate_pages.pl</code></li>
+    <li>Test the routes listed above</li>
+</ol>
+
+<h2>Testing Routes</h2>
+<p>To test the page system, try these URLs:</p>
+<ul>
+    <li><code>http://your-domain/pages</code> - List all pages</li>
+    <li><code>http://your-domain/page/home</code> - View home page (if it exists)</li>
+    <li><code>http://your-domain/pages/create</code> - Create page form (admin only)</li>
+</ul>
+
+<h2>Integration Points</h2>
+<ul>
+    <li><strong>Session Management:</strong> Uses existing session patterns for user roles and site</li>
+    <li><strong>Logging:</strong> Integrates with <code>Comserv::Util::Logging</code></li>
+    <li><strong>Database:</strong> Uses Ency schema via <code>$c->model('Ency::Page')</code></li>
+    <li><strong>Templates:</strong> Follows existing TT patterns and conventions</li>
+    <li><strong>Flash Messages:</strong> Uses Catalyst flash for user feedback</li>
+</ul>

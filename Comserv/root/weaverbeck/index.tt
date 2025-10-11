@@ -1,0 +1,114 @@
+[% META title = 'WeaverBeck - Home' %]
+[% PageVersion = '/weaverbeck/index.tt,v 1.0 2023/04/19 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container mt-5">
+  <div class="jumbotron">
+    <h1 class="display-4">Welcome to WeaverBeck</h1>
+    <p class="lead">Our family home in the beautiful Shuswap region of British Columbia.</p>
+    <hr class="my-4">
+    <p>Explore our site to learn more about our services and how we can help you achieve your goals.</p>
+    <a class="btn btn-primary btn-lg" href="[% c.uri_for('/weaverbeck/about') %]" role="button">Learn More</a>
+  </div>
+  
+  <div class="row mt-5">
+    <div class="col-md-4 mb-4">
+      <div class="card h-100">
+        <div class="card-header bg-primary text-white">
+          <h3 class="card-title text-center">About Us</h3>
+        </div>
+        <div class="card-body">
+          <p class="card-text">WeaverBeck is our family home in the beautiful Shuswap region of British Columbia. Learn more about our history, mission, and values.</p>
+        </div>
+        <div class="card-footer text-center">
+          <a href="[% c.uri_for('/weaverbeck/about') %]" class="btn btn-primary">Read More</a>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-md-4 mb-4">
+      <div class="card h-100">
+        <div class="card-header bg-success text-white">
+          <h3 class="card-title text-center">Our Services</h3>
+        </div>
+        <div class="card-body">
+          <p class="card-text">Discover the comprehensive range of services we offer to meet your specific needs and help you achieve your goals.</p>
+        </div>
+        <div class="card-footer text-center">
+          <a href="[% c.uri_for('/weaverbeck/services') %]" class="btn btn-success">View Services</a>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-md-4 mb-4">
+      <div class="card h-100">
+        <div class="card-header bg-info text-white">
+          <h3 class="card-title text-center">Contact Us</h3>
+        </div>
+        <div class="card-body">
+          <p class="card-text">Have questions or ready to get started? Contact us today to discuss how we can help you achieve your goals.</p>
+        </div>
+        <div class="card-footer text-center">
+          <a href="[% c.uri_for('/weaverbeck/contact') %]" class="btn btn-info">Contact Us</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="row mt-5">
+    <div class="col-lg-8">
+      <div class="card mb-4">
+        <div class="card-body">
+          <h2 class="card-title">Why Choose WeaverBeck?</h2>
+          <p class="card-text">At WeaverBeck, we are committed to providing exceptional service and value to our clients. Here's why you should choose us:</p>
+          <ul class="list-group list-group-flush mt-3">
+            <li class="list-group-item"><strong>Expertise:</strong> Our team of experienced professionals brings deep knowledge and skills to every project.</li>
+            <li class="list-group-item"><strong>Quality:</strong> We are committed to delivering high-quality solutions that exceed expectations.</li>
+            <li class="list-group-item"><strong>Innovation:</strong> We stay at the forefront of industry trends and technologies to provide innovative solutions.</li>
+            <li class="list-group-item"><strong>Customer Focus:</strong> We put our clients first, ensuring their needs are met and their goals are achieved.</li>
+            <li class="list-group-item"><strong>Reliability:</strong> You can count on us to deliver on our promises and meet deadlines.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-lg-4">
+      <div class="card mb-4">
+        <div class="card-body">
+          <h3 class="card-title">Latest News</h3>
+          <div class="list-group">
+            <a href="#" class="list-group-item list-group-item-action">
+              <div class="d-flex w-100 justify-content-between">
+                <h5 class="mb-1">New Service Launched</h5>
+                <small>3 days ago</small>
+              </div>
+              <p class="mb-1">We're excited to announce the launch of our new service offering...</p>
+            </a>
+            <a href="#" class="list-group-item list-group-item-action">
+              <div class="d-flex w-100 justify-content-between">
+                <h5 class="mb-1">Client Success Story</h5>
+                <small>1 week ago</small>
+              </div>
+              <p class="mb-1">Read about how we helped a client achieve their goals...</p>
+            </a>
+            <a href="#" class="list-group-item list-group-item-action">
+              <div class="d-flex w-100 justify-content-between">
+                <h5 class="mb-1">Industry Recognition</h5>
+                <small>2 weeks ago</small>
+              </div>
+              <p class="mb-1">WeaverBeck has been recognized for excellence in...</p>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="text-center mt-5 mb-5">
+    <h2>Ready to get started?</h2>
+    <p class="lead">Contact us today to discuss how we can help you achieve your goals.</p>
+    <a href="[% c.uri_for('/weaverbeck/contact') %]" class="btn btn-lg btn-primary">Contact Us</a>
+  </div>
+</div>

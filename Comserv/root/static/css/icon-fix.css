@@ -1,0 +1,136 @@
+/* Fix for Font Awesome icons in menus */
+
+/* Ensure icons in menu items inherit the text color */
+.menu-item i,
+.dropbtn i {
+    color: inherit !important;
+}
+
+/* Fix for login menu */
+.login-menu i,
+.user-menu i {
+    color: inherit !important;
+}
+
+/* Fix for dropdown content */
+.dropdown-content a i {
+    color: inherit !important;
+    margin-right: 8px;
+}
+
+/* Fix for role badge */
+.role-badge {
+    margin-left: 8px;
+    font-size: 0.8em;
+    opacity: 0.8;
+    color: inherit !important;
+}
+
+/* Username styling */
+.username {
+    font-weight: bold;
+    color: inherit !important;
+}
+
+/* Fix for any icon overrides */
+.fas, .far, .fab, .fa, .icon {
+    color: inherit !important;
+    /* For SVG mask technique */
+    background-color: currentColor !important;
+}
+
+/* Ensure menu items have consistent styling */
+.menu-item {
+    display: flex;
+    align-items: center;
+    color: var(--nav-link-color) !important;
+}
+
+.menu-item i {
+    width: 20px;
+    text-align: center;
+    margin-right: 8px;
+}
+
+/* Fix for dropbtn to use theme colors */
+.dropbtn {
+    color: var(--nav-text) !important;
+    background-color: transparent !important;
+}
+
+/* Fix for dropdown-content to use theme colors */
+.dropdown-content {
+    background-color: var(--dropdown-bg, var(--secondary-color)) !important;
+}
+
+/* Fix for dropdown-content links to use theme colors */
+.dropdown-content a {
+    color: var(--nav-link-color, var(--text-color)) !important;
+}
+
+/* Fix for dropdown-content links hover to use theme colors */
+.dropdown-content a:hover {
+    background-color: var(--nav-hover-bg, rgba(0, 0, 0, 0.1)) !important;
+}
+
+/* Ensure consistent styling for all themes */
+body.theme-default .dropbtn,
+body.theme-csc .dropbtn,
+body.theme-usbm .dropbtn,
+body.theme-apis .dropbtn,
+body.theme-mcoop .dropbtn,
+body.theme-forager .dropbtn,
+body.theme-ve7tit .dropbtn {
+    color: var(--nav-text) !important;
+}
+
+/* Ensure consistent styling for all themes dropdown content */
+body.theme-default .dropdown-content,
+body.theme-csc .dropdown-content,
+body.theme-usbm .dropdown-content,
+body.theme-apis .dropdown-content,
+body.theme-mcoop .dropdown-content,
+body.theme-forager .dropdown-content,
+body.theme-ve7tit .dropdown-content {
+    background-color: var(--dropdown-bg, var(--secondary-color)) !important;
+}
+
+/* Ensure consistent styling for all themes dropdown content links */
+body.theme-default .dropdown-content a,
+body.theme-csc .dropdown-content a,
+body.theme-usbm .dropdown-content a,
+body.theme-apis .dropdown-content a,
+body.theme-mcoop .dropdown-content a,
+body.theme-forager .dropdown-content a,
+body.theme-ve7tit .dropdown-content a {
+    color: var(--nav-link-color, var(--text-color)) !important;
+}
+
+/* Debug footer styling */
+.debug-footer {
+    margin-top: 20px;
+    padding: 10px;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 12px;
+}
+
+.debug-footer details {
+    cursor: pointer;
+}
+
+.debug-footer summary {
+    font-weight: bold;
+    color: #007bff;
+}
+
+.debug-footer ul {
+    margin-top: 10px;
+    padding-left: 20px;
+}
+
+.debug-footer li {
+    margin-bottom: 5px;
+}

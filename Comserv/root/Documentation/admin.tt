@@ -1,0 +1,114 @@
+[% PageVersion = 'Documentation/admin.tt,v 0.01 2024/05/30 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="documentation-page">
+    <h1>Admin Module Documentation</h1>
+    
+    <div class="section">
+        <h2>Introduction</h2>
+        <p>
+            The Admin module provides tools for managing the Comserv system. This documentation
+            covers the various features available in the Admin section and how to use them effectively.
+        </p>
+    </div>
+    
+    <div class="section">
+        <h2>Site Management</h2>
+        <p>The Site Management section includes tools for:</p>
+        <ul>
+            <li><strong>Edit Documentation</strong> - Update system documentation</li>
+            <li><strong>Change Styles</strong> - Modify the appearance of the site</li>
+            <li><strong>Theme Management</strong> - Create and manage site themes</li>
+            <li><strong>Add Theme Column</strong> - Add theme support to database tables</li>
+            <li><strong>Update Software</strong> - Keep the system up to date</li>
+            <li><strong>Change User Roles</strong> - Manage user permissions</li>
+            <li><strong>Access Logging</strong> - View system access logs</li>
+        </ul>
+    </div>
+    
+    <div class="section">
+        <h2>Database Schema Management</h2>
+        <p>The Database Schema Management section provides tools for:</p>
+        <ul>
+            <li><strong>Manage Schema</strong> - Central interface for schema operations</li>
+            <li><strong>Add New Schema</strong> - Create new database schemas</li>
+            <li><strong>Compare Schemas</strong> - Compare different schema versions</li>
+            <li><strong>Get Table Information</strong> - View detailed table structure</li>
+            <li><strong>Migrate Schema</strong> - Update database structure</li>
+        </ul>
+        
+        <h3>Adding a New Schema</h3>
+        <p>To add a new schema:</p>
+        <ol>
+            <li>Navigate to "Add New Schema" in the Admin section</li>
+            <li>Enter the schema name and description</li>
+            <li>Define tables, columns, and relationships</li>
+            <li>Save the schema</li>
+        </ol>
+        
+        <h3>Migrating a Schema</h3>
+        <p>To migrate an existing schema:</p>
+        <ol>
+            <li>Navigate to "Migrate Schema" in the Admin section</li>
+            <li>Select the source and target schemas</li>
+            <li>Review the proposed changes</li>
+            <li>Apply the migration</li>
+        </ol>
+    </div>
+    
+    <div class="section">
+        <h2>Best Practices</h2>
+        <p>When working with the Admin module, consider these best practices:</p>
+        <ul>
+            <li>Always back up your database before making schema changes</li>
+            <li>Test migrations in a development environment first</li>
+            <li>Document all schema changes for future reference</li>
+            <li>Use descriptive names for tables and columns</li>
+            <li>Regularly review access logs for security purposes</li>
+        </ul>
+    </div>
+</div>
+
+<style>
+    .documentation-page {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+    }
+    
+    .section {
+        margin-bottom: 30px;
+    }
+    
+    h1 {
+        color: #333;
+        border-bottom: 2px solid #eee;
+        padding-bottom: 10px;
+    }
+    
+    h2 {
+        color: #0066cc;
+        margin-top: 20px;
+    }
+    
+    h3 {
+        color: #333;
+        margin-top: 15px;
+    }
+    
+    ul, ol {
+        padding-left: 25px;
+    }
+    
+    li {
+        margin-bottom: 8px;
+    }
+    
+    strong {
+        color: #333;
+    }
+</style>
