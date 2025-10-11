@@ -98,6 +98,20 @@ Thumbs.db
 *.pid
 *.socket
 
+# Database files and temporary runtime data
+
+Comserv/cpanfile.temp
+*.backup-*
+
+# Development scripts (temporary)
+Comserv/script/simple_server.pl
+Comserv/script/start_server.pl
+Comserv/script/test_load.pl
+
+# Working copies and implementation summaries
+AI_CONTROLLER_IMPLEMENTATION_SUMMARY.md
+*.md.new
+
 /logs/archive/application.*
 /Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.md
 /Comserv/root/Documentation/AI_DEVELOPMENT_GUIDELINES.tt
