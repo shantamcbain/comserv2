@@ -60,6 +60,7 @@
         [% INCLUDE 'Navigation/TopDropListHosted.tt' %]
         [% INCLUDE 'Navigation/TopDropListMember.tt' %]
         [% INCLUDE 'Navigation/TopDropListIT.tt' %]
+        [% INCLUDE 'Navigation/TopDropListENCY.tt' %]
         <!-- TopDropListCoop.tt has been removed and merged into admintopmenu.tt -->
 
         [% IF is_admin %]

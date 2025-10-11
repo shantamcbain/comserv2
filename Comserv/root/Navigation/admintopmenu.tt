@@ -1,4 +1,13 @@
-[% PageVersion = 'admintopmenu.tt,v 0.3 2025/06/01 shanta Exp shanta ' %]
+[% META
+   title = 'comserv_server.pl - Development Server Script'
+   version = '1.0'
+   author = 'AI Assistant'
+   date = '2025-10-07'
+   last_modified = '2025-10-07 10:06:06 PDT'
+   category = 'developer'
+   tags = 'server, development, cpanfile, dependencies, perlbrew'
+%]
+[% PageVersion = 'admintopmenu.tt,v 0.5 2025/10/06 ai_assistant Exp ai_assistant ' %]
 [% IF debug == 1 %]
     [% PageVersion %]
     [% #INCLUDE 'debug.tt' %]
@@ -21,37 +30,45 @@
             </div>
         </div>
 
+        <!-- AI Section -->
+        <div class="submenu-item">
+            <span class="submenu-header"><a href="/ai" class="dropbtn"><i class="icon-ai"></i>AI Assistant</a></span>
+            <div class="submenu">
+                <a href="/ai"><i class="icon-chat"></i>AI Chat Interface</a>
+                <a href="/ai/query_form"><i class="icon-form"></i>AI Query Form</a>
+                <a href="/ai/check_status"><i class="icon-status"></i>Check AI Status</a>
+                <a href="/ai/models"><i class="icon-model"></i>Model Management</a>
+            </div>
+        </div>
+
         <!-- Projects Section with Improved Navigation -->
         <div class="submenu-item">
             <span class="submenu-header"><a href="/project" class="dropbtn"><i class="icon-file"></i>Projects</a></span>
             <div class="submenu">
                 <a href="/project/addproject"><i class="icon-add"></i>Add New Project</a>
-                <!-- Project List -->
-                [% IF projects && projects.size %]
-                    <div class="project-list-container">
-                        [% MACRO display_projects(projects, level) BLOCK %]
-                            <ul class="project-list level-[% level %]">
-                            [% FOREACH project IN projects.sort('name') %]
-                                <li>
-                                    <a href="/project/details?project_id=[% project.id %]">[% project.name %]</a>
-                                    [% IF project.sub_projects.size && level < 3 %]
-                                        [% display_projects(project.sub_projects, level + 1) %]
-                                    [% END %]
-                                </li>
-                            [% END %]
-                            </ul>
-                        [% END %]
-                        
-                        [% projects_to_display = c.controller('Project').fetch_projects_with_subprojects(c) %]
-                        [% IF projects_to_display.size %]
-                            [% display_projects(projects_to_display, 1) %]
-                        [% ELSE %]
-                            <p class="no-projects">No projects available</p>
-                        [% END %]
-                    </div>
-                [% ELSE %]
+                
+                <!-- Project List Submenu -->
+                <div class="submenu-item">
                     <a href="/project"><i class="icon-list"></i>View All Projects</a>
-                [% END %]
+                    [% IF projects && projects.size %]
+                        <div class="submenu">
+                            [% MACRO display_projects(project_list, level) BLOCK %]
+                                <ul class="project-list level-[% level %]">
+                                [% FOREACH project IN project_list.sort('name') %]
+                                    <li>
+                                        <a href="/project/details?project_id=[% project.id %]">[% project.name %]</a>
+                                        [% IF project.sub_projects.size && level < 3 %]
+                                            [% display_projects(project.sub_projects, level + 1) %]
+                                        [% END %]
+                                    </li>
+                                [% END %]
+                                </ul>
+                            [% END %]
+                            
+                            [% display_projects(projects, 1) %]
+                        </div>
+                    [% END %]
+                </div>
             </div>
         </div>
 
@@ -108,7 +125,7 @@
                                 <form action="/todo/details" method="POST" class="recent-todo-form">
                                     <input type="hidden" name="record_id" value="[% todo.record_id %]">
                                     <button type="submit" class="recent-todo-button">
-                                        <span class="todo-priority priority-[% todo.priority %]">[% todo.priority %]</span>
+                                        <span class="todo-priority priority-[% todo.priority %]">[% INCLUDE todo/priority_display.tt priority_value=todo.priority %]</span>
                                         <span class="todo-subject">[% todo.subject %]</span>
                                     </button>
                                 </form>
