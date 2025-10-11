@@ -1,0 +1,621 @@
+[% PageVersion = 'admin/theme/edit/css.tt,v 0.01 2024/12/27 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+    Version: [% PageVersion %]
+[% END %]
+
+<style>
+    .css-editor-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .css-editor-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid var(--border-color, #ccc);
+    }
+
+    .css-editor-title {
+        margin: 0;
+        color: var(--text-color, #333);
+    }
+
+    .css-editor-actions {
+        display: flex;
+        gap: 10px;
+    }
+
+    .btn {
+        padding: 8px 16px;
+        border: 1px solid var(--border-color, #ccc);
+        border-radius: 4px;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 14px;
+    }
+
+    .btn-primary {
+        background-color: var(--primary-color, #007bff);
+        color: white;
+        border-color: var(--primary-color, #007bff);
+    }
+
+    .btn-secondary {
+        background-color: var(--secondary-color, #6c757d);
+        color: white;
+        border-color: var(--secondary-color, #6c757d);
+    }
+
+    .btn:hover {
+        opacity: 0.9;
+    }
+
+    .theme-selector {
+        margin-bottom: 20px;
+        padding: 15px;
+        background-color: var(--secondary-color, #f8f9fa);
+        border-radius: 5px;
+        border: 1px solid var(--border-color, #dee2e6);
+    }
+
+    .theme-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+
+    .theme-section {
+        background-color: white;
+        border: 1px solid var(--border-color, #dee2e6);
+        border-radius: 5px;
+        padding: 15px;
+    }
+
+    .theme-section h3 {
+        margin-top: 0;
+        color: var(--text-color, #333);
+        border-bottom: 1px solid var(--border-color, #dee2e6);
+        padding-bottom: 8px;
+    }
+
+    .css-variable {
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+        padding: 8px;
+        background-color: var(--secondary-color, #f8f9fa);
+        border-radius: 3px;
+    }
+
+    .css-variable-label {
+        flex: 0 0 150px;
+        font-weight: bold;
+        font-size: 13px;
+        color: var(--text-color, #333);
+    }
+
+    .css-variable-value {
+        flex: 1;
+        padding: 5px 8px;
+        border: 1px solid var(--border-color, #ccc);
+        border-radius: 3px;
+        font-family: monospace;
+        font-size: 13px;
+        background-color: white;
+    }
+
+    .css-variable-actions {
+        flex: 0 0 80px;
+        text-align: right;
+    }
+
+    .btn-edit {
+        background-color: var(--accent-color, #ffc107);
+        color: #212529;
+        border: none;
+        padding: 4px 8px;
+        font-size: 12px;
+        border-radius: 3px;
+        cursor: pointer;
+    }
+
+    .css-preview {
+        margin-top: 30px;
+        padding: 20px;
+        background-color: white;
+        border: 1px solid var(--border-color, #dee2e6);
+        border-radius: 5px;
+    }
+
+    .css-preview h3 {
+        margin-top: 0;
+        color: var(--text-color, #333);
+    }
+
+    .color-preview {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border-radius: 3px;
+        border: 1px solid var(--border-color, #ccc);
+        vertical-align: middle;
+        margin-right: 8px;
+    }
+
+    .priority-preview {
+        display: flex;
+        gap: 10px;
+        margin-top: 10px;
+    }
+
+    .priority-box {
+        padding: 10px;
+        border-radius: 3px;
+        text-align: center;
+        color: #333;
+        font-size: 12px;
+        min-width: 80px;
+    }
+
+    .priority-1 {
+        background-color: var(--todo-priority-1-bg, #ffcccc);
+    }
+
+    .priority-2 {
+        background-color: var(--todo-priority-2-bg, #ffffcc);
+    }
+
+    .priority-3 {
+        background-color: var(--todo-priority-3-bg, #ccffcc);
+    }
+
+    /* Element inspector styles */
+    .css-edit-mode {
+        position: relative;
+    }
+
+    .css-edit-mode::before {
+        content: "CSS EDIT MODE";
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        background-color: var(--warning-color, #ffc107);
+        color: #212529;
+        padding: 5px 10px;
+        border-radius: 3px;
+        font-size: 12px;
+        font-weight: bold;
+        z-index: 9999;
+    }
+
+    .element-highlight {
+        outline: 3px solid var(--warning-color, #ffc107) !important;
+        outline-offset: 2px !important;
+        cursor: pointer !important;
+    }
+
+    .css-edit-dialog {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: white;
+        border: 1px solid var(--border-color, #ccc);
+        border-radius: 8px;
+        padding: 20px;
+        max-width: 500px;
+        width: 90%;
+        max-height: 80vh;
+        overflow-y: auto;
+        z-index: 10000;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+
+    .css-edit-dialog h3 {
+        margin-top: 0;
+        color: var(--text-color, #333);
+        border-bottom: 1px solid var(--border-color, #eee);
+        padding-bottom: 10px;
+    }
+
+    .css-edit-form {
+        display: grid;
+        gap: 15px;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .form-group label {
+        font-weight: bold;
+        margin-bottom: 5px;
+        font-size: 14px;
+        color: var(--text-color, #333);
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        padding: 8px;
+        border: 1px solid var(--border-color, #ccc);
+        border-radius: 4px;
+        font-size: 14px;
+    }
+
+    .form-group textarea {
+        min-height: 80px;
+        resize: vertical;
+    }
+
+    .dialog-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 20px;
+        padding-top: 15px;
+        border-top: 1px solid var(--border-color, #eee);
+    }
+
+    .btn-save {
+        background-color: var(--success-color, #28a745);
+        color: white;
+        border: none;
+    }
+
+    .btn-cancel {
+        background-color: var(--secondary-color, #6c757d);
+        color: white;
+        border: none;
+    }
+</style>
+
+<div class="css-editor-container">
+    <div class="css-editor-header">
+        <h1 class="css-editor-title">CSS Theme Editor</h1>
+        <div class="css-editor-actions">
+            <button id="toggle-css-mode" class="btn btn-primary">Enable CSS Edit Mode</button>
+            <a href="/admin/theme" class="btn btn-secondary">Back to Theme Management</a>
+        </div>
+    </div>
+
+    <div class="theme-selector">
+        <label for="theme-select">Current Theme:</label>
+        <select id="theme-select" class="form-control" style="width: 200px; margin-left: 10px;">
+            [% FOREACH theme_key IN theme_list.keys %]
+                <option value="[% theme_key %]" [% IF current_theme == theme_key %]selected[% END %]>[% theme_list.$theme_key.name OR theme_key %]</option>
+            [% END %]
+        </select>
+        <button id="save-theme" class="btn btn-primary" style="margin-left: 10px;">Save Changes</button>
+    </div>
+
+    <div class="theme-grid">
+        <!-- Color Variables Section -->
+        <div class="theme-section">
+            <h3>🎨 Color Variables</h3>
+            [% FOREACH var_name IN color_variables %]
+                <div class="css-variable">
+                    <div class="css-variable-label">[% var_name %]</div>
+                    <input type="text" class="css-variable-value" data-var="[% var_name %]" value="[% theme_variables.$var_name OR '' %]">
+                    [% IF var_name.match('color|bg$') %]
+                        <div class="color-preview" style="background-color: [% theme_variables.$var_name OR '#ccc' %];"></div>
+                    [% END %]
+                    <div class="css-variable-actions">
+                        <button class="btn-edit" onclick="editVariable('[% var_name %]')">Edit</button>
+                    </div>
+                </div>
+            [% END %]
+        </div>
+
+        <!-- Typography Variables Section -->
+        <div class="theme-section">
+            <h3>📝 Typography Variables</h3>
+            [% FOREACH var_name IN typography_variables %]
+                <div class="css-variable">
+                    <div class="css-variable-label">[% var_name %]</div>
+                    <input type="text" class="css-variable-value" data-var="[% var_name %]" value="[% theme_variables.$var_name OR '' %]">
+                    <div class="css-variable-actions">
+                        <button class="btn-edit" onclick="editVariable('[% var_name %]')">Edit</button>
+                    </div>
+                </div>
+            [% END %]
+        </div>
+
+        <!-- Spacing & Layout Variables Section -->
+        <div class="theme-section">
+            <h3>📏 Layout Variables</h3>
+            [% FOREACH var_name IN layout_variables %]
+                <div class="css-variable">
+                    <div class="css-variable-label">[% var_name %]</div>
+                    <input type="text" class="css-variable-value" data-var="[% var_name %]" value="[% theme_variables.$var_name OR '' %]">
+                    <div class="css-variable-actions">
+                        <button class="btn-edit" onclick="editVariable('[% var_name %]')">Edit</button>
+                    </div>
+                </div>
+            [% END %]
+        </div>
+
+        <!-- Todo Priority Colors Section -->
+        <div class="theme-section">
+            <h3>✅ Todo Priority Colors</h3>
+            [% FOREACH var_name IN todo_priority_variables %]
+                <div class="css-variable">
+                    <div class="css-variable-label">[% var_name %]</div>
+                    <input type="text" class="css-variable-value" data-var="[% var_name %]" value="[% theme_variables.$var_name OR '' %]">
+                    <div class="color-preview" style="background-color: [% theme_variables.$var_name OR '#ccc' %];"></div>
+                    <div class="css-variable-actions">
+                        <button class="btn-edit" onclick="editVariable('[% var_name %]')">Edit</button>
+                    </div>
+                </div>
+            [% END %]
+
+            <div class="priority-preview">
+                <div class="priority-box priority-1">
+                    <strong>Priority 1</strong><br>
+                    Critical
+                </div>
+                <div class="priority-box priority-2">
+                    <strong>Priority 2</strong><br>
+                    High
+                </div>
+                <div class="priority-box priority-3">
+                    <strong>Priority 3</strong><br>
+                    Medium
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CSS Preview Section -->
+    <div class="css-preview">
+        <h3>🎯 Live Preview</h3>
+        <p>Changes you make above will be reflected here in real-time.</p>
+
+        <div style="padding: 15px; background-color: var(--primary-color, #f8f9fa); border-radius: 5px; margin: 15px 0;">
+            <h4>Sample Container</h4>
+            <p>This is how containers will look with the current theme settings.</p>
+        </div>
+
+        <div class="priority-preview">
+            <div class="priority-box priority-1">
+                <strong>Sample Priority 1</strong><br>
+                Critical Task
+            </div>
+            <div class="priority-box priority-2">
+                <strong>Sample Priority 2</strong><br>
+                High Priority
+            </div>
+            <div class="priority-box priority-3">
+                <strong>Sample Priority 3</strong><br>
+                Medium Priority
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Element Inspector Dialog -->
+<div id="css-edit-dialog" class="css-edit-dialog" style="display: none;">
+    <h3>Edit CSS Properties</h3>
+    <div class="css-edit-form" id="css-edit-form">
+        <!-- Form will be populated dynamically -->
+    </div>
+    <div class="dialog-actions">
+        <button class="btn btn-cancel" onclick="closeCssDialog()">Cancel</button>
+        <button class="btn btn-save" onclick="saveCssChanges()">Save Changes</button>
+    </div>
+</div>
+
+<script>
+let cssEditMode = false;
+let selectedElement = null;
+let originalStyles = {};
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Theme selector change handler
+    document.getElementById('theme-select').addEventListener('change', function() {
+        const theme = this.value;
+        // In a real implementation, this would make an AJAX call to switch themes
+        console.log('Theme changed to:', theme);
+        // For now, just reload the page with the new theme
+        window.location.href = '/admin/theme/edit/css?theme=' + theme;
+    });
+
+    // Save theme changes
+    document.getElementById('save-theme').addEventListener('click', function() {
+        saveThemeChanges();
+    });
+
+    // Toggle CSS edit mode
+    document.getElementById('toggle-css-mode').addEventListener('click', function() {
+        toggleCssEditMode();
+    });
+
+    // Real-time preview updates
+    document.querySelectorAll('.css-variable-value').forEach(input => {
+        input.addEventListener('input', function() {
+            const varName = this.getAttribute('data-var');
+            const value = this.value;
+            updateCssPreview(varName, value);
+        });
+    });
+});
+
+function toggleCssEditMode() {
+    cssEditMode = !cssEditMode;
+
+    if (cssEditMode) {
+        document.body.classList.add('css-edit-mode');
+        document.getElementById('toggle-css-mode').textContent = 'Disable CSS Edit Mode';
+        document.getElementById('toggle-css-mode').className = 'btn btn-warning';
+
+        // Add click listeners to all elements
+        document.querySelectorAll('*').forEach(element => {
+            element.addEventListener('click', handleElementClick);
+            element.style.cursor = 'pointer';
+        });
+
+        // Prevent form submissions and links when in edit mode
+        document.addEventListener('click', preventDefaultActions, true);
+
+    } else {
+        document.body.classList.remove('css-edit-mode');
+        document.getElementById('toggle-css-mode').textContent = 'Enable CSS Edit Mode';
+        document.getElementById('toggle-css-mode').className = 'btn btn-primary';
+
+        // Remove click listeners
+        document.querySelectorAll('*').forEach(element => {
+            element.removeEventListener('click', handleElementClick);
+            element.style.cursor = '';
+        });
+
+        document.removeEventListener('click', preventDefaultActions, true);
+        closeCssDialog();
+    }
+}
+
+function handleElementClick(e) {
+    e.stopPropagation();
+    e.preventDefault();
+
+    // Remove highlight from previously selected element
+    if (selectedElement) {
+        selectedElement.classList.remove('element-highlight');
+    }
+
+    selectedElement = e.target;
+    selectedElement.classList.add('element-highlight');
+
+    // Get computed styles
+    const computedStyle = window.getComputedStyle(selectedElement);
+    const styles = {};
+
+    // Get all CSS properties
+    for (let i = 0; i < computedStyle.length; i++) {
+        const prop = computedStyle[i];
+        const value = computedStyle.getPropertyValue(prop);
+        if (value && value !== 'none' && value !== 'auto' && value !== '') {
+            styles[prop] = value;
+        }
+    }
+
+    showCssDialog(selectedElement.tagName.toLowerCase(), styles);
+    return false;
+}
+
+function preventDefaultActions(e) {
+    // Prevent default actions for links and forms when in edit mode
+    if (e.target.tagName === 'A' || e.target.tagName === 'BUTTON' || e.target.type === 'submit') {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+    }
+}
+
+function showCssDialog(elementType, styles) {
+    const dialog = document.getElementById('css-edit-dialog');
+    const form = document.getElementById('css-edit-form');
+
+    // Clear previous form
+    form.innerHTML = '';
+
+    // Add element type info
+    const elementInfo = document.createElement('div');
+    elementInfo.innerHTML = `<p><strong>Element:</strong> ${elementType}</p>`;
+    form.appendChild(elementInfo);
+
+    // Add style inputs for common properties
+    const commonProps = ['background-color', 'color', 'font-size', 'font-weight', 'border', 'padding', 'margin', 'width', 'height'];
+
+    commonProps.forEach(prop => {
+        if (styles[prop]) {
+            const formGroup = document.createElement('div');
+            formGroup.className = 'form-group';
+
+            const label = document.createElement('label');
+            label.textContent = prop;
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = styles[prop];
+            input.setAttribute('data-property', prop);
+
+            formGroup.appendChild(label);
+            formGroup.appendChild(input);
+            form.appendChild(formGroup);
+        }
+    });
+
+    // Add custom CSS textarea
+    const customGroup = document.createElement('div');
+    customGroup.className = 'form-group';
+
+    const customLabel = document.createElement('label');
+    customLabel.textContent = 'Custom CSS';
+
+    const customTextarea = document.createElement('textarea');
+    customTextarea.placeholder = 'Add custom CSS properties...';
+
+    customGroup.appendChild(customLabel);
+    customGroup.appendChild(customTextarea);
+    form.appendChild(customGroup);
+
+    dialog.style.display = 'block';
+}
+
+function closeCssDialog() {
+    document.getElementById('css-edit-dialog').style.display = 'none';
+    if (selectedElement) {
+        selectedElement.classList.remove('element-highlight');
+        selectedElement = null;
+    }
+}
+
+function saveCssChanges() {
+    // In a real implementation, this would save changes to the theme
+    alert('CSS changes would be saved here. This is a demo implementation.');
+    closeCssDialog();
+}
+
+function updateCssPreview(varName, value) {
+    // Update CSS custom property on the root element for live preview
+    document.documentElement.style.setProperty('--' + varName, value);
+
+    // Update color preview boxes
+    document.querySelectorAll('.color-preview').forEach(preview => {
+        const varMatch = preview.parentElement.querySelector('.css-variable-label').textContent;
+        if (varMatch === varName) {
+            preview.style.backgroundColor = value;
+        }
+    });
+}
+
+function editVariable(varName) {
+    const input = document.querySelector(`[data-var="${varName}"]`);
+    if (input) {
+        input.focus();
+        input.select();
+    }
+}
+
+function saveThemeChanges() {
+    const changes = {};
+    document.querySelectorAll('.css-variable-value').forEach(input => {
+        const varName = input.getAttribute('data-var');
+        const value = input.value;
+        if (value.trim()) {
+            changes[varName] = value;
+        }
+    });
+
+    // In a real implementation, this would save to the server
+    console.log('Theme changes to save:', changes);
+    alert('Theme changes would be saved to the server. This is a demo implementation.');
+}
+</script>
