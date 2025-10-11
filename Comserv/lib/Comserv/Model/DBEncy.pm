@@ -6,23 +6,111 @@ use Sys::Hostname;
 use Socket;
 use JSON;
 use Data::Dumper;
+use FindBin;
+use File::Spec;
 
 my $json_text;
 {
     local $/; # Enable 'slurp' mode
-    open my $fh, "<", "db_config.json" or die "Could not open db_config.json: $!";
+    # Find db_config.json relative to the application root
+    my $config_path = File::Spec->catfile($FindBin::Bin, '..', 'db_config.json');
+    open my $fh, "<", $config_path or die "Could not open $config_path: $!";
     $json_text = <$fh>;
     close $fh;
 }
 my $config = decode_json($json_text);
 
+# Function to test database connectivity
+sub test_connection {
+    my ($dsn, $user, $password) = @_;
+    
+    my $success = 0;
+    eval {
+        require DBI;
+        my $dbh = DBI->connect($dsn, $user, $password, { 
+            RaiseError => 0, 
+            PrintError => 0,
+            mysql_connect_timeout => 5,
+            timeout => 5 
+        });
+        if ($dbh) {
+            $success = 1;
+            $dbh->disconnect;
+        }
+    };
+    
+    return $success;
+}
+
+# Function to select best database connection based on priority
+sub get_best_connection {
+    my @connections;
+    
+    # Collect all non-template connections and sort by priority
+    for my $key (keys %$config) {
+        next if $key =~ /^_/; # Skip template/metadata entries
+        my $conn = $config->{$key};
+        next unless ref($conn) eq 'HASH' && exists $conn->{priority};
+        push @connections, { key => $key, %$conn };
+    }
+    
+    # Sort by priority (lower number = higher priority)
+    @connections = sort { $a->{priority} <=> $b->{priority} } @connections;
+    
+    print "🔍 Testing database connections in priority order...\n";
+    
+    # Test each connection in priority order
+    for my $conn (@connections) {
+        my $dsn;
+        if ($conn->{db_type} eq 'mysql') {
+            $dsn = "dbi:mysql:dbname=$conn->{database};host=$conn->{host};port=$conn->{port}";
+        } elsif ($conn->{db_type} eq 'sqlite') {
+            $dsn = "dbi:SQLite:dbname=$conn->{database_path}";
+        }
+        
+        print "  Priority $conn->{priority}: Testing $conn->{key} ($conn->{description})... ";
+        
+        if (test_connection($dsn, $conn->{username}, $conn->{password})) {
+            print "✅ Success!\n";
+            return {
+                dsn => $dsn,
+                user => $conn->{username} // '',
+                password => $conn->{password} // '',
+                connection_name => $conn->{key},
+                description => $conn->{description}
+            };
+        } else {
+            print "❌ Failed\n";
+        }
+    }
+    
+    # If all connections failed, return the highest priority one anyway
+    print "⚠️  All connections failed, using highest priority configuration anyway\n";
+    my $fallback = $connections[0];
+    my $dsn = $fallback->{db_type} eq 'mysql' 
+        ? "dbi:mysql:dbname=$fallback->{database};host=$fallback->{host};port=$fallback->{port}"
+        : "dbi:SQLite:dbname=$fallback->{database_path}";
+    
+    return {
+        dsn => $dsn,
+        user => $fallback->{username} // '',
+        password => $fallback->{password} // '',
+        connection_name => $fallback->{key},
+        description => $fallback->{description}
+    };
+}
+
+# Get the best available connection
+my $best_conn = get_best_connection();
+print "📡 Using database connection: $best_conn->{connection_name} - $best_conn->{description}\n\n";
+
 # Set the schema_class and connect_info attributes
 __PACKAGE__->config(
     schema_class => 'Comserv::Model::Schema::Ency',
     connect_info => {
-        dsn => "dbi:mysql:dbname=$config->{shanta_ency}->{database};host=$config->{shanta_ency}->{host};port=$config->{shanta_ency}->{port}",
-        user => $config->{shanta_ency}->{username},
-        password => $config->{shanta_ency}->{password},
+        dsn => $best_conn->{dsn},
+        user => $best_conn->{user},
+        password => $best_conn->{password},
     }
 );
 sub list_tables {
