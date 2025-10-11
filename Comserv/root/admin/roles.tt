@@ -1,0 +1,268 @@
+[% PageVersion = 'admin/roles.tt,v 0.01 2024/12/27 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+    Version: [% PageVersion %]
+[% END %]
+
+<style>
+    .roles-container {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .roles-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid var(--border-color, #ccc);
+    }
+
+    .roles-title {
+        margin: 0;
+        color: var(--text-color, #333);
+    }
+
+    .roles-actions {
+        display: flex;
+        gap: 10px;
+    }
+
+    .btn {
+        padding: 8px 16px;
+        border: 1px solid var(--border-color, #ccc);
+        border-radius: 4px;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 14px;
+    }
+
+    .btn-primary {
+        background-color: var(--primary-color, #007bff);
+        color: white;
+        border-color: var(--primary-color, #007bff);
+    }
+
+    .btn-secondary {
+        background-color: var(--secondary-color, #6c757d);
+        color: white;
+        border-color: var(--secondary-color, #6c757d);
+    }
+
+    .roles-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+
+    .role-card {
+        background-color: white;
+        border: 1px solid var(--border-color, #dee2e6);
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .role-title {
+        margin: 0 0 15px 0;
+        color: var(--text-color, #333);
+        font-size: 1.2em;
+        border-bottom: 2px solid var(--primary-color, #007bff);
+        padding-bottom: 8px;
+    }
+
+    .role-description {
+        color: var(--text-color, #666);
+        margin-bottom: 15px;
+        line-height: 1.5;
+    }
+
+    .role-permissions {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .role-permission {
+        background-color: var(--secondary-color, #f8f9fa);
+        margin-bottom: 5px;
+        padding: 8px 12px;
+        border-radius: 4px;
+        border-left: 3px solid var(--accent-color, #28a745);
+        font-size: 0.9em;
+    }
+
+    .admin-info {
+        background-color: var(--secondary-color, #e3f2fd);
+        border: 1px solid var(--primary-color, #2196f3);
+        border-radius: 5px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+
+    .admin-info h3 {
+        margin-top: 0;
+        color: var(--primary-color, #2196f3);
+    }
+
+    .css-features {
+        background-color: var(--secondary-color, #fff3cd);
+        border: 1px solid var(--warning-color, #ffc107);
+        border-radius: 5px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+
+    .css-features h3 {
+        margin-top: 0;
+        color: var(--warning-color, #856404);
+    }
+</style>
+
+<div class="roles-container">
+    <div class="roles-header">
+        <h1 class="roles-title">Admin Roles & Permissions</h1>
+        <div class="roles-actions">
+            <a href="/admin" class="btn btn-secondary">Back to Admin</a>
+            <a href="/admin/theme/edit/css" class="btn btn-primary">CSS Editor</a>
+        </div>
+    </div>
+
+    <div class="admin-info">
+        <h3>🔐 Admin Access Information</h3>
+        <p><strong>Current User:</strong> [% c.session.username %] ([% c.session.first_name %] [% c.session.last_name %])</p>
+        <p><strong>Session ID:</strong> [% c.sessionid %]</p>
+        <p><strong>Client IP:</strong> [% c.req.address %]</p>
+        <p><strong>Server:</strong> [% server_hostname %]</p>
+    </div>
+
+    <div class="css-features">
+        <h3>🎨 CSS Editing Features</h3>
+        <p>The system now includes comprehensive CSS editing capabilities:</p>
+        <ul>
+            <li><strong>CSS Edit Mode:</strong> Click the "CSS Edit Mode" button in the admin banner to enter element inspection mode</li>
+            <li><strong>Element Inspector:</strong> Click on any element to see its CSS properties and values</li>
+            <li><strong>Theme Integration:</strong> All theme colors are now centralized and customizable</li>
+            <li><strong>Live Preview:</strong> Changes are reflected in real-time across all pages</li>
+        </ul>
+    </div>
+
+    <div class="roles-grid">
+        <div class="role-card">
+            <h2 class="role-title">👑 Administrator</h2>
+            <div class="role-description">
+                Full system access with complete administrative privileges. Can manage all aspects of the application including user accounts, themes, system configuration, and content.
+            </div>
+            <ul class="role-permissions">
+                <li class="role-permission">✅ Full system administration</li>
+                <li class="role-permission">✅ User management</li>
+                <li class="role-permission">✅ Theme customization</li>
+                <li class="role-permission">✅ CSS editing and inspection</li>
+                <li class="role-permission">✅ Database management</li>
+                <li class="role-permission">✅ System configuration</li>
+                <li class="role-permission">✅ Content moderation</li>
+                <li class="role-permission">✅ Security management</li>
+            </ul>
+        </div>
+
+        <div class="role-card">
+            <h2 class="role-title">👤 Standard User</h2>
+            <div class="role-description">
+                Regular user access with standard permissions for normal application usage. Can create and manage their own content within their assigned permissions.
+            </div>
+            <ul class="role-permissions">
+                <li class="role-permission">✅ Create and edit own content</li>
+                <li class="role-permission">✅ View public content</li>
+                <li class="role-permission">✅ Manage personal profile</li>
+                <li class="role-permission">✅ Participate in discussions</li>
+                <li class="role-permission">❌ System administration</li>
+                <li class="role-permission">❌ User management</li>
+                <li class="role-permission">❌ Theme customization</li>
+                <li class="role-permission">❌ CSS editing</li>
+            </ul>
+        </div>
+
+        <div class="role-card">
+            <h2 class="role-title">🎨 Theme Editor</h2>
+            <div class="role-description">
+                Specialized role for managing visual themes and CSS styling. Can modify themes, colors, and layouts but cannot access core system administration.
+            </div>
+            <ul class="role-permissions">
+                <li class="role-permission">✅ Theme customization</li>
+                <li class="role-permission">✅ CSS editing and inspection</li>
+                <li class="role-permission">✅ Color scheme management</li>
+                <li class="role-permission">✅ Layout modifications</li>
+                <li class="role-permission">❌ User management</li>
+                <li class="role-permission">❌ Database administration</li>
+                <li class="role-permission">❌ System configuration</li>
+                <li class="role-permission">❌ Security settings</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="roles-grid">
+        <div class="role-card">
+            <h2 class="role-title">📊 Content Moderator</h2>
+            <div class="role-description">
+                Focused on content quality and community management. Can moderate user-generated content and discussions but cannot modify system settings.
+            </div>
+            <ul class="role-permissions">
+                <li class="role-permission">✅ Content moderation</li>
+                <li class="role-permission">✅ Discussion management</li>
+                <li class="role-permission">✅ User behavior monitoring</li>
+                <li class="role-permission">✅ Report handling</li>
+                <li class="role-permission">❌ Theme customization</li>
+                <li class="role-permission">❌ System administration</li>
+                <li class="role-permission">❌ User account management</li>
+                <li class="role-permission">❌ CSS editing</li>
+            </ul>
+        </div>
+
+        <div class="role-card">
+            <h2 class="role-title">🔧 System Operator</h2>
+            <div class="role-description">
+                Technical operations role focused on system maintenance, monitoring, and basic troubleshooting. Can handle operational tasks but not policy decisions.
+            </div>
+            <ul class="role-permissions">
+                <li class="role-permission">✅ System monitoring</li>
+                <li class="role-permission">✅ Performance optimization</li>
+                <li class="role-permission">✅ Basic troubleshooting</li>
+                <li class="role-permission">✅ Log management</li>
+                <li class="role-permission">❌ User data access</li>
+                <li class="role-permission">❌ Policy decisions</li>
+                <li class="role-permission">❌ Theme customization</li>
+                <li class="role-permission">❌ CSS editing</li>
+            </ul>
+        </div>
+
+        <div class="role-card">
+            <h2 class="role-title">🚫 Guest</h2>
+            <div class="role-description">
+                Limited read-only access for visitors who are not logged in. Can view public content but cannot interact with the system or access administrative features.
+            </div>
+            <ul class="role-permissions">
+                <li class="role-permission">✅ View public content</li>
+                <li class="role-permission">❌ Create content</li>
+                <li class="role-permission">❌ User accounts</li>
+                <li class="role-permission">❌ Administrative access</li>
+                <li class="role-permission">❌ Theme customization</li>
+                <li class="role-permission">❌ CSS editing</li>
+                <li class="role-permission">❌ System interaction</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="css-features">
+        <h3>🔧 CSS Edit Mode Instructions</h3>
+        <ol>
+            <li><strong>Enable CSS Edit Mode:</strong> Click the "CSS Edit Mode" button in the admin banner</li>
+            <li><strong>Inspect Elements:</strong> Click on any element in the page to see its CSS properties</li>
+            <li><strong>View Properties:</strong> A dialog will show the element's tag, class, ID, and computed CSS values</li>
+            <li><strong>Exit Mode:</strong> Click "Exit CSS Edit Mode" to return to normal browsing</li>
+        </ol>
+        <p><em>Note: CSS Edit Mode adds a yellow indicator in the top-right corner when active.</em></p>
+    </div>
+</div>
