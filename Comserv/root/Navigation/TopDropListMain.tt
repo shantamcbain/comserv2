@@ -131,7 +131,17 @@
 
     .submenu {
         background-color: #f8f9fa;
-        display: block; /* Always show submenus for now */
+        display: none; /* Hidden by default - show on hover */
+        position: absolute;
+        top: 0;
+        left: 100%;
+        min-width: 200px;
+        box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
+        z-index: 101;
+    }
+    
+    .submenu-item:hover .submenu {
+        display: block;
     }
 
     .submenu a {
@@ -191,5 +201,5 @@
     .icon-sync:before { content: "🔄"; }
     .icon-user-links:before { content: "👤🔗"; }
     .icon-globe:before { content: "🌍"; }
-    .icon-manage:before { content = "⚙️"; }
+    .icon-manage:before { content: "⚙️"; }
 </style>
