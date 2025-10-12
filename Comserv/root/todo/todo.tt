@@ -132,9 +132,9 @@
       <td>[% task.get_column('subject') %]</td>
       <td>[% task.get_column('description') %]</td>
       <td>[% task.get_column('developer') %]</td>
-      <td>[% task.get_column('priority') %]</td>
-      <td>[% task.get_column('status') %]</td>
 
+      <td class="priority-[% task.get_column('priority') %]">[% task.priority_name %]</td>
+      <td class="status-[% task.get_column('status') %]">[% task.status_name %]</td>
       <td>[% task.get_column('comments') %]</td>
       <td>[% task.get_column('accumulative_time') %]</td>
       <td class="action-buttons-cell">

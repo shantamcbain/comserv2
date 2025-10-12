@@ -1,5 +1,25 @@
 # Changelog
 
+## [2025-12-28] - Todo Priority Display Template Consistency Fix
+
+### Fixed
+
+#### Todo System Priority Display
+- **Template Dependency Issue** - Fixed priority display template that was dependent on controllers passing specific data
+  - **Self-Contained Template**: Made `priority_display.md` template independent by defining priority mapping internally
+  - **Consistent Mapping**: Standardized priority system: 1=Critical, 2=When we have time, 3=Urgent, etc.
+  - **Improved Maintainability**: Reduced coupling between controllers and views
+  - **Universal Compatibility**: All templates using priority display now work regardless of controller support
+
+### Changed
+- **Priority Display Template**: `/Comserv/root/todo/priority_display.md` - Now self-contained with internal mapping
+- **Template System**: Enhanced reusable component design for better maintainability
+
+### Technical Details
+- **Problem**: Priority display template required controllers to pass `build_priority` hash, causing inconsistent behavior
+- **Solution**: Internalized priority mapping within the template itself
+- **Impact**: All todo-related templates now display consistent priority names across the application
+
 ## [2025-01-27] - Backup System Documentation and AI Workflow Improvements
 
 ### Documentation Enhancements

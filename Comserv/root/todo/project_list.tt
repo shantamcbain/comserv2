@@ -15,7 +15,7 @@
 [% END %]
 
 
-<select id="project_id" name="project_id">
-    <option value="" [% IF !selected_project_id %]selected[% END %]>None</option>
+<select id="[% field_name || 'parent_id' %]" name="[% field_name || 'parent_id' %]" [% IF field_name == 'project_id' %]style="flex: 1;"[% END %]>
+    <option value="" [% IF !selected_project_id %]selected[% END %]>[% IF field_name == 'project_id' %]None (No Project)[% ELSE %]None (Top-level Project)[% END %]</option>
     [% display_project_options(projects, selected_project_id, 0) %]
 </select>
