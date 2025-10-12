@@ -266,8 +266,23 @@ sub details :Path('/todo/details') :Args {
         # Format the total time as 'HH:MM'
         my $accumulative_time = sprintf("%02d:%02d", $hours, $minutes);
 
-        # Add the todo and accumulative_time to the stash
-        $c->stash(record => $todo, accumulative_time => $accumulative_time);
+        # Fetch project data for the project dropdown
+        my $project_controller = $c->controller('Project');
+        my $projects = [];
+        eval {
+            $projects = $project_controller->fetch_projects_with_subprojects($c) || [];
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'details',
+                "Error fetching projects: $@");
+        }
+
+        # Add the todo, accumulative_time, and projects to the stash
+        $c->stash(
+            record => $todo, 
+            accumulative_time => $accumulative_time,
+            projects => $projects
+        );
 
         # Set the template to 'todo/details.tt'
         $c->stash(template => 'todo/details.tt');
@@ -275,6 +290,17 @@ sub details :Path('/todo/details') :Args {
         # Handle the case where the todo is not found
         $c->response->body('Todo not found');
     }
+}
+
+sub add_project :Path('/todo/add_project') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Log the action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_project', 
+        'Redirecting to add_project form from todo context');
+    
+    # Forward to the Project controller's add_project action
+    $c->forward('/project/addproject');
 }
 
 sub addtodo :Path('/todo/addtodo') :Args(0) {
